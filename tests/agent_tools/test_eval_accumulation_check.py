@@ -33,7 +33,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
                 "--root",
                 str(root),
                 "--family-registry",
-                str(PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml"),
+                str(PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml"),
                 *args,
             ],
             check=False,
@@ -281,9 +281,10 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            registry_path = root / "agents" / "evals" / "eval_result_families.toml"
+            registry_path = root / "evidence" / "agent-evals" / "eval_result_families.toml"
+            registry_path.parent.mkdir(parents=True, exist_ok=True)
             registry_path.write_text(
-                (PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml").read_text(
+                (PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml").read_text(
                     encoding="utf-8"
                 )
                 + """
@@ -316,7 +317,7 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
 
     def write_fixture(self, root: Path) -> None:
         """Write a minimal eval result fixture."""
-        evals_root = root / "agents" / "evals"
+        evals_root = root / "evidence" / "agent-evals"
         evals_root.mkdir(parents=True, exist_ok=True)
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         hook_dir = self.hook_path(root).parent

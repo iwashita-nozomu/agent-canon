@@ -13,7 +13,7 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py current moni
 
 This chapter lists concrete false-negative cases: situations that may look acceptable under loose token or checklist rules but should fail under a completion-first system.
 
-These cases should become fixtures under a future `agents/evals/negative_cases/` surface.
+These cases should become fixtures under a future `evidence/agent-evals/negative_cases/` surface.
 
 ## Core false-negative cases
 

@@ -27,6 +27,7 @@ document、dependency manifest、DSL spec、exported evidence artifact に残す
 - 文中の claim は source anchor、dependency header、code dependency、実験 artifact のどれで支えられているか。
 - graph diagnostic、review finding、rewrite operation はどの source span を対象にしているか。
 - 文書 source は正本、runtime mirror、generated report、closed issue record、duplicate heading のどれか。
+- directory responsibility は README と child artifact responsibility から演繹できるか。
 - 文書作成 skill の closure loop は、finding を修正し、同じ checker を再実行したか。
 - dependency header で示される design / implementation / environment surface と、report 内の説明が対応しているか。
 
@@ -84,7 +85,7 @@ cross-DB relation は stable id と validation query で検証する。
 | `deps` | dependency header manifest graph と code dependency evidence。 | dependency header tools / code dependency scanners |
 | `report` | report root、section contract、claim/evidence/finding/action closure。 | report-writing / result-artifact writeout workflow |
 | `corpus` | domain/corpus hints、evaluation profile、retrieval calibration metadata。 | prose graph / literature workflow |
-| `artifact` | git-visible directory/file tree、README-to-directory relation、file responsibility metadata。 | `agent-canon structured-analysis build` |
+| `artifact` | git-visible directory/file tree、README-to-directory relation、file responsibility metadata、directory responsibility projection。 | `agent-canon structured-analysis build` |
 | `document-canon` | duplicate heading、runtime mirror、generated report、stale document evidence。 | `agent-canon structured-analysis` |
 | `diag` | current warning run、severity、rule、target path、suggested action。 | `agent-canon structured-analysis analyze` |
 
@@ -155,12 +156,19 @@ MVP は全ファイルの中間表現を existing graph schema に materialize �
 | --- | --- | --- |
 | `nodes` | `layer = artifact`, `kind = directory`, `payload_json.path` | repo-visible directory node。 |
 | `nodes` | `layer = artifact`, `kind = document/python/rust/shell/cpp/config/build/file`, `payload_json.path` | git-visible file node。 |
+| `nodes` | `layer = artifact`, `kind = directory_responsibility`, `payload_json.path` | README manifest/title または child artifact responsibility から演繹した directory-level responsibility projection。 |
 | `edges` | `layer = artifact`, `kind = contains`, `order_kind = hard` | directory から child directory / file への containment。 |
 | `edges` | `layer = artifact`, `kind = explains_directory` | README file から parent directory への説明 relation。 |
-| `metadata` | `key = artifact_inventory` | file count と directory count。 |
+| `edges` | `layer = artifact`, `kind = has_responsibility` | directory node から derived `directory_responsibility` node への relation。 |
+| `edges` | `layer = artifact`, `kind = supports` | README または child artifact manifest が directory responsibility projection を支える evidence relation。 |
+| `diagnostics` | `layer = artifact`, `rule = directory_responsibility_low_child_coverage` | README responsibility が child artifact responsibilities を十分に含まない候補。 |
+| `metadata` | `key = artifact_inventory` | file count、directory count、directory responsibility count。 |
 
 `artifact` layer は source truth ではない。README 生成、directory description の改稿、
 prose rewrite は別 tool / skill の責務であり、この layer は検査と projection の入力に留める。
+`directory_responsibility` node も同じく derived projection であり、directory ownership や
+README 改稿を自動決定しない。warning は `directory_responsibility_verification`
+route を通して、README manifest/title、child artifact responsibility、再解析結果を確認する。
 
 ## Document Canon Tables
 

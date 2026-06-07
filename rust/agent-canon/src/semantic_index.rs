@@ -4647,7 +4647,7 @@ fn document_responsibility_bucket(path: &str) -> &'static str {
 
 fn responsibility_scope_bucket(path: &str) -> &'static str {
     let normalized = path.replace('\\', "/");
-    if normalized.starts_with("agents/evals/") {
+    if normalized.starts_with("evidence/agent-evals/") {
         return "eval-and-hook-evidence";
     }
     if normalized.starts_with("issues/") {

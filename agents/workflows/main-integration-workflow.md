@@ -23,7 +23,7 @@ upstream design README.md workflow catalog
 - file 構成変更を含む branch は、`main` へ直接手作業で拾い直しません。
 - `git checkout <file>`、手動 copy、partial cherry-pick で構成変更を戻しません。
 - 構成変更を含む統合では、source branch の tree shape をそのまま持ち帰ることを優先します。
-- `main` への統合は、専用 integration worktree で一度閉じます。
+- `main` への統合は、別 `git worktree` を作らず、current checkout 上の integration branch で一度閉じます。
 - `vendor/agent-canon` が submodule の場合、parent tree で比較するのは gitlink SHA です。submodule 内の conflict / local commit は、parent 側で file 単位に拾い直さず、`bash tools/update_agent_canon.sh merge-main-into-current` と `agents/workflows/derived-agent-canon-diff-workflow.md` で先に分類します。
 
 ## 推奨手順
@@ -32,15 +32,15 @@ upstream design README.md workflow catalog
    - branch 側で必要な review と check を完了します。
    - `make ci-quick` 以上を通します。
    - branch の action log と branch note を更新します。
-1. integration worktree を切る
+1. current checkout 上で integration branch を切る
    - `origin/main` から短期の integration branch を作ります。
    - 例:
 
 ```bash
-bash tools/worktree_start.sh integrate/<topic>-YYYYMMDD .worktrees/integrate-<topic>
+git switch -c integrate/<topic>-YYYYMMDD origin/main
 ```
 
-1. integration worktree で source branch を merge する
+1. integration branch で source branch を merge する
    - `main` 直系の integration branch 上で、source branch を Git の merge として取り込みます。
    - 構成変更がある場合は `--no-ff` を既定にします。
 

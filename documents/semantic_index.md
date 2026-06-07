@@ -48,6 +48,29 @@ target-directory publish file, then atomically rename it over the requested
 path. This keeps normal SQLite locking and journaling behavior during mutation
 while still supporting generated cache paths on network-backed worktrees.
 
+## Local LLM And Prose IR Boundary
+
+The `semantic-index` command surface owns vector-cache commands: `build`,
+`search`, `context-pack`, `thin-docs`, `merge-candidates`,
+`natural-relations`, provider comparison, and Eval reports. Its result surface
+is generated SQLite state plus bounded text, JSONL, context-pack, or report
+artifacts. Those outputs are advisory evidence; they are not deletion
+authority, rewrite approval, source truth, or dependency graph closure.
+
+LLM-backed embeddings may call an OpenAI-compatible provider, but the prompt contract is
+still a bounded query with source line ranges, provider metadata, and output
+caps. Do not ask the embedding provider to produce raw word lists or settled
+document structure in chat.
+
+Prose IR and intermediate representation extraction are not stored in the
+semantic-index database. When existing prose must become graph seed data, route
+the document through `agent-canon local-llm extract-prose-ir` and
+`$prose-reasoning-graph`; semantic-index can then supply search context,
+candidate neighbors, or responsibility-bucket evidence. Skill integration
+should pass `context-pack` cells to the receiving skill and keep final
+acceptance with dependency review, structured analysis, tests, and human review
+gates.
+
 ## Commands
 
 Build an index:

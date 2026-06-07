@@ -18,6 +18,7 @@ import argparse
 import fnmatch
 import json
 import re
+import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -57,6 +58,7 @@ class Scope:
     scope_class: str
     description: str
     paths: tuple[str, ...]
+    exclude_paths: tuple[str, ...]
     protecting_tools: tuple[str, ...]
     issues: tuple[str, ...]
 
@@ -142,6 +144,7 @@ def scope_from_mapping(raw_scope: Mapping[str, object]) -> Scope:
         scope_class=str(raw_scope.get("class") or ""),
         description=str(raw_scope.get("description") or ""),
         paths=string_tuple(raw_scope.get("paths")),
+        exclude_paths=string_tuple(raw_scope.get("exclude_paths")),
         protecting_tools=string_tuple(raw_scope.get("protecting_tools")),
         issues=string_tuple(raw_scope.get("issues")),
     )
@@ -177,6 +180,13 @@ def pattern_covers(pattern: str, required_path: str) -> bool:
     return fnmatch.fnmatch(required_path, pattern)
 
 
+def scope_covers(scope: Scope, path: str) -> bool:
+    """Return whether one scope covers a path after exclusions."""
+    if any(pattern_covers(pattern, path) for pattern in scope.exclude_paths):
+        return False
+    return any(pattern_covers(pattern, path) for pattern in scope.paths)
+
+
 def validate_scope_shape(
     scope: Scope,
     owners: set[str],
@@ -206,6 +216,9 @@ def validate_scope_paths(root: Path, scope: Scope) -> list[Finding]:
     for pattern in scope.paths:
         if not pattern_matches(root, pattern):
             findings.append(Finding("scope_path", scope.scope_id, f"no-match:{pattern}"))
+    for pattern in scope.exclude_paths:
+        if not pattern_matches(root, pattern):
+            findings.append(Finding("scope_exclude_path", scope.scope_id, f"no-match:{pattern}"))
     for issue in scope.issues:
         if not (root / issue).is_file():
             findings.append(Finding("scope_issue", scope.scope_id, f"missing:{issue}"))
@@ -231,8 +244,40 @@ def coverage_findings(required: Sequence[str], scopes: Sequence[Scope]) -> list[
     """Return findings for required paths not covered by any scope."""
     findings: list[Finding] = []
     for required_path in required:
-        if not any(pattern_covers(pattern, required_path) for scope in scopes for pattern in scope.paths):
+        if not any(scope_covers(scope, required_path) for scope in scopes):
             findings.append(Finding("coverage", required_path, "uncovered-required-path"))
+    return findings
+
+
+def tracked_paths(root: Path) -> tuple[str, ...]:
+    """Return tracked paths when git is available, otherwise repository files."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return tuple(path for path in result.stdout.splitlines() if path)
+    ignored = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "reports", "target"}
+    paths: list[str] = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if set(Path(relative).parts) & ignored:
+            continue
+        paths.append(relative)
+    return tuple(sorted(paths))
+
+
+def overlap_findings(root: Path, scopes: Sequence[Scope]) -> list[Finding]:
+    """Return findings for files claimed by more than one scope."""
+    findings: list[Finding] = []
+    for path in tracked_paths(root):
+        scope_ids = tuple(scope.scope_id for scope in scopes if scope_covers(scope, path))
+        if len(scope_ids) > 1:
+            findings.append(Finding("scope_overlap", path, "scopes:" + ",".join(scope_ids)))
     return findings
 
 
@@ -288,6 +333,7 @@ def validate(root: Path, manifest: str) -> ScopeReport:
         findings.extend(validate_scope_paths(scope_root, scope))
         findings.extend(validate_protecting_tools(scope_root, scope, catalog_paths))
     findings.extend(coverage_findings(string_tuple(data.get("required_coverage")), scopes))
+    findings.extend(overlap_findings(scope_root, scopes))
     findings.extend(validate_import_rules(scopes, import_rules))
     return ScopeReport(
         scopes,

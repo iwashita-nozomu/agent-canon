@@ -63,7 +63,7 @@ In practical terms, P-1 means adding or formalizing the following surfaces:
 - `agents/templates/artifact_schema.yaml`
 - `agents/templates/behavior_event.schema.yaml`
 - `agents/templates/validation_evidence.schema.yaml`
-- `agents/evals/negative_cases/`
+- `evidence/agent-evals/negative_cases/`
 - generated `completion_verification_report.json`
 - generated `completion_report.md`
 

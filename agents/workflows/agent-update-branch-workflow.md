@@ -21,7 +21,7 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 1. Start from `template/main`.
 1. Create `agent-updates/memory-eval/<slug>`.
-1. Change only `memory/`, `agents/evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document feedback.
+1. Change only `memory/`, `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document feedback.
 1. Run `bash tools/agent_tools/agent_update_branch.sh validate memory-eval`.
 1. Commit with a message that states this is a memory/eval-only agent update branch.
 1. Push with `bash tools/agent_tools/agent_update_branch.sh push memory-eval <branch>`.

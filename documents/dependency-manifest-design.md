@@ -29,7 +29,7 @@ downstream design ./structured-analysis/dependency-header-analysis.md maps manif
 - graph-level の双方向整合、自己参照、循環、closure を tool で検証できる
 - graph-level の孤立 manifest を tool で検証できる
 - dependency header check から repo-wide の machine-readable graph artifact を自動生成できる
-- repo-wide text search の hit file から、依存 graph を辿った edit-scope candidate を自動生成できる
+- responsibility-based search と bounded text search の hit file から、依存 graph を辿った edit-scope candidate を自動生成できる
 - code、docs、workflow、test、environment file を同じ内部 DSL で扱う
 
 ## Non-Goals
@@ -185,13 +185,21 @@ publish `render_dependency_manifest_graph.py` output from the generated TSV.
 This keeps missing/invalid/self-reference findings blocking while making cycles
 visible as review debt instead of silently blocking unrelated PR work.
 
-## Search-To-Edit-Scope Expansion
+## Responsibility-First Search-To-Edit-Scope Expansion
 
-Repo-wide text search must feed dependency triage instead of stopping at raw `rg` hits.
-When a search finds relevant files or folders, pass those hit paths to the graph checker:
+Repo-wide search must run responsibility-based context first and must feed
+dependency triage instead of stopping at raw `rg` hits. When the responsibility
+pass and bounded text search find relevant files or folders, pass those hit
+paths to the graph checker:
 
 ```bash
-rg -l "search phrase" > reports/search_hits.txt
+printf '%s\n' "search purpose or user request" > reports/search_query.txt
+agent-canon semantic-index context-pack \
+  --query-file reports/search_query.txt \
+  --max-cells 12 \
+  --format text \
+  > reports/search_responsibility_context.txt
+rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt

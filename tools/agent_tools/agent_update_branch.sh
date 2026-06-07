@@ -42,7 +42,7 @@ path_allowed() {
   case "$lane" in
     memory-eval)
       [[ "$path" == memory/* ]] && return 0
-      [[ "$path" == agents/evals/* ]] && return 0
+      [[ "$path" == evidence/agent-evals/* ]] && return 0
       [[ "$path" == .agents/skills/*/SKILL.md ]] && return 0
       [[ "$path" == reports/agents/*/agent_evaluation.md ]] && return 0
       [[ "$path" == reports/agents/*/workflow_monitoring.md ]] && return 0

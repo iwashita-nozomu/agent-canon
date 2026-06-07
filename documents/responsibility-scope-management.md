@@ -26,6 +26,9 @@ Each scope declares:
 - `owner`: who owns the surface.
 - `class`: what kind of responsibility the surface carries.
 - `paths`: path patterns covered by the scope.
+- `exclude_paths`: optional path patterns removed from a broad `paths` claim.
+  Use this when a cross-cutting surface inside a broad directory has a
+  different owning responsibility.
 - `protecting_tools`: checkers or workflow tools that keep the scope valid.
 - `issues`: durable local issues that currently drive or explain the scope.
 
@@ -52,8 +55,9 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 ## Tool Contract
 
 `tools/agent_tools/responsibility_scope.py` validates the manifest. It fails
-when a required top-level surface has no scope, a scope names a missing tool, a
-tool is not present in `tools/catalog.yaml`, an issue link is stale, or an
+when a required top-level surface has no scope, a tracked file is claimed by
+multiple scopes after `exclude_paths` are applied, a scope names a missing tool,
+a tool is not present in `tools/catalog.yaml`, an issue link is stale, or an
 `[[import_rule]]` points at an unknown scope.
 
 Use it before adding a new checker, hook, skill, workflow, or issue family:
@@ -65,7 +69,10 @@ python3 tools/agent_tools/responsibility_scope.py --root .
 `tools/agent_tools/import_responsibility.py` uses the same manifest for code
 imports. It parses Python AST, flags unused imported aliases and wildcard
 imports, resolves local imports to files when possible, and rejects source-scope
-to target-scope crossings that are not present in `[[import_rule]]`.
+to target-scope crossings that are not present in `[[import_rule]]`. Scope
+resolution applies `exclude_paths` before choosing the most specific matching
+scope, so an evidence or state file inside a broad runtime/tooling directory can
+carry its own import boundary.
 
 ```bash
 python3 tools/agent_tools/import_responsibility.py --root .

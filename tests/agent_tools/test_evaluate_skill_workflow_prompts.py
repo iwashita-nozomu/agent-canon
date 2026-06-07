@@ -1,12 +1,14 @@
 # @dependency-start
 # responsibility Tests skill and workflow prompt eval automation.
 # upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py helper  # noqa: E501
-# upstream design ../../agents/evals/skill_workflow_prompt_eval.toml eval manifest
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml eval manifest
 # @dependency-end
 """Tests for skill and workflow prompt evals."""
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import subprocess
 import sys
@@ -29,6 +31,7 @@ EXPECTED_WORKFLOW_DOC_COUNT = 22
 EXPECTED_CANONICAL_DOC_COUNT = 6
 EXPECTED_CODEX_AGENT_PROMPT_COUNT = 33
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
@@ -58,7 +61,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_default_manifest_passes(self) -> None:
         """The canonical prompt eval manifest passes on current prompts."""
-        result = run_eval("--manifest", "agents/evals/skill_workflow_prompt_eval.toml")
+        result = run_eval("--manifest", "evidence/agent-evals/skill_workflow_prompt_eval.toml")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("EVAL_STATUS=pass", result.stdout)
@@ -67,9 +70,30 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertIn("EVAL_GROWTH_CANDIDATES=0", result.stdout)
         self.assertIn("EVAL_RUN_ID=skill-eval-", result.stdout)
 
+    def test_legacy_manifest_path_forwards_even_if_stale_old_file_exists(self) -> None:
+        """Old manifest paths warn and resolve canonical even when stale files exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            canonical = root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            legacy = root / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
+            canonical.parent.mkdir(parents=True)
+            legacy.parent.mkdir(parents=True)
+            canonical.write_text("canonical\n", encoding="utf-8")
+            legacy.write_text("stale legacy\n", encoding="utf-8")
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                resolved = resolve_eval_manifest(root, "agents/evals/skill_workflow_prompt_eval.toml")
+
+        self.assertEqual(resolved, canonical)
+        warning = stderr.getvalue()
+        self.assertIn("EVAL_MANIFEST_FORWARDER=deprecated", warning)
+        self.assertIn("old=agents/evals/skill_workflow_prompt_eval.toml", warning)
+        self.assertIn("new=evidence/agent-evals/skill_workflow_prompt_eval.toml", warning)
+
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
-        manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
 
@@ -78,8 +102,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 42)
-        self.assertEqual(globs["agents/skills/*.md"], 62)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 43)
+        self.assertEqual(globs["agents/skills/*.md"], 63)
         self.assertEqual(globs["agents/workflows/*.md"], 21)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], EXPECTED_CODEX_AGENT_PROMPT_COUNT)
@@ -88,7 +112,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """The canonical manifest verifies workflow convention gates and skill calls."""
-        manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         by_id = {str(entry["id"]): entry for entry in evals}
@@ -203,7 +227,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--report-out",
                 str(report),
             )
@@ -223,7 +247,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--compact-out",
                 str(compact),
             )
@@ -245,7 +269,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--report-out",
                 str(report),
                 "--skill-used",
@@ -267,7 +291,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(PROJECT_ROOT),
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
                 str(root / "results"),
@@ -298,7 +322,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(PROJECT_ROOT),
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
                 str(root / "results"),
@@ -328,7 +352,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             tmp_root = Path(tmp_dir)
             canon_root = tmp_root / "canon"
             wrapper_root = tmp_root / "wrapper"
-            eval_dir = canon_root / "agents" / "evals"
+            eval_dir = canon_root / "evidence" / "agent-evals"
             tools_dir = canon_root / "tools" / "agent_tools"
             eval_dir.mkdir(parents=True)
             tools_dir.mkdir(parents=True)
@@ -336,6 +360,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             archive_root.mkdir(parents=True)
             wrapper_root.mkdir()
             (wrapper_root / "agents").symlink_to(canon_root / "agents")
+            (wrapper_root / "evidence").symlink_to(canon_root / "evidence")
             (wrapper_root / "tools").symlink_to(canon_root / "tools")
             (tools_dir / "evaluate_skill_workflow_prompts.py").write_text(
                 "# placeholder for dependency header validation\n",
@@ -353,7 +378,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
                     [[evals]]
                     id = "sample"
-                    target = "agents/evals/prompt.md"
+                    target = "evidence/agent-evals/prompt.md"
                     kind = "workflow"
                     description = "sample"
 
@@ -372,7 +397,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(wrapper_root),
                 "--manifest",
-                "agents/evals/skill_workflow_prompt_eval.toml",
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--run-id",
                 "run-symlink",
@@ -390,7 +415,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             text = reports[0].read_text(encoding="utf-8")
             header = text.split("-->", 1)[0]
             self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", header)
-            self.assertIn("agents/evals/skill_workflow_prompt_eval.toml", header)
+            self.assertIn("evidence/agent-evals/skill_workflow_prompt_eval.toml", header)
             self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:

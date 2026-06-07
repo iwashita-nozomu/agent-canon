@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Runs configurable local LLM single-file responsibility evals.
-# upstream design ../../agents/evals/README.md eval directory contract
+# upstream design ../../evidence/agent-evals/README.md eval directory contract
 # upstream design ../../documents/runtime-log-archive.md eval result archive contract
-# upstream design ../../agents/evals/local_llm_responsibility_eval.toml local LLM eval manifest
+# upstream design ../../evidence/agent-evals/local_llm_responsibility_eval.toml local LLM eval manifest
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file local LLM scope policy
@@ -48,9 +48,10 @@ from file_responsibility_llm import (  # noqa: E402
     prompt_for_target,
     read_target,
 )
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from runtime_log_paths import agent_canon_root, eval_results_dir  # noqa: E402
 
-MANIFEST_PATH = "agents/evals/local_llm_responsibility_eval.toml"
+MANIFEST_PATH = eval_manifest_path("local_llm_responsibility_eval.toml")
 RESULTS_FAMILY = "local-llm-responsibility"
 RUN_ID_PREFIX = "local-llm-eval"
 STATUS_VALUES = ("pass", "fail", "skip")
@@ -126,7 +127,7 @@ class LocalLlmEvalRunner:
     ) -> None:
         """Create one eval runner with resolved AgentCanon paths."""
         self.root = agent_canon_root(root.resolve())
-        self.manifest_path = manifest_path if manifest_path.is_absolute() else self.root / manifest_path
+        self.manifest_path = resolve_eval_manifest(self.root, manifest_path)
         self.model = model
         self.llama_cli = llama_cli
         self.run_llm = run_llm
@@ -385,7 +386,7 @@ def report_markdown(report: EvalReport) -> str:
         "@dependency-start",
         "responsibility Records one local LLM responsibility eval result.",
         "upstream implementation ../../../../tools/agent_tools/local_llm_eval.py generates this report",
-        "upstream design ../../local_llm_responsibility_eval.toml defines local LLM eval cases",
+        "upstream design ../../../../evidence/agent-evals/local_llm_responsibility_eval.toml defines local LLM eval cases",
         "@dependency-end",
         "-->",
         "",

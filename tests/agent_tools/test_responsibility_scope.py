@@ -99,12 +99,53 @@ class ResponsibilityScopeTest(unittest.TestCase):
         scopes = {scope["scope_id"]: scope for scope in report["scopes"]}
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
 
-        self.assertIn("agents/evals/**", paths)
+        self.assertIn("evidence", paths)
+        self.assertIn("evidence/**", paths)
         self.assertIn("documents/runtime-log-archive.md", paths)
         self.assertIn("documents/runtime-log-archive-migration.md", paths)
         self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
         self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
         self.assertIn(".codex/hooks/log_archive_mount_warning.py", paths)
+        self.assertNotIn("evidence/agent-evals/**", scopes["runtime-entrypoints"]["exclude_paths"])
+        self.assertIn(
+            "tools/agent_tools/runtime_log_paths.py",
+            scopes["shared-tooling"]["exclude_paths"],
+        )
+        self.assertIn(
+            "documents/runtime-log-archive.md",
+            scopes["shared-policy-documents"]["exclude_paths"],
+        )
+
+    def test_scope_overlap_fails_without_exclusion(self) -> None:
+        """A tracked file must not be claimed by multiple responsibility scopes."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_file(root, "tools/evidence.py", "# evidence\n")
+            manifest = root / "responsibility-scope.toml"
+            manifest.write_text(
+                manifest.read_text(encoding="utf-8")
+                + "\n".join(
+                    [
+                        "",
+                        "[[scope]]",
+                        'id = "evidence"',
+                        'owner = "agent-canon"',
+                        'class = "tooling"',
+                        'description = "Fixture evidence."',
+                        'paths = ["tools/evidence.py"]',
+                        'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
+                        'issues = []',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("scope_overlap:tools/evidence.py:scopes:tools,evidence", result.stdout)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small responsibility-scope fixture repository."""

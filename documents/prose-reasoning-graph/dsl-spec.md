@@ -40,6 +40,8 @@ This specification is binding for:
 
 - graph layers and allowed MVP layer names;
 - document responsibility contracts and responsibility-derived coverage checks;
+- directory responsibility projections derived from README and child artifact
+  responsibility evidence;
 - document, node, edge, diagnostic, edit operation, judgement, and metadata
   object fields;
 - identifier conventions and source provenance requirements;
@@ -153,6 +155,36 @@ questions, downstream span selection, rewrite packet creation, and rerunning the
 same checker until the gap is closed, explicitly limited, or preserved as an
 unresolved finding.
 
+## Directory Responsibility Contract
+
+Directory responsibility is a derived projection over repository artifact and
+document structure. A directory node is not itself prose source truth. The
+structured-analysis adapter derives a `directory_responsibility` node from, in
+priority order, the directory `README.md` dependency-manifest responsibility,
+the `README.md` title, descendant artifact dependency-manifest
+responsibilities, or a path-only fallback.
+
+The projection must preserve evidence edges. The directory node connects to the
+derived responsibility node with `has_responsibility`; README and child
+artifact nodes that support the projection connect to the responsibility node
+with `supports`. The responsibility node payload records `basis`,
+`readme_path`, `evidence_paths`, descendant counts, child kind counts, and
+whether the projection came from document structure.
+
+When a directory README exists but its declared responsibility has low lexical
+coverage of child artifact responsibilities, structured-analysis emits
+`directory_responsibility_low_child_coverage` on the `artifact` layer. The
+diagnostic is advisory. Its verification route is
+`directory_responsibility_verification`, which asks the skill loop to identify
+the missing child responsibilities, choose the README paragraph or dependency
+manifest line that should carry the directory responsibility, and rerun
+structured-analysis after any rewrite.
+
+This contract extends document responsibility checks without replacing them.
+Document responsibility verifies whether one document covers declared upstream
+design coverage. Directory responsibility verifies whether a directory-level
+projection covers the responsibilities of child documents and code artifacts.
+
 ## Graph Object Model
 
 ### Document
@@ -171,9 +203,9 @@ A document object anchors one ingested source.
 
 A node represents one typed item in one layer. The current MVP implementation
 materializes source, form, concept, phase, discourse, argument, evidence,
-experiment, presentation, explanation, and projection nodes. The canonical
-semantic graph contract
-classifies these nodes by authority:
+experiment, presentation, explanation, projection, artifact, and document-canon
+nodes. The canonical semantic graph contract classifies these nodes by
+authority:
 
 - text-bearing `form` nodes are source-truth nodes for prose content;
 - `section` and `paragraph` nodes are source form containers and reader-order
@@ -182,6 +214,10 @@ classifies these nodes by authority:
 - non-form analysis nodes such as `claim`, `evidence`, `phase`, `concept`, and
   `experiment` are derived analysis conveniences unless their payload declares
   source spans and member anchor ids.
+- `artifact` layer nodes such as `directory`, `file`, and
+  `directory_responsibility` are repository-structure projections. They are
+  derived from git-visible files, dependency manifests, and README structure;
+  they are not final ownership decisions.
 
 | Field | Required | Meaning |
 | ----- | -------- | ------- |
@@ -352,19 +388,28 @@ distinguishes source-truth layers from derived analysis and projection layers.
 | `phase` | move | `realizes_move` | Label genre or rhetorical moves as derived analysis. |
 | `discourse` | none in MVP | discourse relation edges | Represent paragraph-to-paragraph relations. |
 | `argument` | claim | `stated_in` | Represent derived claim views and their source sentence or EDU anchors. |
-| `evidence` | evidence | `supports` | Link evidence candidates to claim views. |
+| `evidence` | evidence, document_responsibility, dependency_manifest | `supports` | Link source evidence and dependency-manifest responsibility evidence to claim views. |
 | `experiment` | hypothesis, metric, baseline, experiment, expected result | none in MVP | Represent derived experiment-plan completeness. |
 | `presentation` | none in MVP | `precedes` | Preserve or propose reader order. |
 | `diagnostics` | none in MVP | none | Store findings over graph objects. |
 | `edit-operation` | none in MVP | none | Store candidate split, merge, bridge, and reorder operations. |
 | `explanation` | summary | none | Store generated natural-language explanation metadata. |
 | `projection` | profile | none | Store projection profile and export metadata. |
+| `artifact` | directory, file, directory_responsibility | contains, explains_directory, has_responsibility, supports | Store repository-structure projections derived from git-visible files and dependency manifests. |
+| `document-canon` | document_record, finding | targets_document, references_canonical | Store document inventory and cleanup evidence. |
 
 Only `source` and text-bearing `form` nodes are canonical source-truth for prose
 content. `section` and `paragraph` are source form containers; they are not the
 same thing as derived macro prose units such as subtopics, macro-claims, or
 argument blocks. Other layer nodes are derived analysis conveniences unless
 their payload explicitly declares source spans and member anchor ids.
+
+Dependency manifests are generic evidence inputs, not document-type exceptions.
+The graph may materialize `responsibility`, `upstream`, and `downstream`
+dependency-manifest records as `evidence` layer nodes. A claim is supported when
+the lower graph can connect it to source evidence or to dependency-manifest
+responsibility evidence through a `supports` edge. `unsupported_claim` is emitted
+only when that support edge is absent.
 
 ## Identifier Conventions
 
@@ -417,6 +462,13 @@ The MVP relation registry includes:
 - `limits`: next paragraph states limitation or risk.
 - `stated_in`: claim is stated in a source sentence.
 - `supports`: evidence supports a claim.
+- `explains_directory`: README file describes its parent directory.
+- `has_responsibility`: directory node points to a derived
+  `directory_responsibility` projection node.
+- `targets_document`: document-canon finding points to the affected document
+  record.
+- `references_canonical`: document-canon finding points to the likely
+  canonical document record.
 
 Relation payloads must explain the basis for inferred relations when the
 relation was not directly encoded in the source.
@@ -450,14 +502,22 @@ connected canonical subgraph into a view, assign a role, and describe reader
 state or abstraction-level movement. It must retain the member canonical node
 ids so an agent can return to the source text.
 
-Projection may also recommend a non-prose presentation form. Bulleted lists are
-appropriate for parallel sibling points, ordered lists for dependency or action
-sequences, tables for aligned attributes or comparison rows, figures for graph,
-architecture, causal, or spatial relations, and equations for compact formal
-definitions or quantitative constraints. These recommendations are presentation
-views over canonical anchors, not source-truth replacements. A renderer or LLM
-rewrite pass may accept, reject, or combine them, but must preserve provenance
-back to the member anchors.
+Projection may also recommend a non-prose presentation form from a materialized
+presentation feature subgraph, not from a fixed section-title, raw-word
+checklist, or numeric threshold. Bulleted lists fit a `parallel_sibling_set`
+feature, ordered lists fit a `dependency_sequence` feature, tables fit an
+`aligned_attribute_set` feature, figures fit a `relational_topology` feature,
+and equations fit a `formal_constraint` feature. These recommendations are
+presentation views over canonical anchors, not source-truth replacements. A
+renderer or LLM rewrite pass may accept, reject, or combine them, but must
+preserve provenance back to the member anchors.
+
+The feature subgraph is part of the `presentation` layer. A source anchor points
+to a `presentation` / `feature` node with a `has_feature` edge. The feature node
+records `feature_kind`, `source_anchor_id`, `member_anchor_ids`, `basis`, and
+`basis_edge_ids` in `payload_json`. Projection views read those feature nodes;
+they must not recompute the same decision from word counts, section names, or
+path-specific case lists.
 
 Projection may also carry corpus hints and the LocalLLM prose IR artifact path.
 Corpus hints select the field-specific norms used to interpret rhetorical moves,
@@ -597,6 +657,9 @@ emits:
 - `claim_without_evidence_layer`: claims exist but no evidence nodes exist.
 - `missing_layer_representation`: one or more required MVP layers has no
   representation.
+- `presentation_format_candidate`: a projection view has a presentation feature
+  subgraph showing that a non-prose form such as a list, table, figure, or
+  equation may communicate the same anchored content better than prose.
 
 The canonical-graph and projection-view contract reserves these rule ids for
 implementations that enforce the new projection model:

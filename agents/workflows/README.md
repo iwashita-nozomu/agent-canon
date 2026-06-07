@@ -17,6 +17,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - 一般説明 prose、学術文書、paper のように file / document responsibility が強い task では overlay workflow を追加します。
 - shared canon maintenance や `main` 統合のような特殊操作だけ、maintenance workflow を追加します。
 - 大規模 refactor では `comprehensive-refactoring-workflow.md` を overlay として追加し、設計見直し、OOP 境界、解析 score gate を固定します。
+- directory layout、directory README ownership、root view、または responsibility-scope map を変える refactor では `$structure-refactor` と `$refactor-loop` を併用し、recursive README graph、Directory Responsibility Map、`scope_delta`、reader / navigation delta を先に固定します。
 - 考察、原因仮説、修正箇所の妥当性検証が必要な task では `hypothesis-validation-workflow.md` を overlay として追加し、code dependency と header dependency を別々に抜いてから実装へ進みます。
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、MCP `goal.loop_status` を機械 gate として扱います。
@@ -37,6 +38,8 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - `agents/workflows/adaptive-improvement-workflow.md`
 - 大規模 repo の包括 refactor、OOP boundary 再設計、解析 score gate
   - `agents/workflows/comprehensive-refactoring-workflow.md`
+- directory reorg、directory README ownership、root view、responsibility-scope map refactor
+  - `agents/workflows/implementation-waterfall-workflow.md` plus `$structure-refactor` and `$refactor-loop`
 
 ### Overlay Workflow
 

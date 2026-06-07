@@ -1,14 +1,14 @@
 # prose-reasoning-graph
 <!--
 @dependency-start
-responsibility Documents prose-reasoning-graph analysis and skill handoff workflow.
+responsibility Documents prose-reasoning-graph analysis, source-truth graph contract, diagnostics, verification routes, presentation decisions, and skill handoff workflow.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
-upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
-downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps
-downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill
-downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI usage
+upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative source truth graph, DSL, projection, verification route, presentation decision, evidence, and responsibility contract
+downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections, diagnostics, evidence support, presentation candidates, integration operations, rewrite-packet operation ids, and skill handoff packets
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps and dependency-manifest coverage diagnostics
+downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill with diagnostics, recursive verification, unresolved leaf policy, presentation decision, and closeout evidence rules
+downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI usage, stats artifacts, runtime result contract, and handoff boundaries
 @dependency-end
 -->
 
@@ -20,51 +20,15 @@ Markdown/plain text into a SQLite-backed intermediate graph, runs layer
 diagnostics, explains graph findings in natural language, and emits handoff
 packets for existing writing, research, review, experiment, and artifact skills.
 
-The normative DSL contract is
-[documents/prose-reasoning-graph/dsl-spec.md](../../documents/prose-reasoning-graph/dsl-spec.md).
-This skill owns when and how to use the graph; the DSL spec owns layer,
-relation, identifier, projection, validation, and adapter vocabulary.
-The source-truth graph is a text-anchored semantic graph: sentence or EDU
-anchors and their typed relations are canonical for prose content, while
-macro-claims, rhetorical moves, reader-state transitions, and similar prose
-objects are projection views over the same graph. Section and paragraph nodes
-remain source form containers and reader-order anchors, not derived macro
-claims.
-Skill handoffs preserve the graph contract vocabulary explicitly: source truth,
-lower graph, typed relation, projection view, node record, edge record, and
-`payload_json`.
-Projection views may also recommend presentation forms such as prose,
-bulleted lists, ordered lists, tables, figures, or equations. Treat these as
-rewrite hints grounded in source anchors, not as permission to replace the
-canonical graph or drop provenance.
-Corpus/domain hints and the initial existing-document-to-DSL seed are LocalLLM
-tasks. `ingest` / `ingest-set` call `agent-canon local-llm extract-prose-ir`,
-which splits multiple documents and terms into bounded parts, extracts
-`local_llm_prose_ir`, and merges `corpus_hints`, `term_contexts`, and
-`dsl_seed` into the graph metadata. Use these hints to choose the academic or
-technical corpus that calibrates examples, review expectations, and evaluation
-criteria; do not reintroduce fixed keyword dictionaries in the prose graph
-tool.
-
-It does not replace `$long-form-writing`, `$report-writing`,
-`$academic-writing`, `$paper-writing`, `$literature-survey`,
-`$structure-planning`, `$formal-proof-workflow`, `logic-gap-review`,
-`citation-evidence-review`, `$experiment-lifecycle`, or
-`$result-artifact-writeout`. It reduces their context burden by giving them
-structured evidence, verification routes, edit operations, and rewrite packets.
-Document responsibility gaps are `document-canon` graph diagnostics produced by
-Rust `structured-analysis`. They enter the same diagnostic, integration,
-verification, and rewrite loop as prose graph findings. The Python prose parser
-does not emit them directly; workflows use `structured-analysis build` or
-`import-document-inventory` to materialize them in the structured graph DB.
-When that DB comes from `structured-analysis`, it may contain diagnostics
-without prose rewrite operations. `project`, `lint`, `explain`, and `integrate`
-must still consume the shared `diagnostics` table; `rewrite-packet` is only for
-DBs where an analysis pass has emitted a concrete edit operation id.
-`document_responsibility_gap` diagnostics carry
-`document_responsibility_verification` route metadata so this skill can expand
-coverage-rule questions recursively as graph diagnostics with downstream
-rewrite and rerun obligations.
+| Boundary | Responsibility |
+| -------- | -------------- |
+| DSL contract | [documents/prose-reasoning-graph/dsl-spec.md](../../documents/prose-reasoning-graph/dsl-spec.md) owns layer, relation, identifier, projection, validation, and adapter vocabulary. This skill owns when and how to use the graph while preserving source-truth anchors and source spans. |
+| Graph contract | Sentence or EDU anchors and their typed relations are canonical for prose content. Macro-claims, rhetorical moves, reader-state transitions, sections, and paragraphs are projection or form views, not replacement source truth. |
+| Handoff vocabulary | Handoff packets preserve source truth, lower graph, typed relation, projection view, node record, edge record, and `payload_json`. |
+| Presentation candidates | Projection views may recommend prose, lists, tables, figures, or equations. Non-prose forms remain verified `presentation_format_candidate` decisions over source anchors, not provenance-dropping rewrites. |
+| LocalLLM boundary | `ingest` / `ingest-set` call `agent-canon local-llm extract-prose-ir` to split documents and terms, extract `local_llm_prose_ir`, and merge `corpus_hints`, `term_contexts`, and `dsl_seed` into graph metadata. Fixed keyword dictionaries are not the corpus source. |
+| Receiving skill boundary | Graph artifacts prepare handoff to `$long-form-writing`, `$report-writing`, `$academic-writing`, `$paper-writing`, `$literature-survey`, `$structure-planning`, `$formal-proof-workflow`, `logic-gap-review`, `citation-evidence-review`, `$experiment-lifecycle`, and `$result-artifact-writeout`; they do not replace those skills' authority. |
+| Document responsibility adapter | Rust `structured-analysis` emits `document-canon` diagnostics such as `document_responsibility_gap`; prose graph commands import them into the same diagnostic, integration, verification, and rewrite loop. Diagnostics-only DBs still use `project`, `lint`, `explain`, and `integrate`, while `rewrite-packet` requires a concrete operation id. |
 
 ## Use When
 
@@ -79,15 +43,19 @@ rewrite and rerun obligations.
 
 ## Standard Sequence
 
-This skill is the structure-first writing gate. For nontrivial document
-creation or revision, do not ask a writing skill to draft reader-facing prose
-from raw notes while graph findings are still open. The default authoring loop
-is: encode the draft or source packet into the graph/DSL, analyze it, expand /
-delete / reorganize graph-backed structure while it is still DSL/projection
-state, rerun diagnostics, and only then project to prose. After projection,
-rerun the same graph check. If a finding appears only after DSL-to-prose
-projection, classify it as a `dsl_to_prose_prompt_defect` against the receiving
-writing skill prompt rather than treating it as an ordinary document finding.
+This skill is the structure-first writing gate. For nontrivial document creation
+or revision, do not ask a writing skill to draft reader-facing prose from raw
+notes while graph findings are still open.
+
+1. Encode the draft or source packet into the graph/DSL.
+1. Analyze the graph.
+1. Expand, delete, or reorganize graph-backed structure while it is still
+   DSL/projection state.
+1. Rerun diagnostics.
+1. Project to prose only after graph findings are closed or explicitly owned.
+1. Rerun the same graph check after projection.
+1. Classify findings that appear only after DSL-to-prose projection as
+   `dsl_to_prose_prompt_defect` against the receiving writing skill prompt.
 
 1. Let `ingest` or `ingest-set` create the graph DB under
    `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
@@ -116,6 +84,11 @@ writing skill prompt rather than treating it as an ordinary document finding.
    and `--stats-out`; read the stats JSON before opening larger artifacts.
    Do not print full projection, diagnostics, explanation, integration,
    handoff, or rewrite structures to chat or CLI stdout.
+   Do not treat `PROSE_REASONING_GRAPH_EDIT_OPERATIONS=0` as `no findings`.
+   Always inspect diagnostic rules and counts. If diagnostics include
+   `presentation_format_candidate`, record each target, recommended format,
+   feature-subgraph reason, verification route, and decision status before
+   closeout.
 1. For each proposed operation that should be rewritten, export
    `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
    only diagnostics and no edit-operation ids.
@@ -125,7 +98,8 @@ writing skill prompt rather than treating it as an ordinary document finding.
    `citation-evidence-review` check external evidence, `$formal-proof-workflow`
    checks mathematical/proof-like or implementation-derived claims,
    `$experiment-lifecycle` checks testable empirical claims, and
-   `$structure-planning` checks reader-state or discourse-connection validity.
+   `$structure-planning` checks reader-state, discourse-connection validity, or
+   feature-subgraph-backed presentation format candidates.
    `document_responsibility_verification` expands dependency-manifest coverage
    rules, maps each missing group to the downstream document span that should
    carry it, and reruns `structured-analysis` to close or preserve the finding.
@@ -135,15 +109,20 @@ writing skill prompt rather than treating it as an ordinary document finding.
    the structure packet, rerun graph diagnostics, and repeat until every leaf is
    verified, explicitly limited, or recorded as an unresolved blocker/warn.
    Unresolved leaves must not become settled prose.
+   A `presentation_format_candidate` remains unresolved until
+   `$structure-planning` / `$report-writing` has adopted it, rejected it with
+   renderer or reader-state evidence, combined it with prose, or preserved it as
+   an explicit unresolved warning with owner and next command.
 1. When the receiving skill is a writing skill, rerun graph diagnostics after
    each DSL/projection rewrite and keep looping until active findings for the
    selected profile are gone. Revise the structure contract, graph-backed
    rewrite packet, or source draft at the structural layer: add missing nodes or
    edges, remove unsupported nodes, split or merge projection units, reorder the
-   projection, or route verification children. Only after that closure may the
-   receiving skill write final prose. After prose projection, rerun
-   `check-document` or the same ingest/analyze/lint path. If new findings appear
-   that were absent from the closed DSL/projection state, record a
+   projection, route verification children, or decide presentation candidates.
+   Only after that closure may the receiving skill write final prose. After
+   prose projection, rerun `check-document` or the same ingest/analyze/lint
+   path. If new findings appear that were absent from the closed
+   DSL/projection state, record a
    `dsl_to_prose_prompt_defect` finding against the sentence-generation,
    section-generation, or DSL-to-prose prompt and repair that prompt before more
    prose rewriting.
@@ -183,16 +162,23 @@ prose_graph_explanation=<path>
 prose_graph_integration_plan=<path>
 prose_graph_handoff=<path>
 prose_graph_rewrite_packet=<path|not_required>
+prose_graph_presentation_decisions=<path|none>
 prose_graph_stats=<path>
 ```
 
 ## Literature Boundary
 
-The graph layers are intentionally plural. RST motivates rhetorical relations
-and nucleus/satellite-style organization, PDTB motivates local discourse
-relations, Annotation Graphs motivate source-span anchored overlays, eRST and
-RST dependency views motivate graph-shaped discourse overlays, Toulmin/AIF
-motivates claim/evidence reasoning, argumentative zoning motivates scholarly
-move labels, and reproducible experiment literature motivates
-hypothesis/metric/baseline planning. Do not collapse these layers into one total
-order until a projection or receiving skill asks for reader order.
+The graph layers are intentionally plural.
+
+| Literature family | Layer motivation |
+| ----------------- | ---------------- |
+| RST | Rhetorical relations and nucleus/satellite-style organization. |
+| PDTB | Local discourse relations. |
+| Annotation Graphs | Source-span anchored overlays. |
+| eRST and RST dependency views | Graph-shaped discourse overlays. |
+| Toulmin / AIF | Claim/evidence reasoning. |
+| Argumentative zoning | Scholarly move labels. |
+| Reproducible experiment literature | Hypothesis, metric, and baseline planning. |
+
+Do not collapse these layers into one total order until a projection or
+receiving skill asks for reader order.

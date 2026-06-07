@@ -30,11 +30,12 @@ contract listed in `documents/README.md`.
 - subagent は task の複雑さ、review 独立性、write scope 分離で使います。使わない場合は user update または run bundle に parent-direct rationale を短く残します。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
 - subagent handoff は workspace 全体を scope として渡しません。role ごとに bounded path list、対象 checker / compact artifact、読むべき canon 節、読まない surface、expected output を明示します。bounded path list は編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。`/workspace` や repo root は作業場所であり、入力 packet の代替ではありません。
+- 追加の `git worktree`、separate worktree、integration worktree は作成・使用しません。すべての repo-changing work と subagent wave は current checkout と、その checkout 内の `vendor/agent-canon/` submodule checkout だけで行います。
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
 - active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
-- write-capable subagent は既定 1 体ですが、parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合は spawn budget 内で複数体を並列化できます。同一 path、同一 ownership surface、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います。
+- write-capable subagent は既定 1 体ですが、parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合は spawn budget 内で複数体を並列化できます。同一 path、同一 ownership surface、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分けます。安全に分離できない writer は追加 worktree へ逃がさず、current checkout 内の後続 wave へ直列化します。
 - 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起動します。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません。
@@ -103,11 +104,12 @@ contract listed in `documents/README.md`.
 
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
-- 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、`agent-canon semantic-index thin-docs --top-k <N> --format text`、または該当する bounded semantic-index command を試します。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。
+- exact path、symbol、literal error message、短い一意 token 以外の検索では、`rg` より先に responsibility-based route を走らせます。まず task / question を `reports/.../query.txt` に書き、`agent-canon semantic-index context-pack --query-file <file> --max-cells <N> --format text`、`agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、または `agent-canon local-llm search --purpose "<purpose>" --providers llm,tool,header-deps,code-deps,vector --format json` で responsibility bucket、dependency-header provider、tool/workflow/document surface を絞ります。directory ownership や責務 coverage が問題なら `agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --report <path>` も先に使います。
+- 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、責務ベースの bounded 結果を source packet の第一候補にします。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。
 - semantic-index が `unable to open database file`、missing DB、または stale cache で失敗した場合は、その場で `agent-canon semantic-index build --root .` を実行してから同じ bounded semantic-index command を再試行します。build 自体が toolchain / permission / model endpoint 理由で失敗した場合だけ、失敗理由を run bundle に残して bounded `rg -l` 比較へ降ります。
 - semantic-index の JSON が必要な場合は、`--top-k` を必ず小さくし、全体 JSON を agent が読むのではなく `--format jsonl` または `jq -r '.results[] | ...'` で必要 field だけ取り出します。JSONL / compact text で足りない場合だけ、tool 実装や schema debugging の根拠を残して full JSON を開きます。
-- 当面は検索 Eval 収集のため、semantic-index の bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
-- 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
+- 当面は検索 Eval 収集のため、責務ベースの bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
+- `rg -l "<pattern>" <source dirs>` は、responsibility route で絞った source dirs / candidate paths に対する比較・補助 evidence、または exact path / symbol / literal error search に使います。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
 - 通常の code / docs / routing 調査では、`.agent-canon/log-archive/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
 - skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary、generated drilldown、prompt/token rolling trend を生成して分析します。token 利用は lifetime total だけで判断せず、recent moving average と coverage status を優先します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
 - 検索で見つけた既存 skill、tool、workflow を使わない場合は、run bundle、PR body、または作業 update に理由を残します。
@@ -162,7 +164,7 @@ contract listed in `documents/README.md`.
 - task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/update_agent_canon.sh latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`issues/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
-- raw `rg` hit で編集対象を決めず、必要な場合は `rg -l "<topic>" > reports/search_hits.txt` のあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。
+- raw `rg` hit で編集対象を決めず、広い概念や修正 surface 探索では先に responsibility-based search / context-pack で source dirs と候補責務を絞ります。必要な場合だけ bounded `rg -l "<topic>" <responsibility-scoped dirs> > reports/search_hits.txt` を併走し、そのあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。
 - skill、tool、workflow、HTML report、実験 script を追加または変更するときは、実装前に既存資産の調査、責務境界の解析、その後の実装という順序を固定します。調査した既存資産、再利用したもの、再利用しなかった候補と理由、責務 owner、生成 artifact の置き場所を run bundle、work log、issue、または PR body に残します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補と、既存実装では足りない理由を確認します。
@@ -180,7 +182,7 @@ contract listed in `documents/README.md`.
 - workflow defect、ログ欠落、hook 誤判定、PR gate 欠陥、検索/依存展開の欠落を見つけた場合は、同じ task 内で durable finding を作るか、既存 issue に追記します。会話上の指摘だけ、または run bundle だけに残して closeout しません。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
-- Shared canon、Large delivery、goal task、long-running worktree では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
+- Shared canon、Large delivery、goal task、long-running multi-step work では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
 - 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree に parallel design doc、backup implementation、snapshot copy、`*_old`、`*_copy`、dated snapshot を残しません。
 - repo に残す durable state は current tree head 上の canonical path だけです。履歴、review、作業メモは `git` と `reports/agents/<run-id>/` に残し、repo tree に別の truth surface を増やしません。
 - 大規模改修、統合、rename、構成変更の直後は、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書への参照を sweep し、current tree head の canonical surface だけを reader に見せます。旧参照の温存や「後で消す」前提で closeout してはいけません。
@@ -218,12 +220,12 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
-- worktree で作業する場合は `bash tools/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。`WORKTREE_SCOPE.md` に `user_request_contract.md` が入っていれば、同じコマンドで action log と run bundle の `work_log.md` を両方更新できます。
-- `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current state と一致しない場合は編集を始めず、`python3 tools/agent_tools/worktree_scope_lint.py --current` で直します。
-- worktree では `Editable Directories` 外と `Read-Only Or Avoid Directories` 内を編集してはいけません。scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に残します。
+- 新規作業を `git worktree` で kickoff しません。`bash tools/worktree_start.sh ...` と `WORKTREE_SCOPE.md` は legacy cleanup / drift diagnosis 専用であり、新しい task の作業場所や scope authority ではありません。
+- stale な `WORKTREE_SCOPE.md`、別 branch、別 path の action log を見つけても、そこへ移動して作業せず、current checkout の `reports/agents/<run-id>/work_log.md` に観測事実と無視理由を残します。
+- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は current checkout の run-local work log に残します。
 - Python 差分では `python-review`、C / C++ 差分では `cpp-review` を既定候補にし、bootstrap は changed path から reviewer を自動で足します。
-- file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` に従い、integration worktree 上で `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
-- closeout 前に AgentCanon の `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。template roots では `vendor/agent-canon/documents/notes-lifecycle.md` を読む。
+- file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` に従い、current checkout 上で integration branch を扱い、`python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
+- closeout 前に AgentCanon の `documents/notes-lifecycle.md` を見て、run-local work log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。template roots では `vendor/agent-canon/documents/notes-lifecycle.md` を読む。
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - closeout 前に、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目があれば実装または該当 stage へ戻ります。
 - closeout 前に `python3 tools/agent_tools/task_close.py ...` の結果を mechanical closeout authority として扱い、chat 上の自己申告だけで完了扱いにしてはいけません。
@@ -279,8 +281,8 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略してはいけません。
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
-- stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を根拠に closeout してはいけません。
-- worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
+- stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を作業 scope や closeout 根拠にしてはいけません。
+- current checkout の run-local work log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
 - `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残る状態で user-facing completion を返してはいけません。
 - read-only diff-check agent が最新 diff を approve していない状態で user-facing completion を返してはいけません。

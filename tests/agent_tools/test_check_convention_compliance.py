@@ -104,11 +104,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py\n"
     ),
-    "agents/evals/skill_workflow_prompt_eval.toml": (
+    "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL\n"
         "evaluate_skill_workflow_prompts.py\n"
     ),
-    "agents/evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
+    "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
     "agents/templates/closeout_gate.md": "evaluate_agent_run.py run_repo_dependency_review.sh\n",
     "agents/workflows/hypothesis-validation-workflow.md": (
         "scan_code_dependencies.sh\n"
@@ -267,7 +267,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "agents" / "evals" / "skill_workflow_prompt_eval.toml").write_text(
+            manifest = root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
                 "version = 1\n",
                 encoding="utf-8",
             )

@@ -70,7 +70,8 @@ mode の意味:
 - PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
-- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime budget の階層
+- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
+- nested subagent が必要な場合は、`run.delegated_spawn_policy` に owner、child role、入力 packet、expected output、write scope、validation route、review gate を固定します
 - parallel write が要るなら file 単位の write-scope 方針
 
 ## Workflow Family Mapping
@@ -106,6 +107,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
 - research-backed implementation や比較改善では `research-workflow` を使います
 - large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
+- directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します

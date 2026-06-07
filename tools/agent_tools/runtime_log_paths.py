@@ -37,7 +37,7 @@ MAX_KEY_LENGTH = 80
 AGENT_CANON_ROOT_MARKERS = (
     (Path("tools") / "agent_tools" / "runtime_log_paths.py", 2),
     (Path("tools") / "agent_tools" / "evaluate_skill_workflow_prompts.py", 2),
-    (Path("agents") / "evals" / "README.md", 2),
+    (Path("evidence") / "agent-evals" / "README.md", 2),
     (Path("documents") / "runtime-log-archive.md", 1),
 )
 

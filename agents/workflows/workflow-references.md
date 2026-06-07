@@ -18,42 +18,26 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
     semantic-index, local LLM, SQLite, Rust tooling, dependency analysis,
     devcontainer, GitHub Actions, scanners, Markdown, YAML, and TOML.
 
+## OpenAI And Codex Product Source Route
+
+OpenAI / Codex の現在情報、API reference、model selection、model upgrade、
+prompt-upgrade guidance、Codex manual、official-domain web fallback は、この
+workflow bibliography で個別 URL や fallback 文書として二重管理しない。
+host-provided `$openai-docs` skill を正本 route とし、そこが指定する
+Codex manual helper、Docs MCP、latest-model page、bundled fallback
+references を使う。
+
+OpenAI / Codex の current product evidence をこの文書へ source-by-source で
+追加してはいけない。role TOML の実装値を変更するときも、根拠確認は
+`$openai-docs` で行い、この bibliography には local decision artifact だけを
+残す。
+
 ## Agent Runtime And Customization
 
-- [Custom instructions with AGENTS.md - Codex | OpenAI Developers](https://developers.openai.com/codex/guides/agents-md)
-  - root `AGENTS.md` を入口にする運用の根拠です。
-- [Subagents - Codex | OpenAI Developers](https://developers.openai.com/codex/subagents)
-  - Codex subagent の置き方と使い分けの根拠です。
 - [Git - git-worktree Documentation](https://git-scm.com/docs/git-worktree)
   - worktree ごとに snapshot を持つ、という運用整理の根拠です。
 - [About Git subtree merges - GitHub Docs](https://docs.github.com/en/get-started/using-git/about-git-subtree-merges)
   - legacy subtree repo を submodule-first 運用へ移行する互換整理だけに使う参考です。新規 template / 派生 repo の標準 path は AgentCanon submodule pin です。
-- [Models | OpenAI API](https://developers.openai.com/api/docs/models)
-  - current model lineup と mainline chooser の根拠です。
-- [Introducing GPT-5.5 | OpenAI](https://openai.com/index/introducing-gpt-5-5/)
-  - `gpt-5.5` を Codex の frontier planning、review、broad implementation、agentic tool-use role に置く根拠です。
-- [GPT-5.5 System Card | OpenAI](https://openai.com/index/gpt-5-5-system-card/)
-  - complex real-world work、coding、research、tool use を担う model としての safety / capability 境界確認に使います。
-- [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)
-  - `gpt-5.4` を previous frontier baseline として比較するときの根拠です。
-- [GPT-5.3-Codex-Spark Model | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
-  - `gpt-5.3-codex-spark` を code-reading と narrow implementation の default に置く根拠です。
-- [All models | OpenAI API](https://developers.openai.com/api/docs/models/all)
-  - GPT-5.5 / GPT-5.4 系を frontier family、Codex 系を coding-specialist family として分ける根拠です。
-- [Introducing GPT-5.4 | OpenAI](https://openai.com/index/introducing-gpt-5-4/)
-  - `gpt-5.4` を previous broad professional / judgment baseline として扱う補助根拠です。
-- [Introducing GPT-5.4 mini and nano | OpenAI](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/)
-  - GPT-5.4 mini の得意領域が fast coding/subagents であること、対してこの repo では coding を Codex 系へ寄せるときの比較根拠です。
-- [Introducing GPT-5.3-Codex-Spark | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
-  - `gpt-5.3-codex-spark` を smaller、text-only、128k の low-latency override かつ code-reading / narrow implementation の default にする根拠です。
-- [Slash commands in Codex CLI | OpenAI Developers](https://developers.openai.com/codex/cli/slash-commands)
-  - `/plan`、`/model`、`/permissions` が session-level command であり、per-agent TOML に mode を持たせない根拠です。
-- [Introducing GPT-5.4 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/5/introducing-gpt54/)
-  - practitioner 視点で、`gpt-5.4` が coding capability を mainline へ寄せたと読む補助資料です。
-- [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for $52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
-  - mini / nano の速度、価格、reasoning tier の実地感を補う資料です。
-- [I Tested GPT 5.4 Against Every Rival — Here's My Honest Review | Thomas Wiegold Blog](https://thomas-wiegold.com/blog/i-tested-gpt-5-4-against-every-rival/)
-  - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex-spark` override を残す判断の補助資料です。
 - [Events that trigger workflows - GitHub Docs](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
   - fork-like PR で repository secrets が渡らない場合があることの根拠です。
 - [Secrets - GitHub Docs](https://docs.github.com/en/actions/concepts/security/secrets)
