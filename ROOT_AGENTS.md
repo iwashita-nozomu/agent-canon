@@ -102,6 +102,7 @@ contract listed in `documents/README.md`.
 
 ## Default Search And Routing
 
+- 検索語や調査 surface を選ぶ前に、今回の topic を 1 文で固定し、最初の作業 update で `topic=...` としてチャットに出します。固定する内容は、user request が問う対象、現在追跡する code / proof / document path、明示的に外す非対象です。隣接する backend、tool、export、runtime surface は、この topic 文から必要性が導ける場合だけ検索対象に入れます。
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
 - exact path、symbol、literal error message、短い一意 token 以外の検索では、`rg` より先に responsibility-based route を走らせます。まず task / question を `reports/.../query.txt` に書き、`agent-canon semantic-index context-pack --query-file <file> --max-cells <N> --format text`、`agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、または `agent-canon local-llm search --purpose "<purpose>" --providers llm,tool,header-deps,code-deps,vector --format json` で responsibility bucket、dependency-header provider、tool/workflow/document surface を絞ります。directory ownership や責務 coverage が問題なら `agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --report <path>` も先に使います。

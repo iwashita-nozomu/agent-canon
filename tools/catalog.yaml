@@ -217,6 +217,63 @@ entries:
     tests:
       - tests/agent_tools/test_formal_proof.py
 
+  - id: algorithm-expansion-ir
+    summary: Builds AST-only Algorithm Expansion IR with instance interaction edges and first-class local proof obligations.
+    path: tools/agent_tools/algorithm_expansion_ir.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/algorithm_expansion_ir.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/algorithm_expansion_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_algorithm_expansion_ir.py
+
+  - id: algorithm-lemma-graph
+    summary: Converts Algorithm Expansion IR JSON into theorem-profiled lemma dependency graphs.
+    path: tools/agent_tools/algorithm_lemma_graph.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/algorithm_lemma_graph.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/algorithm_lemma_graph.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_algorithm_lemma_graph.py
+
+  - id: check-proof-trace-alignment
+    summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
+    path: tools/agent_tools/check_proof_trace_alignment.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_proof_trace_alignment.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/check_proof_trace_alignment.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_check_proof_trace_alignment.py
+
   - id: repo-structure-contract
     summary: Compares an observed repository tree with the AgentCanon structure contract.
     path: tools/agent_tools/repo_structure_contract.py
