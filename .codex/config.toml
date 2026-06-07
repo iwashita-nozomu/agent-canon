@@ -93,6 +93,10 @@ path = "../.agents/skills/formal-proof-workflow/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/algorithm-proof-exploration/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/html-experiment-report/SKILL.md"
 enabled = true
 

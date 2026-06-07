@@ -106,6 +106,9 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
 - research-backed implementation や比較改善では `research-workflow` を使います
 - large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
+- アルゴリズムの収束性、停止性、certificate soundness、finite-precision floor、
+  solver-chain reachability、または証明可能性のための algorithm change が scope にある場合は
+  `algorithm-proof-exploration` と `formal-proof-workflow` を併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します

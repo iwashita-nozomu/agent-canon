@@ -40,6 +40,13 @@ apt_install() {
   run_as_root apt-get install -y --no-install-recommends "$@"
 }
 
+install_timezone_data() {
+  if [ -e /etc/localtime ]; then
+    return
+  fi
+  apt_install tzdata
+}
+
 publish_agent_tools_profile() {
   local profile_script
 
@@ -354,6 +361,7 @@ build_structured_analysis_cache() {
   echo "STRUCTURED_ANALYSIS_BOOTSTRAP=pass"
 }
 
+install_timezone_data
 publish_agent_tools_profile
 if [ -f "${workspace%/}/docker/register_safe_directories.sh" ]; then
   bash "${workspace%/}/docker/register_safe_directories.sh" "$workspace"

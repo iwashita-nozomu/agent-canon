@@ -27,7 +27,8 @@
         "ms-toolsai.jupyter-renderers",
         "ms-azuretools.vscode-docker",
         "ms-vscode.cpptools",
-        "ms-vscode.cmake-tools"
+        "ms-vscode.cmake-tools",
+        "leanprover.lean4"
       ],
       "settings": {
         "jupyter.notebookFileRoot": "/workspace",

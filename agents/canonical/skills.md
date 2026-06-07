@@ -67,6 +67,8 @@ upstream design README.md canonical workflow index
   - 先行研究、関連文献、反証候補の整理
 - `formal-proof-workflow`
   - 自然言語 claim から形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence を作る
+- `algorithm-proof-exploration`
+  - 証明義務を入力に Algorithm Expansion IR / lemma graph / algorithmic blocker frontier でアルゴリズム選択と必要な algorithm change を探索し、formal-proof へ渡す
 - `research-workflow`
   - 外部調査、比較設計、run loop、decision state の整理
 - `comprehensive-development`

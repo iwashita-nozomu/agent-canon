@@ -45,7 +45,13 @@ The analyzer fails for proof-path integrity defects:
 - duplicate B-labels that name different frontier obligations;
 - code-derived facts with unsupported derivability classes, empty statements,
   missing `fact_id`, or IR-backed `source_id` values that are absent from the
-  supplied lemma graphs and Algorithm Expansion IR files.
+  supplied lemma graphs and Algorithm Expansion IR files;
+- nonminimal returned frontier blockers: an open witness must be represented on
+  the selected target chain and must not hide a smaller open target-chain
+  descendant;
+- stale generated lemma groups: when `proof_status.json` records
+  `source_ir_fingerprints`, every listed fingerprint must appear in the
+  supplied lemma graphs.
 
 Open mathematical witnesses do not make the command fail. They keep
 `proof_complete=false` while preserving a connected proof path. This distinction
@@ -76,6 +82,10 @@ The report distinguishes:
 
 - `validation.valid`: graph/path integrity succeeded.
 - `validation.connected`: target chains are structurally connected.
+- `fingerprint_valid`: generated lemma groups match the Algorithm Expansion IR
+  fingerprints recorded by proof status.
+- `frontier_minimal`: all returned open witnesses are the first nonterminal
+  rows on the selected target chain.
 - `proof_complete`: no open witnesses or unprovable-under-assumption rows remain.
 - `code_fact_count`: number of classified code-derived or explicitly non-code
   facts attached to open/refuted proof rows.
@@ -85,7 +95,20 @@ The report distinguishes:
   `mathematical_assumption`.
 
 Use `validation.valid` as the gate for artifact health; use `proof_complete`
-only when deciding whether the mathematical proof is finished.
+only when deciding whether the mathematical proof is finished. Use
+`frontier_minimal` when preparing a nonterminal proof return; if it is false,
+decompose the blocker further or switch to the theorem/profile whose graph
+contains that witness. If `fingerprint_valid=false`, reset the generated
+IR-backed lemma groups by regenerating Algorithm Expansion IR, lemma graphs, and
+the proof-status overlay.
+
+`open_frontier` may contain rows that have already been explored to
+`unprovable_under_assumptions` for the selected theorem/profile. Those rows are
+not counted as open witnesses; the analyzer folds them into
+`unprovable_under_assumptions` so their code-derived facts remain attached to
+the terminal negative result. Use this when a frontier item has been tried and
+the current Algorithm Expansion IR plus assumption ledger does not entail the
+needed witness.
 
 ## Code-Derived Fact Rows
 
@@ -110,3 +133,10 @@ structure. Use `code_only_code_style_opacity` when the fact is recoverable but
 spread across helper/control-flow shape. Use `external_backend_assumption` and
 `mathematical_assumption` for facts that cannot be derived from Python code or
 AST IR.
+
+External assumptions may also carry code-derived fact rows. For example, the
+PDIPM B5 backend boundary records `lean/lib/backend_profiles.json` and
+`lean/lib/backend_fp32_evidence.json` facts under `external_assumptions`; the
+analyzer includes those facts in `code_fact_count` and derivability counts so
+the backend evidence packet is visible instead of being reported as an open
+algorithm blocker.

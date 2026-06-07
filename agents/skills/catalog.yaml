@@ -153,6 +153,10 @@ skill_families:
     purpose: Convert natural-language mathematical claims or Python AST-derived implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .agents/skills/formal-proof-workflow/SKILL.md
+  - id: algorithm-proof-exploration
+    purpose: Explore algorithm choices under proof obligations by building Algorithm Expansion IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
+    canonical_doc: agents/skills/algorithm-proof-exploration.md
+    shim: .agents/skills/algorithm-proof-exploration/SKILL.md
   - id: research-workflow
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md

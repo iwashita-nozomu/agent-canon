@@ -3,6 +3,7 @@
 # upstream design README.md prompt eval directory contract
 # upstream design ../skills/adaptive-improvement-loop.md adaptive improvement skill contract
 # upstream design ../skills/academic-writing.md Academic Writing TeX routing contract
+# upstream design ../skills/algorithm-proof-exploration.md proof-guided algorithm exploration skill contract
 # upstream design ../skills/structure-planning.md reusable structure planning skill contract
 # upstream design ../skills/html-output.md explicit HTML output and browser publication skill contract
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
@@ -13,7 +14,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 42
+expected_count = 43
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +39,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 62
+expected_count = 63
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -361,6 +362,42 @@ id = "LITERATURE-SOURCE-DOC-3"
 critical = true
 description = "Defines reader-facing source sweep and adoption/exclusion sections."
 required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "algorithm-proof-exploration-shim"
+target = ".agents/skills/algorithm-proof-exploration/SKILL.md"
+kind = "skill"
+description = "Algorithm proof exploration must build IR and lemma graph frontiers before formal proof adoption."
+
+[[evals.checklist]]
+id = "ALGORITHM-PROOF-EXPLORATION-SHIM-1"
+critical = true
+description = "Connects algorithm exploration to formal-proof-workflow."
+required_regex = ["\\$formal-proof-workflow", "formal proof adoption", "formal_proof_handoff"]
+
+[[evals.checklist]]
+id = "ALGORITHM-PROOF-EXPLORATION-SHIM-2"
+critical = true
+description = "Requires IR, lemma graph, frontier, and algorithm-change guidance."
+required_regex = ["Algorithm Expansion IR", "Lemma Dependency Graph", "proof_frontier", "algorithm_change_guidance"]
+
+[[evals]]
+id = "algorithm-proof-exploration-doc"
+target = "agents/skills/algorithm-proof-exploration.md"
+kind = "skill"
+description = "Human algorithm proof exploration skill must separate exploration from checker-backed proof adoption."
+
+[[evals.checklist]]
+id = "ALGORITHM-PROOF-EXPLORATION-DOC-1"
+critical = true
+description = "Defines relationship to formal-proof-workflow."
+required_regex = ["Relationship To `\\$formal-proof-workflow`", "探索", "採用"]
+
+[[evals.checklist]]
+id = "ALGORITHM-PROOF-EXPLORATION-DOC-2"
+critical = true
+description = "Requires terminal frontier classifications and algorithm change guidance."
+required_regex = ["verified", "refuted", "unprovable_under_assumptions", "unverified_with_next_witness", "Algorithm change guidance"]
 
 [[evals]]
 id = "formal-proof-workflow-shim"

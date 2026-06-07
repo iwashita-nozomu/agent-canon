@@ -105,18 +105,39 @@ class ProofPathHole:
 
 
 @dataclass(frozen=True)
+class FrontierMinimality:
+    """Minimality check for one returned open frontier row."""
+
+    hole_id: str
+    representative_node_ids: tuple[str, ...]
+    on_target_chain: bool
+    has_smaller_open_target_descendant: bool
+    minimal: bool
+    evidence: str
+
+
+@dataclass(frozen=True)
 class ProofPathReport:
     """Machine-readable proof path analysis."""
 
     status: str
     graph_connectivity: tuple[GraphConnectivity, ...]
+    graph_source_ir_fingerprints: tuple[str, ...]
+    expected_source_ir_fingerprints: tuple[str, ...]
+    fingerprint_valid: bool
     proof_complete: bool
     verified_fragment_count: int
     unadopted_verified_fragment_count: int
     open_witness_count: int
+    operational_assumption_count: int
+    external_assumption_count: int
     unprovable_count: int
     open_witnesses: tuple[ProofPathHole, ...]
+    operational_assumptions: tuple[ProofPathHole, ...]
+    external_assumptions: tuple[ProofPathHole, ...]
     unprovable_under_assumptions: tuple[ProofPathHole, ...]
+    frontier_minimal: bool
+    frontier_minimality: tuple[FrontierMinimality, ...]
     code_fact_count: int
     code_fact_derivability_counts: dict[str, int]
     open_witnesses_without_code_facts: tuple[str, ...]
@@ -253,6 +274,82 @@ def graph_text_corpus(graphs: tuple[dict[str, Any], ...]) -> str:
                 ]
             )
     return "\n".join(parts)
+
+
+def graph_node_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
+    """Return all lemma node ids from all graphs."""
+    return {
+        str(node.get("lemma_id", ""))
+        for graph in graphs
+        for node in as_tuple(graph.get("lemma_nodes"))
+        if isinstance(node, dict)
+    }
+
+
+def graph_adjacency(graphs: tuple[dict[str, Any], ...]) -> dict[str, set[str]]:
+    """Return dependency adjacency across all graph edges."""
+    adjacency: dict[str, set[str]] = {}
+    for graph in graphs:
+        for edge in as_tuple(graph.get("lemma_edges")):
+            if not isinstance(edge, dict):
+                continue
+            source = str(edge.get("source_lemma_id", ""))
+            target = str(edge.get("target_lemma_id", ""))
+            if source and target:
+                adjacency.setdefault(source, set()).add(target)
+    return adjacency
+
+
+def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
+    """Return node ids selected by target chains."""
+    selected: set[str] = set()
+    for graph in graphs:
+        for chain in as_tuple(graph.get("target_chains")):
+            if not isinstance(chain, dict):
+                continue
+            target_id = str(chain.get("target_id", ""))
+            if target_id:
+                selected.add(target_id)
+            selected.update(as_str_tuple(chain.get("lemma_ids")))
+            selected.update(as_str_tuple(chain.get("reachable_lemma_ids")))
+    return selected
+
+
+def graph_source_ir_fingerprints(graphs: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
+    """Return source Algorithm Expansion IR fingerprints recorded by graphs."""
+    return tuple(
+        sorted(
+            {
+                str(graph.get("source_ir_fingerprint", ""))
+                for graph in graphs
+                if graph.get("source_ir_fingerprint")
+            }
+        )
+    )
+
+
+def expected_source_ir_fingerprints(proof_status: dict[str, Any]) -> tuple[str, ...]:
+    """Return proof-status fingerprints that generated lemma overlays must match."""
+    if isinstance(proof_status.get("source_ir_fingerprint"), str):
+        return (str(proof_status["source_ir_fingerprint"]),)
+    values = proof_status.get("source_ir_fingerprints")
+    if isinstance(values, list | tuple):
+        return tuple(sorted(str(value) for value in values if value))
+    return ()
+
+
+def descendant_node_ids(adjacency: dict[str, set[str]], roots: tuple[str, ...]) -> set[str]:
+    """Return all graph descendants reachable from roots."""
+    descendants: set[str] = set()
+    stack = list(roots)
+    while stack:
+        node_id = stack.pop()
+        for child in adjacency.get(node_id, ()):
+            if child in descendants:
+                continue
+            descendants.add(child)
+            stack.append(child)
+    return descendants
 
 
 def ir_text_corpus(irs: tuple[dict[str, Any], ...]) -> str:
@@ -418,6 +515,8 @@ def stale_implementation_tokens(proof_status: dict[str, Any], corpus: str) -> tu
         "checked_fragments",
         "unprovable_under_assumptions",
         "open_frontier",
+        "operational_assumptions",
+        "external_assumptions",
     ):
         for item in entries(proof_status, bucket):
             surface = str(item.get("implementation_surface", ""))
@@ -433,6 +532,69 @@ def code_fact_derivability_counts(facts: tuple[CodeDerivedFact, ...]) -> dict[st
     for fact in facts:
         counts[fact.derivability] = counts.get(fact.derivability, 0) + 1
     return counts
+
+
+def representative_node_ids(
+    hole: ProofPathHole,
+    *,
+    node_ids: set[str],
+    target_chain_ids: set[str],
+) -> tuple[str, ...]:
+    """Return graph node ids that represent one open frontier hole."""
+    ids = {
+        fact.source_id
+        for fact in hole.code_derived_facts
+        if fact.source_id in node_ids and fact.source_id in target_chain_ids
+    }
+    return tuple(sorted(ids))
+
+
+def frontier_minimality_rows(
+    open_witnesses: tuple[ProofPathHole, ...],
+    *,
+    node_ids: set[str],
+    adjacency: dict[str, set[str]],
+    target_chain_ids: set[str],
+) -> tuple[FrontierMinimality, ...]:
+    """Check whether returned open witnesses are minimal graph-frontier rows."""
+    representatives = {
+        hole.hole_id: representative_node_ids(
+            hole,
+            node_ids=node_ids,
+            target_chain_ids=target_chain_ids,
+        )
+        for hole in open_witnesses
+    }
+    rows: list[FrontierMinimality] = []
+    for hole in open_witnesses:
+        reps = representatives[hole.hole_id]
+        descendants = descendant_node_ids(adjacency, reps)
+        smaller_holes = tuple(
+            other.hole_id
+            for other in open_witnesses
+            if other.hole_id != hole.hole_id
+            and bool(set(representatives[other.hole_id]) & descendants)
+        )
+        on_target_chain = bool(reps)
+        has_smaller = bool(smaller_holes)
+        minimal = on_target_chain and not has_smaller
+        if not on_target_chain:
+            evidence = "no representative source_id from this open row appears on a target chain"
+        elif has_smaller:
+            evidence = "smaller open target-chain descendants: " + ", ".join(smaller_holes)
+        else:
+            evidence = "representative source_ids are on a target chain and hide no smaller open target-chain descendant"
+        rows.append(
+            FrontierMinimality(
+                hole_id=hole.hole_id,
+                representative_node_ids=reps,
+                on_target_chain=on_target_chain,
+                has_smaller_open_target_descendant=has_smaller,
+                minimal=minimal,
+                evidence=evidence,
+            )
+        )
+    return tuple(rows)
 
 
 def validate_code_derived_fact(fact: CodeDerivedFact, corpus: str) -> tuple[str, ...]:
@@ -470,6 +632,14 @@ def build_report(
     adoption_corpus = adoption_text(proof_frontier_paths + adoption_paths)
     graph_corpus = graph_text_corpus(graphs)
     proof_source_corpus = "\n".join([graph_corpus, ir_text_corpus(algorithm_irs)])
+    node_ids = graph_node_ids(graphs)
+    adjacency = graph_adjacency(graphs)
+    target_chain_ids = graph_target_chain_ids(graphs)
+    graph_fingerprints = graph_source_ir_fingerprints(graphs)
+    expected_fingerprints = expected_source_ir_fingerprints(proof_status)
+    fingerprint_valid = not expected_fingerprints or set(expected_fingerprints).issubset(
+        set(graph_fingerprints)
+    )
 
     checked = entries(proof_status, "checked_fragments")
     unadopted = tuple(
@@ -479,7 +649,14 @@ def build_report(
         and str(item.get("theorem", "")) not in adoption_corpus
     )
     open_frontier = entries(proof_status, "open_frontier")
+    operational_assumption_rows = entries(proof_status, "operational_assumptions")
+    external_assumption_rows = entries(proof_status, "external_assumptions")
     unprovable = entries(proof_status, "unprovable_under_assumptions")
+    frontier_unprovable = tuple(
+        item
+        for item in open_frontier
+        if str(item.get("status", "")) == "unprovable_under_assumptions"
+    )
     open_witnesses = tuple(
         ProofPathHole(
             hole_id=str(item.get("frontier", "")),
@@ -494,26 +671,58 @@ def build_report(
     )
     unprovable_witnesses = tuple(
         ProofPathHole(
-            hole_id=str(item.get("theorem", "")),
+            hole_id=str(item.get("theorem") or item.get("frontier", "")),
             status=str(item.get("status", "")),
             implementation_surface=str(item.get("implementation_surface", "")),
             next_witness="",
-            missing_assumption=str(item.get("missing_assumption", "")),
+            missing_assumption=str(item.get("missing_assumption") or item.get("next_witness", "")),
             code_derived_facts=code_derived_facts(item),
         )
-        for item in unprovable
+        for item in unprovable + frontier_unprovable
+    )
+    operational_assumptions = tuple(
+        ProofPathHole(
+            hole_id=str(item.get("frontier", "")),
+            status=str(item.get("status", "")),
+            implementation_surface=str(item.get("implementation_surface", "")),
+            next_witness=str(item.get("next_witness", "")),
+            missing_assumption="",
+            code_derived_facts=code_derived_facts(item),
+        )
+        for item in operational_assumption_rows
+    )
+    external_assumptions = tuple(
+        ProofPathHole(
+            hole_id=str(item.get("frontier", "")),
+            status=str(item.get("status", "")),
+            implementation_surface=str(item.get("implementation_surface", "")),
+            next_witness=str(item.get("next_witness", "")),
+            missing_assumption="",
+            code_derived_facts=code_derived_facts(item),
+        )
+        for item in external_assumption_rows
     )
     bare = bare_unverified_frontiers(proof_status, proof_frontier_paths)
     stale = stale_implementation_tokens(proof_status, graph_corpus)
     duplicate_labels = duplicate_b_labels(proof_status, proof_frontier_paths)
     all_code_facts = tuple(
         fact
-        for hole in open_witnesses + unprovable_witnesses
+        for hole in open_witnesses
+        + unprovable_witnesses
+        + operational_assumptions
+        + external_assumptions
         for fact in hole.code_derived_facts
     )
     open_without_code_facts = tuple(
         hole.hole_id for hole in open_witnesses if not hole.code_derived_facts
     )
+    frontier_minimality = frontier_minimality_rows(
+        open_witnesses,
+        node_ids=node_ids,
+        adjacency=adjacency,
+        target_chain_ids=target_chain_ids,
+    )
+    frontier_minimal = all(row.minimal for row in frontier_minimality)
 
     findings: list[ProofPathFinding] = []
     for item in connectivity:
@@ -577,6 +786,32 @@ def build_report(
                 subject=label,
             )
         )
+    if not fingerprint_valid:
+        findings.append(
+            ProofPathFinding(
+                finding_id=f"stale-algorithm-fingerprint-{len(findings) + 1}",
+                severity="error",
+                kind="stale_algorithm_lemma_group",
+                message=(
+                    "proof_status source_ir_fingerprints are absent from the "
+                    "supplied lemma graphs; regenerate Algorithm Expansion IR, "
+                    "lemma graphs, and proof-status overlay before adopting "
+                    "these lemmas"
+                ),
+                subject=", ".join(expected_fingerprints),
+            )
+        )
+    for row in frontier_minimality:
+        if not row.minimal:
+            findings.append(
+                ProofPathFinding(
+                    finding_id=f"frontier-minimality-{len(findings) + 1}",
+                    severity="error",
+                    kind="nonminimal_frontier_blocker",
+                    message=row.evidence,
+                    subject=row.hole_id,
+                )
+            )
     for fact in all_code_facts:
         for problem in validate_code_derived_fact(fact, proof_source_corpus):
             findings.append(
@@ -592,24 +827,34 @@ def build_report(
     graph_valid = all(item.valid for item in connectivity)
     integrity_valid = not findings
     open_witness_count = len(open_witnesses)
+    unprovable_count = len(unprovable_witnesses)
     proof_complete = (
         graph_valid
         and integrity_valid
         and open_witness_count == 0
-        and not unprovable
+        and unprovable_count == 0
         and all(str(item.get("status", "")) == "verified" for item in checked)
     )
     valid = graph_valid and integrity_valid
     return ProofPathReport(
         status="proof_path_valid" if valid else "proof_path_invalid",
         graph_connectivity=connectivity,
+        graph_source_ir_fingerprints=graph_fingerprints,
+        expected_source_ir_fingerprints=expected_fingerprints,
+        fingerprint_valid=fingerprint_valid,
         proof_complete=proof_complete,
         verified_fragment_count=sum(1 for item in checked if item.get("status") == "verified"),
         unadopted_verified_fragment_count=len(unadopted),
         open_witness_count=open_witness_count,
-        unprovable_count=len(unprovable),
+        operational_assumption_count=len(operational_assumptions),
+        external_assumption_count=len(external_assumptions),
+        unprovable_count=unprovable_count,
         open_witnesses=open_witnesses,
+        operational_assumptions=operational_assumptions,
+        external_assumptions=external_assumptions,
         unprovable_under_assumptions=unprovable_witnesses,
+        frontier_minimal=frontier_minimal,
+        frontier_minimality=frontier_minimality,
         code_fact_count=len(all_code_facts),
         code_fact_derivability_counts=code_fact_derivability_counts(all_code_facts),
         open_witnesses_without_code_facts=open_without_code_facts,
@@ -623,6 +868,8 @@ def build_report(
             "integrity_valid": integrity_valid,
             "connected": graph_valid,
             "proof_complete": proof_complete,
+            "frontier_minimal": frontier_minimal,
+            "algorithm_fingerprint_valid": fingerprint_valid,
         },
     )
 
@@ -634,7 +881,11 @@ def render_text(report: ProofPathReport) -> str:
         f"PROOF_PATH_VALID={str(report.validation['valid']).lower()}",
         f"PROOF_PATH_CONNECTED={str(report.validation['connected']).lower()}",
         f"PROOF_PATH_COMPLETE={str(report.proof_complete).lower()}",
+        f"PROOF_PATH_ALGORITHM_FINGERPRINT_VALID={str(report.fingerprint_valid).lower()}",
+        f"PROOF_PATH_FRONTIER_MINIMAL={str(report.frontier_minimal).lower()}",
         f"PROOF_PATH_OPEN_WITNESSES={report.open_witness_count}",
+        f"PROOF_PATH_OPERATIONAL_ASSUMPTIONS={report.operational_assumption_count}",
+        f"PROOF_PATH_EXTERNAL_ASSUMPTIONS={report.external_assumption_count}",
         f"PROOF_PATH_CODE_FACTS={report.code_fact_count}",
         f"PROOF_PATH_FINDINGS={len(report.findings)}",
     ]
@@ -659,10 +910,22 @@ def render_markdown(report: ProofPathReport) -> str:
         f"- status: `{report.status}`",
         f"- graph connected: `{report.validation['connected']}`",
         f"- proof complete: `{report.proof_complete}`",
+        f"- algorithm fingerprint valid: `{report.fingerprint_valid}`",
+        f"- frontier minimal: `{report.frontier_minimal}`",
         f"- verified fragments: `{report.verified_fragment_count}`",
         f"- open witnesses: `{report.open_witness_count}`",
+        f"- operational assumptions: `{report.operational_assumption_count}`",
+        f"- external assumptions: `{report.external_assumption_count}`",
         f"- unprovable-under-assumption rows: `{report.unprovable_count}`",
         f"- code-derived facts: `{report.code_fact_count}`",
+        "",
+        "## Algorithm Fingerprints",
+        "",
+        "| Kind | Fingerprints |",
+        "| --- | --- |",
+        f"| graph source IR | `{', '.join(report.graph_source_ir_fingerprints) or 'none'}` |",
+        f"| proof status expected | `{', '.join(report.expected_source_ir_fingerprints) or 'none'}` |",
+        f"| valid | `{report.fingerprint_valid}` |",
         "",
         "## Graph Connectivity",
         "",
@@ -735,6 +998,87 @@ def render_markdown(report: ProofPathReport) -> str:
             )
     else:
         lines.append("| info | none | proof path overlay | no open witnesses |")
+    lines.extend(
+        [
+            "",
+            "## Frontier Minimality",
+            "",
+            "Each returned open witness must be the first nonterminal target-chain row, not a higher-level blocker hiding a smaller open witness.",
+            "",
+            "| Hole | Minimal | Target-Chain Representatives | Evidence |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    if report.frontier_minimality:
+        for row in report.frontier_minimality:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        markdown_cell(row.hole_id),
+                        markdown_cell(row.minimal),
+                        markdown_cell(", ".join(row.representative_node_ids)),
+                        markdown_cell(row.evidence),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("| info | true | proof path overlay | no open witnesses |")
+    lines.extend(
+        [
+            "",
+            "## Operational Assumptions",
+            "",
+            "Operational assumptions fix the implemented algorithm trace; convergence remains a derived lemma on that trace.",
+            "",
+            "| Assumption | Status | Implementation Surface | Role |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    if report.operational_assumptions:
+        for hole in report.operational_assumptions:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        markdown_cell(hole.hole_id),
+                        markdown_cell(hole.status),
+                        markdown_cell(hole.implementation_surface),
+                        markdown_cell(hole.next_witness),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("| info | none | proof path overlay | no operational assumptions |")
+    lines.extend(
+        [
+            "",
+            "## External Assumptions",
+            "",
+            "External assumptions are trusted proof boundaries, not open PDIPM algorithm witnesses.",
+            "",
+            "| Assumption | Status | Implementation Surface | Boundary |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    if report.external_assumptions:
+        for hole in report.external_assumptions:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        markdown_cell(hole.hole_id),
+                        markdown_cell(hole.status),
+                        markdown_cell(hole.implementation_surface),
+                        markdown_cell(hole.next_witness),
+                    ]
+                )
+                + " |"
+            )
+    else:
+        lines.append("| info | none | proof path overlay | no external assumptions |")
     lines.extend(
         [
             "",

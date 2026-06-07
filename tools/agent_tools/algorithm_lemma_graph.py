@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -108,6 +109,7 @@ class LemmaGraphReport:
 
     status: str
     source_ir_status: str
+    source_ir_fingerprint: str
     root: str
     theorem: str
     target_profiles: tuple[str, ...]
@@ -133,6 +135,36 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--format", choices=("text", "json", "markdown", "dot"), default="text")
     parser.add_argument("--out", help="Optional output path. Omit to print stdout.")
     return parser
+
+
+def algorithm_fingerprint(ir_payload: dict[str, Any]) -> str:
+    """Return a stable fingerprint for algorithm-derived lemma groups.
+
+    The fingerprint deliberately follows the Algorithm Expansion IR, not a
+    hand-edited proof overlay. If the algorithm expansion changes, generated
+    lemma groups derived from the old IR must be regenerated or treated as
+    stale.
+    """
+    fingerprint_payload = {
+        "root_path": ir_payload.get("root_path", ""),
+        "root_symbol": ir_payload.get("root_symbol", ""),
+        "target_theorem": ir_payload.get("target_theorem", ""),
+        "nodes": ir_payload.get("nodes", []),
+        "edges": ir_payload.get("edges", []),
+        "code_facts": ir_payload.get("code_facts", []),
+        "static_checks": ir_payload.get("static_checks", []),
+        "backend_assumptions": ir_payload.get("backend_assumptions", []),
+        "obligations": ir_payload.get("obligations", []),
+        "goal_directed_slice": ir_payload.get("goal_directed_slice", []),
+        "selected_local_obligations": ir_payload.get("selected_local_obligations", []),
+    }
+    encoded = json.dumps(
+        fingerprint_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def slug(value: str) -> str:
@@ -716,6 +748,9 @@ def build_lemma_graph(ir_payload: dict[str, Any], profiles: tuple[str, ...]) -> 
     """Build the lemma dependency graph."""
     theorem = str(ir_payload.get("target_theorem", "target theorem"))
     root = f"{ir_payload.get('root_path', '')}::{ir_payload.get('root_symbol', '')}"
+    source_ir_fingerprint = str(
+        ir_payload.get("algorithm_fingerprint") or algorithm_fingerprint(ir_payload)
+    )
     target_profiles = profiles or KNOWN_TARGET_PROFILES
     raw_obligation_nodes = build_obligation_nodes(ir_payload)
     raw_backend_nodes = build_backend_assumption_nodes(ir_payload)
@@ -753,6 +788,7 @@ def build_lemma_graph(ir_payload: dict[str, Any], profiles: tuple[str, ...]) -> 
     return LemmaGraphReport(
         status="lemma_graph_built" if validation.valid else "lemma_graph_invalid",
         source_ir_status=str(ir_payload.get("status", "unknown")),
+        source_ir_fingerprint=source_ir_fingerprint,
         root=root,
         theorem=theorem,
         target_profiles=target_profiles,
@@ -769,6 +805,7 @@ def render_text(report: LemmaGraphReport) -> str:
         f"LEMMA_GRAPH={report.status}",
         f"LEMMA_GRAPH_ROOT={report.root}",
         f"LEMMA_GRAPH_THEOREM={report.theorem}",
+        f"LEMMA_GRAPH_SOURCE_IR_FINGERPRINT={report.source_ir_fingerprint}",
         f"LEMMA_GRAPH_NODES={len(report.lemma_nodes)}",
         f"LEMMA_GRAPH_EDGES={len(report.lemma_edges)}",
         f"LEMMA_GRAPH_TARGETS={len(report.target_chains)}",
@@ -807,6 +844,7 @@ def render_markdown(report: LemmaGraphReport) -> str:
         "",
         f"- root: `{report.root}`",
         f"- theorem: `{report.theorem}`",
+        f"- source IR fingerprint: `{report.source_ir_fingerprint}`",
         f"- status: `{report.status}`",
         f"- nodes: `{len(report.lemma_nodes)}`",
         f"- edges: `{len(report.lemma_edges)}`",
