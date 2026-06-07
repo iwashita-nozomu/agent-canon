@@ -13,7 +13,7 @@ downstream implementation ../../tests/agent_tools/test_tool_drift.py tests PR ch
 -->
 
 issue_id: AC-20260526-pr-gate-parity
-status: in_progress
+status: resolved
 source: ci
 severity: S1
 evidence: GitHub Actions run 26450128761 failed dependency review after PR #143 moved runtime log evidence out of agents/evals/results.
@@ -21,6 +21,8 @@ affected_surfaces: .github/workflows/agent-canon-static-gates.yml, tools/ci/chec
 edit_scope: .github/workflows/agent-canon-static-gates.yml, tools/ci/check_agent_canon_pr.sh, tools/ci/check_github_workflows.py, tools/agent_tools/tool_drift.py, tools/agent_tools/evaluate_codex_agent_roles.py, tests/tools/test_check_github_workflows.py, tests/agent_tools/test_tool_drift.py, tests/agent_tools/test_evaluate_codex_agent_roles.py, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, documents/tools/README.md
 required_action: Keep GitHub static gates, local AgentCanon PR checks, PR templates, and drift checkers aligned for dependency headers, Codex skill shims, runtime role alignment, prompt eval, and convention compliance.
 close_condition: Removing any local PR parity check from GitHub static gates or check_agent_canon_pr.sh fails a machine check before merge.
+resolved_by: PR #147; static gates, local PR check, workflow checker, and tool drift tests now enforce parity.
+resolved_at: 2026-06-07
 
 ## Finding
 

@@ -69,3 +69,13 @@ candidate evidence. Plain public skill ids in a user prompt now count as
 selected skill evidence, and `$agent-orchestration` now routes Markdown
 lint/link/heading work to `md-style-check` and agent-behavior feedback,
 recurrence prevention, and retrospectives to `agent-learning`.
+
+## 2026-06-07 Triage
+
+This issue remains open after stale-issue triage. The current integration
+branch moves eval source manifests to `evidence/agent-evals/`, keeps
+`agents/evals/` as a legacy resolver, and updates accumulation-aware tools and
+tests. The residual close condition is not only source-manifest placement:
+dashboard workflow attribution, prompt capture coverage, and token-footprint
+comparison evidence still need a branch that proves the accumulated archive is
+complete enough for improvement tooling.
