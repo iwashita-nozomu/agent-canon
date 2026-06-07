@@ -57,7 +57,7 @@ run_direct_agent_checks() {
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
 }
 

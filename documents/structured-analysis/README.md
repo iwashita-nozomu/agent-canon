@@ -49,10 +49,11 @@ is the cache-build entrypoint used by DevContainer post-create. It writes
 unless `--out-dir` is explicit.
 
 The build is source-to-intermediate-representation only. It materializes
-git-visible files as the `artifact` layer, imports document inventory findings
-as the `document-canon` layer, then materializes warning rows into the separate
-`diagnostics.sqlite` database. It does not rewrite `README.md`, source files, or
-repository documents.
+git-visible files as the `artifact` layer, derives directory responsibility
+projection nodes from README and child artifact responsibility evidence, imports
+document inventory findings as the `document-canon` layer, then materializes
+warning rows into the separate `diagnostics.sqlite` database. It does not
+rewrite `README.md`, source files, or repository documents.
 
 ## Layer Model
 
@@ -60,7 +61,7 @@ Structured analysis は次の面を分ける。
 
 | Layer | Source of truth | Notes |
 | --- | --- | --- |
-| Artifact graph | git-visible file tree | directory/file nodes、`contains` edges、README-to-directory edges。 |
+| Artifact graph | git-visible file tree | directory/file nodes、`contains` edges、README-to-directory edges、directory responsibility projections。 |
 | Diagnostics graph | analysis warning snapshot | current warning run、severity、rule、target path、suggested action。 |
 | Prose source anchors | source document spans | sentence、EDU、paragraph、section の source-truth。 |
 | Lower reasoning graph | typed relations over anchors | supports、requires、refines、generalizes、concludes など。 |

@@ -51,6 +51,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
+| `structure-refactor` | directory README と dependency manifest を再帰展開し、責務に基づいて directory 構造、path mapping、scope map を refactor する | `agents/skills/structure-refactor.md` | `.agents/skills/structure-refactor/SKILL.md` |
 | `user-guided-debugging` | ユーザー明示時に、1 件ずつ問題点を提示してから修正し、検証後に次の課題を提示する | `agents/skills/user-guided-debugging.md` | `.agents/skills/user-guided-debugging/SKILL.md` |
 | `long-form-writing` | README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
@@ -95,7 +96,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 ## Codex Defaults
 
 - Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
-- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs, `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
+- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs; do not vendor duplicate OpenAI docs fallback references in AgentCanon. Use `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
@@ -114,6 +115,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
 - 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。
+- directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは `structure-refactor` を追加し、recursive directory responsibility graph を先に作ります。
 - ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は `user-guided-debugging` を使い、修正前の問題提示と修正後の次課題提示を固定します。
 - C / C++ 差分では `cpp-review` を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。

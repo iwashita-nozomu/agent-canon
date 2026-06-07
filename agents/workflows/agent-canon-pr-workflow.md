@@ -58,7 +58,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - standalone AgentCanon PR / branch push では `.github/workflows/agent-canon-static-gates.yml` が tool catalog、tool drift、dependency review、skill mirror、runtime role alignment、skill/workflow prompt eval、convention compliance、GitHub workflow convention、container config を軽量 gate として走らせます。local の `make agent-canon-pr-check` は引き続き merge 前の広い gate です。
 - Issue template / eval capture work uses `documents/issue-label-taxonomy.md`,
   `documents/prompt-skill-evaluation-checklist.md`, and
-  `agents/evals/issue_eval_manifest.toml` as the closeout route.
+  `evidence/agent-evals/issue_eval_manifest.toml` as the closeout route.
 
 ## Freshness Gate Route
 

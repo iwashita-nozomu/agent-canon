@@ -388,7 +388,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "documents/prompt-skill-evaluation-checklist.md",
-  "agents/evals/issue_eval_manifest.toml",
+  "evidence/agent-evals/issue_eval_manifest.toml",
 ]
 
 [[eval]]

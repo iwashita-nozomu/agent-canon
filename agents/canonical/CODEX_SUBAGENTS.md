@@ -336,7 +336,8 @@ role の model / reasoning を変更するときは、該当 `.codex/agents/*.to
 workflow docs、task catalog に role list や model list を重複管理しません。
 
 運用メモ:
-- OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
+- OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
+  この文書は個別 source URL や fallback reference を保持しません。
 - この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います

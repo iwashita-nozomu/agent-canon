@@ -1,4 +1,4 @@
-# Responsibility Scope Management
+# Responsibility Scope Management Issue
 
 <!--
 @dependency-start
@@ -65,3 +65,13 @@ form. AgentCanon needs a gate that distinguishes:
 The workflow should require an owner/scope check before proposing edits outside
 the active repository surface or before treating a dependency API gap as a
 license to modify the dependency.
+
+## 2026-06-07 Triage
+
+This issue remains open after stale-issue triage, but the current integration
+branch covers a major slice: `responsibility-scope.toml` gains exclusion and
+overlap handling, the responsibility checker covers directory and import
+surfaces more directly, and the new `structure-refactor` skill gives directory
+responsibility cleanup a routed workflow. The remaining close condition is the
+full end-to-end gate across external-library boundary decisions and helper-like
+function additions, not only repository directory ownership.

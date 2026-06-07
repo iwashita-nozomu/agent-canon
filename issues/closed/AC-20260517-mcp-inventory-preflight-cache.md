@@ -15,7 +15,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py should ver
 -->
 
 issue_id: AC-20260517-mcp-inventory-preflight-cache
-status: open
+status: resolved
 source: user
 severity: S2
 evidence: .codex/hooks/mcp_session_context.sh
@@ -23,6 +23,8 @@ affected_surfaces: agent-canon-environment.toml, rust/agent-canon/src/mcp_invent
 edit_scope: reports/dependency-review/mcp-inventory-preflight-20260517/dependency_edit_scope.txt
 required_action: Replace per-message MCP inventory repetition with Rust session-scoped or run-scoped evidence while preserving fail-closed repair behavior when MCP configuration is missing or stale.
 close_condition: Rust MCP preflight docs, hook context, checker behavior, environment TOML, and tests define when cached evidence is valid, when revalidation is required, and how run bundles record the evidence.
+resolved_by: PR #87; Rust mcp-preflight-policy, mcp-inventory --session-cache, environment docs, and tests define scoped evidence and invalidation.
+resolved_at: 2026-06-07
 
 ## Finding
 

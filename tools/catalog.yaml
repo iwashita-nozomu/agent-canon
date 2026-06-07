@@ -366,7 +366,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - documents/runtime-log-archive.md
       - documents/runtime-log-archive-migration.md
     tests:
@@ -386,7 +386,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - agents/workflows/agent-canon-pr-workflow.md
       - documents/runtime-log-archive.md
     tests:
@@ -426,8 +426,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
-      - agents/evals/workflow_selection_eval.toml
+      - evidence/agent-evals/README.md
+      - evidence/agent-evals/workflow_selection_eval.toml
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
@@ -446,8 +446,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
-      - agents/evals/report_quality_eval.toml
+      - evidence/agent-evals/README.md
+      - evidence/agent-evals/report_quality_eval.toml
       - documents/runtime-log-archive.md
       - agents/skills/report-writing.md
     tests:
@@ -498,7 +498,7 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
-    command: tools/bin/agent-canon local-llm eval --manifest agents/evals/local_llm_responsibility_eval.toml
+    command: tools/bin/agent-canon local-llm eval --manifest evidence/agent-evals/local_llm_responsibility_eval.toml
     writes: true
     default_wiring:
       ci: true
@@ -507,8 +507,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/local-llm-responsibility-analysis.md
-      - agents/evals/README.md
-      - agents/evals/local_llm_responsibility_eval.toml
+      - evidence/agent-evals/README.md
+      - evidence/agent-evals/local_llm_responsibility_eval.toml
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_local_llm_eval.py
@@ -1085,7 +1085,7 @@ entries:
       ci: true
       pr_check: true
     docs:
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - agents/canonical/CODEX_SUBAGENTS.md
       - tools/README.md
       - documents/tools/README.md
@@ -1478,7 +1478,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_log_surface_inventory.py
@@ -1620,7 +1620,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
@@ -1639,7 +1639,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/README.md
+      - evidence/agent-evals/README.md
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_runtime_dashboard.py

@@ -161,6 +161,10 @@ path = "../.agents/skills/structure-planning/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/structure-refactor/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/subagent-bootstrap/SKILL.md"
 enabled = true
 

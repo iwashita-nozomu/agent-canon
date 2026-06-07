@@ -71,6 +71,8 @@ upstream design README.md canonical workflow index
   - 外部調査、比較設計、run loop、decision state の整理
 - `comprehensive-development`
   - code / docs / tools / runtime をまたぐ包括的開発フロー
+- `structure-refactor`
+  - directory README と dependency manifest を再帰展開し、責務に基づく directory 構造 refactor を進める
 - `environment-maintenance`
   - Docker、CI、dependency、runtime 更新
 

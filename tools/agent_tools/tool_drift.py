@@ -172,8 +172,8 @@ CONTRACTS = (
         name="local_llm_eval",
         tool="tools/agent_tools/local_llm_eval.py",
         links=(
-            LinkCheck("agents/evals/README.md"),
-            LinkCheck("agents/evals/local_llm_responsibility_eval.toml"),
+            LinkCheck("evidence/agent-evals/README.md"),
+            LinkCheck("evidence/agent-evals/local_llm_responsibility_eval.toml"),
             LinkCheck("documents/runtime-log-archive.md"),
             LinkCheck("documents/local-llm-responsibility-analysis.md"),
             LinkCheck("tools/catalog.yaml"),
@@ -214,7 +214,7 @@ CONTRACTS = (
         name="eval_accumulation",
         tool="tools/agent_tools/eval_accumulation_check.py",
         links=(
-            LinkCheck("agents/evals/README.md"),
+            LinkCheck("evidence/agent-evals/README.md"),
             LinkCheck("documents/runtime-log-archive.md"),
             LinkCheck("documents/runtime-log-archive-migration.md"),
             LinkCheck("tools/README.md"),
@@ -227,7 +227,7 @@ CONTRACTS = (
         name="run_accumulated_agent_evals",
         tool="tools/agent_tools/run_accumulated_agent_evals.py",
         links=(
-            LinkCheck("agents/evals/README.md"),
+            LinkCheck("evidence/agent-evals/README.md"),
             LinkCheck("documents/runtime-log-archive.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -282,7 +282,7 @@ CONTRACTS = (
         links=(
             LinkCheck("documents/conventions/README.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
-            LinkCheck("agents/evals/skill_workflow_prompt_eval.toml"),
+            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tools/agent_tools/tool_drift.py"),

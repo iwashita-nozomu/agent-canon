@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Generates PR and push-time guidance from AgentCanon memory, eval, hook, and issue evidence.
-# upstream design ../../agents/evals/README.md eval evidence contract
+# upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream design ../../issues/README.md durable operational issue storage

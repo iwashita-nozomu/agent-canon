@@ -3,7 +3,7 @@
 # @dependency-start
 # responsibility Tests local LLM single-file responsibility eval harness.
 # upstream implementation ../../tools/agent_tools/local_llm_eval.py runs configured eval cases
-# upstream design ../../agents/evals/local_llm_responsibility_eval.toml defines canonical eval cases
+# upstream design ../../evidence/agent-evals/local_llm_responsibility_eval.toml defines canonical eval cases
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file scope policy
 # @dependency-end
 
@@ -58,13 +58,18 @@ class LocalLlmEvalTest(unittest.TestCase):
         self.assertIn("LOCAL_LLM_EVAL_ACCUMULATED_REPORT=", result.stdout)
         self.assertEqual(len(reports), 1)
         self.assertIn("LOCAL_LLM_EVAL_RUN_ID=", report_text)
+        self.assertIn(
+            "upstream design ../../../../evidence/agent-evals/local_llm_responsibility_eval.toml",
+            report_text,
+        )
 
     def test_duplicate_case_id_fails(self) -> None:
         """Duplicate eval case IDs must fail manifest audit."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            manifest = root / "agents" / "evals" / "local_llm_responsibility_eval.toml"
+            manifest = root / "evidence" / "agent-evals" / "local_llm_responsibility_eval.toml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 manifest.read_text(encoding="utf-8")
                 + "\n".join(
@@ -121,8 +126,8 @@ class LocalLlmEvalTest(unittest.TestCase):
         target = root / "tools" / "agent_tools" / "file_responsibility_llm.py"
         target.parent.mkdir(parents=True)
         target.write_text("# @dependency-start\n# responsibility Fixture.\n", encoding="utf-8")
-        manifest = root / "agents" / "evals" / "local_llm_responsibility_eval.toml"
-        manifest.parent.mkdir(parents=True)
+        manifest = root / "evidence" / "agent-evals" / "local_llm_responsibility_eval.toml"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(
             "\n".join(
                 [

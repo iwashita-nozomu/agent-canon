@@ -10,24 +10,23 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 
 # Codex Configuration Reference
 
-この文書は Codex CLI / Codex runtime の設定面を、2026-05-31 時点の公式 OpenAI Codex docs、公式 `config-schema.json`、ローカル `codex --help` / `codex exec --help` / `codex review --help` / `codex mcp --help` / `codex features list`、およびこの template の `.codex/config.toml` から整理したものです。
+この文書は Codex CLI / Codex runtime の設定面を、host-provided
+`$openai-docs` source route、ローカル `codex --help` / `codex exec --help`
+/ `codex review --help` / `codex mcp --help` / `codex features list`、
+およびこの template の `.codex/config.toml` から整理したものです。
 
 目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
 
 ## Primary Sources
 
-- Official configuration reference: <https://developers.openai.com/codex/config-reference>
-- Official basic configuration guide: <https://developers.openai.com/codex/config-basic>
-- Official advanced configuration guide: <https://developers.openai.com/codex/config-advanced>
-- Official sample config: <https://developers.openai.com/codex/config-sample>
-- Official config schema: <https://developers.openai.com/codex/config-schema.json>
-- Official hooks guide: <https://developers.openai.com/codex/hooks>
-- Official MCP guide: <https://developers.openai.com/codex/mcp>
-- Official AGENTS.md guide: <https://developers.openai.com/codex/guides/agents-md>
-- Official skills guide: <https://developers.openai.com/codex/skills>
-- Official subagents guide: <https://developers.openai.com/codex/subagents>
-- Official CLI reference: <https://developers.openai.com/codex/cli/reference>
-- Local evidence: `codex --help`, `codex exec --help`, `codex review --help`, `codex mcp --help`, `.codex/config.toml`.
+- `$openai-docs` is the canonical source route for Codex product docs, Codex
+  manual synthesis, official Docs MCP fetches, official-domain web fallback,
+  latest-model guidance, model upgrades, and prompt-upgrade guidance.
+- Do not duplicate `$openai-docs` bundled fallback references here. When current
+  Codex behavior or model guidance matters, run `$openai-docs` and record the
+  resulting run artifact or decision, not a copied official URL list.
+- Local evidence: `codex --help`, `codex exec --help`, `codex review --help`,
+  `codex mcp --help`, `codex features list`, and `.codex/config.toml`.
 
 ## Configuration Surfaces
 
@@ -56,7 +55,7 @@ Codex combines settings from persistent config, project config, profiles, custom
 Example temporary overrides:
 
 ```bash
-codex -c model='"gpt-5.5"' -c model_reasoning_effort='"high"'
+codex -c model='"<model-id-from-openai-docs>"' -c model_reasoning_effort='"high"'
 codex --enable hooks --search
 codex exec --json -c sandbox_mode='"read-only"' "review this repo"
 ```
@@ -375,7 +374,7 @@ The official schema currently exposes the following top-level keys. Some are nor
 | --- | --------------- |
 | `model` | Select the model for normal turns. Keep repo defaults conservative; use profiles or CLI for experiments. |
 | `review_model` | Use a separate reviewer model when review quality/cost should differ from implementation. |
-| `model_reasoning_effort` | Set default reasoning budget. For GPT-5.5 or complex repo tasks, prefer profile-specific `high` rather than forcing all runs. |
+| `model_reasoning_effort` | Set default reasoning budget. For current frontier models or complex repo tasks, prefer profile-specific `high` rather than forcing all runs; choose model IDs through `$openai-docs`. |
 | `plan_mode_reasoning_effort` | Plan mode can use a different budget from implementation mode. |
 | `model_verbosity` | Controls GPT-5 response detail; use `medium` or `high` for design docs, `low` for terse automation. |
 | `model_provider` | Points to `model_providers.<id>`. |
@@ -699,7 +698,7 @@ model_verbosity = "medium"
 tool_output_token_limit = 8000
 
 [profiles.review]
-model = "gpt-5.5"
+model = "<model-id-from-openai-docs>"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 approval_policy = "never"

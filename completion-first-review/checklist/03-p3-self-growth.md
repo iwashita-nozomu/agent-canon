@@ -56,7 +56,7 @@ P3 makes AgentCanon able to improve itself without turning every observation int
 
 ### [ ] P3-006: negative fixture required
 
-- Target: `agents/evals/negative_cases/`.
+- Target: `evidence/agent-evals/negative_cases/`.
 - Problem: discovered false negatives are not replay-tested.
 - Action: add a fixture representing the old failure.
 - Acceptance: negative fixture fails under new verifier.

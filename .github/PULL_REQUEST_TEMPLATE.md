@@ -89,7 +89,7 @@ Orchestration evidence:
 
 - [ ] `issues/README.md` was reviewed.
 - [ ] AgentCanon maintenance issues use `.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml` fields or explain why an older issue shape is sufficient.
-- [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `agents/evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
+- [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `evidence/agent-evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
@@ -106,7 +106,7 @@ Issue / edit-scope evidence:
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir reports/dependency-review/agent-canon-pr`
 - [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
-- [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml`
+- [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
 - [ ] `python3 tools/agent_tools/tool_catalog.py`
 - [ ] `python3 tools/agent_tools/tool_drift.py`

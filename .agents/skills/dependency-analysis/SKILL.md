@@ -25,7 +25,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
    - explicit file review: pass file paths explicitly
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
-   - repo-wide text search triage: save `rg -l` hits and run search-to-edit-scope expansion
+   - repo-wide search triage: run responsibility-based search first, then use bounded `rg -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
    - repair planning or subagent handoff: build a token-light `Change Impact
      Packet` manifest before selecting implementation targets
 1. For code dependency evidence, run:
@@ -49,10 +49,16 @@ bash tools/agent_tools/check_dependency_header_format.sh --changed --require-hea
 bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
 ```
 
-1. When a repo-wide text search determines a fix surface, write the hit paths and expand them through dependency headers before editing:
+1. When repo-wide search may determine a fix surface, run responsibility-based search before `rg`. Use the result to choose source dirs, candidate paths, and terms; then write bounded `rg -l` hits and expand them through dependency headers before editing:
 
 ```bash
-rg -l "search phrase" > reports/search_hits.txt
+printf '%s\n' "search purpose or user request" > reports/search_query.txt
+agent-canon semantic-index context-pack \
+  --query-file reports/search_query.txt \
+  --max-cells 12 \
+  --format text \
+  > reports/search_responsibility_context.txt
+rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt

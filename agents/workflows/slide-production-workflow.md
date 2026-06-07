@@ -4,7 +4,7 @@ responsibility Documents slide production workflow for this repository.
 upstream design ../../documents/codex-configuration-slides.md slide deck source reference
 upstream design ../../documents/template-bootstrap.md repo bootstrap and canonical runtime views
 upstream design ../../documents/experiment-report-style.md document quality and evidence discipline
-downstream implementation ../../agents/evals/skill_workflow_prompt_eval.toml workflow prompt eval coverage
+downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.toml workflow prompt eval coverage
 @dependency-end
 -->
 

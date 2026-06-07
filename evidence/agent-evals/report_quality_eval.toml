@@ -1,8 +1,8 @@
 # @dependency-start
 # responsibility Defines deterministic report-writing quality checklist evals.
 # upstream design README.md eval usage contract
-# upstream design ../skills/report-writing.md report writing quality checklist
-# upstream design ../skills/result-artifact-writeout.md raw result artifact placement contract
+# upstream design ../../agents/skills/report-writing.md report writing quality checklist
+# upstream design ../../agents/skills/result-artifact-writeout.md raw result artifact placement contract
 # downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs these evals
 # downstream implementation ../../tests/agent_tools/test_evaluate_report_quality.py tests report quality eval behavior
 # @dependency-end

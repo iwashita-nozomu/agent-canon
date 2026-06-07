@@ -4,7 +4,7 @@
 # upstream design ../../documents/conventions/README.md convention index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
-# upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
 # upstream design ../../documents/codex-configuration-reference.md Codex hook severity policy
@@ -116,17 +116,17 @@ TOOL_GATES = {
     "prompt_eval": (
         "tools/agent_tools/evaluate_skill_workflow_prompts.py",
         (
-            "agents/evals/skill_workflow_prompt_eval.toml",
+            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "agents/workflows/adaptive-improvement-workflow.md",
         ),
     ),
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
-        ("agents/evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
+        ("evidence/agent-evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
     ),
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
-        ("tools/ci/run_all_checks.sh", "agents/evals/skill_workflow_prompt_eval.toml"),
+        ("tools/ci/run_all_checks.sh", "evidence/agent-evals/skill_workflow_prompt_eval.toml"),
     ),
     "tool_catalog": (
         "tools/agent_tools/tool_catalog.py",
@@ -500,7 +500,7 @@ def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
 
 def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     """Verify prompt evals cover convention verifier and skill-call routing."""
-    path = "agents/evals/skill_workflow_prompt_eval.toml"
+    path = "evidence/agent-evals/skill_workflow_prompt_eval.toml"
     findings = check_required_files(root, (path,), "prompt_eval")
     if findings:
         return findings

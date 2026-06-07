@@ -182,7 +182,7 @@ schema には他にも多くの flag があります。
 # CLI override
 
 ```bash
-codex -c model='"gpt-5.5"'
+codex -c model='"<model-id-from-openai-docs>"'
 codex -c model_reasoning_effort='"high"'
 codex --enable hooks
 codex --disable some_feature
@@ -242,11 +242,13 @@ CLI override は一時操作に使います。repo の正本へ残すのは、�
 
 ---
 
-# GPT-5.5 時代の実務
+# Model 選択の実務
 
-GPT-5.5 を使える環境では、repo default を一律に重くするより profile / custom agent へ寄せます。
+OpenAI / Codex の最新 model guidance は `$openai-docs` で確認します。
+repo default を一律に重くするより、確認済み model ID を profile / custom
+agent へ寄せます。
 
-- design / review: `model="gpt-5.5"`, `reasoning_effort="high"`
+- design / review: `$openai-docs` で選んだ frontier model + `reasoning_effort="high"`
 - bounded implementation: task sizeに応じて medium/high
 - trivial run: default profile
 - plan mode: `plan_mode_reasoning_effort` を別管理
@@ -426,7 +428,7 @@ current Codex では project-local `.codex/config.toml` の `profiles` は warni
 
 ```toml
 [profiles.review]
-model = "gpt-5.5"
+model = "<model-id-from-openai-docs>"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 approval_policy = "never"

@@ -128,7 +128,7 @@ python3 tools/agent_tools/workflow_monitor.py \
 
 ```bash
 python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest agents/evals/skill_workflow_prompt_eval.toml
+  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
 ```
 
 ## Refactor Integration

@@ -12,7 +12,7 @@ downstream implementation ../../tools/ci/check_github_workflows.py validates iss
 -->
 
 issue_id: AC-20260513-durable-finding-auto-promotion
-status: in_progress
+status: resolved
 source: user
 severity: S0
 evidence: reports/agents/20260513-071352-fix-duplicated-agentcanon-freshness-skil/
@@ -20,6 +20,8 @@ affected_surfaces: ROOT_AGENTS.md, issues/README.md, agents/canonical/CODEX_WORK
 edit_scope: reports/agents/20260513-093806-detail-agentcanon-pr-template-workflow-a/dependency_edit_scope.txt
 required_action: Make AgentCanon workflow and PR gates require durable operational finding capture instead of leaving defects only in run bundles.
 close_condition: The AgentCanon PR workflow, PR templates, issue conventions, and CI checks require durable issue search/write evidence, and focused tests validate the rule.
+resolved_by: PR #6; current issue conventions, PR templates, AgentCanon PR workflow, dependency review route, and check_github_workflows.py enforce durable finding evidence.
+resolved_at: 2026-06-07
 
 ## Finding
 

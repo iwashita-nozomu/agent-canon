@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# upstream design ../../agents/evals/README.md eval directory contract
+# upstream design ../../evidence/agent-evals/README.md eval directory contract
 # upstream implementation ./agent_team.py loads team and task routing metadata
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior

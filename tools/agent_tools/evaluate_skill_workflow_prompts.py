@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
-# upstream design ../../agents/evals/README.md prompt eval directory contract
-# upstream design ../../agents/evals/skill_workflow_prompt_eval.toml default prompt eval manifest
+# upstream design ../../evidence/agent-evals/README.md prompt eval directory contract
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml default prompt eval manifest
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end
@@ -29,6 +29,7 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from eval_manifest_paths import eval_manifest_path, relative_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
 
@@ -173,7 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--manifest",
-        default="agents/evals/skill_workflow_prompt_eval.toml",
+        default=eval_manifest_path("skill_workflow_prompt_eval.toml"),
         help="Prompt eval TOML manifest.",
     )
     parser.add_argument(
@@ -781,8 +782,8 @@ def run(args: argparse.Namespace) -> int:
     """Run prompt evals."""
     root = Path(str(args.root)).resolve()
     manifest_arg = Path(str(args.manifest))
-    manifest = manifest_arg if manifest_arg.is_absolute() else root / manifest_arg
-    manifest_for_report = manifest_arg if not manifest_arg.is_absolute() else manifest
+    manifest = resolve_eval_manifest(root, manifest_arg)
+    manifest_for_report = relative_manifest_path(root, manifest)
     evals, audit = load_manifest(manifest, root)
     results = tuple(result for eval_def in evals for result in evaluate_prompt(eval_def))
     metadata = build_eval_run_metadata(

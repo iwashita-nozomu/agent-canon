@@ -92,6 +92,40 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
 
+    def test_exclude_paths_select_more_specific_responsibility_scope(self) -> None:
+        """Excluded files should resolve to their owning scope for import rules."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            manifest = root / "responsibility-scope.toml"
+            manifest.write_text(
+                manifest.read_text(encoding="utf-8").replace(
+                    'paths = ["app/**"]',
+                    'paths = ["app/**"]\nexclude_paths = ["app/evidence.py"]',
+                )
+                + "\n".join(
+                    [
+                        "",
+                        "[[scope]]",
+                        'id = "evidence"',
+                        'paths = ["app/evidence.py"]',
+                        "",
+                        "[[import_rule]]",
+                        'source = "evidence"',
+                        'targets = ["app", "evidence"]',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            self.write_file(root, "app/main.py", "import app.evidence\n\nVALUE = app.evidence.VALUE\n")
+            self.write_file(root, "app/evidence.py", "VALUE = 1\n")
+
+            result = self.run_checker(root, "app/main.py")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("scope-import:app/main.py:1:app->evidence", result.stdout)
+
     def test_vendored_default_manifest_is_used_when_root_override_is_missing(self) -> None:
         """Derived repos may use the vendored AgentCanon default manifest."""
         with tempfile.TemporaryDirectory() as temp_dir:
