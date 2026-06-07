@@ -12,8 +12,8 @@ downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes th
 
 ## Purpose
 
-GitHub PR と Issue queue を、場当たりの `gh pr merge` ではなく、inventory、
-authority、conflict、validation、merge、Issue 処理、closeout evidence の順に
+GitHub PR と Issue queue を、権限・検証・証跡を省いた直接 merge ではなく、
+inventory、authority、conflict、validation、merge、Issue 処理、closeout evidence の順に
 処理します。
 
 この skill は、PR / Issue 処理の実行順と証跡を固定します。個別のコード修正は

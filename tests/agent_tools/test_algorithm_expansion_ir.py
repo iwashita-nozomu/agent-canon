@@ -4,7 +4,6 @@
 # responsibility Tests AST-only Algorithm Expansion IR tooling.
 # upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm IR.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines Algorithm IR workflow.
-# downstream design ../../documents/tools/algorithm_expansion_ir.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations

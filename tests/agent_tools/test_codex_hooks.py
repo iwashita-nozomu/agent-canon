@@ -1343,6 +1343,75 @@ class CodexHooksTest(unittest.TestCase):
             ["data.lock"],
         )
 
+    def test_style_checker_guard_routes_generated_codex_guide_to_split_validator(self) -> None:
+        """Generated Codex guide Markdown should use split validation, not prose lint."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            docs_dir = temp_root / "tools" / "docs"
+            docs_dir.mkdir(parents=True)
+            fail_checker = "#!/usr/bin/env python3\nraise SystemExit(99)\n"
+            (docs_dir / "check_markdown_lint.py").write_text(fail_checker, encoding="utf-8")
+            (docs_dir / "check_markdown_math.py").write_text(fail_checker, encoding="utf-8")
+            validator = temp_root / "codex-cli-guide" / "tools" / "validate_split.py"
+            validator.parent.mkdir(parents=True)
+            validator.write_text(
+                "#!/usr/bin/env python3\nprint('split validation passed')\n",
+                encoding="utf-8",
+            )
+            section = (
+                temp_root
+                / "codex-cli-guide"
+                / "sections"
+                / "08-additional-configuration-recipes-114-253.md"
+            )
+            section.parent.mkdir(parents=True)
+            section.write_text("# Generated section\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            section.write_text("# Generated section\n\nChanged.\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(STYLE_CHECKER_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["selected_checkers"], ["codex_cli_guide_split"])
+        self.assertEqual(log_entry["unchecked_count"], 0)
+
     def test_module_boundary_guard_blocks_public_surface_change_without_evidence(self) -> None:
         """Module hook should block forced module rewrites without tests or docs."""
         with tempfile.TemporaryDirectory() as temp_dir:

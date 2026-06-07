@@ -9056,13 +9056,13 @@ model_reasoning_effort = "high"
 **戻し方**  profile全体を削除するか、`web_search` だけcachedへ戻す。
 
 
-### 追加設定レシピ 117: 高速修正profile
+### 追加設定レシピ 117: 軽量lint確認profile
 
-**目的**  小さなlint修正やtypo修正を速く行う。
+**目的**  小さなlintやtypoの確認を低コストで行い、修正自体は通常の責務・検証手順に戻す。
 
 
-```
-[profiles.quickfix]
+```toml
+[profiles.focused_lint_check]
 service_tier = "fast"
 model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
@@ -9070,7 +9070,7 @@ approval_policy = "on-request"
 ```
 
 
-**確認**  小さなbranchでlint修正を試し、出力品質と速度を比較する。
+**確認**  小さなbranchでlint確認を試し、出力品質と速度を比較する。
 
 **戻し方**  `service_tier` と `model_reasoning_effort` を削除する。
 
@@ -11761,8 +11761,6 @@ codex execpolicy check "git push"
 
 
 ---
-
-
 # 第IX部 最終追加テンプレート集
 
 
