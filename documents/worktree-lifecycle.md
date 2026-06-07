@@ -1,44 +1,42 @@
-# branch・worktree の例外運用
+# branch・worktree の legacy cleanup 運用
 <!--
 @dependency-start
-responsibility Documents branch・worktree の例外運用 for this repository.
+responsibility Documents branch・worktree legacy cleanup for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->
 
 
-この文書は、`main` 以外で短期的に作業を切り分ける必要がある場合だけ参照します。
-既定運用は `main` です。恒常的な branch 分割や worktree 常用は前提にしません。
+この文書は、既存の stale worktree、古い `WORKTREE_SCOPE.md`、または過去の branch/action log を片付ける場合だけ参照します。
+新規 repo-changing task では追加の `git worktree`、separate worktree、integration worktree を作成・使用しません。既定運用は current checkout 上の branch / wave です。
 
 ## 使う場面
 
-- 大きな refactor を安全に切り分けたい
-- レビュー前に差分を明確に分けたい
-- 長時間実験や破壊的な試行を一時的に隔離したい
+- 既存の stale worktree を棚卸ししたい
+- 古い `WORKTREE_SCOPE.md` や action log が current checkout の作業を汚していないか確認したい
+- 過去の branch / worktree note から current checkout へ知見だけを持ち帰りたい
 
-## 作成前の確認
+## cleanup 前の確認
 
 - `main` と対象 branch が `origin` と同期しているか確認します。
-- 既存の worktree を使い回さず、新しい worktree を切ります。
-- 長時間 run や巨大生成物が無いなら、まず `main` で進めることを優先します。
-- 分離する topic、carry-over 先、runtime output directory を先に決めます。
+- 新しい worktree は切りません。
+- current checkout で続けられる作業は current checkout の後続 wave に直列化します。
+- carry-over 先、runtime output directory、削除または保持する legacy note を先に決めます。
 
-## 作成直後の kickoff
+## legacy scope の確認
 
-新しい worktree を切った直後、または stale な worktree を再開した直後は、`worktree-start` を使って次を閉じます。
+stale な worktree や古い scope を見つけた場合は、作業場所として再開せず、次を確認します。
 
-- [WORKTREE_SCOPE_TEMPLATE.md](WORKTREE_SCOPE_TEMPLATE.md) を基に、worktree root の `WORKTREE_SCOPE.md` を current state へ合わせます。
-- `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` を current branch と current filesystem path に一致させます。不一致のまま編集を始めません。
-- [WORKTREE_LOG_TEMPLATE.md](../notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
-- 継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
-- kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。これにより `work_log.py` 1 回で action log と run bundle `work_log.md` を両方更新できます。
-- この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch`、必要なら `active_worktree` と `scope_file` を合わせます。
-- branch が複数 session 続く、または handoff 前提なら `notes/branches/` に summary を置きます。
+- `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current checkout と違う場合、その scope は作業 authority ではありません。
+- [WORKTREE_LOG_TEMPLATE.md](../notes/worktrees/WORKTREE_LOG_TEMPLATE.md) 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` へ carry-over 判断だけを残します。
+- 継続ログは current checkout の `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
+- experiment topic を持つ古い worktree を見つけた場合は、`experiments/registry.toml` の stale `active_worktree` / `scope_file` を cleanup 対象として扱います。
+- branch が複数 session 続いた場合でも、作業再開は current checkout の branch / wave で行い、`notes/branches/` は summary evidence としてだけ使います。
 - `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で踏みやすい avoid pattern と既知 failure を確認します。
-- `python3 tools/agent_tools/worktree_scope_lint.py --current` か `bash tools/worktree_start.sh --current` で scope の placeholder と kickoff 欄を確認します。
+- `python3 tools/agent_tools/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/worktree_start.sh --current` は cleanup diagnostic 以外では使いません。
 - `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
-- `main` へ戻すための integration worktree を切る場合は、`agents/workflows/main-integration-workflow.md` の手順を先に見ます。
+- `main` へ戻す場合も integration worktree は切らず、`agents/workflows/main-integration-workflow.md` の current-checkout branch 手順を使います。
 
 ## ルール
 
@@ -46,17 +44,17 @@ upstream design README.md durable document index
 - 統合先は常に `main` です。
 - 長期に残す知見は branch 名ではなく `documents/` または `notes/` に移します。
 - 1 回の実験結果を branch 固有の台帳に依存させません。
-- worktree root には必要に応じて `WORKTREE_SCOPE.md` を置き、テンプレートは [WORKTREE_SCOPE_TEMPLATE.md](WORKTREE_SCOPE_TEMPLATE.md) を使います。
-- `WORKTREE_SCOPE.md` は worktree ごとに current state へ更新します。別 branch / 別 path の scope file を流用しません。
+- `WORKTREE_SCOPE.md` は legacy cleanup / drift diagnosis 用の evidence であり、新しい task の scope authority ではありません。
+- 別 branch / 別 path の scope file を流用しません。
 - branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](BRANCH_SCOPE.md) と `notes/branches/` を使います。
-- 例外運用中の action log は kickoff から `notes/worktrees/` に残します。
+- 既存 action log は `notes/worktrees/` に legacy evidence として残します。
 - action log の各 entry には、いま処理している `request_clause_ids=` を残します。
 - scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次残します。repo-changing task では同じ step を run bundle `work_log.md` にも残します。
-- scope が途中で変わったら、追加編集の前に `WORKTREE_SCOPE.md` と action log を更新します。
-- `Editable Directories` 外と `Read-Only Or Avoid Directories` 内は編集しません。
-- runtime output は `WORKTREE_SCOPE.md` に書いた場所へ限定します。
+- scope が途中で変わったら、追加編集の前に current checkout の run-local `work_log.md` と handoff packet を更新します。
+- editable path は current checkout の dependency-expanded write scope と handoff packet で管理します。
+- runtime output は current checkout の run bundle または task 固有 output directory へ限定します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。
-- file 構成変更を含む branch を閉じる前には、integration worktree 上で `python3 tools/ci/check_merge_structure.py ...` を通します。
+- file 構成変更を含む branch を閉じる前には、current checkout 上で `python3 tools/ci/check_merge_structure.py ...` を通します。
 
 ## 閉じる前の確認
 
@@ -64,4 +62,4 @@ upstream design README.md durable document index
 - 不要な branch 専用メモを残していないか
 - 例外運用で得たルールを正本へ反映したか
 - `main` に持ち帰る note と最小 final JSON の置き場が決まっているか
-- worktree を消したあとも `main` から関連 note と結果を辿れるか
+- legacy worktree を消したあとも `main` から関連 note と結果を辿れるか

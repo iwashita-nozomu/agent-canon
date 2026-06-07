@@ -23,11 +23,12 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
    - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`
+   - runtime nesting ceiling: `.codex/config.toml` `[agents].max_depth`, currently `2` for one bounded child-subagent layer
    - workflow active budget: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
-   - stage wave plan: parent-owned bounded waves within the active budget
+   - stage wave plan: owner-owned bounded waves within the active budget; parent may delegate a stage owner to spawn child subagents when the handoff packet fixes owner, input packet, expected output, write scope, validation route, and review gate
    - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
    - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap
-   - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, and `run.write_scope_policy.max_write_subagents`
+   - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`

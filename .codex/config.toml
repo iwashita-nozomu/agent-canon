@@ -194,7 +194,7 @@ enabled = true
 
 [agents]
 max_threads = 24
-max_depth = 1
+max_depth = 2
 job_max_runtime_seconds = 3600
 
 [agents.artifact_reviewer]

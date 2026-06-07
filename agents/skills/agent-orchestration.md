@@ -70,7 +70,8 @@ mode の意味:
 - PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
-- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime budget の階層
+- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
+- nested subagent が必要な場合は、`run.delegated_spawn_policy` に owner、child role、入力 packet、expected output、write scope、validation route、review gate を固定します
 - parallel write が要るなら file 単位の write-scope 方針
 
 ## Workflow Family Mapping

@@ -291,7 +291,7 @@ exit 条件:
 - 実行計画は詳細設計の前に必ず確定させます
 - どの subagent / role がどの stage を担当するか明記します
 - 包括的開発では、`Write Scope Ledger:` と `Integration Order:` を書きます
-- 複数 writer が必要な場合は、writer ごとの disjoint path / separate worktree を明記します
+- 複数 writer が必要な場合は、writer ごとの disjoint path と current checkout 内の wave 順序を明記します。separate worktree は使いません
 
 exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
@@ -711,11 +711,11 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - code、docs、tests、workflow、tools、runtime をまたぐ umbrella pass に使います
 - 背骨は 1 本の waterfall pass のままにし、surface ごとの差分を `schedule.md` の stage owner と write scope で切ります
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
-- Gate 3 では `Write Scope Ledger:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
+- Gate 3 では `Write Scope Ledger:`、`Writer Wave Order:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
 - Gate 8-9 では言語差分に応じて `python_reviewer` や `cpp_reviewer` と `project_reviewer` を通し、slice 単位ではなく全体整合を見ます
 - parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
-- write scope が重なる場合は、writer ごとに serialize するか worktree を分けてから統合します
+- write scope が重なる場合は、writer ごとに current checkout 内の後続 wave へ serialize してから統合します
 
 ## 8. reuse-first の必須ルール
 
