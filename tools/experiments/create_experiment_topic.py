@@ -12,9 +12,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from registry_lib import find_topic
-from registry_lib import load_registry
-from registry_lib import write_registry
+from registry_lib import find_topic, load_registry, write_registry
 
 
 def repo_root_from_script() -> Path:
@@ -118,15 +116,17 @@ def main() -> int:
         "status": args.status,
         "topic_dir": f"experiments/{args.topic}",
         "topic_readme": f"experiments/{args.topic}/README.md",
-        "canonical_entrypoint": f"experiments/{args.topic}/experimentcode.py",
+        "canonical_entrypoint": f"experiments/{args.topic}/run.py",
         "result_root": f"experiments/{args.topic}/result",
         "report_root": "experiments/report",
         "default_variant": args.default_variant,
         "smoke_inner_command": (
-            f"python3 experiments/{args.topic}/experimentcode.py --run-dir {{run_dir}} --limit 4"
+            f"python3 experiments/{args.topic}/run.py --run-dir {{run_dir}} "
+            "--config {config_path} --mode smoke --limit 4"
         ),
         "formal_inner_command": (
-            f"python3 experiments/{args.topic}/experimentcode.py --run-dir {{run_dir}} --limit 32"
+            f"python3 experiments/{args.topic}/run.py --run-dir {{run_dir}} "
+            "--config {config_path} --mode formal --limit 32"
         ),
     }
     if args.primary_note:

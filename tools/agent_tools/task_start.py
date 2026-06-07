@@ -150,11 +150,6 @@ def build_parser(enable_names: tuple[str, ...], task_choices: tuple[str, ...]) -
         help="Workspace root used to resolve WORKTREE_SCOPE.md and write permissions.",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview the run id and paths without writing files.",
-    )
-    parser.add_argument(
         "--skip-agent-canon-preflight",
         action="store_true",
         help="Skip the automatic make agent-canon-ensure-latest preflight.",
@@ -251,23 +246,21 @@ def main() -> int:
         catalog=catalog,
         workflow_family_id=workflow_family_id,
     )
-    created_files: tuple[str, ...] = ()
-    if not args.dry_run:
-        created_files = create_run_bundle(
-            RunBundleSpec(
-                config=config,
-                report_dir=report_dir,
-                run_id=run_id,
-                task=args.task,
-                owner=args.owner,
-                created_at_iso=created_at_iso,
-                roles=roles,
-                workspace_root=workspace_root,
-                workflow_family_id=workflow_family_id or "",
-            )
+    created_files = create_run_bundle(
+        RunBundleSpec(
+            config=config,
+            report_dir=report_dir,
+            run_id=run_id,
+            task=args.task,
+            owner=args.owner,
+            created_at_iso=created_at_iso,
+            roles=roles,
+            workspace_root=workspace_root,
+            workflow_family_id=workflow_family_id or "",
         )
-        active_pointer = report_root / ".active_run"
-        active_pointer.write_text(str(report_dir.resolve()) + "\n", encoding="utf-8")
+    )
+    active_pointer = report_root / ".active_run"
+    active_pointer.write_text(str(report_dir.resolve()) + "\n", encoding="utf-8")
 
     review_roles = tuple(
         role.id
@@ -332,33 +325,30 @@ def main() -> int:
         "IMPLEMENTATION_DOCUMENT_PACKET="
         f"{document_packet_output(config, 'implementer', report_dir, workspace_root)}"
     )
-    if args.dry_run:
-        print("DRY_RUN=1")
-    else:
-        append_monitoring(
-            report_dir,
-            signals=[
-                start_declaration,
-                (
-                    "stage owner routing active_roles="
-                    f"{','.join(role.id for role in roles)}"
-                ),
-                f"agent_canon_preflight={preflight.status}",
-                (
-                    "web_research_not_required: task_start does not decide "
-                    "external research"
-                ),
-            ],
-            interventions=[
-                f"created run bundle and workflow_monitoring.md at {report_dir}",
-            ],
-            behavior_events=[
-                "token_efficiency_not_required reason=task_start_default",
-            ],
-        )
-        print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
-        print(f"CREATED_FILES={','.join(created_files)}")
-        print(f"AGENT_CANON_ACTIVE_RUN_POINTER={active_pointer}")
+    append_monitoring(
+        report_dir,
+        signals=[
+            start_declaration,
+            (
+                "stage owner routing active_roles="
+                f"{','.join(role.id for role in roles)}"
+            ),
+            f"agent_canon_preflight={preflight.status}",
+            (
+                "web_research_not_required: task_start does not decide "
+                "external research"
+            ),
+        ],
+        interventions=[
+            f"created run bundle and workflow_monitoring.md at {report_dir}",
+        ],
+        behavior_events=[
+            "token_efficiency_not_required reason=task_start_default",
+        ],
+    )
+    print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
+    print(f"CREATED_FILES={','.join(created_files)}")
+    print(f"AGENT_CANON_ACTIVE_RUN_POINTER={active_pointer}")
     return 0
 
 

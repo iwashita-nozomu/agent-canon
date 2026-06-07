@@ -23,11 +23,12 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
    - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`
+   - runtime nesting ceiling: `.codex/config.toml` `[agents].max_depth`, currently `2` for one bounded child-subagent layer
    - workflow active budget: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
-   - stage wave plan: parent-owned bounded waves within the active budget
+   - stage wave plan: owner-owned bounded waves within the active budget; parent may delegate a stage owner to spawn child subagents when the handoff packet fixes owner, input packet, expected output, write scope, validation route, and review gate
    - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
    - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap
-   - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, and `run.write_scope_policy.max_write_subagents`
+   - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`
@@ -39,10 +40,10 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - README, workflow, guide, migration, or other general explanatory reader-facing docs -> `$long-form-writing` as the DSL-to-prose projection adapter; do not select it by length alone
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
-     - PR body, PR evidence comment, status update, decision brief, or reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence -> `$report-writing`; report output defaults to Markdown unless the user explicitly asks for HTML, browser view, dashboard, web page, or external browser publication; if raw machine results are written or copied, also add `$result-artifact-writeout`
+     - PR body, PR evidence comment, status update, decision brief, presentation narrative, PPT storyboard, or reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence -> `$report-writing`; report output defaults to Markdown unless the user explicitly asks for HTML, browser view, dashboard, web page, or external browser publication; if PPT/deck is in scope, include a visual asset plan and slide-production workflow; if raw machine results are written or copied, also add `$result-artifact-writeout`
      - explicit HTML output, HTML report, browser-readable page, dashboard, local preview server, or external browser publication -> `$html-output`
      - explicit HTML experiment or Eval report -> `$html-experiment-report` plus `$html-output`
-     - nontrivial report, experiment plan/report, Eval output, decision brief, HTML view, document, paper, or refactor structure; first figure/table/section/slice choice; source map; or invalid interpretation boundary -> `$structure-planning`
+     - nontrivial report, experiment plan/report, Eval output, decision brief, presentation/PPT deck, HTML view, document, paper, or refactor structure; first figure/table/ponchi-e/slide/section/slice choice; source map; source-to-slide map; or invalid interpretation boundary -> `$structure-planning`
      - tool/checker/hook/static-analysis runs to discover problems, create finding packets, compare before/after impact, or feed implementation/refactor planning -> `$tool-finding-report`; if raw results are written, also add `$result-artifact-writeout`; if the output is reader-facing narrative, also add `$report-writing`; if that narrative has a nontrivial finding packet, priority policy, metric/count contract, or source map, also add `$structure-planning`
      - README, workflow, guide, migration, or specification docs keep their domain projection adapter; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
      - large refactor -> `$refactor-loop`

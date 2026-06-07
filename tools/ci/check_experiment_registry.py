@@ -261,10 +261,13 @@ def validate_topic(
 
     topic_dir = repo_root / topic_dir_raw
     topic_readme = repo_root / readme_raw
-    canonical_entrypoint = repo_root / entrypoint_raw
     result_root = repo_root / result_root_raw
     report_root = repo_root / report_root_raw
     expected_topic_dir = repo_root / "experiments" / topic_name
+    expected_entrypoint_raw = f"experiments/{topic_name}/run.py"
+    expected_config_raw = f"experiments/{topic_name}/config.yaml"
+    expected_entrypoint = repo_root / expected_entrypoint_raw
+    expected_config = repo_root / expected_config_raw
 
     if topic_dir != expected_topic_dir:
         findings.append(
@@ -274,15 +277,30 @@ def validate_topic(
                 f"expected experiments/{topic_name} for the default layout",
             )
         )
+    if entrypoint_raw != expected_entrypoint_raw:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: canonical_entrypoint must be the topic-local run.py "
+                f"({expected_entrypoint_raw}), got {entrypoint_raw}",
+            )
+        )
     if not topic_dir.is_dir():
         findings.append(Finding("error", f"{topic_name}: topic_dir is missing: {topic_dir}"))
     if not topic_readme.is_file():
         findings.append(Finding("error", f"{topic_name}: topic_readme is missing: {topic_readme}"))
-    if not canonical_entrypoint.is_file():
+    if not expected_entrypoint.is_file():
         findings.append(
             Finding(
                 "error",
-                f"{topic_name}: canonical_entrypoint is missing: {canonical_entrypoint}",
+                f"{topic_name}: canonical_entrypoint is missing: {expected_entrypoint}",
+            )
+        )
+    if not expected_config.is_file():
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: topic config is missing: {expected_config_raw}",
             )
         )
     if not result_root.is_dir():

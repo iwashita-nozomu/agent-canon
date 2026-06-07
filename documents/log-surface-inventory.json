@@ -1995,8 +1995,16 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "presentation_asset_packet",
+      "line": 242,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "report_output_format",
-      "line": 201,
+      "line": 239,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2004,7 +2012,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_quality_checklist",
-      "line": 202,
+      "line": 240,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2012,7 +2020,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_reviewer",
-      "line": 205,
+      "line": 244,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2020,7 +2028,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_rule_drift",
-      "line": 206,
+      "line": 245,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2028,7 +2036,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_source_packet",
-      "line": 203,
+      "line": 241,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2036,7 +2044,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_writing",
-      "line": 200,
+      "line": 238,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2044,7 +2052,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_contract",
-      "line": 204,
+      "line": 243,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2100,7 +2108,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "audience",
-      "line": 48,
+      "line": 52,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -2108,62 +2116,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "decision_context",
-      "line": 49,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "discourse_relations",
-      "line": 128,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact",
-      "line": 50,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact_question",
-      "line": 51,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "invalid_interpretations",
-      "line": 56,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "metric_or_delta_contract",
-      "line": 54,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordered_structure",
-      "line": 55,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_to_structure_map",
       "line": 53,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2171,63 +2123,55 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_contract",
-      "line": 124,
+      "field": "discourse_relations",
+      "line": 133,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_first_artifact",
-      "line": 125,
+      "field": "first_artifact",
+      "line": 54,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_invalid_interpretations_recorded",
-      "line": 129,
+      "field": "first_artifact_question",
+      "line": 55,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_kind",
-      "line": 47,
+      "field": "invalid_interpretations",
+      "line": 60,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_planning",
-      "line": 123,
+      "field": "metric_or_delta_contract",
+      "line": 58,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_source_map",
-      "line": 127,
+      "field": "ordered_structure",
+      "line": 59,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_visual_plan",
-      "line": 126,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_gate",
+      "field": "source_to_structure_map",
       "line": 57,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2235,8 +2179,72 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 129,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_first_artifact",
+      "line": 130,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_invalid_interpretations_recorded",
+      "line": 134,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_kind",
+      "line": 51,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_planning",
+      "line": 128,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_source_map",
+      "line": 132,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_visual_plan",
+      "line": 131,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 61,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "visual_plan",
-      "line": 52,
+      "line": 56,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -4060,7 +4068,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
-      "line": 354,
+      "line": 345,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4068,7 +4076,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_ACTIVE_RUN_POINTER",
-      "line": 356,
+      "line": 347,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4076,7 +4084,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_CHECKLIST",
-      "line": 273,
+      "line": 267,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4084,7 +4092,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS",
-      "line": 274,
+      "line": 268,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4092,7 +4100,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_COMMAND",
-      "line": 269,
+      "line": 263,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4100,7 +4108,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_NEXT",
-      "line": 272,
+      "line": 266,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4108,7 +4116,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_REASON",
-      "line": 271,
+      "line": 265,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4116,7 +4124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_STATUS",
-      "line": 270,
+      "line": 264,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -4124,126 +4132,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AUTO_SPECIALISTS",
-      "line": 308,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CREATED_FILES",
-      "line": 355,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CROSS_CUTTING_DOCUMENT_PACKET",
-      "line": 314,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DESIGN_DOCUMENT_PACKET",
-      "line": 318,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DRY_RUN",
-      "line": 327,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "IMPLEMENTATION_CODEX_AGENTS",
-      "line": 309,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "IMPLEMENTATION_DOCUMENT_PACKET",
-      "line": 322,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_DIR",
-      "line": 276,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ROLE_MODEL_MATRIX",
-      "line": 313,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_MAX_THREADS",
-      "line": 279,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUN_ID",
-      "line": 275,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "START_DECLARATION",
-      "line": 295,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUGGESTED_SKILLS",
-      "line": 294,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_AUTHORITY",
-      "line": 277,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_DEFAULT_SPECIALISTS",
-      "line": 306,
-      "path": "tools/agent_tools/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_ID",
       "line": 302,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
@@ -4251,23 +4139,31 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_ACTIVE_SPAWN_BUDGET",
-      "line": 304,
+      "field": "CREATED_FILES",
+      "line": 346,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_MAX_WRITE_SUBAGENTS",
-      "line": 305,
+      "field": "CROSS_CUTTING_DOCUMENT_PACKET",
+      "line": 308,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SUBAGENT_PROMPT_PACKET",
+      "field": "DESIGN_DOCUMENT_PACKET",
+      "line": 312,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "IMPLEMENTATION_CODEX_AGENTS",
       "line": 303,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
@@ -4275,8 +4171,112 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "IMPLEMENTATION_DOCUMENT_PACKET",
+      "line": 316,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_DIR",
+      "line": 270,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "ROLE_MODEL_MATRIX",
+      "line": 307,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_MAX_THREADS",
+      "line": 273,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUN_ID",
+      "line": 269,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "START_DECLARATION",
+      "line": 289,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUGGESTED_SKILLS",
+      "line": 288,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_AUTHORITY",
+      "line": 271,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_DEFAULT_SPECIALISTS",
+      "line": 300,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_ID",
+      "line": 296,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_ACTIVE_SPAWN_BUDGET",
+      "line": 298,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_MAX_WRITE_SUBAGENTS",
+      "line": 299,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SUBAGENT_PROMPT_PACKET",
+      "line": 297,
+      "path": "tools/agent_tools/bootstrap_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "WORKSPACE_ROOT",
-      "line": 278,
+      "line": 272,
       "path": "tools/agent_tools/bootstrap_agent_run.py",
       "surface": "tool"
     },
@@ -5564,7 +5564,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
-      "line": 172,
+      "line": 162,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5572,14 +5572,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CREATED_FILES",
-      "line": 173,
-      "path": "tools/agent_tools/doc_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOC_KIND",
       "line": 163,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
@@ -5587,8 +5579,8 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "DRY_RUN",
-      "line": 170,
+      "field": "DOC_KIND",
+      "line": 156,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5596,7 +5588,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RECOMMENDED_SPECIALISTS",
-      "line": 166,
+      "line": 159,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5604,7 +5596,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_DIR",
-      "line": 161,
+      "line": 154,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5612,7 +5604,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUN_ID",
-      "line": 160,
+      "line": 153,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5620,7 +5612,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "START_DECLARATION",
-      "line": 168,
+      "line": 161,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5628,7 +5620,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SUGGESTED_SKILLS",
-      "line": 167,
+      "line": 160,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5636,7 +5628,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_FAMILY_NAME",
-      "line": 164,
+      "line": 157,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5644,7 +5636,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SUBAGENT_PROMPT_PACKET",
-      "line": 165,
+      "line": 158,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -5652,7 +5644,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKSPACE_ROOT",
-      "line": 162,
+      "line": 155,
       "path": "tools/agent_tools/doc_start.py",
       "surface": "tool"
     },
@@ -11012,7 +11004,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
-      "line": 359,
+      "line": 349,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11020,7 +11012,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_ACTIVE_RUN_POINTER",
-      "line": 361,
+      "line": 351,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11028,7 +11020,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_CHECKLIST",
-      "line": 297,
+      "line": 290,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11036,7 +11028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS",
-      "line": 298,
+      "line": 291,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11044,7 +11036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_COMMAND",
-      "line": 293,
+      "line": 286,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11052,7 +11044,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_NEXT",
-      "line": 296,
+      "line": 289,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11060,7 +11052,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_REASON",
-      "line": 295,
+      "line": 288,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11068,7 +11060,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_STATUS",
-      "line": 294,
+      "line": 287,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -11076,158 +11068,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AUTO_SPECIALISTS",
-      "line": 315,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CREATED_FILES",
-      "line": 360,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CROSS_CUTTING_DOCUMENT_PACKET",
-      "line": 323,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DESIGN_DOCUMENT_PACKET",
-      "line": 327,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DRY_RUN",
-      "line": 336,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "IMPLEMENTATION_CODEX_AGENTS",
-      "line": 318,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "IMPLEMENTATION_DOCUMENT_PACKET",
-      "line": 331,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_DIR",
-      "line": 300,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REQUEST_CONTRACT",
-      "line": 303,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REQUEST_CONTRACT_REQUIRED",
-      "line": 304,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ROLE_MODEL_MATRIX",
-      "line": 322,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_MAX_THREADS",
-      "line": 305,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUN_ID",
-      "line": 299,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "START_DECLARATION",
-      "line": 317,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUGGESTED_SKILLS",
-      "line": 316,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_AUTHORITY",
-      "line": 301,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_DEFAULT_SPECIALISTS",
-      "line": 313,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TASK_ID",
-      "line": 307,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_ACTIVE_SPAWN_BUDGET",
-      "line": 311,
-      "path": "tools/agent_tools/task_start.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_FAMILY",
       "line": 308,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
@@ -11235,23 +11075,95 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_FAMILY_NAME",
-      "line": 309,
+      "field": "CREATED_FILES",
+      "line": 350,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_MAX_WRITE_SUBAGENTS",
-      "line": 312,
+      "field": "CROSS_CUTTING_DOCUMENT_PACKET",
+      "line": 316,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SUBAGENT_PROMPT_PACKET",
+      "field": "DESIGN_DOCUMENT_PACKET",
+      "line": 320,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "IMPLEMENTATION_CODEX_AGENTS",
+      "line": 311,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "IMPLEMENTATION_DOCUMENT_PACKET",
+      "line": 324,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_DIR",
+      "line": 293,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REQUEST_CONTRACT",
+      "line": 296,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REQUEST_CONTRACT_REQUIRED",
+      "line": 297,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "ROLE_MODEL_MATRIX",
+      "line": 315,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_MAX_THREADS",
+      "line": 298,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUN_ID",
+      "line": 292,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "START_DECLARATION",
       "line": 310,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
@@ -11259,8 +11171,80 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "WORKSPACE_ROOT",
+      "field": "SUGGESTED_SKILLS",
+      "line": 309,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_AUTHORITY",
+      "line": 294,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_DEFAULT_SPECIALISTS",
+      "line": 306,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TASK_ID",
+      "line": 300,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_ACTIVE_SPAWN_BUDGET",
+      "line": 304,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_FAMILY",
+      "line": 301,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_FAMILY_NAME",
       "line": 302,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_MAX_WRITE_SUBAGENTS",
+      "line": 305,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SUBAGENT_PROMPT_PACKET",
+      "line": 303,
+      "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKSPACE_ROOT",
+      "line": 295,
       "path": "tools/agent_tools/task_start.py",
       "surface": "tool"
     },
@@ -12548,7 +12532,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 549,
+      "line": 567,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -12556,7 +12540,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "registry_path",
-      "line": 547,
+      "line": 565,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -12564,7 +12548,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "repo_root",
-      "line": 546,
+      "line": 564,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -13380,63 +13364,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 419,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "command_source",
-      "line": 794,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "config_path",
-      "line": 793,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "eval_manifest_path",
-      "line": 792,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "manifest_path",
-      "line": 791,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "report_path",
-      "line": 790,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "result_dir",
-      "line": 789,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "run_name",
-      "line": 788,
+      "line": 412,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },

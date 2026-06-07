@@ -73,7 +73,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--variant",
-        default="manual",
+        default="formal",
         help="Variant label used when --run-name is omitted.",
     )
     parser.add_argument(
@@ -96,13 +96,6 @@ def parse_args() -> argparse.Namespace:
         "--skip-report-init",
         action="store_true",
         help="Do not create a report stub when the report file is absent.",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help=(
-            "Resolve run paths and command metadata but do not write files or execute the command."
-        ),
     )
     parser.add_argument(
         "--config-json",
@@ -307,7 +300,7 @@ def render_report_stub(
     registry_path: Path | None,
 ) -> str:
     """Render one initial run report."""
-    command_text = shlex.join(command) if command else "(dry-run)"
+    command_text = shlex.join(command) if command else "(no command)"
     branch_text = branch or "(unknown)"
     commit_text = commit or "(unknown)"
     registry_text = str(registry_path) if registry_path is not None else "(none)"
@@ -760,7 +753,7 @@ def main() -> int:
         manifest_path=manifest_path,
         command=command,
         created_at=created_at,
-        status="initialized" if args.dry_run else "running",
+        status="running",
         registry_path=registry_path,
         registry_entry=registry_entry,
         command_source=command_source,
@@ -784,22 +777,8 @@ def main() -> int:
     manifest["config_path"] = str(config_path)
     manifest["config"] = run_config
 
-    if args.dry_run:
-        print(f"run_name={run_name}")
-        print(f"result_dir={result_dir}")
-        print(f"report_path={report_path}")
-        print(f"manifest_path={manifest_path}")
-        print(f"eval_manifest_path={eval_manifest_path}")
-        print(f"config_path={config_path}")
-        print(f"command_source={command_source}")
-        print("required_eval_patterns=" + ",".join(required_eval_patterns))
-        print("optional_eval_patterns=" + ",".join(optional_eval_patterns))
-        if command:
-            print("command=" + shlex.join(command))
-        return 0
-
     if not command:
-        print("a command is required unless --dry-run is used", file=sys.stderr)
+        print("a command is required", file=sys.stderr)
         return 2
 
     result_dir.mkdir(parents=True, exist_ok=True)
