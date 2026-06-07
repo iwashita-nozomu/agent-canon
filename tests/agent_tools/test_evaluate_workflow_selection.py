@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests workflow selection eval behavior.
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
-# upstream design ../../agents/evals/workflow_selection_eval.toml defines canonical workflow selection cases
+# upstream design ../../evidence/agent-evals/workflow_selection_eval.toml defines canonical workflow selection cases
 # @dependency-end
 
 """Tests for workflow selection evals."""
@@ -80,7 +80,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
-            manifest = root / "agents" / "evals" / "workflow_selection_eval.toml"
+            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 "\n".join(
                     [
@@ -117,7 +118,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         for relative in (
             ".codex/hooks/skill_usage_logger.py",
             ".codex/hooks/hook_event_log.py",
-            "agents/evals/workflow_selection_eval.toml",
+            "evidence/agent-evals/workflow_selection_eval.toml",
         ):
             source = PROJECT_ROOT / relative
             destination = root / relative

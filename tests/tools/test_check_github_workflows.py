@@ -565,7 +565,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
-            "issues/open/AC-20260513-durable-finding-auto-promotion.md",
+            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
             "README.md",
         ]:
             source = REPO_ROOT / relative
@@ -589,7 +590,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
             "issues/README.md",
-            "issues/open/AC-20260513-durable-finding-auto-promotion.md",
+            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
         ]:
             source = REPO_ROOT / relative
             destination = root / "vendor" / "agent-canon" / relative

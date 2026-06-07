@@ -33,9 +33,15 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 
 ## External Evaluation Basis
 
-- OpenAI の agent eval guidance は、debug 中は trace grading で tool call、handoff、policy adherence、prompt/routing change の影響を見ることを推奨しています。Source: https://platform.openai.com/docs/guides/agent-evals
-- OpenAI の trace grading guidance は、end-to-end trace に structured score / label を付け、workflow がどこで成功・失敗したかを特定する考え方を説明しています。Source: https://platform.openai.com/docs/guides/trace-grading
-- OpenAI の Codex 運用記事は、agent が失敗したときに「何の tool / guardrail / documentation が足りないか」を repo に戻し、review feedback と validation を loop 化する方針を説明しています。Source: https://openai.com/index/harness-engineering/
+- OpenAI / Codex の agent eval、trace grading、Codex 運用 guidance は
+  workflow 文書内で個別 URL や fallback 文書として二重管理しません。
+  更新時は `$openai-docs` の source route を使い、Codex manual helper、
+  Docs MCP、official-domain web fallback、または `$openai-docs` が指定する
+  bundled fallback references で確認します。
+- この workflow の local authority は、外部 doc の写しではなく
+  `evidence/agent-evals/agent_behavior_eval.toml`、
+  `reports/agents/<run-id>/agent_evaluation.md`、
+  `tools/agent_tools/evaluate_agent_run.py` です。
 - この repo では外部 API 依存を closeout gate に入れず、同じ原則を `reports/agents/<run-id>/agent_evaluation.md` と `tools/agent_tools/evaluate_agent_run.py` に写像します。
 
 ## Canonical Notes
@@ -111,7 +117,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 `AGENT_EVALUATION_STATUS=revise` の場合は、出力された feedback action を schedule/work_log/該当 artifact に反映し、再度 evaluation を通します。
 `AGENT_EVALUATION_STATUS=pass` になり、`agent_evaluation.md` の `feedback_actions_resolved: yes` と `learning_capture_complete: yes` が揃うまで、`task_close.py` は user-facing completion を許可しません。
-behavior eval の rubric は `agents/evals/agent_behavior_eval.toml` を正本にし、skill / workflow を変えたのに agent 行動が変わっていない場合は revise として扱います。
+behavior eval の rubric は `evidence/agent-evals/agent_behavior_eval.toml` を正本にし、skill / workflow を変えたのに agent 行動が変わっていない場合は revise として扱います。
 
 ## Workflow Monitoring
 

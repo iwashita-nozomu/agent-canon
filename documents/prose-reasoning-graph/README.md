@@ -31,8 +31,10 @@ contract live here.
 - The DSL treats prose as one text-anchored semantic graph; macro prose
   structure is a derived projection view, not a second source graph.
 - Derived projection views may recommend prose, list, table, figure, or
-  equation renderings, but those recommendations remain presentation hints over
-  source anchors.
+  equation renderings only through materialized `presentation` feature nodes and
+  `has_feature` edges attached to source anchors. The recommendation remains a
+  verified presentation candidate, not a replacement for the canonical source
+  graph.
 - Corpus hints may be inferred from source text and user prompt, then exported
   as projection metadata for retrieval and evaluation calibration.
 - `documents/tools/prose_reasoning_graph.md` owns CLI usage and operator flow.

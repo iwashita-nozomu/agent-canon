@@ -4,7 +4,7 @@ responsibility Documents how to move AgentCanon in-tree hook and eval logs into 
 upstream design runtime-log-archive.md runtime log archive ownership and branch policy
 upstream design coding-conventions-logging.md JSONL logging convention
 upstream implementation ../tools/agent_tools/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
-downstream design ../agents/evals/README.md points readers away from in-tree result paths
+downstream design ../evidence/agent-evals/README.md points readers away from in-tree result paths
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates mounted archive JSONL and eval reports
 @dependency-end
 -->
@@ -71,7 +71,7 @@ Run the commands from the AgentCanon repository root.
 
 1. If `agents/evals/results/` is empty after import, remove the directory from
    Git. The migration notice and schema pointers now live in
-   `documents/runtime-log-archive.md` and `agents/evals/README.md`.
+   `documents/runtime-log-archive.md` and `evidence/agent-evals/README.md`.
 
 ## Current Migration Evidence
 

@@ -81,6 +81,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - Human-readable public, internal, and compatibility skill docs: `agents/skills/`
 - Codex runtime config and subagent registry: `.codex/config.toml`
 - Codex role behavior: `.codex/agents/*.toml`
+- Eval manifest source contracts: `evidence/agent-evals/`
 
 ## Team Shape
 

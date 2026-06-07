@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Evaluates deterministic workflow selection routing cases.
-# upstream design ../../agents/evals/README.md eval usage contract
-# upstream design ../../agents/evals/workflow_selection_eval.toml workflow selection eval manifest
+# upstream design ../../evidence/agent-evals/README.md eval usage contract
+# upstream design ../../evidence/agent-evals/workflow_selection_eval.toml workflow selection eval manifest
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py owns prompt-to-workflow classification
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_workflow_selection.py tests workflow selection eval behavior
@@ -26,9 +26,10 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
 
-DEFAULT_MANIFEST = "agents/evals/workflow_selection_eval.toml"
+DEFAULT_MANIFEST = eval_manifest_path("workflow_selection_eval.toml")
 DEFAULT_RESULTS_FAMILY = "workflow-selection"
 RUN_ID_DIGEST_LENGTH = 10
 
@@ -235,7 +236,7 @@ def run_id_for(manifest: Path, results: tuple[WorkflowSelectionResult, ...]) -> 
 def evaluate(root: Path, manifest: Path) -> WorkflowSelectionBundle:
     """Evaluate one workflow selection manifest."""
     resolved_root = root.resolve()
-    resolved_manifest = (resolved_root / manifest).resolve() if not manifest.is_absolute() else manifest
+    resolved_manifest = resolve_eval_manifest(resolved_root, manifest).resolve()
     logger = load_skill_usage_logger(resolved_root)
     results = tuple(evaluate_case(logger, case) for case in load_cases(resolved_manifest))
     status = "pass" if all(result.passed for result in results) else "fail"

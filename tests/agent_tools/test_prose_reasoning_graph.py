@@ -517,6 +517,86 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 basis = cast(dict[str, object], view["inference_basis"])
                 self.assertIn("member_anchor_ids", basis)
 
+    def test_projection_format_uses_graph_evidence_not_raw_terms(self) -> None:
+        """A single graph-like word should not force a figure recommendation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "single_term.md"
+            db = root / "graph.sqlite"
+            output = root / "projection.json"
+            source.write_text(
+                "# Single Term\n\nThe word graph appears once as a label. This sentence keeps local flow.",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            result = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "writing",
+                "--format",
+                "json",
+                "--out",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            views = typed_items(payload, "projection_views")
+            self.assertEqual(views[0]["recommended_format"], "prose")
+
+    def test_projection_format_candidate_uses_concept_graph_shape(self) -> None:
+        """Repeated relational concepts should become a graph-backed figure candidate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "relational.md"
+            db = root / "graph.sqlite"
+            output = root / "projection.json"
+            diagnostics = root / "diagnostics.md"
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    # Relational Shape
+
+                    The graph maps node evidence to edge diagnostics. The graph keeps node and edge anchors visible.
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            result = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "writing",
+                "--format",
+                "json",
+                "--out",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            views = typed_items(payload, "projection_views")
+            self.assertEqual(views[0]["recommended_format"], "figure")
+            self.assertIn("relational_topology", str(views[0]["format_reason"]))
+            basis = cast(dict[str, object], views[0]["inference_basis"])
+            presentation_evidence = cast(dict[str, object], basis["presentation_evidence"])
+            self.assertIn("relational_topology", cast(list[str], presentation_evidence["presentation_features"]))
+            self.assertGreater(len(cast(list[str], presentation_evidence["presentation_feature_edges"])), 0)
+
+            lint = run_graph("lint", "--db", str(db), "--profile", "writing", "--out", str(diagnostics))
+            self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+            diagnostics_text = diagnostics.read_text(encoding="utf-8")
+            self.assertIn("presentation_format_candidate", diagnostics_text)
+            self.assertIn("verification_route=`presentation_format_verification`", diagnostics_text)
+
     def test_experiment_diagnostics_have_unique_rules(self) -> None:
         """Experiment coverage diagnostics should not overwrite one another."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -862,6 +942,44 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("It must still split here.", sentences)
             self.assertNotIn("The method cites e.g.", sentences)
             self.assertNotIn("v1.2.3 and Fig.", sentences)
+
+    def test_dependency_manifest_evidence_supports_responsibility_claims(self) -> None:
+        """Dependency manifests should support matching claims without document-type branches."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "contract.md"
+            db = root / "graph.sqlite"
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    # Contract
+                    <!--
+                    @dependency-start
+                    responsibility Documents canonical anchor graph contract.
+                    upstream design documents/spec.md canonical anchor graph contract and projection vocabulary.
+                    downstream implementation tools/graph.py preserves canonical anchors.
+                    @dependency-end
+                    -->
+
+                    The graph must preserve canonical anchors.
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+
+            rules = diagnostic_rules(db)
+            self.assertNotIn("unsupported_claim", rules)
+            with sqlite3.connect(db) as connection:
+                support_basis = {
+                    json.loads(row[0])["basis"]
+                    for row in connection.execute(
+                        "SELECT payload_json FROM edges WHERE layer = 'evidence' AND kind = 'supports'"
+                    )
+                }
+            self.assertIn("dependency_manifest_concept_coverage", support_basis)
 
     def test_prompt_file_influences_corpus_hints_and_missing_file_errors(self) -> None:
         """Prompt files should feed corpus hints and fail clearly when absent."""

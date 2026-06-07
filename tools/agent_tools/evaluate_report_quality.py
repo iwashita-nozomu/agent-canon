@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Evaluates report-writing quality checklist surfaces.
-# upstream design ../../agents/evals/README.md eval usage contract
-# upstream design ../../agents/evals/report_quality_eval.toml report quality eval manifest
+# upstream design ../../evidence/agent-evals/README.md eval usage contract
+# upstream design ../../evidence/agent-evals/report_quality_eval.toml report quality eval manifest
 # upstream design ../../agents/skills/report-writing.md report writing skill contract
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_report_quality.py tests report quality eval behavior
@@ -25,9 +25,10 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
 
-DEFAULT_MANIFEST = "agents/evals/report_quality_eval.toml"
+DEFAULT_MANIFEST = eval_manifest_path("report_quality_eval.toml")
 DEFAULT_RESULTS_FAMILY = "report-quality"
 RUN_ID_DIGEST_LENGTH = 10
 
@@ -256,7 +257,7 @@ def evaluate_item(report_eval: QualityEval, item: QualityChecklistItem, text: st
 def evaluate(root: Path, manifest: Path) -> ReportQualityBundle:
     """Evaluate one report quality manifest."""
     resolved_root = root.resolve()
-    resolved_manifest = (resolved_root / manifest).resolve() if not manifest.is_absolute() else manifest
+    resolved_manifest = resolve_eval_manifest(resolved_root, manifest).resolve()
     evals = load_manifest(resolved_manifest, resolved_root)
     results: list[QualityChecklistResult] = []
     for report_eval in evals:

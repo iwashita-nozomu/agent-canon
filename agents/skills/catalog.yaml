@@ -93,6 +93,10 @@ skill_families:
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
     shim: .agents/skills/refactor-loop/SKILL.md
+  - id: structure-refactor
+    purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
+    canonical_doc: agents/skills/structure-refactor.md
+    shim: .agents/skills/structure-refactor/SKILL.md
   - id: user-guided-debugging
     purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
     canonical_doc: agents/skills/user-guided-debugging.md

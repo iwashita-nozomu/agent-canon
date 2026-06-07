@@ -360,6 +360,7 @@ exit 条件:
 - `Identifier And Naming Plan:`
 - `Validation And Rollback Plan:`
 - refactor pass では追加で `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を残します
+- directory layout、directory README ownership、root view、または responsibility-scope map refactor では追加で `Directory Responsibility Map:`, `Recursive README Sources:`, `Scope Delta:`, `Reader Navigation Delta:`, `Scope Overlap Report:`, `Import Responsibility Report:` を残します
 - 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Target Score:`, `Static Analyzer Limits:` を残します
 
 ルール:
@@ -382,6 +383,7 @@ exit 条件:
 - worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
+- structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
 - 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の score を design gate に入れます。score pass は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
 - Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 

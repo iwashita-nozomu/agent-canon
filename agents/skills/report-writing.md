@@ -9,7 +9,7 @@ upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design prose-reasoning-graph.md prose graph diagnostics and handoff overlay
 upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream design html-output.md consumes report content for explicit HTML rendering and browser publication
-downstream design ../evals/report_quality_eval.toml report quality checklist eval manifest
+downstream design ../../evidence/agent-evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report writing prompt surfaces
 @dependency-end

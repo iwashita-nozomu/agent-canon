@@ -23,6 +23,7 @@ except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
 from agent_team import resolve_report_root
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
@@ -46,7 +47,7 @@ REQUIRED_ARTIFACTS = (
     "closeout_gate.md",
     "retrospective.md",
 )
-DEFAULT_BEHAVIOR_MANIFEST = "agents/evals/agent_behavior_eval.toml"
+DEFAULT_BEHAVIOR_MANIFEST = eval_manifest_path("agent_behavior_eval.toml")
 
 
 @dataclass(frozen=True)
@@ -989,9 +990,7 @@ def main() -> int:
     if not output_path.is_absolute():
         output_path = report_dir / output_path
 
-    behavior_manifest = Path(args.behavior_manifest)
-    if not behavior_manifest.is_absolute():
-        behavior_manifest = workspace_root / behavior_manifest
+    behavior_manifest = resolve_eval_manifest(workspace_root, args.behavior_manifest)
     behavior_criteria = load_behavior_manifest(behavior_manifest)
     criteria, blockers = evaluate(report_dir, behavior_criteria, workspace_root)
     score = sum(item.score for item in criteria)

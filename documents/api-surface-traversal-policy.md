@@ -4,7 +4,7 @@ responsibility Defines public API traversal evidence before negative capability 
 upstream design ../issues/closed/AC-20260518-api-surface-negative-conclusion.md records the original failure.
 upstream design ../agents/workflows/hypothesis-validation-workflow.md requires cause and evidence before fixes.
 upstream design ./coding-conventions-python.md defines helper and API-use discipline.
-downstream implementation ../agents/evals/issue_eval_manifest.toml registers the API-surface eval case.
+downstream implementation ../evidence/agent-evals/issue_eval_manifest.toml registers the API-surface eval case.
 @dependency-end
 -->
 

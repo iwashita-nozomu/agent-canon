@@ -53,7 +53,26 @@ rewrite の採否は skill、reviewer、workflow の責務です。
 discourse relation、argument claim、evidence、experiment planning、presentation order、
 diagnostics、edit operations、natural-language explanation、projection metadata を層として持ちます。
 
-この source-anchored graph の層構成を DSL spec の語彙へ対応させると次の通りです。
+### Presentation Recommendation Evidence
+
+| Feature | Graph evidence | Projection result |
+| ------- | -------------- | ----------------- |
+| `relational_topology` | Concept relation subgraph. | Figure candidate. |
+| `aligned_attribute_set` | Phase or experiment nodes. | Table candidate. |
+| `formal_constraint` | Formal relation signal on a source anchor. | Equation candidate. |
+| Materialization | `presentation` / `feature` nodes and `has_feature` edges. | `projection_views[].recommended_format` reads the feature subgraph. |
+
+### Claim Support Evidence
+
+| Evidence source | Materialized node | Support rule |
+| --------------- | ----------------- | ------------ |
+| Source text evidence cue. | `evidence` node. | Nearby claim or overlapping claim concepts receive a `supports` edge. |
+| Dependency manifest `responsibility` entry. | `document_responsibility` evidence node. | Matching responsibility concepts receive a `supports` edge. |
+| Dependency manifest `upstream` / `downstream` entry. | `dependency_manifest` evidence node. | Matching dependency concepts receive a `supports` edge. |
+| Missing support edge. | `diagnostics` record. | `unsupported_claim` is emitted. |
+
+次は、この feature subgraph を含めて、source-anchored graph の層構成を DSL spec の語彙へ対応させると
+次の通りです。
 
 - source-truth anchor:
   sentence または EDU が source-truth anchor です。
@@ -111,7 +130,9 @@ graph DB の source-truth record ではありません。
 
 この LocalLLM output と graph DB の境界に加えて、同じ LocalLLM IR の `analysis_intents[]` は、本文が実験計画を述べているのか、
 profile 語彙を説明しているだけなのかを区別します。graph 側はこの intent status を読み、
-`experiment_plan` が `present` の場合だけ experiment layer と experiment diagnostics を起動します。
+`experiment_plan` が `present` の場合に experiment layer と experiment diagnostics を起動します。
+ただし `--profile experiment` は明示的な completeness check 指示なので、LocalLLM IR が active
+plan を検出しない文でも experiment diagnostics を起動できます。
 
 LocalLLM IR が無い旧 DB や障害時だけ、graph 側は非 LLM fallback check を使えます。
 fallback check を呼んだ時点で、その結果が applicable / not-applicable のどちらでも
@@ -238,13 +259,15 @@ warning は fallback result ではなく、fallback を使った事実に対し�
 
 diagnostics が verification route を持つ場合、rewrite の前に route を実行します。
 route は inference validity、external evidence、formal proof obligation、
-experiment-plan fields、discourse connection を該当 skill / reviewer へ渡します。
+experiment-plan fields、discourse connection、presentation format candidate を該当 skill /
+reviewer へ渡します。
 
 | Route | 発火条件 | 主 verifier | 再帰展開 |
 | ----- | -------- | ------------ | -------- |
 | `claim_support_verification` | unsupported claim または missing evidence layer。 | `logic-gap-review`, `$literature-survey`, `citation-evidence-review`; proof-like claim では `$formal-proof-workflow`。 | claim を assumptions、warrants、atomic support requirements に分解する。 |
 | `connection_verification` | weak paragraph bridge、missing warrant、unclear reader-state transition。 | `$structure-planning`, `logic-gap-review`; bridge が external support に依存する場合は `$literature-survey`。 | relation を分類し、missing premise と external bridge claim を検証する。 |
 | `experiment_plan_verification` | hypothesis、metric、baseline、expected result の欠落。 | `$experiment-lifecycle`, `$report-writing`。 | empirical claim、measurement contract、report prose と result / limitation の対応を検証する。 |
+| `presentation_format_verification` | projection view が prose ではなく list / table / figure / equation を推奨している。 | `$structure-planning`, `$report-writing`。 | feature subgraph、renderer contract、reader-state 改善を検証し、採用・却下・併用を決める。 |
 | `document_responsibility_verification` | downstream document が coverage rules 付き upstream design を参照しているが、coverage group を欠いている。 | `$prose-reasoning-graph`, `structured-analysis`, owning document workflow。 | coverage rule を展開し、missing responsibility を担う downstream span を選び、structured-analysis rerun で閉じるか保持する。 |
 
 recursive verification は route の `recursive_max_depth` と closure condition で bounded です。
@@ -258,12 +281,24 @@ unresolved blocker または warning として記録します。
 `logic-gap-review`、`citation-evidence-review`、`$experiment-lifecycle`、
 `$result-artifact-writeout` への entry を出します。
 
-これらの skill-handoff entry は receiving skill が読む bounded packet です。handoff entry は DB path、projection command、diagnostics command、natural-language explanation、
-verification routing、rewrite planning command を receiving skill に渡します。各 entry は
-`corpus_hints`、`projection_views[].recommended_format`、
-`projection_views[].format_reason` などの projection fields を明示します。
+次は、skill-handoff entry の result surface です。これらの entry は receiving skill が読む
+bounded packet であり、presentation format candidate も他の diagnostics と同じ bounded evidence
+として渡します。
 
-この packet 境界の外側では、receiving skill が自分の review gate に対して authority を持ちます。graph diagnostic は
+handoff entry は次の fields を receiving skill に渡します。
+
+- DB path
+- projection command
+- diagnostics command
+- natural-language explanation
+- verification routing
+- rewrite planning command
+- `corpus_hints`
+- `projection_views[].recommended_format`
+- `projection_views[].format_reason`
+- feature-subgraph-backed `presentation_format_candidate` diagnostics
+
+ただし、この packet 境界の外側では、receiving skill が自分の review gate に対して authority を持ちます。graph diagnostic は
 unsupported claim や weak transition を示しますが、paper approval、citation settlement、
 PR merge、repository policy change は判断しません。
 

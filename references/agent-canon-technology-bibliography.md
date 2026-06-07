@@ -6,7 +6,6 @@ upstream design ../agents/workflows/workflow-references.md workflow-level biblio
 upstream design ../documents/semantic_index.md semantic-index tool design and generated-cache policy.
 upstream design ../documents/search-coordination.md coordinated search and bounded context-pack policy.
 upstream design ../documents/dependency-manifest-design.md dependency header and dependency graph policy.
-upstream design ../documents/local-llm-responsibility-analysis.md local LLM advisory boundary.
 downstream design ../documents/tools/README.md documents operator-facing tool entrypoints.
 downstream design ../tools/README.md documents root tool inventory.
 downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the semantic vector cache.
@@ -32,13 +31,14 @@ record.
 
 ## Coverage Map
 
-- Agent runtime: Codex `AGENTS.md`, custom subagents, slash commands, OpenAI
-  embeddings, Model Context Protocol, JSON-RPC.
+- Agent runtime: `$openai-docs` source route for OpenAI/Codex product docs and
+  API reference, Model Context Protocol, JSON-RPC.
 - LLM agent methods: chain-of-thought, ReAct, Reflexion, Toolformer, Tree of
   Thoughts.
 - Semantic indexing and discourse structure: Transformer/BERT/SBERT,
-  vector-space search, discourse relations/connectives, SQLite, llama.cpp,
-  GGUF, SHA-256, Rust crates used by the Rust CLI.
+  vector-space search, provider-compatible embeddings via `$openai-docs` API
+  reference route, discourse relations/connectives, SQLite, llama.cpp, GGUF,
+  SHA-256, Rust crates used by the Rust CLI.
 - Formal proof support: Lean 4, mathlib theorem search, LeanSearch,
   Isabelle/Sledgehammer, CoqHammer, and informal-to-formal proof sketching.
 - Static/dependency analysis: Python AST, Pyright, Ruff, pytest, program
@@ -52,10 +52,7 @@ record.
 
 | Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
 | --- | --- | --- | --- | --- | --- |
-| Codex AGENTS.md guide | <https://developers.openai.com/codex/guides/agents-md> | Root and nested agent instruction files | Codex discovers and merges `AGENTS.md` instruction files by scope, with closer files overriding broader guidance. | Product behavior can change; re-check before changing runtime policy. | Adopt as the source for AGENTS entrypoint and scope-order claims. |
-| Codex subagents guide | <https://developers.openai.com/codex/subagents> | `.codex/agents/*.toml`, subagent routing, spawn-budget policy | Custom agents are standalone TOML profiles; subagents are specialized parallel agents and should be explicitly requested because they consume more tokens. | Runtime availability and model names are product-specific. | Adopt for role TOML shape, explicit subagent routing, and cost caution. |
-| Codex slash commands | <https://developers.openai.com/codex/cli/slash-commands> | `/plan`, `/agent`, `/review`, `/mcp`, `/status`, `/compact` workflow guidance | Codex CLI exposes planning, agent thread, review, MCP, status, and compaction controls as slash commands. | CLI command set may vary by runtime version. | Adopt for plan-mode and runtime-control references. |
-| OpenAI embeddings API | <https://api.openai.com/v1/embeddings> | OpenAI-compatible embedding provider and local embedding endpoint parity | The embeddings endpoint creates embedding vectors representing input text. | API schema and model availability can change; local endpoints only mimic a subset. | Adopt as compatibility target for `openai-compatible-embedding`. |
+| `$openai-docs` source route | host-provided Codex skill | OpenAI/Codex docs, model selection, model upgrades, prompt guidance, Codex manual, and OpenAI API reference | Current OpenAI/Codex product facts are resolved through the Codex manual helper, Docs MCP, official-domain web fallback, and bundled fallback references owned by `$openai-docs`. | The route is host-provided rather than vendored in AgentCanon; record task-local run evidence when a current product claim changes repo policy. | Adopt as the only source route for OpenAI/Codex product docs and API reference. Do not add individual OpenAI doc URLs or fallback copies here. |
 | Model Context Protocol latest specification | <https://modelcontextprotocol.io/specification/latest> | MCP inventory, repo MCP tools, context/resource/tool boundaries | MCP standardizes connections between LLM applications, external data, and tools using JSON-RPC style messages and capability negotiation. | The latest URL redirected to version 2025-11-25 on access date; version-specific behavior must be pinned in implementation docs. | Adopt as the source for MCP protocol boundary and security notes. |
 | MCP tools specification | <https://modelcontextprotocol.io/docs/concepts/tools> | Tool listing, tool result, structured output contracts | MCP servers expose model-invocable tools with input schemas, results, and security considerations around human control. | Fetched page redirected to version 2025-06-18; keep version drift visible. | Adopt for tool schema/output validation language. |
 | MCP resources specification | <https://modelcontextprotocol.io/docs/concepts/resources> | Resource/context handoff concepts | MCP resources provide context/data surfaces separate from tools. | Version-specific page; use only for broad design mapping unless pinned. | Adopt for resource-vs-tool separation. |
@@ -84,7 +81,7 @@ record.
 | SQLite write-ahead logging | <https://www.sqlite.org/wal.html> | Semantic-index publish/locking behavior | WAL mode records committed changes in a separate log and supports readers with a stable end mark. | AgentCanon currently publishes completed temporary DBs rather than relying on repo-local WAL artifacts. | Use to explain SQLite sidecar files and why DB caches are ignored. |
 | llama.cpp HTTP server README | <https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md> | `llama-server-embedding` and OpenAI-compatible local endpoint | llama.cpp server exposes OpenAI-compatible chat, responses, and embeddings routes, with CPU/GPU options. | README tracks `master`; pin versions in installer/tests when reproducibility matters. | Adopt as operational source for local embedding server support. |
 | GGUF format documentation | <https://github.com/ggml-org/ggml/blob/master/docs/gguf.md> | Local model artifact handling and ignored model files | GGUF stores models for inference with ggml-based executors and is designed for extensibility. | Format evolves with ggml; model licensing is separate. | Adopt for local model file terminology and ignore policy. |
-| OpenAI embeddings API | <https://api.openai.com/v1/embeddings> | Provider-compatible vector request/response shape | Embedding responses contain vectors plus model and usage metadata. | Local llama.cpp endpoints may not match every OpenAI schema feature. | Adopt as compatibility reference, not as requirement to use remote OpenAI. |
+| `$openai-docs` API reference route | host-provided Codex skill | Provider-compatible vector request/response shape | Embedding request/response shape is checked through `$openai-docs` Docs MCP / API reference when the OpenAI-compatible provider contract changes. | Local llama.cpp endpoints may not match every OpenAI schema feature. | Adopt as compatibility route, not as requirement to use remote OpenAI. |
 | FIPS 180-4 Secure Hash Standard | <https://csrc.nist.gov/pubs/fips/180-4/upd1/final> | SHA-256 content hashing in Rust CLI tools | FIPS 180-4 specifies SHA-1 and SHA-2 hash algorithms including SHA-256. | NIST notes FIPS 180-4 is planned for revision; keep hash usage conventional, not cryptographic-policy-heavy. | Adopt for SHA-256 naming and standards reference. |
 | rusqlite crate docs | <https://docs.rs/rusqlite/latest/rusqlite/> | Rust SQLite access | `rusqlite` is an ergonomic Rust wrapper around SQLite. | Crate version in AgentCanon is pinned separately in `Cargo.toml` and `Cargo.lock`. | Adopt for Rust SQLite API reference. |
 | serde_json crate docs | <https://docs.rs/serde_json/latest/serde_json/> | JSON and JSONL output from Rust tools | `serde_json` serializes/deserializes JSON and provides untyped `Value` support. | Docs describe latest crate; validate against locked version for API changes. | Adopt for JSON output implementation reference. |

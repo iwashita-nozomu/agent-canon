@@ -11,7 +11,7 @@ upstream design ../../../agents/skills/result-artifact-writeout.md defines raw r
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines graph diagnostics and skill handoff packets
 upstream design ../../../agents/workflows/slide-production-workflow.md defines PPT template, slot, and layout review workflow
 downstream design ../../../agents/skills/html-output.md consumes report content for explicit HTML rendering and browser publication
-downstream design ../../../agents/evals/report_quality_eval.toml defines report quality checklist eval coverage
+downstream design ../../../evidence/agent-evals/report_quality_eval.toml defines report quality checklist eval coverage
 downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py evaluates report-writing prompt surfaces
 @dependency-end
 -->

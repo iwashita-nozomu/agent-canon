@@ -72,7 +72,7 @@ Completion judgment comes first. This checklist defines what must exist before a
 
 ### [ ] P-1-008: negative fixture policy
 
-- Target surface: `agents/evals/negative_cases/`
+- Target surface: `evidence/agent-evals/negative_cases/`
 - Problem: discovered false negatives are not automatically replay-tested.
 - Violation that currently passes: token-only evidence continues to pass after being noticed once.
 - Action: every false negative gets a fixture or an exception.

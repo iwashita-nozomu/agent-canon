@@ -317,8 +317,9 @@ concurrent spawn budget:
 - 各 chunk で checkpoint review を複数回に増やせる
 - 逐次 review と最終 review を分ける
 - 大規模 refactor では `$refactor-loop` を追加します
+- directory layout、directory README ownership、root view、または `responsibility-scope.toml` を変える refactor では `$structure-refactor` も追加し、recursive README graph、Directory Responsibility Map、`scope_delta`、reader / navigation delta を design artifact に固定します
 - refactor pass では feature 追加を同じ pass に混ぜません
-- refactor pass では `refactor_safety_case.md` を起こし、挙動保存契約、削除対象、path mapping、merge structure check を先に固定します
+- refactor pass では `refactor_safety_case.md` を起こし、挙動保存契約、削除対象、path mapping、merge structure check を先に固定します。structure refactor では同 artifact に recursive README sources、Directory Responsibility Map、scope overlap report、import responsibility report も入れます
 - refactor pass では `project_reviewer` と `docs_workflow_steward` を default specialist にし、cross-module drift と stale route を落とします
 - 大規模 repo の包括 refactor では `agents/workflows/comprehensive-refactoring-workflow.md` を overlay とし、設計見直し、OOP 的な最小実装方針、必要な静的解析 score gate を先に固定します
 

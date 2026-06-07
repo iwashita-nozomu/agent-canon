@@ -3,7 +3,7 @@
 responsibility Defines checklist and manifest format for skill, prompt, and workflow behavior evals.
 upstream design ../agents/canonical/skills.md defines skill registry.
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md defines subagent routing.
-downstream implementation ../agents/evals/issue_eval_manifest.toml registers issue-derived eval cases.
+downstream implementation ../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval cases.
 downstream implementation ../.github/ISSUE_TEMPLATE/eval-capture.yml captures new eval candidates.
 downstream implementation ../.github/PULL_REQUEST_TEMPLATE.md requires eval evidence.
 @dependency-end
@@ -45,7 +45,7 @@ messages, task routing, or closeout rules.
 ## Manifest Format
 
 Issue-derived evals are registered in
-`agents/evals/issue_eval_manifest.toml`. Each row records category, source
+`evidence/agent-evals/issue_eval_manifest.toml`. Each row records category, source
 issue, protected behavior, expected route, forbidden route, oracle type, and
 linked rule/tool/workflow.
 
