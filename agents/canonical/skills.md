@@ -37,6 +37,8 @@ upstream design README.md canonical workflow index
   - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
 - `agent-canon-update`
   - AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する
+- `pr-processing`
+  - PR / Issue queue の inventory、authority、conflict 解消、merge 順、validation、Issue triage、closeout evidence を固定する
 - `agent-update-branch`
   - memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する
 - `report-writing`

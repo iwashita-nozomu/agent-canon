@@ -129,6 +129,10 @@ path = "../.agents/skills/prose-reasoning-graph/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/pr-processing/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/python-review/SKILL.md"
 enabled = true
 
