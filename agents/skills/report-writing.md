@@ -24,8 +24,8 @@ prose, claim hygiene, quality review criteria, reader actionability, and
 presentation asset traceability. In the common document pipeline, file
 responsibility selects this as the DSL-to-prose projection adapter when the
 document's job is evidence-backed status, audit, evaluation, review, decision,
-or recommendation. For nontrivial structure, call `prose-reasoning-graph` and
-`structure-planning` before prose projection.
+recommendation, or presentation narrative. For nontrivial structure, call
+`prose-reasoning-graph` and `structure-planning` before prose projection.
 
 Reports can be Markdown or HTML. The default report output is Markdown unless
 the user explicitly asks for HTML, a browser page, dashboard, web view, or
@@ -47,10 +47,10 @@ use this skill to turn that evidence into a report a human can evaluate.
   synthesis.
 - A generated report may influence a workflow, skill, policy, or issue.
 - A report needs explicit quality criteria before it is accepted.
-- A report needs a first figure/table, source-to-section map, metric contract,
-  presentation storyboard, ponchi-e/concept diagram, source-to-section map,
-  source-to-slide map, or invalid interpretation boundary; in that case use
-  `structure-planning` before drafting.
+- A report needs a first figure/table, presentation storyboard, ponchi-e or
+  concept diagram, source-to-section map, source-to-slide map, metric contract,
+  or invalid interpretation boundary; in that case use `structure-planning`
+  before drafting.
 - File / document responsibility classifies the output as a report adapter
   target; in that case create or receive a prose graph handoff, then use graph
   diagnostics, explanation, and integration plan as evidence for reader flow and
@@ -197,8 +197,8 @@ results or slide drafting. It must include:
 ## Review Route
 
 Use `report_reviewer` when the report is claim-heavy, external-facing,
-slide-backed, high-impact, or used as PR / issue / policy evidence. The
-reviewer checks:
+slide-backed, high-impact, or used as PR / issue / policy evidence. The reviewer
+checks:
 
 - structure and reader flow
 - source-to-claim traceability

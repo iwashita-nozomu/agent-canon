@@ -24,7 +24,7 @@ SYNC_CONTEXT_SCRIPT = (
     / "experiments"
     / "sync_experiment_registry_context.py"
 )
-CANONICAL_ENTRYPOINT = "experiments/demo_topic/experimentcode.py"
+CANONICAL_ENTRYPOINT = "experiments/demo_topic/run.py"
 SMOKE_INNER_COMMAND = (
     f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} "
     "--config {config_path} --mode smoke"
@@ -53,7 +53,11 @@ def build_repo(tmp_path: Path) -> Path:
         "from __future__ import annotations\n",
         encoding="utf-8",
     )
-    (repo_root / "experiments" / "_template" / "experimentcode.py").write_text(
+    (repo_root / "experiments" / "_template" / "config.yaml").write_text(
+        "mode: template\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "_template" / "run.py").write_text(
         "from __future__ import annotations\n",
         encoding="utf-8",
     )
@@ -65,11 +69,15 @@ def build_repo(tmp_path: Path) -> Path:
         "# Demo Topic\n",
         encoding="utf-8",
     )
+    (repo_root / "experiments" / "demo_topic" / "config.yaml").write_text(
+        "mode: demo\n",
+        encoding="utf-8",
+    )
     (repo_root / "tools" / "experiments" / "run_managed_experiment.py").write_text(
         "# placeholder\n",
         encoding="utf-8",
     )
-    (repo_root / "experiments" / "demo_topic" / "experimentcode.py").write_text(
+    (repo_root / "experiments" / "demo_topic" / "run.py").write_text(
         "\n".join(
             [
                 "from __future__ import annotations",
@@ -291,7 +299,7 @@ def test_run_managed_experiment_collects_binary_named_optional_artifact_without_
         ),
     )
     registry_path.write_text(registry_text, encoding="utf-8")
-    experiment_path = repo_root / "experiments" / "demo_topic" / "experimentcode.py"
+    experiment_path = repo_root / "experiments" / "demo_topic" / "run.py"
     experiment_path.write_text(
         experiment_path.read_text(encoding="utf-8")
         + "\n(run_dir / 'binary.txt').write_bytes(b'\\xff\\xfe\\n')\n",
@@ -381,7 +389,7 @@ def test_run_managed_experiment_keeps_nested_run_log_artifacts_collectable(
         ),
     )
     registry_path.write_text(registry_text, encoding="utf-8")
-    experiment_path = repo_root / "experiments" / "demo_topic" / "experimentcode.py"
+    experiment_path = repo_root / "experiments" / "demo_topic" / "run.py"
     experiment_path.write_text(
         experiment_path.read_text(encoding="utf-8")
         + "\n(run_dir / 'logs').mkdir(parents=True, exist_ok=True)\n"
@@ -615,6 +623,33 @@ def test_check_experiment_registry_rejects_command_without_config_path(tmp_path:
 
     assert result.returncode == 1
     assert "must contain {config_path}" in result.stdout
+
+
+def test_check_experiment_registry_rejects_non_topic_local_entrypoint(tmp_path: Path) -> None:
+    """The registry checker should require experiments/<topic>/run.py entrypoints."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'canonical_entrypoint = "{CANONICAL_ENTRYPOINT}"',
+        'canonical_entrypoint = "python/package/experiment.py"',
+    )
+    registry_text = registry_text.replace(CANONICAL_ENTRYPOINT, "python/package/experiment.py")
+    registry_path.write_text(registry_text, encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "canonical_entrypoint must be the topic-local run.py" in result.stdout
 
 
 def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(tmp_path: Path) -> None:

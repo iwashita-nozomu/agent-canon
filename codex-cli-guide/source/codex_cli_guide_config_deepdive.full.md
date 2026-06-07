@@ -11698,9 +11698,9 @@ codex mcp list || true
 **戻し方**  CIでMCP tokenがない場合はrequiredにしない。
 
 
-### 追加設定レシピ 251: local dry run
+### 追加設定レシピ 251: local read-only planning
 
-**目的**  危険な作業前にread-onlyでdry runする。
+**目的**  危険な作業前にread-onlyで計画を確認する。
 
 
 ```
@@ -11710,7 +11710,7 @@ codex --profile readonly "Plan the migration. Do not edit files."
 
 **確認**  計画の妥当性を確認してからworkerへ渡す。
 
-**戻し方**  dry run結果だけで実装完了としない。
+**戻し方**  計画だけで実装完了としない。
 
 
 ---

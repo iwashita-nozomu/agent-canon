@@ -182,7 +182,8 @@ contract listed in `documents/README.md`.
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
 - Shared canon、Large delivery、goal task、long-running multi-step work では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
-- 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree に parallel design doc、backup implementation、snapshot copy、`*_old`、`*_copy`、dated snapshot を残しません。
+- 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree に parallel design doc、backup implementation、snapshot copy、`*_old`、`*_copy`、dated snapshot、dated mirror を残しません。
+- 実装 file / module / class / algorithm に版番号接尾辞の正本名を導入してはいけません。`*_v1`、`*_v2`、`AlgorithmV1` のような名前で並行実装を温存するのは禁止し、正本は 1 つの canonical 名に固定します。差し替えや改修が必要な場合は既存正本を更新し、旧実装は同じ change で参照ごと除去します。
 - repo に残す durable state は current tree head 上の canonical path だけです。履歴、review、作業メモは `git` と `reports/agents/<run-id>/` に残し、repo tree に別の truth surface を増やしません。
 - 大規模改修、統合、rename、構成変更の直後は、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書への参照を sweep し、current tree head の canonical surface だけを reader に見せます。旧参照の温存や「後で消す」前提で closeout してはいけません。
 
@@ -255,7 +256,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
 - shared canon PR では `agents/workflows/agent-canon-pr-workflow.md` を使い、`make agent-canon-pr-check` を merge 前の固定 gate にします。
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a repo-local override is intentional.
-- closeout 前に、正本でない設計文書、実装 copy、dated snapshot、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
+- closeout 前に、正本でない設計文書、実装 copy、dated mirror、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
 
 ## Close-Out Prohibitions
 
