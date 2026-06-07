@@ -178,6 +178,15 @@ link there when readers need shared conventions or workflow policy. Generated or
 experiment artifacts stay under `reports/` or `experiments/` unless they become
 a durable repo-local design or policy surface.
 
+## Evidence Contract Boundary
+
+`evidence/` is an AgentCanon shared runtime evidence contract. Root template
+and derived repositories use it as a symlink view into
+`vendor/agent-canon/evidence/` so CI eval producers can resolve the same
+deterministic manifests from either standalone AgentCanon or a submodule parent
+checkout. Generated eval output does not live in this root view; it stays in the
+mounted runtime log archive described by `documents/runtime-log-archive.md`.
+
 ## Memory And Notes Boundary
 
 `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md` are AgentCanon
