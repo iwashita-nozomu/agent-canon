@@ -249,7 +249,7 @@ workflow_families:
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
         - Use `prompt_config_reviewer` before editing prompt, routing, or subagent-config policy surfaces.
-        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths or separate worktrees.
+        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths in the current checkout, and colliding writers must be serialized into later waves instead of moved to separate worktrees.
       reviewer_prompt:
         - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
         - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.

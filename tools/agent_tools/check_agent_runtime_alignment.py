@@ -52,7 +52,7 @@ MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
-EXPECTED_MAX_DEPTH = 1
+EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial three-agent intake role: own user-request clauses",
@@ -460,8 +460,12 @@ def validate_subagent_protocol_docs() -> None:
         for role_id in INITIAL_INTAKE_MARKERS:
             ensure(role_id in text, f"{path} missing initial intake role {role_id}")
         ensure(
-            "subagents do not spawn subagents" in text,
-            f"{path} must state parent-launched waves and no recursive spawn",
+            "max_depth = 2" in text and "delegated_spawn_policy" in text,
+            f"{path} must state bounded nested spawn and delegated_spawn_policy",
+        )
+        ensure(
+            "subagents do not spawn subagents" not in text,
+            f"{path} must not prohibit bounded nested subagent spawn",
         )
         ensure("depth は固定しません" not in text, f"{path} must not allow unfixed depth wording")
     subagents_text = (ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
