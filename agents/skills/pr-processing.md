@@ -6,6 +6,9 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/pr-queue-cleanup-workflow.md AgentCanon source and parent pin PR cleanup workflow
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR versus parent pin route
+upstream design result-artifact-writeout.md run-local result artifact writeout contract
+upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
+upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -54,8 +57,33 @@ flowchart TD
   I --> J["Record final counts and blockers"]
 ```
 
+## PR Log Report Contract
+
+PR 作成 / 更新は、GitHub 上の PR body だけでなく run-local report も同時に
+更新します。active run bundle が無い場合は、PR 操作前に
+`python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
+を実行し、bootstrap output の `RUN_ID`、`REPORT_DIR`、
+`AGENT_CANON_PREFLIGHT_*` を `work_log.md` または `workflow_monitoring.md`
+に残します。
+
+run bundle には次を置きます。
+
+- `pr_body.md`: agent が確認した最終 PR body
+- `github_publish.json`: `github_publish.py publish-pr --summary-out` の機械可読結果
+- `pr_checks.*` または `workflow_monitoring.md`: `gh pr checks` / `github_publish.py checks` の要約
+- `work_log.md` または `pr_processing_log.md`: PR number / URL、branch、head SHA、mutation authority、check summary、Issue action、blocker、次 action
+
+PR body を更新したら、同じ内容または要約を run bundle にも反映します。
+run bundle に無い判断を PR body だけに置かず、PR body に無い validation /
+authority 判断を chat だけで完了扱いにしません。
+
 ## Procedure
 
+1. Run bundle と PR log report を固定します。
+   - 既存の `REPORT_DIR` または `reports/agents/.active_run` を確認する
+   - 無ければ `bootstrap_agent_run.py` で作る
+   - `work_log.md` に bootstrap output、routing declaration、PR task summary を残す
+   - `pr_body.md` と `github_publish.json` の path を決める
 1. Queue snapshot を作ります。
    - `gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt`
    - `gh issue list --state open --json number,title,labels,updatedAt,url`
@@ -107,6 +135,9 @@ flowchart TD
    - merge SHA
    - remaining blockers
    - validation commands
+   - bootstrap report dir
+   - PR body artifact
+   - publish / checks summary artifact
    - final open PR count
    - final open Issue count
 

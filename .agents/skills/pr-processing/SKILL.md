@@ -9,6 +9,9 @@ upstream design ../../../agents/skills/pr-processing.md documents the human-faci
 upstream design ../../../agents/workflows/pr-queue-cleanup-workflow.md defines AgentCanon source and parent pin queue cleanup
 upstream design ../../../agents/workflows/agent-canon-pr-workflow.md defines AgentCanon source PR gates
 upstream design ../../../documents/agent-canon-update-route.md defines source PR versus parent pin update routing
+upstream design ../../../agents/skills/result-artifact-writeout.md defines run-local result artifact writeout
+upstream implementation ../../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
+upstream implementation ../../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
 @dependency-end
 -->
 
@@ -18,6 +21,18 @@ upstream design ../../../documents/agent-canon-update-route.md defines source PR
 1. If AgentCanon source PRs or parent pin PRs are involved, also read
    `agents/workflows/pr-queue-cleanup-workflow.md` and
    `agents/workflows/agent-canon-pr-workflow.md`.
+1. Before creating or updating a PR, identify the active run bundle. If none
+   exists, run `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>"
+   --owner codex --workspace-root "$PWD"` and record `RUN_ID`, `REPORT_DIR`,
+   and `AGENT_CANON_PREFLIGHT_*` lines in `work_log.md` or
+   `workflow_monitoring.md`.
+1. Keep PR publication artifacts inside the run bundle:
+   - write the reviewed PR body to `reports/agents/<run-id>/pr_body.md`;
+   - pass `--summary-out reports/agents/<run-id>/github_publish.json` to
+     `github_publish.py publish-pr`;
+   - record PR number / URL, branch, head SHA, authority decision, checks
+     summary, issue actions, and blockers in `work_log.md` or a run-local
+     `pr_processing_log.md`.
 1. Fix the authority boundary before mutation:
    - inspecting PRs, checks, comments, reviews, and issues is allowed when the
      task asks for PR / Issue processing;
@@ -55,4 +70,6 @@ upstream design ../../../documents/agent-canon-update-route.md defines source PR
    - update active issues with residual work and owner;
    - keep stale issues open when evidence is insufficient.
 1. Close out with a table of PR actions, issue actions, merge SHAs, remaining
-   blockers, validation commands, and final open PR / Issue counts.
+   blockers, validation commands, final open PR / Issue counts, and the run
+   bundle paths that contain the bootstrap log, PR body, publish summary, and
+   check evidence.
