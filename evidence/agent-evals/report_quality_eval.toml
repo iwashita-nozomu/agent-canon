@@ -47,6 +47,16 @@ description = "Requires report reviewer routing and closeout tokens."
 required_regex = ["report_reviewer", "report_quality_checklist", "report_rule_drift"]
 
 [[evals.checklist]]
+id = "REPORT-RUNTIME-4B"
+critical = true
+description = "Requires presentation asset packet routing for deck/PPT output."
+required_regex = [
+  "slide deck/PPT",
+  "presentation asset packet",
+  "presentation_asset_packet",
+]
+
+[[evals.checklist]]
 id = "REPORT-RUNTIME-5"
 critical = true
 description = "Requires evaluation and experiment reports to explain how readers should interpret results."
@@ -103,6 +113,16 @@ required_regex = [
   "Mermaid diagram",
   "process, dependency, ownership, routing, state, review-gate",
   "table or text-only outline",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-4C"
+critical = true
+description = "Checklist covers presentation asset traceability and separates conceptual visuals from data-backed figures."
+required_regex = [
+  "first visual, ponchi-e/concept diagrams",
+  "Conceptual visuals are labeled separately",
+  "Presentation Asset Packet",
 ]
 
 [[evals.checklist]]

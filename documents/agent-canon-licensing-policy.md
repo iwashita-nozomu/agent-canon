@@ -22,8 +22,9 @@ The license boundary is explicit:
   root view does not create a new parent-repository license surface.
 - Template or derived repositories may set a different root project license, but
   they must keep AgentCanon's license with the submodule.
-- Third-party skills or assets in `vendor/agent-canon/vendor/` must record
-  upstream URL, revision, and license metadata before they are enabled.
+- Third-party skills or assets in AgentCanon's internal `vendor/` directory
+  (`vendor/agent-canon/vendor/` when viewed from a parent repository) must
+  record upstream URL, revision, and license metadata before they are enabled.
 - Devcontainer-installed local LLM tooling is not vendored into the repository.
   llama.cpp is an external MIT-licensed tool fetched into `~/.tools`, and the
   default SmolLM3-3B GGUF model is an external Apache-2.0 model fetched
