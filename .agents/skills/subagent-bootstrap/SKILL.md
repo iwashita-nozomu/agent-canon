@@ -25,8 +25,9 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 1. Check the command output for `IMPLEMENTATION_CODEX_AGENTS`.
 1. If `IMPLEMENTATION_CODEX_AGENTS` starts with `spark_worker,worker`, send approved, design-traced, low-risk implementation slices to `spark_worker` first.
 1. Read the corresponding `.codex/agents/<role>.toml` before choosing model / reasoning for a spawned role.
-1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, prefer Spark role TOMLs when explicit spawn authorization exists.
-1. For bounded review, report traceability, and checklist-style review gates, prefer mini review role TOMLs before escalating to frontier roles.
+1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, use read-only roles only when they are independent verification that does not delay the implementation critical path.
+1. For coding / implementation / patch requests, describe the default route as write-capable handoff first. Once bounded `allowed_paths`, write scope, validation plan, and tool-rejection preflight are fixed, schedule or launch `spark_worker` / `worker`; parent owns the handoff packet, integration order, review gate, and final responsibility.
+1. For bounded review, report traceability, and checklist-style review gates, use mini review role TOMLs only when they can run alongside or after the implementation slice without replacing the write-capable handoff.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
 1. Keep every handoff packet bounded: include role-specific `allowed_paths`, checker or compact artifact paths, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema. Do not use `/workspace` or the repo root as the only scope.
 1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.

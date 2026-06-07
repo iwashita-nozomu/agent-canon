@@ -44,7 +44,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
 - approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier role は統合判断、設計判断、最終責任に集中する
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、既定の説明を write-capable handoff first にする。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence であり完了条件ではありません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に該当 role TOML の model / reasoning で fresh default subagent を再試行する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier role TOML に残す
@@ -342,7 +342,7 @@ workflow docs、task catalog に role list や model list を重複管理しま�
 - mini review role TOML は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
 - Spark role TOML は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
 - `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
-- 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は mini review wave に切ります。
+- 明示 spawn 許可がある repo-changing task でも、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を常に先行 read-only wave へ切るわけではありません。coding / implementation / patch work が scope にある task では、implementation critical path を固定してから、並行可能な独立検証だけを Spark read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を置き換えない範囲で mini review wave に切ります。
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、Spark read-only wave は write-capable handoff の準備です。実装可能な scope が固定された後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、read-only role だけで完了扱いにしません。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します

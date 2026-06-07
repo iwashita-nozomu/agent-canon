@@ -43,23 +43,23 @@ Route notes:
 - [ ] This PR only required inspection, branch push, PR creation, title/body update, evidence comments, draft-state preservation, or conversion to draft.
 - [ ] Merge / close / ready-for-review / reviewer request / review dismissal / auto-merge / branch deletion was explicitly authorized by the user for this task, or was not performed.
 - [ ] If merge, close, or ready-for-review is still required, the blocker and required human/maintainer action are recorded below instead of being guessed from `gh` availability.
-- [ ] If `pr_mutation_authority: github_pr_automation_when_green` is used, the PR has GitHub automation visible evidence and local Codex did not perform the merge.
+- [ ] If `pr_mutation_authority: github_copilot_merge_when_green` is used, the PR has Copilot-visible evidence and local Codex did not perform the merge.
 
 Authority / blocker notes:
 
-## GitHub Automation Output
+## Copilot / Automation Output
 
 - goal `pr_mutation_authority`:
-- `GITHUB_PR_AUTOMATION_AUTHORITY=`:
-- `GITHUB_PR_AUTOMATION_DECISION=`:
-- `GITHUB_PR_AUTOMATION_CHECKS=`:
-- `GITHUB_AUTOMATION_VISIBLE_EVIDENCE=`:
-- `GITHUB_AUTOMATION_BLOCKER=`:
+- `COPILOT_PR_AUTHORITY=`:
+- `COPILOT_PR_DECISION=`:
+- `COPILOT_PR_CHECKS=`:
+- `COPILOT_VISIBLE_EVIDENCE=`:
+- `COPILOT_BLOCKER=`:
 - `gh pr checks` summary:
 
 ## Plan Mode Evidence
 
-- [ ] Plan mode was used before non-trivial AgentCanon sync, PR-template, GitHub Actions, or shared runtime-surface changes.
+- [ ] Plan mode was used before non-trivial AgentCanon sync, Copilot, PR-template, GitHub Actions, or shared runtime-surface changes.
 - [ ] Written plan is included in the PR body, issue, run bundle, or linked comment when the runtime did not expose an explicit Plan mode.
 - [ ] Trivial-change exception is explained below when Plan mode was not used.
 
@@ -85,6 +85,19 @@ Orchestration evidence:
 - [ ] Issue Mirror artifact / Step Summary from `.github/workflows/issue-mirror.yml` was reviewed when available.
 
 Issue / edit-scope evidence:
+
+## Copilot Configuration Impact
+
+- [ ] `vendor/agent-canon/documents/github-copilot-configuration.md` was
+  reviewed in template roots, or `documents/github-copilot-configuration.md`
+  was reviewed in standalone AgentCanon.
+- [ ] `.github/copilot-instructions.md` changed / reviewed / not affected.
+- [ ] `.github/instructions/*.instructions.md` changed / reviewed / not affected.
+- [ ] `.github/agents/*.md` changed / reviewed / not affected.
+- [ ] GitHub Copilot MCP, `copilot-setup-steps.yml`, or Copilot environment settings changed / reviewed / not affected.
+- [ ] PR template routing still separates this template / derived repo AgentCanon-pin PR from standalone AgentCanon repository PRs.
+
+Impact notes:
 
 ## Validation
 

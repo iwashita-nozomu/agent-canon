@@ -5,6 +5,7 @@ responsibility Documents reusable structure planning for reports, experiments, d
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
+upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
 downstream design html-output.md consumes structure contracts for explicit HTML output
 @dependency-end
@@ -52,7 +53,7 @@ audience=<reader-or-reviewer>
 decision_context=<decision or action the structure supports>
 first_artifact=<figure|table|ponchi-e|concept-diagram|slide|summary-card|section|experiment-slice|refactor-slice> <short name>
 first_artifact_question=<one sentence>
-visual_plan=<mermaid|table|text-only|html|image|not-applicable> <why this visual shape fits>
+visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable> <why this visual shape fits>
 source_to_structure_map=<source path/id -> section, slide, visual, claim, experiment slice, or refactor slice>
 metric_or_delta_contract=<denominator, directionality, baseline, caveat, allowed structural delta, forbidden semantic delta>
 ordered_structure=<ordered headings, slides/storyboard, visuals, experiment slices, or refactor slices>
@@ -127,7 +128,7 @@ Record these in `workflow_monitoring.md`, a run bundle, or the artifact itself:
 structure_planning=complete
 structure_contract=<path-or-inline>
 structure_first_artifact=<name>
-structure_visual_plan=<mermaid|table|text-only|html|image|not-applicable>
+structure_visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable>
 structure_source_map=<path-or-inline>
 discourse_relations=<path|not_required>
 structure_invalid_interpretations_recorded=yes

@@ -78,7 +78,8 @@ Before drafting, fix these inputs:
 - limitations: missing data, partial runs, stale sources, uncertainty, and
   blocked checks
 - next action: concrete follow-up owner, command, PR, issue, or workflow route
-- output format: `markdown` by default, or `html` only when explicitly requested
+- output format: `markdown` by default, `html` when explicitly requested, or
+  `deck` / `ppt` when the user asks for slide output
 - structure contract: required when the report has a nontrivial reader
   structure; use `structure-planning` to fix first artifact, source-to-section
   map, metric contract, section order, and invalid interpretations
@@ -235,7 +236,7 @@ Record these in `workflow_monitoring.md`, a handoff, or the report itself:
 
 ```text
 report_writing=complete
-report_output_format=<markdown|html>
+report_output_format=<markdown|html|deck|ppt>
 report_quality_checklist=<pass|fail>
 report_source_packet=<path-or-inline>
 presentation_asset_packet=<path|inline|not_required>
