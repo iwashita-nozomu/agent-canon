@@ -1507,8 +1507,24 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "proof_algorithm_ir",
+      "line": 256,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_certified_subgraph",
+      "line": 264,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "proof_checker_command",
-      "line": 118,
+      "line": 249,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1516,7 +1532,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_log",
-      "line": 119,
+      "line": 250,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1524,7 +1540,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_claim",
-      "line": 111,
+      "line": 242,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1532,7 +1548,63 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_existing_queries",
-      "line": 114,
+      "line": 245,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_goal_directed_slice",
+      "line": 257,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_impossibility_certificate",
+      "line": 253,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_expansion_graph",
+      "line": 268,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_root",
+      "line": 267,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph",
+      "line": 259,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_overlay",
+      "line": 262,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_validation",
+      "line": 261,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1540,7 +1612,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_library_trace_module",
-      "line": 117,
+      "line": 248,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1548,7 +1620,23 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_literature_queries",
-      "line": 115,
+      "line": 246,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_missing_frontier",
+      "line": 265,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_path_attempts",
+      "line": 263,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1556,7 +1644,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_plan_json",
-      "line": 112,
+      "line": 243,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1564,7 +1652,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_plan_md",
-      "line": 113,
+      "line": 244,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_selected_local_obligations",
+      "line": 258,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1572,7 +1668,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_kind",
-      "line": 122,
+      "line": 255,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1580,7 +1676,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_packet",
-      "line": 121,
+      "line": 254,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1588,7 +1684,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_status",
-      "line": 120,
+      "line": 251,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_status_table",
+      "line": 266,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1596,7 +1700,31 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_stub",
-      "line": 116,
+      "line": 247,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_target_chains",
+      "line": 260,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_terminal_outcome",
+      "line": 252,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_trace_alignment_check",
+      "line": 269,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -4185,6 +4313,246 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 2092,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 1232,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR",
+      "line": 1880,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_BACKEND_ASSUMPTION",
+      "line": 1908,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_BACKEND_PROFILE_LIBRARY",
+      "line": 1883,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_EDGE",
+      "line": 1897,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_EDGES",
+      "line": 1885,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_NODE",
+      "line": 1892,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_NODES",
+      "line": 1884,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_OBLIGATION",
+      "line": 1915,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_OBLIGATIONS",
+      "line": 1887,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_ROOT",
+      "line": 1881,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_SELECTED_OBLIGATIONS",
+      "line": 1888,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_STATIC_CHECK",
+      "line": 1903,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_STATIC_CHECKS",
+      "line": 1886,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ALGORITHM_EXPANSION_IR_TARGET_THEOREM",
+      "line": 1882,
+      "path": "tools/agent_tools/algorithm_expansion_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 696,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 705,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 711,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 719,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH",
+      "line": 576,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_EDGE",
+      "line": 592,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_EDGES",
+      "line": 580,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_NODE",
+      "line": 586,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_NODES",
+      "line": 579,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_ROOT",
+      "line": 577,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_TARGETS",
+      "line": 581,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_TARGET_CHAIN",
+      "line": 598,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_THEOREM",
+      "line": 578,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LEMMA_GRAPH_VALID",
+      "line": 582,
+      "path": "tools/agent_tools/algorithm_lemma_graph.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "VIOLATION",
@@ -5358,6 +5726,54 @@
       "field": "REPAIR_REPO_MCP",
       "line": 281,
       "path": "tools/agent_tools/check_mcp_inventory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 514,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "PROOF_TRACE_ALIGNMENT",
+      "line": 503,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "PROOF_TRACE_ALIGNMENT_ANCHORS",
+      "line": 505,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "PROOF_TRACE_ALIGNMENT_CONTRACTS",
+      "line": 504,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "PROOF_TRACE_ALIGNMENT_FINDING",
+      "line": 37,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "PROOF_TRACE_ALIGNMENT_FINDINGS",
+      "line": 506,
+      "path": "tools/agent_tools/check_proof_trace_alignment.py",
       "surface": "tool"
     },
     {
@@ -15719,6 +16135,8 @@
     "tools/agent_tools/agent_canon_update_todos.py",
     "tools/agent_tools/agent_team.py",
     "tools/agent_tools/agent_update_branch.sh",
+    "tools/agent_tools/algorithm_expansion_ir.py",
+    "tools/agent_tools/algorithm_lemma_graph.py",
     "tools/agent_tools/analyze_refactor_surface.py",
     "tools/agent_tools/bootstrap_agent_run.py",
     "tools/agent_tools/bootstrap_worktree_notes.py",
@@ -15733,6 +16151,7 @@
     "tools/agent_tools/check_hardcoded_numbers.py",
     "tools/agent_tools/check_log_helper_names.py",
     "tools/agent_tools/check_mcp_inventory.py",
+    "tools/agent_tools/check_proof_trace_alignment.py",
     "tools/agent_tools/check_run_log_contract.py",
     "tools/agent_tools/check_runtime_profile_inventory.py",
     "tools/agent_tools/check_static_any.py",

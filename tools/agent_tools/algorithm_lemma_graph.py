@@ -14,9 +14,10 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 STATIC_EDGE_STATUSES = frozenset(
     {
@@ -136,7 +137,28 @@ def slug(value: str) -> str:
     return normalized or "unnamed"
 
 
-def read_ir_payload(path: str | None) -> dict[str, Any]:
+JsonObject = dict[str, object]
+JsonMapping = Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class RawLemmaNode:
+    """Internal lemma node with source IR bookkeeping."""
+
+    lemma: LemmaNode
+    primary_node_id: str
+    applies_to_nodes: tuple[str, ...] = ()
+
+
+def mapping_sequence(value: object) -> tuple[JsonMapping, ...]:
+    """Return string-keyed mappings from a JSON sequence."""
+    if not isinstance(value, list | tuple):
+        return ()
+    items = cast(list[object] | tuple[object, ...], value)
+    return tuple(cast(JsonMapping, item) for item in items if isinstance(item, Mapping))
+
+
+def read_ir_payload(path: str | None) -> JsonObject:
     """Read Algorithm Expansion IR JSON from a file or stdin."""
     if path is None or path == "-":
         raw = sys.stdin.read()
@@ -145,14 +167,15 @@ def read_ir_payload(path: str | None) -> dict[str, Any]:
     payload = json.loads(raw)
     if not isinstance(payload, dict):
         raise ValueError("IR JSON must be a JSON object")
-    return payload
+    return cast(JsonObject, payload)
 
 
 def tuple_of_strings(value: object) -> tuple[str, ...]:
     """Return a tuple of string values from JSON-ish data."""
     if not isinstance(value, list | tuple):
         return ()
-    return tuple(str(item) for item in value)
+    items = cast(list[object] | tuple[object, ...], value)
+    return tuple(str(item) for item in items)
 
 
 def proof_status_for_grain(grain: str) -> str:
@@ -164,7 +187,7 @@ def proof_status_for_grain(grain: str) -> str:
     return "unverified"
 
 
-def node_profiles(node: dict[str, Any], obligation: dict[str, Any]) -> tuple[str, ...]:
+def node_profiles(node: JsonMapping, obligation: JsonMapping) -> tuple[str, ...]:
     """Infer theorem target profiles for one lemma node."""
     profiles: set[str] = {"all"}
     math_role = str(node.get("math_role", ""))
@@ -216,17 +239,14 @@ def make_target_node(profile: str, theorem: str) -> LemmaNode:
     )
 
 
-def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_obligation_nodes(ir_payload: JsonMapping) -> tuple[RawLemmaNode, ...]:
     """Build raw lemma-node dictionaries from IR obligations."""
-    ir_nodes = {
+    ir_nodes: dict[str, JsonMapping] = {
         str(node.get("node_id")): node
-        for node in ir_payload.get("nodes", [])
-        if isinstance(node, dict)
+        for node in mapping_sequence(ir_payload.get("nodes"))
     }
-    raw_nodes: list[dict[str, Any]] = []
-    for obligation in ir_payload.get("obligations", []):
-        if not isinstance(obligation, dict):
-            continue
+    raw_nodes: list[RawLemmaNode] = []
+    for obligation in mapping_sequence(ir_payload.get("obligations")):
         consumed_nodes = tuple_of_strings(obligation.get("consumes_nodes"))
         if not consumed_nodes:
             continue
@@ -235,8 +255,8 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
         lemma_id = lemma_id_for_node_id(primary_node_id)
         profiles = node_profiles(ir_node, obligation)
         raw_nodes.append(
-            {
-                "lemma": LemmaNode(
+            RawLemmaNode(
+                lemma=LemmaNode(
                     lemma_id=lemma_id,
                     label=str(ir_node.get("source_symbol", primary_node_id)),
                     statement=str(obligation.get("statement", "")),
@@ -253,23 +273,21 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
                     target_profiles=profiles,
                     remaining_gap=str(obligation.get("remaining_gap", "")),
                 ),
-                "primary_node_id": primary_node_id,
-            }
+                primary_node_id=primary_node_id,
+            )
         )
     return tuple(raw_nodes)
 
 
-def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_backend_assumption_nodes(ir_payload: JsonMapping) -> tuple[RawLemmaNode, ...]:
     """Build raw lemma-node dictionaries from IR backend assumption overlays."""
-    raw_nodes: list[dict[str, Any]] = []
-    for assumption in ir_payload.get("backend_assumptions", []):
-        if not isinstance(assumption, dict):
-            continue
+    raw_nodes: list[RawLemmaNode] = []
+    for assumption in mapping_sequence(ir_payload.get("backend_assumptions")):
         assumption_id = str(assumption.get("assumption_id", "backend_profile"))
         applies_to_nodes = tuple_of_strings(assumption.get("applies_to_nodes"))
         raw_nodes.append(
-            {
-                "lemma": LemmaNode(
+            RawLemmaNode(
+                lemma=LemmaNode(
                     lemma_id=f"lemma__{slug(assumption_id)}",
                     label=str(assumption.get("profile_variable", assumption_id)),
                     statement=str(assumption.get("statement", "")),
@@ -286,9 +304,9 @@ def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str
                     target_profiles=("all", "fp32_floor"),
                     remaining_gap=str(assumption.get("checker_route", "")),
                 ),
-                "primary_node_id": f"backend-assumption:{assumption_id}",
-                "applies_to_nodes": applies_to_nodes,
-            }
+                primary_node_id=f"backend-assumption:{assumption_id}",
+                applies_to_nodes=applies_to_nodes,
+            )
         )
     return tuple(raw_nodes)
 
@@ -322,14 +340,12 @@ def dedupe_edges(edges: list[LemmaEdge]) -> tuple[LemmaEdge, ...]:
 
 
 def build_dependency_edges(
-    ir_payload: dict[str, Any],
+    ir_payload: JsonMapping,
     lemma_by_ir_node: dict[str, str],
 ) -> tuple[LemmaEdge, ...]:
     """Build lemma dependency edges from IR implementation edges."""
     edges: list[LemmaEdge] = []
-    for ir_edge in ir_payload.get("edges", []):
-        if not isinstance(ir_edge, dict):
-            continue
+    for ir_edge in mapping_sequence(ir_payload.get("edges")):
         source_lemma_id = lemma_by_ir_node.get(str(ir_edge.get("source_node_id", "")))
         target_lemma_id = lemma_by_ir_node.get(str(ir_edge.get("target_node_id", "")))
         if source_lemma_id is None or target_lemma_id is None:
@@ -360,14 +376,14 @@ def build_dependency_edges(
 
 
 def build_backend_assumption_edges(
-    backend_nodes: tuple[dict[str, Any], ...],
+    backend_nodes: tuple[RawLemmaNode, ...],
     lemma_by_ir_node: dict[str, str],
 ) -> tuple[LemmaEdge, ...]:
     """Connect precision lemmas to the backend assumptions they consume."""
     edges: list[LemmaEdge] = []
     for raw in backend_nodes:
-        assumption_lemma = raw["lemma"].lemma_id
-        for node_id in raw.get("applies_to_nodes", ()):
+        assumption_lemma = raw.lemma.lemma_id
+        for node_id in raw.applies_to_nodes:
             source_lemma = lemma_by_ir_node.get(str(node_id))
             if source_lemma is None:
                 continue
@@ -532,18 +548,18 @@ def validate_graph(
     )
 
 
-def build_lemma_graph(ir_payload: dict[str, Any], profiles: tuple[str, ...]) -> LemmaGraphReport:
+def build_lemma_graph(ir_payload: JsonMapping, profiles: tuple[str, ...]) -> LemmaGraphReport:
     """Build the lemma dependency graph."""
     theorem = str(ir_payload.get("target_theorem", "target theorem"))
     root = f"{ir_payload.get('root_path', '')}::{ir_payload.get('root_symbol', '')}"
     target_profiles = profiles or KNOWN_TARGET_PROFILES
     raw_obligation_nodes = build_obligation_nodes(ir_payload)
     raw_backend_nodes = build_backend_assumption_nodes(ir_payload)
-    obligation_nodes = tuple(raw["lemma"] for raw in raw_obligation_nodes)
+    obligation_nodes = tuple(raw.lemma for raw in raw_obligation_nodes)
     lemma_by_ir_node = {
-        str(raw["primary_node_id"]): raw["lemma"].lemma_id for raw in raw_obligation_nodes
+        raw.primary_node_id: raw.lemma.lemma_id for raw in raw_obligation_nodes
     }
-    backend_nodes = tuple(raw["lemma"] for raw in raw_backend_nodes)
+    backend_nodes = tuple(raw.lemma for raw in raw_backend_nodes)
     target_nodes = tuple(make_target_node(profile, theorem) for profile in target_profiles)
     dependency_edges = build_dependency_edges(ir_payload, lemma_by_ir_node)
     backend_edges = build_backend_assumption_edges(raw_backend_nodes, lemma_by_ir_node)
