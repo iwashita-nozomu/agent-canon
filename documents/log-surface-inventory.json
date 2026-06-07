@@ -1932,7 +1932,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_db",
-      "line": 179,
+      "line": 158,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1940,7 +1940,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_diagnostics",
-      "line": 181,
+      "line": 160,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1948,7 +1948,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_explanation",
-      "line": 182,
+      "line": 161,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1956,7 +1956,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_handoff",
-      "line": 184,
+      "line": 163,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1964,7 +1964,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_integration_plan",
-      "line": 183,
+      "line": 162,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_presentation_decisions",
+      "line": 165,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1972,7 +1980,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_projection",
-      "line": 180,
+      "line": 159,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1980,7 +1988,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_rewrite_packet",
-      "line": 185,
+      "line": 164,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -1988,7 +1996,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_stats",
-      "line": 186,
+      "line": 166,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -2250,9 +2258,169 @@
     },
     {
       "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "allowed_structural_delta",
+      "line": 72,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "behavior_contract",
+      "line": 68,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "directory_responsibility_graph",
+      "line": 69,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "directory_responsibility_graph",
+      "line": 171,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "forbidden_semantic_delta",
+      "line": 73,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "moves_applied",
+      "line": 174,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 74,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 172,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "primary_responsibility_map",
+      "line": 70,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reader_delta",
+      "line": 76,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "recursive_readme_sources",
+      "line": 71,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_delta",
+      "line": 75,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 173,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_path_sweep",
+      "line": 175,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor",
+      "line": 170,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor_root",
+      "line": 67,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 178,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 77,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 177,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_scope",
+      "line": 176,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM",
-      "line": 1333,
+      "line": 1330,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2284,7 +2452,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 1390,
+      "line": 1387,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2292,7 +2460,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_FILE",
-      "line": 1330,
+      "line": 1327,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2300,7 +2468,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_MODEL",
-      "line": 1331,
+      "line": 1328,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2308,7 +2476,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_PROMPT_SHA",
-      "line": 1332,
+      "line": 1329,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2316,7 +2484,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_SCOPE",
-      "line": 1329,
+      "line": 1326,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2956,7 +3124,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CONTEXT_PACK",
-      "line": 4983,
+      "line": 4985,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2964,7 +3132,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CONTEXT_PACK_CELLS",
-      "line": 4984,
+      "line": 4986,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2988,7 +3156,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_DISCOURSE_PROFILE",
-      "line": 5282,
+      "line": 5284,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2996,7 +3164,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_DISCOURSE_RELATIONS",
-      "line": 5281,
+      "line": 5283,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3028,7 +3196,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_ERROR",
-      "line": 5973,
+      "line": 5975,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3044,7 +3212,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_NATURAL_RELATIONS",
-      "line": 5229,
+      "line": 5231,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3068,7 +3236,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_RESPONSIBILITY_TREE",
-      "line": 5033,
+      "line": 5035,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3076,7 +3244,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_SEARCH",
-      "line": 4931,
+      "line": 4933,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3084,7 +3252,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_THIN_DOCS",
-      "line": 5172,
+      "line": 5174,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -3092,7 +3260,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS",
-      "line": 141,
+      "line": 157,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3100,7 +3268,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS",
-      "line": 155,
+      "line": 171,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3108,70 +3276,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 173,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 182,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 187,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
-      "line": 195,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
-      "line": 245,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 205,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 213,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 218,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DB",
       "line": 189,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
@@ -3179,8 +3283,56 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DB",
-      "line": 224,
+      "field": "STRUCTURED_ANALYSIS_ANALYZE",
+      "line": 198,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_ANALYZE",
+      "line": 203,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
+      "line": 211,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
+      "line": 261,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 221,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 229,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 234,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3188,7 +3340,23 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_DB",
-      "line": 359,
+      "line": 205,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DB",
+      "line": 240,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DB",
+      "line": 375,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3196,7 +3364,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_DIRECTORIES",
-      "line": 238,
+      "line": 254,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3204,38 +3372,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
-      "line": 239,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
-      "line": 286,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_FINDINGS",
-      "line": 365,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_RECORDS",
-      "line": 364,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
       "line": 255,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
@@ -3243,8 +3379,24 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 264,
+      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
+      "line": 302,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_FINDINGS",
+      "line": 381,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_RECORDS",
+      "line": 380,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3252,7 +3404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 272,
+      "line": 271,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3260,102 +3412,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 279,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 285,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FILES",
-      "line": 237,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 142,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 156,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 174,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 183,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 206,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 214,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 256,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 265,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 273,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
       "line": 280,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
@@ -3363,8 +3419,32 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 309,
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 288,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 295,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 301,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FILES",
+      "line": 253,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3372,7 +3452,79 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 317,
+      "line": 158,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 172,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 190,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 199,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 222,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 230,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 272,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 281,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 289,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 296,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3396,7 +3548,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 339,
+      "line": 341,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3404,7 +3556,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 346,
+      "line": 349,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3412,23 +3564,23 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 354,
+      "line": 355,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 308,
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 362,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 316,
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 370,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3452,7 +3604,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 338,
+      "line": 340,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3460,7 +3612,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 345,
+      "line": 348,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3468,7 +3620,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 353,
+      "line": 354,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3476,7 +3628,23 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 358,
+      "line": 361,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 369,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 374,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3484,7 +3652,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_INFOS",
-      "line": 197,
+      "line": 213,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3492,7 +3660,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_INFOS",
-      "line": 247,
+      "line": 263,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3500,7 +3668,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_PROFILE",
-      "line": 188,
+      "line": 204,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3508,7 +3676,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_PROFILE",
-      "line": 219,
+      "line": 235,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3516,7 +3684,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNINGS",
-      "line": 194,
+      "line": 210,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3524,7 +3692,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNINGS",
-      "line": 244,
+      "line": 260,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3532,7 +3700,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNS",
-      "line": 196,
+      "line": 212,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -3540,7 +3708,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNS",
-      "line": 246,
+      "line": 262,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -4316,7 +4484,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 773,
+      "line": 777,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -5812,7 +5980,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_ACCUMULATION_FINDING",
-      "line": 74,
+      "line": 75,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -5891,8 +6059,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "EVAL_MANIFEST_FORWARDER",
+      "line": 65,
+      "path": "tools/agent_tools/eval_manifest_paths.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_FEEDBACK_ACTIONS_OPEN",
-      "line": 1009,
+      "line": 1008,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -5900,22 +6076,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_MAX_SCORE",
-      "line": 1007,
-      "path": "tools/agent_tools/evaluate_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_EVALUATION_REPORT",
-      "line": 1004,
-      "path": "tools/agent_tools/evaluate_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_EVALUATION_SCORE",
       "line": 1006,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
@@ -5923,7 +6083,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "AGENT_EVALUATION_STATUS",
+      "field": "AGENT_EVALUATION_REPORT",
+      "line": 1003,
+      "path": "tools/agent_tools/evaluate_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_EVALUATION_SCORE",
       "line": 1005,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
@@ -5931,8 +6099,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "AGENT_EVALUATION_STATUS",
+      "line": 1004,
+      "path": "tools/agent_tools/evaluate_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_THRESHOLD",
-      "line": 1008,
+      "line": 1007,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6076,22 +6252,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_CHECKS",
-      "line": 306,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
-      "line": 308,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPORT_QUALITY_EVAL_FAILED",
       "line": 307,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
@@ -6099,15 +6259,23 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPORT_QUALITY_EVAL_RUN_ID",
-      "line": 303,
+      "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
+      "line": 309,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPORT_QUALITY_EVAL_STATUS",
+      "field": "REPORT_QUALITY_EVAL_FAILED",
+      "line": 308,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPORT_QUALITY_EVAL_RUN_ID",
       "line": 304,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
@@ -6115,8 +6283,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPORT_QUALITY_EVAL_TARGETS",
+      "field": "REPORT_QUALITY_EVAL_STATUS",
       "line": 305,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPORT_QUALITY_EVAL_TARGETS",
+      "line": 306,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -6124,22 +6300,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_CHECKS",
-      "line": 376,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
-      "line": 378,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_QUALITY_EVAL_FAILED",
       "line": 377,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
@@ -6147,23 +6307,23 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
+      "line": 379,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_FAILED",
+      "line": 378,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_REPORT",
-      "line": 380,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_QUALITY_EVAL_RUN_ID",
-      "line": 374,
-      "path": "tools/agent_tools/evaluate_report_quality.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_QUALITY_EVAL_STATUS",
       "line": 381,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
@@ -6171,8 +6331,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "REPORT_QUALITY_EVAL_TARGETS",
+      "field": "REPORT_QUALITY_EVAL_RUN_ID",
       "line": 375,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_STATUS",
+      "line": 382,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_TARGETS",
+      "line": 376,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -6180,7 +6356,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 552,
+      "line": 553,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -6188,7 +6364,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 656,
+      "line": 657,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -6196,7 +6372,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_ACCUMULATED_REPORT",
-      "line": 475,
+      "line": 476,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -6204,62 +6380,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_AUDIT_STATUS",
-      "line": 463,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CHECKS_PASSED",
-      "line": 460,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CHECKS_TOTAL",
-      "line": 459,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_COMPACT_OUT",
-      "line": 479,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CRITICAL_FAILED",
-      "line": 462,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CRITICAL_TOTAL",
-      "line": 461,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_CHECKLIST_IDS",
-      "line": 466,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_EVAL_IDS",
       "line": 464,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -6267,39 +6387,47 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_TARGETS",
-      "line": 465,
+      "field": "EVAL_CHECKS_PASSED",
+      "line": 461,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GIT_BRANCH",
-      "line": 470,
+      "field": "EVAL_CHECKS_TOTAL",
+      "line": 460,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GIT_COMMIT",
-      "line": 471,
+      "field": "EVAL_COMPACT_OUT",
+      "line": 480,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GIT_DIRTY",
-      "line": 472,
+      "field": "EVAL_CRITICAL_FAILED",
+      "line": 463,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GROWTH_CANDIDATES",
+      "field": "EVAL_CRITICAL_TOTAL",
+      "line": 462,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_DUPLICATE_CHECKLIST_IDS",
       "line": 467,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -6307,15 +6435,47 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_REPORT_OUT",
-      "line": 477,
+      "field": "EVAL_DUPLICATE_EVAL_IDS",
+      "line": 465,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_RUN_ID",
+      "field": "EVAL_DUPLICATE_TARGETS",
+      "line": 466,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_BRANCH",
+      "line": 471,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_COMMIT",
+      "line": 472,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_DIRTY",
+      "line": 473,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GROWTH_CANDIDATES",
       "line": 468,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -6323,8 +6483,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "EVAL_REPORT_OUT",
+      "line": 478,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_RUN_ID",
+      "line": 469,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "EVAL_STATUS",
-      "line": 458,
+      "line": 459,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -6332,7 +6508,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_USED_SKILLS",
-      "line": 469,
+      "line": 470,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -6340,7 +6516,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "hookEventName",
-      "line": 194,
+      "line": 195,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6348,7 +6524,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "prompt",
-      "line": 194,
+      "line": 195,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6356,14 +6532,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_CASES",
-      "line": 265,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "WORKFLOW_SELECTION_EVAL_FAILED",
       "line": 266,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
@@ -6371,8 +6539,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "WORKFLOW_SELECTION_EVAL_FAILED",
+      "line": 267,
+      "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_RUN_ID",
-      "line": 263,
+      "line": 264,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6380,7 +6556,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_STATUS",
-      "line": 264,
+      "line": 265,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6388,14 +6564,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_CASES",
-      "line": 338,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SELECTION_EVAL_FAILED",
       "line": 339,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
@@ -6403,8 +6571,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SELECTION_EVAL_FAILED",
+      "line": 340,
+      "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_REPORT",
-      "line": 341,
+      "line": 342,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6412,7 +6588,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_RUN_ID",
-      "line": 337,
+      "line": 338,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -6420,7 +6596,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_STATUS",
-      "line": 342,
+      "line": 343,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -7804,7 +7980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 546,
+      "line": 550,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7812,7 +7988,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 546,
+      "line": 550,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7820,7 +7996,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "imports",
-      "line": 546,
+      "line": 550,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7828,7 +8004,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 546,
+      "line": 550,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7836,7 +8012,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 431,
+      "line": 435,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7844,7 +8020,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY",
-      "line": 538,
+      "line": 542,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7852,7 +8028,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FILES",
-      "line": 535,
+      "line": 539,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7860,7 +8036,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FINDING",
-      "line": 86,
+      "line": 87,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7868,7 +8044,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FINDINGS",
-      "line": 537,
+      "line": 541,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -7876,7 +8052,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_IMPORTS",
-      "line": 536,
+      "line": 540,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -8068,7 +8244,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8076,7 +8252,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8084,7 +8260,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_path",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8092,7 +8268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8100,7 +8276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_llm",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8108,7 +8284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 440,
+      "line": 441,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8116,7 +8292,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 370,
+      "line": 371,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8124,7 +8300,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOCAL_LLM_EVAL",
-      "line": 466,
+      "line": 467,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8132,7 +8308,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOCAL_LLM_EVAL_ACCUMULATED_REPORT",
-      "line": 470,
+      "line": 471,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8140,22 +8316,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOCAL_LLM_EVAL_CASES",
-      "line": 464,
-      "path": "tools/agent_tools/local_llm_eval.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LOCAL_LLM_EVAL_FINDING",
-      "line": 70,
-      "path": "tools/agent_tools/local_llm_eval.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LOCAL_LLM_EVAL_FINDINGS",
       "line": 465,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
@@ -8163,7 +8323,31 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "LOCAL_LLM_EVAL_FINDING",
+      "line": 71,
+      "path": "tools/agent_tools/local_llm_eval.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LOCAL_LLM_EVAL_FINDINGS",
+      "line": 466,
+      "path": "tools/agent_tools/local_llm_eval.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "LOCAL_LLM_EVAL_MODEL",
+      "line": 463,
+      "path": "tools/agent_tools/local_llm_eval.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "LOCAL_LLM_EVAL_RUN_ID",
       "line": 462,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
@@ -8171,16 +8355,8 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "LOCAL_LLM_EVAL_RUN_ID",
-      "line": 461,
-      "path": "tools/agent_tools/local_llm_eval.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
       "field": "LOCAL_LLM_EVAL_RUN_LLM",
-      "line": 463,
+      "line": 464,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8188,7 +8364,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL",
-      "line": 483,
+      "line": 484,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8196,7 +8372,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_ACCUMULATED_REPORT",
-      "line": 485,
+      "line": 486,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8204,14 +8380,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_CASES",
-      "line": 481,
-      "path": "tools/agent_tools/local_llm_eval.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LOCAL_LLM_EVAL_FINDINGS",
       "line": 482,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
@@ -8219,8 +8387,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "LOCAL_LLM_EVAL_FINDINGS",
+      "line": 483,
+      "path": "tools/agent_tools/local_llm_eval.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_MODEL",
-      "line": 479,
+      "line": 480,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8228,7 +8404,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_RUN_ID",
-      "line": 478,
+      "line": 479,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8236,7 +8412,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_RUN_LLM",
-      "line": 480,
+      "line": 481,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -8740,7 +8916,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 607,
+      "line": 657,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8748,7 +8924,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "command",
-      "line": 408,
+      "line": 458,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8756,7 +8932,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "fields",
-      "line": 408,
+      "line": 458,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8764,7 +8940,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "history_effect",
-      "line": 2366,
+      "line": 2809,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8772,7 +8948,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "provenance",
-      "line": 2366,
+      "line": 2809,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8780,7 +8956,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 408,
+      "line": 458,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8788,7 +8964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 408,
+      "line": 458,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8796,7 +8972,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 449,
+      "line": 499,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8804,7 +8980,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 460,
+      "line": 510,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8812,7 +8988,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 409,
+      "line": 459,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8820,7 +8996,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 412,
+      "line": 462,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8828,7 +9004,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 414,
+      "line": 464,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -8836,7 +9012,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "PROSE_REASONING_GRAPH_STATS",
-      "line": 410,
+      "line": 460,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -9044,7 +9220,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 301,
+      "line": 347,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9052,7 +9228,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "import_rules",
-      "line": 301,
+      "line": 347,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9060,7 +9236,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "scopes",
-      "line": 301,
+      "line": 347,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9068,7 +9244,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 301,
+      "line": 347,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9076,7 +9252,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "RESPONSIBILITY_SCOPE_FINDING",
-      "line": 48,
+      "line": 49,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9084,7 +9260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE",
-      "line": 325,
+      "line": 371,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9092,7 +9268,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_FINDINGS",
-      "line": 324,
+      "line": 370,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9100,7 +9276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_IMPORT_RULES",
-      "line": 323,
+      "line": 369,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9108,7 +9284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_SCOPES",
-      "line": 322,
+      "line": 368,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -9196,7 +9372,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL",
-      "line": 254,
+      "line": 259,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -9204,7 +9380,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_FAILED",
-      "line": 253,
+      "line": 258,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -9212,7 +9388,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_PRODUCER",
-      "line": 246,
+      "line": 251,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -9220,7 +9396,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_PRODUCERS",
-      "line": 252,
+      "line": 257,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -15508,6 +15684,7 @@
     ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
     ".agents/skills/structure-planning/SKILL.md",
+    ".agents/skills/structure-refactor/SKILL.md",
     ".agents/skills/subagent-bootstrap/SKILL.md",
     ".agents/skills/task-routing/SKILL.md",
     ".agents/skills/test-design/SKILL.md",
@@ -15595,6 +15772,7 @@
     "agents/skills/static-check.md",
     "agents/skills/static-validation.md",
     "agents/skills/structure-planning.md",
+    "agents/skills/structure-refactor.md",
     "agents/skills/subagent-bootstrap.md",
     "agents/skills/task-routing.md",
     "agents/skills/test-design.md",
@@ -15643,6 +15821,7 @@
     "tools/agent_tools/compare_codex_token_footprints.py",
     "tools/agent_tools/doc_start.py",
     "tools/agent_tools/eval_accumulation_check.py",
+    "tools/agent_tools/eval_manifest_paths.py",
     "tools/agent_tools/evaluate_agent_run.py",
     "tools/agent_tools/evaluate_codex_agent_roles.py",
     "tools/agent_tools/evaluate_report_quality.py",

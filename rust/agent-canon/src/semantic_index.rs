@@ -4647,7 +4647,9 @@ fn document_responsibility_bucket(path: &str) -> &'static str {
 
 fn responsibility_scope_bucket(path: &str) -> &'static str {
     let normalized = path.replace('\\', "/");
-    if normalized.starts_with("evidence/agent-evals/") {
+    if normalized.starts_with("evidence/agent-evals/")
+        || normalized.starts_with("agents/evals/results/")
+    {
         return "eval-and-hook-evidence";
     }
     if normalized.starts_with("issues/") {
@@ -6880,6 +6882,10 @@ mod tests {
         );
         assert_eq!(
             responsibility_scope_bucket("agents/evals/results/run.json"),
+            "eval-and-hook-evidence"
+        );
+        assert_eq!(
+            responsibility_scope_bucket("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             "eval-and-hook-evidence"
         );
         assert_eq!(
