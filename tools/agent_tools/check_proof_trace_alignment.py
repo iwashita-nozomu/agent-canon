@@ -16,7 +16,10 @@ import runpy
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
+
+JsonMapping = Mapping[str, object]
+JsonObject = dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -85,14 +88,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def as_mapping(value: object) -> Mapping[str, Any] | None:
+def as_mapping(value: object) -> JsonMapping | None:
     """Return value as a string-keyed mapping when possible."""
     if not isinstance(value, Mapping):
         return None
     mapping = cast(Mapping[object, object], value)
     if not all(isinstance(key, str) for key in mapping):
         return None
-    return cast(Mapping[str, Any], mapping)
+    return cast(JsonMapping, mapping)
 
 
 def as_sequence(value: object) -> Sequence[object] | None:
@@ -119,7 +122,7 @@ def int_or_none(value: object) -> int | None:
     return value if isinstance(value, int) else None
 
 
-def load_trace(path: Path, trace_symbol: str) -> Mapping[str, Any]:
+def load_trace(path: Path, trace_symbol: str) -> JsonMapping:
     """Load a Python proof trace without importing it as a package module."""
     namespace = runpy.run_path(path.as_posix())
     value = namespace.get(trace_symbol)
@@ -129,7 +132,7 @@ def load_trace(path: Path, trace_symbol: str) -> Mapping[str, Any]:
     return trace
 
 
-def checked_fragment_names(trace: Mapping[str, Any]) -> set[str]:
+def checked_fragment_names(trace: JsonMapping) -> set[str]:
     """Return checked fragment names retained by the trace."""
     names: set[str] = set()
     for fragment in as_sequence(trace.get("checked_proof_fragments")) or ():
@@ -142,7 +145,7 @@ def checked_fragment_names(trace: Mapping[str, Any]) -> set[str]:
     return names
 
 
-def is_contract_entry(value: Mapping[str, Any]) -> bool:
+def is_contract_entry(value: JsonMapping) -> bool:
     """Return whether a mapping looks like a proof contract entry."""
     return any(
         key in value
@@ -158,9 +161,9 @@ def is_contract_entry(value: Mapping[str, Any]) -> bool:
     )
 
 
-def proof_contract_entries(trace: Mapping[str, Any]) -> list[tuple[str, Mapping[str, Any]]]:
+def proof_contract_entries(trace: JsonMapping) -> list[tuple[str, JsonMapping]]:
     """Return top-level proof contract entries from a trace."""
-    entries: list[tuple[str, Mapping[str, Any]]] = []
+    entries: list[tuple[str, JsonMapping]] = []
     for key, value in trace.items():
         mapping = as_mapping(value)
         if mapping is None or not is_contract_entry(mapping):
@@ -170,9 +173,9 @@ def proof_contract_entries(trace: Mapping[str, Any]) -> list[tuple[str, Mapping[
 
 
 def inherited_anchor_mapping(
-    contract: Mapping[str, Any],
-    raw_anchor: Mapping[str, Any],
-) -> dict[str, Any]:
+    contract: JsonMapping,
+    raw_anchor: JsonMapping,
+) -> JsonObject:
     """Return one anchor mapping with contract-level source defaults."""
     anchor = dict(raw_anchor)
     if "source_path" not in anchor and isinstance(contract.get("source_path"), str):
@@ -182,9 +185,9 @@ def inherited_anchor_mapping(
     return anchor
 
 
-def contract_anchor_mappings(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
+def contract_anchor_mappings(contract: JsonMapping) -> list[JsonObject]:
     """Extract implementation anchor mappings from one contract."""
-    anchors: list[dict[str, Any]] = []
+    anchors: list[JsonObject] = []
     for key in ("implementation_anchor", "source_shape_anchor"):
         mapping = as_mapping(contract.get(key))
         if mapping is not None:
@@ -214,10 +217,11 @@ def contract_anchor_mappings(contract: Mapping[str, Any]) -> list[dict[str, Any]
 def normalize_anchor(
     contract_key: str,
     index: int,
-    anchor: Mapping[str, Any],
+    anchor: JsonMapping,
 ) -> AnchorCheck:
     """Normalize a raw trace anchor into a check record."""
     qualname = anchor.get("qualname", anchor.get("source_symbol"))
+    source_path = anchor.get("source_path")
     anchor_id = (
         str(anchor.get("id"))
         if isinstance(anchor.get("id"), str)
@@ -226,9 +230,7 @@ def normalize_anchor(
     return AnchorCheck(
         contract_key=contract_key,
         anchor_id=anchor_id,
-        source_path=anchor.get("source_path")
-        if isinstance(anchor.get("source_path"), str)
-        else None,
+        source_path=source_path if isinstance(source_path, str) else None,
         qualname=qualname if isinstance(qualname, str) else None,
         required_source_tokens=string_tuple(anchor.get("required_source_tokens")),
         forbidden_source_tokens=string_tuple(anchor.get("forbidden_source_tokens")),
@@ -239,7 +241,7 @@ def normalize_anchor(
     )
 
 
-def contract_anchors(contract_key: str, contract: Mapping[str, Any]) -> list[AnchorCheck]:
+def contract_anchors(contract_key: str, contract: JsonMapping) -> list[AnchorCheck]:
     """Return normalized anchors for one contract."""
     return [
         normalize_anchor(contract_key, index, anchor)
@@ -355,7 +357,7 @@ def check_anchor(root: Path, anchor: AnchorCheck) -> list[Finding]:
             return findings
         source_segment = ast.get_source_segment(source_text, node) or source_text
 
-    snippets = ast_operation_snippets(node) if node is not None else set()
+    snippets = ast_operation_snippets(node) if node is not None else set[str]()
     for token in anchor.required_source_tokens:
         if token not in source_segment and compact_space(token) not in snippets:
             findings.append(
@@ -437,7 +439,7 @@ def check_anchor(root: Path, anchor: AnchorCheck) -> list[Finding]:
 
 def check_contract(
     contract_key: str,
-    contract: Mapping[str, Any],
+    contract: JsonMapping,
     known_fragments: set[str],
 ) -> list[Finding]:
     """Check proposition-level fields for one contract."""

@@ -15,7 +15,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 PythonSymbol = ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
 BUILTIN_BOOKKEEPING_CALLS = frozenset(
@@ -50,6 +50,7 @@ STATIC_EDGE_STATUSES = frozenset(
         "static_resolution_gap",
     }
 )
+DEFAULT_MAX_DEPTH = 3
 
 
 @dataclass(frozen=True)
@@ -233,7 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-depth",
         type=int,
-        default=3,
+        default=DEFAULT_MAX_DEPTH,
         help="Maximum same-module recursive expansion depth.",
     )
     parser.add_argument(
@@ -287,7 +288,7 @@ def parse_python_symbol_reference(reference: str) -> tuple[Path, str]:
     return path, qualname
 
 
-def load_backend_profile_library(path: Path | None) -> dict[str, Any]:
+def load_backend_profile_library(path: Path | None) -> dict[str, object]:
     """Load a proof-only backend profile library if one is available."""
     if path is None or not str(path):
         return {}
@@ -296,21 +297,23 @@ def load_backend_profile_library(path: Path | None) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("backend profile library must be a JSON object")
-    profiles = payload.get("profiles")
+    library = cast(dict[str, object], payload)
+    profiles = library.get("profiles")
     if profiles is not None and not isinstance(profiles, dict):
         raise ValueError("backend profile library `profiles` must be a JSON object")
-    return payload
+    return library
 
 
-def backend_profile_ids(profile_library: dict[str, Any]) -> tuple[str, ...]:
+def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
     """Return profile ids from a proof-only profile library."""
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return ()
-    return tuple(str(key) for key in sorted(profiles))
+    profile_map = cast(dict[object, object], profiles)
+    return tuple(sorted(str(key) for key in profile_map))
 
 
-def backend_required_witnesses(profile_library: dict[str, Any]) -> tuple[str, ...]:
+def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str, ...]:
     """Return the union of required witnesses from the backend profile library."""
     default_witnesses = (
         "dtype",
@@ -325,13 +328,16 @@ def backend_required_witnesses(profile_library: dict[str, Any]) -> tuple[str, ..
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return default_witnesses
+    profile_map = cast(dict[object, object], profiles)
     witnesses: set[str] = set()
-    for raw_profile in profiles.values():
+    for raw_profile in profile_map.values():
         if not isinstance(raw_profile, dict):
             continue
-        raw_witnesses = raw_profile.get("required_witnesses")
+        profile = cast(dict[str, object], raw_profile)
+        raw_witnesses = profile.get("required_witnesses")
         if isinstance(raw_witnesses, list | tuple):
-            witnesses.update(str(item) for item in raw_witnesses)
+            witness_values = cast(list[object] | tuple[object, ...], raw_witnesses)
+            witnesses.update(str(item) for item in witness_values)
     if not witnesses:
         return default_witnesses
     return tuple(sorted(witnesses))
@@ -1443,7 +1449,7 @@ def backend_assumptions_for(
     target_theorem: str,
     *,
     profile_library_path: str,
-    profile_library: dict[str, Any],
+    profile_library: dict[str, object],
 ) -> tuple[IRBackendAssumption, ...]:
     """Return proof-only backend assumptions selected by the theorem target."""
     node_tuple = tuple(nodes)
@@ -1567,7 +1573,7 @@ def build_algorithm_ir(
     root: Path,
     import_roots: tuple[Path, ...] = (),
     backend_profile_library_path: str = "",
-    backend_profile_library: dict[str, Any] | None = None,
+    backend_profile_library: dict[str, object] | None = None,
 ) -> AlgorithmIRReport:
     """Build an Algorithm Expansion IR from a root AST symbol."""
     nodes: dict[str, IRNode] = {}
