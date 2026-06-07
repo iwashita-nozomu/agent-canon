@@ -140,7 +140,7 @@ protecting_tools = [
   "tools/agent_tools/log_surface_inventory.py",
 ]
 issues = [
-  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/closed/AC-20260517-check-tool-fragmentation.md",
   "issues/open/AC-20260517-responsibility-scope-management.md",
 ]
 
@@ -207,7 +207,7 @@ protecting_tools = [
   "tools/ci/run_all_checks.sh",
 ]
 issues = [
-  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/closed/AC-20260517-check-tool-fragmentation.md",
   "issues/open/AC-20260517-responsibility-scope-management.md",
 ]
 
