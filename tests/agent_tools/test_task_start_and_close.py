@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -20,6 +21,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
+SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
 
 
 def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
@@ -319,6 +322,77 @@ def write_ready_closeout_bundle(
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
+    def assert_current_checkout_write_policy(
+        self,
+        write_scope_policy: dict[str, object],
+        max_write_subagents: int,
+    ) -> None:
+        """Assert the current-checkout writer serialization contract."""
+        self.assertEqual(write_scope_policy["max_write_subagents"], max_write_subagents)
+        self.assertEqual(
+            write_scope_policy["overlapping_write_scopes"],
+            "serialize_current_checkout_waves",
+        )
+        self.assertNotIn("active_subagents", write_scope_policy)
+
+    def assert_role_prompt_includes(
+        self,
+        manifest: dict[str, object],
+        role_id: str,
+        required_fields: set[str],
+    ) -> None:
+        """Assert one generated role prompt contract includes required fields."""
+        roles = cast("list[object]", manifest["roles"])
+        self.assertIsInstance(roles, list)
+        role: dict[str, object] | None = None
+        for candidate in roles:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_map = cast("dict[str, object]", candidate)
+            if candidate_map.get("id") == role_id:
+                role = candidate_map
+                break
+        self.assertIsNotNone(role, role_id)
+        if role is None:
+            return
+        prompt_contract = cast("dict[str, object]", role["prompt_contract"])
+        self.assertIsInstance(prompt_contract, dict)
+        prompt_must_include = cast("list[object]", prompt_contract["prompt_must_include"])
+        prompt_fields = {str(field) for field in prompt_must_include}
+        self.assertTrue(required_fields.issubset(prompt_fields), role_id)
+
+    def assert_abstract_design_prompt_contracts(self, manifest: dict[str, object]) -> None:
+        """Assert ADF prompt contracts for generated design and review roles."""
+        expected = {
+            "designer": {
+                "abstract_design_frame",
+                "responsibility_model",
+                "concept_or_layer_model",
+            },
+            "design_reviewer": {
+                "abstract_design_frame_review",
+                "adf_before_file_scope",
+                "adf_to_implementation_trace",
+            },
+            "implementer": {
+                "abstract_design_frame",
+                "implementation_source_packet",
+                "design_to_implementation_trace",
+            },
+            "change_reviewer": {
+                "abstract_design_frame_trace",
+                "implementation_source_packet_entry",
+                "revise_if_slice_only_justified_by_nearest_file_helper_or_current_finding",
+            },
+            "final_reviewer": {
+                "abstract_design_frame_trace",
+                "spec_to_product_trace",
+                "review_finding_incorporation_trace",
+            },
+        }
+        for role_id, fields in expected.items():
+            self.assert_role_prompt_includes(manifest, role_id, fields)
+
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -586,8 +660,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(spawn_budget["max_write_subagents"], 4)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
-            self.assertEqual(write_scope_policy["max_write_subagents"], 4)
-            self.assertNotIn("active_subagents", write_scope_policy)
+            self.assert_current_checkout_write_policy(write_scope_policy, 4)
+            self.assert_abstract_design_prompt_contracts(manifest)
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
@@ -639,8 +713,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(spawn_budget["active_subagents"], 10)
             self.assertEqual(spawn_budget["max_write_subagents"], 3)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
-            self.assertEqual(write_scope_policy["max_write_subagents"], 3)
-            self.assertNotIn("active_subagents", write_scope_policy)
+            self.assert_current_checkout_write_policy(write_scope_policy, 3)
             self.assertIn("spawn_budget:", manifest_text)
             self.assertIn("active_subagents: 10", manifest_text)
             self.assertIn("max_write_subagents: 3", manifest_text)
@@ -688,6 +761,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
             self.assertTrue((report_dir / "task_authority.yaml").is_file())
+            self.assertTrue((report_dir / "task_authority.yaml.sha256").is_file())
+            self.assertTrue((workspace_root / "reports" / "agents" / ".active_run.sha256").is_file())
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
@@ -705,6 +780,41 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertNotIn("/docker/README.md", manifest_text)
             self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
+
+    def test_bootstrap_custom_report_root_writes_active_run_baseline_there(self) -> None:
+        """Custom report-root mode should baseline the active pointer it writes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "custom-reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            run_id = "test-custom-report-root"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "workspace-local report root",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((report_root / ".active_run").is_file())
+            self.assertTrue((report_root / ".active_run.sha256").is_file())
+            self.assertFalse((workspace_root / "reports" / "agents" / ".active_run.sha256").exists())
+            self.assertTrue((report_root / run_id / "task_authority.yaml.sha256").is_file())
 
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
         """bootstrap_agent_run should emit runtime and workflow spawn limits for machine use."""
@@ -763,8 +873,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 spawn_budget["runtime_max_threads"],
             )
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
-            self.assertEqual(write_scope_policy["max_write_subagents"], 2)
-            self.assertNotIn("active_subagents", write_scope_policy)
+            self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assertIn("spawn_budget:", manifest_text)
             self.assertIn("active_subagents: 10", manifest_text)
             self.assertIn("max_write_subagents: 2", manifest_text)
@@ -830,6 +939,59 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 self.assertIn("subagent_lifecycle_policy:", manifest_text)
                 self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
                 self.assertIn("prompt_contract:", manifest_text)
+                manifest = yaml.safe_load(manifest_text)
+                self.assert_role_prompt_includes(
+                    manifest,
+                    "implementer",
+                    {"abstract_design_frame", "design_to_implementation_trace"},
+                )
+
+    def test_worktree_start_rejects_branch_kickoff(self) -> None:
+        """worktree_start.py is cleanup-only and must not create branch worktrees."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True, capture_output=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(WORKTREE_START_SCRIPT),
+                    "feature/demo",
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("cleanup diagnostic only", result.stderr)
+            self.assertFalse((workspace_root / ".worktrees").exists())
+
+    def test_setup_worktree_wrapper_rejects_legacy_creation(self) -> None:
+        """setup_worktree.sh should warn and stop instead of creating worktrees."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True, capture_output=True)
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(SETUP_WORKTREE_SCRIPT),
+                    "feature/demo",
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("SETUP_WORKTREE_FORWARDER=deprecated", result.stderr)
+            self.assertIn("CALLER_CHAIN=", result.stderr)
+            self.assertFalse((workspace_root / ".worktrees").exists())
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""

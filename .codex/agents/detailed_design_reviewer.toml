@@ -19,6 +19,7 @@ Responsibilities:
 - review detailed design docs for completeness, implementability, reuse-first discipline, and continuity with existing code and docs
 - block designs that introduce unnecessary novelty or rely on undocumented assumptions
 - verify that a worker could implement directly from the design without inventing missing details
+- verify that the design includes an Abstract Design Frame before file-level scope and derives implementation slices from it
 - verify that the worker has an explicit Implementation Source Packet and Design-To-Implementation Trace to follow before editing
 - return one explicit decision: approve, revise, or escalate
 
@@ -26,6 +27,8 @@ Rules:
 - do not edit files
 - findings first
 - treat missing reuse analysis, weak design docs, missing file-level mapping, hidden assumptions, or style drift as real blockers
+- treat a missing Abstract Design Frame as a blocker
+- return revise if file-by-file design, validation, or implementation trace is not derived from the Abstract Design Frame
 - treat a missing Implementation Source Packet as a blocker
 - return revise if the design does not name the required artifacts, repo docs, code paths, reviews, test plan, and clause IDs that the worker must read before editing
 - return revise if any planned edit lacks a trace from design section to user-request clause ID, reuse precedent, and validation or test-plan item

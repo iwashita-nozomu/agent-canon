@@ -663,6 +663,11 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest run.write_scope_policy.max_write_subagents mismatch",
     )
     ensure(
+        write_scope_policy.get("overlapping_write_scopes")
+        == "serialize_current_checkout_waves",
+        f"task {task_id} manifest overlapping write scope policy must serialize current checkout waves",
+    )
+    ensure(
         "active_subagents" not in write_scope_policy,
         f"task {task_id} manifest write_scope_policy must not carry active_subagents",
     )
@@ -683,6 +688,69 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "prompt_contract:" in manifest_text,
         f"task {task_id} manifest missing role prompt_contract",
     )
+    ensure_manifest_abstract_design_prompt_contracts(manifest, task_id)
+
+
+def ensure_manifest_abstract_design_prompt_contracts(
+    manifest: dict[object, object],
+    task_id: str,
+) -> None:
+    """Ensure generated role prompts preserve ADF trace contracts."""
+    roles = manifest.get("roles")
+    ensure(isinstance(roles, list), f"task {task_id} manifest missing roles list")
+
+    def prompt_fields(role_id: str) -> set[str] | None:
+        for role in roles:
+            if not isinstance(role, dict) or role.get("id") != role_id:
+                continue
+            prompt_contract = role.get("prompt_contract")
+            ensure(
+                isinstance(prompt_contract, dict),
+                f"task {task_id} role {role_id} missing prompt_contract",
+            )
+            raw_fields = prompt_contract.get("prompt_must_include")
+            ensure(
+                isinstance(raw_fields, list),
+                f"task {task_id} role {role_id} missing prompt_must_include",
+            )
+            return {str(field) for field in raw_fields}
+        return None
+
+    expected_role_fields = {
+        "designer": {
+            "abstract_design_frame",
+            "responsibility_model",
+            "concept_or_layer_model",
+        },
+        "design_reviewer": {
+            "abstract_design_frame_review",
+            "adf_before_file_scope",
+            "adf_to_implementation_trace",
+        },
+        "implementer": {
+            "abstract_design_frame",
+            "implementation_source_packet",
+            "design_to_implementation_trace",
+        },
+        "change_reviewer": {
+            "abstract_design_frame_trace",
+            "implementation_source_packet_entry",
+            "revise_if_slice_only_justified_by_nearest_file_helper_or_current_finding",
+        },
+        "final_reviewer": {
+            "abstract_design_frame_trace",
+            "spec_to_product_trace",
+            "review_finding_incorporation_trace",
+        },
+    }
+    for role_id, required_fields in expected_role_fields.items():
+        fields = prompt_fields(role_id)
+        if fields is None:
+            continue
+        ensure(
+            required_fields.issubset(fields),
+            f"task {task_id} role {role_id} missing abstract design prompt fields",
+        )
 
 
 def validate_task_bundle_output(

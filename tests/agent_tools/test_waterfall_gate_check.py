@@ -18,6 +18,231 @@ BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run
 GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_check.py"
 
 
+def write_markdown(path: Path, lines: list[str]) -> None:
+    """Write a compact Markdown fixture."""
+    path.write_text("\n".join([*lines, ""]), encoding="utf-8")
+
+
+def run_gate(report_dir: Path, gate: str) -> subprocess.CompletedProcess[str]:
+    """Run one waterfall gate check."""
+    return subprocess.run(
+        [
+            sys.executable,
+            str(GATE_CHECK_SCRIPT),
+            "--report-dir",
+            str(report_dir),
+            "--gate",
+            gate,
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def write_document_flow_review(report_dir: Path) -> None:
+    """Write an approving document flow review fixture."""
+    write_markdown(
+        report_dir / "document_flow_review.md",
+        [
+            "# Document Flow Review",
+            "",
+            "## Findings",
+            "No blockers.",
+            "## Decision",
+            "approve",
+        ],
+    )
+
+
+def approved_design_review_lines(*, include_abstract: bool = True) -> list[str]:
+    """Return a design review fixture that satisfies the design gate."""
+    lines = [
+        "# Detailed Design Review",
+        "",
+        "## Findings",
+        "No blockers.",
+        "## Upstream Requirement Packet Review",
+        "The design cites the governing requirement and workflow documents.",
+    ]
+    if include_abstract:
+        lines.extend(
+            [
+                "## Abstract Design Frame Review",
+                "The design starts from responsibility before file scope.",
+            ]
+        )
+    lines.extend(
+        [
+        "## Implementation Source Packet Review",
+        "The packet names every required read-before-edit artifact.",
+        "## Canonical Tree-Head Review",
+        "The design leaves only canonical tracked paths in the tree.",
+        "## Design-To-Implementation Trace Review",
+        "Each planned edit maps to the request clause and test plan.",
+        "## Decision",
+        "approve",
+        ]
+    )
+    return lines
+
+
+def design_brief_lines(
+    *,
+    include_abstract: bool = True,
+    include_upstream: bool = True,
+    include_implementation: bool = True,
+    include_canonical: bool = True,
+    include_trace: bool = True,
+) -> list[str]:
+    """Return a detailed design fixture with optional required sections."""
+    lines = [
+        "# Detailed Design Brief",
+        "",
+        "## Goals",
+        "Implement the approved small change.",
+        "## Existing Code And Docs To Reuse",
+        "Mirror `tools/agent_tools/task_close.py`.",
+    ]
+    if include_abstract:
+        lines.extend(
+            [
+                "## Abstract Design Frame",
+                (
+                    "Responsibility model: gate checks enforce design readiness "
+                    "before implementation path selection."
+                ),
+                "Concept or layer model: requirements flow into design, review, implementation, and validation layers.",
+                "Non-goals: the design does not let workers invent file scope from nearby helpers.",
+                "Future extension layers: generated prompts and closeout gates can add stricter checks.",
+                "Evaluation axes: readiness is judged by traceability, reviewability, and validation coverage.",
+                "Canonical-surface relationships: the workflow, templates, tools, and tests stay aligned.",
+            ]
+        )
+    if include_upstream:
+        lines.extend(
+            [
+                "## Upstream Requirement Packet",
+                (
+                    "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
+                    "and `agents/workflows/implementation-waterfall-workflow.md`."
+                ),
+            ]
+        )
+    if include_implementation:
+        lines.extend(
+            [
+                "## Implementation Source Packet",
+                (
+                    "Read `user_request_contract.md`, `design_review.md`, "
+                    "`document_flow_review.md`, `test_plan.md`, and "
+                    "`tools/agent_tools/task_close.py`."
+                ),
+            ]
+        )
+    if include_canonical:
+        lines.extend(
+            [
+                "## Canonical Tree-Head Plan",
+                (
+                    "Keep `tools/agent_tools/waterfall_gate_check.py` as the only "
+                    "canonical implementation path and do not leave backup files."
+                ),
+            ]
+        )
+    lines.extend(["## File-By-File Design", "Update the gate checker only."])
+    if include_trace:
+        lines.extend(
+            [
+                "## Design-To-Implementation Trace",
+                "Slice A maps T1-C1 to the gate checker and test plan item T1.",
+            ]
+        )
+    lines.extend(
+        [
+            "## Identifier And Naming Plan",
+            "Use `waterfall_gate_check.py` after the existing task tool names.",
+        ]
+    )
+    return lines
+
+
+def write_approved_design_bundle(
+    report_dir: Path,
+    design_lines: list[str],
+) -> None:
+    """Write design artifacts with an approving review and document-flow review."""
+    write_design_bundle_with_review(
+        report_dir,
+        design_lines,
+        approved_design_review_lines(),
+    )
+
+
+def write_design_bundle_with_review(
+    report_dir: Path,
+    design_lines: list[str],
+    design_review_lines: list[str],
+) -> None:
+    """Write design artifacts with caller-selected design-review lines."""
+    write_markdown(report_dir / "design_brief.md", design_lines)
+    write_markdown(report_dir / "design_review.md", design_review_lines)
+    write_document_flow_review(report_dir)
+
+
+def write_unknown_requirement_bundle(report_dir: Path) -> None:
+    """Write a requirement bundle with an invalid active unknown clause."""
+    write_markdown(
+        report_dir / "user_request_contract.md",
+        [
+            "# User Request Contract",
+            "",
+            "## Requirements Resolution Sweep",
+            "Checked notes, documents, and local code precedent.",
+            "## Resolved From Accumulated Context",
+            "| Clause ID | Resolved From | Evidence Path | Resolution | Remaining Risk |",
+            "| --------- | ------------- | ------------- | ---------- | -------------- |",
+            "| T1-C0 | repo_or_code_precedent | documents/ | Existing workflow applies. | none |",
+            "## Must-Do Clauses",
+            (
+                "| Clause ID | Source Bucket | User Wording Or Evidence | "
+                "Operational Interpretation | Owner Stage | Evidence Path | Status |"
+            ),
+            (
+                "| --------- | ------------- | ------------------------- | "
+                "-------------------------- | ----------- | ------------- | ------ |"
+            ),
+            (
+                "| T1-C1 | unknown_or_open_question | unclear | decide later | "
+                "requirements | user_request_contract.md | active |"
+            ),
+            "## Must-Not-Do Clauses",
+            "| Clause ID | Source Bucket | Forbidden Drift | Why It Is Forbidden | Guard Stage | Evidence Path | Status |",
+            "| --------- | ------------- | --------------- | ------------------- | ----------- | ------------- | ------ |",
+            "## Completion Evidence Clauses",
+            "| Clause ID | Source Bucket | Required Evidence | Where It Must Appear | Owner Stage | Status |",
+            "| --------- | ------------- | ----------------- | -------------------- | ----------- | ------ |",
+            "| T1-E1 | current_request | requirements review | management_review.md | requirements | active |",
+        ],
+    )
+    write_markdown(
+        report_dir / "management_review.md",
+        [
+            "# Management Review",
+            "",
+            "## Scope Review",
+            "Scope is concrete.",
+            "## Accumulated Context Resolution Review",
+            "Resolution sweep is recorded.",
+            "## Unknown Handling Review",
+            "No unknowns should remain active.",
+            "## Decision",
+            "approve",
+        ],
+    )
+
+
 class WaterfallGateCheckTest(unittest.TestCase):
     """Verify that intermediate waterfall gates fail closed."""
 
@@ -26,99 +251,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "unknown-requirement"
             report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "user_request_contract.md").write_text(
-                "\n".join(
-                    [
-                        "# User Request Contract",
-                        "",
-                        "## Requirements Resolution Sweep",
-                        "Checked notes, documents, and local code precedent.",
-                        "## Resolved From Accumulated Context",
-                        (
-                            "| Clause ID | Resolved From | Evidence Path | Resolution | "
-                            "Remaining Risk |"
-                        ),
-                        (
-                            "| --------- | ------------- | ------------- | ---------- | "
-                            "-------------- |"
-                        ),
-                        (
-                            "| T1-C0 | repo_or_code_precedent | documents/ | "
-                            "Existing workflow applies. | none |"
-                        ),
-                        "## Must-Do Clauses",
-                        (
-                            "| Clause ID | Source Bucket | User Wording Or Evidence | "
-                            "Operational Interpretation | Owner Stage | Evidence Path | Status |"
-                        ),
-                        (
-                            "| --------- | ------------- | ------------------------- | "
-                            "-------------------------- | ----------- | ------------- | ------ |"
-                        ),
-                        (
-                            "| T1-C1 | unknown_or_open_question | unclear | decide later | "
-                            "requirements | user_request_contract.md | active |"
-                        ),
-                        "## Must-Not-Do Clauses",
-                        (
-                            "| Clause ID | Source Bucket | Forbidden Drift | Why It Is Forbidden | "
-                            "Guard Stage | Evidence Path | Status |"
-                        ),
-                        (
-                            "| --------- | ------------- | --------------- | ------------------- | "
-                            "----------- | ------------- | ------ |"
-                        ),
-                        "## Completion Evidence Clauses",
-                        (
-                            "| Clause ID | Source Bucket | Required Evidence | "
-                            "Where It Must Appear | Owner Stage | Status |"
-                        ),
-                        (
-                            "| --------- | ------------- | ----------------- | "
-                            "-------------------- | ----------- | ------ |"
-                        ),
-                        (
-                            "| T1-E1 | current_request | requirements review | "
-                            "management_review.md | requirements | active |"
-                        ),
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "management_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Management Review",
-                        "",
-                        "## Scope Review",
-                        "Scope is concrete.",
-                        "## Accumulated Context Resolution Review",
-                        "Resolution sweep is recorded.",
-                        "## Unknown Handling Review",
-                        "No unknowns should remain active.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "requirements",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            write_unknown_requirement_bundle(report_dir)
+            result = run_gate(report_dir, "requirements")
 
             self.assertNotEqual(result.returncode, 0)
             expected_blocker = "user_request_contract.md:active_unknown_clause:must_do_clauses"
@@ -150,20 +284,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 text=True,
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "design",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "design")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("WATERFALL_GATE_READY=no", result.stdout)
@@ -239,100 +360,145 @@ class WaterfallGateCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "filled"
             report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "design_brief.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Brief",
-                        "",
-                        "## Goals",
-                        "Implement the approved small change.",
-                        "## Existing Code And Docs To Reuse",
-                        "Mirror `tools/agent_tools/task_close.py`.",
-                        "## Upstream Requirement Packet",
-                        (
-                            "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
-                            "and `agents/workflows/implementation-waterfall-workflow.md`."
-                        ),
-                        "## Implementation Source Packet",
-                        (
-                            "Read `user_request_contract.md`, `design_review.md`, "
-                            "`document_flow_review.md`, `test_plan.md`, and "
-                            "`tools/agent_tools/task_close.py`."
-                        ),
-                        "## Canonical Tree-Head Plan",
-                        (
-                            "Keep `tools/agent_tools/waterfall_gate_check.py` as the only "
-                            "canonical implementation path and do not leave backup or copy files."
-                        ),
-                        "## File-By-File Design",
-                        "Update `tools/agent_tools/waterfall_gate_check.py` only.",
-                        "## Design-To-Implementation Trace",
-                        (
-                            "Slice A maps T1-C1 to "
-                            "`tools/agent_tools/waterfall_gate_check.py` and test plan item T1."
-                        ),
-                        "## Identifier And Naming Plan",
-                        "Use `waterfall_gate_check.py` after the existing task tool names.",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "design_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Upstream Requirement Packet Review",
-                        "The design cites the governing requirement and workflow documents.",
-                        "## Implementation Source Packet Review",
-                        "The packet names every required read-before-edit artifact.",
-                        "## Canonical Tree-Head Review",
-                        "The design leaves only canonical tracked paths in the tree.",
-                        "## Design-To-Implementation Trace Review",
-                        "Each planned edit maps to the request clause and test plan.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "document_flow_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Document Flow Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "design",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            result = run_gate(report_dir, "design")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("WATERFALL_GATE_READY=yes", result.stdout)
             self.assertIn("NEXT_ACTION=proceed_to_next_waterfall_gate", result.stdout)
+
+    def test_design_gate_rejects_missing_abstract_design_frame(self) -> None:
+        """Design gate should fail when design narrows to files without abstraction."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-abstract-frame"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_approved_design_bundle(
+                report_dir,
+                design_brief_lines(include_abstract=False),
+            )
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            expected_blocker = (
+                "design_brief.md:section_empty_or_missing:abstract_design_frame"
+            )
+            self.assertIn(expected_blocker, result.stdout)
+
+    def test_design_gate_rejects_missing_abstract_design_frame_review(self) -> None:
+        """Design gate should fail when design review omits abstract-frame review."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-abstract-review"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_design_bundle_with_review(
+                report_dir,
+                design_brief_lines(),
+                approved_design_review_lines(include_abstract=False),
+            )
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            expected_blocker = (
+                "design_review.md:section_empty_or_missing:abstract_design_frame_review"
+            )
+            self.assertIn(expected_blocker, result.stdout)
+
+    def test_design_gate_rejects_under_specified_abstract_design_frame(self) -> None:
+        """Design gate should require the six abstract design frame dimensions."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "thin-abstract-frame"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            thin_design = design_brief_lines()
+            thin_design = [
+                line
+                for line in thin_design
+                if not line.startswith(
+                    (
+                        "Concept or layer model:",
+                        "Non-goals:",
+                        "Future extension layers:",
+                        "Evaluation axes:",
+                        "Canonical-surface relationships:",
+                    )
+                )
+            ]
+            write_approved_design_bundle(report_dir, thin_design)
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_brief.md:abstract_design_frame_missing:concept_or_layer_model",
+                result.stdout,
+            )
+            self.assertIn(
+                "design_brief.md:abstract_design_frame_missing:canonical_surface_relationships",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_term_inventory_abstract_design_frame(self) -> None:
+        """Design gate should reject a one-line inventory of ADF terms."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "inventory-abstract-frame"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            inventory_design = design_brief_lines()
+            start = inventory_design.index("## Abstract Design Frame")
+            end = inventory_design.index("## Upstream Requirement Packet")
+            inventory_design = (
+                inventory_design[: start + 1]
+                + [
+                    (
+                        "Responsibility model, concept graph, non-goals, future extension layers, "
+                        "evaluation axes, and relationship to existing canonical surfaces."
+                    )
+                ]
+                + inventory_design[end:]
+            )
+            write_approved_design_bundle(report_dir, inventory_design)
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_brief.md:abstract_design_frame_missing:responsibility_model",
+                result.stdout,
+            )
+            self.assertIn(
+                "design_brief.md:abstract_design_frame_missing:evaluation_axes",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_placeholder_abstract_design_frame_values(self) -> None:
+        """Design gate should reject ADF labels that still have placeholder values."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "placeholder-abstract-frame"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            placeholder_design = design_brief_lines()
+            placeholder_design = [
+                "Responsibility model: todo" if line.startswith("Responsibility model:") else line
+                for line in placeholder_design
+            ]
+            write_approved_design_bundle(report_dir, placeholder_design)
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_brief.md:abstract_design_frame_missing:responsibility_model",
+                result.stdout,
+            )
+
+    def test_implementation_checkpoint_contract_requires_abstract_trace(self) -> None:
+        """Checkpoint review surfaces should reject file-local-only justification."""
+        template_text = (PROJECT_ROOT / "agents" / "templates" / "change_review.md").read_text(
+            encoding="utf-8"
+        )
+        workflow_text = (
+            PROJECT_ROOT / "agents" / "workflows" / "implementation-waterfall-workflow.md"
+        ).read_text(encoding="utf-8")
+
+        for text in (template_text, workflow_text):
+            self.assertIn("Abstract Design Frame", text)
+            self.assertIn("Implementation Source Packet", text)
+            self.assertIn("nearest file", text)
+            self.assertIn("helper", text)
+            self.assertIn("current finding", text)
 
     def test_final_gate_rejects_empty_work_log(self) -> None:
         """Final gate should fail when work_log.md has no concrete entries."""
@@ -547,71 +713,11 @@ class WaterfallGateCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-source-packet"
             report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "design_brief.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Brief",
-                        "",
-                        "## Goals",
-                        "Implement the approved small change.",
-                        "## Existing Code And Docs To Reuse",
-                        "Mirror `tools/agent_tools/task_close.py`.",
-                        "## Identifier And Naming Plan",
-                        "Use local precedent.",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
+            write_approved_design_bundle(
+                report_dir,
+                design_brief_lines(include_implementation=False),
             )
-            (report_dir / "design_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Upstream Requirement Packet Review",
-                        "The design cites the governing requirement and workflow documents.",
-                        "## Implementation Source Packet Review",
-                        "The packet names every required read-before-edit artifact.",
-                        "## Design-To-Implementation Trace Review",
-                        "Each planned edit maps to the request clause and test plan.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "document_flow_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Document Flow Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "design",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "design")
 
             self.assertNotEqual(result.returncode, 0)
             expected_blocker = (
@@ -624,73 +730,11 @@ class WaterfallGateCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-upstream-packet"
             report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "design_brief.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Brief",
-                        "",
-                        "## Goals",
-                        "Implement the approved small change.",
-                        "## Existing Code And Docs To Reuse",
-                        "Mirror `tools/agent_tools/task_close.py`.",
-                        "## Implementation Source Packet",
-                        "Read `user_request_contract.md` and `design_review.md`.",
-                        "## Design-To-Implementation Trace",
-                        "Slice A maps T1-C1 to `tools/agent_tools/task_close.py`.",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
+            write_approved_design_bundle(
+                report_dir,
+                design_brief_lines(include_upstream=False),
             )
-            (report_dir / "design_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Detailed Design Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Upstream Requirement Packet Review",
-                        "The design should cite the governing requirement docs.",
-                        "## Implementation Source Packet Review",
-                        "The packet names every required read-before-edit artifact.",
-                        "## Design-To-Implementation Trace Review",
-                        "Each planned edit maps to the request clause and test plan.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "document_flow_review.md").write_text(
-                "\n".join(
-                    [
-                        "# Document Flow Review",
-                        "",
-                        "## Findings",
-                        "No blockers.",
-                        "## Decision",
-                        "approve",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "design",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "design")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(

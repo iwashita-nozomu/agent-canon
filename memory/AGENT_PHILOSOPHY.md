@@ -177,6 +177,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User pointed out direct rg prohibition after a broad rg -n hit bmu_tracked_intermediate CSV data and produced huge output.
 
+- 2026-06-07 | interaction-observation | 設計時に実装対象を早く絞りすぎず、先に抽象責務、概念モデル、非対象、拡張余地、評価軸を固定してから実装 slice に落とす。
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback: 設計を行う際にスコープを絞り杉です。もっと抽象的に設計するべきです
+
 ## Task Retrospectives
 
 

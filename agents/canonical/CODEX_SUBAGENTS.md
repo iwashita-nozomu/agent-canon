@@ -44,7 +44,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
-- approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
+- Abstract Design Frame と approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、既定の説明を write-capable handoff first にする。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence であり完了条件ではありません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に該当 role TOML の model / reasoning で fresh default subagent を再試行する
@@ -176,9 +176,9 @@ Constraints:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `spark_worker` first for design-traced narrow slices; `worker` fallback for broad or ambiguous implementation |
+| `implementer` | `spark_worker` first for narrow slices derived from the Abstract Design Frame and design trace; `worker` fallback for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
-| `final_reviewer` | `ship_reviewer`, then `reviewer` / `project_reviewer` when final gate escalation is needed |
+| `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
 | `auditor` | parent closeout and workflow-monitoring gate |
 | `researcher` | `literature_researcher` or `explorer` |
@@ -234,7 +234,7 @@ Constraints:
 - `diff_triage_reviewer`
   - 狭い diff の first-pass review を安価に行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
 - `ship_reviewer`
-  - user request clause、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
+  - user request clause、Abstract Design Frame、approved packet、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
 - `explorer`
   - 読み取り専用で codebase / docs / workflow の調査を行う
 - `reviewer`
@@ -248,7 +248,7 @@ Constraints:
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
 - `spark_worker`
-  - approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
+  - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
 - `prompt_config_reviewer`
@@ -297,8 +297,8 @@ Constraints:
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report を事実として扱い、OOP 原則別に文書化する |
-| 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
-| 低リスク実装slice | design trace、naming、validation が固定済みの slice だけを `spark_worker` first |
+| 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
+| 低リスク実装slice | Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice だけを `spark_worker` first |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
 | 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、prompt/config surface がある場合は `prompt_config_reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
@@ -338,13 +338,13 @@ workflow docs、task catalog に role list や model list を重複管理しま�
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は個別 source URL や fallback reference を保持しません。
-- この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark role TOML に寄せます。
+- この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と Abstract Design Frame から導かれた設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします
 - mini review role TOML は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
 - Spark role TOML は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
-- `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
+- `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
 - 明示 spawn 許可がある repo-changing task でも、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を常に先行 read-only wave へ切るわけではありません。coding / implementation / patch work が scope にある task では、implementation critical path を固定してから、並行可能な独立検証だけを Spark read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を置き換えない範囲で mini review wave に切ります。
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、Spark read-only wave は write-capable handoff の準備です。実装可能な scope が固定された後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、read-only role だけで完了扱いにしません。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります

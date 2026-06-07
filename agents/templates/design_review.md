@@ -29,6 +29,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Check whether the design explicitly cites the upstream documented requirement packet: request contract, schedule, intent brief, waterfall docs, and other governing documents. Return revise if the design appears to rely on chat-only memory. -->
 
+## Abstract Design Frame Review
+
+<!-- Check whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces before narrowing to implementation files, helpers, or current findings. Return revise if file-by-file design or validation is not derived from this frame. -->
+
 ## Implementation Source Packet Review
 
 <!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->

@@ -56,7 +56,7 @@ upstream design README.md canonical workflow index
 - `mvp-skeleton`
   - MVP、prototype、v0、first working version、thin slice の初手を 1 core loop と明示 deferral に抑える
 - `worktree-start`
-  - worktree 開始時の scope、action log、kickoff を整える
+  - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を cleanup evidence として診断する。new worktree kickoff には使わない
 - `worktree-health`
   - worktree の scope drift と cleanup risk を確認
 - `experiment-lifecycle`

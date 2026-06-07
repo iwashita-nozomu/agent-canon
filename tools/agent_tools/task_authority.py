@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +26,8 @@ import yaml
 AUTHORITY_FILE_NAME = "task_authority.yaml"
 AUTHORITY_ENV = "AGENT_CANON_TASK_AUTHORITY"
 ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
+ACTIVE_RUN_BASELINE_POINTER = Path("reports") / "agents" / ".active_run.sha256"
+AUTHORITY_BASELINE_SUFFIX = ".sha256"
 VALID_ACTIONS = {"add", "modify", "delete", "move", "rename", "write", "read"}
 VALID_RISKY_AUTHORITY_KEYS = {
     "helper_change",
@@ -70,27 +73,71 @@ class TaskAuthority:
     def risky_entries(self, key: str) -> tuple[AuthorityEntry, ...]:
         """Return risky authority entries for one key, including legacy aliases."""
         entries: list[object] = []
-        risky = self.payload.get("risky_authorities")
-        if isinstance(risky, dict):
-            value = risky.get(key)
-            if isinstance(value, list):
-                entries.extend(value)
+        risky = object_mapping(self.payload.get("risky_authorities"))
+        value = risky.get(key)
+        if isinstance(value, list):
+            entries.extend(cast(list[object], value))
         alias_value = self.payload.get(f"{key}_authority")
         if isinstance(alias_value, list):
-            entries.extend(alias_value)
+            entries.extend(cast(list[object], alias_value))
         if key == "first_party_library_change":
             legacy = self.payload.get("library_change_authority")
             if isinstance(legacy, list):
-                entries.extend(legacy)
+                entries.extend(cast(list[object], legacy))
         return tuple(cast(AuthorityEntry, item) for item in entries if isinstance(item, dict))
 
 
 def load_yaml_mapping(path: Path) -> AuthorityPayload:
     """Load one YAML mapping."""
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         return {}
     return cast(AuthorityPayload, raw)
+
+
+def object_mapping(value: object) -> dict[object, object]:
+    """Return a typed object mapping when YAML produced one."""
+    return cast(dict[object, object], value) if isinstance(value, dict) else {}
+
+
+def object_list(value: object) -> list[object]:
+    """Return a typed object list when YAML produced one."""
+    return cast(list[object], value) if isinstance(value, list) else []
+
+
+def file_sha256(path: Path) -> str:
+    """Return the SHA-256 hash of one file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def authority_baseline_path(authority_path: Path) -> Path:
+    """Return the immutable baseline sidecar path for one authority file."""
+    return authority_path.with_name(authority_path.name + AUTHORITY_BASELINE_SUFFIX)
+
+
+def write_hash_baseline(path: Path, baseline_path: Path) -> None:
+    """Write a hash baseline sidecar for a runtime authority file."""
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_text(file_sha256(path) + "\n", encoding="utf-8")
+
+
+def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:
+    """Return whether a runtime authority file differs from its baseline sidecar."""
+    if not path.is_file() or not baseline_path.is_file():
+        return False
+    expected = baseline_path.read_text(encoding="utf-8").strip()
+    return bool(expected) and file_sha256(path) != expected
+
+
+def write_task_authority_baselines(report_dir: Path, report_root: Path) -> None:
+    """Write baselines for active-run pointer and task authority after bootstrap."""
+    active_pointer = report_root / ACTIVE_RUN_POINTER.name
+    if active_pointer.is_file():
+        active_baseline = active_pointer.with_name(ACTIVE_RUN_BASELINE_POINTER.name)
+        write_hash_baseline(active_pointer, active_baseline)
+    authority_path = report_dir / AUTHORITY_FILE_NAME
+    if authority_path.is_file():
+        write_hash_baseline(authority_path, authority_baseline_path(authority_path))
 
 
 def find_authority_path(root: Path) -> Path | None:
@@ -120,6 +167,45 @@ def load_task_authority(root: Path) -> TaskAuthority | None:
     return TaskAuthority(path=path.resolve(), payload=load_yaml_mapping(path))
 
 
+def validate_role_policies(raw_roles: object) -> tuple[AuthorityFinding, ...]:
+    """Validate task-authority role policy rows."""
+    if not isinstance(raw_roles, dict):
+        return (AuthorityFinding("invalid-roles", "roles-must-be-mapping"),)
+    findings: list[AuthorityFinding] = []
+    for role, policy in cast(dict[object, object], raw_roles).items():
+        if not isinstance(role, str) or not isinstance(policy, dict):
+            findings.append(AuthorityFinding("invalid-role-entry", str(role)))
+            continue
+        policy_mapping = cast(dict[object, object], policy)
+        if "can_modify_repo" in policy_mapping and not isinstance(policy_mapping["can_modify_repo"], bool):
+            findings.append(AuthorityFinding("invalid-role-policy", f"{role}.can_modify_repo"))
+    return tuple(findings)
+
+
+def validate_risky_authorities(raw_risky: object) -> tuple[AuthorityFinding, ...]:
+    """Validate risky-authority policy rows."""
+    if not isinstance(raw_risky, dict):
+        return (AuthorityFinding("invalid-risky-authorities", "must-be-mapping"),)
+    findings: list[AuthorityFinding] = []
+    for key, value in cast(dict[object, object], raw_risky).items():
+        if key not in VALID_RISKY_AUTHORITY_KEYS:
+            findings.append(AuthorityFinding("unknown-risky-authority", str(key)))
+        if not isinstance(value, list):
+            findings.append(AuthorityFinding("invalid-risky-authority-list", str(key)))
+    return tuple(findings)
+
+
+def validate_allowed_path_actions(raw_allowed_paths: object) -> tuple[AuthorityFinding, ...]:
+    """Validate allowed-path action names."""
+    findings: list[AuthorityFinding] = []
+    for entry in path_authority_entries(raw_allowed_paths):
+        actions = entry.get("actions", [])
+        action_values = cast(list[object], actions) if isinstance(actions, list) else []
+        if not isinstance(actions, list) or not all(action in VALID_ACTIONS for action in action_values):
+            findings.append(AuthorityFinding("invalid-actions", str(entry.get("path", ""))))
+    return tuple(findings)
+
+
 def validate_authority_payload(payload: AuthorityPayload) -> tuple[AuthorityFinding, ...]:
     """Validate the shared task authority schema."""
     findings: list[AuthorityFinding] = []
@@ -132,29 +218,9 @@ def validate_authority_payload(payload: AuthorityPayload) -> tuple[AuthorityFind
         value = payload.get(key, [])
         if not isinstance(value, list):
             findings.append(AuthorityFinding("invalid-list", key))
-    roles = payload.get("roles", {})
-    if not isinstance(roles, dict):
-        findings.append(AuthorityFinding("invalid-roles", "roles-must-be-mapping"))
-    else:
-        for role, policy in roles.items():
-            if not isinstance(role, str) or not isinstance(policy, dict):
-                findings.append(AuthorityFinding("invalid-role-entry", str(role)))
-                continue
-            if "can_modify_repo" in policy and not isinstance(policy["can_modify_repo"], bool):
-                findings.append(AuthorityFinding("invalid-role-policy", f"{role}.can_modify_repo"))
-    risky = payload.get("risky_authorities", {})
-    if not isinstance(risky, dict):
-        findings.append(AuthorityFinding("invalid-risky-authorities", "must-be-mapping"))
-    else:
-        for key, value in risky.items():
-            if key not in VALID_RISKY_AUTHORITY_KEYS:
-                findings.append(AuthorityFinding("unknown-risky-authority", str(key)))
-            if not isinstance(value, list):
-                findings.append(AuthorityFinding("invalid-risky-authority-list", str(key)))
-    for entry in path_authority_entries(payload.get("allowed_paths", [])):
-        actions = entry.get("actions", [])
-        if not isinstance(actions, list) or not all(action in VALID_ACTIONS for action in actions):
-            findings.append(AuthorityFinding("invalid-actions", str(entry.get("path", ""))))
+    findings.extend(validate_role_policies(payload.get("roles", {})))
+    findings.extend(validate_risky_authorities(payload.get("risky_authorities", {})))
+    findings.extend(validate_allowed_path_actions(payload.get("allowed_paths", [])))
     return tuple(findings)
 
 
@@ -163,7 +229,7 @@ def path_authority_entries(raw_entries: object) -> tuple[AuthorityEntry, ...]:
     if not isinstance(raw_entries, list):
         return ()
     entries: list[AuthorityEntry] = []
-    for item in raw_entries:
+    for item in cast(list[object], raw_entries):
         if isinstance(item, str):
             entries.append({"path": item, "actions": ["modify"]})
         elif isinstance(item, dict):
@@ -188,7 +254,7 @@ def entry_matches_path(entry: AuthorityEntry, path: str) -> bool:
     raw_patterns = entry.get("paths")
     patterns: list[str] = []
     if isinstance(raw_patterns, list):
-        patterns.extend(str(pattern) for pattern in raw_patterns)
+        patterns.extend(str(pattern) for pattern in cast(list[object], raw_patterns))
     raw_path = entry.get("path")
     if isinstance(raw_path, str):
         patterns.append(raw_path)
@@ -208,7 +274,7 @@ def helper_authority_matches(
         if not entry_matches_path(entry, path):
             continue
         raw_qualnames = entry.get("qualnames")
-        qualnames = [str(item) for item in raw_qualnames] if isinstance(raw_qualnames, list) else []
+        qualnames = [str(item) for item in cast(list[object], raw_qualnames)] if isinstance(raw_qualnames, list) else []
         raw_qualname = entry.get("qualname")
         if isinstance(raw_qualname, str):
             qualnames.append(raw_qualname)

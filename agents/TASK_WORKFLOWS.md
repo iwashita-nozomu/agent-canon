@@ -73,12 +73,12 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - 原因考察、コード改善、修正箇所選定、複数候補比較が必要な task では `agents/workflows/hypothesis-validation-workflow.md` を overlay とし、code dependency scan と header dependency graph を別々に取得してから仮説、expected mechanism、candidate comparison、反証条件、support evidence、fix surface 妥当性を固定します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
-- 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
+- 詳細設計には `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` を必ず含め、worker が確認する抽象責務と、読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
 - 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
-- rate-limit pressure が強い場合は、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
+- rate-limit pressure が強い場合は、Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
 - user が `/goal <objective>` または goal-driven task を指定した場合は `agents/workflows/codex-goals-workflow.md` と `agents/workflows/goal-plan-implementation-loop.md` を overlay とします。objective が未確定なら parent が conservative な goal draft を作り、`/goal` 確定前に provisional run bundle と read-only subagent fan-out plan (`requirements_organizer`、`explorer`、必要なら `execution_planner`、`plan_reviewer`) を作ります。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、持たない場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。`/goal` 設定後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を固定するまで実装へ進みません。ただし planning は次の cohesive slice を実装可能にする checkpoint に限定し、`NEXT_ACTION=run_next_iteration` のたびに broad planning へ戻りません
 - token 消費を抑える必要がある場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile (`token-lite` / `token-standard` / `token-deep`) と agent mode (`parent-direct` / `scout-only` / `spark-slice` / `full-stage` / `deep-review`) を先に決めます

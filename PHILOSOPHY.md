@@ -17,6 +17,8 @@ downstream design memory/AGENT_PHILOSOPHY.md append-first observation log before
 ## 原則
 
 - まず責務を明確にする。
+- 設計は、最初に実装対象 file や最小 patch へ閉じない。
+- 先に抽象責務、概念モデル、非対象、拡張余地、評価軸を固定し、その後で実装 slice に落とす。
 - code、directory、document、tool、skill、workflow、DB、report の責務を同じように扱う。
 - 責務が曖昧な surface を作らない。
 - directory は単なる置き場ではなく、配下の code / document / artifact を束ねる責務を持つ。

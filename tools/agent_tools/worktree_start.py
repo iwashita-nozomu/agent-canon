@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Provides worktree start agent workflow automation.
+# responsibility Inspects legacy worktree scope evidence for cleanup diagnostics.
 # upstream design ../README.md shared automation index
 # @dependency-end
 
-"""Bootstrap or resume a worktree and summarize the next action surface."""
+"""Inspect legacy worktree scope evidence and summarize cleanup actions."""
 
 from __future__ import annotations
 
@@ -20,32 +20,31 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Create or resume a worktree, inspect WORKTREE_SCOPE.md, run kickoff checks, "
-            "and print the next-step summary used by the worktree-start skill."
+            "Inspect the current checkout for legacy WORKTREE_SCOPE.md and worktree action-log "
+            "state. This diagnostic does not create, resume, or switch worktrees."
         )
     )
     parser.add_argument(
         "branch",
         nargs="?",
-        help="Branch to create or resume. Omit to inspect the current workspace.",
+        help="Legacy branch argument is unsupported; use --current to inspect the current workspace.",
     )
     parser.add_argument(
         "worktree_path",
         nargs="?",
-        help="Optional worktree path. Defaults to .worktrees/<branch-name>.",
+        help="Legacy worktree path argument is unsupported; use --current for cleanup diagnostics.",
     )
     parser.add_argument(
         "--current",
         action="store_true",
         help=(
-            "Inspect the current workspace root instead of creating or resuming "
-            "a branch worktree."
+            "Inspect the current workspace root for legacy worktree scope evidence."
         ),
     )
     parser.add_argument(
         "--no-log",
         action="store_true",
-        help="Do not append a kickoff or resume entry to the action log.",
+        help="Do not append a cleanup diagnostic entry to the legacy action log.",
     )
     return parser
 
@@ -101,79 +100,6 @@ def normalize_branch_name(branch_ref: str) -> str:
     if branch_ref.startswith(prefix):
         return branch_ref[len(prefix) :]
     return branch_ref
-
-
-def default_worktree_path(repo_root: Path, branch: str) -> Path:
-    """Return the default worktree path for one branch."""
-    return repo_root / ".worktrees" / branch.replace("/", "-")
-
-
-def resolve_existing_worktree(repo_root: Path, branch: str) -> Path | None:
-    """Return the path of one existing worktree for the branch."""
-    for entry in parse_worktree_list(repo_root):
-        if normalize_branch_name(entry.get("branch", "")) == branch:
-            worktree_path = entry.get("worktree", "")
-            if worktree_path:
-                return Path(worktree_path).resolve()
-    return None
-
-
-def ensure_branch_worktree(
-    repo_root: Path,
-    branch: str,
-    worktree_path: str | None,
-) -> tuple[Path, str]:
-    """Create or reuse the target branch worktree."""
-    requested_path = (
-        Path(worktree_path).expanduser().resolve()
-        if worktree_path is not None
-        else default_worktree_path(repo_root, branch).resolve()
-    )
-
-    existing_path = resolve_existing_worktree(repo_root, branch)
-    if existing_path is not None:
-        return existing_path, "reused-existing-branch-worktree"
-
-    if requested_path.exists():
-        result = run_optional(["git", "rev-parse", "--show-toplevel"], cwd=requested_path)
-        if result.returncode == 0:
-            actual_root = Path(result.stdout.strip()).resolve()
-            actual_branch = current_branch(actual_root)
-            if actual_branch == branch:
-                return actual_root, "reused-existing-path"
-            raise SystemExit(
-                "Requested worktree path already exists but branch differs: "
-                f"{requested_path} ({actual_branch})"
-            )
-
-    cmd = ["bash", "tools/setup_worktree.sh", branch]
-    if worktree_path is not None:
-        cmd.append(worktree_path)
-    subprocess.run(cmd, cwd=repo_root, check=True)
-    return requested_path.resolve(), "created"
-
-
-def bootstrap_worktree_notes(repo_root: Path, workspace_root: Path, branch: str) -> None:
-    """Create concrete note paths and fill scope placeholders."""
-    script = repo_root / "scripts" / "agent_tools" / "bootstrap_worktree_notes.py"
-    if not script.is_file():
-        return
-    subprocess.run(
-        [
-            "python3",
-            str(script),
-            "--repo-root",
-            str(repo_root),
-            "--workspace-root",
-            str(workspace_root),
-            "--branch",
-            branch,
-        ],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def parse_sections(scope_file: Path) -> dict[str, list[str]]:
@@ -281,22 +207,15 @@ def main() -> int:
     args = build_parser().parse_args()
     starting_root = repo_root(Path.cwd())
 
-    if args.current:
-        workspace_root = starting_root
-        status = "current-workspace"
-    elif args.branch is not None:
-        workspace_root, status = ensure_branch_worktree(
-            starting_root,
-            args.branch,
-            args.worktree_path,
+    if args.branch is not None or args.worktree_path is not None:
+        raise SystemExit(
+            "worktree_start.py is cleanup diagnostic only; branch/path worktree kickoff is unsupported."
         )
-    else:
-        workspace_root = starting_root
-        status = "current-workspace"
+
+    workspace_root = starting_root
+    status = "current-workspace"
 
     branch = current_branch(workspace_root)
-    if branch != "(unknown)":
-        bootstrap_worktree_notes(starting_root, workspace_root, branch)
     scope_file = workspace_root / "WORKTREE_SCOPE.md"
     findings = lint_scope(workspace_root)
     action_log_path = (
@@ -307,7 +226,7 @@ def main() -> int:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
         entry = (
             f"`{timestamp} | {status} | branch={branch} "
-            f"worktree={workspace_root} | next: refresh scope and kickoff checks`"
+            f"worktree={workspace_root} | next: inspect legacy scope and cleanup evidence`"
         )
         _log_action_entry(action_log_path, entry)
 
@@ -327,13 +246,13 @@ def main() -> int:
 
     print("LINT_STATUS=ok")
     print("NEXT_STEPS:")
-    print("  1. Confirm action log, branch summary, and carry-over targets are current.")
+    print("  1. Confirm legacy action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
     print(
         "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> "
         "--message '<what changed>' --next '<next>' after each meaningful step."
     )
-    print("  4. Start editing only after the kickoff record is updated.")
+    print("  4. Start editing only after the current checkout run-local handoff is updated.")
     return 0
 
 

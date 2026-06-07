@@ -58,7 +58,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - [skills/adaptive-improvement-loop.md](skills/adaptive-improvement-loop.md)
   - 実験、調査、チューニング、比較改良の outer loop
 - [skills/worktree-start.md](skills/worktree-start.md)
-  - worktree kickoff、scope 初期化、action log 起点の固定
+  - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断
 - [skills/long-form-writing.md](skills/long-form-writing.md)
   - README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter
 - [skills/academic-writing.md](skills/academic-writing.md)

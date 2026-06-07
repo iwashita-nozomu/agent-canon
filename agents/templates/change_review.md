@@ -31,7 +31,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design-Base Implementation Review
 
-<!-- Check whether each changed slice cites an approved design artifact path and section, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise for missing citations. Return escalate for design drift or design gaps. -->
+<!-- Check whether each changed slice traces to the Abstract Design Frame, approved design section, Implementation Source Packet entry, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise when a slice is justified only by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Return escalate for design drift or design gaps. -->
 
 ## Canonical Tree-Head Review
 

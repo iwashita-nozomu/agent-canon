@@ -134,7 +134,7 @@ skill_families:
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .agents/skills/dependency-analysis/SKILL.md
   - id: worktree-start
-    purpose: Initialize or refresh worktree scope, action-log targets, and kickoff checks before editing.
+    purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md
     shim: .agents/skills/worktree-start/SKILL.md
   - id: worktree-health

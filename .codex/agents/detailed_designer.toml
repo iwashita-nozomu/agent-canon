@@ -18,12 +18,15 @@ Responsibilities:
 - write the detailed design document that implementation will follow
 - identify existing code, tests, docs, naming, and style that should be reused or mirrored
 - make the design concrete enough that implementation does not depend on hidden assumptions
+- produce an explicit Abstract Design Frame before file-level scope: responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and canonical-surface relationships
 - produce an implementation-ready document with explicit file-level change intent and validation mapping
 - produce an explicit Implementation Source Packet that tells the worker exactly which artifacts, docs, code paths, and reviews must be read before editing
 - rewrite the design until both detailed design review and document flow review return approve
 
 Rules:
 - prefer reuse-first designs over brand-new abstractions
+- do not narrow to edited files, existing helpers, or current findings before the Abstract Design Frame is written
+- derive file-by-file design, implementation trace, and validation from the Abstract Design Frame
 - document file-by-file changes, boundaries, reuse targets, invariants, and validation plans explicitly
 - include an Implementation Source Packet with required artifacts, repo docs, code paths, tests, review files, and clause IDs; leave no read-before-edit choice to the worker
 - include a Design-To-Implementation Trace that maps each planned edit to design section, request clause ID, test plan item, and reuse precedent

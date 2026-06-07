@@ -2,6 +2,8 @@
 <!--
 @dependency-start
 responsibility Documents worktree-start for this repository.
+upstream design ../canonical/skills.md skill canon registry
+downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shim
 @dependency-end
 -->
 
@@ -14,7 +16,7 @@ responsibility Documents worktree-start for this repository.
 
 - stale な worktree の棚卸し
 - 古い `WORKTREE_SCOPE.md` の再開禁止確認
-- `WORKTREE_SCOPE.md` の再作成や scope refresh
+- `WORKTREE_SCOPE.md` が stale evidence かどうかの診断
 - handoff 前提で legacy action log の carry-over 先を決めたいとき
 
 ## Core References

@@ -60,7 +60,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `document-canon-cleanup` | 非正本の文書候補を棚卸しし、generated evidence / closed issue / duplicate heading を正本へ振り分ける | `agents/skills/document-canon-cleanup.md` | `.agents/skills/document-canon-cleanup/SKILL.md` |
 | `dependency-analysis` | 依存 manifest / 実コード依存を確認し、変更影響範囲と repair-planning packet を作る | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
-| `worktree-start` | worktree 開始時の scope、action log、kickoff を整える | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
+| `worktree-start` | stale worktree / `WORKTREE_SCOPE.md` / action log を legacy cleanup evidence として診断し、new worktree kickoff には使わない | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
 | `computational-optimization` | 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約を固定する | `agents/skills/computational-optimization.md` | `.agents/skills/computational-optimization/SKILL.md` |
@@ -132,7 +132,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の first visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
-- worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
+- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
