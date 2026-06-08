@@ -162,7 +162,7 @@ derived repo から shared canon だけ更新するときは、必要に応じ�
 
 ```bash
 bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 

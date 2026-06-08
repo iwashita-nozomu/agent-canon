@@ -47,7 +47,7 @@ bash tools/update_agent_canon.sh apply
 git -C vendor/agent-canon switch -c canon-pr/<short-topic>
 git -C vendor/agent-canon add -A
 git -C vendor/agent-canon commit -m "<message>"
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 

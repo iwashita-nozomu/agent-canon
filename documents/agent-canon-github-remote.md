@@ -69,7 +69,7 @@ same tool. Do not infer the destination repository from PR context, branch
 naming, template repository names, `.git/config` fallback, or literal URL push.
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 ```
 
 ## Commit Message Note

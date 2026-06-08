@@ -30,6 +30,7 @@ Usage:
   bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh rebuild-tools
   bash tools/update_agent_canon.sh merge-main-into-current [branch]
+  bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -49,6 +50,11 @@ Commands:
       currently checked-out AgentCanon branch. This is the canonical repair path
       for local AgentCanon branches that need to be brought near GitHub main
       before pushing an AgentCanon PR branch.
+  merge-main-into-current-preserve-dirty
+      Explicitly stash dirty vendor/agent-canon work, run merge-main-into-current,
+      and restore the dirty work after a successful merge. If the merge itself
+      conflicts, the stash is kept and the command reports the stash ref to
+      restore after resolving the main merge.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -309,7 +315,7 @@ emit_agentcanon_conflict_workflow_route() {
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
+  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
   echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
   echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
 }
@@ -539,15 +545,15 @@ cmd_merge_main_into_current() {
     echo "agent_canon_merge_worktree_status=dirty"
     echo "agent_canon_merge_result=blocked_dirty"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_merge-main-into-current"
-    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or explicitly stash non-artifact local changes before merging main"
+    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_rerun_merge-main-into-current-preserve-dirty"
+    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or use merge-main-into-current-preserve-dirty before merging main"
   fi
   echo "agent_canon_merge_worktree_status=clean"
 
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_result=blocked_detached_head"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current"
+    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current-preserve-dirty"
     die "submodule '$PREFIX' is detached; create or switch to a branch before merging main"
   fi
 
@@ -602,6 +608,71 @@ cmd_merge_main_into_current() {
   exit 1
 }
 
+cmd_merge_main_into_current_preserve_dirty() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local current_branch=""
+  local submodule_status=""
+  local stash_sha=""
+  local stash_ref=""
+  local merge_rc=0
+  local restore_log=""
+  local restore_rc=0
+
+  ensure_agent_canon_submodule
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+
+  echo "agent_canon_merge_dirty_preserve_prefix=$PREFIX"
+  echo "agent_canon_merge_dirty_preserve_target_branch=${current_branch:-<detached>}"
+
+  if [ -z "$current_branch" ]; then
+    echo "agent_canon_merge_dirty_preserve_result=blocked_detached_head"
+    echo "agent_canon_merge_dirty_preserve_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
+    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current-preserve-dirty"
+    die "submodule '$PREFIX' is detached; create or switch to a branch before preserving dirty state and merging main"
+  fi
+
+  if [ -z "$submodule_status" ]; then
+    echo "agent_canon_merge_dirty_preserve_result=clean_passthrough"
+    cmd_merge_main_into_current "$branch"
+    return
+  fi
+
+  echo "agent_canon_merge_dirty_preserve_result=started"
+  echo "agent_canon_merge_dirty_preserve_worktree_status=dirty"
+  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "preserve dirty AgentCanon work before merge-main-into-current" >/dev/null
+  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+  stash_ref="$(stash_ref_for_sha "$stash_sha")"
+  echo "agent_canon_merge_dirty_stash_ref=${stash_ref:-<unknown>}"
+  echo "agent_canon_merge_dirty_stash_sha=$stash_sha"
+
+  ( cmd_merge_main_into_current "$branch" ) || merge_rc=$?
+  if [ "$merge_rc" -ne 0 ]; then
+    echo "agent_canon_merge_dirty_restore=skipped_merge_failed"
+    echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
+    echo "NEXT_ACTION=resolve_agentcanon_merge_then_apply_stash_ref_${stash_ref:-$stash_sha}"
+    return "$merge_rc"
+  fi
+
+  restore_log="$(mktemp)"
+  git -C "$ROOT_DIR/$PREFIX" stash apply "$stash_sha" >"$restore_log" 2>&1 || restore_rc=$?
+  if [ "$restore_rc" -eq 0 ]; then
+    rm -f "$restore_log"
+    drop_stash_sha_if_present "$stash_sha"
+    echo "agent_canon_merge_dirty_restore=applied"
+    echo "agent_canon_merge_dirty_stash_dropped=yes"
+    echo "NEXT_ACTION=review_restored_dirty_state_then_continue_agentcanon_PR_flow"
+    return
+  fi
+
+  cat "$restore_log" >&2
+  rm -f "$restore_log"
+  echo "agent_canon_merge_dirty_restore=conflict"
+  echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
+  echo "NEXT_ACTION=resolve_restored_dirty_conflicts_then_drop_stash_ref_${stash_ref:-$stash_sha}"
+  return "$restore_rc"
+}
+
 main() {
   local subcommand="${1:-}"
   case "$subcommand" in
@@ -624,6 +695,10 @@ main() {
     merge-main-into-current)
       shift
       cmd_merge_main_into_current "${1:-$DEFAULT_BRANCH}"
+      ;;
+    merge-main-into-current-preserve-dirty)
+      shift
+      cmd_merge_main_into_current_preserve_dirty "${1:-$DEFAULT_BRANCH}"
       ;;
     status)
       shift

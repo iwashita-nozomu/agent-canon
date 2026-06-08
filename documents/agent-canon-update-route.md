@@ -30,7 +30,8 @@ AgentCanon PR.
 | `tools/update_agent_canon.sh plan` | observe/update route decision; read-only |
 | `tools/update_agent_canon.sh latest` | high-level parent pin/root-view update route |
 | `tools/update_agent_canon.sh apply` | compatibility low-level apply; not the canonical task-start route |
-| `tools/update_agent_canon.sh merge-main-into-current` | local AgentCanon source branch PR route |
+| `tools/update_agent_canon.sh merge-main-into-current` | strict clean-worktree local AgentCanon source branch PR route |
+| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | dirty-preserving local AgentCanon source branch PR route |
 | `tools/sync_agent_canon.sh link-root` | repair root symlink/copy views |
 | `tools/sync_agent_canon.sh check` | validate root views |
 | `tools/ci/check_agent_canon_latest.sh` | latest-state gate; mutation must be explicit in output |
