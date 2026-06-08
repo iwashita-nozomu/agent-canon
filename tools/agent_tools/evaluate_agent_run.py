@@ -16,6 +16,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 try:
     import tomllib
@@ -150,9 +151,14 @@ def string_tuple(value: object, field: str) -> tuple[str, ...]:
     """Return a tuple of strings from a manifest value."""
     if value is None:
         return ()
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not isinstance(value, list):
         raise ValueError(f"{field} must be a list of strings")
-    return tuple(value)
+    strings: list[str] = []
+    for item in cast(list[object], value):
+        if not isinstance(item, str):
+            raise ValueError(f"{field} must be a list of strings")
+        strings.append(item)
+    return tuple(strings)
 
 
 def markdown_section_text(text: str, heading: str) -> str:
@@ -181,13 +187,14 @@ def markdown_section_lines(lines: list[str], heading: str) -> Iterator[str]:
 
 def load_behavior_manifest(path: Path) -> tuple[BehaviorCriterion, ...]:
     """Load manifest-defined behavior criteria."""
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    data = cast(dict[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     raw_criteria = data.get("criteria")
     if not isinstance(raw_criteria, list) or not raw_criteria:
         raise ValueError("behavior manifest must define at least one [[criteria]] entry")
+    criteria = cast(list[object], raw_criteria)
     return tuple(
         behavior_criterion_from_manifest_entry(index, entry)
-        for index, entry in enumerate(raw_criteria, 1)
+        for index, entry in enumerate(criteria, 1)
     )
 
 
@@ -198,20 +205,21 @@ def behavior_criterion_from_manifest_entry(
     """Build one behavior criterion from a manifest entry."""
     if not isinstance(entry, dict):
         raise ValueError(f"behavior criterion {index} must be a table")
-    name = str(entry["name"])
-    source = str(entry.get("source", "behavior_events"))
+    mapping = cast(dict[str, object], entry)
+    name = str(mapping["name"])
+    source = str(mapping.get("source", "behavior_events"))
     if source not in {"behavior_events", "bundle"}:
         raise ValueError(f"behavior criterion {name} has invalid source={source}")
-    feedback = str(entry.get("feedback", f"Record behavior evidence for {name}."))
+    feedback = str(mapping.get("feedback", f"Record behavior evidence for {name}."))
     return BehaviorCriterion(
         name=name,
-        max_score=int(str(entry.get("max_score", 5))),
+        max_score=int(str(mapping.get("max_score", 5))),
         feedback=feedback,
         source=source,
-        required_all=string_tuple(entry.get("required_all"), f"{name}.required_all"),
-        required_any=string_tuple(entry.get("required_any"), f"{name}.required_any"),
+        required_all=string_tuple(mapping.get("required_all"), f"{name}.required_all"),
+        required_any=string_tuple(mapping.get("required_any"), f"{name}.required_any"),
         forbidden_any=string_tuple(
-            entry.get("forbidden_any"),
+            mapping.get("forbidden_any"),
             f"{name}.forbidden_any",
         ),
     )
@@ -385,6 +393,32 @@ def improvement_decisions_complete(evidence: RunEvidence) -> bool:
             "memory_learning_decision",
         )
     )
+
+
+def improvement_decision_applied_or_recorded(evidence: RunEvidence) -> bool:
+    """Return whether at least one improvement decision changed durable state."""
+    return any(
+        status_in(evidence.monitoring_status, key, {"applied", "recorded"})
+        for key in (
+            "skill_improvement_decision",
+            "config_improvement_decision",
+            "workflow_improvement_decision",
+            "memory_learning_decision",
+        )
+    )
+
+
+def runtime_feedback_requires_improvement(evidence: RunEvidence) -> bool:
+    """Return whether observed runtime feedback requires a non-no-op decision."""
+    text = evidence.behavior_events_text
+    return "runtime_feedback=observed" in text and "action=no_op" not in text
+
+
+def runtime_feedback_closure_complete(evidence: RunEvidence) -> bool:
+    """Return whether observed runtime feedback was closed into an action route."""
+    if not runtime_feedback_requires_improvement(evidence):
+        return True
+    return improvement_decisions_complete(evidence) and improvement_decision_applied_or_recorded(evidence)
 
 
 def orchestration_evidence_present(evidence: RunEvidence) -> bool:
@@ -677,10 +711,16 @@ def build_self_improvement_feedback_criterion(evidence: RunEvidence) -> Criterio
         section_has_content(evidence.retrospective_text, "## What Worked")
         and section_has_content(evidence.retrospective_text, "## What Hurt")
         and section_has_content(evidence.retrospective_text, "## Follow-ups")
-        and improvement_decisions_complete(evidence),
+        and improvement_decisions_complete(evidence)
+        and runtime_feedback_closure_complete(evidence),
         "Fill retrospective sections and mark skill/config/workflow/memory "
-        "improvement decisions as applied, recorded, or not_applicable.",
-        partial_score=8 if improvement_decisions_complete(evidence) else 0,
+        "improvement decisions as applied, recorded, or not_applicable. "
+        "When runtime_feedback=observed is not action=no_op, at least one "
+        "improvement decision must be applied or recorded.",
+        partial_score=8
+        if improvement_decisions_complete(evidence)
+        and runtime_feedback_closure_complete(evidence)
+        else 0,
     )
 
 

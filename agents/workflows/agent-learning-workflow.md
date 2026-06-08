@@ -129,6 +129,19 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
 
+### Runtime Feedback Closure Loop
+
+user / reviewer が agent の動き、routing、自己改善、tool 化、prompt の弱さを指摘した場合、parent はその場で `$agent-learning` を有効化します。指摘を chat 上の反省で終わらせず、次の順で閉じます。
+
+1. `workflow_monitor.py --runtime-feedback` で `source=... target=... action=... evidence=...` を記録する
+1. 指摘の反映先を `skill prompt`、`workflow prompt`、`tool/checker`、`eval rubric`、`memory`、`issue`、`no_op` のどれかに分類する
+1. `action=no_op` 以外では、`skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` の少なくとも 1 つを `applied` または `recorded` にする
+1. prompt / tool / eval を更新した場合は、対応する test、checker、prompt eval、または workflow eval を同じ run で再実行する
+1. memory に残す場合は `log_agent_learning.py` で短い observation に圧縮し、raw chat を貼らない
+1. `evaluate_agent_run.py --write` が `AGENT_EVALUATION_STATUS=pass` になるまで closeout しない
+
+この loop は「最終 retrospective で思い出す」ものではなく、フィードバックを受けた時点で実行する作業です。`runtime_feedback=observed` があるのに improvement decision がすべて `not_applicable` の run は、agent evaluation で revise になります。
+
 ### Hook And Tool Protocol Feedback
 
 hook、code checker、static analysis、CI、tool validation の結果は、pass / fail の記録だけで閉じません。
