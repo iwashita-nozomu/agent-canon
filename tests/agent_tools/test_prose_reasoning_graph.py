@@ -21,6 +21,8 @@ from typing import cast
 
 import yaml
 
+from tools.agent_tools import prose_reasoning_graph as prose_graph
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
 
@@ -59,6 +61,307 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
+
+    def test_selected_ordering_topology_overrides_source_order(self) -> None:
+        """Explicit ordering edges should control whole-document sentence order."""
+        source_anchors = [
+            prose_graph.Node(
+                node_id="s:later",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="later",
+                text="Graph-first sentence.",
+                payload={},
+                source_start=10,
+                source_end=20,
+            ),
+            prose_graph.Node(
+                node_id="s:earlier",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="earlier",
+                text="Source-first sentence.",
+                payload={},
+                source_start=0,
+                source_end=9,
+            ),
+            prose_graph.Node(
+                node_id="s:tail",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="tail",
+                text="Tail sentence.",
+                payload={},
+                source_start=21,
+                source_end=30,
+            ),
+        ]
+        ordering_edges: list[dict[str, object]] = [
+            {
+                "edge_id": "edge:explicit-order",
+                "from_node_id": "s:later",
+                "to_node_id": "s:earlier",
+                "layer": "form",
+                "kind": "contains_order",
+                "order_kind": "hard_before",
+            }
+        ]
+
+        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
+            source_anchors,
+            ordering_edges,
+            "report",
+            {},
+        )
+
+        self.assertEqual(ordered_ids, ["s:later", "s:earlier", "s:tail"])
+        self.assertFalse(cycle_detected)
+        self.assertEqual(relaxed_edges, [])
+
+    def test_selected_ordering_soft_edges_are_priority_not_constraints(self) -> None:
+        """Soft adjacency preferences should not become hard topology cycles."""
+        source_anchors = [
+            prose_graph.Node(
+                node_id="s:earlier",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="earlier",
+                text="Source-first sentence.",
+                payload={},
+                source_start=0,
+                source_end=9,
+            ),
+            prose_graph.Node(
+                node_id="s:later",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="later",
+                text="Source-later sentence.",
+                payload={},
+                source_start=10,
+                source_end=20,
+            ),
+        ]
+        ordering_edges: list[dict[str, object]] = [
+            {
+                "edge_id": "edge:soft-a-b",
+                "from_node_id": "s:earlier",
+                "to_node_id": "s:later",
+                "layer": "discourse",
+                "kind": "relates_to",
+                "order_kind": "adjacency_preferred",
+                "confidence": 0.8,
+            },
+            {
+                "edge_id": "edge:soft-b-a",
+                "from_node_id": "s:later",
+                "to_node_id": "s:earlier",
+                "layer": "discourse",
+                "kind": "relates_to",
+                "order_kind": "adjacency_preferred",
+                "confidence": 0.8,
+            },
+        ]
+
+        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
+            source_anchors,
+            ordering_edges,
+            "report",
+            {},
+        )
+
+        self.assertEqual(ordered_ids, ["s:earlier", "s:later"])
+        self.assertFalse(cycle_detected)
+        self.assertEqual(relaxed_edges, [])
+
+    def test_selected_ordering_soft_edge_can_override_source_tie_break(self) -> None:
+        """Soft adjacency should rank before confidence/source order tie-breaks."""
+        source_anchors = [
+            prose_graph.Node(
+                node_id="s:later",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="later",
+                text="Soft-preferred predecessor.",
+                payload={},
+                source_start=10,
+                source_end=20,
+            ),
+            prose_graph.Node(
+                node_id="s:earlier",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="earlier",
+                text="Source-first soft successor.",
+                payload={},
+                source_start=0,
+                source_end=9,
+            ),
+        ]
+        ordering_edges: list[dict[str, object]] = [
+            {
+                "edge_id": "edge:soft-later-earlier",
+                "from_node_id": "s:later",
+                "to_node_id": "s:earlier",
+                "layer": "discourse",
+                "kind": "relates_to",
+                "order_kind": "adjacency_preferred",
+                "confidence": 0.9,
+            }
+        ]
+
+        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
+            source_anchors,
+            ordering_edges,
+            "report",
+            {},
+        )
+
+        self.assertLess(ordered_ids.index("s:later"), ordered_ids.index("s:earlier"))
+        self.assertFalse(cycle_detected)
+        self.assertEqual(relaxed_edges, [])
+
+    def test_selected_ordering_hard_cycle_becomes_diagnostic(self) -> None:
+        """Hard ordering cycles should be visible in diagnostics."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db = Path(tmp_dir) / "graph.sqlite"
+            with prose_graph.connect(db) as connection:
+                prose_graph.initialize_schema(connection)
+                connection.execute(
+                    """
+                    INSERT INTO documents(id, path, title, kind, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    ("doc", "cycle.md", "Cycle", "document", "2026-06-08T00:00:00Z"),
+                )
+                prose_graph.insert_node(
+                    connection,
+                    "s:a",
+                    "doc",
+                    "form",
+                    "sentence",
+                    "a",
+                    "Sentence A.",
+                    0,
+                    10,
+                    payload={"span_kind": "sentence"},
+                )
+                prose_graph.insert_node(
+                    connection,
+                    "s:b",
+                    "doc",
+                    "form",
+                    "sentence",
+                    "b",
+                    "Sentence B.",
+                    11,
+                    20,
+                    payload={"span_kind": "sentence"},
+                )
+                prose_graph.insert_edge(
+                    connection,
+                    "edge:a-b",
+                    "presentation",
+                    "precedes",
+                    "s:a",
+                    "s:b",
+                    order_kind="hard_before",
+                )
+                prose_graph.insert_edge(
+                    connection,
+                    "edge:b-a",
+                    "presentation",
+                    "precedes",
+                    "s:b",
+                    "s:a",
+                    order_kind="hard_before",
+                )
+
+                prose_graph.add_selected_ordering_cycle_diagnostic(connection, "report")
+                diagnostics = prose_graph.fetch_diagnostics(connection)
+
+            cycle_diagnostic = next(item for item in diagnostics if item.rule == "selected_ordering_cycle")
+            self.assertEqual(cycle_diagnostic.layer, "projection")
+            self.assertEqual(cycle_diagnostic.action["verification_route"], "ordering_cycle_verification")
+
+    def test_selected_ordering_cycle_relaxes_only_cyclic_hard_edges(self) -> None:
+        """Cycle relaxation should preserve hard edges outside the cycle."""
+        source_anchors = [
+            prose_graph.Node(
+                node_id="s:a",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="a",
+                text="Sentence A.",
+                payload={},
+                source_start=0,
+                source_end=10,
+            ),
+            prose_graph.Node(
+                node_id="s:c",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="c",
+                text="Sentence C.",
+                payload={},
+                source_start=11,
+                source_end=20,
+            ),
+            prose_graph.Node(
+                node_id="s:b",
+                document_id="doc",
+                layer="form",
+                kind="sentence",
+                label="b",
+                text="Sentence B.",
+                payload={},
+                source_start=21,
+                source_end=30,
+            ),
+        ]
+        ordering_edges: list[dict[str, object]] = [
+            {
+                "edge_id": "edge:a-b",
+                "from_node_id": "s:a",
+                "to_node_id": "s:b",
+                "order_kind": "hard_before",
+            },
+            {
+                "edge_id": "edge:b-a",
+                "from_node_id": "s:b",
+                "to_node_id": "s:a",
+                "order_kind": "hard_before",
+            },
+            {
+                "edge_id": "edge:b-c",
+                "from_node_id": "s:b",
+                "to_node_id": "s:c",
+                "order_kind": "hard_before",
+            },
+        ]
+
+        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
+            source_anchors,
+            ordering_edges,
+            "report",
+            {},
+        )
+
+        self.assertTrue(cycle_detected)
+        self.assertLess(ordered_ids.index("s:b"), ordered_ids.index("s:c"))
+        self.assertEqual(
+            {str(edge["edge_id"]) for edge in relaxed_edges},
+            {"edge:a-b", "edge:b-a"},
+        )
 
     def test_ingest_defaults_db_to_user_home_cache(self) -> None:
         """DB-creating commands should use the user-home cache unless --db is explicit."""
@@ -231,6 +534,17 @@ class ProseReasoningGraphTest(unittest.TestCase):
             sentence_payload = cast(dict[str, object], sentence_anchor["payload"])
             self.assertEqual(sentence_payload["span_kind"], "sentence")
             self.assertEqual(sentence_payload["segmentation_basis"], "sentence_split")
+            selected_ordering = cast(dict[str, object], payload["selected_ordering"])
+            self.assertEqual(selected_ordering["scope"], "whole_document_source_anchors")
+            self.assertEqual(selected_ordering["unit_kind"], "sentence")
+            ordered_anchor_ids = cast(list[str], selected_ordering["ordered_anchor_ids"])
+            ordered_anchors = typed_items(selected_ordering, "ordered_anchors")
+            self.assertEqual(len(ordered_anchor_ids), len(ordered_anchors))
+            self.assertEqual(
+                ordered_anchor_ids,
+                [str(item["node_id"]) for item in ordered_anchors],
+            )
+            self.assertFalse(selected_ordering["cycle_detected"])
             projection_views = typed_items(payload, "projection_views")
             self.assertGreaterEqual(len(projection_views), 1)
             first_view = projection_views[0]
@@ -300,6 +614,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("$paper-writing", handoff_text)
             self.assertIn("citation-evidence-review", handoff_text)
             self.assertIn("projection_views[].recommended_format", handoff_text)
+            self.assertIn("selected_ordering.ordered_anchors", handoff_text)
             self.assertIn("corpus_hints", handoff_text)
             self.assertIn("## Verification Routes", handoff_text)
             self.assertIn("$formal-proof-workflow", handoff_text)
@@ -338,6 +653,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(payload["canonical_graph"], "text_anchored_semantic_graph")
             self.assertIn("projection_views", payload)
             self.assertIn("source_anchors", payload)
+            self.assertIn("selected_ordering", payload)
+            selected_ordering = cast(dict[str, object], payload["selected_ordering"])
+            self.assertEqual(selected_ordering["algorithm"], "priority_topological_sort_selected_ordering_subgraph")
             layers = payload["layers"]
             self.assertIsInstance(layers, dict)
             self.assertIn("edit-operation", cast(dict[str, object], layers))

@@ -43,6 +43,8 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 - claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
 - 非自明な academic prose の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る
 - prose graph diagnostics は unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
+- prose graph handoff に `selected_ordering.ordered_anchors` がある場合は、全文 sentence anchor の topological order を DSL-to-prose input sequence として使う
+- graph responsibility は肯定形の academic prose contract に射影する。claim、definition、warrant、evidence relation、limitation、reviewer handoff を直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
 - reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。claim contract、evidence map、paragraph claim map、graph-backed rewrite packet、または graph-backed unit を直し、graph diagnostics を再実行してから draft する
 - DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は `dsl_to_prose_prompt_defect` として academic prose-generation prompt を直す
 - `evidence map` で claim と support を section 単位で結ぶ

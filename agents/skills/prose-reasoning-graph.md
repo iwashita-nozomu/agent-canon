@@ -93,6 +93,11 @@ notes while graph findings are still open.
    `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
    only diagnostics and no edit-operation ids.
 1. Export `skill-handoff` and pass it to the receiving skill or reviewer.
+1. For DSL-to-prose projection, pass the `project --out` payload's
+   `selected_ordering.ordered_anchors` to the receiving writing skill as the
+   whole-document sentence sequence. The ordering is a priority topological sort
+   over the selected ordering subgraph, so the LLM receives a deterministic reader-order contract
+   before it writes sentences or sections.
 1. If diagnostics include a verification route, verify before rewrite:
    `logic-gap-review` checks inference validity, `$literature-survey` and
    `citation-evidence-review` check external evidence, `$formal-proof-workflow`
