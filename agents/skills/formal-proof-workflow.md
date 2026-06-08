@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents the natural-language to formal-proof workflow.
 upstream design ../canonical/skills.md skill canon registry.
+upstream design algorithm-proof-exploration.md proof-guided algorithm exploration workflow.
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
@@ -40,6 +41,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - `agents/skills/report-writing.md`
 - `agents/skills/research-workflow.md`
 - `agents/skills/paper-writing.md`
+- `agents/skills/algorithm-proof-exploration.md`
 - `documents/tools/formal_proof.md`
 - `references/agent-canon-technology-bibliography.md`
 
@@ -48,6 +50,11 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - 形式化前に、claim、assumptions、definitions、target theorem、proof sketch を分けます。
 - 実装由来の claim は `formal_proof.py --python-symbol path.py::qualname` で
   AST から抽出できます。この route は対象 module を import / execute しません。
+- アルゴリズム由来の claim で、証明 path 探索、algorithm change の判断、
+  IR / lemma graph / frontier overlay の更新が必要な場合は、先に
+  `$algorithm-proof-exploration` を使います。この skill は、その探索結果を
+  theorem statement、checked fragment、counterexample、unprovable-under-assumptions
+  witness として採用する段階を担当します。
 - アルゴリズム由来の claim では、局所証明を選ぶ前に root algorithm を
   AST / initialize edge / call edge から機械的に再帰展開し、
   Algorithm Expansion IR として保持します。IR は proof ではなく、
@@ -59,6 +66,13 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `InitializeConfig` へ proof-only field として足さず、Algorithm Expansion IR の
   `backend_assumptions` と Lemma Dependency Graph overlay に theorem variable /
   witness obligation として保持します。
+- runtime `Info` はランタイムで使う診断・収束判定・ログに限定し、証明用 witness を
+  追加してはいけません。証明に必要な値は `Problem + InitializeConfig + State_k`
+  と実装 path から proof extractor / lemma graph 側で再構成し、必要なら
+  `runtime_value <= upper_bound <= requested_budget` の上界補題として扱います。
+  反復ごとに KKT 条件数を評価することは一つの検証 route にすぎず、局所 tube 上の
+  一様 regularity / preconditioner / slack-floor certificate で各 `k` の witness を
+  補完できる場合はそれを優先します。
 - checker 向け中間表現、lemma graph、profile library、Lean stub は
   `lean/<proof-theme>/` に置き、再利用する profile / arithmetic library は
   `lean/lib/` に置きます。profile library を読むのは
@@ -70,6 +84,13 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `proof_target_chains`、graph validation evidence として proof note または
   run artifact に残します。IR は実装展開、lemma graph は命題依存を表し、
   両者を混ぜて `verified` claim を作ってはいけません。
+- 生成された補題群は Algorithm Expansion IR から出てくるものとして扱います。
+  `algorithm_lemma_graph.py` が出す `source_ir_fingerprint` を
+  `proof_status.json` の `source_ir_fingerprints` に記録し、
+  `proof_path_analyzer.py` で一致を検査します。アルゴリズム変更により
+  fingerprint が変わった場合、IR-backed な補題群と採用済み overlay は
+  stale なので、補題を持ち越さず IR / graph / proof-status overlay を
+  再生成します。
 - Lemma Dependency Graph は証明探索の編集対象です。機械生成された
   IR-backed obligation は source program の変更に伴う IR 再生成でだけ同期し、
   agent / human が追加する
@@ -98,6 +119,47 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   同じ loop へ再投入します。`verified`、`refuted`、
   `unprovable_under_assumptions` まで到達するか、より小さい named witness を持つ
   open row へ縮約するまで、proof note を closeout してはいけません。
+- ユーザーが「実行」「示して」「証明して」と依頼した場合、
+  `unverified_with_next_witness` は同一 turn 内の作業 queue であり、
+  user-facing な終端 outcome ではありません。各 frontier row は
+  `verified`、`refuted`、`unprovable_under_assumptions`、または strict に
+  小さい named witness を持つ open row のどれかへ落とし、小さい witness も
+  直ちに同じ loop へ再投入します。
+- 「どの証明 path でも証明できない」と言う場合は、絶対的な不可証明ではなく、
+  現在の Algorithm Expansion IR、assumption ledger、採用済み external axiom の
+  もとで target conclusion が導けないことを、反例 model、independence result、
+  または機械検査済み obligation gap で示します。失敗ログや「hard」は outcome では
+  ありません。
+- user-facing に進捗を返す前に、現在選択した部品証明をすべて終端状態まで
+  処理します。部品証明ごとに `verified`、`refuted`、
+  `unprovable_under_assumptions`、またはより小さい named witness を持つ
+  `unverified_with_next_witness` へ到達させ、単なる scaffold 作成、未実行 stub、
+  「未証明」の列挙だけで返してはいけません。
+- target claim が `verified` / `refuted` /
+  `unprovable_under_assumptions` に到達していない状態で user-facing に返す場合は、
+  必ず nonterminal proof return を出します。最低限、
+  target claim、現在の terminal outcome、通った checker-backed fragment、失敗した
+  route、残る named witness、各 witness の owner
+  (`problem_class` / `implementation` / `backend` / `formal_library` /
+  `algorithm_exploration`) 、必要性 status
+  (`necessary_proven` / `route_sufficient` / `candidate` / `unknown` /
+  `algorithmic_blocker_proven`) 、minimality evidence、証拠 path、次に実行すべき
+  checker / IR / graph / algorithm-exploration action を示します。
+  「証明できませんでした」だけで返してはいけません。
+- user-facing に返す blocker は、選択した theorem/profile の proof graph 上で
+  frontier-minimal であることを示します。すなわち、返した blocker より手前の
+  target-chain node は `verified` / `refuted` /
+  `unprovable_under_assumptions` / external assumption として処理済みであり、
+  返した blocker の下にさらに小さい未処理 target-chain witness が残っていないことを、
+  proof-path analyzer、lemma graph slice、または checker-backed minimality lemma で
+  示します。高レベルな「局所収束が未証明」「KKT が未証明」だけを blocker として
+  返してはいけません。
+- route-specific な十分 witness、探索候補、または現在の theorem route で
+  消費している変数を、数学的に必要な仮定として書いてはいけません。
+  必要性は checker-backed な refutation / independence / minimality theorem が
+  ある場合だけ `necessary_proven` とし、それ以外は `route_sufficient`、
+  `candidate`、または `unknown` と明示します。必要性が未証明なら、命題を
+  消さずに必要性主張だけを落とすのが proof-status 上の最小修正です。
 - `python3 tools/agent_tools/formal_proof.py` で scaffold と query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
@@ -154,6 +216,21 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - backend arithmetic、IREE FP32、fast-math、denormal、lowered IR などの
      実行基盤前提は IR の `backend_assumptions` に置く。証明のためだけに
      production `InitializeConfig` や algorithm state を増やしてはいけない
+   - compiler/runtime semantics が proof theme の本体でない場合は、IREE FP32
+     lowering などを内部証明対象にしない。`backend_assumptions` と
+     `lean/lib` profile に「外部 backend axiom」として置き、PDIPM などの
+     algorithm proof はその axiom が与える `Delta_backend,k` だけを消費する。
+     backend 自体を証明したい task でない限り、lowering / fast-math /
+     denormal / minmax semantics の全証明を本体 proof の blocker にしない
+   - 実装アルゴリズムそのものは、IR から抽出した
+     `trace follows A_impl / Step_impl` という operational assumption として置く。
+     convergence、finite termination、residual reachability、certificate
+     soundness は、この operational assumption から導く lemma / theorem であり、
+     assumption にしてはいけない
+   - proof status overlay では operational assumption を
+     `operational_assumptions` に置く。未証明数理 gap の `open_frontier`、
+     backend / runtime boundary の `external_assumptions`、反例付きの
+     `unprovable_under_assumptions` と混ぜない
    - IR edge には `calls`、`initializes`、`updates_state`、`requests_certificate`、
      `projects_status`、`performance_only` などの関係を持たせる
    - final target theorem から backward slice し、必要な局所 proof obligation と
@@ -163,6 +240,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - Algorithm Expansion IR JSON を
      `python3 tools/agent_tools/algorithm_lemma_graph.py --target-profile <profile> --format json|markdown`
      へ渡し、補助命題 graph を生成する
+   - graph は `source_ir_fingerprint` を持つ。proof-status overlay は
+     `source_ir_fingerprints` に採用対象 fingerprint を書く。analyzer が
+     fingerprint 不一致を検出した場合、その補題群は stale として reset し、
+     アルゴリズム変更後の IR から再生成する
    - lemma node は auxiliary lemma、assumption、target theorem/profile を表す
    - lemma edge は「source lemma が target lemma を消費する」依存を表す
    - lemma id は implementation symbol ではなく IR `node_id` から作る。
@@ -190,6 +271,14 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - `result_status=unverified_with_next_witness` の attempt は、`next_frontier` を
      次の探索対象として即座に再投入する。bare `unverified` は generated stub や
      未実行 node の状態に限り、frontier の最終分類には使わない
+   - `next_frontier` が repository code、既存 proof library、公式 source packet、
+     local run artifact、または checker output から導出可能なら、ユーザーへ
+     「未証明」と返す前に、その証拠捕捉・IR/lemma graph overlay・proof note
+     更新・必要な bounded code 修正を実装する。返答してよいのは、証拠が
+     user-owned external run、未導入 tool、権限、または proof theme 外の外部
+     semantics に依存する場合だけで、その場合も `external_assumption`、
+     `unprovable_under_assumptions`、または strictly smaller `next_witness` に
+     分類する
    - proof note は探索 log 全体ではなく、現在採用する certified subgraph と
      missing frontier を示す。`verified` と言えるのは checker 済み theorem /
      lemma と、それらだけで接続された target chain に限る
@@ -218,7 +307,9 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 1. Verification:
    - generated command か project-specific command を実行する
    - log が pass した file / theorem だけを verified にする
-   - placeholder、axiom、admit、sorry、unchecked assumption は gap として残す
+   - placeholder、admit、sorry は gap として残す。明示的な external axiom は
+     `verified` に混ぜず、`external_assumption` として theorem target、
+     採用理由、消費先、置換する場合に必要な proof theme を記録する
    - proof search が失敗した場合は、失敗を terminal result にしない。
      theorem が偽である反例、仮定不足 witness、形式的 independence、
      または実装 path と theorem の矛盾を証明できる場合だけ
@@ -229,6 +320,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - 実装 code path の説明が proof claim を理解するために必要な場合は、Design 文書に
      対応表または code-path 節を置き、proof note から参照する。証明本文、仮定、
      theorem target、gap ledger は proof note 側を正本にし、Design 側へ重複させない。
+   - 最上位 theorem statement は
+     `ImplementedTrace -> ProblemWitnesses -> BackendWitnesses -> Convergence`
+     の形に正規化する。`ImplementedTrace` は仮定、`Convergence` は導出補題であり、
+     `Convergence` 自体を仮定に入れない
 1. Handoff:
    - 学術文章へ戻す場合は `$academic-writing` / `$paper-writing`
    - proof note や長い証明整理文書へ戻す場合は `$academic-writing` または
@@ -267,6 +362,7 @@ proof_status_table=<path-or-section-anchor>
 proof_initialize_root=<module.initialize|none>
 proof_initialize_expansion_graph=<path-or-section-anchor|none>
 proof_trace_alignment_check=<command-and-log|not_run>
+proof_nonterminal_return=<path-or-section-anchor|none>
 ```
 
 ## Proof Status Table
@@ -294,6 +390,35 @@ closeout state.
 Only `verified`, `refuted`, and `unprovable_under_assumptions` are terminal
 outcomes for this skill; all other statuses require more proof work or a
 changed claim / assumption ledger.
+
+## Nonterminal Proof Return
+
+When the target theorem is not terminal, the user-facing return must be
+specific enough for the next agent or human to continue without rediscovering
+the same gaps. Use this shape:
+
+| Field | Required Content |
+| --- | --- |
+| Target claim | Exact theorem or natural-language claim being attempted |
+| Current outcome | `open`, `unverified_with_next_witness`, `not_run`, or `blocked`; do not call it proved |
+| Strongest checked fragments | Theorems / artifacts that passed, with checker command |
+| Failed or rejected routes | The route, why it does not close the target, and whether it is refuted, too strong, or merely incomplete |
+| Remaining witnesses | Named witnesses with units / theorem variables where applicable |
+| Witness owner | `problem_class`, `implementation`, `backend`, `formal_library`, or `algorithm_exploration` |
+| Necessity status | `necessary_proven`, `route_sufficient`, `candidate`, `unknown`, or `algorithmic_blocker_proven`; do not imply necessity from a selected proof route |
+| Minimality evidence | Target-chain/frontier evidence showing no smaller open blocker remains under this returned row |
+| Evidence path | Proof status row, lemma graph node, Lean file, source packet, log, or code path |
+| Next action | Exact checker command, IR/graph regeneration, literature search, or algorithm-exploration handoff |
+
+If the result is `unprovable_under_assumptions`, include the witness/model that
+satisfies the assumptions while falsifying the entailment. If the result is
+`refuted`, include the counterexample, formal model, or implementation trace
+that falsifies the target conclusion. If the result is still `open`, state why
+it is open and which smaller witness is next. A selected route may be a useful
+sufficient condition without being necessary; mark that distinction explicitly.
+If a returned blocker cannot be shown frontier-minimal, do not return it as the
+blocker; decompose it once more and return the smaller open node or state the
+tool/checker limitation that prevents the minimality check.
 
 ## Algorithm Expansion IR
 
@@ -404,6 +529,8 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
    - exact implementation identity: 実装の式変形、projection、reconstruction
    - conditional bridge: 下位 theorem / certificate があれば上位 theorem へ渡せる命題
    - reachability / existence: 反復法が tolerance に届く、line search が受理する、など
+   - algorithmic-blocker analysis: 現在の algorithm choice が theorem を
+     阻んでいるか、その choice を変えるとどの proof obligation が必要になるか
    - external assumption binding: backend profile、problem-class、local tube witness
 1. 正規化した命題に対して checker-backed な結果を一つ取りに行きます。
    - `verified`: escape hatch なしで checker が命題を証明した
@@ -414,9 +541,18 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
      backend evidence、problem-class witness が特定されている
      この場合は named witness / next frontier を同じ loop へ即座に再投入し、
      bare `unverified` のまま proof note を closeout しない
+1. 単独の補題候補が強すぎて失敗しても、その downstream theorem が失敗したとは
+   扱いません。失敗した route は overlay に残し、より弱い補題、隣接 graph fact、
+   code-derived identity、problem witness を束ねた certified subgraph で同じ
+   downstream node を閉じられるかを探索します。target theorem の否定や
+   `unprovable_under_assumptions` は、そのような合成 route でも閉じないことを
+   checker-backed に示した場合だけ採用します。
 1. 弱い命題だけが証明できた場合は、その弱い命題から target theorem へ何が不足するかを
    bridge edge として残します。強い route が refuted の場合は、refutation を残し、
    theorem narrowing または algorithm change を書きます。
+1. blocker が algorithmic choice にある場合は、変更候補を proof obligation として
+   書き出し、実装変更後に IR / lemma graph を再生成して同じ loop へ戻します。
+   algorithm-change guidance だけで target theorem の作業を終えません。
 1. proof status table と proof note を同じ pass で更新します。open row は、次が
    数学証明、implementation certificate plumbing、backend evidence binding、
    theorem narrowing のどれかを必ず示します。

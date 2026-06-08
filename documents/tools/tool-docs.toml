@@ -135,6 +135,13 @@ language = "python"
 summary = "Lemma dependency graph builder documentation, including theorem profiles, graph validation, and Algorithm IR traceability."
 
 [[tool]]
+id = "proof-path-analyzer"
+tool = "tools/agent_tools/proof_path_analyzer.py"
+doc = "documents/tools/proof_path_analyzer.md"
+language = "python"
+summary = "Proof path analyzer documentation, including proof-status adoption and connected proof-hole checks."
+
+[[tool]]
 id = "check-proof-trace-alignment"
 tool = "tools/agent_tools/check_proof_trace_alignment.py"
 doc = "documents/tools/check_proof_trace_alignment.md"

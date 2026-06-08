@@ -255,6 +255,25 @@ entries:
     tests:
       - tests/agent_tools/test_algorithm_lemma_graph.py
 
+  - id: proof-path-analyzer
+    summary: Checks proof-status overlays against lemma graphs and reports connected proof holes.
+    path: tools/agent_tools/proof_path_analyzer.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/proof_path_analyzer.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/proof_path_analyzer.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_proof_path_analyzer.py
+
   - id: check-proof-trace-alignment
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
     path: tools/agent_tools/check_proof_trace_alignment.py

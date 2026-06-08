@@ -24,7 +24,6 @@ python3 tools/agent_tools/algorithm_expansion_ir.py \
   --python-symbol python/jax_util/optimizers/pdipm.py::_solve \
   --target-theorem "PDIPM local floor-limited convergence" \
   --backend-profile-library lean/lib/backend_profiles.json \
-  --max-depth 3 \
   --format markdown \
   --out reports/formal-proof/pdipm_algorithm_ir.md
 ```
@@ -40,9 +39,12 @@ emits backend assumptions; the target algorithm does not read it.
 
 ## IR Grain
 
-The intended grain is the known-lemma or selected-local-obligation unit, not
-every type fact or every expression. Nodes and edges keep enough information to
-decide which local theorem is needed for the final proof target.
+The intended graph grain is the known-lemma or selected-local-obligation unit.
+Nodes and edges keep enough information to decide which local theorem is needed
+for the final proof target. The report also emits `code_facts` for
+AST-derived assignment, return, module-constant, and class-default expressions
+that are relevant to proof-topic equation tags such as reduced KKT, step
+updates, floor-preserving steps, MINRES defaults, and PDIPM initialization.
 
 Node fields include:
 
@@ -52,6 +54,7 @@ Node fields include:
 - `runtime_object`: coarse runtime object such as `State`, `Info`,
   residual, direction, or certificate.
 - `precision_model`: dtype/backend floor involvement when mechanically visible.
+- `equation_tags`: proof-topic tags visible from the symbol and local code.
 - `proof_relevance`: `required` or `excluded` for the goal-directed proof slice.
 
 Edge fields include:
@@ -62,6 +65,14 @@ Edge fields include:
 - `receiver_name` and `receiver_type`: mechanically inferred instance
   interaction information for calls such as `algorithm.step(...)`.
 - `resolved`: whether the target was resolved to a same-module AST symbol.
+
+Code fact fields include:
+
+- `fact_id`: stable source-derived id usable from proof-status records.
+- `fact_kind`: `assignment_equation`, `return_equation`, `module_constant`,
+  or `class_default`.
+- `target` and `expression`: normalized AST source text.
+- `equation_tags` and `target_profiles`: proof-topic routing for lemma graphs.
 
 Static check records include:
 
@@ -98,7 +109,9 @@ Obligation records include:
 
 ## Limits
 
-The first version resolves same-module functions, classes, and methods. It also
+The tool saturates recursively over AST-resolved calls and stops by already
+expanded `path.py::qualname` keys. It resolves same-module functions, classes,
+and methods. It also
 infers instance method calls from argument annotations and simple constructor
 assignment. Resolved instance interactions are emitted as static checks and are
 not consumed by proof obligations. If the receiver type is known but the method
