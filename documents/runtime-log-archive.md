@@ -145,6 +145,7 @@ or not a Git clone.
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
 python3 tools/agent_tools/runtime_log_archive_git.py push
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 Do not copy raw hook JSONL or accumulated eval reports back into AgentCanon
@@ -170,10 +171,25 @@ python3 tools/agent_tools/runtime_log_archive_git.py sync
 `sync` ensures the archive clone, copies current `reports/agents/` run bundles
 to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
 summaries, and agent reports, then commits and pushes the source repository's
-`logs/<repo-key>` branch. It skips `.active_run`, cache files, Python cache
-directories, and oversized single files. The source repo's ignored
-`reports/agents/` directory remains run-local working evidence; the log archive
-is the durable accumulated store.
+`logs/<repo-key>` branch. Its pull/rebase step uses Git autostash because hooks
+can append log lines while the sync command itself is running. It skips
+`.active_run`, cache files, Python cache directories, and oversized single
+files. The source repo's ignored `reports/agents/` directory remains run-local
+working evidence; the log archive is the durable accumulated store.
+
+Before task closeout, run:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
+```
+
+`check-clean` must report `RUNTIME_LOG_ARCHIVE_CLEAN=yes`,
+`RUNTIME_LOG_ARCHIVE_BRANCH_MATCH=yes`, `RUNTIME_LOG_ARCHIVE_DIRTY=no`, and
+`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`. `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes`
+means logs for a different `<repo-key>` were written while the archive worktree
+was on the current source repository's `logs/<repo-key>` branch. Treat that as
+a log repository operation blocker, not as optional cleanup: sync or migrate
+the listed foreign key before unlocking the run bundle.
 
 To print the resolved placement without writing anything, run:
 

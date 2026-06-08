@@ -189,6 +189,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-08 user feedback: 自己成長のフローが弱いです
 
+- 2026-06-08 | interaction-observation | runtime log repository operation is incomplete when agents only emit logs locally. Log archive API compatibility, dirty-state visibility, sync/push evidence, and closeout gates must be treated as part of the agent workflow, not as optional cleanup.
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-08 user feedback: ログリポジトリの運用が甘いです
+
 ## Task Retrospectives
 
 

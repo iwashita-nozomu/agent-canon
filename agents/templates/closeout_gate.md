@@ -36,6 +36,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - diff_check_agent_complete: no
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
+- runtime_log_archive_synced: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -65,6 +66,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - diff_check_agent_complete: yes
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
+- runtime_log_archive_synced: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -151,6 +153,22 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Agent Evaluation Evidence
 
 <!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
+
+## Runtime Log Archive Evidence
+
+<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+
+- runtime_log_archive_sync_command:
+- runtime_log_archive_sync_status:
+- runtime_log_archive_check_clean_command:
+- runtime_log_archive_check_clean_status:
+- runtime_log_archive_repo_key:
+- runtime_log_archive_branch:
+- runtime_log_archive_branch_match:
+- runtime_log_archive_dirty:
+- runtime_log_archive_foreign_dirty:
+- runtime_log_archive_commit:
+- runtime_log_archive_push:
 
 ## Evidence
 
