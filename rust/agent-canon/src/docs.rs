@@ -395,13 +395,11 @@ fn format_markdown_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteS
 }
 
 fn fix_math_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, "fix-math", |text| fix_markdown_math(text))
+    rewrite_markdown_files(root, raw_paths, "fix-math", fix_markdown_math)
 }
 
 fn fix_mermaid_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, "fix-mermaid", |text| {
-        fix_mermaid_markdown(text)
-    })
+    rewrite_markdown_files(root, raw_paths, "fix-mermaid", fix_mermaid_markdown)
 }
 
 fn rewrite_markdown_files(
@@ -1360,7 +1358,7 @@ fn contains_node_after_edge(line: &str, node_id: &str) -> bool {
             || line.contains(&format!("{edge}|"))
                 && line
                     .split('|')
-                    .last()
+                    .next_back()
                     .map(|tail| tail.trim_start().starts_with(node_id))
                     .unwrap_or(false)
     })
