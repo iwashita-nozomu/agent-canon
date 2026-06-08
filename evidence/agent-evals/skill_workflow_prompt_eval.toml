@@ -210,7 +210,7 @@ description = "Markdown style skill shim must route formatter-adjacent work thro
 id = "MD-STYLE-RUST-1"
 critical = true
 description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
-required_regex = ["tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust"]
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust", "DOCS_CHECK_REPORT_BEGIN"]
 
 [[evals.checklist]]
 id = "MD-STYLE-RUST-2"
@@ -240,7 +240,7 @@ description = "Human Markdown style skill doc must expose the unified Rust docs 
 id = "MD-STYLE-DOC-RUST-1"
 critical = true
 description = "Documents the unified check, format, math, and Mermaid commands."
-required_regex = ["tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid"]
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid", "DOCS_CHECK_REPORT_BEGIN"]
 
 [[evals.checklist]]
 id = "MD-STYLE-DOC-RUST-2"

@@ -128,8 +128,7 @@ pub fn run(args: &[String]) -> i32 {
     match Args::parse(args) {
         Ok(parsed) => run_parsed(parsed),
         Err(message) => {
-            eprintln!("DOCS_TOOL=fail");
-            eprintln!("DOCS_TOOL_FINDING=invalid-arguments:{message}");
+            render_tool_error("DOCS_TOOL", "invalid-arguments", &message);
             print_usage();
             2
         }
@@ -233,10 +232,29 @@ impl Args {
     }
 }
 
+fn usage_text() -> &'static str {
+    "usage: agent-canon docs <command> [options] [paths...]\n\
+\n\
+commands:\n\
+  check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
+  format                  format Markdown, then run the adjacent docs check\n\
+  fix-math                normalize Markdown math notation, then run the adjacent docs check\n\
+  fix-mermaid             normalize Mermaid fenced blocks and node labels, then run the adjacent docs check\n\
+  render-runtime-profile  render the runtime profile inventory\n\
+  help, -h, --help        show this command contract\n\
+\n\
+options:\n\
+  --root <repo-root>      repository root to evaluate; defaults to the current directory\n\
+  --format text|json      output format for check results; defaults to text\n\
+\n\
+examples:\n\
+  tools/bin/agent-canon docs -h\n\
+  tools/bin/agent-canon docs check documents/tools/agent-canon.md\n\
+  tools/bin/agent-canon docs format README.md"
+}
+
 fn print_usage() {
-    eprintln!(
-        "usage: agent-canon docs <check|format|fix-math|fix-mermaid|render-runtime-profile> [--root <repo-root>] [--format text|json] [paths...]"
-    );
+    eprintln!("{}", usage_text());
 }
 
 fn render_runtime_profile_command(root: &Path) -> i32 {
@@ -270,8 +288,8 @@ fn render_write_then_check(
     let summary = match writer(root, raw_paths) {
         Ok(summary) => summary,
         Err(error) => {
-            eprintln!("DOCS_{action}=fail");
-            eprintln!("DOCS_TOOL_FINDING=write-error:{error}");
+            let report_name = format!("DOCS_{}", action.to_ascii_uppercase().replace('-', "_"));
+            render_tool_error(&report_name, "write-error", &error.to_string());
             return 1;
         }
     };
@@ -320,6 +338,7 @@ fn render_findings(findings: &[Finding], root: &Path, output_format: &OutputForm
                     finding.check, path, line, finding.message
                 );
             }
+            eprint!("{}", structured_findings_report(findings, root));
         }
         OutputFormat::Json => {
             let mut output = String::from("{\"status\":\"");
@@ -358,6 +377,53 @@ fn render_findings(findings: &[Finding], root: &Path, output_format: &OutputForm
     } else {
         1
     }
+}
+
+fn render_tool_error(report_name: &str, kind: &str, detail: &str) {
+    eprintln!("{report_name}=fail");
+    eprintln!("DOCS_TOOL_FINDING={kind}:{detail}");
+    eprintln!("DOCS_TOOL_REPORT_BEGIN");
+    eprintln!("status: fail");
+    eprintln!("summary: AgentCanon docs tool failed before completing the requested operation.");
+    eprintln!("findings:");
+    eprintln!("- kind: {kind}");
+    eprintln!("  detail: {detail}");
+    eprintln!("next_action:");
+    eprintln!("- Use the machine-readable finding above as the repair target.");
+    eprintln!("- Run `tools/bin/agent-canon docs -h` for the command contract and option list.");
+    eprintln!("- Do not inspect implementation files unless this report lacks the needed contract detail.");
+    eprintln!("DOCS_TOOL_REPORT_END");
+}
+
+fn structured_findings_report(findings: &[Finding], root: &Path) -> String {
+    let mut report = String::new();
+    report.push_str("DOCS_CHECK_REPORT_BEGIN\n");
+    report.push_str("status: fail\n");
+    report.push_str(&format!(
+        "summary: Documentation checks found {} issue(s). Use these locations before reading broader files.\n",
+        findings.len()
+    ));
+    report.push_str("findings:\n");
+    for finding in findings {
+        let path = finding
+            .path
+            .as_ref()
+            .map(|path| display_path(root, path))
+            .unwrap_or_else(|| "-".to_string());
+        let line = finding
+            .line
+            .map(|line| line.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        report.push_str(&format!("- check: {}\n", finding.check));
+        report.push_str(&format!("  location: {path}:{line}\n"));
+        report.push_str(&format!("  problem: {}\n", finding.message));
+    }
+    report.push_str("next_action:\n");
+    report.push_str("- Open only the reported location and nearby lines needed for the repair.\n");
+    report.push_str("- Prefer `tools/bin/agent-canon docs format`, `fix-math`, or `fix-mermaid` when the finding is mechanical.\n");
+    report.push_str("- Rerun `tools/bin/agent-canon docs check <paths...>` after the repair.\n");
+    report.push_str("DOCS_CHECK_REPORT_END\n");
+    report
 }
 
 fn collect_check_findings(root: &Path, raw_paths: &[String]) -> Vec<Finding> {
@@ -1586,6 +1652,36 @@ mod tests {
         assert!(findings[0]
             .message
             .contains("workspace-absolute markdown link should be relative"));
+    }
+
+    #[test]
+    fn structured_report_tells_agents_to_use_reported_location() {
+        let root = PathBuf::from("/repo");
+        let finding = Finding {
+            check: "markdown-links",
+            path: Some(root.join("docs/bad.md")),
+            line: Some(3),
+            message: "local markdown link target is missing: ./missing.md".to_string(),
+        };
+
+        let report = structured_findings_report(&[finding], &root);
+
+        assert!(report.contains("DOCS_CHECK_REPORT_BEGIN"));
+        assert!(report.contains("summary: Documentation checks found 1 issue(s)."));
+        assert!(report.contains("location: docs/bad.md:3"));
+        assert!(report.contains("Open only the reported location"));
+        assert!(report.contains("DOCS_CHECK_REPORT_END"));
+    }
+
+    #[test]
+    fn help_text_exposes_options_and_examples() {
+        let usage = usage_text();
+
+        assert!(usage.contains("usage: agent-canon docs <command> [options] [paths...]"));
+        assert!(usage.contains("help, -h, --help"));
+        assert!(usage.contains("--root <repo-root>"));
+        assert!(usage.contains("--format text|json"));
+        assert!(usage.contains("tools/bin/agent-canon docs -h"));
     }
 
     #[test]

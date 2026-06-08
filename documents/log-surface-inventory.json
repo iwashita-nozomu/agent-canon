@@ -2548,7 +2548,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "DOCS_CHECK",
-      "line": 303,
+      "line": 322,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -2556,15 +2556,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "DOCS_CHECK",
-      "line": 306,
-      "path": "rust/agent-canon/src/docs.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "DOCS_TOOL",
-      "line": 131,
+      "line": 325,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -2572,15 +2564,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "DOCS_TOOL_FINDING",
-      "line": 132,
-      "path": "rust/agent-canon/src/docs.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "DOCS_TOOL_FINDING",
-      "line": 273,
+      "line": 384,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -2588,7 +2572,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "DOCS_WRITE_FILE",
-      "line": 423,
+      "line": 488,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -2596,7 +2580,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "RUNTIME_PROFILE_INVENTORY_FINDING",
-      "line": 251,
+      "line": 270,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -2604,7 +2588,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "RUNTIME_PROFILE_INVENTORY_RENDER",
-      "line": 250,
+      "line": 269,
       "path": "rust/agent-canon/src/docs.rs",
       "surface": "tool"
     },
@@ -5532,7 +5516,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 155,
+      "line": 154,
       "path": "tools/agent_tools/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -5540,7 +5524,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 160,
+      "line": 159,
       "path": "tools/agent_tools/check_dependency_headers.py",
       "surface": "tool"
     },

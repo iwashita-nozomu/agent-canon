@@ -48,6 +48,8 @@ class AuditAndFixLinksTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("DOCS_CHECK_FINDING=markdown-links", result.stderr)
+            self.assertIn("DOCS_CHECK_REPORT_BEGIN", result.stderr)
+            self.assertIn("Open only the reported location", result.stderr)
             self.assertIn("missing.md", result.stderr)
 
     def test_apply_rewrites_uniquely_resolvable_relative_targets(self) -> None:
@@ -85,6 +87,7 @@ class AuditAndFixLinksTest(unittest.TestCase):
 
             self.assertEqual(check_result.returncode, 1, check_result.stdout)
             self.assertIn("DOCS_CHECK_FINDING=markdown-links", check_result.stderr)
+            self.assertIn("DOCS_CHECK_REPORT_BEGIN", check_result.stderr)
             self.assertIn(
                 "workspace-absolute markdown link should be relative",
                 check_result.stderr,
