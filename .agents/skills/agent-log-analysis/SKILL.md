@@ -21,9 +21,12 @@ upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py re
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
-1. Call the log archive repository tool, not raw JSONL. Replace `<archive-root>` with `RUNTIME_LOG_ARCHIVE_ROOT` from `status --porcelain`:
+1. Do not complete log analysis or task closeout while `check-clean` reports `RUNTIME_LOG_ARCHIVE_CLEAN=no`. If it reports `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes`, resolve the listed foreign repo-key logs before returning to the user.
+1. Call the log archive repository tool, not raw JSONL. Replace `<archive-root>` with `RUNTIME_LOG_ARCHIVE_ROOT` from `status --porcelain` or `check-clean --porcelain`:
 
 ```bash
 python3 <archive-root>/tools/runtime_log_dashboard.py \

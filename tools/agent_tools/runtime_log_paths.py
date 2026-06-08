@@ -73,6 +73,11 @@ def _log_environment_key(root: Path) -> str:
     return f"{safe_slug(canonical.name or 'agent-canon')}-{short_hash(str(canonical))}"
 
 
+def log_environment_key(root: Path) -> str:
+    """Return the public local environment key used in archive context output."""
+    return _log_environment_key(root)
+
+
 def mounted_log_archive_root(canon_root: Path) -> Path:
     """Return the preferred AgentCanon-local log archive mount path."""
     return canon_root / LOG_ARCHIVE_PARENT

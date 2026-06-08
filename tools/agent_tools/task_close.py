@@ -219,6 +219,9 @@ def main() -> int:
     agent_canon_latest = parse_markdown_status_section(
         closeout_path, "AgentCanon Latest And CI Gate Evidence"
     )
+    runtime_log_archive = parse_markdown_status_section(
+        closeout_path, "Runtime Log Archive Evidence"
+    )
     diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
     diff_check_artifact_path = resolve_run_artifact(
         report_dir, diff_check.get("diff_check_artifact", "")
@@ -363,6 +366,39 @@ def main() -> int:
         in {"none", "resolved"},
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
+        "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced") == "yes",
+        "runtime_log_archive_sync_command": runtime_log_archive.get(
+            "runtime_log_archive_sync_command", ""
+        )
+        not in {"", "missing", "none"},
+        "runtime_log_archive_sync_status": runtime_log_archive.get(
+            "runtime_log_archive_sync_status", ""
+        )
+        == "pass",
+        "runtime_log_archive_check_clean_status": runtime_log_archive.get(
+            "runtime_log_archive_check_clean_status", ""
+        )
+        == "pass",
+        "runtime_log_archive_dirty": runtime_log_archive.get(
+            "runtime_log_archive_dirty", ""
+        )
+        == "no",
+        "runtime_log_archive_foreign_dirty": runtime_log_archive.get(
+            "runtime_log_archive_foreign_dirty", ""
+        )
+        == "no",
+        "runtime_log_archive_branch_match": runtime_log_archive.get(
+            "runtime_log_archive_branch_match", ""
+        )
+        == "yes",
+        "runtime_log_archive_commit_or_noop": runtime_log_archive.get(
+            "runtime_log_archive_commit", ""
+        )
+        not in {"", "missing", "none"},
+        "runtime_log_archive_push_or_noop": runtime_log_archive.get(
+            "runtime_log_archive_push", ""
+        )
+        not in {"", "missing", "none"},
         "agent_evaluation_status": agent_evaluation.get("evaluation_status") == "pass",
         "agent_feedback_resolved": agent_evaluation.get("feedback_actions_resolved") == "yes",
         "agent_learning_capture_complete": agent_evaluation.get("learning_capture_complete")
@@ -487,6 +523,31 @@ def main() -> int:
         f"{closeout.get('canonical_tree_head_complete', '')}"
     )
     print(f"AGENT_EVALUATION_COMPLETE={closeout.get('agent_evaluation_complete', '')}")
+    print(f"RUNTIME_LOG_ARCHIVE_SYNCED={closeout.get('runtime_log_archive_synced', '')}")
+    print(
+        "RUNTIME_LOG_ARCHIVE_SYNC_COMMAND="
+        f"{runtime_log_archive.get('runtime_log_archive_sync_command', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_SYNC_STATUS="
+        f"{runtime_log_archive.get('runtime_log_archive_sync_status', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN_STATUS="
+        f"{runtime_log_archive.get('runtime_log_archive_check_clean_status', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_DIRTY="
+        f"{runtime_log_archive.get('runtime_log_archive_dirty', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY="
+        f"{runtime_log_archive.get('runtime_log_archive_foreign_dirty', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH="
+        f"{runtime_log_archive.get('runtime_log_archive_branch_match', '')}"
+    )
     print(f"AGENT_EVALUATION_STATUS={agent_evaluation.get('evaluation_status', '')}")
     print(f"AGENT_FEEDBACK_RESOLVED={agent_evaluation.get('feedback_actions_resolved', '')}")
     print(
