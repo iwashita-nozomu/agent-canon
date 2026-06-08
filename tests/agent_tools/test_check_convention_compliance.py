@@ -134,6 +134,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/ci/run_all_checks.sh": (
         "check_hardcoded_numbers.py check_static_any.py "
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
+        "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
@@ -170,6 +171,7 @@ MINIMAL_AGENT_TOOLS = (
     "evaluate_skill_workflow_prompts.py",
     "evaluate_agent_run.py",
     "check_convention_compliance.py",
+    "check_skill_frontmatter.py",
     "tool_catalog.py",
     "tool_drift.py",
     "surface_manifest.py",
@@ -433,7 +435,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         github_checker = root / "tools" / "ci" / "check_github_workflows.py"
         github_checker.parent.mkdir(parents=True, exist_ok=True)
-        github_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        github_checker.write_text(
+            "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",
+            encoding="utf-8",
+        )
         container_checker = root / "tools" / "ci" / "container_config.py"
         container_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
 
