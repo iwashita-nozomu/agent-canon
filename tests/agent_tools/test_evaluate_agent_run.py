@@ -142,6 +142,8 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "- subagent_lifecycle=closed subagents_closed=yes",
             "- diff_check_not_required reason=unit-test-run-bundle",
             "- token_efficiency_not_required reason=unit-test-run-bundle",
+            "## Tool Warnings",
+            "- tool_warnings_status: none",
             "## Interventions",
             (
                 "- Monitoring kept implementation local and required dependency review "
@@ -428,6 +430,89 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
             self.assertIn("Record the selected skills", result.stdout)
+
+    def test_evaluate_open_tool_warning_fails(self) -> None:
+        """An observed tool warning must be closed before agent evaluation passes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- tool_warnings_status: none",
+                    "\n".join(
+                        [
+                            "- tool_warnings_status: resolved",
+                            (
+                                "- tool_warning=recorded warning_id=W1 "
+                                "source_tool=legacy-forwarder severity=warning "
+                                "status=open message=deprecated_wrapper "
+                                "repair_command=agent-canon_cli"
+                            ),
+                        ]
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tool warning remains open: W1", result.stdout)
+
+    def test_evaluate_fix_now_tool_warning_requires_resolution(self) -> None:
+        """Fix-now tool warnings cannot be closed by deferral."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- tool_warnings_status: none",
+                    "\n".join(
+                        [
+                            "- tool_warnings_status: resolved",
+                            (
+                                "- tool_warning=recorded warning_id=W1 "
+                                "source_tool=legacy-forwarder severity=fix-now "
+                                "status=deferred_with_issue "
+                                "message=deprecated_wrapper "
+                                "repair_command=agent-canon_cli issue=issues/open/W1.md"
+                            ),
+                        ]
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("fix-now tool warning must be resolved: W1", result.stdout)
 
     def test_evaluate_missing_accumulated_prompt_eval_report_fails(self) -> None:
         """Prompt eval evidence must point to a real accumulated report."""
