@@ -26,7 +26,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 - shared canon の正本は常に `vendor/agent-canon/` です。root symlink view を直接直して解決した扱いにしません。
 - 派生 repo の shared canon 差分は、まず `vendor/agent-canon/` 内の named GitHub branch に commit します。
 - `ensure-latest` が local divergence で止まった場合、local 差分を消して再試行せず、AgentCanon branch / PR で差分の行き先を決めます。
-- `vendor/agent-canon/` が local checkout branch を指している場合、その branch は破棄対象ではありません。shared-canon candidate があるなら `merge-main-into-current` で GitHub `main` を取り込み、同じ branch を AgentCanon PR として進めます。`agent_canon_merge_remote_main_in_post_head=yes` と `agent_canon_merge_remote_main_verified=yes` が出ない branch は PR-ready と扱いません。
+- `vendor/agent-canon/` が local checkout branch を指している場合、その branch は破棄対象ではありません。shared-canon candidate があるなら `merge-main-into-current-preserve-dirty` で GitHub `main` を取り込み、同じ branch を AgentCanon PR として進めます。`agent_canon_merge_remote_main_in_post_head=yes` と `agent_canon_merge_remote_main_verified=yes` が出ない branch は PR-ready と扱いません。
 - shared canon main に取り込んだあとは、派生 repo 側で `make agent-canon-ensure-latest` を再実行し、submodule worktree HEAD と parent gitlink が shared canon main と同じ commit になるまで閉じません。
 - template repo で作業している場合は、template `main`、template GitHub remote、parent gitlink 更新も completion evidence に含めます。
 - closeout 前に `schedule.md`、`work_log.md`、validation、commit、push、AgentCanon branch、shared canon main、派生 repo parent gitlink の未完了項目が無いことを確認します。
@@ -55,7 +55,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 | ----- | ------- | ------------------ |
 | `already_current_submodule` | parent gitlink、submodule worktree、shared canon main が一致 | root drift だけなら `link-root` / `check` へ進む |
 | `submodule_update` | shared canon main が進んでいる | AgentCanon update surface が repairable なら、親 repo の無関係な dirty state があっても `make agent-canon-ensure-latest` を実行し、parent pin commit を作る。unsafe な shared-canon 差分が同時にある場合は、先に AgentCanon branch / PR に出して merge 後に再実行する |
-| `diverged_submodule_history` | local submodule commit と remote main が分岐 | `merge-main-into-current` で current branch に GitHub main を取り込み、conflict は submodule 内で解消して AgentCanon PR に出す |
+| `diverged_submodule_history` | local submodule commit と remote main が分岐 | `merge-main-into-current-preserve-dirty` で current branch に GitHub main を取り込み、conflict は submodule 内で解消して AgentCanon PR に出す |
 | `already_current_tree` / `already_current_split` | legacy subtree 互換 mode で local tree と shared canon main が一致 | legacy appendix のみ。submodule repo では使わない |
 | `snapshot_import_*` / `subtree_pull` | legacy subtree 互換 mode の update route | maintainer が legacy cleanup として扱い、通常の submodule repo には持ち込まない |
 
@@ -81,7 +81,7 @@ merge 後の evidence には少なくとも `agent_canon_merge_source_sha`、
 `agent_canon_merge_remote_main_verified=yes` を残します。
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 

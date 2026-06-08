@@ -1228,6 +1228,7 @@ class CodexHooksTest(unittest.TestCase):
             "make ci deploy",
             "bash tools/update_agent_canon.sh latest",
             "bash tools/update_agent_canon.sh merge-main-into-current",
+            "bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "bash tools/sync_agent_canon.sh ensure-latest",
             "bash tools/sync_agent_canon.sh link-root",
         ]
