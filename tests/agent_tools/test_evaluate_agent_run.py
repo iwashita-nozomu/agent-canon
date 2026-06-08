@@ -148,7 +148,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
                 "evidence before closeout."
             ),
             "## Improvement Decisions",
-            "- skill_improvement_decision: not_applicable",
+            "- skill_improvement_decision: recorded",
             "- config_improvement_decision: not_applicable",
             "- workflow_improvement_decision: not_applicable",
             "- memory_learning_decision: not_applicable",
@@ -558,6 +558,38 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("runtime feedback", result.stdout.lower())
+
+    def test_evaluate_observed_runtime_feedback_requires_improvement_decision(self) -> None:
+        """Observed user feedback should not pass with all improvements not applicable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- skill_improvement_decision: recorded",
+                    "- skill_improvement_decision: not_applicable",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("runtime_feedback=observed", result.stdout)
+            self.assertIn("applied or recorded", result.stdout)
 
     def test_evaluate_missing_hook_tool_protocol_feedback_fails(self) -> None:
         """Hook and tool outcomes must route into protocol feedback decisions."""
