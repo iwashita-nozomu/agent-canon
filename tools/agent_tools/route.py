@@ -294,6 +294,24 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
         ),
     ),
     (
+        "agent-log-analysis",
+        "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
+        (
+            ("routing miss",),
+            ("selection gap",),
+            ("routing", "coverage"),
+            ("toolcall", "skillcall", "coverage"),
+            ("toolcall", "skillcall", "routing"),
+            ("toolcall", "skillcall", "miss"),
+            ("toolcall", "skillcall", "50"),
+            ("toolcall", "skillcall", "されない"),
+            ("ルーティング", "ログ"),
+            ("ログ", "skill"),
+            ("ログ", "tool"),
+            ("toolcall", "skillcall", "ルーティング"),
+        ),
+    ),
+    (
         "md-style-check",
         "Markdown style, links, headings, or docs lint are in scope",
         (

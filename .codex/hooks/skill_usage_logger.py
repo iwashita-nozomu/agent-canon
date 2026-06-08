@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, replace
@@ -36,49 +37,32 @@ WORKFLOW_FIELD_RE = re.compile(
 )
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 IGNORED_SKILL_IDS = frozenset(("skill-name",))
-KNOWN_SKILL_IDS = frozenset(
+EXTERNAL_SKILL_IDS = frozenset(
     (
-        "academic-writing",
-        "adaptive-improvement-loop",
-        "agent-canon-update",
-        "agent-learning",
-        "agent-orchestration",
-        "agent-update-branch",
-        "behavior-preserving-refactor",
-        "change-review",
-        "codex-task-workflow",
-        "computational-optimization",
-        "comprehensive-development",
-        "cpp-review",
-        "dependency-analysis",
-        "document-canon-cleanup",
         "empirical-prompt-tuning",
-        "environment-maintenance",
-        "experiment-lifecycle",
         "imagegen",
-        "literature-survey",
-        "long-form-writing",
-        "md-style-check",
         "openai-docs",
-        "oop-readability-check",
-        "paper-writing",
         "plugin-creator",
-        "python-review",
-        "repo-onboarding",
-        "report-writing",
-        "research-workflow",
-        "result-artifact-writeout",
         "skill-creator",
         "skill-installer",
-        "start-repository",
-        "subagent-bootstrap",
-        "task-routing",
-        "test-design",
-        "user-preference-sync",
-        "worktree-health",
-        "worktree-start",
     )
 )
+
+
+def repo_skill_ids() -> frozenset[str]:
+    """Return current AgentCanon skill ids from discoverable skill shims."""
+    skills_root = Path(__file__).resolve().parents[2] / ".agents" / "skills"
+    try:
+        return frozenset(
+            path.name
+            for path in skills_root.iterdir()
+            if path.is_dir() and SKILL_ID_RE.fullmatch(path.name)
+        )
+    except OSError:
+        return frozenset()
+
+
+KNOWN_SKILL_IDS = repo_skill_ids() | EXTERNAL_SKILL_IDS
 GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     "agent-learning": (
@@ -102,6 +86,20 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("サブエージェント", "起動"),
         ("subagent", "routing"),
         ("workflow=", "skills="),
+    ),
+    "agent-log-analysis": (
+        ("routing miss",),
+        ("selection gap",),
+        ("routing", "coverage"),
+        ("toolcall", "skillcall", "coverage"),
+        ("toolcall", "skillcall", "routing"),
+        ("toolcall", "skillcall", "miss"),
+        ("toolcall", "skillcall", "50"),
+        ("toolcall", "skillcall", "されない"),
+        ("ルーティング", "ログ"),
+        ("ログ", "skill"),
+        ("ログ", "tool"),
+        ("toolcall", "skillcall", "ルーティング"),
     ),
     "agent-canon-update": (
         ("agentcanon", "update"),
@@ -148,6 +146,13 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("run bundle", "evidence"),
         ("蓄積分析", "レポート"),
         ("ログ", "レポート", "残"),
+    ),
+    "task-routing": (
+        ("tool", "skill", "routing"),
+        ("tool", "skill", "ルーティング"),
+        ("route.py",),
+        ("public skill set",),
+        ("skill set", "route"),
     ),
     "oop-readability-check": (
         ("oop", "readability"),
@@ -199,7 +204,8 @@ FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
 }
 SKILL_TEXT_FIELDS = ("prompt", "last_assistant_message", "message")
-TOOL_CANDIDATE_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
+ROUTING_CANDIDATE_TEXT_FIELDS = SKILL_TEXT_FIELDS
+OBSERVED_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
 
 
 @dataclass(frozen=True)
@@ -430,12 +436,17 @@ def observed_text_for_fields(payload: dict[str, object], fields: tuple[str, ...]
 
 def observed_text(payload: dict[str, object]) -> list[str]:
     """Return hook payload text fields relevant for general evidence discovery."""
-    return observed_text_for_fields(payload, TOOL_CANDIDATE_TEXT_FIELDS)
+    return observed_text_for_fields(payload, OBSERVED_TEXT_FIELDS)
 
 
 def observed_skill_text(payload: dict[str, object]) -> list[str]:
     """Return text fields trusted for explicit skill and workflow declarations."""
     return observed_text_for_fields(payload, SKILL_TEXT_FIELDS)
+
+
+def observed_routing_candidate_text(payload: dict[str, object]) -> list[str]:
+    """Return text fields trusted for prompt-derived routing candidates."""
+    return observed_text_for_fields(payload, ROUTING_CANDIDATE_TEXT_FIELDS)
 
 
 def prompt_text(payload: dict[str, object]) -> str:
@@ -529,7 +540,7 @@ def feedback_action(labels: tuple[str, ...]) -> str:
 def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     """Classify prompt text into explicit and candidate routing signals."""
     skill_texts = observed_skill_text(payload)
-    candidate_texts = observed_text(payload)
+    candidate_texts = observed_routing_candidate_text(payload)
     skills = tuple(observed_skills(payload))
     labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
     candidate_skills = tuple(
@@ -648,12 +659,24 @@ def command_selected_tools(tool_input: object) -> tuple[str, ...]:
     command = tool_input.get("cmd") or tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         return ()
+    try:
+        parts = tuple(part for part in shlex.split(command) if part)
+    except ValueError:
+        parts = tuple(command.strip().split())
     observed: list[str] = []
-    haystack = command.lower()
-    for tool_name in sorted(TOOL_KEYWORDS):
-        if tool_name.lower() in haystack:
-            observed.append(tool_name)
+    for index, part in enumerate(parts):
+        name = Path(part).name
+        if index == 0 and name in TOOL_KEYWORDS:
+            observed.append(name)
+        if repo_tool_path_part(part) and name in TOOL_KEYWORDS:
+            observed.append(name)
     return tuple(dict.fromkeys(observed))
+
+
+def repo_tool_path_part(part: str) -> bool:
+    """Return whether one shell token is an executable repo tool path."""
+    executable_repo_path = "tools/" in part or ".codex/hooks/" in part
+    return executable_repo_path and part.endswith((".py", ".sh"))
 
 
 def default_log_path(root: Path) -> Path:

@@ -3656,6 +3656,69 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["skill_source_fields"], ["tool_input"])
         self.assertTrue(entry["tool_input_fingerprint"])
 
+    def test_skill_usage_logger_does_not_treat_tool_input_search_as_routing_candidate(self) -> None:
+        """Tool input mentions are execution evidence, not prompt-derived routing candidates."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "command": (
+                                "rg -n \"skill_usage_logger.py|agent-log-analysis\" "
+                                ".codex/hooks tests"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["candidate_skills"], [])
+        self.assertEqual(entry["candidate_tools"], [])
+        self.assertEqual(entry["selected_tools"], [])
+        self.assertEqual(entry["skill_source_fields"], ["tool_input"])
+
+    def test_skill_usage_logger_records_hook_tool_execution(self) -> None:
+        """Direct hook script execution should remain selected repo-tool evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "command": "python3 .codex/hooks/skill_usage_logger.py"
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["candidate_tools"], [])
+        self.assertEqual(entry["selected_tools"], ["skill_usage_logger.py"])
+
     def test_skill_usage_logger_does_not_count_prompt_shell_variables_as_skills(self) -> None:
         """Prompt dollar tokens should be known skills, not shell variable lookalikes."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3912,7 +3975,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(tool.stdout, "")
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
         self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
-        self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
+        self.assertEqual(entries[1]["candidate_tools"], [])
         self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
@@ -4012,6 +4075,57 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["candidate_skills"], [])
         self.assertEqual(entry["skill_selection_kind"], "declared_skill")
         self.assertEqual(entry["skill_source_fields"], ["prompt"])
+
+    def test_skill_usage_logger_discovers_current_repo_skill_ids(self) -> None:
+        """New AgentCanon skill shims should be counted without hand-editing the hook list."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-log-analysis and $prose-reasoning-graph.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["selected_skills"], ["agent-log-analysis", "prose-reasoning-graph"])
+        self.assertEqual(entry["skill_selection_kind"], "declared_skill")
+
+    def test_skill_usage_logger_does_not_route_standalone_toolcall_prompt_to_log_analysis(self) -> None:
+        """Standalone ToolCall implementation text should not imply log-analysis routing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Implement ToolCall parser support in the runtime adapter",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("agent-log-analysis", entry["candidate_skills"])
 
     def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
         """Prompt feedback should be classified with bounded redacted prompt text."""

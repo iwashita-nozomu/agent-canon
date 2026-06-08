@@ -118,6 +118,34 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("oop-readability-check", decision["skills"])
 
+    def test_prompt_routes_skill_tool_call_coverage_to_log_analysis(self) -> None:
+        """ToolCall and SkillCall coverage requests should route to runtime log analysis."""
+        result = self.run_route(
+            "--prompt",
+            "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("agent-log-analysis", decision["skills"])
+        self.assertIn("agent-log-analysis", decision["matched_skills"])
+
+    def test_prompt_does_not_route_standalone_toolcall_work_to_log_analysis(self) -> None:
+        """Standalone ToolCall implementation text should not imply log analysis."""
+        result = self.run_route(
+            "--prompt",
+            "Implement ToolCall parser support in the runtime adapter",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("agent-log-analysis", decision["skills"])
+        self.assertNotIn("agent-log-analysis", decision["matched_skills"])
+
     def test_prompt_routes_plain_public_skill_names(self) -> None:
         """Plain public skill ids in user text should count as explicit skill routing."""
         result = self.run_route(
