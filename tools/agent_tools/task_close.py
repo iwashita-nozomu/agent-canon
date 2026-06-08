@@ -92,6 +92,68 @@ def parse_markdown_status_section(path: Path, heading: str) -> dict[str, str]:
     return data
 
 
+def markdown_section_text(path: Path, heading: str) -> str:
+    """Return one level-2 Markdown section."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    target = f"## {heading}"
+    in_section = False
+    selected: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped == target:
+            in_section = True
+            selected.append(line)
+            continue
+        if in_section and stripped.startswith("## "):
+            break
+        if in_section:
+            selected.append(line)
+    return "\n".join(selected)
+
+
+def token_fields(line: str) -> dict[str, str]:
+    """Parse whitespace-separated key=value fields from one evidence line."""
+    data: dict[str, str] = {}
+    for token in line.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        data[key.strip()] = value.strip("`'\"")
+    return data
+
+
+def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str, ...]:
+    """Return unresolved workflow-monitoring tool warning problems."""
+    if not workflow_monitoring_path.is_file():
+        return ("workflow_monitoring.md missing",)
+    status = parse_markdown_status(workflow_monitoring_path).get(
+        "tool_warnings_status", ""
+    ).strip().lower()
+    problems: list[str] = []
+    if status not in {"none", "resolved"}:
+        problems.append("tool_warnings_status must be none or resolved")
+    latest_by_id: dict[str, dict[str, str]] = {}
+    for line in markdown_section_text(
+        workflow_monitoring_path, "Tool Warnings"
+    ).splitlines():
+        if "tool_warning=recorded" not in line:
+            continue
+        fields = token_fields(line)
+        warning_id = fields.get("warning_id", "")
+        if not warning_id:
+            problems.append("tool_warning entry missing warning_id")
+            continue
+        latest_by_id[warning_id] = fields
+    for warning_id, fields in sorted(latest_by_id.items()):
+        warning_status = fields.get("status", "").lower()
+        severity = fields.get("severity", "").lower()
+        if warning_status in {"", "open", "pending", "observed", "unresolved"}:
+            problems.append(f"tool warning remains open: {warning_id}")
+        if severity in {"fix-now", "s0", "s1", "blocker"} and warning_status != "resolved":
+            problems.append(f"fix-now tool warning must be resolved: {warning_id}")
+    return tuple(problems)
+
+
 def join_blockers(blockers: list[str]) -> str:
     """Render blocker list for terminal output."""
     return ",".join(blockers) if blockers else ""
@@ -193,6 +255,7 @@ def main() -> int:
     request_contract_path = report_dir / "user_request_contract.md"
     schedule_path = report_dir / "schedule.md"
     work_log_path = report_dir / "work_log.md"
+    workflow_monitoring_path = report_dir / "workflow_monitoring.md"
     final_review_path = report_dir / "final_review.md"
     agent_evaluation_path = report_dir / "agent_evaluation.md"
     if not verification_path.is_file():
@@ -213,11 +276,17 @@ def main() -> int:
     mechanical_loop = parse_markdown_status_section(
         closeout_path, "Mechanical Completion Loop Evidence"
     )
+    tool_warning_evidence = parse_markdown_status_section(
+        closeout_path, "Tool Warning Evidence"
+    )
     subagent_lifecycle = parse_markdown_status_section(
         closeout_path, "Subagent Lifecycle Evidence"
     )
     agent_canon_latest = parse_markdown_status_section(
         closeout_path, "AgentCanon Latest And CI Gate Evidence"
+    )
+    runtime_log_archive = parse_markdown_status_section(
+        closeout_path, "Runtime Log Archive Evidence"
     )
     diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
     diff_check_artifact_path = resolve_run_artifact(
@@ -230,6 +299,9 @@ def main() -> int:
     )
     active_diff_ref = current_diff_ref(workspace)
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
+    workflow_tool_warning_blockers = workflow_tool_warning_problems(
+        workflow_monitoring_path
+    )
     request_contract = parse_markdown_status(request_contract_path)
     schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
@@ -276,6 +348,18 @@ def main() -> int:
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
+        "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
+        "tool_warning_monitoring_status": tool_warning_evidence.get(
+            "tool_warning_monitoring_status", ""
+        )
+        in {"none", "resolved"},
+        "tool_warning_open_items": tool_warning_evidence.get("tool_warning_open_items")
+        == "none",
+        "tool_warning_resolution_evidence": tool_warning_evidence.get(
+            "tool_warning_resolution_evidence", ""
+        )
+        not in {"", "missing", "none"},
+        "workflow_tool_warnings_closed": not workflow_tool_warning_blockers,
         "mechanical_completion_loop_complete": closeout.get(
             "mechanical_completion_loop_complete"
         )
@@ -363,6 +447,39 @@ def main() -> int:
         in {"none", "resolved"},
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
+        "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced") == "yes",
+        "runtime_log_archive_sync_command": runtime_log_archive.get(
+            "runtime_log_archive_sync_command", ""
+        )
+        not in {"", "missing", "none"},
+        "runtime_log_archive_sync_status": runtime_log_archive.get(
+            "runtime_log_archive_sync_status", ""
+        )
+        == "pass",
+        "runtime_log_archive_check_clean_status": runtime_log_archive.get(
+            "runtime_log_archive_check_clean_status", ""
+        )
+        == "pass",
+        "runtime_log_archive_dirty": runtime_log_archive.get(
+            "runtime_log_archive_dirty", ""
+        )
+        == "no",
+        "runtime_log_archive_foreign_dirty": runtime_log_archive.get(
+            "runtime_log_archive_foreign_dirty", ""
+        )
+        == "no",
+        "runtime_log_archive_branch_match": runtime_log_archive.get(
+            "runtime_log_archive_branch_match", ""
+        )
+        == "yes",
+        "runtime_log_archive_commit_or_noop": runtime_log_archive.get(
+            "runtime_log_archive_commit", ""
+        )
+        not in {"", "missing", "none"},
+        "runtime_log_archive_push_or_noop": runtime_log_archive.get(
+            "runtime_log_archive_push", ""
+        )
+        not in {"", "missing", "none"},
         "agent_evaluation_status": agent_evaluation.get("evaluation_status") == "pass",
         "agent_feedback_resolved": agent_evaluation.get("feedback_actions_resolved") == "yes",
         "agent_learning_capture_complete": agent_evaluation.get("learning_capture_complete")
@@ -433,6 +550,23 @@ def main() -> int:
         "POST_FIX_FULL_REVIEW_COMPLETE="
         f"{closeout.get('post_fix_full_review_complete', '')}"
     )
+    print(f"TOOL_WARNINGS_RESOLVED={closeout.get('tool_warnings_resolved', '')}")
+    print(
+        "TOOL_WARNING_MONITORING_STATUS="
+        f"{tool_warning_evidence.get('tool_warning_monitoring_status', '')}"
+    )
+    print(
+        "TOOL_WARNING_OPEN_ITEMS="
+        f"{tool_warning_evidence.get('tool_warning_open_items', '')}"
+    )
+    print(
+        "TOOL_WARNING_RESOLUTION_EVIDENCE="
+        f"{tool_warning_evidence.get('tool_warning_resolution_evidence', '')}"
+    )
+    print(
+        "WORKFLOW_TOOL_WARNING_BLOCKERS="
+        f"{join_blockers(list(workflow_tool_warning_blockers))}"
+    )
     print(
         "MECHANICAL_COMPLETION_LOOP_COMPLETE="
         f"{closeout.get('mechanical_completion_loop_complete', '')}"
@@ -487,6 +621,31 @@ def main() -> int:
         f"{closeout.get('canonical_tree_head_complete', '')}"
     )
     print(f"AGENT_EVALUATION_COMPLETE={closeout.get('agent_evaluation_complete', '')}")
+    print(f"RUNTIME_LOG_ARCHIVE_SYNCED={closeout.get('runtime_log_archive_synced', '')}")
+    print(
+        "RUNTIME_LOG_ARCHIVE_SYNC_COMMAND="
+        f"{runtime_log_archive.get('runtime_log_archive_sync_command', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_SYNC_STATUS="
+        f"{runtime_log_archive.get('runtime_log_archive_sync_status', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN_STATUS="
+        f"{runtime_log_archive.get('runtime_log_archive_check_clean_status', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_DIRTY="
+        f"{runtime_log_archive.get('runtime_log_archive_dirty', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY="
+        f"{runtime_log_archive.get('runtime_log_archive_foreign_dirty', '')}"
+    )
+    print(
+        "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH="
+        f"{runtime_log_archive.get('runtime_log_archive_branch_match', '')}"
+    )
     print(f"AGENT_EVALUATION_STATUS={agent_evaluation.get('evaluation_status', '')}")
     print(f"AGENT_FEEDBACK_RESOLVED={agent_evaluation.get('feedback_actions_resolved', '')}")
     print(

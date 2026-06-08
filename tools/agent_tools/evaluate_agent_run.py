@@ -16,6 +16,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 try:
     import tomllib
@@ -33,6 +34,19 @@ from report_artifact_checks import (
 )
 
 DEFAULT_MIN_SCORE = 85
+DEFAULT_BEHAVIOR_CRITERION_MAX_SCORE = 5
+ARTIFACT_COMPLETENESS_SCORE = 8
+REQUEST_TRACEABILITY_SCORE = 10
+PLANNED_WORK_AND_CHRONOLOGY_SCORE = 10
+WORKFLOW_MONITORING_SCORE = 12
+TOOL_WARNING_OBLIGATION_SCORE = 8
+ORCHESTRATION_INTAKE_SCORE = 12
+PROMPT_EVAL_ARTIFACT_SCORE = 8
+REVIEW_FEEDBACK_LOOP_SCORE = 10
+VALIDATION_AND_CLOSEOUT_SCORE = 12
+DEPENDENCY_AND_CANONICAL_SCORE = 10
+SELF_IMPROVEMENT_FEEDBACK_SCORE = 16
+SELF_IMPROVEMENT_FEEDBACK_PARTIAL_SCORE = 8
 MARKDOWN_COMMENT_PATTERN = re.compile(r"<!--.*?-->", flags=re.DOTALL)
 SKILL_INVOCATION_PATTERN = re.compile(r"\bskill_invocation=\$?([A-Za-z0-9_-]+)")
 EVAL_FIELD_PATTERN = re.compile(r"\b(EVAL_RUN_ID|EVAL_ACCUMULATED_REPORT|EVAL_USED_SKILLS)=([^\s]+)")
@@ -94,6 +108,7 @@ class RunEvidence:
     signals_text: str
     behavior_events_text: str
     behavior_events_raw_text: str
+    tool_warnings_text: str
 
 
 @dataclass(frozen=True)
@@ -150,9 +165,14 @@ def string_tuple(value: object, field: str) -> tuple[str, ...]:
     """Return a tuple of strings from a manifest value."""
     if value is None:
         return ()
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not isinstance(value, list):
         raise ValueError(f"{field} must be a list of strings")
-    return tuple(value)
+    strings: list[str] = []
+    for item in cast(list[object], value):
+        if not isinstance(item, str):
+            raise ValueError(f"{field} must be a list of strings")
+        strings.append(item)
+    return tuple(strings)
 
 
 def markdown_section_text(text: str, heading: str) -> str:
@@ -181,13 +201,14 @@ def markdown_section_lines(lines: list[str], heading: str) -> Iterator[str]:
 
 def load_behavior_manifest(path: Path) -> tuple[BehaviorCriterion, ...]:
     """Load manifest-defined behavior criteria."""
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    data = cast(dict[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     raw_criteria = data.get("criteria")
     if not isinstance(raw_criteria, list) or not raw_criteria:
         raise ValueError("behavior manifest must define at least one [[criteria]] entry")
+    criteria = cast(list[object], raw_criteria)
     return tuple(
         behavior_criterion_from_manifest_entry(index, entry)
-        for index, entry in enumerate(raw_criteria, 1)
+        for index, entry in enumerate(criteria, 1)
     )
 
 
@@ -198,20 +219,23 @@ def behavior_criterion_from_manifest_entry(
     """Build one behavior criterion from a manifest entry."""
     if not isinstance(entry, dict):
         raise ValueError(f"behavior criterion {index} must be a table")
-    name = str(entry["name"])
-    source = str(entry.get("source", "behavior_events"))
+    mapping = cast(dict[str, object], entry)
+    name = str(mapping["name"])
+    source = str(mapping.get("source", "behavior_events"))
     if source not in {"behavior_events", "bundle"}:
         raise ValueError(f"behavior criterion {name} has invalid source={source}")
-    feedback = str(entry.get("feedback", f"Record behavior evidence for {name}."))
+    feedback = str(mapping.get("feedback", f"Record behavior evidence for {name}."))
     return BehaviorCriterion(
         name=name,
-        max_score=int(str(entry.get("max_score", 5))),
+        max_score=int(
+            str(mapping.get("max_score", DEFAULT_BEHAVIOR_CRITERION_MAX_SCORE))
+        ),
         feedback=feedback,
         source=source,
-        required_all=string_tuple(entry.get("required_all"), f"{name}.required_all"),
-        required_any=string_tuple(entry.get("required_any"), f"{name}.required_any"),
+        required_all=string_tuple(mapping.get("required_all"), f"{name}.required_all"),
+        required_any=string_tuple(mapping.get("required_any"), f"{name}.required_any"),
         forbidden_any=string_tuple(
-            entry.get("forbidden_any"),
+            mapping.get("forbidden_any"),
             f"{name}.forbidden_any",
         ),
     )
@@ -330,6 +354,10 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
         monitoring_text,
         "## Behavior Events",
     )
+    tool_warnings_text = markdown_section_text_raw(
+        monitoring_text,
+        "## Tool Warnings",
+    )
     return RunEvidence(
         missing_artifacts=tuple(missing),
         request_contract=parse_markdown_status(
@@ -354,6 +382,7 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
             "## Behavior Events",
         ),
         behavior_events_raw_text=behavior_events_raw_text,
+        tool_warnings_text=tool_warnings_text,
     )
 
 
@@ -364,6 +393,7 @@ def monitoring_sections_complete(evidence: RunEvidence) -> bool:
         for heading in (
             "## Signals",
             "## Behavior Events",
+            "## Tool Warnings",
             "## Interventions",
             "## Improvement Decisions",
         )
@@ -385,6 +415,83 @@ def improvement_decisions_complete(evidence: RunEvidence) -> bool:
             "memory_learning_decision",
         )
     )
+
+
+def improvement_decision_applied_or_recorded(evidence: RunEvidence) -> bool:
+    """Return whether at least one improvement decision changed durable state."""
+    return any(
+        status_in(evidence.monitoring_status, key, {"applied", "recorded"})
+        for key in (
+            "skill_improvement_decision",
+            "config_improvement_decision",
+            "workflow_improvement_decision",
+            "memory_learning_decision",
+        )
+    )
+
+
+def runtime_feedback_requires_improvement(evidence: RunEvidence) -> bool:
+    """Return whether observed runtime feedback requires a non-no-op decision."""
+    text = evidence.behavior_events_text
+    return "runtime_feedback=observed" in text and "action=no_op" not in text
+
+
+def runtime_feedback_closure_complete(evidence: RunEvidence) -> bool:
+    """Return whether observed runtime feedback was closed into an action route."""
+    if not runtime_feedback_requires_improvement(evidence):
+        return True
+    return improvement_decisions_complete(evidence) and improvement_decision_applied_or_recorded(evidence)
+
+
+def token_fields(line: str) -> dict[str, str]:
+    """Parse whitespace-separated key=value fields from one evidence line."""
+    data: dict[str, str] = {}
+    for token in line.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        data[key.strip()] = value.strip("`'\"")
+    return data
+
+
+def tool_warning_problems(evidence: RunEvidence) -> tuple[str, ...]:
+    """Return unresolved tool warning closure problems."""
+    problems: list[str] = []
+    status = evidence.monitoring_status.get("tool_warnings_status", "").strip().lower()
+    if status not in {"none", "resolved"}:
+        problems.append(
+            "tool_warnings_status must be none or resolved in workflow_monitoring.md"
+        )
+
+    latest_by_id: dict[str, dict[str, str]] = {}
+    for line in evidence.tool_warnings_text.splitlines():
+        if "tool_warning=recorded" not in line:
+            continue
+        fields = token_fields(line)
+        warning_id = fields.get("warning_id", "")
+        if not warning_id:
+            problems.append("tool_warning entry missing warning_id")
+            continue
+        latest_by_id[warning_id] = fields
+
+    for warning_id, fields in sorted(latest_by_id.items()):
+        warning_status = fields.get("status", "").lower()
+        severity = fields.get("severity", "").lower()
+        if warning_status in {"", "open", "pending", "observed", "unresolved"}:
+            problems.append(f"tool warning remains open: {warning_id}")
+        if severity in {"fix-now", "s0", "s1", "blocker"} and warning_status != "resolved":
+            problems.append(f"fix-now tool warning must be resolved: {warning_id}")
+        if warning_status in {"resolved", "accepted_with_reason", "deferred_with_issue"}:
+            if not fields.get("evidence") and not fields.get("issue"):
+                problems.append(
+                    f"closed tool warning lacks evidence or issue: {warning_id}"
+                )
+    return tuple(problems)
+
+
+def tool_warnings_closed(evidence: RunEvidence) -> bool:
+    """Return whether tool warning obligations are explicitly closed."""
+    return not tool_warning_problems(evidence)
 
 
 def orchestration_evidence_present(evidence: RunEvidence) -> bool:
@@ -466,13 +573,13 @@ def build_artifact_and_traceability_criteria(
     return [
         criterion(
             "artifact_completeness",
-            8,
+            ARTIFACT_COMPLETENESS_SCORE,
             not evidence.missing_artifacts,
             f"Create missing run artifacts: {', '.join(evidence.missing_artifacts)}.",
         ),
         criterion(
             "request_traceability",
-            10,
+            REQUEST_TRACEABILITY_SCORE,
             request_contract.get("all_clauses_resolved") == "yes"
             and request_contract.get("forbidden_drift_detected") == "no"
             and not request_contract.get("unresolved_clause_ids", "").strip(),
@@ -493,20 +600,31 @@ def build_workflow_execution_criteria(
     return [
         criterion(
             "planned_work_and_chronology",
-            10,
+            PLANNED_WORK_AND_CHRONOLOGY_SCORE,
             not schedule_blockers and not work_log_blockers,
             "Fill schedule stage/coverage/work-unit tables and add meaningful work-log entries.",
         ),
         criterion(
             "workflow_monitoring",
-            12,
+            WORKFLOW_MONITORING_SCORE,
             monitoring_sections_complete(evidence),
             "Fill workflow_monitoring.md with signals, Behavior Events, "
-            "interventions, and improvement decisions from the active workflow.",
+            "Tool Warnings, interventions, and improvement decisions from the "
+            "active workflow.",
+        ),
+        criterion(
+            "tool_warning_obligation_closure",
+            TOOL_WARNING_OBLIGATION_SCORE,
+            tool_warnings_closed(evidence),
+            "Record every non-blocking tool, hook, checker, and wrapper warning "
+            "in ## Tool Warnings and close each item with resolved, "
+            "accepted_with_reason, deferred_with_issue, not_applicable, or "
+            "tool_warnings_status=none. Problems: "
+            + "; ".join(tool_warning_problems(evidence)),
         ),
         criterion(
             "orchestration_and_pre_design_intake",
-            12,
+            ORCHESTRATION_INTAKE_SCORE,
             orchestration_evidence_present(evidence),
             "Record skills, stage/subagent or parent-direct routing, MCP preflight "
             "or explicit opt-out, repo dependency intake, web research decision, "
@@ -526,7 +644,7 @@ def build_prompt_eval_artifact_criterion(
     if not invoked_skills:
         return criterion(
             "prompt_eval_artifact_integrity",
-            8,
+            PROMPT_EVAL_ARTIFACT_SCORE,
             True,
             "No action required.",
         )
@@ -552,7 +670,7 @@ def build_prompt_eval_artifact_criterion(
         problems.append("missing accumulated prompt eval skills: " + ",".join(missing_skills))
     return criterion(
         "prompt_eval_artifact_integrity",
-        8,
+        PROMPT_EVAL_ARTIFACT_SCORE,
         not problems,
         "; ".join(problems) if problems else "No action required.",
     )
@@ -628,7 +746,7 @@ def build_review_and_closeout_criteria(
     return [
         criterion(
             "review_feedback_loop",
-            10,
+            REVIEW_FEEDBACK_LOOP_SCORE,
             has_approve_decision(evidence.final_review_text)
             and not final_review_blockers
             and not has_open_review_findings(
@@ -647,7 +765,7 @@ def build_closeout_criteria(evidence: RunEvidence) -> list[CriterionResult]:
     return [
         criterion(
             "validation_and_closeout_evidence",
-            12,
+            VALIDATION_AND_CLOSEOUT_SCORE,
             evidence.verification.get("status") == "pass"
             and closeout.get("validation_complete") == "yes"
             and closeout.get("commit_created") == "yes"
@@ -657,7 +775,7 @@ def build_closeout_criteria(evidence: RunEvidence) -> list[CriterionResult]:
         ),
         criterion(
             "dependency_and_canonical_evidence",
-            10,
+            DEPENDENCY_AND_CANONICAL_SCORE,
             closeout.get("dependency_headers_complete") == "yes"
             and closeout.get("repo_wide_dependency_tools_complete") == "yes"
             and closeout.get("repo_wide_static_analysis_complete") == "yes"
@@ -673,14 +791,20 @@ def build_self_improvement_feedback_criterion(evidence: RunEvidence) -> Criterio
     """Build the self-improvement feedback capture criterion."""
     return criterion(
         "self_improvement_feedback_capture",
-        16,
+        SELF_IMPROVEMENT_FEEDBACK_SCORE,
         section_has_content(evidence.retrospective_text, "## What Worked")
         and section_has_content(evidence.retrospective_text, "## What Hurt")
         and section_has_content(evidence.retrospective_text, "## Follow-ups")
-        and improvement_decisions_complete(evidence),
+        and improvement_decisions_complete(evidence)
+        and runtime_feedback_closure_complete(evidence),
         "Fill retrospective sections and mark skill/config/workflow/memory "
-        "improvement decisions as applied, recorded, or not_applicable.",
-        partial_score=8 if improvement_decisions_complete(evidence) else 0,
+        "improvement decisions as applied, recorded, or not_applicable. "
+        "When runtime_feedback=observed is not action=no_op, at least one "
+        "improvement decision must be applied or recorded.",
+        partial_score=SELF_IMPROVEMENT_FEEDBACK_PARTIAL_SCORE
+        if improvement_decisions_complete(evidence)
+        and runtime_feedback_closure_complete(evidence)
+        else 0,
     )
 
 

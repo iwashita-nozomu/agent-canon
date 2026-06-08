@@ -55,7 +55,7 @@ make agent-canon-ensure-latest
    source branch/PR:
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 

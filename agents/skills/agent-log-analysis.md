@@ -32,9 +32,12 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
-1. `status --porcelain` の `RUNTIME_LOG_ARCHIVE_ROOT` を `<archive-root>` として、log archive repo 側の API / compact profile を呼びます。
+1. `check-clean` が `RUNTIME_LOG_ARCHIVE_CLEAN=yes` を返すまで、分析や closeout を完了扱いにしません。`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes` の場合は、別 repo_key の log が現在 branch に混入しているので、該当 repo_key の sync / migration を先に解消します。
+1. `status --porcelain` または `check-clean --porcelain` の `RUNTIME_LOG_ARCHIVE_ROOT` を `<archive-root>` として、log archive repo 側の API / compact profile を呼びます。
 
 ```bash
 python3 <archive-root>/tools/runtime_log_dashboard.py \

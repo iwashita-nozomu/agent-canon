@@ -183,6 +183,24 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User feedback: 設計を行う際にスコープを絞り杉です。もっと抽象的に設計するべきです
 
+- 2026-06-08 | interaction-observation | runtime feedback を記録しても improvement decision に接続しなければ自己成長 flow は弱い。user/reviewer 指摘を受けた時点で target/action を分類し、action=no_op 以外は skill/config/workflow/memory decision の少なくとも 1 つを applied または recorded にする
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-08 user feedback: 自己成長のフローが弱いです
+
+- 2026-06-08 | interaction-observation | runtime log repository operation is incomplete when agents only emit logs locally. Log archive API compatibility, dirty-state visibility, sync/push evidence, and closeout gates must be treated as part of the agent workflow, not as optional cleanup.
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-08 user feedback: ログリポジトリの運用が甘いです
+
+- 2026-06-08 | interaction-observation | Tool warnings are likely to be ignored when they are emitted only as transient stdout/stderr and are not converted into owned, status-bearing workflow obligations before closeout.
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: User reported agents tend to ignore tool warnings; current workflow monitor has behavior events but no dedicated unresolved-warning gate.
+
 ## Task Retrospectives
 
 

@@ -2,7 +2,7 @@
 // responsibility Checks and scopes AgentCanon repo MCP preflight behavior.
 // upstream design ../../../.codex/README.md documents MCP inventory preflight
 // upstream design ../../../mcp/README.md documents repo MCP ownership
-// upstream design ../../../issues/open/AC-20260517-mcp-inventory-preflight-cache.md records scoped preflight issue
+// upstream design ../../../issues/closed/AC-20260517-mcp-inventory-preflight-cache.md records scoped preflight issue
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 

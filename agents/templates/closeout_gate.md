@@ -31,11 +31,13 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
+- tool_warnings_resolved: no
 - mechanical_completion_loop_complete: no
 - subagents_closed: no
 - diff_check_agent_complete: no
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
+- runtime_log_archive_synced: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -60,11 +62,13 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
+- tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
 - diff_check_agent_complete: yes
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
+- runtime_log_archive_synced: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -86,7 +90,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## AgentCanon Latest And CI Gate Evidence
 
-<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass` unless the only blocker is a documented environment/toolchain issue and full-repo pyright plus ruff fallback evidence is recorded as `environment_blocked_with_full_static_fallback`. -->
+<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass` unless the only blocker is a documented environment/toolchain issue and full-repo pyright plus ruff fallback evidence is recorded as `environment_blocked_with_full_static_fallback`. -->
 
 - agent_canon_latest_command:
 - agent_canon_latest_status:
@@ -105,6 +109,14 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Post-Fix Full Review Evidence
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
+
+## Tool Warning Evidence
+
+<!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->
+
+- tool_warning_monitoring_status:
+- tool_warning_open_items:
+- tool_warning_resolution_evidence:
 
 ## Mechanical Completion Loop Evidence
 
@@ -151,6 +163,22 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Agent Evaluation Evidence
 
 <!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
+
+## Runtime Log Archive Evidence
+
+<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+
+- runtime_log_archive_sync_command:
+- runtime_log_archive_sync_status:
+- runtime_log_archive_check_clean_command:
+- runtime_log_archive_check_clean_status:
+- runtime_log_archive_repo_key:
+- runtime_log_archive_branch:
+- runtime_log_archive_branch_match:
+- runtime_log_archive_dirty:
+- runtime_log_archive_foreign_dirty:
+- runtime_log_archive_commit:
+- runtime_log_archive_push:
 
 ## Evidence
 

@@ -11,6 +11,7 @@
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
@@ -123,6 +124,13 @@ TOOL_GATES = {
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
         ("evidence/agent-evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
+    ),
+    "skill_frontmatter": (
+        "tools/agent_tools/check_skill_frontmatter.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/ci/check_github_workflows.py",
+        ),
     ),
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
@@ -385,7 +393,7 @@ def check_tool_gates(root: Path) -> list[Finding]:
     """Verify each mechanical convention gate exists and is referenced."""
     findings: list[Finding] = []
     for gate_name, (tool_path, references) in TOOL_GATES.items():
-        if not (root / tool_path).is_file():
+        if readable_path(root, tool_path) is None:
             findings.append(
                 Finding("tool_gate", tool_path, f"{gate_name}:missing-tool")
             )

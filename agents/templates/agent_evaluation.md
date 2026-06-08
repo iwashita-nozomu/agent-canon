@@ -38,4 +38,4 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces pass st
 
 ## Learning Capture
 
-<!-- Record whether durable agent-side observations should be logged with tools/agent_tools/log_agent_learning.py, and whether any skill/config/workflow change was applied or explicitly not_applicable. Do not paste raw chat. -->
+<!-- Record whether durable agent-side observations should be logged with tools/agent_tools/log_agent_learning.py, and whether any skill/config/workflow change was applied or explicitly not_applicable. Do not paste raw chat. If runtime feedback was observed and action was not no_op, cite the applied or recorded improvement decision and its concrete target. -->
