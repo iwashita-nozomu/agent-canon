@@ -2,6 +2,7 @@
 name: formal-proof-workflow
 description: Use when natural-language mathematical claims, Python AST-derived implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
 ---
+
 <!--
 @dependency-start
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
@@ -9,6 +10,7 @@ upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill 
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
 upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
+upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
 -->
@@ -40,9 +42,23 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    initialization-path facts, and solver defaults should be represented as
    code-derived facts and connected to lemma graph nodes before they are cited
    in a proof status table.
+1. After any algorithm update that changes initialization, cold-start,
+   Phase-I, basin-entry, or tube-entry logic, regenerate the Algorithm
+   Expansion IR, lemma graphs, and proof-status overlay before reporting back.
+   Discharge every initialization fact that the code now exposes as
+   `code_facts` first: selected base point, epigraph point, slack/multiplier
+   floors, initial residuals, and initial child-solver state. Do not return
+   those as user-owned blockers when they can be extracted from the current
+   implementation.
+1. Normalize initialization proofs through a selected initializer
+   `z_init = Init(Problem, InitializeConfig)`. Do not make `z_init = 0` a
+   theorem premise unless the implementation path itself mathematically fixes
+   zero and the IR code facts show that specialization. If a hard-coded zero or
+   default vector is merely an algorithmic choice that blocks the theorem,
+   route it back to `$algorithm-proof-exploration` as an algorithmic choice or
+   problem-class witness.
 1. For implementation-derived convergence claims, treat the implemented
-   algorithm itself as an operational assumption: `trace follows A_impl /
-   Step_impl` extracted from IR. Convergence, finite termination, residual
+   algorithm itself as an operational assumption: `trace follows A_impl / Step_impl` extracted from IR. Convergence, finite termination, residual
    reachability, and certificate soundness are derived lemmas, not assumptions.
    Record this premise under `operational_assumptions`, separate from
    `open_frontier` and `external_assumptions`.
@@ -69,6 +85,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    adopted fingerprints into `proof_status.json` as `source_ir_fingerprints`
    and let `proof_path_analyzer.py` reject stale lemma groups after algorithm
    changes.
+1. If the task asks what iterative algorithm is implemented or where proof
+   holes sit on the implementation path, use `$algorithm-flowchart` after IR,
+   LemmaGraph, and proof-status generation. The chart is navigation evidence,
+   not proof completion.
 1. After a proof-status overlay exists, run
    `python3 tools/agent_tools/proof_path_analyzer.py --lemma-graph <graph.json> --proof-status <proof_status.json> --proof-frontier <frontier.md> --adoption-text <proof-note.md>`
    before claiming proof-path progress. Treat `validation.valid=true` as
@@ -190,6 +210,11 @@ Use this pattern before proving implementation-derived algorithm claims.
    Expand visible function-pointer variants such as `self.update(...)` into
    same-module variant functions before proof selection; keep variant selection
    as a static dispatch check and the variant math as ordinary nodes.
+1. For initialization and tube-entry blockers, consume IR `code_facts` before
+   returning. Code-derived selected-initializer equations belong in the graph
+   and proof-status overlay; only the remaining non-code problem facts, such as
+   tube membership, regularity, differentiability, or compactness witnesses,
+   may remain as mathematical assumptions.
 1. Put backend arithmetic, IREE FP32, fast-math, denormal, and lowered-IR assumptions in IR `backend_assumptions`; treat them as theorem variables or witness obligations.
 1. Assign each selected obligation to a formal theorem, existing-proof search, literature evidence, or explicit problem-class/backend assumption.
 
@@ -245,7 +270,7 @@ algorithm theorem.
      assumptions do not entail the proposition.
    - `unverified_with_next_witness`: the exact missing theorem variable,
      runtime certificate, backend evidence, or problem-class witness is named.
-      Immediately re-enter this same loop on that witness or next frontier.
+     Immediately re-enter this same loop on that witness or next frontier.
 1. A failed single-lemma route does not by itself falsify the downstream
    theorem. Keep the failed route as overlay evidence and search for a weaker
    lemma plus adjacent graph facts, code-derived identities, or problem

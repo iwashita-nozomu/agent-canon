@@ -255,6 +255,27 @@ entries:
     tests:
       - tests/agent_tools/test_algorithm_lemma_graph.py
 
+  - id: algorithm-flowchart
+    summary: Renders Algorithm Expansion IR, LemmaGraph, and proof_status overlays as Mermaid block charts.
+    path: tools/agent_tools/algorithm_flowchart.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/algorithm_flowchart.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/algorithm_flowchart.md
+      - agents/skills/algorithm-flowchart.md
+      - agents/skills/algorithm-proof-exploration.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_algorithm_flowchart.py
+
   - id: proof-path-analyzer
     summary: Checks proof-status overlays against lemma graphs and reports connected proof holes.
     path: tools/agent_tools/proof_path_analyzer.py

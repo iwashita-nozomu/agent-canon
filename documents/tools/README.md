@@ -68,6 +68,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
 - `tools/agent_tools/proof_path_analyzer.py`
   - `algorithm_lemma_graph.py` の lemma graph と topic-local `proof_status.json` を読み、checked fragment の採用漏れ、裸の `unverified` frontier、stale implementation token、重複 B-label、target-chain 切断を検査します。数学的 witness が未接続な箇所は open witness として残し、artifact integrity と proof completion を分けて報告します。
+- `tools/agent_tools/algorithm_flowchart.py`
+  - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm extract-prose-ir`

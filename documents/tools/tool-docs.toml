@@ -135,6 +135,13 @@ language = "python"
 summary = "Lemma dependency graph builder documentation, including theorem profiles, graph validation, and Algorithm IR traceability."
 
 [[tool]]
+id = "algorithm-flowchart"
+tool = "tools/agent_tools/algorithm_flowchart.py"
+doc = "documents/tools/algorithm_flowchart.md"
+language = "python"
+summary = "Algorithm flowchart renderer documentation, including AST/IR Mermaid diagrams and proof-status overlays."
+
+[[tool]]
 id = "proof-path-analyzer"
 tool = "tools/agent_tools/proof_path_analyzer.py"
 doc = "documents/tools/proof_path_analyzer.md"

@@ -1,4 +1,5 @@
 # formal-proof-workflow
+
 <!--
 @dependency-start
 responsibility Documents the natural-language to formal-proof workflow.
@@ -7,6 +8,7 @@ upstream design algorithm-proof-exploration.md proof-guided algorithm exploratio
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
+upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 @dependency-end
@@ -59,6 +61,19 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   AST / initialize edge / call edge から機械的に再帰展開し、
   Algorithm Expansion IR として保持します。IR は proof ではなく、
   最終命題に必要な局所 theorem / lemma だけを選ぶための中間表現です。
+- algorithm update が初期値選択、cold start、Phase I、basin entry、tube entry を
+  変更した場合は、ユーザーへ返す前に IR / lemma graph / proof-status overlay を
+  再生成し、初期化経路から機械抽出できる code fact をすべて採用候補へ接続します。
+  例: `z_init`、`x_init`、slack / multiplier floor、initial residual、
+  epigraph 変数、初期 KKT state の由来。これらを「コードを読めばわかるはず」として
+  blocker に残さず、checker-backed fragment、code-derived fact、または graph edge として
+  記録します。
+- 初期値証明では、実装が数学的に要求しない限り `z_init = 0` を theorem premise に
+  しません。証明はまず `z_init = Init(Problem, InitializeConfig)` という
+  code-selected initializer として正規化し、IR の code fact が本当に zero initializer を
+  示す場合だけその特殊化を使います。zero が単なる現在の実装選択であり theorem を
+  狭めているなら、problem-class witness または algorithmic choice として
+  `$algorithm-proof-exploration` に戻します。
 - Algorithm Expansion IR は `python3 tools/agent_tools/algorithm_expansion_ir.py`
   で作成し、`proof_algorithm_ir`、`proof_goal_directed_slice`、
   `proof_selected_local_obligations` として proof note または run artifact に残します。
@@ -84,6 +99,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `proof_target_chains`、graph validation evidence として proof note または
   run artifact に残します。IR は実装展開、lemma graph は命題依存を表し、
   両者を混ぜて `verified` claim を作ってはいけません。
+- 実装されている反復法と証明状態を人間が一目で確認する必要がある場合は、
+  `$algorithm-flowchart` / `algorithm_flowchart.py` で IR、LemmaGraph、
+  `proof_status.json` から Mermaid chart を生成します。図は proof path の
+  navigation evidence であり、`verified` claim の authority ではありません。
 - 生成された補題群は Algorithm Expansion IR から出てくるものとして扱います。
   `algorithm_lemma_graph.py` が出す `source_ir_fingerprint` を
   `proof_status.json` の `source_ir_fingerprints` に記録し、
@@ -187,8 +206,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   - 長い note / guide / workflow 形なら `$long-form-writing` を使います。
   - checker evidence や audit 結果を reader-facing にまとめる場合は `$report-writing` を使います。
 - proof note には、claim ごとの証明状態対応表を必ず置きます。少なくとも
-  `claim / theorem or lemma / implementation surface / proof_status /
-  checker evidence / remaining obligation` を列として持たせます。
+  `claim / theorem or lemma / implementation surface / proof_status / checker evidence / remaining obligation` を列として持たせます。
   `verified`、`unverified`、`not_run`、`blocked` を混ぜて prose へ埋め込まず、
   読者が一目で証明済みか否かを判定できる形にします。
 - 一つの proof topic では、証明本文、仮定、未証明 gap、checker evidence を
@@ -233,9 +251,18 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
      `unprovable_under_assumptions` と混ぜない
    - IR edge には `calls`、`initializes`、`updates_state`、`requests_certificate`、
      `projects_status`、`performance_only` などの関係を持たせる
-   - final target theorem から backward slice し、必要な局所 proof obligation と
-     不要な implementation detail を分ける。Pyright や型構造でわかる事実は、
-     最終命題の数学的依存でない限り証明対象にしない
+
+- final target theorem から backward slice し、必要な局所 proof obligation と
+  不要な implementation detail を分ける。Pyright や型構造でわかる事実は、
+  最終命題の数学的依存でない限り証明対象にしない
+- 初期化・cold-start・Phase-I 由来の事実は、proof route の blocker として
+  返す前に IR `code_facts` から具体式を拾い、lemma graph 上の
+  initialization / tube-entry node に接続する。コードから直接わかる式を
+  `unverified_with_next_witness` や user-facing blocker に残さない
+- selected initializer は `Init(Problem, InitializeConfig)` として扱い、
+  hard-coded zero、default vector、supplied state などの個別値は IR が示す
+  実装特殊化としてだけ使う
+
 1. Lemma dependency graph:
    - Algorithm Expansion IR JSON を
      `python3 tools/agent_tools/algorithm_lemma_graph.py --target-profile <profile> --format json|markdown`
@@ -369,9 +396,9 @@ proof_nonterminal_return=<path-or-section-anchor|none>
 
 Reader-facing proof notes must include a table shaped like this:
 
-| Claim | Formal theorem / lemma | Implementation surface | Status | Evidence | Remaining obligation |
-| --- | --- | --- | --- | --- | --- |
-| `<claim>` | `<theorem>` | `<path::symbol>` | `verified` / `refuted` / `unprovable_under_assumptions` / `unverified_with_next_witness` / `unverified` / `not_run` / `blocked` | `<checker command/log/counterexample>` | `<gap or none>` |
+| Claim     | Formal theorem / lemma | Implementation surface | Status                                                                                                                          | Evidence                               | Remaining obligation |
+| --------- | ---------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------- |
+| `<claim>` | `<theorem>`            | `<path::symbol>`       | `verified` / `refuted` / `unprovable_under_assumptions` / `unverified_with_next_witness` / `unverified` / `not_run` / `blocked` | `<checker command/log/counterexample>` | `<gap or none>`      |
 
 Use `verified` only for checker-passing artifacts without proof escape hatches.
 Use `refuted` only when a counterexample, formal model, or implementation trace
@@ -397,18 +424,18 @@ When the target theorem is not terminal, the user-facing return must be
 specific enough for the next agent or human to continue without rediscovering
 the same gaps. Use this shape:
 
-| Field | Required Content |
-| --- | --- |
-| Target claim | Exact theorem or natural-language claim being attempted |
-| Current outcome | `open`, `unverified_with_next_witness`, `not_run`, or `blocked`; do not call it proved |
-| Strongest checked fragments | Theorems / artifacts that passed, with checker command |
-| Failed or rejected routes | The route, why it does not close the target, and whether it is refuted, too strong, or merely incomplete |
-| Remaining witnesses | Named witnesses with units / theorem variables where applicable |
-| Witness owner | `problem_class`, `implementation`, `backend`, `formal_library`, or `algorithm_exploration` |
-| Necessity status | `necessary_proven`, `route_sufficient`, `candidate`, `unknown`, or `algorithmic_blocker_proven`; do not imply necessity from a selected proof route |
-| Minimality evidence | Target-chain/frontier evidence showing no smaller open blocker remains under this returned row |
-| Evidence path | Proof status row, lemma graph node, Lean file, source packet, log, or code path |
-| Next action | Exact checker command, IR/graph regeneration, literature search, or algorithm-exploration handoff |
+| Field                       | Required Content                                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target claim                | Exact theorem or natural-language claim being attempted                                                                                             |
+| Current outcome             | `open`, `unverified_with_next_witness`, `not_run`, or `blocked`; do not call it proved                                                              |
+| Strongest checked fragments | Theorems / artifacts that passed, with checker command                                                                                              |
+| Failed or rejected routes   | The route, why it does not close the target, and whether it is refuted, too strong, or merely incomplete                                            |
+| Remaining witnesses         | Named witnesses with units / theorem variables where applicable                                                                                     |
+| Witness owner               | `problem_class`, `implementation`, `backend`, `formal_library`, or `algorithm_exploration`                                                          |
+| Necessity status            | `necessary_proven`, `route_sufficient`, `candidate`, `unknown`, or `algorithmic_blocker_proven`; do not imply necessity from a selected proof route |
+| Minimality evidence         | Target-chain/frontier evidence showing no smaller open blocker remains under this returned row                                                      |
+| Evidence path               | Proof status row, lemma graph node, Lean file, source packet, log, or code path                                                                     |
+| Next action                 | Exact checker command, IR/graph regeneration, literature search, or algorithm-exploration handoff                                                   |
 
 If the result is `unprovable_under_assumptions`, include the witness/model that
 satisfies the assumptions while falsifying the entailment. If the result is
@@ -459,27 +486,27 @@ tool/checker limitation that prevents the minimality check.
 
 Algorithm IR record は次の形を基本にします。
 
-| Field | Meaning |
-| --- | --- |
-| `ir_node_id` | stable node identifier |
-| `source_symbol` | `path.py::qualname` or theorem/source anchor |
-| `runtime_object` | `Problem`, `State`, `SolveConfig`, `Info`, residual block, direction, etc. |
-| `math_role` | state transition, residual map, direction solve, certificate, or bookkeeping |
-| `edge_kind` | call, initialize, state update, certificate request, status projection, or performance-only edge |
-| `residual_unit` | residual or norm unit if the node exports numeric evidence |
-| `precision_model` | dtype/backend floor or `none` |
-| `backend_assumptions` | proof-only backend profile variables and witness obligations |
-| `proof_relevance` | required, assumption, helper, performance-only, or excluded |
-| `selected_obligation` | local theorem / lemma required by the final target, or `none` |
+| Field                 | Meaning                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `ir_node_id`          | stable node identifier                                                                           |
+| `source_symbol`       | `path.py::qualname` or theorem/source anchor                                                     |
+| `runtime_object`      | `Problem`, `State`, `SolveConfig`, `Info`, residual block, direction, etc.                       |
+| `math_role`           | state transition, residual map, direction solve, certificate, or bookkeeping                     |
+| `edge_kind`           | call, initialize, state update, certificate request, status projection, or performance-only edge |
+| `residual_unit`       | residual or norm unit if the node exports numeric evidence                                       |
+| `precision_model`     | dtype/backend floor or `none`                                                                    |
+| `backend_assumptions` | proof-only backend profile variables and witness obligations                                     |
+| `proof_relevance`     | required, assumption, helper, performance-only, or excluded                                      |
+| `selected_obligation` | local theorem / lemma required by the final target, or `none`                                    |
 
 Static check record は、証明前に機械的に片付く構造制約を表します。
 
-| Field | Meaning |
-| --- | --- |
-| `check_kind` | constructor resolution or instance method resolution |
-| `edge_id` | expansion edge discharged before proof selection |
-| `status` | `statically_checked`, `static_checker_required`, or `static_resolution_gap` |
-| `proof_effect` | why this edge is removed from proof obligations |
+| Field          | Meaning                                                                     |
+| -------------- | --------------------------------------------------------------------------- |
+| `check_kind`   | constructor resolution or instance method resolution                        |
+| `edge_id`      | expansion edge discharged before proof selection                            |
+| `status`       | `statically_checked`, `static_checker_required`, or `static_resolution_gap` |
+| `proof_effect` | why this edge is removed from proof obligations                             |
 
 ## Lemma Dependency Graph
 
@@ -559,16 +586,16 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
 
 Proof path attempt record は次の形を基本にします。
 
-| Field | Meaning |
-| --- | --- |
-| `attempt_id` | stable attempt identifier |
-| `target_lemma` | lemma or theorem node the attempt tries to discharge |
-| `method` | proof assistant, existing-proof search, hand proof, SMT, numeric bound, or literature route |
-| `input_evidence` | source theorem, paper, code anchor, checker file, or calculation used |
-| `checker_status` | `pass`, `fail`, `not_run`, or `not_applicable` |
-| `result_status` | `verified`, `failed`, `blocked`, `assumed`, or `candidate` |
-| `adoption_decision` | `adopted`, `rejected`, `superseded`, or `deferred` |
-| `next_frontier` | lemma nodes or assumptions still needed after this attempt |
+| Field               | Meaning                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| `attempt_id`        | stable attempt identifier                                                                   |
+| `target_lemma`      | lemma or theorem node the attempt tries to discharge                                        |
+| `method`            | proof assistant, existing-proof search, hand proof, SMT, numeric bound, or literature route |
+| `input_evidence`    | source theorem, paper, code anchor, checker file, or calculation used                       |
+| `checker_status`    | `pass`, `fail`, `not_run`, or `not_applicable`                                              |
+| `result_status`     | `verified`, `failed`, `blocked`, `assumed`, or `candidate`                                  |
+| `adoption_decision` | `adopted`, `rejected`, `superseded`, or `deferred`                                          |
+| `next_frontier`     | lemma nodes or assumptions still needed after this attempt                                  |
 
 ## Initialize-Rooted Proof Expansion
 
@@ -610,16 +637,16 @@ Algorithm Expansion IR の一部として `InitializeConfig` ownership edge を
 
 Expansion graph record は次の形を基本にします。
 
-| Field | Meaning |
-| --- | --- |
-| `root_initialize` | root module initialize function |
-| `root_config_type` | root `InitializeConfig` type |
-| `proof_scope` | independent theorem family required at that root |
-| `child_config_field` | field that owns a nested `InitializeConfig` |
-| `child_initialize` | nested initialize function selected by that field |
-| `selection_rule` | static field, variant tag, or method registry rule selecting the child |
-| `role` | correctness certificate, reachability certificate, stopping predicate, or performance-only helper |
-| `status` | `verified`, `refuted`, `unprovable_under_assumptions`, `unverified_with_next_witness`, `unverified`, `not_run`, or `blocked` for the proof scope, not for initialization itself |
+| Field                | Meaning                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root_initialize`    | root module initialize function                                                                                                                                                 |
+| `root_config_type`   | root `InitializeConfig` type                                                                                                                                                    |
+| `proof_scope`        | independent theorem family required at that root                                                                                                                                |
+| `child_config_field` | field that owns a nested `InitializeConfig`                                                                                                                                     |
+| `child_initialize`   | nested initialize function selected by that field                                                                                                                               |
+| `selection_rule`     | static field, variant tag, or method registry rule selecting the child                                                                                                          |
+| `role`               | correctness certificate, reachability certificate, stopping predicate, or performance-only helper                                                                               |
+| `status`             | `verified`, `refuted`, `unprovable_under_assumptions`, `unverified_with_next_witness`, `unverified`, `not_run`, or `blocked` for the proof scope, not for initialization itself |
 
 ## Nested Iterative Solver Proofs
 

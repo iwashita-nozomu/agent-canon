@@ -165,6 +165,10 @@ skill_families:
     purpose: Explore algorithm choices under proof obligations by building Algorithm Expansion IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
     shim: .agents/skills/algorithm-proof-exploration/SKILL.md
+  - id: algorithm-flowchart
+    purpose: Render AST-derived Algorithm Expansion IR, LemmaGraph, and proof_status overlays into Mermaid block charts for algorithm/proof-state review.
+    canonical_doc: agents/skills/algorithm-flowchart.md
+    shim: .agents/skills/algorithm-flowchart/SKILL.md
   - id: research-workflow
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md

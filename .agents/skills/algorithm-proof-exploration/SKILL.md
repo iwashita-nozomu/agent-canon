@@ -2,6 +2,7 @@
 name: algorithm-proof-exploration
 description: Use when exploring, refactoring, or choosing an algorithm under proof obligations; builds Algorithm Expansion IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change guidance before handing terminal proof work to formal-proof-workflow.
 ---
+
 <!--
 @dependency-start
 responsibility Exposes theorem-driven algorithm exploration to Codex/Copilot skill discovery.
@@ -10,6 +11,7 @@ upstream design ../../../agents/skills/formal-proof-workflow.md checker-backed c
 upstream implementation ../../../tools/agent_tools/algorithm_expansion_ir.py builds implementation IR.
 upstream implementation ../../../tools/agent_tools/algorithm_lemma_graph.py builds lemma graphs.
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays.
+upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 @dependency-end
 -->
 
@@ -37,6 +39,10 @@ upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks
    fingerprint. If the algorithm changes and that fingerprint changes, reset
    generated lemma groups and rebuild the proof-status overlay instead of
    carrying old lemmas forward by hand.
+1. When the user asks what iterative algorithm is currently implemented or
+   which blocks are proved/open, run `$algorithm-flowchart` after IR and
+   LemmaGraph generation. The Mermaid chart is visualization evidence; proof
+   completion still comes from checker-backed fragments.
 1. Treat the lemma graph as the editable algorithm exploration surface. Agents
    and humans may add candidate algorithm changes, certificate edges, source
    packets, and formal-proof handoff decisions as overlay data, but must not
@@ -53,16 +59,31 @@ upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks
    result, classify whether the gap is better solved by changing the algorithm,
    adding a runtime certificate, narrowing the problem class, or leaving an
    external assumption boundary.
+1. For initialization, basin-entry, or tube-entry blockers, normalize the
+   implementation as a selected initializer
+   `z_init = Init(Problem, InitializeConfig)`. Do not promote a hard-coded zero,
+   default vector, supplied state, or previous-state reuse into a theorem
+   premise unless the algorithm genuinely requires that value and the IR code
+   facts show the specialization. If the selected initializer is too weak,
+   classify the gap as either a problem-class witness for that initializer or
+   an algorithmic choice to add a stronger initializer, Phase I, or
+   globalization path.
 1. If the gap is a current algorithmic choice, enumerate the smallest
    implementation degrees of freedom that could make the target theorem
    provable and translate each candidate into a proof obligation before editing
    code. After any algorithm change, regenerate IR/graphs and re-enter the same
    algorithm frontier; do not stop at guidance when the target theorem can still
    be tested by `$formal-proof-workflow`.
+1. After changing initialization logic, require `$formal-proof-workflow` to
+   consume the newly extracted initialization code facts before returning to
+   the user. Code-visible selected initial point, epigraph point,
+   slack/multiplier floor, initial residual, and child-solver state facts are
+   not acceptable user-facing blockers.
 1. When the code must change for provability, state the algorithm change in
    proof terms first: expose a runtime certificate, remove an unsound gate,
    strengthen a returned residual certificate, change the blocking algorithmic
-   choice, add Phase I/globalization, narrow to a local theorem, or add a
+   choice, replace hard-coded initial points with a proof-visible selected
+   initializer, add Phase I/globalization, narrow to a local theorem, or add a
    problem-class witness.
 1. Do not treat frontier classification or algorithm-change guidance as the
    skill completion condition. Completion requires a checker-backed result for
@@ -94,6 +115,8 @@ upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks
 
 - `proof_algorithm_ir`: root, target theorem, selected obligations, code facts.
 - `proof_lemma_graph`: target chains, generated nodes, overlay candidates.
+- `proof_algorithm_flowchart`: generated Mermaid or Markdown diagram showing
+  implementation blocks and proof-state overlay.
 - `proof_operational_assumptions`: implemented trace premise consumed by the
   final theorem.
 - `algorithm_frontier`: current algorithmic blockers, candidate changes, and

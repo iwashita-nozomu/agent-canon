@@ -1,4 +1,5 @@
 # algorithm-proof-exploration
+
 <!--
 @dependency-start
 responsibility Documents theorem-driven algorithm exploration before final formal proof adoption.
@@ -7,6 +8,7 @@ upstream design computational-optimization.md numerical optimization contract wo
 upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm Expansion IR.
 upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds lemma dependency graphs.
 upstream implementation ../../tools/agent_tools/proof_path_analyzer.py validates proof-status overlays.
+upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
@@ -111,6 +113,15 @@ current IR / assumption ledger から導けないことを checker-backed に示
      regenerating IR, regenerating graphs, and rebuilding the overlay. Do not
      carry old generated lemmas across an algorithm change by editing labels or
      prose.
+1. Algorithm Flowchart:
+   - use `python3 tools/agent_tools/algorithm_flowchart.py` after IR and
+     LemmaGraph generation when a human or agent needs to see the implemented
+     iteration path and proof-state overlay at once
+   - render from IR / LemmaGraph / `proof_status.json`, not from a hand-drawn
+     diagram
+   - treat the Mermaid chart as navigation evidence only. It may show where a
+     block is verified, open, or external, but proof completion still comes from
+     `$formal-proof-workflow` checker evidence and `proof_path_analyzer.py`
 1. Algorithm frontier extraction:
    - choose graph frontier nodes by their algorithmic impact, not prose order
    - normalize each target-facing blocker to implementation identity,
@@ -131,6 +142,19 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - when a target-facing blocker remains after formal-proof exploration,
      classify whether it comes from missing problem assumptions, missing
      external evidence, or a current algorithmic choice
+   - for initialization, basin-entry, or tube-entry blockers, first normalize
+     the implementation as a selected initializer
+     `z_init = Init(Problem, InitializeConfig)`. Do not treat a hard-coded zero,
+     default vector, supplied state, or previous-state reuse as a mathematical
+     theorem premise unless the algorithm genuinely requires that value. If the
+     current selected initializer is too weak, classify the gap as either a
+     problem-class witness for that initializer or an algorithmic choice to add
+     a stronger initializer / Phase I / globalization path.
+   - after changing initialization logic, regenerate IR/graphs and require
+     `$formal-proof-workflow` to consume the newly extracted initialization
+     code facts before returning to the user. Code-visible initial point,
+     epigraph, slack/multiplier floor, initial residual, and child-state facts
+     are not acceptable user-facing blockers
    - if it is algorithmic, enumerate the smallest implementation degrees of
      freedom that could make the theorem provable and translate each candidate
      into a proof obligation before editing code
@@ -146,6 +170,10 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - remove unsound gates or zero-update paths
    - change an algorithmic choice only when the proof obligation shows that the
      current choice blocks the theorem
+   - replace hard-coded initial points with a proof-visible selected initializer
+     when the target theorem needs basin/tube entry, and state whether the
+     remaining proof obligation is on `Init(Problem, InitializeConfig)` or on a
+     stronger Phase-I/globalization algorithm
    - add Phase I / globalization when the theorem needs basin entry
    - narrow a theorem to local tube / warm-start assumptions
    - add problem-class or backend evidence witnesses
@@ -161,6 +189,8 @@ Use these names in run bundles, proof notes, or `lean/<proof-theme>/` artifacts:
 - `proof_lemma_graph`: target chains and dependency edges.
 - `proof_operational_assumptions`: extracted implemented-algorithm trace
   premise, such as `trace follows A_impl / Step_impl`.
+- `proof_algorithm_flowchart`: Mermaid or Markdown diagram generated from the
+  current IR, LemmaGraph, and proof-status overlay.
 - `algorithm_frontier`: current algorithmic blockers, candidate changes, and
   handoff targets.
 - `algorithm_change_guidance`: implementation changes needed for provability.
