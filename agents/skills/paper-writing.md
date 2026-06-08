@@ -67,7 +67,7 @@ section contract と citation/evidence trace を先に固定し、複数 reviewe
 1. `logic_gap_reviewer` に logic-gap review を通す
 1. 別 reviewer に docs completeness review を通す
 1. higher-order revision を終えてから line edit に入る
-1. `make docs-check` で閉じる
+1. `tools/bin/agent-canon docs check` で閉じる
 
 ## Standard Command
 

@@ -1292,15 +1292,15 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            docs_dir = temp_root / "tools" / "docs"
-            docs_dir.mkdir(parents=True)
-            checker_text = (
-                "#!/usr/bin/env python3\n"
-                "import sys\n"
-                "print('STYLE_TEST_CHECKER_OK=' + ','.join(sys.argv[1:]))\n"
+            bin_dir = temp_root / "tools" / "bin"
+            bin_dir.mkdir(parents=True)
+            agent_canon = bin_dir / "agent-canon"
+            agent_canon.write_text(
+                "#!/usr/bin/env sh\n"
+                "echo STYLE_TEST_CHECKER_OK=\"$*\"\n",
+                encoding="utf-8",
             )
-            (docs_dir / "check_markdown_lint.py").write_text(checker_text, encoding="utf-8")
-            (docs_dir / "check_markdown_math.py").write_text(checker_text, encoding="utf-8")
+            agent_canon.chmod(0o755)
             readme = temp_root / "README.md"
             data = temp_root / "data.lock"
             root_jsonl = temp_root / "runtime.jsonl"
@@ -1343,7 +1343,7 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
-        self.assertEqual(log_entry["selected_checkers"], ["markdown_lint", "markdown_math"])
+        self.assertEqual(log_entry["selected_checkers"], ["agent_canon_docs_check"])
         self.assertEqual(log_entry["unchecked_count"], 1)
         self.assertEqual(
             cast("list[dict[str, object]]", log_entry["unchecked_files"])[0]["paths"],
@@ -1367,11 +1367,11 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            docs_dir = temp_root / "tools" / "docs"
-            docs_dir.mkdir(parents=True)
-            fail_checker = "#!/usr/bin/env python3\nraise SystemExit(99)\n"
-            (docs_dir / "check_markdown_lint.py").write_text(fail_checker, encoding="utf-8")
-            (docs_dir / "check_markdown_math.py").write_text(fail_checker, encoding="utf-8")
+            bin_dir = temp_root / "tools" / "bin"
+            bin_dir.mkdir(parents=True)
+            agent_canon = bin_dir / "agent-canon"
+            agent_canon.write_text("#!/usr/bin/env sh\nexit 99\n", encoding="utf-8")
+            agent_canon.chmod(0o755)
             validator = temp_root / "codex-cli-guide" / "tools" / "validate_split.py"
             validator.parent.mkdir(parents=True)
             validator.write_text(
@@ -3946,7 +3946,7 @@ class CodexHooksTest(unittest.TestCase):
                 input=json.dumps(
                     {
                         "hookEventName": "UserPromptSubmit",
-                        "prompt": "マークダウンの hook と docs-check が引っかかっていないか見たい。",
+                        "prompt": "マークダウンの hook と agent-canon docs check が引っかかっていないか見たい。",
                     }
                 ),
                 check=True,
@@ -3961,7 +3961,7 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
                     }
                 ),
                 check=True,
@@ -3974,9 +3974,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(prompt.stdout, "")
         self.assertEqual(tool.stdout, "")
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
-        self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
+        self.assertIn("agent-canon-docs", entries[0]["candidate_tools"])
         self.assertEqual(entries[1]["candidate_tools"], [])
-        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-docs", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
         """Optimization prompts should route to the computational optimization skill."""
@@ -4031,7 +4031,7 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
                     }
                 ),
                 check=True,
@@ -4045,7 +4045,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
         self.assertEqual(entries[1]["workflow_selection_kind"], "context_workflow")
         self.assertEqual(entries[1]["workflow_context_source"], "recent_log")
-        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-docs", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
         """Plain public skill ids in user prompts should become selected skill evidence."""

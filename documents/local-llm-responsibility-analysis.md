@@ -324,7 +324,7 @@ model availability に依存しません。
 ```bash
 cargo test --manifest-path rust/agent-canon/Cargo.toml local_llm
 python3 -m unittest tests/agent_tools/test_prose_reasoning_graph.py
-make docs-check
+tools/bin/agent-canon docs check
 ```
 
 prompt contract を変える場合は、`local_llm.rs` の prompt regression test を更新し、

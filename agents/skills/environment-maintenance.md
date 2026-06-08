@@ -80,7 +80,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - `make server-check`
 - `make ci-quick`
 - 必要なら `make ci`
-- 文書更新を含む場合は `make docs-check`
+- 文書更新を含む場合は `tools/bin/agent-canon docs check`
 
 ## Boundary
 

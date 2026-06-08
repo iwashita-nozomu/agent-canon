@@ -1,22 +1,27 @@
 <!--
 @dependency-start
-responsibility Documents fix_markdown_math tool usage.
-upstream implementation ../../tools/docs/fix_markdown_math.py rewrites markdown math delimiters.
-upstream implementation ../../tools/docs/check_markdown_math.py defines markdown math policy.
+responsibility Documents legacy fix_markdown_math forwarder usage.
+upstream implementation ../../rust/agent-canon/src/docs.rs rewrites markdown math delimiters and runs adjacent checks.
+upstream implementation ../../tools/docs/fix_markdown_math.py forwards legacy CLI calls.
 downstream implementation ../../tests/tools/test_fix_markdown_math.py validates fixer behavior.
 @dependency-end
 -->
 
 # fix_markdown_math.py
 
-`fix_markdown_math.py` rewrites Markdown math notation to the repository
-standard:
+`fix_markdown_math.py` is a legacy CLI forwarder. The canonical command is:
+
+```bash
+tools/bin/agent-canon docs fix-math <paths...>
+```
+
+The Rust command rewrites Markdown math notation to the repository standard:
 
 - inline math uses the single-dollar form
 - display math uses the double-dollar form
 
-The fixer is conservative. It rewrites the common drift that
-`check_markdown_math.py` reports:
+The fixer is conservative. It rewrites the common drift that `agent-canon docs
+check` reports:
 
 - backslash-parenthesis inline delimiters to the single-dollar form
 - backslash-bracket display delimiters to the double-dollar form
@@ -26,11 +31,9 @@ The fixer is conservative. It rewrites the common drift that
 It skips fenced code blocks.
 
 ```bash
-python3 tools/docs/fix_markdown_math.py documents/design/感度解析.md
-python3 tools/docs/fix_markdown_math.py documents
-python3 tools/docs/fix_markdown_math.py "documents/**/*.md"
+tools/bin/agent-canon docs fix-math documents/design/感度解析.md
+tools/bin/agent-canon docs fix-math documents
 ```
 
-Use it as a repair helper after `python3 tools/docs/check_markdown_math.py`
-finds notation drift. It is not a general Markdown formatter and should not be
-used as a substitute for broader docs cleanup.
+The command runs the adjacent docs check after writing repairs. The old Python
+entrypoint prints a forwarder warning and then executes this Rust command.

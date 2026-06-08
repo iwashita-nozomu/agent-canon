@@ -23,7 +23,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `agents/skills/static-validation.md`
 - `documents/tools/README.md`
 - `tools/ci/run_all_checks.sh`
-- `tools/ci/run_docs_checks.sh`
+- `tools/bin/agent-canon docs check`
 - `tools/ci/check_docker_build.sh`
 
 ## Expected Outcome
@@ -37,14 +37,14 @@ upstream design ../canonical/skills.md skill canon registry
 - agent runtime、skill、mirror を触ったら `make agent-checks` を先に実行します。
 - code / docs 変更では、まず `make ci-quick` を基礎 gate にします。
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を追加します。
-- Markdown 中心の変更では `make docs-check` を追加します。
+- Markdown 中心の変更では `tools/bin/agent-canon docs check` を追加します。
 - Docker / runtime / dependency 変更では `make docker-build-check` を追加します。
 - 失敗が出た場合は、追加コマンドを増やす前に、どの gate が不足しているかを明示します。
 
 ## Default Sequence
 
 1. 変更対象を見て、code、docs、runtime、agent のどこを触ったかを固定します。
-1. 最低限必要な gate を選び、`make agent-checks`、`make ci-quick`、`make docs-check`、`make docker-build-check` から組み合わせます。
+1. 最低限必要な gate を選び、`make agent-checks`、`make ci-quick`、`tools/bin/agent-canon docs check`、`make docker-build-check` から組み合わせます。
 1. 速い gate を先に実行し、失敗したらその時点で原因を切り分けます。
 1. 追加の深い検証が必要なら `static-validation` へ進みます。
 1. closeout では、通ったもの、失敗したもの、まだ回していないものを分けて残します。
@@ -53,7 +53,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `make agent-checks`
 - `make ci-quick`
-- `make docs-check`
+- `tools/bin/agent-canon docs check`
 - `make docker-build-check`
 
 ## Boundary

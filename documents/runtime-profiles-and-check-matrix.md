@@ -58,7 +58,7 @@ set is sufficient.
 
 | Changed surface | Required check |
 | --- | --- |
-| Markdown docs only | `make docs-check`; changed-file dependency header checks |
+| Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
 | AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; prompt/eval checks when prompt surfaces change |
 | Root shared views or submodule pin | `bash tools/sync_agent_canon.sh check`; `git submodule status vendor/agent-canon` evidence |

@@ -162,6 +162,20 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
 
+    def test_prompt_routes_formatter_adjacent_checks_to_markdown_style(self) -> None:
+        """Formatter-adjacent check complaints should route to Markdown style checks."""
+        result = self.run_route(
+            "--prompt",
+            "フォーマッタ系の周辺チェックを通してすらないことが多い",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("md-style-check", decision["skills"])
+        self.assertIn("md-style-check", decision["matched_skills"])
+
     def test_prompt_routes_prose_reasoning_graph(self) -> None:
         """Prose graph requests should route to the public graph skill."""
         result = self.run_route(

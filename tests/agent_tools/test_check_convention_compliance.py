@@ -138,7 +138,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
-    "tools/ci/run_docs_checks.sh": "check_runtime_profile_inventory.py\n",
+    "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
+    "documents/tools/agent_canon_docs.md": "docs\n",
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
     "agents/skills/environment-maintenance.md": "container_config.py\n",
     ".codex/README.md": (

@@ -276,7 +276,7 @@ python3 tools/agent_tools/render_dependency_manifest_graph.py \
 echo ""
 
 echo "7️⃣  documentation checks"
-run_make_or_direct docs-check bash tools/ci/run_docs_checks.sh
+tools/bin/agent-canon docs check
 echo ""
 
 echo "8️⃣  repository quick CI"

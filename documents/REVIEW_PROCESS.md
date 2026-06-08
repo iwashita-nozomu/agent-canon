@@ -75,10 +75,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - CMake project なら `cmake -S . -B build`
   - CMake project なら `cmake --build build`
   - test target があれば `ctest --test-dir build`
-- Markdown 差分を含む場合は、少なくとも `make docs-check` を実行します。
+- Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。
 - checkpoint review と final acceptance review では、変更ファイルだけでなく全 repo に `bash tools/agent_tools/run_repo_dependency_review.sh` を適用し、`change_review.md` または `final_review.md` に `REPO_DEPENDENCY_REVIEW=pass` と checked path count を残します。
 - final acceptance review 前に、read-only diff-check agent に最新 diff、run bundle、request contract、schedule、dependency evidence、validation evidence を渡し、parent 自己レビューではなく独立 review decision を artifact に残します。
-- `make docs-check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
+- `tools/bin/agent-canon docs check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
 - README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
 - 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。
 - 論文や thesis chapter では、さらに `citation_evidence_reviewer` を省略しません。

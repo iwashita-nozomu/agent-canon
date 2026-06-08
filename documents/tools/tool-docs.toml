@@ -79,6 +79,13 @@ language = "python"
 summary = "Repository tree versus AgentCanon structure contract checker documentation."
 
 [[tool]]
+id = "agent-canon-docs"
+tool = "tools/bin/agent-canon docs"
+doc = "documents/tools/agent_canon_docs.md"
+language = "rust"
+summary = "Unified Rust Markdown documentation formatter and checker."
+
+[[tool]]
 id = "github-publish"
 tool = "tools/agent_tools/github_publish.py"
 doc = "documents/tools/github_publish.md"
@@ -89,15 +96,15 @@ summary = "gh-backed GitHub branch and PR publish tool documentation."
 id = "fix-markdown-math"
 tool = "tools/docs/fix_markdown_math.py"
 doc = "documents/tools/fix_markdown_math.md"
-language = "python"
-summary = "Markdown math notation fixer documentation."
+language = "python-forwarder"
+summary = "Legacy Markdown math notation fixer forwarder."
 
 [[tool]]
 id = "fix-mermaid"
 tool = "tools/docs/fix_mermaid.py"
 doc = "documents/tools/fix_mermaid.md"
-language = "python"
-summary = "Mermaid fenced-block formatter documentation."
+language = "python-forwarder"
+summary = "Legacy Mermaid fenced-block formatter forwarder."
 
 [[tool]]
 id = "render-dependency-manifest-graph"

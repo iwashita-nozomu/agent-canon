@@ -201,6 +201,42 @@ description = "Defaults reports to Markdown and routes explicit HTML/browser out
 required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$html-output", "browser view", "external browser publication"]
 
 [[evals]]
+id = "md-style-check-unified-rust-docs"
+target = ".agents/skills/md-style-check/SKILL.md"
+kind = "skill"
+description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-1"
+critical = true
+description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
+required_regex = ["tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust"]
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-2"
+critical = true
+description = "Requires adjacent checks after formatter or fixer execution."
+required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
+
+[[evals]]
+id = "md-style-check-human-doc-unified-rust-docs"
+target = "agents/skills/md-style-check.md"
+kind = "skill"
+description = "Human Markdown style skill doc must expose the unified Rust docs command and formatter-adjacent check contract."
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-1"
+critical = true
+description = "Documents the unified check, format, math, and Mermaid commands."
+required_regex = ["tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-2"
+critical = true
+description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
+required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals]]
 id = "html-output-shim"
 target = ".agents/skills/html-output/SKILL.md"
 kind = "skill"

@@ -138,8 +138,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - full confidence が必要な時に主要なチェックをまとめて実行します。small docs / focused code では check matrix に従って個別 check を選びます。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
-- `tools/ci/run_docs_checks.sh`
-  - repo-wide の Markdown 体裁とリンク監査をまとめて実行します。
+- `tools/bin/agent-canon docs check`
+  - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
@@ -200,20 +200,16 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
 - `tools/run_pytest_with_logs.sh`
   - Python テストをログ付きで実行します。
-- `tools/docs/check_markdown_lint.py`
-  - Markdown の体裁確認です。
-- `tools/docs/audit_and_fix_links.py`
-  - Markdown のリンク監査です。
+- `tools/bin/agent-canon docs format`
+  - Markdown の機械整形を実行し、同じ入口で隣接 check まで閉じます。
 - `tools/docs/fix_markdown_code_blocks.py`
   - 言語未指定の fenced code block を補正します。
 - `tools/docs/fix_markdown_headers.py`
   - Markdown header level の飛びを補正します。
-- `tools/docs/fix_markdown_math.py`
-  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正します。
-- `tools/docs/fix_mermaid.py`
-  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避けます。
-- `tools/docs/format_markdown.py`
-  - 軽い整形と Mermaid fenced block 補正をまとめて当てます。
+- `tools/bin/agent-canon docs fix-math`
+  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正し、隣接 check を実行します。
+- `tools/bin/agent-canon docs fix-mermaid`
+  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避け、隣接 check を実行します。
 - `tools/docs/fix_markdown_docs.py`
   - conservatively な Markdown 整形を当てます。
 - `tools/docs/find_similar_documents.py`

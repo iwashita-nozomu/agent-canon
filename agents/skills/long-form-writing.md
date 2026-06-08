@@ -61,7 +61,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 1. `document_flow_reviewer` を通す
 1. 別 reviewer で docs completeness review を通す
 1. 必要なら docs consistency review を追加する
-1. `make docs-check` で閉じる
+1. `tools/bin/agent-canon docs check` で閉じる
 
 ## Boundary
 

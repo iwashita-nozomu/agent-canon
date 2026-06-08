@@ -137,7 +137,7 @@
     {
       "changed_surface": "Markdown docs only",
       "required_check": [
-        "`make docs-check`",
+        "`tools/bin/agent-canon docs check`",
         "changed-file dependency header checks"
       ]
     },

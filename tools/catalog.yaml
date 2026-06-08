@@ -1110,13 +1110,31 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
+  - id: agent-canon-docs
+    summary: Runs unified Rust Markdown formatting, math, Mermaid, link, and documentation checks.
+    path: tools/bin/agent-canon
+    family: docs
+    role: formatter-checker
+    status: canonical
+    command: tools/bin/agent-canon docs check
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/md-style-check.md
+    tests:
+      - rust/agent-canon/src/docs.rs
+
   - id: fix-markdown-math
-    summary: Rewrites Markdown math notation to the repo-standard dollar delimiters.
+    summary: Legacy CLI forwarder for Markdown math notation repair; use agent-canon docs fix-math.
     path: tools/docs/fix_markdown_math.py
     family: docs
     role: helper
-    status: canonical
-    command: python3 tools/docs/fix_markdown_math.py <files...>
+    status: forwarded
+    command: tools/bin/agent-canon docs fix-math <files...>
     writes: true
     callable_by_default: false
     default_wiring:
@@ -1131,12 +1149,12 @@ entries:
       - tests/tools/test_fix_markdown_math.py
 
   - id: fix-mermaid
-    summary: Rewrites Mermaid fenced blocks in Markdown documents.
+    summary: Legacy CLI forwarder for Mermaid fenced block repair; use agent-canon docs fix-mermaid.
     path: tools/docs/fix_mermaid.py
     family: docs
     role: helper
-    status: canonical
-    command: python3 tools/docs/fix_mermaid.py <files...>
+    status: forwarded
+    command: tools/bin/agent-canon docs fix-mermaid <files...>
     writes: true
     callable_by_default: false
     default_wiring:
@@ -1151,12 +1169,12 @@ entries:
       - tests/tools/test_fix_mermaid.py
 
   - id: run-docs-checks
-    summary: Runs the shared Markdown, math, and link documentation checks.
+    summary: Legacy shell forwarder for the unified Rust documentation check.
     path: tools/ci/run_docs_checks.sh
     family: ci
     role: runner
-    status: canonical
-    command: bash tools/ci/run_docs_checks.sh
+    status: forwarded
+    command: tools/bin/agent-canon docs check
     writes: false
     default_wiring:
       ci: false

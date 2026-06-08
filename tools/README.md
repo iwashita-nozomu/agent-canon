@@ -160,6 +160,9 @@ Rust entrypoint for document-canon inventory. It reports runtime mirrors,
 generated evidence, closed issue records, missing dependency manifests,
 duplicate headings, and stale document names, and can feed those findings into
 the structured-analysis SQLite graph through `import-document-inventory`.
+`tools/bin/agent-canon docs check` is the canonical Rust Markdown docs checker.
+Use `docs format`, `docs fix-math`, and `docs fix-mermaid` for mechanical
+repairs; each repair command runs the adjacent check path before completion.
 
 ## 含めるもの
 - `bin/`

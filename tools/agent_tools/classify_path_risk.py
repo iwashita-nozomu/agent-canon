@@ -68,7 +68,7 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
                 profile="docs-only-or-docs-impact",
                 reason="markdown_or_text_changed",
                 checks=(
-                    "bash tools/ci/run_docs_checks.sh",
+                    "tools/bin/agent-canon docs check",
                     "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
                 ),
             )

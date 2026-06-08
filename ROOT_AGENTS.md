@@ -302,7 +302,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - `make agent-checks`
 - `make ci`
-- `make docs-check`
+- `tools/bin/agent-canon docs check`
 - `python3 -m pytest tests/ -q --tb=short`
 - `python3 -m pyright`
 - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`

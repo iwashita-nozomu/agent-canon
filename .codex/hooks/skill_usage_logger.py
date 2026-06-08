@@ -117,10 +117,19 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     "md-style-check": (
         ("md-style",),
         ("docs-check",),
+        ("agent-canon", "docs"),
+        ("docs", "format"),
+        ("docs", "check"),
         ("markdownlint",),
         ("markdown", "lint"),
         ("markdown", "heading"),
         ("markdown", "link"),
+        ("markdown", "formatter"),
+        ("format_markdown",),
+        ("formatter", "adjacent"),
+        ("フォーマッタ",),
+        ("フォーマット", "周辺"),
+        ("通してすらない",),
         ("マークダウン", "体裁"),
         ("マークダウン", "リンク"),
     ),
@@ -171,6 +180,7 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "agent-canon-docs": ("agent-canon docs", "docs check", "docs format", "docs fix-math", "docs fix-mermaid"),
     "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
     "check_markdown_lint.py": ("check_markdown_lint.py", "markdownlint"),
     "check_markdown_math.py": ("check_markdown_math.py", "markdown math"),
@@ -666,6 +676,9 @@ def command_selected_tools(tool_input: object) -> tuple[str, ...]:
     observed: list[str] = []
     for index, part in enumerate(parts):
         name = Path(part).name
+        if name == "agent-canon" and parts[index + 1 : index + 2] == ("docs",):
+            observed.append("agent-canon-docs")
+            continue
         if index == 0 and name in TOOL_KEYWORDS:
             observed.append(name)
         if repo_tool_path_part(part) and name in TOOL_KEYWORDS:
@@ -676,7 +689,9 @@ def command_selected_tools(tool_input: object) -> tuple[str, ...]:
 def repo_tool_path_part(part: str) -> bool:
     """Return whether one shell token is an executable repo tool path."""
     executable_repo_path = "tools/" in part or ".codex/hooks/" in part
-    return executable_repo_path and part.endswith((".py", ".sh"))
+    return executable_repo_path and (
+        part.endswith((".py", ".sh")) or part.endswith("tools/bin/agent-canon")
+    )
 
 
 def default_log_path(root: Path) -> Path:

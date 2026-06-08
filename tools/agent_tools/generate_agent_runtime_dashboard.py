@@ -85,10 +85,13 @@ PERCENT_SCALE = 100.0
 UNKNOWN_RESET_BASIS = "untracked-or-unknown"
 MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
+    "agent-canon-docs",
     "audit_and_fix_links.py",
     "check_markdown_lint.py",
     "check_markdown_math.py",
     "format_markdown.py",
+    "fix_markdown_math.py",
+    "fix_mermaid.py",
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
     "run_docs_checks.sh",
@@ -2625,8 +2628,8 @@ def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         action="repair Markdown/docs checking signal",
         reason=reason,
         evidence=MARKDOWN_EVIDENCE_TARGET,
-        owner_surface=".agents/skills/md-style-check/SKILL.md and tools/docs/",
-        command="bash tools/ci/run_docs_checks.sh",
+        owner_surface=".agents/skills/md-style-check/SKILL.md and rust/agent-canon/src/docs.rs",
+        command="tools/bin/agent-canon docs check",
         done_condition="markdown eval failures are 0 and markdown hook signal is present",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
