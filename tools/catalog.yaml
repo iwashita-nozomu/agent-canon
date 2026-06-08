@@ -1021,6 +1021,24 @@ entries:
     tests:
       - tests/agent_tools/test_check_agent_runtime_alignment.py
 
+  - id: check-skill-frontmatter
+    summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
+    path: tools/agent_tools/check_skill_frontmatter.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_skill_frontmatter.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/skills.md
+    tests:
+      - tests/agent_tools/test_check_skill_frontmatter.py
+
   - id: vendor-skill-adapters
     summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
     path: tools/agent_tools/vendor_skill_adapters.py

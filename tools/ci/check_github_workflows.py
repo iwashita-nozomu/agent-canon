@@ -12,6 +12,7 @@
 # upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
+# upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
 
@@ -186,6 +187,7 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "run_accumulated_agent_evals.py",
     "eval_accumulation_check.py",
     "check_agent_runtime_alignment.py",
+    "check_skill_frontmatter.py",
     "smoke_test_research_perspective_pack.py",
     "check_convention_compliance.py",
     "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
