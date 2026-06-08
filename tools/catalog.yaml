@@ -799,6 +799,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/agent-canon.md
       - documents/rust-agent-tool-migration.md
       - .codex/README.md
       - mcp/README.md
@@ -1110,30 +1111,12 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
-  - id: agent-canon-docs
-    summary: Runs unified Rust Markdown formatting, math, Mermaid, link, and documentation checks.
-    path: tools/bin/agent-canon
-    family: docs
-    role: formatter-checker
-    status: canonical
-    command: tools/bin/agent-canon docs check
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/md-style-check.md
-    tests:
-      - rust/agent-canon/src/docs.rs
-
   - id: fix-markdown-math
     summary: Legacy CLI forwarder for Markdown math notation repair; use agent-canon docs fix-math.
     path: tools/docs/fix_markdown_math.py
     family: docs
     role: helper
-    status: forwarded
+    status: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-math <files...>
     writes: true
     callable_by_default: false
@@ -1153,7 +1136,7 @@ entries:
     path: tools/docs/fix_mermaid.py
     family: docs
     role: helper
-    status: forwarded
+    status: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-mermaid <files...>
     writes: true
     callable_by_default: false
@@ -1173,7 +1156,7 @@ entries:
     path: tools/ci/run_docs_checks.sh
     family: ci
     role: runner
-    status: forwarded
+    status: compatibility_wrapper
     command: tools/bin/agent-canon docs check
     writes: false
     default_wiring:

@@ -180,7 +180,7 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "agent-canon-docs": ("agent-canon docs", "docs check", "docs format", "docs fix-math", "docs fix-mermaid"),
+    "agent-canon-cli": ("agent-canon docs", "docs check", "docs format", "docs fix-math", "docs fix-mermaid"),
     "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
     "check_markdown_lint.py": ("check_markdown_lint.py", "markdownlint"),
     "check_markdown_math.py": ("check_markdown_math.py", "markdown math"),
@@ -677,7 +677,7 @@ def command_selected_tools(tool_input: object) -> tuple[str, ...]:
     for index, part in enumerate(parts):
         name = Path(part).name
         if name == "agent-canon" and parts[index + 1 : index + 2] == ("docs",):
-            observed.append("agent-canon-docs")
+            observed.append("agent-canon-cli")
             continue
         if index == 0 and name in TOOL_KEYWORDS:
             observed.append(name)

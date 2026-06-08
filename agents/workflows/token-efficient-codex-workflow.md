@@ -81,11 +81,18 @@ Mode selection rules:
 
 ## Context Budget Rules
 
-- Read dependency headers and named upstream files before broad directory scans.
+- For tool-covered questions, call the canonical checker, router, semantic
+  index, dashboard, or compact report before reading prose or spawning
+  subagents. Treat pass/finding output as the authority for that covered
+  property.
+- Read exact paths, lines, dependency headers, and named upstream files only
+  after the tool output identifies a repair or ambiguity that needs context.
 - Prefer `rg`, `sed -n`, `git diff --stat`, and MCP status tools over bulk
   file dumps.
 - Summarize long artifacts into the run bundle before handing them to another
   agent.
+- Hand compact tool artifacts to subagents; do not ask them to re-run
+  deterministic checks by reading the same documents.
 - Pass file paths, clause IDs, and section names to subagents instead of chat
   summaries.
 - Cap each subagent prompt to the packet it needs for the current stage; do not
@@ -94,6 +101,9 @@ Mode selection rules:
   `verification.txt` as durable memory instead of repeating long chat context.
 - Use `tool_output_token_limit` profiles to keep large command output from
   flooding the session; rerun targeted commands when exact lines are needed.
+- If a canonical tool lacks the abstraction needed for routing, extend the tool
+  or record the tool-contract gap instead of compensating with broad manual
+  reading.
 
 ## Token Reduction Protocol
 

@@ -51,7 +51,8 @@ formatter を実行した場合は、体裁修正だけで完了にせず、同�
 ## Default Sequence
 
 1. changed Markdown files を固定します。
-1. `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。
+1. 文書全体を読む前に `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。`DOCS_CHECK=pass` と `DOCS_CHECK_FINDING=...` は tool-covered property の正本判定として扱います。
+1. finding がある場合だけ、修正に必要な path / line / 近傍 slice を読みます。tool が見た property を subagent や reviewer に再読解させません。
 1. formatting drift がある場合は `tools/bin/agent-canon docs format <paths...>` を使い、その command が続けて走らせる adjacent check の結果まで確認します。
 1. markdown math drift は `tools/bin/agent-canon docs fix-math <paths...>`、Mermaid drift は `tools/bin/agent-canon docs fix-mermaid <paths...>` で機械修正し、修正後の check 結果を evidence に残します。
 1. 体裁違反、broken link、見出し drift を修正します。

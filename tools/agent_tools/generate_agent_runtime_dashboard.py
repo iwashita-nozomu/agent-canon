@@ -85,7 +85,7 @@ PERCENT_SCALE = 100.0
 UNKNOWN_RESET_BASIS = "untracked-or-unknown"
 MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
-    "agent-canon-docs",
+    "agent-canon-cli",
     "audit_and_fix_links.py",
     "check_markdown_lint.py",
     "check_markdown_math.py",

@@ -119,7 +119,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("oop-readability-check", decision["skills"])
 
     def test_prompt_routes_skill_tool_call_coverage_to_log_analysis(self) -> None:
-        """ToolCall and SkillCall coverage requests should route to runtime log analysis."""
+        """Toolcall and Skillcall coverage requests should route to runtime log analysis."""
         result = self.run_route(
             "--prompt",
             "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",

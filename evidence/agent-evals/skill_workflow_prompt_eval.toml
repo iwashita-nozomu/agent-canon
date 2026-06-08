@@ -219,6 +219,18 @@ description = "Requires adjacent checks after formatter or fixer execution."
 required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
 
 [[evals]]
+id = "subagent-bootstrap-tool-first-gate"
+target = ".agents/skills/subagent-bootstrap/SKILL.md"
+kind = "skill"
+description = "Subagent bootstrap must not spend subagent tokens on deterministic checks already owned by tools."
+
+[[evals.checklist]]
+id = "SUBAGENT-TOOL-FIRST-1"
+critical = true
+description = "Requires canonical checker/router/dashboard before read-only exploration."
+required_regex = ["Before assigning read-only exploration", "canonical checker", "compact tool artifacts", "not to repeat deterministic tool checks"]
+
+[[evals]]
 id = "md-style-check-human-doc-unified-rust-docs"
 target = "agents/skills/md-style-check.md"
 kind = "skill"
@@ -858,6 +870,18 @@ required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subage
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]
+id = "ORCH-TOOL-FIRST-1"
+critical = true
+description = "Uses tool pass/finding output as the authority before broad reading or subagents."
+required_regex = ["canonical tool", "call the tool first", "trust its compact pass/finding output", "read only the exact file slice"]
+
+[[evals.checklist]]
+id = "ORCH-TOOL-FIRST-2"
+critical = true
+description = "Prevents subagents from repeating deterministic tool checks."
+required_regex = ["Do not use `explorer`", "re-check properties", "compact tool artifacts", "extend or repair the tool contract"]
+
+[[evals.checklist]]
 id = "REPORT-ROUTING-SKILL-1"
 critical = true
 description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and pairs raw machine result storage with result-artifact-writeout."
@@ -1229,6 +1253,12 @@ required_regex = [
   "token_ratio <= 0.5",
   "skill accuracy",
 ]
+
+[[evals.checklist]]
+id = "TOKEN-TOOL-FIRST-1"
+critical = true
+description = "Calls tools first and treats pass/finding output as authority for covered properties."
+required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand compact tool artifacts to subagents"]
 
 [[evals]]
 id = "slide-production-workflow"

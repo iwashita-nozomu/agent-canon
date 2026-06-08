@@ -184,7 +184,7 @@ TOOL_GATES = {
     ),
     "runtime_profile_inventory": (
         "rust/agent-canon/src/docs.rs",
-        ("documents/tools/agent_canon_docs.md",),
+        ("documents/tools/agent-canon.md",),
     ),
 }
 

@@ -789,7 +789,17 @@ fn check_markdown_links(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
             if target_path.is_empty() {
                 continue;
             }
-            if resolve_local_target(path, root, target_path).is_some() {
+            if let Some(resolved) = resolve_local_target(path, root, target_path) {
+                if workspace_absolute_target(root, target_path, &resolved) {
+                    findings.push(Finding {
+                        check: "markdown-links",
+                        path: Some(path.to_path_buf()),
+                        line: Some(line_no),
+                        message: format!(
+                            "workspace-absolute markdown link should be relative: {target}"
+                        ),
+                    });
+                }
                 continue;
             }
             let candidates = Path::new(target_path)
@@ -820,6 +830,14 @@ fn check_markdown_links(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
         }
     }
     findings
+}
+
+fn workspace_absolute_target(root: &Path, target_path: &str, resolved: &Path) -> bool {
+    let raw = Path::new(target_path);
+    if !raw.is_absolute() {
+        return false;
+    }
+    resolved.starts_with(root) || map_absolute_workspace_path(root, raw).is_some()
 }
 
 fn markdown_link_targets(text: &str) -> Vec<(String, usize)> {
@@ -1547,6 +1565,28 @@ mod tests {
 
         assert_eq!(changes, 4);
         assert_eq!(fixed, "$x$\n$$\ny\n$$\n$$z$$\n");
+    }
+
+    #[test]
+    fn flags_workspace_absolute_markdown_links_even_when_target_exists() {
+        let root =
+            std::env::temp_dir().join(format!("agent-canon-docs-test-{}", std::process::id()));
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).expect("create docs dir");
+        let target = docs.join("target.md");
+        let source = docs.join("source.md");
+        fs::write(&target, "# Target\n").expect("write target");
+        fs::write(&source, format!("[Target]({})\n", target.display())).expect("write source");
+
+        let findings = check_markdown_links(&root, &[source.clone()]);
+        fs::remove_dir_all(&root).ok();
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].check, "markdown-links");
+        assert_eq!(findings[0].path.as_ref(), Some(&source));
+        assert!(findings[0]
+            .message
+            .contains("workspace-absolute markdown link should be relative"));
     }
 
     #[test]

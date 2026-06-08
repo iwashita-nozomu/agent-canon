@@ -35,6 +35,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 ## Decision Order
 
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
+1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の compact output を信頼し、修正に必要な path / line / bounded slice だけを読む
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
 1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget、stage wave は parent が active budget 内で切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Three-Agent Intake は初期責務 wave であり、総同時起動数の cap ではありません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
@@ -43,6 +44,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
+1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは compact tool artifact と bounded finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
 mode の意味:
 

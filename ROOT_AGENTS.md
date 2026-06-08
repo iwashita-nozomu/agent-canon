@@ -28,6 +28,7 @@ contract listed in `documents/README.md`.
 
 - repo-changing task では、task の risk class を先に決めます。trivial / Routine docs / Focused code は parent-direct を許可し、Shared canon / Large delivery / high-risk では requirements / planning / detailed design / review / implementation を stage ごとに分けます。
 - subagent は task の複雑さ、review 独立性、write scope 分離で使います。使わない場合は user update または run bundle に parent-direct rationale を短く残します。
+- canonical tool が正本判定を持つ question では、subagent 起動や広い文書読解の前に tool を呼びます。tool-covered property は compact pass / finding output を信頼し、subagent に同じ文書を読ませて再判定させません。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
 - subagent handoff は workspace 全体を scope として渡しません。role ごとに bounded path list、対象 checker / compact artifact、読むべき canon 節、読まない surface、expected output を明示します。bounded path list は編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。`/workspace` や repo root は作業場所であり、入力 packet の代替ではありません。
 - 追加の `git worktree`、separate worktree、integration worktree は作成・使用しません。すべての repo-changing work と subagent wave は current checkout と、その checkout 内の `vendor/agent-canon/` submodule checkout だけで行います。
@@ -106,6 +107,7 @@ contract listed in `documents/README.md`.
 
 - 検索語や調査 surface を選ぶ前に、今回の topic を 1 文で固定し、最初の作業 update で `topic=...` としてチャットに出します。固定する内容は、user request が問う対象、現在追跡する code / proof / document path、明示的に外す非対象です。隣接する backend、tool、export、runtime surface は、この topic 文から必要性が導ける場合だけ検索対象に入れます。
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
+- checker、router、semantic index、dashboard、compact report が対象判断を所有している場合は、manual prose reading より先にその tool を呼びます。tool が返す compact output で足りる場合は追加読解をしません。不足する場合は tool contract の gap として修正または記録します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
 - exact path、symbol、literal error message、短い一意 token 以外の検索では、`rg` より先に responsibility-based route を走らせます。まず task / question を `reports/.../query.txt` に書き、`agent-canon semantic-index context-pack --query-file <file> --max-cells <N> --format text`、`agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、または `agent-canon local-llm search --purpose "<purpose>" --providers llm,tool,header-deps,code-deps,vector --format json` で responsibility bucket、dependency-header provider、tool/workflow/document surface を絞ります。directory ownership や責務 coverage が問題なら `agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --report <path>` も先に使います。
 - 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、責務ベースの bounded 結果を source packet の第一候補にします。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。

@@ -180,13 +180,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `Bash` | `2` |",
             "| `tools/bin/agent-canon` | `1` |",
             "### Selected Repo Tools",
-            "| `agent-canon-docs` | `1` |",
+            "| `agent-canon-cli` | `1` |",
             "## Markdown Docs Hook Signals",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS=2",
             "markdown_hook_signal_status: `present`",
-            "| `agent-canon-docs` | `1` |",
+            "| `agent-canon-cli` | `1` |",
         )
         for expected in required:
             self.assertIn(expected, dashboard)
@@ -201,7 +201,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "`0.0%` | `untracked-or-unknown` |",
             "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
             "`100.0%` | `untracked-or-unknown` |",
-            "| `tool` | `agent-canon-docs` | `1` | `1` | `0` | "
+            "| `tool` | `agent-canon-cli` | `1` | `1` | `0` | "
             "`0.0%` | `untracked-or-unknown` |",
         )
         for row in rows:
@@ -438,7 +438,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "skills": ["agent-orchestration"],
                     "candidate_workflows": ["environment-maintenance"],
                     "candidate_skills": ["md-style-check", "oop-readability-check"],
-                    "candidate_tools": ["agent-canon-docs"],
+                    "candidate_tools": ["agent-canon-cli"],
                     "feedback_labels": ["quality_gap"],
                     "prompt_capture_status": "present",
                     "prompt_excerpt_redacted": "Use environment maintenance",
@@ -478,7 +478,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "tool_name": "Bash",
                     "tool_selection_kind": "executed_tool",
                     "tool_command_verb": "tools/bin/agent-canon",
-                    "selected_tools": ["agent-canon-docs"],
+                    "selected_tools": ["agent-canon-cli"],
                     "tool_input_key_count": 1,
                     "tool_input_keys": ["cmd"],
                 }

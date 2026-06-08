@@ -79,11 +79,11 @@ language = "python"
 summary = "Repository tree versus AgentCanon structure contract checker documentation."
 
 [[tool]]
-id = "agent-canon-docs"
-tool = "tools/bin/agent-canon docs"
-doc = "documents/tools/agent_canon_docs.md"
+id = "agent-canon-cli"
+tool = "tools/bin/agent-canon"
+doc = "documents/tools/agent-canon.md"
 language = "rust"
-summary = "Unified Rust Markdown documentation formatter and checker."
+summary = "Unified Rust CLI including Markdown documentation formatting and checks."
 
 [[tool]]
 id = "github-publish"

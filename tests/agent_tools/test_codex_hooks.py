@@ -3974,9 +3974,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(prompt.stdout, "")
         self.assertEqual(tool.stdout, "")
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
-        self.assertIn("agent-canon-docs", entries[0]["candidate_tools"])
+        self.assertIn("agent-canon-cli", entries[0]["candidate_tools"])
         self.assertEqual(entries[1]["candidate_tools"], [])
-        self.assertIn("agent-canon-docs", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
         """Optimization prompts should route to the computational optimization skill."""
@@ -4045,7 +4045,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
         self.assertEqual(entries[1]["workflow_selection_kind"], "context_workflow")
         self.assertEqual(entries[1]["workflow_context_source"], "recent_log")
-        self.assertIn("agent-canon-docs", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
         """Plain public skill ids in user prompts should become selected skill evidence."""
