@@ -1577,7 +1577,7 @@ mod tests {
         fs::write(&target, "# Target\n").expect("write target");
         fs::write(&source, format!("[Target]({})\n", target.display())).expect("write source");
 
-        let findings = check_markdown_links(&root, &[source.clone()]);
+        let findings = check_markdown_links(&root, std::slice::from_ref(&source));
         fs::remove_dir_all(&root).ok();
 
         assert_eq!(findings.len(), 1);
