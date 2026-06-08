@@ -195,6 +195,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-08 user feedback: ログリポジトリの運用が甘いです
 
+- 2026-06-08 | interaction-observation | Tool warnings are likely to be ignored when they are emitted only as transient stdout/stderr and are not converted into owned, status-bearing workflow obligations before closeout.
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: User reported agents tend to ignore tool warnings; current workflow monitor has behavior events but no dedicated unresolved-warning gate.
+
 ## Task Retrospectives
 
 

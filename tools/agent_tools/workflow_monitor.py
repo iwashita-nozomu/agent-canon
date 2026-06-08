@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping
+import fcntl
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import TextIO, cast
 
 from agent_team import resolve_report_root
 
@@ -24,6 +26,22 @@ DECISION_KEYS = (
     "memory_learning_decision",
 )
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
+TOOL_WARNING_REQUIRED_KEYS = (
+    "warning_id",
+    "source_tool",
+    "severity",
+    "status",
+    "message",
+    "repair_command",
+)
+TOOL_WARNING_STATUS_VALUES = {
+    "open",
+    "resolved",
+    "accepted_with_reason",
+    "deferred_with_issue",
+    "not_applicable",
+}
+TOOL_WARNING_LEDGER_STATUS_VALUES = {"pending", "open", "resolved", "none"}
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
     "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
@@ -78,6 +96,8 @@ class MonitoringEntries:
     signals: tuple[str, ...] = ()
     behavior_events: tuple[str, ...] = ()
     runtime_feedback: tuple[str, ...] = ()
+    tool_warnings: tuple[str, ...] = ()
+    tool_warning_status: str = ""
     interventions: tuple[str, ...] = ()
     decisions: Mapping[str, str] = field(default_factory=empty_decisions)
     timestamp: str = ""
@@ -88,10 +108,26 @@ MONITORING_LEGACY_KEYS = {
     "signals",
     "behavior_events",
     "runtime_feedback",
+    "tool_warnings",
+    "tool_warning_status",
     "interventions",
     "decisions",
     "timestamp",
 }
+
+
+@contextmanager
+def locked_monitoring_artifact(path: Path) -> Iterator[TextIO]:
+    """Hold an exclusive lock while updating the monitoring artifact."""
+    path.touch(exist_ok=True)
+    with path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            yield handle
+        finally:
+            handle.flush()
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -142,6 +178,27 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--tool-warning",
+        action="append",
+        default=[],
+        help=(
+            "Observed non-blocking tool, hook, checker, or wrapper warning as "
+            "key=value tokens. Required keys: warning_id, source_tool, severity, "
+            "status, message, repair_command. Status values: open, resolved, "
+            "accepted_with_reason, deferred_with_issue, not_applicable."
+        ),
+    )
+    parser.add_argument(
+        "--tool-warning-status",
+        choices=sorted(TOOL_WARNING_LEDGER_STATUS_VALUES),
+        default="",
+        help=(
+            "Set the aggregate Tool Warnings ledger status. Use none when no "
+            "tool warnings were observed, open while any warning is unresolved, "
+            "and resolved only after all warning_ids are closed."
+        ),
+    )
+    parser.add_argument(
         "--closeout-token-preset",
         action="store_true",
         help=(
@@ -186,6 +243,10 @@ def default_monitoring_text(report_dir: Path) -> str:
             "## Signals",
             "",
             "## Behavior Events",
+            "",
+            "## Tool Warnings",
+            "",
+            "- tool_warnings_status: pending",
             "",
             "## Interventions",
             "",
@@ -232,6 +293,90 @@ def normalize_runtime_feedback(entry: str) -> str:
     if "target=" not in stripped or "action=" not in stripped:
         raise ValueError("runtime feedback must include target=... and action=...")
     return f"runtime_feedback=observed {stripped}"
+
+
+def parse_token_fields(entry: str) -> dict[str, str]:
+    """Parse whitespace-separated key=value tokens."""
+    data: dict[str, str] = {}
+    for token in entry.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        data[key.strip()] = value.strip()
+    return data
+
+
+def normalize_tool_warning(entry: str) -> str:
+    """Render one tool warning ledger item with required routing fields."""
+    stripped = entry.strip()
+    if not stripped:
+        raise ValueError("tool warning entries must not be empty")
+    fields = parse_token_fields(stripped)
+    missing = [key for key in TOOL_WARNING_REQUIRED_KEYS if key not in fields]
+    if missing:
+        raise ValueError(
+            "tool warning must include required keys: " + ",".join(missing)
+        )
+    status = fields["status"]
+    if status not in TOOL_WARNING_STATUS_VALUES:
+        raise ValueError(
+            "tool warning status must be one of: "
+            + ",".join(sorted(TOOL_WARNING_STATUS_VALUES))
+        )
+    return f"tool_warning=recorded {stripped}"
+
+
+def set_section_status(
+    lines: list[str],
+    heading: str,
+    key: str,
+    value: str,
+) -> None:
+    """Set or insert one '- key: value' line under a section."""
+    if not value:
+        return
+    ensure_section(lines, heading)
+    start, end = section_bounds(lines, heading)
+    prefix = f"- {key}:"
+    for index in range(start + 1, end):
+        if lines[index].strip().startswith(prefix):
+            lines[index] = f"- {key}: {value}"
+            return
+    insert_at = start + 1
+    while insert_at < end and lines[insert_at].strip() == "":
+        insert_at += 1
+    lines.insert(insert_at, f"- {key}: {value}")
+
+
+def infer_tool_warning_status(lines: list[str]) -> str:
+    """Infer aggregate ledger status from the latest row for each warning_id."""
+    start = section_start(lines, "## Tool Warnings")
+    if start == -1:
+        return ""
+    section = "\n".join(markdown_section_lines(lines, "## Tool Warnings"))
+    latest: dict[str, str] = {}
+    for line in section.splitlines():
+        if "tool_warning=recorded" not in line:
+            continue
+        fields = parse_token_fields(line)
+        warning_id = fields.get("warning_id", "")
+        status = fields.get("status", "")
+        if warning_id and status:
+            latest[warning_id] = status
+    if not latest:
+        return ""
+    if any(status == "open" for status in latest.values()):
+        return "open"
+    return "resolved"
+
+
+def markdown_section_lines(lines: list[str], heading: str) -> list[str]:
+    """Return raw lines for one existing level-2 markdown section."""
+    start = section_start(lines, heading)
+    if start == -1:
+        return []
+    _, end = section_bounds(lines, heading)
+    return lines[start:end]
 
 
 def section_start(lines: list[str], heading: str) -> int:
@@ -346,6 +491,8 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         signals=string_entries(kwargs.get("signals")),
         behavior_events=string_entries(kwargs.get("behavior_events")),
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
+        tool_warnings=string_entries(kwargs.get("tool_warnings")),
+        tool_warning_status=str(kwargs.get("tool_warning_status", "")),
         interventions=string_entries(kwargs.get("interventions")),
         decisions=decision_entries(kwargs.get("decisions")),
         timestamp=str(kwargs.get("timestamp", "")),
@@ -361,30 +508,48 @@ def append_monitoring(
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
     path = report_dir / "workflow_monitoring.md"
-    if not path.is_file():
-        path.write_text(default_monitoring_text(report_dir), encoding="utf-8")
-    lines = path.read_text(encoding="utf-8").splitlines()
-    signal_entries = [
-        normalize_entry(item, active_entries.timestamp)
-        for item in active_entries.signals
-    ]
-    behavior_entries = [
-        normalize_entry(item, active_entries.timestamp)
-        for item in active_entries.behavior_events
-    ]
-    behavior_entries.extend(
-        normalize_entry(normalize_runtime_feedback(item), active_entries.timestamp)
-        for item in active_entries.runtime_feedback
-    )
-    intervention_entries = [
-        normalize_entry(item, active_entries.timestamp)
-        for item in active_entries.interventions
-    ]
-    insert_entries(lines, "## Signals", signal_entries)
-    insert_entries(lines, "## Behavior Events", behavior_entries)
-    insert_entries(lines, "## Interventions", intervention_entries)
-    apply_decisions(lines, dict(active_entries.decisions))
-    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    with locked_monitoring_artifact(path) as handle:
+        text = handle.read()
+        if not text.strip():
+            text = default_monitoring_text(report_dir)
+        lines = text.splitlines()
+        signal_entries = [
+            normalize_entry(item, active_entries.timestamp)
+            for item in active_entries.signals
+        ]
+        behavior_entries = [
+            normalize_entry(item, active_entries.timestamp)
+            for item in active_entries.behavior_events
+        ]
+        behavior_entries.extend(
+            normalize_entry(normalize_runtime_feedback(item), active_entries.timestamp)
+            for item in active_entries.runtime_feedback
+        )
+        tool_warning_entries = [
+            normalize_entry(normalize_tool_warning(item), active_entries.timestamp)
+            for item in active_entries.tool_warnings
+        ]
+        intervention_entries = [
+            normalize_entry(item, active_entries.timestamp)
+            for item in active_entries.interventions
+        ]
+        insert_entries(lines, "## Signals", signal_entries)
+        insert_entries(lines, "## Behavior Events", behavior_entries)
+        insert_entries(lines, "## Tool Warnings", tool_warning_entries)
+        inferred_tool_warning_status = (
+            active_entries.tool_warning_status or infer_tool_warning_status(lines)
+        )
+        set_section_status(
+            lines,
+            "## Tool Warnings",
+            "tool_warnings_status",
+            inferred_tool_warning_status,
+        )
+        insert_entries(lines, "## Interventions", intervention_entries)
+        apply_decisions(lines, dict(active_entries.decisions))
+        handle.seek(0)
+        handle.truncate()
+        handle.write("\n".join(lines).rstrip() + "\n")
     return path
 
 
@@ -403,6 +568,8 @@ def main() -> int:
             signals=tuple(signals),
             behavior_events=tuple(behavior_events),
             runtime_feedback=tuple(args.runtime_feedback),
+            tool_warnings=tuple(args.tool_warning),
+            tool_warning_status=str(args.tool_warning_status),
             interventions=tuple(args.intervention),
             decisions=decisions,
             timestamp=str(args.timestamp),

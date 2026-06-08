@@ -99,6 +99,11 @@ def ready_closeout_evidence_lines(
         "- mechanical_loop_canon_sync_status: complete",
         "- mechanical_loop_follow_up_status: none",
         "",
+        "## Tool Warning Evidence",
+        "- tool_warning_monitoring_status: none",
+        "- tool_warning_open_items: none",
+        "- tool_warning_resolution_evidence: workflow_monitoring.md no warnings observed",
+        "",
         "## Subagent Lifecycle Evidence",
         "- fresh_subagents_required: yes",
         "- reuse_for_new_task: forbidden",
@@ -177,6 +182,23 @@ def _log_ready_work(report_dir: Path) -> None:
                     "- `2026-04-08 09:30 JST | test | passed closeout checks | "
                     "request_clause_ids: T1-C1 | next: close`"
                 ),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_ready_workflow_monitoring(report_dir: Path) -> None:
+    """Write workflow monitoring evidence with no open tool warnings."""
+    (report_dir / "workflow_monitoring.md").write_text(
+        "\n".join(
+            [
+                "# Workflow Monitoring",
+                "",
+                "## Tool Warnings",
+                "",
+                "- tool_warnings_status: none",
                 "",
             ]
         ),
@@ -316,6 +338,7 @@ def write_ready_closeout_bundle(
                 "- spec_product_coverage_complete: yes",
                 "- review_findings_integrated: yes",
                 "- post_fix_full_review_complete: yes",
+                "- tool_warnings_resolved: yes",
                 "- mechanical_completion_loop_complete: yes",
                 "- subagents_closed: yes",
                 "- diff_check_agent_complete: yes",
@@ -332,6 +355,7 @@ def write_ready_closeout_bundle(
     )
     write_ready_schedule(report_dir)
     _log_ready_work(report_dir)
+    write_ready_workflow_monitoring(report_dir)
     write_ready_agent_evaluation(report_dir)
     write_ready_final_review(report_dir)
 
@@ -1131,6 +1155,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- tool_warnings_resolved: yes",
                         "- mechanical_completion_loop_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
@@ -1147,6 +1172,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
             write_ready_diff_check_artifact(report_dir)
@@ -1166,6 +1192,53 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_rejects_open_tool_warning(self) -> None:
+        """task_close should fail while workflow monitoring has open tool warnings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-open-tool-warning"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+            (report_dir / "workflow_monitoring.md").write_text(
+                "\n".join(
+                    [
+                        "# Workflow Monitoring",
+                        "",
+                        "## Tool Warnings",
+                        "",
+                        "- tool_warnings_status: resolved",
+                        (
+                            "- tool_warning=recorded warning_id=W1 "
+                            "source_tool=legacy-forwarder severity=warning "
+                            "status=open message=deprecated_wrapper "
+                            "repair_command=agent-canon_cli"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("workflow_tool_warnings_closed", result.stdout)
+            self.assertIn("tool warning remains open: W1", result.stdout)
 
     def test_task_close_defaults_report_root_to_workspace_cwd(self) -> None:
         """task_close --run-id should resolve reports/agents under the current workspace."""
@@ -1259,6 +1332,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- tool_warnings_resolved: yes",
                         "- mechanical_completion_loop_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
@@ -1275,6 +1349,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -1867,6 +1942,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- tool_warnings_resolved: yes",
                         "- mechanical_completion_loop_complete: no",
                         "- diff_check_agent_complete: no",
                         "- canonical_tree_head_complete: yes",
@@ -1882,6 +1958,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -1979,6 +2056,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -2095,6 +2173,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -2174,6 +2253,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- tool_warnings_resolved: yes",
                         "- mechanical_completion_loop_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
@@ -2190,6 +2270,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -2289,6 +2370,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- tool_warnings_resolved: yes",
                         "- mechanical_completion_loop_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
@@ -2304,6 +2386,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
+            write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 

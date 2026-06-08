@@ -31,6 +31,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
+- tool_warnings_resolved: no
 - mechanical_completion_loop_complete: no
 - subagents_closed: no
 - diff_check_agent_complete: no
@@ -61,6 +62,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
+- tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
 - diff_check_agent_complete: yes
@@ -107,6 +109,14 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Post-Fix Full Review Evidence
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
+
+## Tool Warning Evidence
+
+<!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->
+
+- tool_warning_monitoring_status:
+- tool_warning_open_items:
+- tool_warning_resolution_evidence:
 
 ## Mechanical Completion Loop Evidence
 
