@@ -137,34 +137,35 @@ pub fn run(args: &[String]) -> i32 {
 }
 
 fn run_parsed(args: Args) -> i32 {
+    let root = fs::canonicalize(&args.root).unwrap_or_else(|_| args.root.clone());
     match args.command {
         DocsCommand::Help => {
             print_usage();
             0
         }
-        DocsCommand::Check => render_check(&args.root, &args.paths, &args.output_format),
+        DocsCommand::Check => render_check(&root, &args.paths, &args.output_format),
         DocsCommand::Format => render_write_then_check(
-            &args.root,
+            &root,
             &args.paths,
             &args.output_format,
             "format",
             format_markdown_files,
         ),
         DocsCommand::FixMath => render_write_then_check(
-            &args.root,
+            &root,
             &args.paths,
             &args.output_format,
             "fix-math",
             fix_math_files,
         ),
         DocsCommand::FixMermaid => render_write_then_check(
-            &args.root,
+            &root,
             &args.paths,
             &args.output_format,
             "fix-mermaid",
             fix_mermaid_files,
         ),
-        DocsCommand::RenderRuntimeProfile => render_runtime_profile_command(&args.root),
+        DocsCommand::RenderRuntimeProfile => render_runtime_profile_command(&root),
     }
 }
 
