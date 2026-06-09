@@ -86,6 +86,13 @@ language = "rust"
 summary = "Unified Rust CLI including Markdown documentation formatting and checks."
 
 [[tool]]
+id = "test-design-check"
+tool = "rust/agent-canon/src/test_design.rs"
+doc = "documents/tools/test_design.md"
+language = "rust"
+summary = "Rust test design resilience diagnostics."
+
+[[tool]]
 id = "github-publish"
 tool = "tools/agent_tools/github_publish.py"
 doc = "documents/tools/github_publish.md"

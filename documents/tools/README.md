@@ -13,6 +13,7 @@ downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py man
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
+downstream implementation ../../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
@@ -65,6 +66,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - changed path list から docs / Python / Docker / GitHub / shared-canon / full-confidence 候補を分類し、targeted validation command を出します。`.github/workflows/path-risk-check-matrix-smoke.yml` もこの classifier を使います。
 - `tools/agent_tools/formal_proof.py`
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
+- `agent-canon test-design check`
+  - Rust CLI の test design 診断入口です。既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。説明文書は [test_design.md](test_design.md) です。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm route-implementation-surface`

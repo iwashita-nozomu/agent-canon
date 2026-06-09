@@ -7,6 +7,7 @@
 # downstream implementation src/python_algorithm_contract.rs Python algorithm contract checker
 # downstream implementation src/rust_migration_plan.rs Rust migration planning command
 # downstream implementation src/structured_analysis.rs structured analysis document inventory and cache build commands
+# downstream implementation src/test_design.rs test design resilience diagnostics
 # @dependency-end
 
 [package]

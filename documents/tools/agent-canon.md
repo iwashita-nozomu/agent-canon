@@ -7,10 +7,12 @@ downstream implementation ../../tools/ci/run_docs_checks.sh forwards legacy docs
 @dependency-end
 -->
 
-# agent-canon docs
+# agent-canon CLI
 
-`agent-canon docs` is the canonical Rust entrypoint for Markdown documentation
-formatting and adjacent checks.
+`agent-canon` is the canonical Rust entrypoint for deterministic AgentCanon
+tooling. This page covers the command families that share the wrapper.
+`agent-canon docs` owns Markdown documentation formatting and adjacent checks.
+`agent-canon test-design` owns resilient test-design diagnostics.
 
 Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
@@ -24,6 +26,7 @@ tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs fix-math <paths...>
 tools/bin/agent-canon docs fix-mermaid <paths...>
+tools/bin/agent-canon test-design check <test-paths...>
 ```
 
 `check` verifies Markdown lint, heading order, fenced-code language, math
@@ -52,6 +55,11 @@ DOCS_CHECK_REPORT_END
 Agent and subagent prompts should use the report block as the repair packet
 instead of opening implementation files or scanning whole documents. If the
 command contract is unclear, run `tools/bin/agent-canon docs -h` first.
+
+`test-design check` reports missing oracle, brittle coupling, exact
+mock/output/prose assertions, time coupling, unseeded randomness, and
+property/metamorphic candidates. Its detailed contract lives in
+[test_design.md](test_design.md).
 
 `format`, `fix-math`, and `fix-mermaid` write mechanical repairs and then run
 the same adjacent `check` path. A formatter run is complete only when the final

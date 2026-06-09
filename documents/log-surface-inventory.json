@@ -3881,6 +3881,30 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "TEST_DESIGN_CHECK",
+      "line": 64,
+      "path": "rust/agent-canon/src/test_design.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "TEST_DESIGN_CHECK",
+      "line": 684,
+      "path": "rust/agent-canon/src/test_design.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "TEST_DESIGN_CHECK_ERROR",
+      "line": 65,
+      "path": "rust/agent-canon/src/test_design.rs",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
@@ -16715,6 +16739,7 @@
     "rust/agent-canon/src/rust_migration_plan.rs",
     "rust/agent-canon/src/semantic_index.rs",
     "rust/agent-canon/src/structured_analysis.rs",
+    "rust/agent-canon/src/test_design.rs",
     "tools/__init__.py",
     "tools/agent_tools/agent_canon_preflight.py",
     "tools/agent_tools/agent_canon_update_todos.py",

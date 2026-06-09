@@ -25,6 +25,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   - <https://abseil.io/resources/swe-book/html/ch12.html>
 - Wilson et al. 2014, "Best Practices for Scientific Computing":
   - <https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.1001745>
+- Test design flexibility source packet:
+  - [references/test-design-flexibility.md](../references/test-design-flexibility.md)
 
 ## 🚀 クイックリファレンス
 
@@ -66,6 +68,22 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 unit test は「1 つの観測可能 behavior に対する concrete example」です。
 実装内部の call sequence や private helper の存在を固定するものではありません。
+
+変更耐性のある test design は、次の 5 軸を先に固定します。
+
+- `Behavior Contract`: どの observable behavior、failure mode、diagnostic key を固定するか。
+- `Observation Level`: unit、service/API、CLI、integration、acceptance のどこで見るか。
+- `Oracle`: literal expected、known reference、exception type、state change、property、metamorphic relation のどれか。
+- `Input Space`: concrete regression、boundary table、random/property generator、metamorphic follow-up input のどれか。
+- `Adequacy Evidence`: branch/edge coverage、mutation score、regression replay、manual review のどれで assertion の強さを確認するか。
+
+実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
+private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
+その対象が public contract である理由を test 名か test plan に残します。
+
+parser、formatter、normalizer、serializer、graph builder、router、mapping では、
+hand-picked example だけで終えず、契約に合う property / metamorphic relation を検討します。
+例: round-trip、idempotence、ordering、preservation、equivalent-input relation。
 
 必須方針:
 
