@@ -126,9 +126,9 @@ contract listed in `documents/README.md`.
 - Routine docs / Focused code / Profile change / Shared canon / Large delivery の risk class を使い、changed path と user request に合う check を選びます。
 - `make ci` は full confidence gate です。small docs や narrow code では docs check、targeted tests、changed-file dependency checks を evidence にできます。
 - AgentCanon-owned path、root shared views、hooks、skills、workflows、tools、submodule pin を触る場合は Shared canon profile として扱い、AgentCanon PR gate を通します。
-- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答します。
-- GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させません。`agent-canon mcp-preflight-policy --request-kind github-actions-read` は `MCP_PREFLIGHT_DECISION=skip` を返します。
-- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。MCP inventory は常時 hook / 常時必須 gate ではなく、workflow evidence が必要な場合、または `.codex/config.toml`、`mcp/`、repo MCP tools、MCP-dependent goal-loop gate を編集する場合に明示実行します。
+- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、shell / GitHub check を走らせず、会話だけで応答します。
+- GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させません。
+- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。
 
 ## Experiment And Log Diagnostics
 
@@ -162,8 +162,7 @@ contract listed in `documents/README.md`.
 
 ## Required Before Implementation
 
-- task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection では `make agent-canon-ensure-latest`、MCP inventory、repo MCP tools、local CI / GitHub checks を実行しません。
-- repository task で MCP preflight が必要な場合は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を既定にし、run bundle の `workflow_monitoring.md` へ evidence を直接追記する必要がある場合だけ `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。Rust CLI または local Cargo が AgentCanon の lockfile を読めない場合は `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior そのものが task scope でない限り既存 Python / shell gate で検証を続けます。
+- task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection では `make agent-canon-ensure-latest`、local CI / GitHub checks を実行しません。
 - repository task 開始時、`make agent-canon-ensure-latest` を high-level latest route として実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
 - `vendor/agent-canon/` の dirty state が古い checkout 由来の AgentCanon-owned eval / hook result under `agents/evals/results/` だけなら、latest route は互換処理として `agent-logs/<parent-repo>` branch へ退避してから続行できます。新規蓄積は `.agent-canon/log-archive/` に置き、runtime source、workflow、skill、tool、document、test の dirty state は自動退避せず、AgentCanon branch / PR workflow に送ります。
 - task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/update_agent_canon.sh latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
@@ -238,8 +237,8 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - Shared canon、Large delivery、高 risk 変更では closeout 前に independent diff-check を通します。user が multi-agent work を明示した場合は read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して approve / revise / escalate decision を artifact に残します。
 - runtime の上位制約で spontaneous subagent spawn が禁止され、user も multi-agent work を明示していない場合は、read-only diff-check agent を起動せず、no-spawn rationale、mechanical diff review、`task_close.py` evidence を artifact に残します。
 - eval feedback action は chat で認めるだけでは完了ではありません。`workflow_monitoring.md`、eval report、goal backlog、workflow、skill、memory、または closeout artifact の該当箇所へ反映してから closeout します。
-- `workflow_monitoring.md` は `evaluate_agent_run.py` が読める machine-readable token を含めます。少なくとも skills、subagent routing、MCP preflight、dependency review、web research decision、eval feedback decision、intervention、next improvement target を token 化します。
-- adaptive-improvement-loop では `python3 tools/agent_tools/goal_loop.py` または repo MCP `goal_loop_status` の `NEXT_ACTION` が closeout 判断を支配します。
+- `workflow_monitoring.md` は `evaluate_agent_run.py` が読める machine-readable token を含めます。少なくとも skills、subagent routing、dependency review、web research decision、eval feedback decision、intervention、next improvement target を token 化します。
+- adaptive-improvement-loop では `python3 tools/agent_tools/goal_loop.py` の `NEXT_ACTION` が closeout 判断を支配します。
 - `NEXT_ACTION=run_next_iteration` は active goal の完了報告を禁止し、次の backlog iteration へ戻ります。
 - `NEXT_ACTION=close_goal_loop` は closeout 候補にすぎません。validation、dependency review、static analysis、commit / push、shared-canon evidence が揃って初めて user-facing completion report を返せます。
 

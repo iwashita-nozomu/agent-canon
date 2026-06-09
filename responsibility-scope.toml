@@ -39,7 +39,6 @@ required_coverage = [
   "evidence",
   "documents",
   "issues",
-  "mcp",
   "memory",
   "notes",
   "references",
@@ -120,7 +119,7 @@ targets = [
 id = "runtime-entrypoints"
 owner = "agent-canon"
 class = "shared_runtime"
-description = "Agent runtime entrypoints, workflow canon, skills, hooks, MCP bridge, and shared runtime configuration."
+description = "Agent runtime entrypoints, workflow canon, skills, hooks, and shared runtime configuration."
 paths = [
   "AGENTS.md",
   "ROOT_AGENTS.md",
@@ -129,7 +128,6 @@ paths = [
   ".devcontainer/**",
   "agent-canon-environment.toml",
   "agents/**",
-  "mcp/**",
 ]
 exclude_paths = [
   ".codex/hooks/log_archive_mount_warning.py",

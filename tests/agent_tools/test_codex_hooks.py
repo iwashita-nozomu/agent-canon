@@ -4,7 +4,6 @@
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares active guardrail hooks
-# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits optional MCP context JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
@@ -44,7 +43,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
-HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
@@ -393,7 +391,6 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("hooks = true", config_text)
         self.assertNotIn("codex_hooks", config_text)
         self.assertTrue(HOOKS_JSON.exists())
-        self.assertTrue(HOOK_SCRIPT.exists())
         self.assertTrue(HOOK_DISPATCHER.exists())
         self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
         self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
@@ -2765,32 +2762,6 @@ class CodexHooksTest(unittest.TestCase):
         )
 
         self.assertEqual(result.stdout, "")
-
-    def test_mcp_context_hook_outputs_valid_additional_context(self) -> None:
-        """The hook script should emit JSON Codex can add to model context."""
-        result = subprocess.run(
-            ["bash", str(HOOK_SCRIPT), "SessionStart"],
-            cwd=PROJECT_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout)
-
-        hook_output = payload["hookSpecificOutput"]
-        self.assertEqual(hook_output["hookEventName"], "SessionStart")
-        self.assertIn("ordinary consultation", hook_output["additionalContext"])
-        self.assertIn("not repository tasks", hook_output["additionalContext"])
-        self.assertIn("Do not run check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("repo_mcp_server", hook_output["additionalContext"])
-        self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("manual context helper only", hook_output["additionalContext"])
-        self.assertIn("mcp_preflight_unavailable", hook_output["additionalContext"])
-        self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])
-        self.assertIn("goal.loop_status", hook_output["additionalContext"])
-        self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])
-        self.assertIn("context/loop-status only", hook_output["additionalContext"])
-        self.assertIn("do not repeat that limitation", hook_output["additionalContext"])
 
     def test_prompt_secret_guard_blocks_obvious_api_key(self) -> None:
         """The prompt guard should block high-confidence secret patterns."""

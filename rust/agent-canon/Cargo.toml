@@ -4,7 +4,6 @@
 # downstream implementation src/main.rs CLI entrypoint
 # downstream implementation src/local_llm.rs local LLM CLI command
 # downstream implementation src/migration_audit.rs Rust migration audit command
-# downstream implementation src/mcp_inventory.rs Rust MCP preflight command
 # downstream implementation src/python_algorithm_contract.rs Python algorithm contract checker
 # downstream implementation src/rust_migration_plan.rs Rust migration planning command
 # downstream implementation src/structured_analysis.rs structured analysis document inventory and cache build commands

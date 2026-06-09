@@ -47,14 +47,9 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
-- 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は `check_mcp_inventory.py`、repo MCP tools、shell / GitHub checks を走らせず、会話だけで応答します。
-- GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない。迷う場合は `agent-canon mcp-preflight-policy --request-kind github-actions-read` で `MCP_PREFLIGHT_DECISION=skip` を確認する
-- repository task の intake では、MCP evidence が workflow 上必要か、または `.codex/config.toml`、`mcp/`、repo MCP tools、MCP-dependent goal-loop gate を編集するかを判定する。必要な場合だけ `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を実行し、pass したら repo MCP tools を repo root / status / context 確認の優先候補にする。run bundle へ monitoring evidence を追記したい場合だけ `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用する
-- Rust CLI または local Cargo が AgentCanon の lockfile を読めない場合は `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior そのものが task scope でない限り既存 Python / shell gate で検証を続ける
-- AgentCanon owns the repo MCP implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md`; Codex owns `.codex/config.toml` registration, project trust, hooks, apps, external connectors, and session tool availability
-- current `repo_mcp_server` は status/context 専用なので、file editing capability が無いことを毎回 user update で説明しない。MCP failure / mismatch または user の質問がある場合だけ説明する
-- `repo_mcp_server` に file edit、GitHub connector、shell runner、web access、Codex app の代替を実装しない。必要な capability は Codex-provided tool / connector surface を使う
-- 編集手段は、小〜中規模は patch-based edit、機械生成・一括変換は repo script / formatter、MCP editing は explicit edit tool 実装後、の順に選ぶ
+- 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
+- GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
+- 編集手段は、小〜中規模は patch-based edit、機械生成・一括変換は repo script / formatter の順に選ぶ
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` を読み、各 implementation slice が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
 - 実装前に `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と design trace から導かれた narrow slice は `spark_worker` を先に使う

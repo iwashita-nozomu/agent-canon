@@ -986,8 +986,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-SHIM-5"
 critical = true
-description = "Uses MCP goal.loop_status as the mechanical iteration gate."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration"]
+description = "Uses goal_loop.py as the mechanical iteration gate."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration"]
 
 [[evals]]
 id = "adaptive-improvement-loop-human-skill"
@@ -1028,8 +1028,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-HUMAN-5"
 critical = true
-description = "Requires MCP goal.loop_status to keep iterations mechanical."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "MCP Goal Loop Status"]
+description = "Requires goal_loop.py to keep iterations mechanical."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "Goal Loop Status"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-6"
@@ -1082,8 +1082,8 @@ required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-
 [[evals.checklist]]
 id = "AIL-WF-5"
 critical = true
-description = "Requires MCP goal.loop_status to decide whether to continue or close."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+description = "Requires goal_loop.py to decide whether to continue or close."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
 
 [[evals.checklist]]
 id = "AIL-WF-7"
@@ -1173,24 +1173,24 @@ required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "i
 id = "codex-goals-workflow"
 target = "agents/workflows/codex-goals-workflow.md"
 kind = "workflow"
-description = "The Codex goals workflow must bind the feature to goal.md and MCP loop status."
+description = "The Codex goals workflow must bind the feature to goal.md and goal_loop.py status."
 
 [[evals.checklist]]
 id = "CODEX-GOALS-1"
 critical = true
-description = "Defines the role split between goal.md, Codex goals, MCP, and goal_loop.py."
-required_regex = ["goal\\.md", "Codex `goals`", "goal\\.loop_status", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
+description = "Defines the role split between goal.md, Codex goals, and goal_loop.py."
+required_regex = ["goal\\.md", "Codex `goals`", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-2"
 critical = true
-description = "Requires feature and MCP preflight commands."
-required_regex = ["codex features list", "check_mcp_inventory\\.py", "goal_loop\\.py status"]
+description = "Requires feature and goal loop status commands."
+required_regex = ["codex features list", "goal_loop\\.py status"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-3"
 critical = true
-description = "Blocks closeout while MCP or goal.md says to continue."
+description = "Blocks closeout while goal_loop.py or goal.md says to continue."
 required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop", "not complete"]
 
 [[evals.checklist]]
@@ -1319,37 +1319,13 @@ required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice",
 id = "CODEX-WF-GOALS-1"
 critical = true
 description = "Mentions the goals feature preflight and durable goal source."
-required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal\\.loop_status"]
+required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal_loop\\.py"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-2"
 critical = true
 description = "Requires Plan-mode contract output for user-specified goals."
 required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "Execution Slices"]
-
-[[evals]]
-id = "repo-mcp-server-goal-loop-tool"
-target = "mcp/repo_mcp_server.py"
-kind = "mcp"
-description = "The repo MCP server must expose goal loop state for adaptive iterations."
-
-[[evals.checklist]]
-id = "MCP-GOAL-1"
-critical = true
-description = "Declares the goal.loop_status tool and calls goal_loop.py status."
-required_regex = ["goal\\.loop_status", "goal_loop\\.py", "NEXT_ACTION"]
-
-[[evals]]
-id = "mcp-readme-goal-loop-tool"
-target = "mcp/README.md"
-kind = "mcp"
-description = "The MCP README must document goal.loop_status as an iteration gate."
-
-[[evals.checklist]]
-id = "MCP-README-GOAL-1"
-critical = true
-description = "Documents goal.loop_status and run_next_iteration behavior."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "adaptive improvement"]
 
 [[evals]]
 id = "oop-readability-external-repo-route"

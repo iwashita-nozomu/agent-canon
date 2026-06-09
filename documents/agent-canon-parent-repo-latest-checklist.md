@@ -38,11 +38,7 @@ agent entrypoint は `tools/agent_tools/agent_canon_preflight.py` 経由でこ�
 
 Run this sequence before editing shared AgentCanon surfaces or starting a repo-changing task.
 
-1. Confirm MCP inventory when the runtime supports it.
-
-```bash
-python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
-```
+1. Confirm the runtime profile and selected validation route before editing.
 
 1. Check the parent worktree and classify dirty state.
 
@@ -230,7 +226,7 @@ Source window:
 - [ ] GitHub MCP Server secret scanning: if the repo has GitHub Secret Protection
   enabled, decide whether Codex or other approved AI agents should run the
   GitHub MCP Server secret scanning tool before commit or PR. Do not confuse this
-  external GitHub MCP Server with the local AgentCanon `repo_mcp_server`.
+  external GitHub MCP Server with AgentCanon local CLI tools.
 - [ ] GitHub MCP Server dependency scanning: if Dependabot alerts are enabled,
   decide whether to enable the GitHub MCP Server `dependabot` toolset for
   pre-commit dependency vulnerability scans. Record whether the Advanced

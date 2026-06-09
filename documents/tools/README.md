@@ -161,17 +161,6 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     最新化した template / derived repo は、DevContainer を作り直したあと
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
-  - `mcp-preflight-policy` は prompt / user request の種類から MCP preflight
-    が必要かを機械判定します。GitHub Actions run、PR check、GitHub Issue を
-    読むだけなら `agent-canon mcp-preflight-policy --request-kind
-    github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
-  - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
-    MCP evidence が必要な workflow、または MCP surface を変更する task
-    で `agent-canon mcp-inventory --root . --require repo_mcp_server
-    --session-cache` を使い、同じ session / unchanged MCP surface での
-    繰り返し確認を cache hit にします。local Cargo が lockfile を読めない
-    環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime
-    behavior が scope でない限り Python / shell gate で検証を続けます。
   - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
     入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
     Python 実装は互換 engine として残します。
@@ -349,9 +338,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
 - Codex `goals` feature
-  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は MCP `goal.loop_status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
-- `mcp/repo_mcp_server.py` の `goal.loop_status`
-  - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
+  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
   - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-report|archive-agent-reports|push` を使います。

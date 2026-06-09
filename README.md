@@ -95,7 +95,6 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | `completion-first-review/` | 14 | 14 | completion-first 改善 review の index と説明。 |
 | `documents/` | 115 | 113 | shared policy、運用規約、tool / structured-analysis / prose graph docs。runtime log archive docs は `eval-and-hook-evidence` scope。 |
 | `issues/` | 21 | 21 | AgentCanon operational finding の open / closed issue record。 |
-| `mcp/` | 3 | 3 | repo MCP launcher / server surface。 |
 | `memory/` | 3 | 3 | user preference と agent philosophy の durable memory。 |
 | `notes/` | 30 | 30 | knowledge、guardrail、theme、failure、branch、worktree notes。 |
 | `references/` | 3 | 3 | workflow、tool、research の外部参照索引。OpenAI / Codex product evidence は `$openai-docs` source route を参照する。 |
@@ -211,14 +210,13 @@ Template や派生 repo では `vendor/agent-canon/` を source of truth にし�
 root の入口は symlink view または明示的な synced copy にします。Template /
 derived repo に露出する root view は次です。
 
-- `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、MCP、docs の正本。
+- `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、docs の正本。
 - `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
 - `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
-- `mcp -> vendor/agent-canon/mcp`: repo MCP launcher / server の共有 view。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
 - `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。

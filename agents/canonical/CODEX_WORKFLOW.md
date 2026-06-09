@@ -133,33 +133,19 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。
 「無いから作る」「無いから無視する」は、template / canon 確認前の有効な判断ではありません。
 
-### MCP Surface Preflight
+### Repository Task Boundary
 
-repository task では、repo-local `repo_mcp_server` が configured inventory にあるものとして扱いますが、MCP inventory は常時 hook / 常時必須 gate ではありません。GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させず、repo MCP preflight を走らせません。MCP evidence が workflow 上必要な場合、または `.codex/config.toml`、`mcp/`、repo MCP tools、MCP-dependent goal-loop gate を編集する場合に限り、明示 preflight を実行します。
+普通の相談、壁打ち、routing-only advice、説明だけの turn は repository
+task ではありません。その場合は shell、GitHub check、local validation を
+起動せず、会話だけで応答します。
 
-```bash
-agent-canon mcp-preflight-policy --request-kind github-actions-read
-agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
-```
+GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read
+inspection は repository task に昇格させません。
 
-- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合はこの preflight を走らせず、repo MCP tool、shell、GitHub check も起動せず、会話だけで応答します。
-- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時点で repository task として扱い、切り替えを user-facing update で明示してから MCP preflight が必要か判断します。
-- 判断が曖昧なときは `agent-canon mcp-preflight-policy --request-kind <kind>` を使います。`github-actions-read`、`github-read`、`pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、`implementation`、`validation`、`pr-mutation`、`issue-sync` は `required` です。
-- `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` は MCP evidence が必要な task で使います。session 内の小さな follow-up repository task では cache hit を pass evidence として使えます。`.codex/config.toml`、`mcp/`、Rust MCP inventory source、Python compatibility checker が変わったら cache は無効です。
-- Rust CLI または local Cargo が AgentCanon の lockfile を読めない場合は `mcp_preflight_unavailable=<reason>` を work log、run bundle、または user-facing update に残し、MCP runtime behavior そのものが task scope でない限り既存 Python / shell gate で検証を続けます。
-- `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
-- template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
-- AgentCanon owns the server implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and the repo MCP tool contract documented by `mcp/README.md`.
-- Codex owns the registration and runtime plane: `.codex/config.toml`, project trust, hook context, apps, external connectors, and available session tools.
-- MCP inventory が pass した場合は、repo state、repo root、goal loop status、goal plan、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
-- current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / MCP-covered context check 用です。file editing capability は持ちません。
-- Do not add file edit, GitHub connector, shell runner, web access, or Codex app replacement behavior to `repo_mcp_server`; use the Codex-provided tool or connector surface when that capability is needed.
-- MCP が pass したあと、毎回「MCP は編集できないので patch で編集する」と user update に書いてはいけません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
-- `.codex/hooks.json` の `SessionStart` では MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
-- configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
-- `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
-- inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録します。MCP 前提作業だけを停止し、MCP に依存しない実装 / 検証は継続できます。
-- contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。`workflow_monitoring.md` への explicit evidence が必要な run では、Python 互換入口 `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。
+local repo state 確認、file edit、validation、PR / issue mutation、local CI
+実行、または実装作業へ切り替わった時点で repository task として扱い、
+切り替えを user-facing update で明示してから通常の workflow gate に入り
+ます。
 
 ### Codex Goals Feature Preflight
 
@@ -173,14 +159,14 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 ```
 
 - shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
-- `goal.md` は durable source of truth、Codex goals は session view、MCP `goal.loop_status` は機械 gate です。
+- `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
 - `goal.md` は repo-local state であり、`vendor/agent-canon/goal.md` への symlink にしてはいけません。
 - user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が conservative な Objective draft を作り、`goal.md` に先に固定します。通常 task から goal を勝手に推論してはいけません。
 - repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only fan-out plan を作ります。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、持たない場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃うまで起動しません。
 - user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含むまで実装へ進みません。
 - `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。bare objective だけで実装へ進んではいけません。
 - goal-driven task では、Codex goals だけを更新して closeout してはいけません。対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を先に更新します。
-- `goal_loop.py status` または MCP `goal.loop_status` が `NEXT_ACTION=run_next_iteration` を返す限り、Codex goals 上で完了に見えても user-facing completion を返しません。
+- `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り、Codex goals 上で完了に見えても user-facing completion を返しません。
 - Codex goals と `goal.md` が食い違う場合は、repo-owned `goal.md` を正本にして session goal view を修正してから実装へ戻ります。
 
 ### Token And Agent Mode Preflight
@@ -222,8 +208,6 @@ Repo file edits use the narrowest reliable execution surface:
 
 1. 通常の小〜中規模編集は patch-based edit を使います。
 1. 機械生成・一括変換・format は repo 内の script / formatter / generator を使います。
-1. MCP 経由編集は、repo MCP server が explicit edit tool を提供してから使います。status-only MCP を edit tool として扱ってはいけません。
-
 この選択は作業 log / run bundle に必要な粒度で残しますが、user update では冗長に説明しません。説明が必要なのは、既定から外れる編集手段を使う場合、tool availability が作業判断に影響する場合、または user が編集手段を質問した場合です。
 
 ### Library And Reuse Sweep

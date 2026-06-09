@@ -24,7 +24,6 @@
         "`agents/`",
         "`.agents/`",
         "`.codex/`",
-        "`mcp/`",
         "shared `tools/`"
       ],
       "required_when": "An agent performs or reviews repo work"

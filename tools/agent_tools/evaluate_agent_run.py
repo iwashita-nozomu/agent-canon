@@ -511,15 +511,6 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
         and has_any(
             signals_text,
             (
-                "mcp_inventory=pass",
-                "check_mcp_inventory",
-                "mcp_preflight_not_required",
-                "mcp not required",
-            ),
-        )
-        and has_any(
-            signals_text,
-            (
                 "repo_dependency_review=pass",
                 "run_repo_dependency_review.sh",
                 "repo_dependency_intake_not_required",

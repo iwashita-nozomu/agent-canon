@@ -130,7 +130,7 @@ these happens:
 - Existing implementation reuse is unclear.
 - A reviewer returns `revise` or `escalate`.
 - Validation fails for a reason not explained by the current design.
-- `goal.loop_status` or `goal_loop.py status` says another iteration remains.
+- `goal_loop.py status` says another iteration remains.
 
 ## Closeout
 

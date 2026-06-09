@@ -2875,126 +2875,6 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 56,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 201,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 210,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 224,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 228,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY_CACHE",
-      "line": 200,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY_CACHE",
-      "line": 221,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY_ERROR",
-      "line": 57,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_INVENTORY_ERROR",
-      "line": 211,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_DECISION",
-      "line": 69,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_ERROR",
-      "line": 75,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_POLICY",
-      "line": 67,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_POLICY",
-      "line": 74,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_REASON",
-      "line": 70,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "MCP_PREFLIGHT_SCOPE",
-      "line": 68,
-      "path": "rust/agent-canon/src/mcp_inventory.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
       "field": "RUST_MIGRATION_AUDIT",
       "line": 52,
       "path": "rust/agent-canon/src/migration_audit.rs",
@@ -4892,7 +4772,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 845,
+      "line": 841,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -5614,166 +5494,6 @@
       "field": "LOG_HELPER_NAME_FINDINGS",
       "line": 254,
       "path": "tools/agent_tools/check_log_helper_names.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 212,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "EXPECTED_REPO_MCP_LAUNCHER",
-      "line": 277,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LIKELY_CAUSE",
-      "line": 275,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 259,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 270,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 303,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 314,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY",
-      "line": 319,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY_EMPTY",
-      "line": 315,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_INVENTORY_ERROR",
-      "line": 260,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_LAUNCHER_ERROR",
-      "line": 305,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MCP_SERVER",
-      "line": 244,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MISSING_MCP_SERVERS",
-      "line": 271,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 284,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 291,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 306,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 316,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PROJECT_CODEX_CONFIG_DECLARES_MISSING_MCP",
-      "line": 273,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PROJECT_CONFIG_MCP_SERVERS",
-      "line": 274,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPAIR_REPO_MCP",
-      "line": 281,
-      "path": "tools/agent_tools/check_mcp_inventory.py",
       "surface": "tool"
     },
     {
@@ -6564,7 +6284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_FEEDBACK_ACTIONS_OPEN",
-      "line": 1132,
+      "line": 1123,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6572,7 +6292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_MAX_SCORE",
-      "line": 1130,
+      "line": 1121,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6580,7 +6300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_REPORT",
-      "line": 1127,
+      "line": 1118,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6588,7 +6308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_SCORE",
-      "line": 1129,
+      "line": 1120,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6596,7 +6316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_STATUS",
-      "line": 1128,
+      "line": 1119,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -6604,7 +6324,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_EVALUATION_THRESHOLD",
-      "line": 1131,
+      "line": 1122,
       "path": "tools/agent_tools/evaluate_agent_run.py",
       "surface": "tool"
     },
@@ -9244,7 +8964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 444,
+      "line": 442,
       "path": "tools/agent_tools/parent_repo_readiness.py",
       "surface": "tool"
     },
@@ -9252,7 +8972,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 444,
+      "line": 442,
       "path": "tools/agent_tools/parent_repo_readiness.py",
       "surface": "tool"
     },
@@ -9260,7 +8980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 444,
+      "line": 442,
       "path": "tools/agent_tools/parent_repo_readiness.py",
       "surface": "tool"
     },
@@ -9276,22 +8996,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "PARENT_REPO_READINESS",
-      "line": 464,
-      "path": "tools/agent_tools/parent_repo_readiness.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PARENT_REPO_READINESS_CHECKED",
-      "line": 461,
-      "path": "tools/agent_tools/parent_repo_readiness.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PARENT_REPO_READINESS_ERRORS",
       "line": 462,
       "path": "tools/agent_tools/parent_repo_readiness.py",
       "surface": "tool"
@@ -9299,8 +9003,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "PARENT_REPO_READINESS_CHECKED",
+      "line": 459,
+      "path": "tools/agent_tools/parent_repo_readiness.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PARENT_REPO_READINESS_ERRORS",
+      "line": 460,
+      "path": "tools/agent_tools/parent_repo_readiness.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "PARENT_REPO_READINESS_WARNINGS",
-      "line": 463,
+      "line": 461,
       "path": "tools/agent_tools/parent_repo_readiness.py",
       "surface": "tool"
     },
@@ -9820,7 +9540,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 643,
+      "line": 635,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -9828,7 +9548,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 661,
+      "line": 653,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -9836,7 +9556,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 681,
+      "line": 673,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -9844,7 +9564,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 709,
+      "line": 701,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -9852,7 +9572,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 427,
+      "line": 419,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -9860,7 +9580,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 775,
+      "line": 767,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -12644,7 +12364,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "runtime_feedback",
-      "line": 295,
+      "line": 294,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -12652,7 +12372,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "tool_warning",
-      "line": 326,
+      "line": 325,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -12660,7 +12380,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_MONITORING",
-      "line": 578,
+      "line": 577,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -16795,7 +16515,6 @@
     ".codex/hooks/library_implementation_guard.py",
     ".codex/hooks/log_archive_mount_warning.py",
     ".codex/hooks/log_surface_inventory_guard.py",
-    ".codex/hooks/mcp_session_context.sh",
     ".codex/hooks/module_boundary_guard.py",
     ".codex/hooks/notebook_quality_guard.py",
     ".codex/hooks/oop_readability_guard.py",
@@ -16874,7 +16593,6 @@
     "rust/agent-canon/src/docs.rs",
     "rust/agent-canon/src/local_llm.rs",
     "rust/agent-canon/src/main.rs",
-    "rust/agent-canon/src/mcp_inventory.rs",
     "rust/agent-canon/src/migration_audit.rs",
     "rust/agent-canon/src/python_algorithm_contract.rs",
     "rust/agent-canon/src/python_module_groups.rs",
@@ -16905,7 +16623,6 @@
     "tools/agent_tools/check_dependency_headers.py",
     "tools/agent_tools/check_hardcoded_numbers.py",
     "tools/agent_tools/check_log_helper_names.py",
-    "tools/agent_tools/check_mcp_inventory.py",
     "tools/agent_tools/check_proof_trace_alignment.py",
     "tools/agent_tools/check_run_log_contract.py",
     "tools/agent_tools/check_runtime_profile_inventory.py",

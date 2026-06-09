@@ -178,16 +178,6 @@ repairs; each repair command runs the adjacent check path before completion.
     `rust-migration-plan` は固定 policy と hook / skill feedback logs から
     次に Rust 化する tool 候補を出します。派生 repo では
     `agent-canon rust-migration-plan --root vendor/agent-canon` を使います。
-    `mcp-preflight-policy` は相談、GitHub-only read inspection、local repo
-    task の境界を機械判定します。`github-actions-read`、`github-read`、
-    `pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、
-    `implementation`、`validation`、`pr-mutation`、`issue-sync` は `required`
-    です。`mcp-inventory` は Rust 実装の repo MCP inventory checker で、
-    MCP evidence が必要な workflow、または MCP surface を変更する task
-    で `agent-canon mcp-inventory --root . --require repo_mcp_server
-    --session-cache` を使います。local Cargo が lockfile を読めない環境では
-    `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior が
-    scope でない限り Python / shell gate で検証を続けます。
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
     Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
     呼び、現在の Python engine は内部互換実装として扱います。
@@ -395,13 +385,8 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 After evidence is verified, `workflow_monitor.py --closeout-token-preset` records the standard behavior tokens consumed by `evaluate_agent_run.py`; it is a recording shortcut, not a substitute for validation evidence.
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically.
-Use `agent-canon mcp-preflight-policy` before turning read-only GitHub
-inspection into a local repository task. Use `agent-canon mcp-inventory --root
-. --require repo_mcp_server --session-cache` only when the workflow needs MCP
-evidence or the task edits MCP surfaces, and use
-`check_mcp_inventory.py --report-dir <run>` only when the run bundle needs
-direct `workflow_monitoring.md` evidence. `run_repo_dependency_review.sh` can
-append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
+`run_repo_dependency_review.sh` can append evidence when given `--report-dir`
+or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 `compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
 When a run uses skills, prompt eval evidence is required. Run

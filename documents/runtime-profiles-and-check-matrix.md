@@ -24,7 +24,7 @@ activate only the profile required by the current change.
 | Profile | Activates | Required when |
 | --- | --- | --- |
 | Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo |
-| Agent runtime | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, shared `tools/` | An agent performs or reviews repo work |
+| Agent runtime | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, shared `tools/` | An agent performs or reviews repo work |
 | Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used |
 | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes |
 | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change |

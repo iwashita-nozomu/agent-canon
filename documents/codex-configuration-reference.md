@@ -77,24 +77,15 @@ goals = true
 [agents]
 max_threads = 24
 job_max_runtime_seconds = 3600
-
-[mcp_servers.repo_mcp_server]
-command = "bash"
-args = ["mcp/repo_mcp_server.sh"]
-enabled = true
-required = false
-startup_timeout_sec = 20
-tool_timeout_sec = 300
 ```
 
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
 - `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
-- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `repo_mcp_server.goal_loop_status`.
+- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `tools/agent_tools/goal_loop.py`.
 - Reusable runtime profiles such as `token-lite`, `token-standard`, and `token-deep` belong in user-level Codex config. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
-- `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
 ## Current Template Coverage Matrix
 
@@ -110,7 +101,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
 | `features` | `features.hooks=true` and `features.goals=true` are configured. |
 | `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
-| `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
+| `mcp_servers` | Not configured by the template. |
 
 ### Top-Level Keys Not Currently In `.codex/config.toml`
 
@@ -222,7 +213,6 @@ workspace_owner_usage_nudge
 | Surface | Configured Here | Schema-Available But Absent Here |
 | ------- | --------------- | -------------------------------- |
 | `[agents]` | `max_threads`, `job_max_runtime_seconds` | `max_depth` and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` |
-| `[mcp_servers.repo_mcp_server]` | `command`, `args`, `enabled`, `required`, `startup_timeout_sec`, `tool_timeout_sec` | `url`, `cwd`, `env`, `env_vars`, `http_headers`, `env_http_headers`, `bearer_token_env_var`, `enabled_tools`, `disabled_tools`, `tools`, `default_tools_approval_mode`, `supports_parallel_tool_calls`, `oauth_resource`, `scopes`, `startup_timeout_ms`, `experimental_environment`, `name` |
 | `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
 | `.agents/skills/` versus `[skills]` | skills are provided as files under `.agents/skills/` | `[skills] include_instructions`, `[skills.bundled]`, and `[[skills.config]]` name/path enablement entries |
 
@@ -490,20 +480,17 @@ CLI management:
 ```bash
 codex mcp list --json
 codex mcp add docs --url https://example.invalid/mcp
-codex mcp add repo -- bash mcp/repo_mcp_server.sh
 codex mcp remove repo
 codex mcp login repo
 codex mcp logout repo
 ```
 
-Template guidance for local repo MCP:
+Template guidance for MCP:
 
-- Keep `required=false` for optional local-process MCP so the agent can still boot and report a startup problem.
-- Put deterministic repo-local startup in `mcp/repo_mcp_server.sh`.
-- Use hooks and validation scripts to detect missing MCP inventory; do not hide startup failures.
-- Treat `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md` as the AgentCanon-owned repo MCP implementation and tool contract.
-- Treat `.codex/config.toml`, hook registration, project trust, user profiles, apps, and external connectors as the Codex-owned registration and runtime plane.
-- Keep `repo_mcp_server` limited to repo context and goal-loop checks. Do not reimplement file edit, GitHub, shell, web, or Codex app connector behavior inside AgentCanon MCP.
+- Keep MCP server configuration out of shared AgentCanon runtime unless a task
+  explicitly needs an external connector.
+- Prefer deterministic AgentCanon CLI tools for repo-local checks and goal-loop
+  gates.
 
 ## Hooks
 

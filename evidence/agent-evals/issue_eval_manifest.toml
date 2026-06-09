@@ -307,27 +307,6 @@ linked_rules = [
 ]
 
 [[eval]]
-id = "mcp-preflight-fallback-runbook"
-category = "workflow-bypass"
-source_issue = 116
-oracle_type = "rubric"
-protects = [
-  "MCP preflight is not treated as a universal blocker",
-  "fallback routes are explicit when MCP is unavailable",
-]
-expected_route = [
-  "read documents/mcp-preflight-and-fallback-policy.md",
-  "record mcp_preflight_unavailable only when relevant to the task",
-]
-forbidden_route = [
-  "block unrelated repository work because MCP inventory cannot run",
-]
-linked_rules = [
-  "documents/mcp-preflight-and-fallback-policy.md",
-  "ROOT_AGENTS.md",
-]
-
-[[eval]]
 id = "agentcanon-submodule-rollback-runbook"
 category = "wrong-artifact"
 source_issue = 117

@@ -113,14 +113,6 @@ AREA_DATA: tuple[AreaData, ...] = (
         ),
     ),
     (
-        "mcp",
-        "MCP",
-        "Check MCP inventory without turning optional surfaces into default work.",
-        "check_mcp_inventory_when_required",
-        ("python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server",),
-        ("mcp_optional_preflight.py", "mcp-profile"),
-    ),
-    (
         "goal",
         "goal loop",
         "Limit goal machinery to explicit goal-driven tasks.",
