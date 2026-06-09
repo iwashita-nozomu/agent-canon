@@ -121,6 +121,13 @@ language = "python"
 summary = "Formal proof scaffold planner documentation, including natural-language, Python AST, and package-retained trace routes."
 
 [[tool]]
+id = "lean-proof-env"
+tool = "tools/agent_tools/lean_proof_env.py"
+doc = "documents/tools/lean_proof_env.md"
+language = "python"
+summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
+
+[[tool]]
 id = "algorithm-expansion-ir"
 tool = "tools/agent_tools/algorithm_expansion_ir.py"
 doc = "documents/tools/algorithm_expansion_ir.md"
@@ -140,6 +147,20 @@ tool = "tools/agent_tools/algorithm_flowchart.py"
 doc = "documents/tools/algorithm_flowchart.md"
 language = "python"
 summary = "Algorithm flowchart renderer documentation, including AST/IR Mermaid diagrams and proof-status overlays."
+
+[[tool]]
+id = "ir-graph-correspondence"
+tool = "tools/agent_tools/ir_graph_correspondence.py"
+doc = "documents/tools/ir_graph_correspondence.md"
+language = "python"
+summary = "IR equation fact to lemma graph correspondence checker documentation, including assignment coverage and proof-status adoption."
+
+[[tool]]
+id = "kkt-equation-section"
+tool = "tools/agent_tools/kkt_equation_section.py"
+doc = "documents/tools/kkt_equation_section.md"
+language = "python"
+summary = "KKT solver-chain equation-section generator documentation, including fail-closed IR code-fact evidence checks."
 
 [[tool]]
 id = "proof-path-analyzer"

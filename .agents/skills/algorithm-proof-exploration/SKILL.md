@@ -12,6 +12,8 @@ upstream implementation ../../../tools/agent_tools/algorithm_expansion_ir.py bui
 upstream implementation ../../../tools/agent_tools/algorithm_lemma_graph.py builds lemma graphs.
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays.
 upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
+upstream implementation ../../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
+upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
 @dependency-end
 -->
 
@@ -43,6 +45,23 @@ upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py render
    which blocks are proved/open, run `$algorithm-flowchart` after IR and
    LemmaGraph generation. The Mermaid chart is visualization evidence; proof
    completion still comes from checker-backed fragments.
+   Use `--view runtime` or `--view core --include-code-facts` when the chart
+   must show implementation flow without proof-only labels or branches.
+1. For reduced KKT / KKT / MINRES solver-chain equations, use
+   `python3 tools/agent_tools/kkt_equation_section.py` with the current
+   PDIPM/KKT/MINRES Algorithm Expansion IR files. Missing required evidence is
+   an IR extraction or code-shape issue, not a reason to hand-maintain proof
+   prose. The generated section owns the displayed implementation formulas by
+   substituting matched IR `code_facts[*].expression` values; proof notes should
+   link to that section instead of carrying parallel hand-written runtime
+   equations.
+1. For theorem-critical intermediate formulas, use
+   `python3 tools/agent_tools/ir_graph_correspondence.py` after LemmaGraph
+   generation. Check assignment and return equations per iteration unit
+   (`source_symbol` plus `equation_tags`, such as `step_update` or
+   `reduced_kkt`) before handing them to `$formal-proof-workflow`. If the
+   correspondence checker reports a missing graph node or consumption edge,
+   fix IR extraction or graph generation instead of hard-coding prose equations.
 1. Treat the lemma graph as the editable algorithm exploration surface. Agents
    and humans may add candidate algorithm changes, certificate edges, source
    packets, and formal-proof handoff decisions as overlay data, but must not
@@ -59,7 +78,28 @@ upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py render
    result, classify whether the gap is better solved by changing the algorithm,
    adding a runtime certificate, narrowing the problem class, or leaving an
    external assumption boundary.
-1. For initialization, basin-entry, or tube-entry blockers, normalize the
+1. Do not solve a frontier by injecting assumptions unrelated to the target
+   algorithm inputs. For a fixed algorithm, all mathematical assumptions live at
+   the theorem top level and are over the target `Problem` and config object.
+   Intermediate frontier claims are problem/config-derived lemmas that must be
+   proved from those top-level assumptions plus the extracted code path.
+   Architecture assumptions such as the implementation trace and backend/runtime
+   semantics are allowed only as architecture boundaries, and must be labeled
+   separately from Problem/config assumptions.
+1. Treat a desired local assumption as a derivation target, not as a premise.
+   For each desired intermediate condition, run a try-and-error derivation loop:
+   name the condition as a candidate lemma, bind every variable to either
+   `Problem`, config, the IR-extracted path state, a code fact, or an allowed
+   architecture boundary, then ask `$formal-proof-workflow` to prove it from the
+   top-level assumptions plus the code path. If the route fails, change the
+   lemma shape before changing the theorem: try quotient/projection forms,
+   upper-bound lemmas, selected-scope certificates, finite-prefix certificates,
+   same-units conversion, or returned-runtime certificates that are useful to
+   the algorithm. Do not promote the desired condition into an independent
+   assumption. If no derivation route closes, return the minimal blocker as
+   either missing top-level problem/config property, missing external
+   architecture evidence, or an algorithmic choice that must change.
+1. For initialization, basin-entry, or selected-scope-entry blockers, normalize the
    implementation as a selected initializer
    `z_init = Init(Problem, InitializeConfig)`. Do not promote a hard-coded zero,
    default vector, supplied state, or previous-state reuse into a theorem

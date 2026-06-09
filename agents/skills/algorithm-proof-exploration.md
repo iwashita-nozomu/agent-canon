@@ -9,6 +9,8 @@ upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds
 upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds lemma dependency graphs.
 upstream implementation ../../tools/agent_tools/proof_path_analyzer.py validates proof-status overlays.
 upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
+upstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
+upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
 downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
@@ -119,9 +121,31 @@ current IR / assumption ledger から導けないことを checker-backed に示
      iteration path and proof-state overlay at once
    - render from IR / LemmaGraph / `proof_status.json`, not from a hand-drawn
      diagram
+   - use `--view runtime` or `--view core --include-code-facts` when the
+     artifact must show implementation flow without proof-only branches or
+     labels
    - treat the Mermaid chart as navigation evidence only. It may show where a
      block is verified, open, or external, but proof completion still comes from
      `$formal-proof-workflow` checker evidence and `proof_path_analyzer.py`
+1. Equation projection:
+   - after LemmaGraph generation, use
+     `python3 tools/agent_tools/ir_graph_correspondence.py` for theorem-critical
+     assignment and return equations
+   - check iteration slices by `source_symbol` and `equation_tags`, for example
+     `step_update`, `reduced_kkt`, `minres_defaults`, and initialization tags
+   - if an equation fact is absent from the graph or lacks a
+     `lemma_consumes_code_fact` edge, fix IR extraction or graph generation
+     before writing proof prose or Lean bridge lemmas
+   - for reduced KKT / KKT / MINRES solver-chain equations, use
+     `python3 tools/agent_tools/kkt_equation_section.py` with the current
+     PDIPM/KKT/MINRES Algorithm Expansion IR files
+   - if the generator fails because a required code fact is missing, classify
+     the gap as IR extraction weakness or code-shape opacity before writing
+     proof prose
+   - displayed implementation formulas in that section are substituted from
+     matched IR `code_facts[*].expression`; proof notes should link to the
+     generated section instead of carrying parallel hand-written runtime
+     equations
 1. Algorithm frontier extraction:
    - choose graph frontier nodes by their algorithmic impact, not prose order
    - normalize each target-facing blocker to implementation identity,
@@ -130,19 +154,36 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - do not treat a failed single-lemma route as an algorithm failure. Hand
      proof-route alternatives to `$formal-proof-workflow`; this skill uses the
      returned proof outcome to decide whether an algorithm change is needed
-   - when formal-proof returns a missing witness or assumption-insufficiency
-     result, decide whether that gap is better solved by changing the algorithm,
-     adding a runtime certificate, narrowing the problem class, or leaving an
-     external assumption boundary
-   - if formal-proof returns only `unverified_with_next_witness`, feed that
-     named witness back to formal-proof before classifying an algorithmic
+  - when formal-proof returns a missing witness or assumption-insufficiency
+    result, decide whether that gap is better solved by changing the algorithm,
+    adding a runtime certificate, narrowing the problem class, or leaving an
+    external assumption boundary
+  - frontier を、対象アルゴリズム入力と無関係な仮定注入で閉じてはいけません。
+    固定された algorithm では、数学的仮定は theorem top level の
+    `Problem` と config object にだけ置きます。途中で必要になる主張は仮定ではなく
+    `top_level_problem_config_lemma` のような problem/config-derived lemma として持ち、
+    その top-level 仮定と抽出済み code path から証明します。
+    implementation trace や backend/runtime semantics のような architecture
+    assumption は許可しますが、Problem/config assumption とは別ラベルにします。
+  - ほしい局所仮定は premise ではなく導出 target として扱います。各中間条件に
+    candidate lemma 名を付け、すべての変数を `Problem`、config、IR が抽出した
+    path state、code fact、または許可された architecture boundary のどれかへ
+    束縛してから、`$formal-proof-workflow` へ渡して top-level 仮定と code path
+    から導けるかを試します。失敗した場合は、theorem を緩める前に lemma 形状を変えます:
+    quotient / projection、上界補題、selected-scope certificate、finite-prefix
+    certificate、same-units conversion、algorithm に有用な returned-runtime
+    certificate を試します。ほしい条件を独立仮定に昇格してはいけません。どの導出 route も
+    閉じない場合だけ、最小 blocker を top-level Problem/config property の不足、
+    external architecture evidence の不足、または変更すべき algorithmic choice として返します。
+  - if formal-proof returns only `unverified_with_next_witness`, feed that
+    named witness back to formal-proof before classifying an algorithmic
      blocker; do not turn a proof-search queue item into algorithm-change
      guidance
 1. Algorithmic blocker exploration:
    - when a target-facing blocker remains after formal-proof exploration,
      classify whether it comes from missing problem assumptions, missing
      external evidence, or a current algorithmic choice
-   - for initialization, basin-entry, or tube-entry blockers, first normalize
+   - for initialization, basin-entry, or selected-scope-entry blockers, first normalize
      the implementation as a selected initializer
      `z_init = Init(Problem, InitializeConfig)`. Do not treat a hard-coded zero,
      default vector, supplied state, or previous-state reuse as a mathematical
@@ -167,15 +208,15 @@ current IR / assumption ledger から導けないことを checker-backed に示
 1. Algorithm change guidance:
    - expose a runtime certificate
    - return same-run true residuals
-   - remove unsound gates or zero-update paths
+   - remove unsound gates
    - change an algorithmic choice only when the proof obligation shows that the
      current choice blocks the theorem
    - replace hard-coded initial points with a proof-visible selected initializer
-     when the target theorem needs basin/tube entry, and state whether the
+     when the target theorem needs basin/selected-scope entry, and state whether the
      remaining proof obligation is on `Init(Problem, InitializeConfig)` or on a
      stronger Phase-I/globalization algorithm
    - add Phase I / globalization when the theorem needs basin entry
-   - narrow a theorem to local tube / warm-start assumptions
+   - narrow a theorem to selected local scope / warm-start assumptions
    - add problem-class or backend evidence witnesses
 1. Formal proof handoff:
    - pass exact theorem variables, proof artifacts, checked fragments, and remaining obligations to `$formal-proof-workflow`

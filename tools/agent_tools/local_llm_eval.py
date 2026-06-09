@@ -40,6 +40,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from file_responsibility_llm import (  # noqa: E402
     DEFAULT_MAX_BYTES,
     DEFAULT_MODEL,
@@ -48,7 +49,6 @@ from file_responsibility_llm import (  # noqa: E402
     prompt_for_target,
     read_target,
 )
-from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from runtime_log_paths import agent_canon_root, eval_results_dir  # noqa: E402
 
 MANIFEST_PATH = eval_manifest_path("local_llm_responsibility_eval.toml")

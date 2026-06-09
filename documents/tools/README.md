@@ -20,6 +20,8 @@ downstream implementation ../../tools/agent_tools/search.py coordinates purpose-
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
+downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
 downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
 @dependency-end
@@ -66,10 +68,16 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - changed path list から docs / Python / Docker / GitHub / shared-canon / full-confidence 候補を分類し、targeted validation command を出します。`.github/workflows/path-risk-check-matrix-smoke.yml` もこの classifier を使います。
 - `tools/agent_tools/formal_proof.py`
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
+- `tools/agent_tools/lean_proof_env.py`
+  - Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。topic-local theorem package に一時的な Mathlib 依存を入れず、環境責務をこの tool に集約します。
 - `tools/agent_tools/proof_path_analyzer.py`
   - `algorithm_lemma_graph.py` の lemma graph と topic-local `proof_status.json` を読み、checked fragment の採用漏れ、裸の `unverified` frontier、stale implementation token、重複 B-label、target-chain 切断を検査します。数学的 witness が未接続な箇所は open witness として残し、artifact integrity と proof completion を分けて報告します。
+- `tools/agent_tools/ir_graph_correspondence.py`
+  - Algorithm Expansion IR の `assignment_equation` / `return_equation` が lemma graph の code-fact node、`lemma_consumes_code_fact` edge、target chain、必要なら `proof_status.json` の `code_derived_facts` に対応しているかを検査します。反復法は `source_symbol` と `equation_tags` で grouped iteration unit として報告します。
 - `tools/agent_tools/algorithm_flowchart.py`
-  - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。
+  - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。`--view runtime|core` は proof-only node / label を runtime 図から外し、実装経路の確認に使います。
+- `tools/agent_tools/kkt_equation_section.py`
+  - Algorithm Expansion IR の `code_facts` を検査し、PDIPM/KKT/MINRES solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、KKT 式を proof note に手書きで足す経路を避けます。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm extract-prose-ir`

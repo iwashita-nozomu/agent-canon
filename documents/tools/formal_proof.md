@@ -85,8 +85,12 @@ Python trace module avoids that extra packaging requirement.
 The generated query files are inputs for `$formal-proof-workflow` and
 `$literature-survey`. Search formal libraries and existing proofs before writing
 new lemmas. Verification authority remains with the target checker command
-reported in the plan, for example `lake env lean <stub>.lean`, `isabelle
-process`, `coqc`, `z3`, or `cvc5`.
+reported in the plan, for example `python3
+tools/agent_tools/lean_proof_env.py check-file --env-dir
+reports/formal-proof/lean-proof-env --lean-file <stub>.lean --execute`,
+`isabelle process`, `coqc`, `z3`, or `cvc5`. Lean stubs should use the
+AgentCanon Mathlib/Aesop proof environment unless the theorem package itself
+owns a Mathlib-based theory.
 
 For algorithm-derived claims, a generated single-lemma scaffold is only one
 candidate proof route. If that route is too strong or fails, do not report the

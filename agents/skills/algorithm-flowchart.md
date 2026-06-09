@@ -6,6 +6,7 @@ upstream design formal-proof-workflow.md checker-backed proof workflow.
 upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders Mermaid diagrams.
 upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm Expansion IR.
 upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds Lemma Dependency Graphs.
+upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections.
 downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
@@ -70,6 +71,10 @@ assumption の位置を一目で確認するための visualization layer です
      --out lean/pdipm_convergence/pdipm_algorithm_flowchart.md
    ```
 
+   実装経路だけを見せる図では `--view runtime`、数理・solver 中核だけを
+   見せる図では `--view core --include-code-facts` を使います。`proof`
+   view 以外では proof status label を出しません。
+
 1. 図を reader-facing proof note へ貼る場合は、生成済み Markdown から
    fenced `mermaid` block を引用します。手書きで Mermaid を更新せず、
    実装や証明 overlay が変わったら再生成します。
@@ -97,3 +102,6 @@ assumption の位置を一目で確認するための visualization layer です
   LemmaGraph、`proof_status.json`、`lean/lib` profile から読みます。
 - 大きな graph では `--include-code-facts` を必要な review だけに使い、
   proof note には対象 theorem に関係する diagram を載せます。
+- runtime diagram に proof-only boundary、proof obligation、手書きの分岐を
+  足しません。KKT solver-chain の数式 section は
+  `tools/agent_tools/kkt_equation_section.py` で IR code fact から生成します。

@@ -47,6 +47,19 @@ def sample_ir_payload() -> dict[str, object]:
                 "runtime_object": "direction_or_solve",
                 "residual_unit": "minres_true_residual_unit",
                 "precision_model": "dtype_or_backend_floor",
+                "proof_relevance": "required",
+                "equation_tags": ["minres_defaults"],
+            },
+            {
+                "node_id": "python_app_minres_py__helper",
+                "source_path": "python/app/minres.py",
+                "source_symbol": "_helper",
+                "math_role": "implementation_bookkeeping",
+                "runtime_object": "unknown",
+                "residual_unit": "none",
+                "precision_model": "none",
+                "proof_relevance": "excluded",
+                "equation_tags": [],
             },
         ],
         "edges": [
@@ -56,7 +69,17 @@ def sample_ir_payload() -> dict[str, object]:
                 "target_node_id": "python_app_minres_py___solve",
                 "edge_kind": "calls",
                 "call_text": "solve_kkt_with_minres",
+                "role": "runtime_dependency",
                 "status": "retained",
+            },
+            {
+                "edge_id": "edge-2",
+                "source_node_id": "python_app_pdipm_py___solve",
+                "target_node_id": "python_app_minres_py___solve",
+                "edge_kind": "requests_certificate",
+                "call_text": "proof_only_certificate",
+                "role": "correctness_certificate",
+                "status": "unverified",
             }
         ],
         "code_facts": [
@@ -68,6 +91,17 @@ def sample_ir_payload() -> dict[str, object]:
                 "fact_kind": "assignment_equation",
                 "target": "r_true",
                 "expression": "physical_proj @ (physical_b - physical_Mv @ x_physical)",
+                "equation_tags": ["minres_defaults"],
+            },
+            {
+                "fact_id": "fact__python_app_minres_py_helper_tmp",
+                "source_path": "python/app/minres.py",
+                "source_symbol": "_helper",
+                "source_node_id": "python_app_minres_py__helper",
+                "fact_kind": "assignment_equation",
+                "target": "tmp",
+                "expression": "value",
+                "equation_tags": [],
             }
         ],
     }
@@ -163,9 +197,73 @@ class AlgorithmFlowchartTest(unittest.TestCase):
         self.assertIn("```mermaid", result.stdout)
         self.assertIn("flowchart LR", result.stdout)
         self.assertIn("solve_kkt_with_minres", result.stdout)
+        self.assertIn("proof_only_certificate", result.stdout)
         self.assertIn("assignment_equation: r_true", result.stdout)
         self.assertIn("proof: unverified_with_next_witness", result.stdout)
         self.assertIn("classDef open", result.stdout)
+
+    def test_runtime_view_omits_proof_overlay_and_certificate_edges(self) -> None:
+        """Runtime view should render implementation flow without proof-only edges."""
+        with tempfile.TemporaryDirectory() as raw_dir:
+            tmp = Path(raw_dir)
+            ir_path = tmp / "ir.json"
+            graph_path = tmp / "graph.json"
+            proof_path = tmp / "proof_status.json"
+            ir_payload = sample_ir_payload()
+            nodes = ir_payload["nodes"]
+            edges = ir_payload["edges"]
+            assert isinstance(nodes, list)
+            assert isinstance(edges, list)
+            nodes.append(
+                {
+                    "node_id": "python_app_pdipm_py__logging",
+                    "source_path": "python/app/pdipm.py",
+                    "source_symbol": "_log_iteration",
+                    "math_role": "implementation_bookkeeping",
+                    "runtime_object": "logging",
+                    "residual_unit": "none",
+                    "precision_model": "none",
+                    "proof_relevance": "excluded",
+                }
+            )
+            edges.append(
+                {
+                    "edge_id": "edge-3",
+                    "source_node_id": "python_app_pdipm_py___solve",
+                    "target_node_id": "python_app_pdipm_py__logging",
+                    "edge_kind": "calls",
+                    "call_text": "log_iteration",
+                    "role": "runtime_dependency",
+                    "status": "retained",
+                }
+            )
+            ir_path.write_text(json.dumps(ir_payload), encoding="utf-8")
+            graph_path.write_text(json.dumps(sample_lemma_graph()), encoding="utf-8")
+            proof_path.write_text(json.dumps(sample_proof_status()), encoding="utf-8")
+
+            result = self.run_tool(
+                "--ir-json",
+                str(ir_path),
+                "--lemma-graph",
+                str(graph_path),
+                "--proof-status",
+                str(proof_path),
+                "--include-code-facts",
+                "--view",
+                "runtime",
+                "--format",
+                "markdown",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("- View: `runtime`", result.stdout)
+        self.assertIn("solve_kkt_with_minres", result.stdout)
+        self.assertIn("assignment_equation: r_true", result.stdout)
+        self.assertNotIn("proof_only_certificate", result.stdout)
+        self.assertNotIn("proof:", result.stdout)
+        self.assertNotIn("unverified_with_next_witness", result.stdout)
+        self.assertNotIn("log_iteration", result.stdout)
+        self.assertIn("class n0 runtime", result.stdout)
 
     def test_json_summary_reports_status_counts(self) -> None:
         """JSON output should expose machine-readable status counts."""
@@ -180,9 +278,33 @@ class AlgorithmFlowchartTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "algorithm_flowchart_built")
-        self.assertEqual(payload["node_count"], 2)
-        self.assertEqual(payload["status_counts"]["unverified"], 2)
+        self.assertEqual(payload["view"], "proof")
+        self.assertEqual(payload["node_count"], 3)
+        self.assertEqual(payload["status_counts"]["unverified"], 3)
         self.assertIn("flowchart TD", payload["mermaid"])
+
+    def test_core_view_filters_bookkeeping_and_omits_proof_labels(self) -> None:
+        """Core view should show math/equation blocks without proof overlay text."""
+        result = self.run_tool(
+            "--ir-json",
+            "-",
+            "--include-code-facts",
+            "--view",
+            "core",
+            "--format",
+            "json",
+            stdin=json.dumps(sample_ir_payload()),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["view"], "core")
+        source_ids = {node["source_id"] for node in payload["nodes"]}
+        self.assertIn("python_app_minres_py___solve", source_ids)
+        self.assertIn("fact__python_app_minres_py___finish__r_true", source_ids)
+        self.assertNotIn("python_app_minres_py__helper", source_ids)
+        self.assertNotIn("fact__python_app_minres_py_helper_tmp", source_ids)
+        self.assertNotIn("proof:", payload["mermaid"])
 
 
 if __name__ == "__main__":

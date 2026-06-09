@@ -69,6 +69,16 @@ python3 tools/agent_tools/algorithm_flowchart.py \
 - `--include-code-facts`: render assignment/default/return facts as subordinate
   blocks. Use this when the important recurrence, stopping, or residual
   equation is a code fact rather than a function-level IR node.
+- `--view`: selects the projection.
+  - `proof`: overlays LemmaGraph and `proof_status.json` and includes proof
+    status labels.
+  - `runtime`: omits proof-status labels and proof-only edges. By default it
+    also drops theorem-slice-excluded bookkeeping nodes; use
+    `--include-bookkeeping` for a full implementation expansion.
+  - `core`: omits proof-status labels and keeps mathematical state-transition,
+    solver, certificate, diagnostic, and tagged equation-fact blocks.
+- `--include-bookkeeping`: keeps theorem-slice-excluded bookkeeping nodes in
+  `runtime` / `core` views.
 
 ## Output
 
@@ -94,3 +104,8 @@ The chart is intentionally a visualization layer. It does not replace
 `proof_path_analyzer.py`, and it does not infer missing proof obligations from
 prose. Regenerate the chart after changing implementation code, Algorithm
 Expansion IR, LemmaGraph, or `proof_status.json`.
+
+When a proof note needs an implementation-only diagram, use `--view runtime` or
+`--view core`; do not hand-draw proof boundaries or mix proof obligations into
+the runtime diagram. Use `kkt_equation_section.py` for KKT equation prose that
+must be backed by IR code facts.

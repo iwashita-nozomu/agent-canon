@@ -85,6 +85,7 @@ class FormalProofToolTest(unittest.TestCase):
             )
 
             stub = (out_dir / "spd_quadratic_form_positive.lean").read_text(encoding="utf-8")
+            self.assertIn("import Aesop", stub)
             self.assertIn("<FORMAL_TARGET>", stub)
             self.assertIn("sorry", stub)
             self.assertIn("not proof evidence", stub)

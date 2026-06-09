@@ -8,7 +8,10 @@ upstream design algorithm-proof-exploration.md proof-guided algorithm exploratio
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
+upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments.
 upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
+upstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
+upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 @dependency-end
@@ -61,7 +64,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   AST / initialize edge / call edge から機械的に再帰展開し、
   Algorithm Expansion IR として保持します。IR は proof ではなく、
   最終命題に必要な局所 theorem / lemma だけを選ぶための中間表現です。
-- algorithm update が初期値選択、cold start、Phase I、basin entry、tube entry を
+- algorithm update が初期値選択、cold start、Phase I、basin entry、selected-scope entry を
   変更した場合は、ユーザーへ返す前に IR / lemma graph / proof-status overlay を
   再生成し、初期化経路から機械抽出できる code fact をすべて採用候補へ接続します。
   例: `z_init`、`x_init`、slack / multiplier floor、initial residual、
@@ -77,6 +80,13 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - Algorithm Expansion IR は `python3 tools/agent_tools/algorithm_expansion_ir.py`
   で作成し、`proof_algorithm_ir`、`proof_goal_directed_slice`、
   `proof_selected_local_obligations` として proof note または run artifact に残します。
+- reduced KKT / KKT / MINRES solver-chain の数式 section は、現在の
+  Algorithm Expansion IR から
+  `python3 tools/agent_tools/kkt_equation_section.py` で生成します。必須の
+  `code_facts` が欠けて tool が失敗した場合は、proof note を手書きで補わず、
+  IR 抽出または実装形状を直してから再生成します。表示される実装式は matched
+  IR `code_facts[*].expression` から代入し、proof note 側に同じ runtime 数式を
+  並行して手書きしません。
 - backend / dtype / IREE / finite-precision semantics は production code や
   `InitializeConfig` へ proof-only field として足さず、Algorithm Expansion IR の
   `backend_assumptions` と Lemma Dependency Graph overlay に theorem variable /
@@ -85,9 +95,27 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   追加してはいけません。証明に必要な値は `Problem + InitializeConfig + State_k`
   と実装 path から proof extractor / lemma graph 側で再構成し、必要なら
   `runtime_value <= upper_bound <= requested_budget` の上界補題として扱います。
-  反復ごとに KKT 条件数を評価することは一つの検証 route にすぎず、局所 tube 上の
+  反復ごとに KKT 条件数を評価することは一つの検証 route にすぎず、選択された局所 scope 上の
   一様 regularity / preconditioner / slack-floor certificate で各 `k` の witness を
   補完できる場合はそれを優先します。
+- 採用する仮定は必ず対象アルゴリズムの入力に接地します。実装由来の
+  algorithm theorem で許される非 code premise は、対象 `Problem` の性質、
+  対象 config object の数値選択、IR から抽出した operational trace や選択
+  backend/runtime profile のような architecture assumption、または formal library
+  theorem に限ります。`State_k` のような path state は `Problem + Config` の trace が
+  生成した値としてだけ使い、独立注入仮定にしてはいけません。任意の residual map、
+  抽象 direction、自由な selected scope、proof-only state、diagnostic-only field
+  など、対象入力でないものへの仮定を置いてはいけません。中間で必要になる主張は
+  仮定ではなく補題です。トップレベル仮定と抽出済み code path から証明し、途中で
+  新しい独立仮定として注入してはいけません。機械分類では
+  `top_level_problem_config_lemma` のような problem/config-derived lemma として持ち、
+  `Problem + Config` と生成 path から導く lemma / witness へ書き換えるか、強すぎる theorem を `refuted` /
+  `unprovable_under_assumptions` として分類します。PDIPM では、注入される数学的仮定は
+  最適化 `Problem` と `InitializeConfig` に限定し、実装 trace と backend/runtime
+  semantics は architecture assumption として分けます。
+  最適化問題で「微分可能」と言う場合は、対象 `Problem` の目的関数・制約関数の
+  微分可能性だけを指します。residual sequence、更新則、proof-introduced helper の
+  微分可能性を代替仮定にしてはいけません。
 - checker 向け中間表現、lemma graph、profile library、Lean stub は
   `lean/<proof-theme>/` に置き、再利用する profile / arithmetic library は
   `lean/lib/` に置きます。profile library を読むのは
@@ -99,6 +127,13 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `proof_target_chains`、graph validation evidence として proof note または
   run artifact に残します。IR は実装展開、lemma graph は命題依存を表し、
   両者を混ぜて `verified` claim を作ってはいけません。
+- theorem-critical な中間計算式を証明 fragment が消費する前に、
+  `python3 tools/agent_tools/ir_graph_correspondence.py` を使い、
+  IR の `assignment_equation` / `return_equation` が lemma graph の
+  code-fact node、`lemma_consumes_code_fact` edge、target chain、必要なら
+  `proof_status.json` の `code_derived_facts` に対応していることを検査します。
+  反復単位の式は `source_symbol` と `equation_tags` で slice し、式を Lean や
+  proof note に手書きで散らす前に、IR 由来の式として graph に固定します。
 - 実装されている反復法と証明状態を人間が一目で確認する必要がある場合は、
   `$algorithm-flowchart` / `algorithm_flowchart.py` で IR、LemmaGraph、
   `proof_status.json` から Mermaid chart を生成します。図は proof path の
@@ -131,7 +166,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   の順に試します。「難しい」だけで terminal outcome にしてはいけません。
 - open frontier には、証明を進めるために必要な algorithm change を必ず書きます。
   例: runtime certificate を返す、acceptance contract を強める、problem-class witness を
-  追加する、theorem を warm-start/local tube に狭める、globalization / Phase-I を足す。
+  追加する、theorem を warm-start/selected local scope に狭める、globalization / Phase-I を足す。
   これは proof guidance であり、proof-only field を production config へ足す口実では
   ありません。
 - `unverified_with_next_witness` を書いたらそこで止めず、named witness / next frontier を
@@ -182,7 +217,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - `python3 tools/agent_tools/formal_proof.py` で scaffold と query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
-- Lean/mathlib では mathlib docs、LeanSearch / Loogle / Moogle 系、Zulip archive、`exact?` / `apply?` のような in-editor tactic search を候補にします。
+- Lean では、proof theme が明示的に core-only を要求しない限り Mathlib を使う方を標準 route とします。mathlib docs、LeanSearch / Loogle / Moogle 系、Zulip archive、`exact?` / `apply?` のような in-editor tactic search を候補にし、routine な propositional / constructor / relation-composition / library-lemma search obligation では Aesop を既定の bounded automation として試します。`aesop?` / `aesop` の出力を確認し、可能なら短い証明へ最小化し、checker log を残します。`import Aesop` / `import Mathlib` が topic-local proof package で失敗する場合は、個別 package に ad hoc 依存を足す前に `python3 tools/agent_tools/lean_proof_env.py smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使い、AgentCanon 側の証明環境として整備します。topic-local package に Mathlib 依存を足すのは、その package 自体が Mathlib-based theory を所有する場合だけです。
 - Isabelle/HOL では AFP、loaded theory、Sledgehammer result、reconstruction proof を分けます。
 - Coq/Rocq では library search、CoqHammer、SMTCoq、Tactician などの適用範囲と限界を記録します。
 - SMT route は first-order / arithmetic / bit-vector / array など solver-friendly な obligation に限り、証明対象全体の代替にしません。
@@ -257,7 +292,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   最終命題の数学的依存でない限り証明対象にしない
 - 初期化・cold-start・Phase-I 由来の事実は、proof route の blocker として
   返す前に IR `code_facts` から具体式を拾い、lemma graph 上の
-  initialization / tube-entry node に接続する。コードから直接わかる式を
+  initialization / selected-scope-entry node に接続する。コードから直接わかる式を
   `unverified_with_next_witness` や user-facing blocker に残さない
 - selected initializer は `Init(Problem, InitializeConfig)` として扱い、
   hard-coded zero、default vector、supplied state などの個別値は IR が示す
@@ -329,7 +364,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - `<FORMAL_TARGET>` を正式な proposition に置き換える
    - informal proof sketch を assistant-checkable lemmas に分ける
 1. Automation:
-   - Lean/mathlib tactic search、Isabelle Sledgehammer、CoqHammer、SMT solver などを bounded subgoal に使う
+   - Lean では Mathlib/Aesop を標準 automation route とし、`aesop?` / `aesop`、Lean/mathlib tactic search、Isabelle Sledgehammer、CoqHammer、SMT solver などを bounded subgoal に使う
    - automation result は再構成・最小化・checker log まで確認する
 1. Verification:
    - generated command か project-specific command を実行する
@@ -558,7 +593,7 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
    - reachability / existence: 反復法が tolerance に届く、line search が受理する、など
    - algorithmic-blocker analysis: 現在の algorithm choice が theorem を
      阻んでいるか、その choice を変えるとどの proof obligation が必要になるか
-   - external assumption binding: backend profile、problem-class、local tube witness
+   - external assumption binding: backend profile、problem-class、selected local scope witness
 1. 正規化した命題に対して checker-backed な結果を一つ取りに行きます。
    - `verified`: escape hatch なしで checker が命題を証明した
    - `refuted`: counterexample / formal model / implementation trace が命題を否定した
@@ -655,7 +690,7 @@ Expansion graph record は次の形を基本にします。
 
 1. 外側 iteration の添字をすべての量に付けます。条件数、スケーリング、
    必要精度、前処理誤差を固定定数に潰してはいけません。固定定数を使う場合は、
-   local tube 全体で一様 bound が成り立つことを別 theorem として証明します。
+   selected local scope 全体で一様 bound が成り立つことを別 theorem として証明します。
 1. まず外側 recurrence が必要とする方向誤差や residual floor を決め、そこから
    inner solver の requested residual budget を導出します。典型形は
    `effective_residual_budget_k <= requested_residual_budget_k` なら

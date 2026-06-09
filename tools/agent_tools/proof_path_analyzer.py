@@ -41,7 +41,9 @@ CODE_FACT_DERIVABILITY_CLASSES = frozenset(
         "code_only_ir_algorithm_gap",
         "code_only_code_style_opacity",
         "external_backend_assumption",
+        "architecture_assumption",
         "mathematical_assumption",
+        "top_level_problem_config_lemma",
         "not_derivable_from_code",
         "proof_status_only",
     }

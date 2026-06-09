@@ -38,6 +38,7 @@ STATUS_PRIORITY = {
 }
 
 STATUS_CLASS = {
+    "runtime": "runtime",
     "verified": "verified",
     "assumption": "assumption",
     "external_assumption": "external",
@@ -57,6 +58,16 @@ STATIC_EDGE_STATUSES = {
     "static_checker_required",
     "static_resolution_gap",
 }
+
+RUNTIME_VIEW_EDGE_ROLES = {
+    "runtime_dependency",
+    "instance_interaction",
+    "variant_dispatch",
+    "callback_dispatch",
+    "state_transition",
+}
+
+FLOWCHART_VIEWS = ("proof", "runtime", "core")
 
 
 @dataclass(frozen=True)
@@ -90,6 +101,7 @@ class FlowchartReport:
     """Machine-readable flowchart report."""
 
     status: str
+    view: str
     root: str
     theorem: str
     source_ir_status: str
@@ -144,6 +156,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-code-facts",
         action="store_true",
         help="Render IR code facts as subordinate blocks.",
+    )
+    parser.add_argument(
+        "--view",
+        choices=FLOWCHART_VIEWS,
+        default="proof",
+        help=(
+            "Render mode. `proof` overlays LemmaGraph/proof_status; `runtime` "
+            "renders implementation edges only and omits proof-status labels; "
+            "`core` renders proof-relevant mathematical/solver/certificate/"
+            "diagnostic blocks and tagged equation facts only."
+        ),
+    )
+    parser.add_argument(
+        "--include-bookkeeping",
+        action="store_true",
+        help=(
+            "In runtime view, keep implementation_bookkeeping nodes that are "
+            "excluded from theorem-directed proof slices."
+        ),
     )
     parser.add_argument(
         "--direction",
@@ -335,7 +366,7 @@ def combine_status_maps(*maps: dict[str, set[str]]) -> dict[str, set[str]]:
     return combined
 
 
-def flow_label_for_node(node: dict[str, Any], proof_status: str) -> str:
+def flow_label_for_node(node: dict[str, Any], proof_status: str, *, view: str) -> str:
     """Build a compact block label for an IR node."""
     symbol = short_symbol(str(node.get("source_symbol", "")))
     role = str(node.get("math_role", "unknown"))
@@ -346,11 +377,12 @@ def flow_label_for_node(node: dict[str, Any], proof_status: str) -> str:
         pieces.append(f"precision: {precision}")
     if unit and unit != "unknown":
         pieces.append(f"unit: {unit}")
-    pieces.append(f"proof: {proof_status}")
+    if view == "proof":
+        pieces.append(f"proof: {proof_status}")
     return "\n".join(pieces)
 
 
-def flow_label_for_fact(fact: dict[str, Any], proof_status: str) -> str:
+def flow_label_for_fact(fact: dict[str, Any], proof_status: str, *, view: str) -> str:
     """Build a compact block label for a code fact."""
     target = str(fact.get("target", "fact"))
     expression = str(fact.get("expression", "")).strip()
@@ -362,10 +394,50 @@ def flow_label_for_fact(fact: dict[str, Any], proof_status: str) -> str:
         for item in (
             f"{kind}: {target}",
             expression,
-            f"proof: {proof_status}",
+            f"proof: {proof_status}" if view == "proof" else "",
         )
         if item
     )
+
+
+def should_render_edge(edge: dict[str, Any], *, view: str) -> bool:
+    """Return whether an IR edge belongs in the selected flowchart view."""
+    if view == "proof":
+        return True
+    return str(edge.get("role", "runtime_dependency")) in RUNTIME_VIEW_EDGE_ROLES
+
+
+def should_render_node(
+    node: dict[str, Any],
+    *,
+    view: str,
+    include_bookkeeping: bool,
+) -> bool:
+    """Return whether an IR node belongs in the selected flowchart view."""
+    if view == "proof" or include_bookkeeping:
+        return True
+    if view == "core":
+        math_role = str(node.get("math_role", ""))
+        equation_tags = node.get("equation_tags", ())
+        return (
+            (isinstance(equation_tags, list | tuple) and bool(equation_tags))
+            or math_role
+            in {
+                "mathematical_state_transition",
+                "linear_or_nonlinear_solve",
+                "certificate",
+                "diagnostic",
+            }
+        )
+    return str(node.get("proof_relevance", "required")) != "excluded"
+
+
+def should_render_fact(fact: dict[str, Any], *, view: str) -> bool:
+    """Return whether one IR code fact belongs in the selected flowchart view."""
+    if view != "core":
+        return True
+    equation_tags = fact.get("equation_tags", ())
+    return isinstance(equation_tags, list | tuple) and bool(equation_tags)
 
 
 def build_flowchart_report(
@@ -374,9 +446,13 @@ def build_flowchart_report(
     proof_status_payload: dict[str, Any] | None,
     *,
     include_code_facts: bool,
+    include_bookkeeping: bool,
     direction: str,
+    view: str,
 ) -> FlowchartReport:
     """Build the flowchart report."""
+    if view not in FLOWCHART_VIEWS:
+        raise ValueError(f"unknown flowchart view: {view}")
     graph_node_statuses, graph_fact_statuses, lemma_by_id = lemma_graph_statuses(lemma_graphs)
     fact_source_node = {
         str(fact.get("fact_id", "")): str(fact.get("source_node_id", ""))
@@ -388,8 +464,12 @@ def build_flowchart_report(
         lemma_by_id,
         fact_source_node,
     )
-    node_statuses = combine_status_maps(graph_node_statuses, overlay_node_statuses)
-    fact_statuses = combine_status_maps(graph_fact_statuses, overlay_fact_statuses)
+    if view in {"runtime", "core"}:
+        node_statuses: dict[str, set[str]] = defaultdict(set)
+        fact_statuses: dict[str, set[str]] = defaultdict(set)
+    else:
+        node_statuses = combine_status_maps(graph_node_statuses, overlay_node_statuses)
+        fact_statuses = combine_status_maps(graph_fact_statuses, overlay_fact_statuses)
 
     flow_nodes: list[FlowNode] = []
     flow_edges: list[FlowEdge] = []
@@ -397,15 +477,25 @@ def build_flowchart_report(
     for index, node in enumerate(ir_payload.get("nodes", []) or []):
         if not isinstance(node, dict):
             continue
+        if not should_render_node(
+            node,
+            view=view,
+            include_bookkeeping=include_bookkeeping,
+        ):
+            continue
         source_id = str(node.get("node_id", f"node_{index}"))
-        proof_status = strongest_status(node_statuses.get(source_id, set()))
+        proof_status = (
+            "runtime"
+            if view in {"runtime", "core"}
+            else strongest_status(node_statuses.get(source_id, set()))
+        )
         flow_id = f"n{index}"
         source_to_flow[source_id] = flow_id
         flow_nodes.append(
             FlowNode(
                 flow_id=flow_id,
                 source_id=source_id,
-                label=flow_label_for_node(node, proof_status),
+                label=flow_label_for_node(node, proof_status, view=view),
                 source_path=str(node.get("source_path", "")),
                 source_symbol=str(node.get("source_symbol", "")),
                 block_kind="algorithm_node",
@@ -419,18 +509,24 @@ def build_flowchart_report(
         for index, fact in enumerate(ir_payload.get("code_facts", []) or []):
             if not isinstance(fact, dict):
                 continue
+            if not should_render_fact(fact, view=view):
+                continue
             fact_id = str(fact.get("fact_id", f"fact_{index}"))
             source_node_id = str(fact.get("source_node_id", ""))
             if source_node_id not in source_to_flow:
                 continue
-            proof_status = strongest_status(fact_statuses.get(fact_id, set()))
+            proof_status = (
+                "runtime"
+                if view in {"runtime", "core"}
+                else strongest_status(fact_statuses.get(fact_id, set()))
+            )
             flow_id = f"f{index}"
             source_to_flow[fact_id] = flow_id
             flow_nodes.append(
                 FlowNode(
                     flow_id=flow_id,
                     source_id=fact_id,
-                    label=flow_label_for_fact(fact, proof_status),
+                    label=flow_label_for_fact(fact, proof_status, view=view),
                     source_path=str(fact.get("source_path", "")),
                     source_symbol=str(fact.get("source_symbol", "")),
                     block_kind="code_fact",
@@ -451,6 +547,8 @@ def build_flowchart_report(
 
     for edge in ir_payload.get("edges", []) or []:
         if not isinstance(edge, dict):
+            continue
+        if not should_render_edge(edge, view=view):
             continue
         source = source_to_flow.get(str(edge.get("source_node_id", "")))
         target = source_to_flow.get(str(edge.get("target_node_id", "")))
@@ -477,6 +575,7 @@ def build_flowchart_report(
     mermaid = render_mermaid(flow_nodes, flow_edges, direction=direction)
     return FlowchartReport(
         status="algorithm_flowchart_built",
+        view=view,
         root=f"{ir_payload.get('root_path', '')}::{ir_payload.get('root_symbol', '')}",
         theorem=str(ir_payload.get("target_theorem", "")),
         source_ir_status=str(ir_payload.get("status", "")),
@@ -514,6 +613,7 @@ def render_mermaid(nodes: tuple[FlowNode, ...] | list[FlowNode], edges: tuple[Fl
     lines.extend(
         [
             "  classDef verified fill:#dcfce7,stroke:#166534,color:#052e16;",
+            "  classDef runtime fill:#e0f2fe,stroke:#0369a1,color:#082f49;",
             "  classDef assumption fill:#fef9c3,stroke:#a16207,color:#422006;",
             "  classDef external fill:#ede9fe,stroke:#6d28d9,color:#2e1065;",
             "  classDef operational fill:#dbeafe,stroke:#1d4ed8,color:#172554;",
@@ -530,18 +630,21 @@ def render_mermaid(nodes: tuple[FlowNode, ...] | list[FlowNode], edges: tuple[Fl
 
 def render_markdown(report: FlowchartReport, title: str) -> str:
     """Render a Markdown report with Mermaid diagram."""
+    status_heading = "Proof Status Counts" if report.view == "proof" else "Runtime Status Counts"
+    status_label = "Proof status" if report.view == "proof" else "View status"
     lines = [
         f"# {title}",
         "",
+        f"- View: `{report.view}`",
         f"- Root: `{report.root}`",
         f"- Target theorem: `{report.theorem}`",
         f"- Source IR status: `{report.source_ir_status}`",
         f"- Blocks: `{report.node_count}`",
         f"- Edges: `{report.edge_count}`",
         "",
-        "## Status Counts",
+        f"## {status_heading}",
         "",
-        "| Status | Blocks |",
+        f"| {status_label} | Blocks |",
         "| --- | ---: |",
     ]
     for status, count in report.status_counts.items():
@@ -557,7 +660,7 @@ def render_markdown(report: FlowchartReport, title: str) -> str:
             "",
             "## Blocks",
             "",
-            "| Block | Source | Role | Proof status |",
+            f"| Block | Source | Role | {status_label} |",
             "| --- | --- | --- | --- |",
         ]
     )
@@ -591,7 +694,9 @@ def main() -> int:
         lemma_graphs,
         proof_status_payload,
         include_code_facts=bool(args.include_code_facts),
+        include_bookkeeping=bool(args.include_bookkeeping),
         direction=str(args.direction),
+        view=str(args.view),
     )
     if args.format == "mermaid":
         rendered = report.mermaid

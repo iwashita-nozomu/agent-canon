@@ -217,6 +217,25 @@ entries:
     tests:
       - tests/agent_tools/test_formal_proof.py
 
+  - id: lean-proof-env
+    summary: Creates and checks reusable Lean 4 proof environments with Mathlib/Aesop for formal-proof workflows.
+    path: tools/agent_tools/lean_proof_env.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/lean_proof_env.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/lean_proof_env.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_lean_proof_env.py
+
   - id: algorithm-expansion-ir
     summary: Builds AST-only Algorithm Expansion IR with instance interaction edges and first-class local proof obligations.
     path: tools/agent_tools/algorithm_expansion_ir.py
@@ -275,6 +294,46 @@ entries:
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_algorithm_flowchart.py
+
+  - id: ir-graph-correspondence
+    summary: Checks Algorithm Expansion IR equation facts against lemma graph code-fact nodes and proof-status adoption.
+    path: tools/agent_tools/ir_graph_correspondence.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/ir_graph_correspondence.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/ir_graph_correspondence.md
+      - agents/skills/algorithm-proof-exploration.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_ir_graph_correspondence.py
+
+  - id: kkt-equation-section
+    summary: Emits reproducible KKT solver-chain equation sections from Algorithm Expansion IR code facts.
+    path: tools/agent_tools/kkt_equation_section.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/kkt_equation_section.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/kkt_equation_section.md
+      - agents/skills/algorithm-proof-exploration.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_kkt_equation_section.py
 
   - id: proof-path-analyzer
     summary: Checks proof-status overlays against lemma graphs and reports connected proof holes.
