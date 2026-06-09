@@ -67,6 +67,14 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `agent-canon local-llm route-implementation-surface`
+  - 実装前の置き場所 router です。`--request-file`、`--request-stdin`、または
+    `--request` で依頼文を渡し、repo / directory / tool / skill / workflow /
+    root instruction / document / report surface の primary owner、candidate
+    paths、forbidden paths、required pre-edit checks を compact text または
+    JSON で返します。
+  - llama.cpp が使える場合は Local LLM advisory を併記し、使えない場合も
+    `IMPLEMENTATION_SURFACE_ROUTER_WARNING=...` 付き fallback を返します。
 - `agent-canon local-llm extract-prose-ir`
   - 複数 document と複数 term を受け取り、LocalLLM 向け part に分割して prose intermediate representation JSON を作ります。
   - 返す単位は単語 list ではなく、document responsibility、section role、term context、corpus hints、`dsl_seed`、`parts[]` です。
@@ -162,8 +170,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
   - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
-    入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
-    Python 実装は互換 engine として残します。
+    入口です。`route-implementation-surface` は実装前に primary owner と
+    required pre-edit checks を返します。`search`、`build-index`、`eval`
+    もこの CLI surface から呼び、Python 実装は互換 engine として残します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`

@@ -51,6 +51,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
 - 編集手段は、小〜中規模は patch-based edit、機械生成・一括変換は repo script / formatter の順に選ぶ
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
+- 実装 path を選ぶ前に、承認済み design packet が owner、canonical paths、forbidden paths、required checks をすでに固定していない限り、`agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text` を走らせるか引用する。code、tool、skill、workflow、document、runtime instruction のどこに置くかは、この compact route を source packet seed にして決める
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` を読み、各 implementation slice が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
 - 実装前に `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と design trace から導かれた narrow slice は `spark_worker` を先に使う
 - 変更対象の `Dependency Manifest Plan` を設計で固定し、編集前に upstream、編集後に downstream を読む

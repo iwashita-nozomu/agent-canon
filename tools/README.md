@@ -71,6 +71,7 @@ python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
+agent-canon local-llm route-implementation-surface --request-file reports/task.txt
 agent-canon local-llm build-index
 python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
@@ -137,6 +138,11 @@ their stdout/stderr under `reports/agent-eval-runs/<run-id>/`, then leaves
 `agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
+`agent-canon local-llm route-implementation-surface` is the pre-edit router for
+implementation ownership. Pass the user request or design question with
+`--request-file`, `--request-stdin`, or `--request`; the command returns a
+primary surface, candidate paths, forbidden paths, required pre-edit checks, and
+a warning-backed fallback when llama.cpp is unavailable.
 `agent-canon local-llm build-index` builds the repo-local ignored semantic-card
 index consumed by the LLM provider under `.agent-canon/search-index/`.
 `agent-canon local-llm eval` validates the configured single-file local LLM
@@ -179,8 +185,11 @@ repairs; each repair command runs the adjacent check path before completion.
     次に Rust 化する tool 候補を出します。派生 repo では
     `agent-canon rust-migration-plan --root vendor/agent-canon` を使います。
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
-    Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
-    呼び、現在の Python engine は内部互換実装として扱います。
+    Rust CLI です。`route-implementation-surface` は実装前に repo /
+    directory / tool / skill / workflow / root instruction / document /
+    report surface の primary owner と required check を返します。
+    `search`、`build-index`、`eval` も同じ CLI surface から呼び、現在の
+    Python engine は内部互換実装として扱います。
     `structured-analysis build` は repo source を書き換えず、user-home
     cache に全ファイルの中間表現 DB と warning DB を再生成します。
     `structured-analysis document-inventory` は document-canon cleanup の

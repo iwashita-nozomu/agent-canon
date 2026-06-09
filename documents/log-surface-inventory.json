@@ -2596,7 +2596,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM",
-      "line": 1330,
+      "line": 2000,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2604,7 +2604,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 395,
+      "line": 549,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2612,7 +2612,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 402,
+      "line": 556,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2620,7 +2620,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 416,
+      "line": 570,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2628,7 +2628,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 1387,
+      "line": 2057,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2636,7 +2636,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_FILE",
-      "line": 1327,
+      "line": 1997,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2644,7 +2644,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_MODEL",
-      "line": 1328,
+      "line": 1998,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2652,7 +2652,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_PROMPT_SHA",
-      "line": 1329,
+      "line": 1999,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2660,7 +2660,87 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_SCOPE",
-      "line": 1326,
+      "line": 1996,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FORBIDDEN_PATHS",
+      "line": 1127,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER",
+      "line": 688,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER",
+      "line": 1107,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 673,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 680,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 1097,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
+      "line": 689,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
+      "line": 1115,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
+      "line": 690,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_WARNING",
+      "line": 1121,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2668,30 +2748,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI",
-      "line": 68,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_CLI",
-      "line": 122,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_CLI",
-      "line": 134,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_CLI_ERROR",
       "line": 69,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -2699,8 +2755,16 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_CLI_ERROR",
-      "line": 123,
+      "field": "LOCAL_LLM_CLI",
+      "line": 129,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI",
+      "line": 141,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2708,7 +2772,23 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI_ERROR",
-      "line": 135,
+      "line": 70,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI_ERROR",
+      "line": 130,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI_ERROR",
+      "line": 142,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2716,7 +2796,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR",
-      "line": 479,
+      "line": 633,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2724,7 +2804,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR",
-      "line": 503,
+      "line": 657,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2732,7 +2812,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
-      "line": 474,
+      "line": 628,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2740,7 +2820,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
-      "line": 505,
+      "line": 659,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2748,7 +2828,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 432,
+      "line": 586,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2756,7 +2836,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 439,
+      "line": 593,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2764,7 +2844,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 448,
+      "line": 602,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2772,7 +2852,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 456,
+      "line": 610,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2780,7 +2860,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 488,
+      "line": 642,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2788,7 +2868,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 495,
+      "line": 649,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2796,7 +2876,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 500,
+      "line": 654,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2804,7 +2884,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_JSON",
-      "line": 504,
+      "line": 658,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2812,7 +2892,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_MODEL",
-      "line": 477,
+      "line": 631,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2820,7 +2900,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_PARTS",
-      "line": 476,
+      "line": 630,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2828,7 +2908,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_PARTS",
-      "line": 507,
+      "line": 661,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2836,7 +2916,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_PROMPT_SHA",
-      "line": 478,
+      "line": 632,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2844,7 +2924,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_PROMPT_SHA",
-      "line": 508,
+      "line": 662,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2852,7 +2932,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_SCOPE",
-      "line": 473,
+      "line": 627,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2860,7 +2940,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_TERMS",
-      "line": 475,
+      "line": 629,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2868,7 +2948,39 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_TERMS",
-      "line": 506,
+      "line": 660,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PRIMARY_OWNER",
+      "line": 1124,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PRIMARY_PATHS",
+      "line": 1126,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PRIMARY_SCORE",
+      "line": 1125,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PRIMARY_SURFACE",
+      "line": 1123,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },

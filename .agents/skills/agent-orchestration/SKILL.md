@@ -20,6 +20,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. First classify the request into one of these modes:
    - `repo-changing execution`: the user is asking to edit the repo, start the run, or produce a concrete kickoff command now
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
+1. For repo-changing execution where the implementation owner is not already fixed by an explicit path and source packet, run `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` before selecting edit paths. Use `PRIMARY_SURFACE`, `PRIMARY_PATHS`, `FORBIDDEN_PATHS`, and `REQUIRED_PRE_EDIT_CHECKS` as the source packet seed. If it returns `IMPLEMENTATION_SURFACE_ROUTER_WARNING=...`, keep the warning in the run bundle and still use the deterministic fallback candidates instead of guessing from chat context.
 1. Before reading broad prose, scanning raw logs, or spawning a subagent, check whether a canonical tool already owns the needed judgment. If yes, call the tool first, trust its compact pass/finding output for the covered property, and read only the exact file slice needed to repair a finding.
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
