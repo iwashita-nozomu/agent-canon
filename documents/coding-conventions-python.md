@@ -150,6 +150,6 @@ def load_config(path: Path) -> dict[str, str]:
 
 ## Markdown ファイル修正後
 
-- `make docs-check`
+- `tools/bin/agent-canon docs check`
 - 相対パスと参照先の存在を確認
 - 必要なら `make ci` で Python と docs をまとめて確認

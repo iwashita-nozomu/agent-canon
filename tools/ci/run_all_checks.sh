@@ -288,7 +288,7 @@ echo ""
 
 # 1. Markdown / link checks
 echo "1️⃣  documentation checks を実行中..."
-if bash tools/ci/run_docs_checks.sh 2>&1; then
+if tools/bin/agent-canon docs check 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"

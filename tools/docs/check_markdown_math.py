@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import argparse
 import glob
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -21,6 +24,25 @@ LEGACY_DISPLAY_PATTERN = re.compile(r"(?<!\\)\\\[|(?<!\\)\\\]")
 DISPLAY_SINGLE_LINE_PATTERN = re.compile(r"^\$\$.+\$\$$")
 STANDALONE_INLINE_PATTERN = re.compile(r"^\$(?!\$).+(?<!\$)\$$")
 INLINE_DOUBLE_DOLLAR_PATTERN = re.compile(r"\$\$.+?\$\$")
+
+
+def forward_cli_to_rust(args: list[str]) -> int:
+    """Forward legacy CLI use to the unified Rust docs checker."""
+    root = Path(__file__).resolve().parents[2]
+    caller_chain = f"ppid={os.getppid()}"
+    print("AGENT_CANON_FORWARDER=deprecated", file=sys.stderr)
+    print("AGENT_CANON_FORWARDER_SEVERITY=fix-now", file=sys.stderr)
+    print(f"AGENT_CANON_FORWARDER_CALLER_CHAIN={caller_chain}", file=sys.stderr)
+    print(
+        "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs check",
+        file=sys.stderr,
+    )
+    completed = subprocess.run(
+        [str(root / "tools/bin/agent-canon"), "docs", "check", *args],
+        cwd=Path.cwd(),
+        check=False,
+    )
+    return completed.returncode
 
 
 def collect_markdown_files(patterns: list[str]) -> list[str]:
@@ -111,4 +133,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(forward_cli_to_rust(sys.argv[1:]))

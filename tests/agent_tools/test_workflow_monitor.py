@@ -19,7 +19,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
-MCP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_mcp_inventory.py"
 
 
 class WorkflowMonitorTest(unittest.TestCase):
@@ -339,49 +338,6 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
-
-    def test_mcp_inventory_records_monitoring_when_report_dir_is_given(self) -> None:
-        """MCP inventory checks should record pass evidence when directed to a run."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            report_dir = root / "reports" / "agents" / "run-2"
-            codex = root / "fake-codex"
-            codex.write_text(
-                "#!/usr/bin/env bash\n"
-                "printf '%s\\n' '[{\"name\":\"repo_mcp_server\","
-                "\"enabled\":true,\"command\":\"bash\","
-                "\"args\":[\"mcp/repo_mcp_server.sh\"]}]'\n",
-                encoding="utf-8",
-            )
-            codex.chmod(0o755)
-            mcp_dir = root / "mcp"
-            mcp_dir.mkdir()
-            (mcp_dir / "repo_mcp_server.sh").write_text(
-                "#!/usr/bin/env bash\n",
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(MCP_SCRIPT),
-                    "--codex-bin",
-                    str(codex),
-                    "--require",
-                    "repo_mcp_server",
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
-            self.assertIn("mcp_inventory=pass", text)
-            self.assertIn("check_mcp_inventory.py recorded MCP inventory pass", text)
 
 
 if __name__ == "__main__":

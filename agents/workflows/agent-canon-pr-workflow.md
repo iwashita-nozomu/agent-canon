@@ -207,7 +207,7 @@ python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --git
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/ci/check_github_workflows.py
-bash tools/ci/run_docs_checks.sh
+tools/bin/agent-canon docs check
 bash tools/ci/run_all_checks.sh --quick
 ```
 
@@ -391,7 +391,7 @@ Scope:
 
 Validation:
 - python3 tools/ci/check_github_workflows.py: pass
-- make docs-check: pass
+- tools/bin/agent-canon docs check: pass
 - make ci: pass
 ```
 

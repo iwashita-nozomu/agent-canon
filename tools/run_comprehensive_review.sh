@@ -213,7 +213,7 @@ log_info "【Document Checks】"
 
 log_info ""
 log_info "8️⃣ Documentation checks..."
-if bash "$SCRIPT_DIR/ci/run_docs_checks.sh" > "$LOG_DIR/docs_check.log" 2>&1; then
+if "$SCRIPT_DIR/bin/agent-canon" docs check > "$LOG_DIR/docs_check.log" 2>&1; then
     log_success "docs-check: OK"
 else
     log_error "docs-check: FAILED (see $LOG_DIR/docs_check.log)"

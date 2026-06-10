@@ -213,6 +213,54 @@ description = "Requires report projection prose to use positive responsibility c
 required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
 
 [[evals]]
+id = "md-style-check-unified-rust-docs"
+target = ".agents/skills/md-style-check/SKILL.md"
+kind = "skill"
+description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-1"
+critical = true
+description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust", "DOCS_CHECK_REPORT_BEGIN"]
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-2"
+critical = true
+description = "Requires adjacent checks after formatter or fixer execution."
+required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
+
+[[evals]]
+id = "subagent-bootstrap-tool-first-gate"
+target = ".agents/skills/subagent-bootstrap/SKILL.md"
+kind = "skill"
+description = "Subagent bootstrap must not spend subagent tokens on deterministic checks already owned by tools."
+
+[[evals.checklist]]
+id = "SUBAGENT-TOOL-FIRST-1"
+critical = true
+description = "Requires canonical checker/router/dashboard before read-only exploration."
+required_regex = ["Before assigning read-only exploration", "canonical checker", "compact tool artifacts", "not to repeat deterministic tool checks"]
+
+[[evals]]
+id = "md-style-check-human-doc-unified-rust-docs"
+target = "agents/skills/md-style-check.md"
+kind = "skill"
+description = "Human Markdown style skill doc must expose the unified Rust docs command and formatter-adjacent check contract."
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-1"
+critical = true
+description = "Documents the unified check, format, math, and Mermaid commands."
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid", "DOCS_CHECK_REPORT_BEGIN"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-2"
+critical = true
+description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
+required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals]]
 id = "html-output-shim"
 target = ".agents/skills/html-output/SKILL.md"
 kind = "skill"
@@ -942,6 +990,18 @@ required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subage
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]
+id = "ORCH-TOOL-FIRST-1"
+critical = true
+description = "Uses tool pass/finding output as the authority before broad reading or subagents."
+required_regex = ["canonical tool", "call the tool first", "trust its compact pass/finding output", "read only the exact file slice"]
+
+[[evals.checklist]]
+id = "ORCH-TOOL-FIRST-2"
+critical = true
+description = "Prevents subagents from repeating deterministic tool checks."
+required_regex = ["Do not use `explorer`", "re-check properties", "compact tool artifacts", "extend or repair the tool contract"]
+
+[[evals.checklist]]
 id = "REPORT-ROUTING-SKILL-1"
 critical = true
 description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and pairs raw machine result storage with result-artifact-writeout."
@@ -1046,8 +1106,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-SHIM-5"
 critical = true
-description = "Uses MCP goal.loop_status as the mechanical iteration gate."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration"]
+description = "Uses goal_loop.py as the mechanical iteration gate."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration"]
 
 [[evals]]
 id = "adaptive-improvement-loop-human-skill"
@@ -1088,8 +1148,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-HUMAN-5"
 critical = true
-description = "Requires MCP goal.loop_status to keep iterations mechanical."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "MCP Goal Loop Status"]
+description = "Requires goal_loop.py to keep iterations mechanical."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "Goal Loop Status"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-6"
@@ -1142,8 +1202,8 @@ required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-
 [[evals.checklist]]
 id = "AIL-WF-5"
 critical = true
-description = "Requires MCP goal.loop_status to decide whether to continue or close."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+description = "Requires goal_loop.py to decide whether to continue or close."
+required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
 
 [[evals.checklist]]
 id = "AIL-WF-7"
@@ -1233,24 +1293,24 @@ required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "i
 id = "codex-goals-workflow"
 target = "agents/workflows/codex-goals-workflow.md"
 kind = "workflow"
-description = "The Codex goals workflow must bind the feature to goal.md and MCP loop status."
+description = "The Codex goals workflow must bind the feature to goal.md and goal_loop.py status."
 
 [[evals.checklist]]
 id = "CODEX-GOALS-1"
 critical = true
-description = "Defines the role split between goal.md, Codex goals, MCP, and goal_loop.py."
-required_regex = ["goal\\.md", "Codex `goals`", "goal\\.loop_status", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
+description = "Defines the role split between goal.md, Codex goals, and goal_loop.py."
+required_regex = ["goal\\.md", "Codex `goals`", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-2"
 critical = true
-description = "Requires feature and MCP preflight commands."
-required_regex = ["codex features list", "check_mcp_inventory\\.py", "goal_loop\\.py status"]
+description = "Requires feature and goal loop status commands."
+required_regex = ["codex features list", "goal_loop\\.py status"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-3"
 critical = true
-description = "Blocks closeout while MCP or goal.md says to continue."
+description = "Blocks closeout while goal_loop.py or goal.md says to continue."
 required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop", "not complete"]
 
 [[evals.checklist]]
@@ -1314,6 +1374,12 @@ required_regex = [
   "skill accuracy",
 ]
 
+[[evals.checklist]]
+id = "TOKEN-TOOL-FIRST-1"
+critical = true
+description = "Calls tools first and treats pass/finding output as authority for covered properties."
+required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand compact tool artifacts to subagents"]
+
 [[evals]]
 id = "slide-production-workflow"
 target = "agents/workflows/slide-production-workflow.md"
@@ -1373,37 +1439,13 @@ required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice",
 id = "CODEX-WF-GOALS-1"
 critical = true
 description = "Mentions the goals feature preflight and durable goal source."
-required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal\\.loop_status"]
+required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal_loop\\.py"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-2"
 critical = true
 description = "Requires Plan-mode contract output for user-specified goals."
 required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "Execution Slices"]
-
-[[evals]]
-id = "repo-mcp-server-goal-loop-tool"
-target = "mcp/repo_mcp_server.py"
-kind = "mcp"
-description = "The repo MCP server must expose goal loop state for adaptive iterations."
-
-[[evals.checklist]]
-id = "MCP-GOAL-1"
-critical = true
-description = "Declares the goal.loop_status tool and calls goal_loop.py status."
-required_regex = ["goal\\.loop_status", "goal_loop\\.py", "NEXT_ACTION"]
-
-[[evals]]
-id = "mcp-readme-goal-loop-tool"
-target = "mcp/README.md"
-kind = "mcp"
-description = "The MCP README must document goal.loop_status as an iteration gate."
-
-[[evals.checklist]]
-id = "MCP-README-GOAL-1"
-critical = true
-description = "Documents goal.loop_status and run_next_iteration behavior."
-required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "adaptive improvement"]
 
 [[evals]]
 id = "oop-readability-external-repo-route"

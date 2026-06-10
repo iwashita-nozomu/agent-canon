@@ -4,7 +4,6 @@
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares active guardrail hooks
-# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits optional MCP context JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
@@ -44,7 +43,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
-HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
@@ -393,7 +391,6 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("hooks = true", config_text)
         self.assertNotIn("codex_hooks", config_text)
         self.assertTrue(HOOKS_JSON.exists())
-        self.assertTrue(HOOK_SCRIPT.exists())
         self.assertTrue(HOOK_DISPATCHER.exists())
         self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
         self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
@@ -1292,15 +1289,15 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            docs_dir = temp_root / "tools" / "docs"
-            docs_dir.mkdir(parents=True)
-            checker_text = (
-                "#!/usr/bin/env python3\n"
-                "import sys\n"
-                "print('STYLE_TEST_CHECKER_OK=' + ','.join(sys.argv[1:]))\n"
+            bin_dir = temp_root / "tools" / "bin"
+            bin_dir.mkdir(parents=True)
+            agent_canon = bin_dir / "agent-canon"
+            agent_canon.write_text(
+                "#!/usr/bin/env sh\n"
+                "echo STYLE_TEST_CHECKER_OK=\"$*\"\n",
+                encoding="utf-8",
             )
-            (docs_dir / "check_markdown_lint.py").write_text(checker_text, encoding="utf-8")
-            (docs_dir / "check_markdown_math.py").write_text(checker_text, encoding="utf-8")
+            agent_canon.chmod(0o755)
             readme = temp_root / "README.md"
             data = temp_root / "data.lock"
             root_jsonl = temp_root / "runtime.jsonl"
@@ -1343,7 +1340,7 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
-        self.assertEqual(log_entry["selected_checkers"], ["markdown_lint", "markdown_math"])
+        self.assertEqual(log_entry["selected_checkers"], ["agent_canon_docs_check"])
         self.assertEqual(log_entry["unchecked_count"], 1)
         self.assertEqual(
             cast("list[dict[str, object]]", log_entry["unchecked_files"])[0]["paths"],
@@ -1367,11 +1364,11 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            docs_dir = temp_root / "tools" / "docs"
-            docs_dir.mkdir(parents=True)
-            fail_checker = "#!/usr/bin/env python3\nraise SystemExit(99)\n"
-            (docs_dir / "check_markdown_lint.py").write_text(fail_checker, encoding="utf-8")
-            (docs_dir / "check_markdown_math.py").write_text(fail_checker, encoding="utf-8")
+            bin_dir = temp_root / "tools" / "bin"
+            bin_dir.mkdir(parents=True)
+            agent_canon = bin_dir / "agent-canon"
+            agent_canon.write_text("#!/usr/bin/env sh\nexit 99\n", encoding="utf-8")
+            agent_canon.chmod(0o755)
             validator = temp_root / "codex-cli-guide" / "tools" / "validate_split.py"
             validator.parent.mkdir(parents=True)
             validator.write_text(
@@ -2766,32 +2763,6 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
 
-    def test_mcp_context_hook_outputs_valid_additional_context(self) -> None:
-        """The hook script should emit JSON Codex can add to model context."""
-        result = subprocess.run(
-            ["bash", str(HOOK_SCRIPT), "SessionStart"],
-            cwd=PROJECT_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout)
-
-        hook_output = payload["hookSpecificOutput"]
-        self.assertEqual(hook_output["hookEventName"], "SessionStart")
-        self.assertIn("ordinary consultation", hook_output["additionalContext"])
-        self.assertIn("not repository tasks", hook_output["additionalContext"])
-        self.assertIn("Do not run check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("repo_mcp_server", hook_output["additionalContext"])
-        self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("manual context helper only", hook_output["additionalContext"])
-        self.assertIn("mcp_preflight_unavailable", hook_output["additionalContext"])
-        self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])
-        self.assertIn("goal.loop_status", hook_output["additionalContext"])
-        self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])
-        self.assertIn("context/loop-status only", hook_output["additionalContext"])
-        self.assertIn("do not repeat that limitation", hook_output["additionalContext"])
-
     def test_prompt_secret_guard_blocks_obvious_api_key(self) -> None:
         """The prompt guard should block high-confidence secret patterns."""
         result = subprocess.run(
@@ -3656,6 +3627,69 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["skill_source_fields"], ["tool_input"])
         self.assertTrue(entry["tool_input_fingerprint"])
 
+    def test_skill_usage_logger_does_not_treat_tool_input_search_as_routing_candidate(self) -> None:
+        """Tool input mentions are execution evidence, not prompt-derived routing candidates."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "command": (
+                                "rg -n \"skill_usage_logger.py|agent-log-analysis\" "
+                                ".codex/hooks tests"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["candidate_skills"], [])
+        self.assertEqual(entry["candidate_tools"], [])
+        self.assertEqual(entry["selected_tools"], [])
+        self.assertEqual(entry["skill_source_fields"], ["tool_input"])
+
+    def test_skill_usage_logger_records_hook_tool_execution(self) -> None:
+        """Direct hook script execution should remain selected repo-tool evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "command": "python3 .codex/hooks/skill_usage_logger.py"
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["candidate_tools"], [])
+        self.assertEqual(entry["selected_tools"], ["skill_usage_logger.py"])
+
     def test_skill_usage_logger_does_not_count_prompt_shell_variables_as_skills(self) -> None:
         """Prompt dollar tokens should be known skills, not shell variable lookalikes."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3883,7 +3917,7 @@ class CodexHooksTest(unittest.TestCase):
                 input=json.dumps(
                     {
                         "hookEventName": "UserPromptSubmit",
-                        "prompt": "マークダウンの hook と docs-check が引っかかっていないか見たい。",
+                        "prompt": "マークダウンの hook と agent-canon docs check が引っかかっていないか見たい。",
                     }
                 ),
                 check=True,
@@ -3898,7 +3932,7 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
                     }
                 ),
                 check=True,
@@ -3911,9 +3945,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(prompt.stdout, "")
         self.assertEqual(tool.stdout, "")
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
-        self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
-        self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
-        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-cli", entries[0]["candidate_tools"])
+        self.assertEqual(entries[1]["candidate_tools"], [])
+        self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
         """Optimization prompts should route to the computational optimization skill."""
@@ -3968,7 +4002,7 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
                     }
                 ),
                 check=True,
@@ -3982,7 +4016,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
         self.assertEqual(entries[1]["workflow_selection_kind"], "context_workflow")
         self.assertEqual(entries[1]["workflow_context_source"], "recent_log")
-        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+        self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
         """Plain public skill ids in user prompts should become selected skill evidence."""
@@ -4012,6 +4046,57 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["candidate_skills"], [])
         self.assertEqual(entry["skill_selection_kind"], "declared_skill")
         self.assertEqual(entry["skill_source_fields"], ["prompt"])
+
+    def test_skill_usage_logger_discovers_current_repo_skill_ids(self) -> None:
+        """New AgentCanon skill shims should be counted without hand-editing the hook list."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-log-analysis and $prose-reasoning-graph.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["selected_skills"], ["agent-log-analysis", "prose-reasoning-graph"])
+        self.assertEqual(entry["skill_selection_kind"], "declared_skill")
+
+    def test_skill_usage_logger_does_not_route_standalone_toolcall_prompt_to_log_analysis(self) -> None:
+        """Standalone ToolCall implementation text should not imply log-analysis routing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Implement ToolCall parser support in the runtime adapter",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("agent-log-analysis", entry["candidate_skills"])
 
     def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
         """Prompt feedback should be classified with bounded redacted prompt text."""

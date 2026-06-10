@@ -83,7 +83,7 @@ def write_planning_artifacts(report_dir: Path) -> None:
             (
                 "- kickoff: request_clause_ids=C1 "
                 "skills=$agent-orchestration,$codex-task-workflow "
-                "stage owner=codex subagent=worker mcp_preflight_not_required "
+                "stage owner=codex subagent=worker "
                 "web_research_not_required next=implementation"
             ),
             "- validation: request_clause_ids=C1 repo_dependency_review=pass next=closeout",
@@ -101,7 +101,6 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "## Signals",
             "- skills=$agent-orchestration,$codex-task-workflow",
             "- stage owner=codex subagent=worker parent_direct_reason=small test run",
-            "- mcp_preflight_not_required: no MCP tool needed for this unit test",
             "- repo_dependency_review=pass path_count=12",
             "- web_research_not_required: local deterministic test",
             "- review_status=approve",

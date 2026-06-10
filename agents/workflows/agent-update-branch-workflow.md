@@ -46,7 +46,7 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 ```bash
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 make agent-checks
-make docs-check
+tools/bin/agent-canon docs check
 make ci
 ```
 

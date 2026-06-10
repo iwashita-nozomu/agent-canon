@@ -20,6 +20,7 @@ downstream implementation agent_tools/search_index.py builds repo-local semantic
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
+downstream implementation ../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 @dependency-end
 -->
 
@@ -71,6 +72,8 @@ python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
+agent-canon local-llm route-implementation-surface --request-file reports/task.txt
+agent-canon test-design check tests
 agent-canon local-llm build-index
 python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
@@ -134,9 +137,19 @@ required eval families. It runs role, skill/workflow prompt, local LLM,
 workflow-selection, and report-quality evals with `--accumulate`, captures
 their stdout/stderr under `reports/agent-eval-runs/<run-id>/`, then leaves
 `eval_accumulation_check.py` to validate the resulting archive structure.
+`agent-canon test-design check` scans test-like files for missing oracle,
+private-detail coupling, exact mock/output/prose assertions, wall-clock
+waiting, unseeded randomness, and property/metamorphic candidates. Use it
+before writing or rewriting tests; `fix-now` findings are repair targets, while
+`review` and `design-hint` findings feed the `$test-design` skill.
 `agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
+`agent-canon local-llm route-implementation-surface` is the pre-edit router for
+implementation ownership. Pass the user request or design question with
+`--request-file`, `--request-stdin`, or `--request`; the command returns a
+primary surface, candidate paths, forbidden paths, required pre-edit checks, and
+a warning-backed fallback when llama.cpp is unavailable.
 `agent-canon local-llm build-index` builds the repo-local ignored semantic-card
 index consumed by the LLM provider under `.agent-canon/search-index/`.
 `agent-canon local-llm eval` validates the configured single-file local LLM
@@ -160,6 +173,12 @@ Rust entrypoint for document-canon inventory. It reports runtime mirrors,
 generated evidence, closed issue records, missing dependency manifests,
 duplicate headings, and stale document names, and can feed those findings into
 the structured-analysis SQLite graph through `import-document-inventory`.
+`tools/bin/agent-canon docs check` is the canonical Rust Markdown docs checker.
+Use `docs format`, `docs fix-math`, and `docs fix-mermaid` for mechanical
+repairs; each repair command runs the adjacent check path before completion.
+`tools/bin/agent-canon test-design check` is the canonical Rust test-design
+diagnostic entrypoint. It emits compact `fix-now`, `review`, and `design-hint`
+findings for resilient test planning.
 
 ## 含めるもの
 - `bin/`
@@ -175,19 +194,12 @@ the structured-analysis SQLite graph through `import-document-inventory`.
     `rust-migration-plan` は固定 policy と hook / skill feedback logs から
     次に Rust 化する tool 候補を出します。派生 repo では
     `agent-canon rust-migration-plan --root vendor/agent-canon` を使います。
-    `mcp-preflight-policy` は相談、GitHub-only read inspection、local repo
-    task の境界を機械判定します。`github-actions-read`、`github-read`、
-    `pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、
-    `implementation`、`validation`、`pr-mutation`、`issue-sync` は `required`
-    です。`mcp-inventory` は Rust 実装の repo MCP inventory checker で、
-    MCP evidence が必要な workflow、または MCP surface を変更する task
-    で `agent-canon mcp-inventory --root . --require repo_mcp_server
-    --session-cache` を使います。local Cargo が lockfile を読めない環境では
-    `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior が
-    scope でない限り Python / shell gate で検証を続けます。
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
-    Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
-    呼び、現在の Python engine は内部互換実装として扱います。
+    Rust CLI です。`route-implementation-surface` は実装前に repo /
+    directory / tool / skill / workflow / root instruction / document /
+    report surface の primary owner と required check を返します。
+    `search`、`build-index`、`eval` も同じ CLI surface から呼び、現在の
+    Python engine は内部互換実装として扱います。
     `structured-analysis build` は repo source を書き換えず、user-home
     cache に全ファイルの中間表現 DB と warning DB を再生成します。
     `structured-analysis document-inventory` は document-canon cleanup の
@@ -207,6 +219,7 @@ the structured-analysis SQLite graph through `import-document-inventory`.
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では responsibility-based semantic / local-LLM search を先に走らせた後の比較 evidence として併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
+  - `agent-canon test-design check` は既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
@@ -392,13 +405,8 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 After evidence is verified, `workflow_monitor.py --closeout-token-preset` records the standard behavior tokens consumed by `evaluate_agent_run.py`; it is a recording shortcut, not a substitute for validation evidence.
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically.
-Use `agent-canon mcp-preflight-policy` before turning read-only GitHub
-inspection into a local repository task. Use `agent-canon mcp-inventory --root
-. --require repo_mcp_server --session-cache` only when the workflow needs MCP
-evidence or the task edits MCP surfaces, and use
-`check_mcp_inventory.py --report-dir <run>` only when the run bundle needs
-direct `workflow_monitoring.md` evidence. `run_repo_dependency_review.sh` can
-append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
+`run_repo_dependency_review.sh` can append evidence when given `--report-dir`
+or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 `compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
 When a run uses skills, prompt eval evidence is required. Run

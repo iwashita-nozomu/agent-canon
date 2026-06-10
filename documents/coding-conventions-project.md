@@ -35,7 +35,7 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 
 - `documents/` には正本だけを置きます。
 - 実装変更でルールや設計が変わる場合は、対応する文書を同じ変更で更新します。
-- Markdown を編集したら、対象の `.md` に `mdformat` を適用し、その後で `make docs-check` を通さなければなりません。
+- Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通さなければなりません。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。
 - agent team の要約は `agents/README.md` に集約し、他の入口へ複製しません。

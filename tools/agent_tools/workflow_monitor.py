@@ -75,7 +75,6 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "diff_check_agent_decision=approve diff_check_agent_complete=yes",
 )
 STANDARD_CLOSEOUT_SIGNALS = (
-    "mcp_inventory=pass",
     "repo_dependency_review=pass scope=repo-wide",
     "web_research_not_required reason=not-needed-for-closeout-token-recording",
     "review_status=approve",

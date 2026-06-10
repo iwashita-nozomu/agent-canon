@@ -20,7 +20,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `make ci-quick`
 - `make ci`
-- `make docs-check`
+- `tools/bin/agent-canon docs check`
 - `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
 - `python3 tools/agent_tools/check_convention_compliance.py`
 

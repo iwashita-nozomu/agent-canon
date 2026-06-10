@@ -65,7 +65,7 @@ git submodule status vendor/agent-canon
 
 ```bash
 make ci-quick
-make docs-check
+tools/bin/agent-canon docs check
 ```
 
 1. `main` へ持ち帰る

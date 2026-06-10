@@ -6,8 +6,7 @@
 # responsibility Documents Project-scoped Codex settings. for this repository.
 # upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
-# downstream implementation ./hooks.json injects MCP startup and prompt context
-# downstream implementation ../tools/agent_tools/check_mcp_inventory.py verifies MCP inventory
+# downstream implementation ./hooks.json injects lifecycle hook context
 # downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates agent registry and role TOML
 # downstream design ../agents/workflows/token-efficient-codex-workflow.md token-aware runtime modes
 # @dependency-end
@@ -336,12 +335,3 @@ config_file = "agents/test_designer.toml"
 [agents.worker]
 description = "Implementation agent for bounded code, docs, or test changes."
 config_file = "agents/worker.toml"
-
-[mcp_servers.repo_mcp_server]
-command = "bash"
-args = ["mcp/repo_mcp_server.sh"]
-cwd = "."
-enabled = true
-required = false
-startup_timeout_sec = 20
-tool_timeout_sec = 300

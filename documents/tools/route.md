@@ -38,6 +38,11 @@ request. It always starts with `$agent-orchestration`, adds
 task-shape skills such as `$result-artifact-writeout`, `$agent-learning`, or
 `$oop-readability-check`.
 
+Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are
+log-analysis tasks. `route.py --prompt ... --format json` should include
+`$agent-log-analysis` for those requests so the agent reads compact runtime
+dashboard evidence before editing prompt, hook, skill, or workflow surfaces.
+
 Use this tool when a task needs a short answer to "which profile, check,
 runtime, skill, or closeout path applies?" Use the specialized checker or
 runner only after `route.py` points to it.

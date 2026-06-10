@@ -99,8 +99,8 @@ When `goal.md` was blocked on the source PR, update it after each queue step:
 - after source merge, mark the source PR backlog item complete;
 - after template pin realignment, mark the freshness item complete;
 - after dependent validation passes, mark the validation items complete;
-- only set `goal_status: achieved` when `goal_loop.py status` and repo MCP
-  `goal.loop_status` report `NEXT_ACTION=close_goal_loop`.
+- only set `goal_status: achieved` when `goal_loop.py status` reports
+  `NEXT_ACTION=close_goal_loop`.
 
 ## Convention Compliance Gate
 
