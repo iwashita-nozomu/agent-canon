@@ -15,7 +15,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.task_authority import AUTHORITY_ENV, AUTHORITY_FILE_NAME, find_authority_path
+from tools.agent_tools.task_authority import (
+    AUTHORITY_ENV,
+    AUTHORITY_FILE_NAME,
+    find_authority_path,
+)
 
 
 class TaskAuthorityTest(unittest.TestCase):
