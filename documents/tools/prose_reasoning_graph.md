@@ -81,6 +81,11 @@ diagnostics、edit operations、natural-language explanation、projection metada
 - projection view:
   macro-claim、subtopic、reader-state transition、rhetorical role は lower graph からの
   derived projection view です。
+- selected ordering:
+  `project` は全文 sentence anchor を、選択された ordering subgraph の priority topological sort として
+  `selected_ordering.ordered_anchors` に出します。`hard_before` は topo constraint、
+  `adjacency_preferred` は soft priority として扱い、hard cycle は diagnostic に出します。
+  writing LLM はこの順序を DSL-to-prose input sequence として使います。
 - node record:
   `nodes table` は id、document id、layer、kind、text、source span、confidence、
   `payload_json` を保持します。
@@ -206,7 +211,7 @@ rewrite packet の本文は file artifact として開きます。
 | Integration plan | `integrate --out <file>` | rewrite candidate と recursive verification route を見る。 |
 | Skill handoff | `skill-handoff --out <file>` | receiving skill へ bounded graph evidence を渡す。 |
 | Document check | `check-document --out-dir <dir>` | prose diagnostics と target document-canon findings を同じ report へ出す。 |
-| Projection | `project --out <file>` | full graph layers、source anchors、projection views、diagnostics、edit operations を inspection する。 |
+| Projection | `project --out <file>` | full graph layers、source anchors、`selected_ordering.ordered_anchors`、projection views、diagnostics、edit operations を inspection する。 |
 | Explanation | `explain --out <file>` | claim path、gap、recommended next edits を自然言語で読む。 |
 | Rewrite packet | `rewrite-packet --op <id> --out <file>` | 1 つの edit operation を preserve / do-not rule 付きで渡す。 |
 
