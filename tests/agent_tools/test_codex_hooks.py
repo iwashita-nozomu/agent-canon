@@ -128,6 +128,7 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                     **(extra_env or {}),
                 },
             )
@@ -136,7 +137,11 @@ class CodexHooksTest(unittest.TestCase):
                 "dict[str, object]",
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
-            payload = cast("dict[str, object]", json.loads(result.stdout))
+            payload = (
+                cast("dict[str, object]", json.loads(result.stdout))
+                if result.stdout.strip()
+                else {}
+            )
         return payload, log_entry
 
     def _run_oop_guard_with_preexisting_finding(
@@ -205,6 +210,7 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                     **(extra_env or {}),
                 },
             )
@@ -2990,21 +2996,20 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
-    def test_oop_readability_guard_infers_post_tool_event_when_event_missing(self) -> None:
-        """OOP guard should run when tool payloads omit hookEventName."""
+    def test_oop_readability_guard_requires_declared_hook_event(self) -> None:
+        """OOP guard should not infer PostToolUse when hookEventName is missing."""
         payload, log_entry = self._run_oop_guard_with_changed_python(
             json.dumps({"tool_name": "apply_patch"})
         )
-        self.assertEqual(payload["decision"], "approve")
-        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(payload, {})
+        self.assertEqual(log_entry["event"], "UnknownHookEvent")
         self.assertEqual(log_entry["tool_name"], "apply_patch")
         self.assertEqual(log_entry["payload_status"], "valid")
-        self.assertTrue(log_entry["event_fallback"])
-        self.assertTrue(log_entry["checked"])
-        self.assertEqual(log_entry["failed_count"], 1)
+        self.assertFalse(log_entry["event_declared"])
+        self.assertFalse(log_entry["checked"])
+        self.assertEqual(log_entry["failed_count"], 0)
         self.assertIn("hook_run_id", log_entry)
         self.assertIn("payload_fingerprint", log_entry)
-        self.assertIn("failure_fingerprint", log_entry)
 
     def test_oop_readability_guard_warns_preexisting_findings_by_default(self) -> None:
         """OOP guard should warn on current changed-source findings by default."""
@@ -3050,6 +3055,7 @@ class CodexHooksTest(unittest.TestCase):
                 cwd=temp_root,
                 input=json.dumps(
                     {
+                        "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
                         "tool_input": {"cmd": "sed -n '1,20p' README.md"},
                     }
@@ -3057,11 +3063,14 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
-            )
+                env={
+                    **os.environ,
+                    "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                },
+        )
 
         self.assertEqual(result.stdout, "")
-        self.assertFalse(log_path.exists())
 
     def test_oop_readability_guard_skips_bash_checker_invocations(self) -> None:
         """Bash commands that only run checkers should not recursively trigger OOP."""
@@ -3083,6 +3092,7 @@ class CodexHooksTest(unittest.TestCase):
                     cwd=temp_root,
                     input=json.dumps(
                         {
+                            "hookEventName": "PostToolUse",
                             "tool_name": "Bash",
                             "tool_input": {"cmd": command},
                         }
@@ -3090,11 +3100,14 @@ class CodexHooksTest(unittest.TestCase):
                     check=True,
                     capture_output=True,
                     text=True,
-                    env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                        "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    },
                 )
 
             self.assertEqual(result.stdout, "")
-            self.assertFalse(log_path.exists())
 
     def test_helper_inventory_guard_blocks_repo_policy_findings(self) -> None:
         """Helper inventory guard should use repo-owned policy thresholds."""
@@ -3162,8 +3175,8 @@ class CodexHooksTest(unittest.TestCase):
             self.assertEqual(result.stdout, "")
             self.assertFalse(log_path.exists())
 
-    def test_helper_inventory_guard_uses_agentcanon_default_policy(self) -> None:
-        """Missing repo-local policy should fall back to the AgentCanon default policy."""
+    def test_helper_inventory_guard_requires_repo_policy(self) -> None:
+        """Missing repo-local policy should block until the policy exists."""
         payload, log_entry = self._run_helper_guard_with_changed_python(
             json.dumps(
                 {
@@ -3183,10 +3196,9 @@ class CodexHooksTest(unittest.TestCase):
         )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertEqual(log_entry["policy_status"], "agentcanon-default")
-        self.assertTrue(str(log_entry["policy_path"]).endswith("helper_inventory_guard_policy.json"))
-        self.assertEqual(log_entry["mode"], "policy")
-        self.assertEqual(log_entry["violations"], 1)
+        self.assertEqual(log_entry["policy_status"], "error")
+        self.assertIn("helper inventory policy is required", str(log_entry["policy_error"]))
+        self.assertIn("repair_helper_inventory_policy", payload["next_action"])
 
     def test_helper_inventory_guard_repo_policy_can_select_report_mode(self) -> None:
         """Repo-local policy may loosen the default blocking behavior explicitly."""
@@ -3318,7 +3330,11 @@ class CodexHooksTest(unittest.TestCase):
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
-            env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
+            env = {
+                **os.environ,
+                "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+            }
 
             prompt = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -3398,7 +3414,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[2]["observed_text_field_count"], 1)
         self.assertEqual(entries[2]["observed_text_value_count"], 1)
         self.assertTrue(all(entry["payload_key_count"] >= 2 for entry in entries))
-        self.assertTrue(all(entry["event_fallback"] is False for entry in entries))
+        self.assertTrue(all(entry["event_declared"] is True for entry in entries))
 
     def test_skill_usage_logger_defaults_to_agentcanon_hook_result(self) -> None:
         """Default skill hook output should live under AgentCanon hook results."""

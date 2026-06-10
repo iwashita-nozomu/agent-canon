@@ -25,7 +25,7 @@ Core labels:
 | `tooling` | Tool, hook, checker, CLI, CI, or catalog surface. |
 | `docs` | Reader-facing documentation or runbook surface. |
 | `github` | GitHub Actions, PR template, issue template, or GitHub automation surface. |
-| `mcp` | MCP preflight, server, inventory, or fallback behavior. |
+| `mcp` | MCP preflight, server, inventory, or alternate route behavior. |
 | `submodule` | AgentCanon pin/update/root-view propagation behavior. |
 
 Issue templates require runtime profile, affected path, validation, eval

@@ -270,10 +270,10 @@ class HookEvidenceCounter:
         self.state.events[event] += 1
         if event in ("UnknownHookEvent", "missing_event"):
             self.state.quality["unknown_event"] += 1
-        if entry.get("event_fallback") is True:
-            self.state.quality["event_fallback"] += 1
-        if entry.get("payload_fallback") is True:
-            self.state.quality["payload_fallback"] += 1
+        if entry.get("event_declared") is False:
+            self.state.quality["missing_declared_event"] += 1
+        if entry.get("payload_empty") is True:
+            self.state.quality["empty_payload"] += 1
         payload_status = str(entry.get("payload_status") or "")
         if payload_status and payload_status != "valid":
             self.state.quality[f"payload_status:{payload_status}"] += 1

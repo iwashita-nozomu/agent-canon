@@ -342,8 +342,7 @@ def main() -> int:
         not in {"", "missing", "none"},
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
         not in {"", "missing", "none"},
-        "make_ci_status": closeout.get("make_ci_status")
-        in {"pass", "environment_blocked_with_full_static_fallback"},
+        "make_ci_status": closeout.get("make_ci_status") == "pass",
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",

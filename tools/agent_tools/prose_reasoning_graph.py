@@ -844,13 +844,13 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "evidence_required": ["hypothesis", "metric", "baseline", "expected result", "run or rerun decision"],
             "recursive_verification": recursive_verification_for_route("experiment_plan_verification"),
         }
-    if rule == "non_llm_experiment_plan_fallback":
+    if rule == "local_llm_experiment_plan_ir_missing":
         return {
-            "add": "LocalLLM IR analysis_intents or subagent verification packet",
-            "verification_route": "local_llm_or_subagent_intent_verification",
-            "verification_question": "Can experiment-plan applicability be classified by LocalLLM IR or a subagent instead of non-LLM fallback?",
-            "verification_targets": ["$prose-reasoning-graph", "subagent-fallback"],
-            "evidence_required": ["local_llm_prose_ir.analysis_intents", "subagent judgement or explicit fallback acceptance"],
+            "add": "LocalLLM prose IR with analysis_intents.experiment_plan status",
+            "verification_route": "local_llm_environment_repair",
+            "verification_question": "Why is LocalLLM prose IR missing from a graph that requires experiment-plan applicability?",
+            "verification_targets": ["$prose-reasoning-graph", "agent-canon local-llm extract-prose-ir"],
+            "evidence_required": ["local_llm_prose_ir.analysis_intents", "LocalLLM command path and model evidence"],
         }
     if rule == "presentation_format_candidate":
         return {
@@ -2603,7 +2603,7 @@ def experiment_layer_applicable(connection: sqlite3.Connection) -> bool:
 
 def experiment_plan_applicable_for_graph(
     connection: sqlite3.Connection,
-    texts: Iterable[str],
+    _texts: Iterable[str],
     profile: str,
 ) -> bool:
     """Return true when LocalLLM IR says experiment-plan analysis is applicable."""
@@ -2614,16 +2614,15 @@ def experiment_plan_applicable_for_graph(
         return True
     if local_status in {"absent", "vocabulary_only"}:
         return False
-    fallback_applicable = non_llm_experiment_plan_fallback_applicable(texts, profile)
     insert_document_diagnostic(
         connection,
-        "non_llm_experiment_plan_fallback",
+        "local_llm_experiment_plan_ir_missing",
         (
-            "LocalLLM experiment-plan intent was unavailable; "
-            "non-LLM fallback check was used."
+            "LocalLLM experiment-plan intent is missing; repair prose IR generation "
+            "before accepting experiment-plan diagnostics."
         ),
     )
-    return fallback_applicable
+    return False
 
 
 def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
@@ -2645,24 +2644,6 @@ def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
     if "absent" in statuses:
         return "absent"
     return ""
-
-
-def non_llm_experiment_plan_fallback_applicable(texts: Iterable[str], profile: str) -> bool:
-    """Return a fallback experiment-plan decision when LocalLLM IR is unavailable."""
-    text_values = list(texts)
-    if profile == "experiment":
-        return any(has_any(text, EXPERIMENT_CUES) for text in text_values)
-    field_kinds = experiment_plan_assignment_kinds(text_values)
-    if len(field_kinds) >= 2:
-        return True
-    activity_present = any(has_any(text, EXPERIMENT_ACTIVITY_CUES) for text in text_values)
-    field_vocabulary_present = any(
-        has_any(text, ("hypothesis", "metric", "baseline", "expected", "仮説", "指標", "ベースライン", "期待"))
-        for text in text_values
-    )
-    return (bool(field_kinds) and activity_present) or (
-        activity_present and not field_vocabulary_present
-    )
 
 
 def experiment_sentence_kinds(text: str) -> list[str]:

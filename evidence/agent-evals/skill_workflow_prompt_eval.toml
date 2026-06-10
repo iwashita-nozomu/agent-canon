@@ -261,54 +261,6 @@ description = "Defines formatter completion as adjacent Markdown checks, not for
 required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
 
 [[evals]]
-id = "md-style-check-unified-rust-docs"
-target = ".agents/skills/md-style-check/SKILL.md"
-kind = "skill"
-description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
-
-[[evals.checklist]]
-id = "MD-STYLE-RUST-1"
-critical = true
-description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
-required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust", "DOCS_CHECK_REPORT_BEGIN"]
-
-[[evals.checklist]]
-id = "MD-STYLE-RUST-2"
-critical = true
-description = "Requires adjacent checks after formatter or fixer execution."
-required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
-
-[[evals]]
-id = "subagent-bootstrap-tool-first-gate"
-target = ".agents/skills/subagent-bootstrap/SKILL.md"
-kind = "skill"
-description = "Subagent bootstrap must not spend subagent tokens on deterministic checks already owned by tools."
-
-[[evals.checklist]]
-id = "SUBAGENT-TOOL-FIRST-1"
-critical = true
-description = "Requires canonical checker/router/dashboard before read-only exploration."
-required_regex = ["Before assigning read-only exploration", "canonical checker", "compact tool artifacts", "not to repeat deterministic tool checks"]
-
-[[evals]]
-id = "md-style-check-human-doc-unified-rust-docs"
-target = "agents/skills/md-style-check.md"
-kind = "skill"
-description = "Human Markdown style skill doc must expose the unified Rust docs command and formatter-adjacent check contract."
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-RUST-1"
-critical = true
-description = "Documents the unified check, format, math, and Mermaid commands."
-required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid", "DOCS_CHECK_REPORT_BEGIN"]
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-RUST-2"
-critical = true
-description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
-required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
-
-[[evals]]
 id = "html-output-shim"
 target = ".agents/skills/html-output/SKILL.md"
 kind = "skill"
@@ -756,7 +708,7 @@ required_regex = ["optimization contract", "objective", "constraints", "derivati
 id = "COMP-OPT-SHIM-2"
 critical = true
 description = "Forbids numerical test greenwashing."
-required_regex = ["relaxing tolerances", "deleting assertions", "skipping cases", "changing expected values", "falling back to CPU"]
+required_regex = ["relaxing tolerances", "deleting assertions", "skipping cases", "changing expected values", "using CPU"]
 
 [[evals.checklist]]
 id = "COMP-OPT-SHIM-3"
@@ -967,7 +919,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
-description = "Builds a missing semantic-index cache before exact-search fallback."
+description = "Builds a missing semantic-index cache before exact-search comparison."
 required_regex = ["semantic-index build --root \\.", "bounded `rg -l`"]
 
 [[evals.checklist]]
@@ -980,7 +932,7 @@ required_regex = ["GitPush", "github_publish\\.py", "PR evidence", "hook / check
 id = "agent-canon-pr-gh-publish-workflow"
 target = "agents/workflows/agent-canon-pr-workflow.md"
 kind = "workflow"
-description = "The AgentCanon PR workflow must route push and PR operations through the gh-backed publish tool without fallback push routes."
+description = "The AgentCanon PR workflow must route push and PR operations through the gh-backed publish tool without noncanonical push routes."
 
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-1"
@@ -991,8 +943,8 @@ required_regex = ["tools/agent_tools/github_publish\\.py", "--user-task", "remot
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-2"
 critical = true
-description = "Forbids fallback remote inference and literal URL push as standard routes."
-required_regex = ["fallback", "literal URL push is not a standard route", "hardcoded repository name"]
+description = "Forbids noncanonical remote inference and literal URL push as standard routes."
+required_regex = ["push 先を推定しません", "literal URL push is not a standard route", "hardcoded repository name"]
 
 [[evals]]
 id = "agents-readme-routing-entrypoint"
@@ -1822,8 +1774,8 @@ required_regex = ["runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-2"
 critical = true
-description = "Forbids raw JSONL fallback when the archive API is missing."
-required_regex = ["log_archive_api_missing", "do not fall back to raw JSONL"]
+description = "Forbids raw JSONL use when the archive API is missing."
+required_regex = ["log_archive_api_missing", "do not use raw JSONL"]
 
 [[evals]]
 id = "agent-log-analysis-archive-api-doc"

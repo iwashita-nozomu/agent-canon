@@ -335,7 +335,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         """Standalone workflows must reference an available checkout helper."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_valid_workflow(root, helper_fallback=False)
+            self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
             (root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh").unlink()
 
@@ -505,7 +505,6 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         top_permissions: bool = True,
         job_permissions: bool = False,
         helper_env: bool = True,
-        helper_fallback: bool = True,
     ) -> None:
         """Write one minimal valid workflow."""
         workflow_dir = root / ".github" / "workflows"
@@ -524,16 +523,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if helper_env
             else ""
         )
-        helper_command = (
-            "        run: |\n"
-            "          if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then\n"
-            "            bash .github/scripts/checkout_agent_canon_submodule.sh\n"
-            "          else\n"
-            "            bash tools/ci/checkout_agent_canon_submodule.sh\n"
-            "          fi\n"
-            if helper_fallback
-            else "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
-        )
+        helper_command = "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
         (workflow_dir / "ci.yml").write_text(
             "name: CI\n"
             + "on: [push]\n"

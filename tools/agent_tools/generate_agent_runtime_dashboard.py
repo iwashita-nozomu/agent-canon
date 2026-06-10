@@ -620,7 +620,6 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
             ".agent-canon/log-archive/eval-results/**/*.md",
-            ".agent-canon/archive/*/eval-results/**/*.md",
         )
         paths: set[Path] = set()
         for pattern in patterns:
@@ -2728,10 +2727,10 @@ def blocking_next_action_count(summary: RuntimeDashboardSummary) -> int:
     return sum(1 for action in dashboard_next_actions(summary) if action.priority in {"P0", "P1"})
 
 
-def top_counter_key(counter: Counter[str], fallback: str) -> str:
+def top_counter_key(counter: Counter[str], default_key: str) -> str:
     """Return the most common key from a counter."""
     if not counter:
-        return fallback
+        return default_key
     return counter.most_common(1)[0][0]
 
 

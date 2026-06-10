@@ -72,8 +72,8 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Validation And Rollback Plan
 
-<!-- Describe how the design will be validated and what rollback or fallback path exists. -->
+<!-- Describe how the design will be validated and what rollback or alternate route path exists. -->
 
 ## Risks
 
-<!-- Capture tradeoffs, known risks, and fallback options. -->
+<!-- Capture tradeoffs, known risks, and alternate route options. -->

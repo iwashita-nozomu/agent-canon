@@ -54,8 +54,8 @@ Local LLM command surface が担う責務は 3 つです。
 - `route-implementation-surface`:
   実装前に、repo / directory / tool / skill / workflow / root instruction /
   document / report surface のどこを primary owner とするかを構造化します。
-  llama.cpp が使える場合は Local LLM advisory を付け、使えない場合も
-  warning 付き deterministic fallback を返します。
+  llama.cpp が使えない場合は環境構築ミスとして error schema を返し、
+  implementation path の選択へ進ませません。
 - `extract-prose-ir`:
   複数 document と複数 term から Prose IR を抽出し、graph seed と corpus hint を返します。
 
@@ -160,18 +160,26 @@ text mode は次の machine-readable keys を返します。
 
 ```text
 IMPLEMENTATION_SURFACE_ROUTER=pass
-IMPLEMENTATION_SURFACE_ROUTER_STATUS=fallback_without_local_llm
-IMPLEMENTATION_SURFACE_ROUTER_WARNING=local_llm_unavailable: ...
+IMPLEMENTATION_SURFACE_ROUTER_STATUS=local_llm_advisory
 PRIMARY_SURFACE=agentcanon_local_llm_tool
 PRIMARY_PATHS=rust/agent-canon/src/local_llm.rs | tools/catalog.yaml | ...
 FORBIDDEN_PATHS=...
 REQUIRED_PRE_EDIT_CHECKS=...
 ```
 
-LLM が利用できる場合は `LOCAL_LLM_ROUTE_ADVISORY_BEGIN` /
-`LOCAL_LLM_ROUTE_ADVISORY_END` に JSON advisory を出します。agent は
+LocalLLM advisory は `LOCAL_LLM_ROUTE_ADVISORY_BEGIN` /
+`LOCAL_LLM_ROUTE_ADVISORY_END` に JSON advisory として出ます。agent は
 primary surface、forbidden paths、required checks を実装前の source packet
 として使い、同じ判定を広い文書読解や subagent に再実行させません。
+
+LocalLLM 実行環境が壊れている場合は次の error surface を返して非 0 終了します。
+
+```text
+IMPLEMENTATION_SURFACE_ROUTER=error
+IMPLEMENTATION_SURFACE_ROUTER_SCHEMA=agent_canon.local_llm.implementation_surface_route.error.v1
+IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE=local_llm_required_unavailable
+IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION=repair LocalLLM environment before running implementation-surface routing
+```
 
 ## Prose IR Contract
 
@@ -183,7 +191,7 @@ primary surface、forbidden paths、required checks を実装前の source packe
 | `schema` | IR schema name. |
 | `task_owner` | Always `local_llm`. |
 | `status` | Tool status for the extraction run. |
-| `model` | Local model name or advisory fallback marker. |
+| `model` | Local model name used for extraction. |
 | `prompt_sha` | Stable prompt digest. |
 | `document_count` | Number of input documents. |
 | `term_count` | Number of input terms. |
@@ -303,10 +311,8 @@ queue、visited、depth、downstream selection、child finding 生成は skill �
 Local LLM は unresolved item と candidate route を返すだけです。
 
 `analysis_intents[]` が無い旧 artifact または LocalLLM 失敗時は、receiving tool が
-非 LLM fallback check を使ってもよいです。ただし、その場合は warning を出し、
-LocalLLM IR の再生成または subagent fallback へ route します。この warning は
-fallback result ではなく fallback を使った事実に対して出します。fallback result は通常の
-settled LocalLLM judgement として扱いません。
+`local_llm_experiment_plan_ir_missing` diagnostic を出し、LocalLLM IR の再生成を
+要求します。語彙検索や非 LLM 判定で settled LocalLLM judgement を代替しません。
 
 ## Result Surface
 

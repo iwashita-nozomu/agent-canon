@@ -71,7 +71,7 @@ _MCP追加カードの確認カード06。_
 
 #### 図解: MCP追加カード 07
 
-`required` → `startup` → `fallback`
+`required` → `startup` → `alternate route`
 
 _MCP追加カードの確認カード07。_
 
@@ -120,7 +120,7 @@ _MCP追加カードの確認カード13。_
 
 #### 図解: MCP追加カード 14
 
-`incident` → `block` → `fallback`
+`incident` → `block` → `alternate route`
 
 _MCP追加カードの確認カード14。_
 
@@ -496,7 +496,7 @@ _サブエージェントカードの確認カード15。_
 
 #### 図解: サブエージェントカード 16
 
-`failure` → `fallback` → `human`
+`failure` → `alternate route` → `human`
 
 _サブエージェントカードの確認カード16。_
 
@@ -886,7 +886,7 @@ _トラブルシュートカードの確認カード19。_
 
 #### 図解: トラブルシュートカード 20
 
-`server down` → `disable` → `fallback`
+`server down` → `disable` → `alternate route`
 
 _トラブルシュートカードの確認カード20。_
 

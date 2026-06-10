@@ -49,7 +49,7 @@ layout と build tree の正本は [cpp-build-layout.md](cpp-build-layout.md) �
 
 - 数式・アルゴリズムの前提を丁寧に書きます。
 - 近似や数値安定性の注意点を必ず記述します。
-- 実装 boundary が担う式、state、guard、fallback を Boundary Map と一致させます。
+- 実装 boundary が担う式、state、guard、alternate route を Boundary Map と一致させます。
 
 ## 4.5 数値リテラル
 

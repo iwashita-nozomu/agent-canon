@@ -1503,7 +1503,7 @@ server名とidentityの両方が合う必要がある設計にする。
 
 
 ```
-## MCP fallback
+## MCP alternate route
 - If repo_knowledge MCP is unavailable, inspect docs/ and runbooks/ manually.
 - If tracker MCP is unavailable, ask the user for the issue URL or summary.
 - Do not guess production incidents without logs or issue context.
@@ -1515,7 +1515,7 @@ MCP障害時にCodexが推測で進まないかを見る。
 
 
 **落とし穴** 
-required=trueのserverにはfallbackが効かない。必須か任意かを分ける。
+required=trueのserverにはalternate routeが効かない。必須か任意かを分ける。
 
 
 ### 設定レシピ 056: MCP tool実行をHooksで監査する
@@ -2205,20 +2205,20 @@ project_root_markers = [".git", "pnpm-workspace.yaml", "package.json"]
 markerを増やしすぎると深いsubdirがroot扱いになる可能性がある。
 
 
-### 設定レシピ 084: AGENTS fallback filename
+### 設定レシピ 084: AGENTS alternate route filename
 
 
 **目的と配置**  目的: AGENTS.md以外の社内文書も読む。 配置: `.codex/config.toml`。まずこの断片だけを追加し、`/debug-config` または関連CLIで有効値を確認する。
 
 
 ```
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 ```
 
 
 **確認** 
-AGENTS.mdがないdirでfallbackが使われるか確認する。
+AGENTS.mdがないdirでalternate routeが使われるか確認する。
 
 
 **落とし穴** 
@@ -2897,7 +2897,7 @@ schema対応エディタで補完と診断を使う。
 
 ```
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 
@@ -3108,7 +3108,7 @@ tool_timeout_sec = 60
 ```
 # .codex/config.toml
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 

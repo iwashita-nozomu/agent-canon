@@ -18,11 +18,7 @@ from pathlib import Path
 
 import yaml
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[2]

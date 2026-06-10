@@ -24,11 +24,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -104,9 +100,7 @@ class EvalAccumulationReport:
 
 def is_mounted_archive_path(path_label: str) -> bool:
     """Return whether a finding path points at the mounted external archive."""
-    return path_label.startswith(".agent-canon/archive/") or path_label.startswith(
-        ".agent-canon/log-archive/"
-    )
+    return path_label.startswith(".agent-canon/log-archive/")
 
 
 def is_warning_finding(finding: Finding) -> bool:
@@ -191,7 +185,7 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
 def intentionally_ignored_archive_path(path: Path) -> bool:
     """Return whether the path is inside the mounted external log archive."""
     parts = path.parts
-    return ".agent-canon" in parts and ("archive" in parts or "log-archive" in parts)
+    return ".agent-canon" in parts and "log-archive" in parts
 
 
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
@@ -539,7 +533,30 @@ def render_text(
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the eval accumulation checker."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root, str(args.family_registry))
+    try:
+        report = validate(args.root, str(args.family_registry))
+    except RuntimeError as error:
+        if "AgentCanon log archive root is required" not in str(error):
+            raise
+        if args.format == "json":
+            print(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "error_code": "log_archive_required",
+                        "message": str(error),
+                        "next_action": "mount .agent-canon/log-archive or set AGENT_CANON_HOOK_ARCHIVE_DIR",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("EVAL_ACCUMULATION=error")
+            print("EVAL_ACCUMULATION_ERROR_CODE=log_archive_required")
+            print(f"EVAL_ACCUMULATION_ERROR={error}")
+            print("NEXT_ACTION=mount_.agent-canon/log-archive_or_set_AGENT_CANON_HOOK_ARCHIVE_DIR")
+        return 1
     if args.compact_out is not None:
         write_compact_summary(args.compact_out, report)
     if args.format == "json":

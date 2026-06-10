@@ -951,7 +951,7 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "hook_log_namespace": context.runtime_namespace(),
             "timestamp": timestamp,
             "event": hook_event_name(payload),
-            "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
+            "event_declared": hook_event_name(payload) != "UnknownHookEvent",
             "skills": list(signals.skills),
             "selected_skills": list(signals.skills),
             "skill_selection_kind": "declared_skill" if signals.skills else "",

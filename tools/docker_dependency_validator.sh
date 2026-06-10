@@ -138,7 +138,7 @@ check_post_create_python_install() {
     grep -q 'docker/install_python_dependencies.sh' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must run the Python dependency installer"
     grep -q 'git config --global --add safe.directory "$workspace"' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must provide standalone safe.directory fallback"
+      || report_issue ".devcontainer/post-create.sh must provide standalone safe.directory route"
     grep -q 'repo-local Python dependency installer absent' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must skip missing repo-local Python installer"
     grep -q 'cli.github.com/packages' "$post_create" \

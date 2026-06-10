@@ -87,10 +87,10 @@ contract listed in `documents/README.md`.
 ## Execution Priorities
 
 - 規定の実行 target は GPU です。CPU 実行は user request、環境制約、または task scope 上の明示理由がある場合だけ使い、その理由と影響を validation evidence に残します。
-- 数値的 test / experiment / benchmark の緑化は禁止です。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU fallback などで pass させる前に、code・数学仕様・文書 contract のどこを直すべきかを判定し、必要なら failure として残します。
+- 数値的 test / experiment / benchmark の緑化は禁止です。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU alternate route などで pass させる前に、code・数学仕様・文書 contract のどこを直すべきかを判定し、必要なら failure として残します。
 - すべての変更では、コードと文書それぞれの責務を第一に考えます。実行できることや説明できることだけで完了扱いにせず、実装 surface と document surface が担うべき責務、境界、読者への契約に合っているかを優先して確認します。
 - 設計では、実装対象 file、既存 helper、または直近 finding だけに scope を閉じません。先に抽象責務、概念モデル、非対象、将来 layer、評価軸、既存正本との関係を固定し、そこから実装 slice と validation を導きます。
-- ad hoc / 場当たりの修正実装は禁止します。局所的に失敗を隠す patch、未設計の fallback / wrapper / helper、責務にない分岐、test / warning だけを黙らせる変更を入れて完了扱いにしてはいけません。修正は user request、責務、依存 graph、既存正本、検証 gate に結び付け、必要なら design / skill / workflow / tool の正本を先に直します。
+- ad hoc / 場当たりの修正実装は禁止します。局所的に失敗を隠す patch、未設計の alternate route / wrapper / helper、責務にない分岐、test / warning だけを黙らせる変更を入れて完了扱いにしてはいけません。修正は user request、責務、依存 graph、既存正本、検証 gate に結び付け、必要なら design / skill / workflow / tool の正本を先に直します。
 - Reader-facing な docs、reports、plans、workflow guides で process、dependency、ownership、routing、state transition、review gate、multi-step flow が非自明な場合は、Mermaid diagram を既定の visual 候補にします。diagram が単純な箇条書きの重複にしかならない場合だけ省略し、省略理由を structure contract、work log、または文書内に短く残します。
 
 ## Mechanical Guardrail Policy
@@ -108,7 +108,7 @@ contract listed in `documents/README.md`.
 - 検索語や調査 surface を選ぶ前に、今回の topic を 1 文で固定し、最初の作業 update で `topic=...` としてチャットに出します。固定する内容は、user request が問う対象、現在追跡する code / proof / document path、明示的に外す非対象です。隣接する backend、tool、export、runtime surface は、この topic 文から必要性が導ける場合だけ検索対象に入れます。
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - checker、router、semantic index、dashboard、compact report が対象判断を所有している場合は、manual prose reading より先にその tool を呼びます。tool が返す compact output で足りる場合は追加読解をしません。不足する場合は tool contract の gap として修正または記録します。
-- 実装前に置き場所が明示 path と source packet で固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text` を走らせます。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed とし、`IMPLEMENTATION_SURFACE_ROUTER_WARNING=...` が出ても warning を run bundle に残して deterministic fallback 候補を使います。
+- 実装前に置き場所が明示 path と source packet で固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text` を走らせます。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed とし、`IMPLEMENTATION_SURFACE_ROUTER=error` が出た場合は implementation path を選ぶ前に LocalLLM 環境を修復します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
 - exact path、symbol、literal error message、短い一意 token 以外の検索では、`rg` より先に responsibility-based route を走らせます。まず task / question を `reports/.../query.txt` に書き、`agent-canon semantic-index context-pack --query-file <file> --max-cells <N> --format text`、`agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、または `agent-canon local-llm search --purpose "<purpose>" --providers llm,tool,header-deps,code-deps,vector --format json` で responsibility bucket、dependency-header provider、tool/workflow/document surface を絞ります。directory ownership や責務 coverage が問題なら `agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --report <path>` も先に使います。
 - 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、責務ベースの bounded 結果を source packet の第一候補にします。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。

@@ -42,13 +42,6 @@ SKILL_PATTERNS = (
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")
 TOOL_PATTERNS = ("tools/*.py", "tools/*.sh", "tools/**/*.py", "tools/**/*.sh", "tools/**/*.bash")
 RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
-FALLBACK_SURFACE_DIRS = (
-    Path(".codex/hooks"),
-    Path(".agents/skills"),
-    Path("agents/skills"),
-    Path("tools"),
-    Path("rust/agent-canon/src"),
-)
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20
 OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}
@@ -441,22 +434,9 @@ def tracked_surface_files(root: Path) -> tuple[Path, ...]:
     """Return tracked files matching known hook/skill/tool surfaces."""
     tracked_paths = git_tracked_files(root)
     if not tracked_paths:
-        return filesystem_surface_files(root)
+        raise RuntimeError(f"git tracked surface inventory is required: {root}")
     tracked = tuple(root / path for path in tracked_paths)
     return tuple(path for path in tracked if surface_kind(path.relative_to(root)) is not None)
-
-
-def filesystem_surface_files(root: Path) -> tuple[Path, ...]:
-    """Return known surface files when git metadata is unavailable."""
-    files: list[Path] = []
-    for relative_dir in FALLBACK_SURFACE_DIRS:
-        directory = root / relative_dir
-        if directory.is_file():
-            files.append(directory)
-            continue
-        if directory.is_dir():
-            files.extend(path for path in directory.rglob("*") if path.is_file())
-    return tuple(path for path in files if surface_kind(path.relative_to(root)) is not None)
 
 
 def should_skip(relative: Path) -> bool:
@@ -705,7 +685,12 @@ def main() -> int:
     baseline_path = resolve_baseline_path(root, Path(args.baseline))
     if args.check and baseline_path.is_file() and not args.paths:
         check_root = inventory_root_for_baseline(baseline_path)
-    inventory = build_inventory(check_root if args.check else root, list(args.paths))
+    try:
+        inventory = build_inventory(check_root if args.check else root, list(args.paths))
+    except RuntimeError as exc:
+        print("LOG_SURFACE_INVENTORY=fail")
+        print(f"LOG_SURFACE_INVENTORY_ERROR={exc}")
+        return 1
 
     if args.output:
         write_inventory((root / args.output).resolve(), inventory)

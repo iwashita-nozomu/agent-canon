@@ -34,10 +34,10 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 ## External Evaluation Basis
 
 - OpenAI / Codex の agent eval、trace grading、Codex 運用 guidance は
-  workflow 文書内で個別 URL や fallback 文書として二重管理しません。
+  workflow 文書内で個別 URL や alternate route 文書として二重管理しません。
   更新時は `$openai-docs` の source route を使い、Codex manual helper、
-  Docs MCP、official-domain web fallback、または `$openai-docs` が指定する
-  bundled fallback references で確認します。
+  Docs MCP、official-domain web alternate route、または `$openai-docs` が指定する
+  bundled alternate route references で確認します。
 - この workflow の local authority は、外部 doc の写しではなく
   `evidence/agent-evals/agent_behavior_eval.toml`、
   `reports/agents/<run-id>/agent_evaluation.md`、

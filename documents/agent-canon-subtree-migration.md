@@ -350,7 +350,7 @@ legacy subtree repo は移行完了まで次を互換 path として使えます
 - `bash tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
 - `git subtree pull --prefix=vendor/agent-canon`
 - `git subtree push --prefix=vendor/agent-canon`
-- `snapshot_import_no_subtree*` fallback
+- `snapshot_import_no_subtree*` alternate route
 
 これらは新規 repo の標準 path ではありません。submodule 化済み repo で subtree route を選ぶ場合は、互換対応である理由を PR / closeout evidence に残します。
 

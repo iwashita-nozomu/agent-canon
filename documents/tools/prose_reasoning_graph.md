@@ -139,10 +139,9 @@ profile 語彙を説明しているだけなのかを区別します。graph 側
 ただし `--profile experiment` は明示的な completeness check 指示なので、LocalLLM IR が active
 plan を検出しない文でも experiment diagnostics を起動できます。
 
-LocalLLM IR が無い旧 DB や障害時だけ、graph 側は非 LLM fallback check を使えます。
-fallback check を呼んだ時点で、その結果が applicable / not-applicable のどちらでも
-`non_llm_experiment_plan_fallback` warning を diagnostics に残し、subagent fallback または
-LocalLLM IR 再生成へ route します。
+LocalLLM IR が無い旧 DB や障害時は、graph 側が
+`local_llm_experiment_plan_ir_missing` diagnostic を出し、LocalLLM IR の再生成を
+要求します。語彙検索や非 LLM 判定で experiment-plan applicability を代替しません。
 
 ## Command Surface
 
@@ -257,8 +256,8 @@ profile は analysis surface の選択です。profile 名や verification-route
 active experiment plan そのものではありません。この区別は語彙検索ではなく、
 LocalLLM IR の `analysis_intents[].intent=experiment_plan` と `status` で受け取ります。
 
-一方で、その通常経路が使えない場合だけ、非 LLM fallback は warning 付きの互換経路として使えます。
-warning は fallback result ではなく、fallback を使った事実に対して出ます。
+LocalLLM IR が無い場合は `local_llm_experiment_plan_ir_missing` finding として扱い、
+graph 側だけで applicability を確定しません。
 
 ## Verification Route
 

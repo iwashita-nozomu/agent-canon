@@ -338,7 +338,7 @@ _Unix系運用_
 
 #### 図解: 38 requirements.toml
 
-`管理者が制約` → `ユーザー上書き不可` → `互換値へフォールバック`
+`管理者が制約` → `ユーザー上書き不可` → `互換値へ代替経路`
 
 _管理設定_
 
@@ -845,7 +845,7 @@ AGENTS/プロジェクト/履歴  |  `compact_prompt`  |  string  |  会話圧�
 AGENTS/プロジェクト/履歴  |  `experimental_compact_prompt_file`  |  string(path)  |  圧縮プロンプトを読むファイル。
 AGENTS/プロジェクト/履歴  |  `history.persistence`  |  save-all | none  |  履歴JSONLへ保存するか。
 AGENTS/プロジェクト/履歴  |  `history.max_bytes`  |  integer  |  履歴ファイルの最大バイト数。
-AGENTS/プロジェクト/履歴  |  `project_doc_fallback_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
+AGENTS/プロジェクト/履歴  |  `project_doc_alternate route_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
 AGENTS/プロジェクト/履歴  |  `project_doc_max_bytes`  |  integer  |  AGENTS.md由来指示の読み込み上限。
 AGENTS/プロジェクト/履歴  |  `project_root_markers`  |  array<string>  |  プロジェクトルート検出マーカー。既定.git。
 AGENTS/プロジェクト/履歴  |  `projects.<path>.trust_level`  |  trusted | untrusted  |  プロジェクトスコープ.codex層の信頼状態。

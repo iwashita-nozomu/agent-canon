@@ -29,10 +29,7 @@ STREAM_TERMINATION_TIMEOUT_SECONDS = 10
 INTERRUPTED_EXIT_CODE = 130
 DURATION_ROUND_DIGITS = 3
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 
 def repo_root_from_script() -> Path:

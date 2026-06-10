@@ -309,7 +309,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
 
     def test_plan_prefers_subtree_pull_when_local_split_is_remote_ancestor(self) -> None:
-        """Plan should prefer subtree_pull over tree-match fallback when subtree metadata exists."""
+        """Plan should prefer subtree_pull over tree-match snapshot route when subtree metadata exists."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             clone_dir = root / "clone"

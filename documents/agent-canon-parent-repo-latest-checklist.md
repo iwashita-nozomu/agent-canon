@@ -248,7 +248,7 @@ Source window:
   branches, confirm the new name remains inside every applicable ruleset.
 - [ ] GitHub App enterprise installation API: if repo tools enumerate GitHub App
   installations for an enterprise, replace broad pagination with the enterprise
-  installation API and record fallback behavior for organizations, repositories,
+  installation API and record alternate route behavior for organizations, repositories,
   and users.
 
 ### P3: Watch Or Mark Not Applicable

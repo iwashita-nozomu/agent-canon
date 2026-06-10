@@ -24,11 +24,7 @@ sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now  # noqa: E402
 from task_authority import first_party_library_authorized, load_task_authority  # noqa: E402
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 LOG_PATH_ENV = "AGENT_CANON_FIRST_PARTY_LIBRARY_HOOK_LOG_PATH"

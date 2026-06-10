@@ -111,14 +111,14 @@ This checklist starts only after P-1 has at least a draft Definition of Done and
 ### [ ] P2-001: honest MCP status
 
 - Target: `mcp_status.md` or equivalent JSON.
-- Problem: pass/fail/fallback/not-applicable can be conflated.
+- Problem: pass/fail/alternate route/not-applicable can be conflated.
 - Acceptance: MCP unavailable state cannot be recorded as pass.
 
-### [ ] P2-002: fallback command policy
+### [ ] P2-002: alternate route command policy
 
 - Target: MCP docs/config.
-- Problem: MCP fallback can become ad hoc shell work.
-- Acceptance: fallback command is allowed by profile and evidence is recorded.
+- Problem: MCP alternate route can become ad hoc shell work.
+- Acceptance: alternate route command is allowed by profile and evidence is recorded.
 
 ### [ ] P2-003: goal loop controls completion
 
