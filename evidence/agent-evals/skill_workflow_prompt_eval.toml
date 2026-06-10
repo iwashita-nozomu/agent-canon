@@ -200,6 +200,18 @@ critical = true
 description = "Defaults reports to Markdown and routes explicit HTML/browser output to html-output."
 required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$html-output", "browser view", "external browser publication"]
 
+[[evals.checklist]]
+id = "REPORT-PROJECTION-ORDER-SKILL-1"
+critical = true
+description = "Requires report prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "REPORT-POSITIVE-RESPONSIBILITY-SKILL-1"
+critical = true
+description = "Requires report projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
 [[evals]]
 id = "md-style-check-unified-rust-docs"
 target = ".agents/skills/md-style-check/SKILL.md"
@@ -482,6 +494,18 @@ critical = true
 description = "Requires structure-planning before drafting when section, figure/table, or claim/evidence layout is nontrivial."
 required_regex = ["\\$structure-planning", "section order", "figure/table placement", "claim/evidence layout", "invalid interpretations"]
 
+[[evals.checklist]]
+id = "ACADEMIC-PROJECTION-ORDER-SHIM-1"
+critical = true
+description = "Requires academic prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "ACADEMIC-POSITIVE-RESPONSIBILITY-SHIM-1"
+critical = true
+description = "Requires academic projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
 [[evals]]
 id = "academic-writing-tex-routing-doc"
 target = "agents/skills/academic-writing.md"
@@ -499,6 +523,18 @@ id = "ACADEMIC-TEX-DOC-2"
 critical = true
 description = "Limits default TeX routing to Academic Writing rather than general writing skills."
 required_regex = ["TeX を使う既定配線はこの skill に限る", "一般の `\\$long-form-writing`"]
+
+[[evals.checklist]]
+id = "ACADEMIC-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human academic writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "ACADEMIC-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human academic writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
 
 [[evals]]
 id = "academic-writing-workflow-tex-output"
@@ -524,6 +560,18 @@ critical = true
 description = "Forbid Academic Writing's default TeX route from leaking into long-form writing."
 forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
 
+[[evals.checklist]]
+id = "LONG-FORM-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human long-form writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "LONG-FORM-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human long-form writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
+
 [[evals]]
 id = "paper-writing-avoids-tex-default"
 target = "agents/skills/paper-writing.md"
@@ -535,6 +583,18 @@ id = "NON-ACADEMIC-TEX-2"
 critical = true
 description = "Forbid Academic Writing's default TeX route from leaking into paper writing."
 forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "PAPER-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human paper writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "PAPER-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human paper writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
 
 [[evals]]
 id = "research-workflow-source-record"
@@ -577,6 +637,18 @@ id = "REPORT-OUTPUT-FORMAT-DOC-1"
 critical = true
 description = "Defines Markdown default and explicit HTML route."
 required_regex = ["default report output is Markdown", "explicitly asks for HTML", "html-output", "output format"]
+
+[[evals.checklist]]
+id = "REPORT-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human report writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "REPORT-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human report writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["positive responsibility prose", "Boundary, Limitation, and Non-Goal", "ad hoc", "prompt-defect"]
 
 [[evals.checklist]]
 id = "NON-ACADEMIC-TEX-3"
@@ -686,6 +758,42 @@ critical = true
 description = "Routes nontrivial long-form workflow/dependency/ownership/routing/state/review-gate explanations to Mermaid through structure-planning visual_plan."
 required_regex = ["Mermaid", "visual_plan", "workflow", "dependency", "ownership", "routing", "state transition", "review gate", "fenced `mermaid`"]
 
+[[evals.checklist]]
+id = "DOCUMENT-PROJECTION-ORDER-1"
+critical = true
+description = "Requires long-form prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "DOCUMENT-POSITIVE-RESPONSIBILITY-1"
+critical = true
+description = "Requires long-form projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "prose-reasoning-graph-selected-ordering-shim"
+target = ".agents/skills/prose-reasoning-graph/SKILL.md"
+kind = "skill"
+description = "Runtime prose graph skill must hand whole-document selected ordering to writing adapters."
+
+[[evals.checklist]]
+id = "PROSE-GRAPH-ORDER-SHIM-1"
+critical = true
+description = "Requires selected ordering to be passed as the whole-document sentence sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+
+[[evals]]
+id = "prose-reasoning-graph-selected-ordering-doc"
+target = "agents/skills/prose-reasoning-graph.md"
+kind = "skill"
+description = "Human prose graph skill must define selected ordering as the DSL-to-prose input sequence."
+
+[[evals.checklist]]
+id = "PROSE-GRAPH-ORDER-DOC-1"
+critical = true
+description = "Requires selected ordering to be passed as the whole-document sentence sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+
 [[evals]]
 id = "paper-writing-structure-planning"
 target = ".agents/skills/paper-writing/SKILL.md"
@@ -703,6 +811,18 @@ id = "PAPER-STRUCTURE-2"
 critical = true
 description = "Connects paper paragraph claim flow and transition pairs to discourse-relations."
 required_regex = ["discourse-relations", "academic-argument", "transition pairs", "logic-gap"]
+
+[[evals.checklist]]
+id = "PAPER-PROJECTION-ORDER-SHIM-1"
+critical = true
+description = "Requires paper prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "PAPER-POSITIVE-RESPONSIBILITY-SHIM-1"
+critical = true
+description = "Requires paper projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
 
 [[evals]]
 id = "refactor-loop-structure-planning"
