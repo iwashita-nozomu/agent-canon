@@ -31,10 +31,13 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Mandatory Checklist
 
 - `summary statement` で argument、purpose、reader を先に固定する
+- 実質的な文書追記・修正では、reader-facing prose を足す前に対象文書の responsibility、reader path、section order、source map、上位 / 下位 canon との関係を構造解析する。typo、link、format-only、機械的な表記揺れ修正だけなら `md-style-check` で足りる
 - section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph flow や transition choice が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile general` または `--profile academic-argument` を使う
 - 非自明な一般説明文書の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る。既存 repo Markdown なら `check-document` で prose diagnostics と document-canon diagnostics を同時に出す
 - prose graph diagnostics / explanation / integration plan を section order、paragraph bridge、split / merge の evidence として使う
+- prose graph handoff に `selected_ordering.ordered_anchors` がある場合は、全文 sentence anchor の topological order を DSL-to-prose input sequence として使う
+- graph responsibility は肯定形の prose contract に射影する。section、tool、workflow、document が何を担い、どの evidence が支えるかを直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
 - reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。structure contract または graph-backed rewrite packet を直し、graph-backed unit の追加・削除・分割・統合・順序変更を行い、graph diagnostics を再実行し、selected profile の active finding がなくなってから draft する
 - DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は、通常の文書 finding ではなく `dsl_to_prose_prompt_defect` として prose-generation prompt を直す
 - process、dependency、ownership、routing、state transition、review gate、multi-step flow が読者理解の中心なら、`structure-planning` の `visual_plan` で Mermaid 図を既定候補にし、Markdown 内に fenced `mermaid` block として残す
@@ -49,11 +52,12 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Default Sequence
 
 1. `summary statement` を短く書く
+1. 文書追記・修正が substantive かを判定する。section、責務、claim/support、reader path、source map、canonical route が変わるなら構造解析 gate を必須にし、typo / format-only ならその理由を残して省略する
 1. 必要なら `structure-planning` で first section、source-to-structure map、section order、invalid interpretation を固定する
 1. workflow、dependency、ownership、routing、state、review gate、handoff の説明がある場合は、first visual として Mermaid 図を置くか、`visual_plan=text-only` の理由を残す
 1. paragraph order / transition evidence が必要なら discourse-relations JSONL を構造 contract に添付する
 1. roadmap と section contract を作る
-1. 非自明な一般説明文書なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
+1. 非自明または substantive な一般説明文書の追記・修正なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. 必要なら `python3 tools/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
 1. reader order で draft する
 1. DSL / projection から prose に射影した後、同じ graph check を再実行し、射影後だけの finding は `dsl_to_prose_prompt_defect` として記録する
@@ -61,7 +65,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 1. `document_flow_reviewer` を通す
 1. 別 reviewer で docs completeness review を通す
 1. 必要なら docs consistency review を追加する
-1. `make docs-check` で閉じる
+1. `tools/bin/agent-canon docs check` で閉じる
 
 ## Boundary
 

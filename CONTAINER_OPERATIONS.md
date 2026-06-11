@@ -269,7 +269,7 @@ Hook output is evidence, not a decoration.
   the hook before writing if they are not intended as durable evidence. Once a
   tracked AgentCanon hook-run line exists, treat it as evidence until a retention
   pass explicitly compacts it.
-- An empty or fallback hook payload that still evaluates changed source must be
+- An empty or alternate route hook payload that still evaluates changed source must be
   logged with the payload status, not silently treated as success.
 - Skill and workflow eval results must receive unique IDs and append-only result
   files. Do not overwrite detailed eval evidence.
@@ -292,7 +292,7 @@ the tooling that enforces them. Merge times are GitHub `mergedAt` values in UTC.
 | #10 `d8caa5b` | 2026-05-13 12:15 | Review backlog and repo-wide scans must degrade when `rg` is missing instead of assuming one local search tool. |
 | #9 `2da3793` | 2026-05-13 12:01 | PR queue cleanup requires validation gates and authority evidence before mutation. |
 | #8 `7f512e3` | 2026-05-13 11:50 | PR mutation authority is explicit. `gh` availability alone does not authorize merge, close, or branch delete. |
-| #7 `0856d16` | 2026-05-13 11:06 | OOP hook fallback payloads must be logged with unique evidence rather than disappearing into a generic pass/fail result. |
+| #7 `0856d16` | 2026-05-13 11:06 | OOP hook alternate route payloads must be logged with unique evidence rather than disappearing into a generic pass/fail result. |
 
 ## Recent Template Rule Changes
 
@@ -304,7 +304,7 @@ a template-derived repository that may still contain stale wording.
 | --- | --- |
 | `d68f736` | Template now adopts the shared AgentCanon devcontainer and Agent Improvement Guide workflow. |
 | `3715e3d` | Template pinned the AgentCanon operational issue and inspection proposal; issue evidence is part of workflow state. |
-| `b5c8368` | GitHub CI installs `ripgrep`; repo-wide search tooling may prefer `rg` but must still document fallback behavior where required. |
+| `b5c8368` | GitHub CI installs `ripgrep`; repo-wide search tooling may prefer `rg` but must still document alternate route behavior where required. |
 | `58d3e18` | AgentCanon snapshot sync: root shared views are repaired by sync tooling, not edited as independent truth surfaces. |
 | `8ee9867` | AgentCanon snapshot sync: downstream template changes must carry the submodule pin evidence. |
 | `d597611` | AgentCanon snapshot sync: template root views track the AgentCanon pin and must not assume subtree ownership. |

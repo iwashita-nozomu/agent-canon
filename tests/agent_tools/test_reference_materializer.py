@@ -65,8 +65,8 @@ class ReferenceMaterializerTest(unittest.TestCase):
             self.assertIn("Visible body text.", text)
             self.assertNotIn("hidden()", text)
 
-    def test_pdf_literal_text_fallback_is_written_as_markdown(self) -> None:
-        """PDF input should keep extracted text in a references Markdown file."""
+    def test_pdf_literal_text_scanner_is_not_used(self) -> None:
+        """PDF input should fail when configured extractors cannot read the source."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             pdf_path = root / "source.pdf"
@@ -86,14 +86,13 @@ class ReferenceMaterializerTest(unittest.TestCase):
                 "PDF Reference",
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("REFERENCE_MATERIALIZE_SOURCE_KIND=pdf", result.stdout)
-            self.assertIn("REFERENCE_MATERIALIZE=pass", result.stdout)
-            path_line = next(line for line in result.stdout.splitlines() if line.startswith("REFERENCE_MATERIALIZE_PATH="))
-            output = root / path_line.partition("=")[2]
-            text = output.read_text(encoding="utf-8")
-            self.assertIn("source_url: https://example.com/source.pdf", text)
-            self.assertIn("PDF Visible Text", text)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REFERENCE_MATERIALIZE=fail", result.stdout)
+            self.assertRegex(
+                result.stderr,
+                r"REFERENCE_MATERIALIZE_ERROR=pdf-text-(?:extractor-required|extraction-failed)",
+            )
+            self.assertFalse((root / "references").exists())
 
 
 if __name__ == "__main__":

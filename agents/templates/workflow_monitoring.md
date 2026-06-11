@@ -17,7 +17,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 ## Signals
 
-<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, MCP preflight, repo dependency intake, web-research decision, review status, validation status, and any drift risk. Use explicit opt-out markers such as mcp_preflight_not_required only when the workflow made that decision. -->
+<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, repo dependency intake, web-research decision, review status, validation status, and any drift risk. -->
 
 ## Behavior Events
 

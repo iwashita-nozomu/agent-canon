@@ -87,6 +87,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH=logs/{key}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(
+            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon) / 'agent-reports' / key}",
+            result.stdout,
+        )
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", result.stdout)
 
     def test_ensure_status_and_push_logs_branch(self) -> None:

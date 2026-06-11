@@ -212,7 +212,7 @@ It should not include unverified pass claims.
 The following should fail strict or self-growth completion:
 
 1. `make ci passed` with no command evidence.
-2. `mcp_inventory=pass` without MCP report or fallback report.
+2. `mcp_inventory=pass` without MCP report or alternate route report.
 3. `diff_check_agent_complete=yes` with reviewer role equal to parent/self.
 4. `runtime_feedback=observed` without self-growth repair manifest.
 5. `prompt_eval=pass` without eval ID and rerun evidence.

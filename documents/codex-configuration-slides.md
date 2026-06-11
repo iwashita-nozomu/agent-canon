@@ -79,14 +79,6 @@ goals = true
 [agents]
 max_threads = 24
 job_max_runtime_seconds = 3600
-
-[mcp_servers.repo_mcp_server]
-command = "bash"
-args = ["mcp/repo_mcp_server.sh"]
-enabled = true
-required = false
-startup_timeout_sec = 20
-tool_timeout_sec = 300
 ```
 
 ---
@@ -95,12 +87,10 @@ tool_timeout_sec = 300
 
 - 外部 sandbox 前提なので approval は `never`
 - filesystem sandbox は `danger-full-access`
-- hooks を有効化し、MCP 起動や context 注入を runtime に組み込む
+- hooks を有効化し、runtime guardrail を組み込む
 - subagent は最大 24 thread、job timeout 3600 秒
-- repo MCP は optional startup にして、失敗時も起動後に検出・報告する
-- AgentCanon は `mcp/repo_mcp_server.sh` / `mcp/repo_mcp_server.py` の実装と repo MCP tool contract を所有する
-- Codex は `.codex/config.toml` registration、project trust、hook context、apps / external connectors / session tool availability を所有する
-- `repo_mcp_server` は repo context / goal loop 専用で、file edit、GitHub、shell、web、Codex app connector の代替を実装しない
+- AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
+- Codex は project trust、hook context、apps / external connectors / session tool availability を所有する
 
 ---
 
@@ -170,7 +160,7 @@ schema には他にも多くの flag があります。
 - 未設定: `max_depth`
 - 未設定: inline role entries
 
-`[mcp_servers.repo_mcp_server]`:
+`[mcp_servers.<name>]`:
 
 - 未設定: `url`, `cwd`, `env`, `env_vars`
 - 未設定: `enabled_tools`, `disabled_tools`, `tools`
@@ -312,19 +302,9 @@ Custom agents は次に置けます。
 
 # MCP
 
-MCP は Codex が外部 tool を呼ぶ接続面です。
-
-```toml
-[mcp_servers.repo_mcp_server]
-command = "bash"
-args = ["mcp/repo_mcp_server.sh"]
-enabled = true
-required = false
-startup_timeout_sec = 20
-tool_timeout_sec = 300
-```
-
-repo-local tool は `required=false` にして、boot 不能より「起動後に失敗を検知して直す」設計にします。
+MCP は Codex が外部 tool や認可済み workspace data を呼ぶ接続面です。
+AgentCanon の repo-local deterministic checks は MCP server ではなく CLI
+tool と structured output を正本にします。
 
 ---
 
@@ -365,7 +345,7 @@ Hook には「毎回確実に動いてほしい deterministic 処理」を置き
 - 禁止 tool の事前 block
 - OOP guard の中間 block と呼び出しログ
 - notebook-as-test misuse の中間 block と呼び出しログ
-- skill usage の `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` 追記
+- skill usage の `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` 追記
 - tool 結果の監査ログ化
 - permission request の追加 review
 
@@ -411,7 +391,7 @@ enabled = true
 関連 key:
 
 - `project_doc_max_bytes`
-- `project_doc_fallback_filenames`
+- `project_doc_alternate route_filenames`
 - `project_root_markers`
 - `include_environment_context`
 - `include_permissions_instructions`

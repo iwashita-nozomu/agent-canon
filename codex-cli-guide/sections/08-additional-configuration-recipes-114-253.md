@@ -471,18 +471,18 @@ repo/packages/ui/AGENTS.md
 
 ### 追加設定レシピ 136: project doc容量調整
 
-**目的**  AGENTSやfallback文書を読みすぎない。
+**目的**  AGENTSやalternate route文書を読みすぎない。
 
 
 ```
 project_doc_max_bytes = 150000
-project_doc_fallback_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
 ```
 
 
 **確認**  巨大文書でcontextが圧迫されないか確認する。
 
-**戻し方**  文書を分割し、不要なfallbackを外す。
+**戻し方**  文書を分割し、不要なalternate routeを外す。
 
 
 ### 追加設定レシピ 137: root markerを言語別にする

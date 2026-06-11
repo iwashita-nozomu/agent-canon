@@ -133,9 +133,7 @@ remote 名や一台の host path に合わせて変えません。
 - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - `tools/shared/error_handler.py`
 - `tools/validation/triplet_validator.py`
-- `tools/docs/audit_and_fix_links.py`
-- `tools/docs/check_markdown_lint.py`
-- `tools/docs/check_markdown_math.py`
+- `tools/bin/agent-canon docs check`
 - `tools/agent_tools/bootstrap_agent_run.py`
 - `tools/agent_tools/smoke_test_research_perspective_pack.py`
 - `tools/agent_tools/validate_role_write_scope.py`
@@ -352,7 +350,7 @@ legacy subtree repo は移行完了まで次を互換 path として使えます
 - `bash tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
 - `git subtree pull --prefix=vendor/agent-canon`
 - `git subtree push --prefix=vendor/agent-canon`
-- `snapshot_import_no_subtree*` fallback
+- `snapshot_import_no_subtree*` alternate route
 
 これらは新規 repo の標準 path ではありません。submodule 化済み repo で subtree route を選ぶ場合は、互換対応である理由を PR / closeout evidence に残します。
 

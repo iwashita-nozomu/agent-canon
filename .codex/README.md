@@ -7,7 +7,6 @@ upstream implementation ./config.toml project-scoped Codex settings
 upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
-downstream implementation ./hooks/mcp_session_context.sh provides optional MCP context text
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
 downstream implementation ./hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
@@ -17,7 +16,6 @@ downstream implementation ./hooks/module_boundary_guard.py warns on forced modul
 downstream implementation ./hooks/library_implementation_guard.py warns on library implementation rewrites
 downstream implementation ./hooks/helper_first_guard.py warns on helper-first implementation drift
 downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as-test misuse
-downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
 @dependency-end
 -->
 
@@ -51,7 +49,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 
 - `goals` feature は `.codex/config.toml` の `[features].goals = true` で有効にします。
 - TUI の user-facing command surface は `/goal`, `/goal <objective>`, `/goal pause`, `/goal resume`, `/goal clear` です。
-- `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は MCP `goal.loop_status` と `tools/agent_tools/goal_loop.py status` に置きます。
+- `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は `tools/agent_tools/goal_loop.py status` に置きます。
 - template repo の active `goal.md` は runtime state であり、派生 repo seed に混入させません。tracked product state に入れず、必要なら `.gitignore` で ignored local file として保持します。
 - goal-driven task では `/goal <objective>` の直後に `/plan <goal-driven task summary>` を使い、Plan-mode output に `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を出します。
 - pre-goal subagent fan-out は active runtime の authorization に従います。明示許可がある場合は read-only wave を起動し、無い場合は `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` と handoff packet を artifact に残します。
@@ -112,29 +110,6 @@ or high-risk review. Profiles do not waive workflow gates.
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
-## MCP Inventory
-
-- `repo_mcp_server` は [config.toml](config.toml) の `[mcp_servers.repo_mcp_server]` を正本にします。
-- launcher は host-global `repo_mcp_server` command ではなく、repo-local `bash mcp/repo_mcp_server.sh` を使います。
-- `cwd = "."` を設定し、launcher 側でも `CODEX_WORKSPACE_ROOT` を repo root に固定します。Goal / resume 後の restart で current working directory が揺れても、MCP は同じ repo root を見ます。
-- root `mcp/` は `vendor/agent-canon/mcp/` への runtime view で、`tools/sync_agent_canon.sh link-root` が復元します。
-- AgentCanon-owned surface は `mcp/repo_mcp_server.sh`、`mcp/repo_mcp_server.py`、および [../mcp/README.md](../mcp/README.md) の repo MCP tool contract です。
-- Codex-owned surface は `[mcp_servers.repo_mcp_server]` の registration、project trust、hook wiring、apps / external connectors / tool availability です。
-- AgentCanon repo MCP は repo context / goal loop status / goal plan 専用です。file edit、GitHub 操作、shell 実行、web access、Codex apps の代替を `repo_mcp_server` に実装しません。
-- MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
-- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答します。
-- repository task へ切り替えるのは、ユーザーが local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業を求めた場合です。GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させず、repo MCP preflight を走らせません。
-- 判断が曖昧な場合、または task が MCP surface を変更する場合は Rust CLI で `agent-canon mcp-preflight-policy --request-kind <kind>` を使います。`github-actions-read`、`github-read`、`pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、`implementation`、`validation`、`pr-mutation`、`issue-sync` は `required` です。
-- repository task で MCP evidence が workflow 上必要な場合、または `.codex/config.toml`、`mcp/`、repo MCP tools、MCP-dependent goal-loop gate を編集する場合だけ、`agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を実行します。Python 互換入口の `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` は run bundle の `workflow_monitoring.md` へ evidence を追記する必要がある場合に使います。
-- Rust CLI または local Cargo が AgentCanon の lockfile を読めない場合は `mcp_preflight_unavailable=<reason>` を work log、run bundle、または user-facing update に残し、MCP runtime behavior そのものが task scope でない限り既存 Python / shell gate で検証を続けます。
-- `--session-cache` は `reports/agents/.mcp_inventory_cache.json` に pass evidence を保存します。`.codex/config.toml`、`mcp/`、`rust/agent-canon/src/mcp_inventory.rs`、`tools/agent_tools/check_mcp_inventory.py` が変わった場合、cache は無効化されます。
-- inventory が pass した task では、repo root / status / goal loop status / goal plan / MCP-covered context checks で repo MCP tools を優先候補にします。
-- current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / context check 専用で、file edit tool は提供しません。
-- MCP が pass している通常作業では、この制限を user update で毎回説明しません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
-- `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
-- `.codex/config.toml` が `repo_mcp_server` を宣言しているのに `codex mcp list --json` が空の場合は、project trust または Codex project-config loading を先に修復します。
-- `check_mcp_inventory.py` は inventory だけでなく launcher command と repo-local script の存在も検査します。
-
 ## Hook Context
 
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
@@ -143,8 +118,6 @@ or high-risk review. Profiles do not waive workflow gates.
 - dispatcher は `GitPush` tool、単純な `git push`、安全な `gh pr` inspection / create / edit / checks / comment、`python3 tools/agent_tools/github_publish.py ...` でも child guard を起動しません。GitHub publish / PR evidence は publish tool と PR gate の責務であり、非重大 hook finding で止めません。
 - dispatcher は fail-open が既定です。子 hook の `decision=block` はログと修復 context として保持しますが、prompt secret など `CRITICAL_BLOCKING_CHILD_HOOKS` に入った高確信の公開事故だけを runtime block として維持します。明示的な hook 開発・強制検証では `AGENT_CANON_HOOK_STRICT_BLOCKS=1` または `AGENT_CANON_HOOK_STRICT_FAILURES=1` を設定できます。
 - process / search / reuse / planning / review completeness の規律は、hook blocker ではなく warning、run bundle evidence、closeout gate、または reviewer finding として扱います。hook finding は closeout 前に直すべき evidence ですが、通常の read-only 調査、validation、修復作業を止めません。
-- `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
-- `hooks/mcp_session_context.sh` は互換用の手動 context helper として残します。通常の Codex session startup / resume では呼び出しません。
 - `UserPromptSubmit` と `PreToolUse` は `hooks/log_archive_mount_warning.py` で `.agent-canon/log-archive/` が mounted Git clone として見えるか確認します。missing / invalid の場合も block せず、先に `python3 tools/agent_tools/runtime_log_archive_git.py ensure` を実行してから hook / eval logs を蓄積するよう促す警告だけを返します。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
@@ -161,9 +134,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `Stop` でも `hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば closeout repair context を返します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
 - dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。
-- `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:`、host/repo hash fallback の順で決まります。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` でテスト・debug 用の出力先を差し替えられます。
-- hook の役割は「MCP preflight が必要な workflow、または MCP surface を変更する task では inventory を明示実行する」ことを session 開始時に思い出させることです。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection を repo task に変換してはいけません。local Cargo が lockfile を読めない環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior が scope でない限り Python / shell gate で検証を続けます。完了 gate は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache`、または run bundle evidence が必要な場合の `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` で判定します。
-- hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
+- `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:` のいずれかで明示されます。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` でテスト・debug 用の出力先を差し替えられます。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
@@ -171,7 +142,7 @@ or high-risk review. Profiles do not waive workflow gates.
 
 - `.codex/agents/*.toml` is the source of truth for each Codex subagent's
   `model` and `model_reasoning_effort`.
-- `.codex/config.toml` owns project features, runtime limits, MCP registration,
+- `.codex/config.toml` owns project features, runtime limits,
   skill registration, and the agent registry only; it does not carry a second
   model settings table.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and

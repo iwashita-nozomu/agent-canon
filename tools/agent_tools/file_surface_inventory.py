@@ -183,14 +183,14 @@ def run_git_untracked_files(root: Path) -> list[tuple[str, str]]:
 
 
 def run_git_ls_files(root: Path) -> list[tuple[str, str]]:
-    """Return tracked and untracked paths, or an empty list outside git."""
+    """Return tracked and untracked paths from a Git worktree."""
     result = subprocess.run(
         ["git", "-C", str(root), "ls-files", "-z", "-s"],
         check=False,
         capture_output=True,
     )
     if result.returncode != 0:
-        return []
+        raise RuntimeError(f"git ls-files failed for inventory scope: {root}")
     rows: list[tuple[str, str]] = []
     for raw_record in result.stdout.split(b"\0"):
         if not raw_record:
@@ -200,28 +200,6 @@ def run_git_ls_files(root: Path) -> list[tuple[str, str]]:
         mode = metadata.split(" ", 1)[0]
         rows.append((mode, path))
     rows.extend(run_git_untracked_files(root))
-    return sorted(rows, key=lambda row: row[1])
-
-
-def fallback_files(root: Path) -> list[tuple[str, str]]:
-    """Return files from a non-git directory while skipping generated surfaces."""
-    rows: list[tuple[str, str]] = []
-    for current_root, dirnames, filenames in os.walk(root, followlinks=False):
-        current = Path(current_root)
-        for dirname in list(dirnames):
-            path = current / dirname
-            relative = path.relative_to(root)
-            if path.is_symlink() and not set(relative.parts) & EXCLUDED_PARTS:
-                rows.append(("120000", relative.as_posix()))
-        dirnames[:] = [
-            dirname for dirname in dirnames if dirname not in EXCLUDED_PARTS
-        ]
-        for filename in filenames:
-            path = current / filename
-            relative = path.relative_to(root)
-            if set(relative.parts) & EXCLUDED_PARTS:
-                continue
-            rows.append(("100644", relative.as_posix()))
     return sorted(rows, key=lambda row: row[1])
 
 
@@ -323,7 +301,7 @@ def selected_mode(args: argparse.Namespace) -> str:
 
 def inventory_scope(scope_name: str, root: Path, surface_lookup: SurfaceLookup) -> ScopeInventory:
     """Inventory one scan scope."""
-    rows = run_git_ls_files(root) or fallback_files(root)
+    rows = run_git_ls_files(root)
     entries = [
         make_entry(scope_name, root, git_mode, path, surface_lookup)
         for git_mode, path in rows
@@ -449,10 +427,15 @@ def main() -> int:
     root = Path(args.root).resolve()
     mode = selected_mode(args)
     surface_lookup = load_surface_lookup(root)
-    scopes = [
-        inventory_scope(name, scope_root, surface_lookup)
-        for name, scope_root in scope_roots(root, mode)
-    ]
+    try:
+        scopes = [
+            inventory_scope(name, scope_root, surface_lookup)
+            for name, scope_root in scope_roots(root, mode)
+        ]
+    except RuntimeError as exc:
+        print(f"FILE_SURFACE_INVENTORY_ERROR={exc}")
+        print("FILE_SURFACE_INVENTORY=fail")
+        return 1
     json_text = render_json(mode, root, scopes)
     markdown_text = render_markdown(mode, root, scopes, int(args.max_markdown_entries))
     write_optional(args.json_out, json_text)

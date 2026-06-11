@@ -23,7 +23,7 @@ upstream implementation ../tools/sync_agent_canon.sh root symlink view generatio
 - runtime success、smoke pass、性能改善だけをもって、数理と実装が一致したとは扱いません。
 - 数式や仕様が変わったのか、数値近似が変わったのか、実装構造だけが変わったのかを同じ iteration に混ぜません。
 - class や helper を作る前に、どの式、変数、constraint、assumption、state transition を担うかを明示します。
-- 近似、省略、guard、fallback、cache、vectorization、parallelization は、数理境界からの逸脱として記録します。
+- 近似、省略、guard、alternate route、cache、vectorization、parallelization は、数理境界からの逸脱として記録します。
 
 ## 実装前に固定する境界
 
@@ -45,7 +45,7 @@ upstream implementation ../tools/sync_agent_canon.sh root symlink view generatio
 
 | Math / Spec Item | Implementation Boundary | Inputs | Outputs | State Owner | Approximation / Omission / Guard | Validation |
 | ---------------- | ----------------------- | ------ | ------- | ----------- | -------------------------------- | ---------- |
-| 式、制約、変数、仮定、仕様項目 | path と module / function / class / method | shape、dtype、unit | shape、dtype、unit | state を保持する boundary | 近似、省略、guard、fallback | test、reference、review evidence |
+| 式、制約、変数、仮定、仕様項目 | path と module / function / class / method | shape、dtype、unit | shape、dtype、unit | state を保持する boundary | 近似、省略、guard、alternate route | test、reference、review evidence |
 
 この表は reader と reviewer が数理から code へ辿るための正本です。
 実装者の頭の中にだけある対応や、実装後に説明を合わせる後付け mapping は不可です。
@@ -91,7 +91,7 @@ reviewer は、run が通っていても Boundary Map と implementation がズ�
 
 - 設計 artifact に Boundary Map がある。
 - 変更後の実装 boundary が Boundary Map の path / function / class と一致している。
-- 近似、省略、guard、fallback が文書化されている。
+- 近似、省略、guard、alternate route が文書化されている。
 - test または review evidence が、数理境界と実装境界の対応を直接確認している。
 - README、workflow、docstring、report が古い数理境界や旧実装 boundary を案内していない。
 

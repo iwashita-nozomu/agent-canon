@@ -42,7 +42,7 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 1. `project-review` で inventory を取り、comprehensive に見る必要があるかを判断します。
 1. `bash tools/run_comprehensive_review.sh` を実行します。
 1. 失敗した validator の log を見て、repo-wide issue と局所 issue を切り分けます。
-1. 必要に応じて `make agent-checks`、`make docs-check`、`make ci-quick` へ掘り下げます。
+1. 必要に応じて `make agent-checks`、`tools/bin/agent-canon docs check`、`make ci-quick` へ掘り下げます。
 1. closeout では、通った validator、失敗した validator、未確認領域を残します。
 
 ## Default Commands

@@ -16,11 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 from agent_team import (
     ROOT,
@@ -231,10 +227,6 @@ def validate_project_hooks() -> None:
     ensure(
         "mcp_session_context.sh" not in hooks_text,
         "mcp_session_context.sh must not be wired as a startup hook",
-    )
-    ensure(
-        (ROOT / ".codex" / "hooks" / "mcp_session_context.sh").is_file(),
-        "mcp_session_context.sh must exist as an optional context helper",
     )
     for hook_script in (
         "log_archive_mount_warning.py",

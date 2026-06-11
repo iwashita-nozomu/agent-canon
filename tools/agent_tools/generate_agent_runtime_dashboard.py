@@ -85,10 +85,13 @@ PERCENT_SCALE = 100.0
 UNKNOWN_RESET_BASIS = "untracked-or-unknown"
 MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
+    "agent-canon-cli",
     "audit_and_fix_links.py",
     "check_markdown_lint.py",
     "check_markdown_math.py",
     "format_markdown.py",
+    "fix_markdown_math.py",
+    "fix_mermaid.py",
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
     "run_docs_checks.sh",
@@ -617,7 +620,6 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
             ".agent-canon/log-archive/eval-results/**/*.md",
-            ".agent-canon/archive/*/eval-results/**/*.md",
         )
         paths: set[Path] = set()
         for pattern in patterns:
@@ -1907,6 +1909,8 @@ def evidence_location_lines(root: Path) -> list[str]:
         f"- evidence_root: `{root.as_posix()}`",
         "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
+        "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
+        "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
@@ -2625,8 +2629,8 @@ def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         action="repair Markdown/docs checking signal",
         reason=reason,
         evidence=MARKDOWN_EVIDENCE_TARGET,
-        owner_surface=".agents/skills/md-style-check/SKILL.md and tools/docs/",
-        command="bash tools/ci/run_docs_checks.sh",
+        owner_surface=".agents/skills/md-style-check/SKILL.md and rust/agent-canon/src/docs.rs",
+        command="tools/bin/agent-canon docs check",
         done_condition="markdown eval failures are 0 and markdown hook signal is present",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
@@ -2725,10 +2729,10 @@ def blocking_next_action_count(summary: RuntimeDashboardSummary) -> int:
     return sum(1 for action in dashboard_next_actions(summary) if action.priority in {"P0", "P1"})
 
 
-def top_counter_key(counter: Counter[str], fallback: str) -> str:
+def top_counter_key(counter: Counter[str], default_key: str) -> str:
     """Return the most common key from a counter."""
     if not counter:
-        return fallback
+        return default_key
     return counter.most_common(1)[0][0]
 
 

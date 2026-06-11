@@ -341,7 +341,7 @@ _Unix系運用_
 
 #### 図解: 38 requirements.toml
 
-`管理者が制約` → `ユーザー上書き不可` → `互換値へフォールバック`
+`管理者が制約` → `ユーザー上書き不可` → `互換値へ代替経路`
 
 _管理設定_
 
@@ -848,7 +848,7 @@ AGENTS/プロジェクト/履歴  |  `compact_prompt`  |  string  |  会話圧�
 AGENTS/プロジェクト/履歴  |  `experimental_compact_prompt_file`  |  string(path)  |  圧縮プロンプトを読むファイル。
 AGENTS/プロジェクト/履歴  |  `history.persistence`  |  save-all | none  |  履歴JSONLへ保存するか。
 AGENTS/プロジェクト/履歴  |  `history.max_bytes`  |  integer  |  履歴ファイルの最大バイト数。
-AGENTS/プロジェクト/履歴  |  `project_doc_fallback_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
+AGENTS/プロジェクト/履歴  |  `project_doc_alternate route_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
 AGENTS/プロジェクト/履歴  |  `project_doc_max_bytes`  |  integer  |  AGENTS.md由来指示の読み込み上限。
 AGENTS/プロジェクト/履歴  |  `project_root_markers`  |  array<string>  |  プロジェクトルート検出マーカー。既定.git。
 AGENTS/プロジェクト/履歴  |  `projects.<path>.trust_level`  |  trusted | untrusted  |  プロジェクトスコープ.codex層の信頼状態。
@@ -1096,7 +1096,7 @@ _ルート検出_
 
 #### 図解: 58 代替指示名
 
-`fallback names` → `find per directory` → `one file per dir`
+`alternate route names` → `find per directory` → `one file per dir`
 
 _AGENTS代替ファイル_
 
@@ -1554,7 +1554,7 @@ web_search = "cached"
 
 # プロジェクト指示の読み込み上限と代替名。
 project_doc_max_bytes = 65536
-project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 
 # workspace-write時の細かい境界。必要なものだけ許可する。
 [sandbox_workspace_write]
@@ -1681,12 +1681,12 @@ monorepo/
 
 ### 代替ファイル名
 
-既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_fallback_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
+既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_alternate route_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
 
 
 ```
 # ~/.codex/config.toml または .codex/config.toml
-project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 project_doc_max_bytes = 65536
 ```
 
@@ -3268,7 +3268,7 @@ _初期確認手順を用意する。_
 _止め方を決める。_
 
 
-#### 図解: MCPとFallback
+#### 図解: MCPとAlternate route
 
 `server down` → `repo search` → `human ask`
 
@@ -3347,7 +3347,7 @@ _停止手順を練習する。_
 
 #### 図解: MCPと障害
 
-`detect` → `notify` → `fallback`
+`detect` → `notify` → `alternate route`
 
 _障害時の体験を決める。_
 
@@ -3452,7 +3452,7 @@ risk: read-only
 owner: platform-team
 allowed_agents: [docs_researcher, pr_explorer]
 forbidden: secrets, production data, write operations
-failure_fallback: use ripgrep in docs/ and ask human for missing context
+failure_alternate route: use ripgrep in docs/ and ask human for missing context
 ```
 
 
@@ -3477,7 +3477,7 @@ _環境変数は必要最小限にする。_
 _read-only toolに絞る。_
 
 
-#### 図解: STDIO fallback
+#### 図解: STDIO alternate route
 
 `server down` → `grep` → `human ask`
 
@@ -3850,7 +3850,7 @@ _tool単体で再現する。_
 
 ## MCP追加時のレビューシート
 
-MCPを追加するpull requestには、設定diffだけでなく、目的、owner、server実装場所、認証方式、許可tool、禁止tool、timeout、fallback、AGENTS更新、Hook有無を含める。特にwrite系toolを含む場合は、read系serverと分けるか、初期状態では`enabled = false`にする。
+MCPを追加するpull requestには、設定diffだけでなく、目的、owner、server実装場所、認証方式、許可tool、禁止tool、timeout、alternate route、AGENTS更新、Hook有無を含める。特にwrite系toolを含む場合は、read系serverと分けるか、初期状態では`enabled = false`にする。
 
 
 ```text
@@ -3864,7 +3864,7 @@ tools  |  `enabled_tools`で絞っているか。  |  必要最小限から始�
 timeout  |  startupとtool timeout。  |  server別に設定する。
 hooks  |  危険toolを検査するか。  |  write系にはhookを付ける。
 docs  |  AGENTS.mdやdocs更新。  |  使い方と禁止事項を書く。
-fallback  |  server停止時の代替手段。  |  人間が困らない状態にする。
+alternate route  |  server停止時の代替手段。  |  人間が困らない状態にする。
 rollback  |  enabled falseや設定削除。  |  戻し方をPRに書く。
 ```
 
@@ -4123,7 +4123,7 @@ _MCP upgradeの基本パターン。_
 
 #### 図解: MCP incident
 
-`detect` → `disable` → `fallback`
+`detect` → `disable` → `alternate route`
 
 _MCP incidentの基本パターン。_
 
@@ -4347,7 +4347,7 @@ _subagent outputの基本パターン。_
 
 #### 図解: subagent failure
 
-`timeout` → `fallback` → `merge`
+`timeout` → `alternate route` → `merge`
 
 _subagent failureの基本パターン。_
 
@@ -4600,7 +4600,7 @@ _MCP追加カードの確認カード06。_
 
 #### 図解: MCP追加カード 07
 
-`required` → `startup` → `fallback`
+`required` → `startup` → `alternate route`
 
 _MCP追加カードの確認カード07。_
 
@@ -4649,7 +4649,7 @@ _MCP追加カードの確認カード13。_
 
 #### 図解: MCP追加カード 14
 
-`incident` → `block` → `fallback`
+`incident` → `block` → `alternate route`
 
 _MCP追加カードの確認カード14。_
 
@@ -5025,7 +5025,7 @@ _サブエージェントカードの確認カード15。_
 
 #### 図解: サブエージェントカード 16
 
-`failure` → `fallback` → `human`
+`failure` → `alternate route` → `human`
 
 _サブエージェントカードの確認カード16。_
 
@@ -5415,7 +5415,7 @@ _トラブルシュートカードの確認カード19。_
 
 #### 図解: トラブルシュートカード 20
 
-`server down` → `disable` → `fallback`
+`server down` → `disable` → `alternate route`
 
 _トラブルシュートカードの確認カード20。_
 
@@ -7139,7 +7139,7 @@ server名とidentityの両方が合う必要がある設計にする。
 
 
 ```
-## MCP fallback
+## MCP alternate route
 - If repo_knowledge MCP is unavailable, inspect docs/ and runbooks/ manually.
 - If tracker MCP is unavailable, ask the user for the issue URL or summary.
 - Do not guess production incidents without logs or issue context.
@@ -7151,7 +7151,7 @@ MCP障害時にCodexが推測で進まないかを見る。
 
 
 **落とし穴** 
-required=trueのserverにはfallbackが効かない。必須か任意かを分ける。
+required=trueのserverにはalternate routeが効かない。必須か任意かを分ける。
 
 
 ### 設定レシピ 056: MCP tool実行をHooksで監査する
@@ -7841,20 +7841,20 @@ project_root_markers = [".git", "pnpm-workspace.yaml", "package.json"]
 markerを増やしすぎると深いsubdirがroot扱いになる可能性がある。
 
 
-### 設定レシピ 084: AGENTS fallback filename
+### 設定レシピ 084: AGENTS alternate route filename
 
 
 **目的と配置**  目的: AGENTS.md以外の社内文書も読む。 配置: `.codex/config.toml`。まずこの断片だけを追加し、`/debug-config` または関連CLIで有効値を確認する。
 
 
 ```
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 ```
 
 
 **確認** 
-AGENTS.mdがないdirでfallbackが使われるか確認する。
+AGENTS.mdがないdirでalternate routeが使われるか確認する。
 
 
 **落とし穴** 
@@ -8533,7 +8533,7 @@ schema対応エディタで補完と診断を使う。
 
 ```
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 
@@ -8744,7 +8744,7 @@ tool_timeout_sec = 60
 ```
 # .codex/config.toml
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 
@@ -9438,18 +9438,18 @@ repo/packages/ui/AGENTS.md
 
 ### 追加設定レシピ 136: project doc容量調整
 
-**目的**  AGENTSやfallback文書を読みすぎない。
+**目的**  AGENTSやalternate route文書を読みすぎない。
 
 
 ```
 project_doc_max_bytes = 150000
-project_doc_fallback_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
+project_doc_alternate route_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
 ```
 
 
 **確認**  巨大文書でcontextが圧迫されないか確認する。
 
-**戻し方**  文書を分割し、不要なfallbackを外す。
+**戻し方**  文書を分割し、不要なalternate routeを外す。
 
 
 ### 追加設定レシピ 137: root markerを言語別にする

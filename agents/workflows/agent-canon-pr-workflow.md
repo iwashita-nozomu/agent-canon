@@ -167,7 +167,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
 - 標準入口は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` です。この tool は `gh repo view` と `git remote get-url origin` が同じ `owner/name` を指す場合だけ publish / PR 操作へ進み、stdout に `REMOTE_VERIFIED=yes` と user task を出します。
 - `git status --short --branch` は branch 状態の補助 evidence として見ますが、push 先 repository の決定には使いません。
-- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata を読む fallback へ降りません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
+- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata から push 先を推定しません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
 - literal URL push is not a standard route. GitHub publish / PR 作業は `github_publish.py` の verified remote route に戻します。
 - PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
 
@@ -207,7 +207,7 @@ python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --git
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/ci/check_github_workflows.py
-bash tools/ci/run_docs_checks.sh
+tools/bin/agent-canon docs check
 bash tools/ci/run_all_checks.sh --quick
 ```
 
@@ -391,7 +391,7 @@ Scope:
 
 Validation:
 - python3 tools/ci/check_github_workflows.py: pass
-- make docs-check: pass
+- tools/bin/agent-canon docs check: pass
 - make ci: pass
 ```
 

@@ -50,7 +50,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `structure-planning` | report / experiment / Eval / presentation / document / refactor の構造 contract、first artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
 | `html-output` | HTML が明示された出力だけを browser-readable artifact にし、layout、ImageGen、既存 server reuse / external URL 公開を固定する | `agents/skills/html-output.md` | `.agents/skills/html-output/SKILL.md` |
 | `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
-| `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
+| `test-design` | brittle test 診断、behavior contract、oracle、property/metamorphic 候補、nasty/regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
 | `structure-refactor` | directory README と dependency manifest を再帰展開し、責務に基づいて directory 構造、path mapping、scope map を refactor する | `agents/skills/structure-refactor.md` | `.agents/skills/structure-refactor/SKILL.md` |
 | `user-guided-debugging` | ユーザー明示時に、1 件ずつ問題点を提示してから修正し、検証後に次の課題を提示する | `agents/skills/user-guided-debugging.md` | `.agents/skills/user-guided-debugging/SKILL.md` |
@@ -98,7 +98,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 ## Codex Defaults
 
 - Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
-- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs; do not vendor duplicate OpenAI docs fallback references in AgentCanon. Use `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
+- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs; do not vendor duplicate OpenAI docs alternate route references in AgentCanon. Use `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。

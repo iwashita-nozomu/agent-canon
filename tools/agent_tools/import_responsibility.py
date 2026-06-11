@@ -24,11 +24,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 MANIFEST_PATH = "responsibility-scope.toml"
 PYTHON_SUFFIX = ".py"

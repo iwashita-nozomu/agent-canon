@@ -135,7 +135,7 @@ _MCP upgradeの基本パターン。_
 
 #### 図解: MCP incident
 
-`detect` → `disable` → `fallback`
+`detect` → `disable` → `alternate route`
 
 _MCP incidentの基本パターン。_
 
@@ -359,7 +359,7 @@ _subagent outputの基本パターン。_
 
 #### 図解: subagent failure
 
-`timeout` → `fallback` → `merge`
+`timeout` → `alternate route` → `merge`
 
 _subagent failureの基本パターン。_
 

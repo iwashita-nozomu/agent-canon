@@ -20,9 +20,9 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 ## Primary Sources
 
 - `$openai-docs` is the canonical source route for Codex product docs, Codex
-  manual synthesis, official Docs MCP fetches, official-domain web fallback,
+  manual synthesis, official Docs MCP fetches, official-domain web alternate route,
   latest-model guidance, model upgrades, and prompt-upgrade guidance.
-- Do not duplicate `$openai-docs` bundled fallback references here. When current
+- Do not duplicate `$openai-docs` bundled alternate route references here. When current
   Codex behavior or model guidance matters, run `$openai-docs` and record the
   resulting run artifact or decision, not a copied official URL list.
 - Local evidence: `codex --help`, `codex exec --help`, `codex review --help`,
@@ -39,7 +39,7 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 | CLI direct flags | single invocation | Common overrides for model, profile, sandbox, approval policy, cwd, images, web search, and output mode. |
 | `.codex/agents/*.toml` / `~/.codex/agents/*.toml` | project / user | Custom subagent roles with model, sandbox, MCP, skills, and instructions overrides. |
 | `.agents/skills/**/SKILL.md` and other skill roots | directory / repo / user / system | Reusable task instructions and optional scripts/resources. |
-| `AGENTS.md` and fallback project docs | repo tree | Runtime instructions discovered from cwd to root. |
+| `AGENTS.md` and alternate route project docs | repo tree | Runtime instructions discovered from cwd to root. |
 | `hooks.json` or `[hooks]` | repo / user | Lifecycle automation around session start, prompt submit, tool use, stop, and permission events. |
 
 ## Load and Override Model
@@ -77,24 +77,15 @@ goals = true
 [agents]
 max_threads = 24
 job_max_runtime_seconds = 3600
-
-[mcp_servers.repo_mcp_server]
-command = "bash"
-args = ["mcp/repo_mcp_server.sh"]
-enabled = true
-required = false
-startup_timeout_sec = 20
-tool_timeout_sec = 300
 ```
 
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
 - `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
-- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `repo_mcp_server.goal_loop_status`.
+- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `tools/agent_tools/goal_loop.py`.
 - Reusable runtime profiles such as `token-lite`, `token-standard`, and `token-deep` belong in user-level Codex config. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
-- `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
 ## Current Template Coverage Matrix
 
@@ -110,7 +101,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
 | `features` | `features.hooks=true` and `features.goals=true` are configured. |
 | `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
-| `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
+| `mcp_servers` | Not configured by the template. |
 
 ### Top-Level Keys Not Currently In `.codex/config.toml`
 
@@ -118,7 +109,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | -------- | ----------- |
 | Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
-| Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
+| Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_alternate route_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
 | Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
 | MCP OAuth and auth storage | `mcp_oauth_callback_port`, `mcp_oauth_callback_url`, `mcp_oauth_credentials_store`, `cli_auth_credentials_store`, `forced_chatgpt_workspace_id`, `forced_login_method` |
 | UI, history, logging, and local state | `tui`, `history`, `log_dir`, `sqlite_home`, `notify`, `file_opener`, `feedback`, `analytics`, `notice`, `check_for_update_on_startup`, `suppress_unstable_features_warning`, `disable_paste_burst`, `commit_attribution`, `compact_prompt`, `hide_agent_reasoning`, `show_raw_agent_reasoning`, `background_terminal_max_timeout` |
@@ -222,7 +213,6 @@ workspace_owner_usage_nudge
 | Surface | Configured Here | Schema-Available But Absent Here |
 | ------- | --------------- | -------------------------------- |
 | `[agents]` | `max_threads`, `job_max_runtime_seconds` | `max_depth` and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` |
-| `[mcp_servers.repo_mcp_server]` | `command`, `args`, `enabled`, `required`, `startup_timeout_sec`, `tool_timeout_sec` | `url`, `cwd`, `env`, `env_vars`, `http_headers`, `env_http_headers`, `bearer_token_env_var`, `enabled_tools`, `disabled_tools`, `tools`, `default_tools_approval_mode`, `supports_parallel_tool_calls`, `oauth_resource`, `scopes`, `startup_timeout_ms`, `experimental_environment`, `name` |
 | `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
 | `.agents/skills/` versus `[skills]` | skills are provided as files under `.agents/skills/` | `[skills] include_instructions`, `[skills.bundled]`, and `[[skills.config]]` name/path enablement entries |
 
@@ -345,7 +335,7 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `plugins` | object | Plugin enablement by plugin name. |
 | `profile` | string | Selected named profile. |
 | `profiles` | object | Named reusable config overlays. |
-| `project_doc_fallback_filenames` | array | Fallback filenames when `AGENTS.md` is missing. |
+| `project_doc_alternate route_filenames` | array | Alternate route filenames when `AGENTS.md` is missing. |
 | `project_doc_max_bytes` | integer | Maximum bytes read from project doc files. |
 | `project_root_markers` | array | Markers for detecting repo root when scanning `.codex`. |
 | `projects` | object | Per-project trust settings. |
@@ -490,20 +480,17 @@ CLI management:
 ```bash
 codex mcp list --json
 codex mcp add docs --url https://example.invalid/mcp
-codex mcp add repo -- bash mcp/repo_mcp_server.sh
 codex mcp remove repo
 codex mcp login repo
 codex mcp logout repo
 ```
 
-Template guidance for local repo MCP:
+Template guidance for MCP:
 
-- Keep `required=false` for optional local-process MCP so the agent can still boot and report a startup problem.
-- Put deterministic repo-local startup in `mcp/repo_mcp_server.sh`.
-- Use hooks and validation scripts to detect missing MCP inventory; do not hide startup failures.
-- Treat `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md` as the AgentCanon-owned repo MCP implementation and tool contract.
-- Treat `.codex/config.toml`, hook registration, project trust, user profiles, apps, and external connectors as the Codex-owned registration and runtime plane.
-- Keep `repo_mcp_server` limited to repo context and goal-loop checks. Do not reimplement file edit, GitHub, shell, web, or Codex app connector behavior inside AgentCanon MCP.
+- Keep MCP server configuration out of shared AgentCanon runtime unless a task
+  explicitly needs an external connector.
+- Prefer deterministic AgentCanon CLI tools for repo-local checks and goal-loop
+  gates.
 
 ## Hooks
 
@@ -647,7 +634,7 @@ Codex uses `AGENTS.md` as project instructions. Config keys affecting discovery 
 | Key | Purpose |
 | --- | ------- |
 | `project_doc_max_bytes` | Maximum bytes included from project doc files. |
-| `project_doc_fallback_filenames` | Alternative filenames when `AGENTS.md` is missing. |
+| `project_doc_alternate route_filenames` | Alternative filenames when `AGENTS.md` is missing. |
 | `project_root_markers` | Root-detection markers used while searching for `.codex` folders. |
 | `include_environment_context` | Whether environment context block is injected. |
 | `include_permissions_instructions` | Whether permissions instruction block is injected. |

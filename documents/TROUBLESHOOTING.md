@@ -14,7 +14,7 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 
 - `make ci-quick` を再実行して、どの段階で落ちているかを切り分けます。
 - Python 関連なら `docker/requirements.txt` と設定ファイルの不整合を確認します。
-- 文書関連なら `make docs-check` を流します。
+- 文書関連なら `tools/bin/agent-canon docs check` を流します。
 
 ## Docker build が通らない
 

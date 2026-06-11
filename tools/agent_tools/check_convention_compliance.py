@@ -183,8 +183,8 @@ TOOL_GATES = {
         ),
     ),
     "runtime_profile_inventory": (
-        "tools/agent_tools/check_runtime_profile_inventory.py",
-        ("tools/ci/run_docs_checks.sh",),
+        "rust/agent-canon/src/docs.rs",
+        ("documents/tools/agent-canon.md",),
     ),
 }
 
@@ -194,7 +194,7 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
     "tools/agent_tools/github_publish.py",
     "gh repo view",
     "git remote get-url origin",
-    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push",
+    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
     "literal URL push is not a standard route",
     "hardcoded repository name",
 )
@@ -364,7 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def readable_path(root: Path, relative_path: str) -> Path | None:
-    """Return the readable root path, falling back to vendored AgentCanon docs."""
+    """Return the readable root or vendored AgentCanon document path."""
     candidates = (root / relative_path, root / "vendor" / "agent-canon" / relative_path)
     for candidate in candidates:
         if candidate.is_file():

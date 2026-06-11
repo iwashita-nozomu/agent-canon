@@ -17,11 +17,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 from agent_team import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
@@ -507,15 +503,6 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
         and has_any(
             signals_text,
             ("subagent", "stage owner", "parent_direct_reason", "trivial_direct_edit"),
-        )
-        and has_any(
-            signals_text,
-            (
-                "mcp_inventory=pass",
-                "check_mcp_inventory",
-                "mcp_preflight_not_required",
-                "mcp not required",
-            ),
         )
         and has_any(
             signals_text,

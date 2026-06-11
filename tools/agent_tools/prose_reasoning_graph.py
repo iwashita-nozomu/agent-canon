@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
 import json
 import os
 import re
@@ -152,6 +153,8 @@ WSL_MOUNT_MIN_PATH_PARTS = 3
 DEFAULT_DB_HOME_ENV = "AGENT_CANON_PROSE_GRAPH_HOME"
 DEFAULT_DB_NAME = "prose_graph.sqlite"
 DEFAULT_CACHE_HASH_LENGTH = 12
+DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE = 4
+DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE = 32
 VERIFICATION_RECURSION_MAX_DEPTH = 3
 FORM_NODE_LABEL_WORD_LIMIT = 8
 CONCEPT_CANDIDATE_LIMIT = 12
@@ -173,6 +176,19 @@ EXPLANATION_CLAIM_LIMIT = 5
 EXPLANATION_DISCOURSE_EDGE_LIMIT = 6
 EXPLANATION_DIAGNOSTIC_LIMIT = 8
 EXPLANATION_OPERATION_LIMIT = 6
+PHASE_ORDER = (
+    "context",
+    "hypothesis",
+    "operationalization",
+    "development",
+    "limitation",
+    "recommendation",
+)
+PROJECTION_VIEW_FALLBACK_CONFIDENCE = 0.4
+DOCUMENT_CANON_FINDING_CONFIDENCE = 0.8
+DEFAULT_ORDERING_CONFIDENCE = 1.0
+NO_ORDERING_EDGE_COUNT = 0
+NO_ORDERING_CONFIDENCE = 0.0
 STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY = "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY_JSON"
 LOCAL_LLM_PROSE_IR_STDOUT_KEY = "LOCAL_LLM_PROSE_IR_JSON"
 GRAPH_TOPOLOGY_CONCEPTS = frozenset(
@@ -227,7 +243,18 @@ class Edge:
     from_node_id: str
     to_node_id: str
     order_kind: str
+    confidence: float
     payload: dict[str, object]
+
+
+@dataclass(frozen=True)
+class SoftOrderingPriority:
+    """Soft ordering evidence used after hard topological constraints."""
+
+    incoming_count: int
+    outgoing_count: int
+    incoming_confidence: float
+    outgoing_confidence: float
 
 
 @dataclass(frozen=True)
@@ -433,13 +460,13 @@ def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--local-llm-document-batch-size",
         type=int,
-        default=4,
+        default=DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE,
         help="Maximum documents per LocalLLM prose IR part.",
     )
     parser.add_argument(
         "--local-llm-term-batch-size",
         type=int,
-        default=32,
+        default=DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE,
         help="Maximum terms per LocalLLM prose IR part.",
     )
 
@@ -817,13 +844,13 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "evidence_required": ["hypothesis", "metric", "baseline", "expected result", "run or rerun decision"],
             "recursive_verification": recursive_verification_for_route("experiment_plan_verification"),
         }
-    if rule == "non_llm_experiment_plan_fallback":
+    if rule == "local_llm_experiment_plan_ir_missing":
         return {
-            "add": "LocalLLM IR analysis_intents or subagent verification packet",
-            "verification_route": "local_llm_or_subagent_intent_verification",
-            "verification_question": "Can experiment-plan applicability be classified by LocalLLM IR or a subagent instead of non-LLM fallback?",
-            "verification_targets": ["$prose-reasoning-graph", "subagent-fallback"],
-            "evidence_required": ["local_llm_prose_ir.analysis_intents", "subagent judgement or explicit fallback acceptance"],
+            "add": "LocalLLM prose IR with analysis_intents.experiment_plan status",
+            "verification_route": "local_llm_environment_repair",
+            "verification_question": "Why is LocalLLM prose IR missing from a graph that requires experiment-plan applicability?",
+            "verification_targets": ["$prose-reasoning-graph", "agent-canon local-llm extract-prose-ir"],
+            "evidence_required": ["local_llm_prose_ir.analysis_intents", "LocalLLM command path and model evidence"],
         }
     if rule == "presentation_format_candidate":
         return {
@@ -833,6 +860,15 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "verification_targets": ["$structure-planning", "$report-writing"],
             "evidence_required": ["projection view", "member anchors", "format reason", "reader-state before/after"],
             "recursive_verification": recursive_verification_for_route("presentation_format_verification"),
+        }
+    if rule == "selected_ordering_cycle":
+        return {
+            "add": "reorder decision, relaxed edge explanation, or graph edge correction",
+            "verification_route": "ordering_cycle_verification",
+            "verification_question": "Which hard ordering constraints should be relaxed, split, or corrected so the reader sequence remains acyclic?",
+            "verification_targets": ["$structure-planning", "$prose-reasoning-graph"],
+            "evidence_required": ["selected_ordering.relaxed_edges", "source anchors", "preserved source ids"],
+            "recursive_verification": recursive_verification_for_route("ordering_cycle_verification"),
         }
     return {}
 
@@ -937,6 +973,27 @@ def recursive_verification_for_route(route: str) -> dict[str, object]:
                     "route": "$structure-planning",
                     "question": "Does the format improve the reader-state transition without hiding necessary prose warrants?",
                     "if_unresolved": "combine prose with the candidate or keep the warning open",
+                },
+            ],
+        }
+    if route == "ordering_cycle_verification":
+        return {
+            **common,
+            "steps": [
+                {
+                    "id": "inspect_relaxed_edges",
+                    "question": "Which relaxed hard ordering edges create the cycle?",
+                    "route": "$prose-reasoning-graph",
+                },
+                {
+                    "id": "choose_reader_order",
+                    "question": "Which acyclic order preserves source anchors and reader-state transition?",
+                    "route": "$structure-planning",
+                },
+                {
+                    "id": "record_relaxation",
+                    "question": "Is the relaxed edge explained as a reorder edit, limitation, or graph correction?",
+                    "route": "$prose-reasoning-graph",
                 },
             ],
         }
@@ -1149,9 +1206,9 @@ def local_llm_prose_ir_payload(
         "--json-out",
         str(ir_path),
         "--document-batch-size",
-        str(getattr(args, "local_llm_document_batch_size", 4)),
+        str(getattr(args, "local_llm_document_batch_size", DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE)),
         "--term-batch-size",
-        str(getattr(args, "local_llm_term_batch_size", 32)),
+        str(getattr(args, "local_llm_term_batch_size", DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE)),
     ]
     if prompt_text.strip():
         command.extend(["--prompt", prompt_text])
@@ -2402,6 +2459,38 @@ def add_diagnostics(
         insert_document_diagnostic(connection, "claim_without_evidence_layer", "Claims exist but the evidence layer has no evidence nodes.")
     add_layer_coverage_diagnostic(connection, profile)
     add_presentation_format_diagnostics(connection, profile)
+    add_selected_ordering_cycle_diagnostic(connection, profile)
+
+
+def add_selected_ordering_cycle_diagnostic(connection: sqlite3.Connection, profile: str) -> None:
+    """Record a diagnostic when hard selected ordering constraints cycle."""
+    sentence_nodes = fetch_nodes(connection, layer="form", kind="sentence")
+    if not sentence_nodes:
+        return
+    ordering_edges = selected_ordering_edges(connection, sentence_nodes)
+    phase_by_anchor = phase_by_sentence_anchor(connection, sentence_nodes)
+    _ordered_ids, cycle_detected, relaxed_edges = priority_topological_order(
+        sentence_nodes,
+        ordering_edges,
+        profile,
+        phase_by_anchor,
+    )
+    if not cycle_detected:
+        return
+    first_relaxed_edge = relaxed_edges[0] if relaxed_edges else {}
+    target_node_id = str(first_relaxed_edge.get("from_node_id", sentence_nodes[0].node_id))
+    target_edge_id = str(first_relaxed_edge.get("edge_id", ""))
+    insert_diagnostic(
+        connection,
+        "diag:selected-ordering-cycle",
+        "projection",
+        target_node_id,
+        "warn",
+        "selected_ordering_cycle",
+        "Selected ordering hard constraints contain a cycle; projection relaxed cyclic hard edges.",
+        target_edge_id=target_edge_id,
+        action=verification_action_for_rule("selected_ordering_cycle"),
+    )
 
 
 def is_structured_presentation_block(text: str) -> bool:
@@ -2514,7 +2603,7 @@ def experiment_layer_applicable(connection: sqlite3.Connection) -> bool:
 
 def experiment_plan_applicable_for_graph(
     connection: sqlite3.Connection,
-    texts: Iterable[str],
+    _texts: Iterable[str],
     profile: str,
 ) -> bool:
     """Return true when LocalLLM IR says experiment-plan analysis is applicable."""
@@ -2525,16 +2614,15 @@ def experiment_plan_applicable_for_graph(
         return True
     if local_status in {"absent", "vocabulary_only"}:
         return False
-    fallback_applicable = non_llm_experiment_plan_fallback_applicable(texts, profile)
     insert_document_diagnostic(
         connection,
-        "non_llm_experiment_plan_fallback",
+        "local_llm_experiment_plan_ir_missing",
         (
-            "LocalLLM experiment-plan intent was unavailable; "
-            "non-LLM fallback check was used."
+            "LocalLLM experiment-plan intent is missing; repair prose IR generation "
+            "before accepting experiment-plan diagnostics."
         ),
     )
-    return fallback_applicable
+    return False
 
 
 def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
@@ -2542,7 +2630,8 @@ def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
     payload = metadata_json(connection, "local_llm_prose_ir", {})
     if not isinstance(payload, dict):
         return ""
-    intents = object_list(payload.get("analysis_intents"))
+    typed_payload = cast(dict[str, object], payload)
+    intents = object_list(typed_payload.get("analysis_intents"))
     statuses = [
         str(intent.get("status", ""))
         for intent in intents
@@ -2555,24 +2644,6 @@ def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
     if "absent" in statuses:
         return "absent"
     return ""
-
-
-def non_llm_experiment_plan_fallback_applicable(texts: Iterable[str], profile: str) -> bool:
-    """Return a fallback experiment-plan decision when LocalLLM IR is unavailable."""
-    text_values = list(texts)
-    if profile == "experiment":
-        return any(has_any(text, EXPERIMENT_CUES) for text in text_values)
-    field_kinds = experiment_plan_assignment_kinds(text_values)
-    if len(field_kinds) >= 2:
-        return True
-    activity_present = any(has_any(text, EXPERIMENT_ACTIVITY_CUES) for text in text_values)
-    field_vocabulary_present = any(
-        has_any(text, ("hypothesis", "metric", "baseline", "expected", "仮説", "指標", "ベースライン", "期待"))
-        for text in text_values
-    )
-    return (bool(field_kinds) and activity_present) or (
-        activity_present and not field_vocabulary_present
-    )
 
 
 def experiment_sentence_kinds(text: str) -> list[str]:
@@ -2833,11 +2904,515 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
         "layers": {layer: counts.get(layer, 0) for layer in LAYERS},
         "skill_handoffs": skill_handoffs(profile, db_path),
         "source_anchors": [asdict(node) for node in source_anchor_nodes(graph_nodes)],
+        "selected_ordering": selected_ordering_payload(connection, profile),
         "projection_views": projection_views,
         "nodes": nodes,
         "edges": edges,
         "diagnostics": diagnostics,
         "edit_operations": operations,
+    }
+
+
+def selected_ordering_payload(connection: sqlite3.Connection, profile: str) -> dict[str, object]:
+    """Return whole-document source-anchor order for prose projection."""
+    sentence_nodes = fetch_nodes(connection, layer="form", kind="sentence")
+    ordering_edges = selected_ordering_edges(connection, sentence_nodes)
+    phase_by_anchor = phase_by_sentence_anchor(connection, sentence_nodes)
+    ordered_ids, cycle_detected, relaxed_edges = priority_topological_order(
+        sentence_nodes,
+        ordering_edges,
+        profile,
+        phase_by_anchor,
+    )
+    node_by_id = {node.node_id: node for node in sentence_nodes}
+    return {
+        "scope": "whole_document_source_anchors",
+        "unit_kind": "sentence",
+        "profile": profile,
+        "algorithm": "priority_topological_sort_selected_ordering_subgraph",
+        "ordering_policy": [
+            "presentation/form hard_before edges as topological constraints",
+            "form containment and source anchor membership",
+            "profile phase preference",
+            "discourse adjacency_preferred edges as soft queue priorities",
+            "soft-edge confidence score",
+            "source order as final stable tie-breaker",
+        ],
+        "cycle_policy": "diagnose hard constraint cycles and relax only cyclic hard edges",
+        "cycle_detected": cycle_detected,
+        "relaxed_edges": relaxed_edges,
+        "ordering_edges": ordering_edges,
+        "ordered_anchor_ids": ordered_ids,
+        "ordered_anchors": [
+            ordered_anchor_record(node_by_id[node_id], position, profile, phase_by_anchor)
+            for position, node_id in enumerate(ordered_ids, start=1)
+            if node_id in node_by_id
+        ],
+    }
+
+
+def phase_by_sentence_anchor(
+    connection: sqlite3.Connection,
+    sentence_nodes: Sequence[Node],
+) -> dict[str, str]:
+    """Return phase labels projected from paragraph move nodes to sentence anchors."""
+    phase_by_paragraph: dict[str, str] = {}
+    for phase in fetch_nodes(connection, layer="phase", kind="move"):
+        paragraph_id = phase.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            phase_by_paragraph[paragraph_id] = phase.label
+    phase_by_anchor: dict[str, str] = {}
+    for sentence in sentence_nodes:
+        paragraph_id = sentence.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            phase_by_anchor[sentence.node_id] = phase_by_paragraph.get(paragraph_id, "")
+    return phase_by_anchor
+
+
+def selected_ordering_edges(
+    connection: sqlite3.Connection,
+    source_anchors: Sequence[Node],
+) -> list[dict[str, object]]:
+    """Return ordering edges over the selected whole-document anchor set."""
+    anchor_ids = {node.node_id for node in source_anchors}
+    edges: list[dict[str, object]] = []
+    for edge in fetch_edges(connection):
+        if edge.from_node_id in anchor_ids and edge.to_node_id in anchor_ids and edge_participates_in_ordering(edge):
+            edges.append(ordering_edge_record(edge, "direct"))
+    edges.extend(derived_sentence_ordering_edges(connection, source_anchors))
+    if not edges:
+        edges.extend(source_order_fallback_edges(source_anchors))
+    return sorted(edges, key=lambda item: str(item["edge_id"]))
+
+
+def derived_sentence_ordering_edges(
+    connection: sqlite3.Connection,
+    source_anchors: Sequence[Node],
+) -> list[dict[str, object]]:
+    """Project paragraph and containment order onto sentence anchors."""
+    sentences_by_paragraph: dict[str, list[Node]] = {}
+    for sentence in sorted(source_anchors, key=source_anchor_sort_key):
+        paragraph_id = sentence.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            sentences_by_paragraph.setdefault(paragraph_id, []).append(sentence)
+
+    edges: list[dict[str, object]] = []
+    for paragraph_id, sentences in sorted(sentences_by_paragraph.items()):
+        for index, (left, right) in enumerate(zip(sentences, sentences[1:]), start=1):
+            edges.append(
+                {
+                    "edge_id": f"derived-sentence-order:{paragraph_id}:{index}",
+                    "from_node_id": left.node_id,
+                    "to_node_id": right.node_id,
+                    "layer": "form",
+                    "kind": "contains_order",
+                    "order_kind": "hard_before",
+                    "constraint_strength": "hard",
+                    "confidence": DEFAULT_ORDERING_CONFIDENCE,
+                    "basis": "paragraph_sentence_sequence",
+                }
+            )
+
+    for edge in fetch_edges(connection):
+        if not edge_participates_in_ordering(edge):
+            continue
+        from_sentences = sentences_by_paragraph.get(edge.from_node_id, [])
+        to_sentences = sentences_by_paragraph.get(edge.to_node_id, [])
+        if from_sentences and to_sentences:
+            edges.append(
+                {
+                    "edge_id": f"derived-paragraph-order:{edge.edge_id}",
+                    "from_node_id": from_sentences[-1].node_id,
+                    "to_node_id": to_sentences[0].node_id,
+                    "layer": edge.layer,
+                    "kind": edge.kind,
+                    "order_kind": edge.order_kind or "selected_order",
+                    "constraint_strength": ordering_constraint_strength(edge.order_kind),
+                    "confidence": edge.confidence,
+                    "basis": f"paragraph_order_edge:{edge.edge_id}",
+                }
+            )
+    return edges
+
+
+def edge_participates_in_ordering(edge: Edge) -> bool:
+    """Return whether an edge belongs to a selected ordering subgraph."""
+    if edge.order_kind in {"hard_before", "adjacency_preferred"}:
+        return True
+    return bool(edge.payload.get("participates_in_ordering_dag"))
+
+
+def ordering_constraint_strength(order_kind: str) -> str:
+    """Classify ordering edge strength for projection sorting."""
+    if order_kind == "hard_before":
+        return "hard"
+    if order_kind == "adjacency_preferred":
+        return "soft"
+    if order_kind == "source_order_tie_break":
+        return "tie_breaker"
+    return "selected"
+
+
+def ordering_edge_record(edge: Edge, basis: str) -> dict[str, object]:
+    """Render one selected ordering edge."""
+    return {
+        "edge_id": edge.edge_id,
+        "from_node_id": edge.from_node_id,
+        "to_node_id": edge.to_node_id,
+        "layer": edge.layer,
+        "kind": edge.kind,
+        "order_kind": edge.order_kind or "selected_order",
+        "constraint_strength": ordering_constraint_strength(edge.order_kind),
+        "confidence": edge.confidence,
+        "basis": basis,
+    }
+
+
+def source_order_fallback_edges(source_anchors: Sequence[Node]) -> list[dict[str, object]]:
+    """Return deterministic source-order edges when no explicit ordering edge exists."""
+    ordered = sorted(source_anchors, key=source_anchor_sort_key)
+    edges: list[dict[str, object]] = []
+    for index, (left, right) in enumerate(zip(ordered, ordered[1:]), start=1):
+        edges.append(
+            {
+                "edge_id": f"fallback-source-order:{index}",
+                "from_node_id": left.node_id,
+                "to_node_id": right.node_id,
+                "layer": "projection",
+                "kind": "source_order_tie_break",
+                "order_kind": "source_order_tie_break",
+                "constraint_strength": "tie_breaker",
+                "confidence": DEFAULT_ORDERING_CONFIDENCE,
+                "basis": "source_order_final_tie_breaker",
+            }
+        )
+    return edges
+
+
+def priority_topological_order(
+    source_anchors: Sequence[Node],
+    ordering_edges: Sequence[dict[str, object]],
+    profile: str,
+    phase_by_anchor: dict[str, str],
+) -> tuple[list[str], bool, list[dict[str, object]]]:
+    """Topologically sort the selected ordering subgraph with stable priorities."""
+    node_by_id = {node.node_id: node for node in source_anchors}
+    outgoing: dict[str, list[str]] = {node.node_id: [] for node in source_anchors}
+    indegree: dict[str, int] = {node.node_id: 0 for node in source_anchors}
+    edge_pairs: set[tuple[str, str]] = set()
+    hard_edges = [edge for edge in ordering_edges if ordering_edge_is_hard(edge)]
+    soft_priorities = soft_ordering_priorities(ordering_edges, source_anchors)
+    for edge in hard_edges:
+        from_id = str(edge.get("from_node_id", ""))
+        to_id = str(edge.get("to_node_id", ""))
+        if from_id not in node_by_id or to_id not in node_by_id or (from_id, to_id) in edge_pairs:
+            continue
+        outgoing[from_id].append(to_id)
+        indegree[to_id] += 1
+        edge_pairs.add((from_id, to_id))
+
+    ready: list[tuple[tuple[object, ...], str]] = []
+    for node in source_anchors:
+        if indegree[node.node_id] == 0:
+            heapq.heappush(
+                ready,
+                (projection_sort_priority(node, profile, phase_by_anchor, soft_priorities), node.node_id),
+            )
+
+    ordered: list[str] = []
+    while ready:
+        _, node_id = heapq.heappop(ready)
+        ordered.append(node_id)
+        for next_id in sorted(
+            outgoing[node_id],
+            key=lambda item: projection_sort_priority(node_by_id[item], profile, phase_by_anchor, soft_priorities),
+        ):
+            indegree[next_id] -= 1
+            if indegree[next_id] == 0:
+                heapq.heappush(
+                    ready,
+                    (
+                        projection_sort_priority(node_by_id[next_id], profile, phase_by_anchor, soft_priorities),
+                        next_id,
+                    ),
+                )
+
+    if len(ordered) == len(source_anchors):
+        return ordered, False, []
+
+    remaining_nodes = [node for node in source_anchors if node.node_id not in set(ordered)]
+    remaining_ordered, relaxed_edges = relax_cyclic_hard_edges_preserving_component_dag(
+        remaining_nodes,
+        hard_edges,
+        profile,
+        phase_by_anchor,
+        soft_priorities,
+    )
+    ordered.extend(remaining_ordered)
+    return ordered, True, relaxed_edges
+
+
+def relax_cyclic_hard_edges_preserving_component_dag(
+    remaining_nodes: Sequence[Node],
+    hard_edges: Sequence[dict[str, object]],
+    profile: str,
+    phase_by_anchor: dict[str, str],
+    soft_priorities: dict[str, SoftOrderingPriority],
+) -> tuple[list[str], list[dict[str, object]]]:
+    """Relax only cyclic hard edges while preserving acyclic component order."""
+    node_by_id = {node.node_id: node for node in remaining_nodes}
+    remaining_ids = set(node_by_id)
+    relevant_edges = [
+        edge
+        for edge in hard_edges
+        if str(edge.get("from_node_id", "")) in remaining_ids and str(edge.get("to_node_id", "")) in remaining_ids
+    ]
+    components = strongly_connected_components(remaining_ids, relevant_edges)
+    component_by_node = {
+        node_id: component_index for component_index, component in enumerate(components) for node_id in component
+    }
+    relaxed_edges = [
+        edge
+        for edge in relevant_edges
+        if component_by_node[str(edge.get("from_node_id", ""))] == component_by_node[str(edge.get("to_node_id", ""))]
+    ]
+    component_edges: dict[int, set[int]] = {index: set() for index in range(len(components))}
+    component_indegree: dict[int, int] = {index: 0 for index in range(len(components))}
+    component_edge_pairs: set[tuple[int, int]] = set()
+    for edge in relevant_edges:
+        from_component = component_by_node[str(edge.get("from_node_id", ""))]
+        to_component = component_by_node[str(edge.get("to_node_id", ""))]
+        if from_component == to_component or (from_component, to_component) in component_edge_pairs:
+            continue
+        component_edges[from_component].add(to_component)
+        component_indegree[to_component] += 1
+        component_edge_pairs.add((from_component, to_component))
+
+    ready: list[tuple[tuple[object, ...], int]] = []
+    for component_index, component in enumerate(components):
+        if component_indegree[component_index] == 0:
+            heapq.heappush(
+                ready,
+                (component_sort_priority(component, node_by_id, profile, phase_by_anchor, soft_priorities), component_index),
+            )
+
+    ordered_component_ids: list[int] = []
+    while ready:
+        _priority, component_index = heapq.heappop(ready)
+        ordered_component_ids.append(component_index)
+        for next_component in sorted(
+            component_edges[component_index],
+            key=lambda item: component_sort_priority(components[item], node_by_id, profile, phase_by_anchor, soft_priorities),
+        ):
+            component_indegree[next_component] -= 1
+            if component_indegree[next_component] == 0:
+                heapq.heappush(
+                    ready,
+                    (
+                        component_sort_priority(components[next_component], node_by_id, profile, phase_by_anchor, soft_priorities),
+                        next_component,
+                    ),
+                )
+
+    if len(ordered_component_ids) < len(components):
+        missing_components = sorted(set(range(len(components))) - set(ordered_component_ids))
+        ordered_component_ids.extend(missing_components)
+
+    ordered: list[str] = []
+    for component_index in ordered_component_ids:
+        ordered.extend(
+            sorted(
+                components[component_index],
+                key=lambda item: projection_sort_priority(node_by_id[item], profile, phase_by_anchor, soft_priorities),
+            )
+        )
+    return ordered, relaxed_edges
+
+
+def strongly_connected_components(
+    node_ids: set[str],
+    edges: Sequence[dict[str, object]],
+) -> list[set[str]]:
+    """Return strongly connected components for hard ordering edges."""
+    adjacency: dict[str, list[str]] = {node_id: [] for node_id in node_ids}
+    reverse_adjacency: dict[str, list[str]] = {node_id: [] for node_id in node_ids}
+    for edge in edges:
+        from_id = str(edge.get("from_node_id", ""))
+        to_id = str(edge.get("to_node_id", ""))
+        if from_id not in node_ids or to_id not in node_ids:
+            continue
+        adjacency[from_id].append(to_id)
+        reverse_adjacency[to_id].append(from_id)
+
+    finished: list[str] = []
+    seen: set[str] = set()
+
+    def visit_forward(node_id: str) -> None:
+        seen.add(node_id)
+        for next_id in adjacency[node_id]:
+            if next_id not in seen:
+                visit_forward(next_id)
+        finished.append(node_id)
+
+    for node_id in sorted(node_ids):
+        if node_id not in seen:
+            visit_forward(node_id)
+
+    components: list[set[str]] = []
+    seen.clear()
+
+    def visit_reverse(node_id: str, component: set[str]) -> None:
+        seen.add(node_id)
+        component.add(node_id)
+        for next_id in reverse_adjacency[node_id]:
+            if next_id not in seen:
+                visit_reverse(next_id, component)
+
+    for node_id in reversed(finished):
+        if node_id not in seen:
+            component: set[str] = set()
+            visit_reverse(node_id, component)
+            components.append(component)
+    return components
+
+
+def component_sort_priority(
+    component: set[str],
+    node_by_id: dict[str, Node],
+    profile: str,
+    phase_by_anchor: dict[str, str],
+    soft_priorities: dict[str, SoftOrderingPriority],
+) -> tuple[object, ...]:
+    """Return stable queue priority for a hard-order component."""
+    return min(
+        projection_sort_priority(node_by_id[node_id], profile, phase_by_anchor, soft_priorities)
+        for node_id in component
+    )
+
+
+def ordering_edge_is_hard(edge: dict[str, object]) -> bool:
+    """Return true when an ordering edge must constrain topological order."""
+    return str(edge.get("order_kind", "")) == "hard_before"
+
+
+def ordering_edge_is_soft(edge: dict[str, object]) -> bool:
+    """Return true when an ordering edge is advisory for queue priority."""
+    return str(edge.get("order_kind", "")) == "adjacency_preferred"
+
+
+def ordering_edge_confidence(edge: dict[str, object]) -> float:
+    """Return numeric ordering confidence."""
+    confidence = edge.get("confidence", NO_ORDERING_CONFIDENCE)
+    if isinstance(confidence, int | float):
+        return float(confidence)
+    return NO_ORDERING_CONFIDENCE
+
+
+def soft_ordering_priorities(
+    ordering_edges: Sequence[dict[str, object]],
+    source_anchors: Sequence[Node],
+) -> dict[str, SoftOrderingPriority]:
+    """Summarize soft ordering preferences per anchor."""
+    anchor_ids = {node.node_id for node in source_anchors}
+    incoming_counts: Counter[str] = Counter()
+    outgoing_counts: Counter[str] = Counter()
+    incoming_confidence: dict[str, float] = {}
+    outgoing_confidence: dict[str, float] = {}
+    for edge in ordering_edges:
+        if not ordering_edge_is_soft(edge):
+            continue
+        from_id = str(edge.get("from_node_id", ""))
+        to_id = str(edge.get("to_node_id", ""))
+        if from_id not in anchor_ids or to_id not in anchor_ids:
+            continue
+        confidence = ordering_edge_confidence(edge)
+        outgoing_counts[from_id] += 1
+        incoming_counts[to_id] += 1
+        outgoing_confidence[from_id] = outgoing_confidence.get(from_id, NO_ORDERING_CONFIDENCE) + confidence
+        incoming_confidence[to_id] = incoming_confidence.get(to_id, NO_ORDERING_CONFIDENCE) + confidence
+    return {
+        node.node_id: SoftOrderingPriority(
+            incoming_count=incoming_counts[node.node_id],
+            outgoing_count=outgoing_counts[node.node_id],
+            incoming_confidence=incoming_confidence.get(node.node_id, NO_ORDERING_CONFIDENCE),
+            outgoing_confidence=outgoing_confidence.get(node.node_id, NO_ORDERING_CONFIDENCE),
+        )
+        for node in source_anchors
+    }
+
+
+def soft_priority_for_node(
+    node: Node,
+    soft_priorities: dict[str, SoftOrderingPriority],
+) -> SoftOrderingPriority:
+    """Return soft ordering priority for one node."""
+    return soft_priorities.get(
+        node.node_id,
+        SoftOrderingPriority(
+            incoming_count=NO_ORDERING_EDGE_COUNT,
+            outgoing_count=NO_ORDERING_EDGE_COUNT,
+            incoming_confidence=NO_ORDERING_CONFIDENCE,
+            outgoing_confidence=NO_ORDERING_CONFIDENCE,
+        ),
+    )
+
+
+def projection_sort_priority(
+    node: Node,
+    profile: str,
+    phase_by_anchor: dict[str, str],
+    soft_priorities: dict[str, SoftOrderingPriority],
+) -> tuple[object, ...]:
+    """Return stable priority for graph-to-prose projection order."""
+    soft_priority = soft_priority_for_node(node, soft_priorities)
+    return (
+        phase_priority(phase_by_anchor.get(node.node_id, ""), profile),
+        soft_priority.incoming_count,
+        -soft_priority.outgoing_count,
+        soft_priority.incoming_confidence,
+        -soft_priority.outgoing_confidence,
+        node.document_id,
+        node.source_start,
+        node.source_end,
+        node.node_id,
+    )
+
+
+def phase_priority(phase: str, profile: str) -> int:
+    """Return profile-aware phase preference rank."""
+    if profile not in {"writing", "report", "academic", "paper", "all"}:
+        return len(PHASE_ORDER)
+    try:
+        return PHASE_ORDER.index(phase)
+    except ValueError:
+        return len(PHASE_ORDER)
+
+
+def source_anchor_sort_key(node: Node) -> tuple[object, ...]:
+    """Return stable source order for source anchors."""
+    return (node.document_id, node.source_start, node.source_end, node.node_id)
+
+
+def ordered_anchor_record(
+    node: Node,
+    position: int,
+    profile: str,
+    phase_by_anchor: dict[str, str],
+) -> dict[str, object]:
+    """Render one ordered source anchor."""
+    phase = phase_by_anchor.get(node.node_id, "")
+    return {
+        "position": position,
+        "node_id": node.node_id,
+        "document_id": node.document_id,
+        "kind": node.kind,
+        "text": node.text,
+        "source_start": node.source_start,
+        "source_end": node.source_end,
+        "paragraph_id": node.payload.get("paragraph_id", ""),
+        "section_path": node.payload.get("section_path", []),
+        "phase": phase,
+        "profile_priority": phase_priority(phase, profile),
     }
 
 
@@ -2909,7 +3484,9 @@ def build_projection_views(connection: sqlite3.Connection, profile: str) -> tupl
                     else [],
                     "presentation_evidence": asdict(format_evidence),
                 },
-                confidence=PHASE_INFERENCE_CONFIDENCE if paragraph.node_id in phase_by_paragraph else 0.4,
+                confidence=PHASE_INFERENCE_CONFIDENCE
+                if paragraph.node_id in phase_by_paragraph
+                else PROJECTION_VIEW_FALLBACK_CONFIDENCE,
             )
         )
     return tuple(views)
@@ -2979,6 +3556,7 @@ def edge_from_row(row: sqlite3.Row) -> Edge:
         from_node_id=str(row["from_node_id"]),
         to_node_id=str(row["to_node_id"]),
         order_kind=str(row["order_kind"] or ""),
+        confidence=float(row["confidence"]),
         payload=read_json_object(str(row["payload_json"])),
     )
 
@@ -3091,6 +3669,7 @@ def fetch_edges(connection: sqlite3.Connection) -> tuple[Edge, ...]:
             from_node_id=str(row["from_node_id"]),
             to_node_id=str(row["to_node_id"]),
             order_kind=str(row["order_kind"] or ""),
+            confidence=float(row["confidence"]),
             payload=read_json_object(str(row["payload_json"])),
         )
         for row in rows
@@ -3140,6 +3719,9 @@ def skill_handoffs(profile: str, db_path: Path) -> list[dict[str, object]]:
             "projection_fields": [
                 "canonical_graph",
                 "source_anchors",
+                "selected_ordering",
+                "selected_ordering.ordered_anchor_ids",
+                "selected_ordering.ordered_anchors",
                 "projection_views",
                 "projection_views[].recommended_format",
                 "projection_views[].format_reason",
@@ -3699,7 +4281,7 @@ def import_target_document_canon_findings(
             message,
             0,
             0,
-            confidence=0.8,
+            confidence=DOCUMENT_CANON_FINDING_CONFIDENCE,
             payload={
                 "path": path,
                 "kind": kind,

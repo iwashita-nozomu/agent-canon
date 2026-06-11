@@ -244,7 +244,7 @@ workflow_families:
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, and Abstract Design Frame-derived eligible narrow implementation slices to Spark roles first; route bounded review and report traceability to mini review roles; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
         - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-        - Review the whole repository, not only the local diff; keep root adapters thin and shared canon authoritative.
+        - Review repo-wide integration risk through compact tool output, dependency-expanded path lists, and bounded canon slices; do not hand agents the whole repository as their read scope.
         - For AgentCanon tasks, classify whether the change is standalone AgentCanon source, template parent gitlink, root shared-surface sync, or derived repo proposal before editing.
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.

@@ -60,9 +60,7 @@ python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501
 手順:
 
 ```bash
-make docs-check
-python3 tools/docs/check_markdown_lint.py --check <changed-file>.md
-python3 tools/docs/check_markdown_math.py <changed-file>.md
+tools/bin/agent-canon docs check <changed-file>.md
 ```
 
 確認:

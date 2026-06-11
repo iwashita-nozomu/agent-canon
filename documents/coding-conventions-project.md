@@ -35,7 +35,7 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 
 - `documents/` には正本だけを置きます。
 - 実装変更でルールや設計が変わる場合は、対応する文書を同じ変更で更新します。
-- Markdown を編集したら、対象の `.md` に `mdformat` を適用し、その後で `make docs-check` を通さなければなりません。
+- Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通さなければなりません。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。
 - agent team の要約は `agents/README.md` に集約し、他の入口へ複製しません。
@@ -50,7 +50,7 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 - canonical container の `safe.directory` は `docker/register_safe_directories.sh` で管理します。Docker image build 時は repo workspace の `/workspace` を登録し、devcontainer 作成時や smoke test では mount 済み workspace の `vendor/*` を列挙して `/workspace/vendor/<name>` を動的に登録しなければなりません。
 - Template / AgentCanon 固有の machine-local remote path は Dockerfile に焼きません。具体の remote 名は `documents/template-github-remote.md` と `documents/agent-canon-github-remote.md` を正本にします。
 - Docker container 内から Docker を使う手順を正本にする場合は、同梱するのは CLI だけとし、host socket mount または別 daemon が必要であることを文書へ明記しなければなりません。
-- canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は script の fallback で検証を継続できますが、Dockerfile 側の欠落を放置してはいけません。
+- canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は検証を継続せず、環境構築ミスとして `rsync` を導入してから同じ検証を再実行します。
 - `docker/Dockerfile` に Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針を入れることを禁止します。具体的な境界、例外、validation は `CONTAINER_OPERATIONS.md` を正本にします。
 
 ## 4.5 環境依存ツール導入提案のルール

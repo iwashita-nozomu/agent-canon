@@ -20,7 +20,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - directory layout、directory README ownership、root view、または responsibility-scope map を変える refactor では `$structure-refactor` と `$refactor-loop` を併用し、recursive README graph、Directory Responsibility Map、`scope_delta`、reader / navigation delta を先に固定します。
 - 考察、原因仮説、修正箇所の妥当性検証が必要な task では `hypothesis-validation-workflow.md` を overlay として追加し、code dependency と header dependency を別々に抜いてから実装へ進みます。
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
-- Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、MCP `goal.loop_status` を機械 gate として扱います。
+- Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、`goal_loop.py status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
 - token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context budget、escalation trigger を先に決めます。
 
@@ -93,7 +93,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - `hypothesis-validation-workflow.md`
   - code dependency と header dependency を別々に抽出し、仮説と修正箇所妥当性を検証してから実装する overlay
 - `codex-goals-workflow.md`
-  - Codex goals feature、top-level `goal.md`、Plan-mode entry、MCP `goal.loop_status` の責務境界と同期手順
+  - Codex goals feature、top-level `goal.md`、Plan-mode entry、`goal_loop.py status` の責務境界と同期手順
 - `token-efficient-codex-workflow.md`
   - Codex parent profile、agent mode、context budget、token-saving escalation trigger
 

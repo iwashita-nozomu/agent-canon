@@ -64,7 +64,7 @@ bash tools/sync_agent_canon.sh link-root
 
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
-`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `mcp/`, and `tools/`.
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 

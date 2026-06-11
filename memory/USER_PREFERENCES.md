@@ -102,7 +102,7 @@ upstream design README.md memory surface index
 - 2026-04-22 | 必要な subagent や MCP surface がある task では、起動確認を先に行い、未起動のまま parent 単独へ静かに downgrade しないでほしい。
   - source: chat
 
-- 2026-04-22 | temporary fallback や旧経路を温存せず、canonical path を 1 本に寄せてほしい。フォールバック温存は実装の二重化の温床になる。
+- 2026-04-22 | temporary alternate route や旧経路を温存せず、canonical path を 1 本に寄せてほしい。代替経路温存は実装の二重化の温床になる。
   - source: chat
 
 - 2026-04-22 | repo に搭載されている test は単一の canonical file に文書化してほしい。追加・削除・rename 時はその file も同じ pass で更新してほしい。

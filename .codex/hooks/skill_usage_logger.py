@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, replace
@@ -36,49 +37,32 @@ WORKFLOW_FIELD_RE = re.compile(
 )
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 IGNORED_SKILL_IDS = frozenset(("skill-name",))
-KNOWN_SKILL_IDS = frozenset(
+EXTERNAL_SKILL_IDS = frozenset(
     (
-        "academic-writing",
-        "adaptive-improvement-loop",
-        "agent-canon-update",
-        "agent-learning",
-        "agent-orchestration",
-        "agent-update-branch",
-        "behavior-preserving-refactor",
-        "change-review",
-        "codex-task-workflow",
-        "computational-optimization",
-        "comprehensive-development",
-        "cpp-review",
-        "dependency-analysis",
-        "document-canon-cleanup",
         "empirical-prompt-tuning",
-        "environment-maintenance",
-        "experiment-lifecycle",
         "imagegen",
-        "literature-survey",
-        "long-form-writing",
-        "md-style-check",
         "openai-docs",
-        "oop-readability-check",
-        "paper-writing",
         "plugin-creator",
-        "python-review",
-        "repo-onboarding",
-        "report-writing",
-        "research-workflow",
-        "result-artifact-writeout",
         "skill-creator",
         "skill-installer",
-        "start-repository",
-        "subagent-bootstrap",
-        "task-routing",
-        "test-design",
-        "user-preference-sync",
-        "worktree-health",
-        "worktree-start",
     )
 )
+
+
+def repo_skill_ids() -> frozenset[str]:
+    """Return current AgentCanon skill ids from discoverable skill shims."""
+    skills_root = Path(__file__).resolve().parents[2] / ".agents" / "skills"
+    try:
+        return frozenset(
+            path.name
+            for path in skills_root.iterdir()
+            if path.is_dir() and SKILL_ID_RE.fullmatch(path.name)
+        )
+    except OSError:
+        return frozenset()
+
+
+KNOWN_SKILL_IDS = repo_skill_ids() | EXTERNAL_SKILL_IDS
 GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     "agent-learning": (
@@ -103,9 +87,34 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("subagent", "routing"),
         ("workflow=", "skills="),
     ),
+    "agent-log-analysis": (
+        ("routing miss",),
+        ("selection gap",),
+        ("generate_agent_runtime_dashboard.py",),
+        ("runtime dashboard",),
+        ("生ログ", "要約"),
+        ("routing", "coverage"),
+        ("toolcall", "skillcall", "coverage"),
+        ("toolcall", "skillcall", "routing"),
+        ("toolcall", "skillcall", "miss"),
+        ("toolcall", "skillcall", "50"),
+        ("toolcall", "skillcall", "されない"),
+        ("ルーティング", "ログ"),
+        ("ログ", "skill"),
+        ("ログ", "tool"),
+        ("toolcall", "skillcall", "ルーティング"),
+    ),
+    "adaptive-improvement-loop": (
+        ("adaptive-improvement-loop",),
+        ("goal.md", "backlog"),
+        ("next_action", "iteration"),
+        ("改善ループ",),
+        ("backlog", "iteration"),
+    ),
     "agent-canon-update": (
         ("agentcanon", "update"),
         ("agent-canon", "update"),
+        ("agent-canon pr",),
         ("agentcanon", "latest"),
         ("agent-canon", "latest"),
         ("agent-canon-ensure-latest",),
@@ -119,14 +128,24 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     "md-style-check": (
         ("md-style",),
         ("docs-check",),
+        ("agent-canon", "docs"),
+        ("docs", "format"),
+        ("docs", "check"),
         ("markdownlint",),
         ("markdown", "lint"),
         ("markdown", "heading"),
         ("markdown", "link"),
+        ("markdown", "formatter"),
+        ("format_markdown",),
+        ("formatter", "adjacent"),
+        ("フォーマッタ",),
+        ("フォーマット", "周辺"),
+        ("通してすらない",),
         ("マークダウン", "体裁"),
         ("マークダウン", "リンク"),
     ),
     "computational-optimization": (
+        ("computational optimization",),
         ("計算最適化",),
         ("数値最適化",),
         ("optimizer",),
@@ -138,16 +157,31 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("convergence", "tolerance"),
         ("収束", "tolerance"),
         ("solver", "residual"),
+        ("residual",),
     ),
     "result-artifact-writeout": (
         ("結果書き出し",),
         ("結果を書き出",),
         ("result writeout",),
+        ("runtime_log_archive_git.py",),
         ("artifact", "evidence"),
         ("artifact", "report"),
         ("run bundle", "evidence"),
         ("蓄積分析", "レポート"),
         ("ログ", "レポート", "残"),
+    ),
+    "task-routing": (
+        ("tool", "skill", "routing"),
+        ("tool", "skill", "ルーティング"),
+        ("route.py",),
+        ("public skill set",),
+        ("skill set", "route"),
+        ("skill selection",),
+        ("workflow routing",),
+        ("workflow=", "skills="),
+        ("which workflow",),
+        ("どのスキル",),
+        ("ルーティング",),
     ),
     "oop-readability-check": (
         ("oop", "readability"),
@@ -158,24 +192,312 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("可読性", "class"),
         ("可読性", "method"),
     ),
+    "academic-writing": (
+        ("academic writing",),
+        ("scholarly note",),
+        ("citation", "evidence"),
+        ("logic gap",),
+        ("学術文章",),
+        ("notation", "logic"),
+        ("記法", "論理"),
+    ),
+    "codex-task-workflow": (
+        ("repo-changing",),
+        ("実装", "修正"),
+        ("コード", "直して"),
+        ("implementation", "fix"),
+        ("patch", "repo"),
+        ("修正",),
+        ("修正して",),
+        ("直して",),
+        ("small fix",),
+        ("patch",),
+        ("実装して",),
+        ("public behavior",),
+        ("narrow behavior",),
+        ("regression case",),
+        ("小規模",),
+        ("チェック",),
+        ("報告",),
+        ("更新",),
+    ),
+    "change-review": (
+        ("change-review",),
+        ("code review",),
+        ("diff review",),
+        ("review", "finding"),
+        ("レビュー", "finding"),
+    ),
+    "comprehensive-development": (
+        ("comprehensive development",),
+        ("repo-wide", "workflow"),
+        ("repo-wide", "tooling"),
+        ("包括的", "整理"),
+        ("500", "タスク"),
+    ),
+    "environment-maintenance": (
+        ("docker",),
+        ("devcontainer",),
+        ("container",),
+        ("github actions",),
+        ("ci", "修正"),
+        ("dependency", "upgrade"),
+        ("lockfile",),
+    ),
+    "dependency-analysis": (
+        ("dependency-analysis",),
+        ("dependency review",),
+        ("dependency graph",),
+        ("run_repo_dependency_review.sh",),
+        ("依存", "graph"),
+        ("依存", "レビュー"),
+    ),
+    "experiment-lifecycle": (
+        ("experiment",),
+        ("実験",),
+        ("run", "result"),
+        ("benchmark", "result"),
+        ("再現", "実験"),
+    ),
+    "html-experiment-report": (
+        ("html", "experiment"),
+        ("html", "eval report"),
+        ("ブラウザ", "実験"),
+        ("browser-readable", "experiment"),
+    ),
+    "html-output": (
+        ("html",),
+        ("browser-readable",),
+        ("ブラウザ",),
+        ("dashboard",),
+        ("web page",),
+    ),
+    "literature-survey": (
+        ("literature survey",),
+        ("prior art",),
+        ("先行研究",),
+        ("論文調査",),
+    ),
+    "long-form-writing": (
+        ("readme", "guide"),
+        ("workflow", "guide"),
+        ("migration", "guide"),
+        ("長文", "文書"),
+        ("説明文書",),
+    ),
+    "paper-writing": (
+        ("paper", "draft"),
+        ("thesis chapter",),
+        ("投稿論文",),
+        ("論文", "draft"),
+    ),
+    "pr-processing": (
+        ("pr #",),
+        ("pull request",),
+        ("merge", "pr"),
+        ("checks", "pr"),
+        ("レビュー", "pr"),
+    ),
+    "prose-reasoning-graph": (
+        ("structure analysis",),
+        ("構造解析",),
+        ("prose graph",),
+        ("文書", "構造"),
+        ("claim", "evidence"),
+    ),
+    "refactor-loop": (
+        ("refactor",),
+        ("リファクタ",),
+        ("behavior-preserving",),
+        ("構造変更",),
+    ),
+    "report-writing": (
+        ("report",),
+        ("レポート",),
+        ("decision brief",),
+        ("summary", "evidence"),
+        ("結果", "説明"),
+    ),
+    "research-workflow": (
+        ("research-backed",),
+        ("external research",),
+        ("外部調査",),
+        ("比較実験",),
+        ("benchmark", "compare"),
+    ),
+    "structure-planning": (
+        ("structure contract",),
+        ("構造", "計画"),
+        ("section order",),
+        ("source map",),
+        ("first figure",),
+    ),
+    "structure-refactor": (
+        ("structure drift",),
+        ("repo structure",),
+        ("directory layout",),
+        ("root view",),
+        ("responsibility-scope",),
+        ("構造", "drift"),
+    ),
+    "subagent-bootstrap": (
+        ("マルチエージェント",),
+        ("subagent",),
+        ("spawn", "agent"),
+        ("複数 agent",),
+        ("agent", "fan-out"),
+    ),
+    "test-design": (
+        ("test design",),
+        ("nasty case",),
+        ("regression case",),
+        ("regression",),
+        ("既存テスト",),
+        ("テスト",),
+        ("public behavior",),
+        ("仕様解釈",),
+        ("テスト設計",),
+    ),
+    "tool-finding-report": (
+        ("tool finding",),
+        ("checker finding",),
+        ("static analysis", "finding"),
+        ("finding packet",),
+        ("run_repo_dependency_review.sh",),
+        ("dependency graph",),
+        ("complete report",),
+        ("検出結果",),
+    ),
+    "user-guided-debugging": (
+        ("one issue at a time",),
+        ("user-guided debugging",),
+        ("一つずつ", "debug"),
+        ("デバッグ", "一件"),
+        ("問題ごと", "修正"),
+        ("原因説明", "patch"),
+    ),
 }
 WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "adaptive-improvement-loop": ("goal.md", "next_action", "backlog", "iteration", "改善ループ"),
-    "agent-canon-pr-workflow": ("agent-canon pr", "pull request", "pr #", "マージ", "merge"),
-    "codex-task-workflow": ("実装", "修正", "組み込み", "続けて", "repo-changing"),
-    "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
+    "agent-canon-pr-workflow": (
+        "agent-canon pr",
+        "agent-canon-ensure-latest",
+        "vendor/agent-canon",
+        "submodule pin",
+        "agentcanon 最新",
+        "parent pin",
+        "sync_agent_canon.sh",
+        "pull request",
+        "pr #",
+        "マージ",
+        "merge",
+    ),
+    "agent-canon-update-route": ("agent-canon-ensure-latest", "vendor/agent-canon", "submodule pin", "親 pin", "agentcanon 最新"),
+    "codex-task-workflow": (
+        "codex-task-workflow",
+        "repo-changing",
+        "patch",
+        "small fix",
+        "narrow behavior",
+        "regression case",
+        "generate_agent_runtime_dashboard.py",
+        "run_repo_dependency_review.sh",
+        "runtime_log_archive_git.py",
+        "oop-readability-check",
+        "mechanical verdict",
+        "実装して",
+        "修正して",
+        "直して",
+        "デバッグ",
+    ),
+    "comprehensive-development": ("comprehensive development", "repo-wide", "包括的", "500", "tooling rearchitecture"),
+    "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci", "lockfile"),
+    "large-delivery": (
+        "large-delivery",
+        "large refactor",
+        "大規模",
+        "複数 chunk",
+        "milestone",
+        "新機能",
+        "structure drift",
+        "repo structure",
+        "directory layout",
+        "root view",
+        "responsibility-scope",
+        "構造変更",
+    ),
+    "platform-and-environment": ("docker", "devcontainer", "container", "github actions", "ci", "dependency upgrade"),
+    "research-driven-change": (
+        "research-driven-change",
+        "research-backed",
+        "external research",
+        "外部調査",
+        "比較実験",
+        "benchmark",
+        "先行研究",
+        "prior art",
+        "experiment result",
+        "experiment report",
+        "experiment lifecycle",
+        "html eval report",
+        "実験結果",
+        "paper draft",
+        "thesis chapter",
+        "scholarly note",
+        "投稿論文",
+        "論文",
+        "academic writing",
+    ),
+    "routing-only-advisory": (
+        "実装しないで",
+        "patch しないで",
+        "相談だけ",
+        "advisory",
+        "どのスキル",
+        "which workflow",
+    ),
+    "scoped-change": ("public behavior", "narrow behavior", "regression case", "cross-module", "小規模", "仕様解釈", "既存テスト"),
+    "scoped-change-lite": ("scoped-change-lite", "軽微", "one-file", "単一 file", "typo", "flaky test", "小さい修正", "small fix"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "agent-canon-cli": (
+        "agent-canon docs",
+        "docs check",
+        "docs format",
+        "docs fix-math",
+        "docs fix-mermaid",
+        "agent-canon-ensure-latest",
+        "sync_agent_canon.sh",
+        "agentcanon 最新",
+        "parent pin",
+        "checkout drift",
+        "agent-canon pr",
+    ),
     "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
     "check_markdown_lint.py": ("check_markdown_lint.py", "markdownlint"),
     "check_markdown_math.py": ("check_markdown_math.py", "markdown math"),
+    "evaluate_skill_workflow_prompts.py": ("evaluate_skill_workflow_prompts.py", "skill workflow eval", "prompt eval"),
+    "evaluate_workflow_selection.py": ("evaluate_workflow_selection.py", "workflow selection eval", "routing eval"),
     "format_markdown.py": ("format_markdown.py", "markdown format"),
-    "skill_usage_logger.py": ("入力プロンプト", "prompt", "skill usage", "skill_usage"),
-    "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
     "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
-    "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
+    "generate_agent_runtime_dashboard.py": (
+        "generate_agent_runtime_dashboard.py",
+        "runtime dashboard",
+        "agent dashboard",
+        "dashboard",
+    ),
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
-    "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "markdownlint"),
+    "run_repo_dependency_review.sh": ("run_repo_dependency_review.sh", "dependency review", "dependency graph"),
+    "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "docs check", "markdownlint"),
+    "runtime_log_archive_git.py": (
+        "runtime_log_archive_git.py",
+        "agent report archive",
+        "runbundle archive",
+        "archive path",
+    ),
+    "skill_usage_logger.py": ("入力プロンプト", "prompt", "skill usage", "skill_usage"),
+    "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
+    "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
 }
 SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
     "task": "spawn",
@@ -199,7 +521,8 @@ FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
 }
 SKILL_TEXT_FIELDS = ("prompt", "last_assistant_message", "message")
-TOOL_CANDIDATE_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
+ROUTING_CANDIDATE_TEXT_FIELDS = SKILL_TEXT_FIELDS
+OBSERVED_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
 
 
 @dataclass(frozen=True)
@@ -430,12 +753,17 @@ def observed_text_for_fields(payload: dict[str, object], fields: tuple[str, ...]
 
 def observed_text(payload: dict[str, object]) -> list[str]:
     """Return hook payload text fields relevant for general evidence discovery."""
-    return observed_text_for_fields(payload, TOOL_CANDIDATE_TEXT_FIELDS)
+    return observed_text_for_fields(payload, OBSERVED_TEXT_FIELDS)
 
 
 def observed_skill_text(payload: dict[str, object]) -> list[str]:
     """Return text fields trusted for explicit skill and workflow declarations."""
     return observed_text_for_fields(payload, SKILL_TEXT_FIELDS)
+
+
+def observed_routing_candidate_text(payload: dict[str, object]) -> list[str]:
+    """Return text fields trusted for prompt-derived routing candidates."""
+    return observed_text_for_fields(payload, ROUTING_CANDIDATE_TEXT_FIELDS)
 
 
 def prompt_text(payload: dict[str, object]) -> str:
@@ -529,7 +857,7 @@ def feedback_action(labels: tuple[str, ...]) -> str:
 def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     """Classify prompt text into explicit and candidate routing signals."""
     skill_texts = observed_skill_text(payload)
-    candidate_texts = observed_text(payload)
+    candidate_texts = observed_routing_candidate_text(payload)
     skills = tuple(observed_skills(payload))
     labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
     candidate_skills = tuple(
@@ -648,12 +976,29 @@ def command_selected_tools(tool_input: object) -> tuple[str, ...]:
     command = tool_input.get("cmd") or tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         return ()
+    try:
+        parts = tuple(part for part in shlex.split(command) if part)
+    except ValueError:
+        parts = tuple(command.strip().split())
     observed: list[str] = []
-    haystack = command.lower()
-    for tool_name in sorted(TOOL_KEYWORDS):
-        if tool_name.lower() in haystack:
-            observed.append(tool_name)
+    for index, part in enumerate(parts):
+        name = Path(part).name
+        if name == "agent-canon" and parts[index + 1 : index + 2] == ("docs",):
+            observed.append("agent-canon-cli")
+            continue
+        if index == 0 and name in TOOL_KEYWORDS:
+            observed.append(name)
+        if repo_tool_path_part(part) and name in TOOL_KEYWORDS:
+            observed.append(name)
     return tuple(dict.fromkeys(observed))
+
+
+def repo_tool_path_part(part: str) -> bool:
+    """Return whether one shell token is an executable repo tool path."""
+    executable_repo_path = "tools/" in part or ".codex/hooks/" in part
+    return executable_repo_path and (
+        part.endswith((".py", ".sh")) or part.endswith("tools/bin/agent-canon")
+    )
 
 
 def default_log_path(root: Path) -> Path:
@@ -913,7 +1258,7 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "hook_log_namespace": context.runtime_namespace(),
             "timestamp": timestamp,
             "event": hook_event_name(payload),
-            "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
+            "event_declared": hook_event_name(payload) != "UnknownHookEvent",
             "skills": list(signals.skills),
             "selected_skills": list(signals.skills),
             "skill_selection_kind": "declared_skill" if signals.skills else "",

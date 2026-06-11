@@ -25,7 +25,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 MAX_CHANGED_LINES_ENV = "AGENT_CANON_MODULE_BOUNDARY_MAX_CHANGED_LINES"
@@ -139,12 +138,10 @@ def has_tool_signal(payload: dict[str, object]) -> bool:
 
 
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name, with PostToolUse fallback for tool-shaped input."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if payload_status(payload) == PAYLOAD_STATUS_VALID and has_tool_signal(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 

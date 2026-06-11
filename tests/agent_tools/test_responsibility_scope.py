@@ -78,7 +78,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertIn("coverage:issues:uncovered-required-path", result.stdout)
 
     def test_parent_repository_requires_top_level_manifest(self) -> None:
-        """A parent repo must not fall back to a vendored AgentCanon manifest."""
+        """A parent repo must require its own responsibility manifest."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_file(root, "tools/catalog.yaml", "version: 1\nentries: []\n")

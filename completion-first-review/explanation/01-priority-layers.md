@@ -20,7 +20,7 @@ The layers are:
 | P-1 | Completion judgment rules and completion-verifier tooling | What does done mean, and which tool decides it? |
 | P0 | Agent settings and runtime invariants | How should agents run to satisfy completion profiles? |
 | P1 | Tool, evidence, and verifier implementation | Which tools produce trusted evidence? |
-| P2 | MCP, goal loop, and fallback evidence | How do MCP and fallback states affect completion? |
+| P2 | MCP, goal loop, and alternate route evidence | How do MCP and alternate route states affect completion? |
 | P3 | Self-growth state machine | How does feedback become verified repair? |
 | P4 | Surface ownership and AgentCanon sync | Which repo surface owns each change? |
 | P5 | Workflow and skill contracts | Which workflows and skills are machine-checkable? |
@@ -103,7 +103,7 @@ Completion should distinguish:
 ```text
 mcp_status=pass
 mcp_status=fail
-mcp_status=shell_fallback
+mcp_status=shell_alternate route
 mcp_status=not_applicable
 ```
 

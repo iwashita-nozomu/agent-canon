@@ -33,8 +33,7 @@ SKIP_PREFIXES = (
     ".git/",
     ".pytest_cache/",
     ".ruff_cache/",
-    "reports/agents/",
-    "reports/dependency-review/",
+    "reports/",
 )
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096

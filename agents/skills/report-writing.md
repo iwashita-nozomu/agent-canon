@@ -96,6 +96,15 @@ Before drafting, fix these inputs:
   source-to-section map, graph-backed rewrite packet, or graph-backed units and
   rerun graph diagnostics until the selected profile has no active `fix-now`
   findings before writing report prose
+- selected ordering: when the prose graph handoff includes
+  `selected_ordering.ordered_anchors`, use that whole-document topological
+  sentence order as the DSL-to-prose input sequence before drafting report
+  sections or paragraph transitions
+- positive responsibility prose: state what the report observes, infers,
+  recommends, limits, and hands off. Boundary, Limitation, and Non-Goal sections
+  hold boundary statements; `ad hoc` labels are replaced with a named
+  responsibility, evidence gap, verification route, or prompt-defect
+  classification
 
 ## Report Quality Checklist
 

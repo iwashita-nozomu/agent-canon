@@ -84,8 +84,6 @@ For the broader agent routing path, return to `agents/README.md`.
   good AgentCanon SHA.
 - [Derived Repository Bootstrap Runbook](./derived-repo-bootstrap-runbook.md):
   shortest safe onboarding and triage path for repos that vendor AgentCanon.
-- [MCP Preflight And Fallback Policy](./mcp-preflight-and-fallback-policy.md):
-  MCP required/optional/not-applicable decision table and closeout evidence.
 - [Issue Label Taxonomy](./issue-label-taxonomy.md): AgentCanon maintenance
   issue templates, label taxonomy, and issue backfill policy.
 - [Prompt And Skill Evaluation Checklist](./prompt-skill-evaluation-checklist.md):

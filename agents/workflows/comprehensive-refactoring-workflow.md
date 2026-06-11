@@ -47,7 +47,7 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Allowed Structural Delta:` 許可する file split、rename、move、dependency direction、adapter 導入。
 - `Forbidden Semantic Delta:` 今回混ぜない仕様変更、数値変更、protocol change、performance tuning。
 - `Path Mapping:` old path / symbol から new path / symbol への対応。
-- `Deletion Plan:` 消す file、helper、alias、fallback、旧 route。
+- `Deletion Plan:` 消す file、helper、alias、alternate route、旧 route。
 - `Compatibility Plan:` 互換 layer を残すか、残すなら期限と削除 gate。
 
 設計見直しは、既存コードを読まずに始めません。

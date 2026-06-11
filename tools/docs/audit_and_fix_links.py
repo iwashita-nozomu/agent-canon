@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,28 @@ DEFAULT_PATHS = [
 ]
 LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 SKIP_PARTS = {".git", ".worktrees", "__pycache__", "Archive"}
+
+
+def forward_cli_to_rust(args: list[str]) -> int | None:
+    """Forward legacy check-only CLI use to the unified Rust docs checker."""
+    if "--apply" in args:
+        return None
+    rust_args = [arg for arg in args if arg != "--check"]
+    caller_chain = f"ppid={os.getppid()}"
+    print("AGENT_CANON_FORWARDER=deprecated", file=sys.stderr)
+    print("AGENT_CANON_FORWARDER_SEVERITY=fix-now", file=sys.stderr)
+    print(f"AGENT_CANON_FORWARDER_CALLER_CHAIN={caller_chain}", file=sys.stderr)
+    print(
+        "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs check",
+        file=sys.stderr,
+    )
+    canon_root = Path(__file__).resolve().parents[2]
+    completed = subprocess.run(
+        [str(canon_root / "tools/bin/agent-canon"), "docs", "check", *rust_args],
+        cwd=Path.cwd(),
+        check=False,
+    )
+    return completed.returncode
 
 
 @dataclass(frozen=True)
@@ -86,7 +109,7 @@ def iter_markdown_files(paths: list[str]) -> list[Path]:
 
 
 def build_name_index() -> dict[str, list[Path]]:
-    """Build a filename index for fallback resolution."""
+    """Build a filename index for explicit unique-name resolution."""
     name_index: dict[str, list[Path]] = {}
     for path in ROOT.rglob("*"):
         if not path.is_file():
@@ -261,4 +284,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    forwarded = forward_cli_to_rust(sys.argv[1:])
+    if forwarded is not None:
+        sys.exit(forwarded)
     sys.exit(main())

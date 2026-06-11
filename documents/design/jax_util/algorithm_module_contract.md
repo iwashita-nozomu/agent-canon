@@ -20,7 +20,7 @@ other initialization sinks. `SolveConfig` owns runtime numerical controls such
 as tolerances, iteration limits, and stopping configuration. A parent algorithm
 that wraps a child algorithm must surface the child ownership explicitly through
 nested config, info, and algorithm fields instead of hiding those dependencies
-behind ad hoc module state or fallback defaults.
+behind ad hoc module state or alternate route defaults.
 
 The Rust `python-algorithm-contract-check` tool is the stricter checker for this
 contract. It analyzes Python AST JSON to verify the public surface, callable

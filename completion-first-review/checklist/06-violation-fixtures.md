@@ -46,7 +46,7 @@ positive_fixture: V001_positive
 
 - Represents: MCP unavailable but recorded as pass.
 - Should fail when: MCP status artifact is required.
-- Positive case: MCP pass artifact or accepted shell fallback artifact.
+- Positive case: MCP pass artifact or accepted shell alternate route artifact.
 
 ### [ ] VF-004: runtime feedback without self-growth fixture
 

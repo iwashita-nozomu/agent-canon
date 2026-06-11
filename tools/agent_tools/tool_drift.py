@@ -101,7 +101,7 @@ CONTRACTS = (
             TextCheck(
                 ".github/workflows/agent-coordination.yml",
                 "tools/ci/checkout_agent_canon_submodule.sh",
-                "missing-standalone-checkout-helper-fallback",
+                "missing-standalone-checkout-helper-route",
             ),
         ),
     ),

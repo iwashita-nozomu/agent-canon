@@ -65,6 +65,9 @@ jobs:
       - name: Install static gate dependencies
         run: python3 -m pip install --upgrade pyyaml tomli
 
+      - name: Prepare runtime log archive
+        run: mkdir -p .agent-canon/log-archive
+
       - name: Install Rust gate components
         run: rustup component add rustfmt clippy
 

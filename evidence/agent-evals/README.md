@@ -170,6 +170,15 @@ and bounded run stdout/stderr may live under `reports/agent-eval-runs/<run-id>/`
 | Report quality | `python3 tools/agent_tools/evaluate_report_quality.py --manifest evidence/agent-evals/report_quality_eval.toml` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
 | Codex subagent roles | `python3 tools/agent_tools/evaluate_codex_agent_roles.py` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
 
+`workflow_selection_eval.toml` may define reusable `[[case_groups]]`.
+Each group supplies prompt templates, subjects, expected workflow labels, and
+optional expected skill / tool labels. The workflow-selection producer expands
+those groups before evaluation and fails closed when `expected_case_count` or
+`expected_generated_case_count` does not match the expanded corpus. The
+canonical manifest intentionally expands to 500 realistic user-task prompts
+across 20 route families, while reports preserve only case IDs, route labels,
+skills, tools, count checks, and the optional source `--run-id`.
+
 The role eval fails when a role TOML violates this contract:
 
 | Role eval concern | Contract |
