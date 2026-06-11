@@ -16,11 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 from agent_team import (
     ROOT,

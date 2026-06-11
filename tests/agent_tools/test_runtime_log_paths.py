@@ -26,7 +26,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
     """Exercise runtime log archive path ordering."""
 
     def test_hook_result_search_dirs_parent_prefers_archive_legacy_before_tree_legacy(self) -> None:
-        """Parent repo invocation should search mounted legacy import before in-tree fallback."""
+        """Parent repo invocation should search mounted legacy import before in-tree legacy logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir)
             canon_root = parent / "vendor" / "agent-canon"
@@ -41,7 +41,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(dirs[2], canon_root / "agents" / "evals" / "results" / "hook-runs")
 
     def test_hook_result_search_dirs_standalone_prefers_archive_legacy_before_tree_legacy(self) -> None:
-        """Standalone AgentCanon invocation should search mounted legacy import before in-tree fallback."""
+        """Standalone AgentCanon invocation should search mounted legacy import before in-tree legacy logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             canon_root = Path(temp_dir)
             archive_root = mounted_log_archive_root(canon_root)

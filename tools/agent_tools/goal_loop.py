@@ -56,7 +56,7 @@ DEFAULT_EXIT_CRITERIA = (
     (
         "G5",
         "Repo-wide static analysis or CI passes with `make ci`, or the "
-        "documented fallback `python3 -m pyright` plus "
+        "documented static-analysis route `python3 -m pyright` plus "
         "`python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`.",
     ),
     ("G6", "Objective-specific completion evidence is recorded."),
@@ -562,7 +562,7 @@ def evidence_hint(item: CheckboxItem) -> str:
         or "pyright" in text
         or "ruff" in text
     ):
-        return "`make ci` or documented static-analysis fallback"
+        return "`make ci` or documented static-analysis route"
     if "evidence" in text:
         return "run-bundle artifact with clause mapping"
     return "specific artifact path, command output, or review decision"

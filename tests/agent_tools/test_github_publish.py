@@ -75,7 +75,7 @@ class GithubPublishTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parser.parse_args(["push"])
 
-    def test_verify_remote_rejects_repo_mismatch_without_fallback(self) -> None:
+    def test_verify_remote_rejects_repo_mismatch_when_verified_remote_required(self) -> None:
         """Mismatched gh repo and origin must fail instead of trying another push route."""
         runner = FakeRunner()
         runner.add(
@@ -87,7 +87,7 @@ class GithubPublishTest(unittest.TestCase):
         with self.assertRaises(github_publish.UserVisibleFailure) as context:
             github_publish.verify_remote(runner, repo="owner/repo", remote="origin")
 
-        self.assertIn("without_fallback_push", context.exception.next_action)
+        self.assertIn("verified_remote_required", context.exception.next_action)
 
     def test_push_allows_dirty_worktree_and_uses_verified_origin(self) -> None:
         """Dirty worktree is warning evidence, not a push blocker."""

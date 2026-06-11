@@ -153,22 +153,22 @@ class SourceLoader:
 
 @dataclass(frozen=True)
 class PdfExtractor:
-    """Extract PDF text using optional tools and a fallback scanner."""
+    """Extract PDF text using configured PDF text tools."""
 
     source: LoadedSource
 
     def extract(self) -> tuple[str, str]:
         """Return extracted PDF text and method."""
+        extractor_available = importlib.util.find_spec("pypdf") is not None or shutil.which("pdftotext") is not None
+        if not extractor_available:
+            raise ValueError("pdf-text-extractor-required: install pypdf or pdftotext")
         pypdf_text = extract_pdf_with_pypdf(self.source.data)
         if pypdf_text:
             return pypdf_text, "pypdf"
         pdftotext_text = self.extract_with_pdftotext()
         if pdftotext_text:
             return pdftotext_text, "pdftotext"
-        fallback_text = extract_pdf_literal_strings(self.source.data)
-        if fallback_text:
-            return fallback_text, "pdf-literal-string-fallback"
-        return "", "unavailable"
+        raise ValueError("pdf-text-extraction-failed: repair pypdf or pdftotext extraction")
 
     def extract_with_pdftotext(self) -> str:
         """Extract PDF text with the pdftotext binary when available."""
@@ -275,36 +275,12 @@ def run_pdftotext(binary: str, input_path: Path) -> str:
     return normalize_whitespace(result.stdout)
 
 
-def extract_pdf_literal_strings(data: bytes) -> str:
-    """Extract simple PDF literal text strings as a last-resort fallback."""
-    strings: list[str] = []
-    for match in re.finditer(rb"\((?:\\.|[^\\)]){2,}\)\s*Tj", data):
-        raw = match.group(0).rsplit(b")", 1)[0][1:]
-        strings.append(decode_pdf_literal(raw))
-    for match in re.finditer(rb"\[(.*?)\]\s*TJ", data, flags=re.DOTALL):
-        for raw in re.findall(rb"\((?:\\.|[^\\)]){2,}\)", match.group(1)):
-            strings.append(decode_pdf_literal(raw[1:-1]))
-    return normalize_whitespace(" ".join(item for item in strings if item.strip()))
-
-
-def decode_pdf_literal(data: bytes) -> str:
-    """Decode a basic PDF literal string."""
-    unescaped = (
-        data.replace(rb"\(", b"(")
-        .replace(rb"\)", b")")
-        .replace(rb"\\", b"\\")
-        .replace(rb"\n", b"\n")
-        .replace(rb"\r", b"\r")
-        .replace(rb"\t", b"\t")
-    )
-    return unescaped.decode("utf-8", errors="replace")
-
-
-def fallback_title(url: str) -> str:
-    """Return a readable title from a URL."""
-    parsed = urlparse(url)
-    stem = Path(parsed.path).stem or parsed.netloc or "external-reference"
-    return normalize_whitespace(stem.replace("-", " ").replace("_", " ")).title()
+def require_title(title: str) -> str:
+    """Return a normalized title or fail when the source did not provide one."""
+    normalized = normalize_whitespace(title)
+    if not normalized:
+        raise ValueError("reference title is required: pass --title or provide an HTML <title>")
+    return normalized
 
 
 def slugify(value: str) -> str:
@@ -367,10 +343,10 @@ def build_reference(args: argparse.Namespace) -> ExtractedReference:
     source_kind = infer_source_kind(source, args.source_kind)
     if source_kind == "pdf":
         extracted_text, method = PdfExtractor(source).extract()
-        title = args.title or fallback_title(args.url)
+        title = require_title(args.title)
     else:
         title, extracted_text, method = extract_html(source.data, args.title)
-        title = title or fallback_title(args.url)
+        title = require_title(title)
     return ExtractedReference(
         url=args.url,
         source_kind=source_kind,

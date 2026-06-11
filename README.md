@@ -156,7 +156,7 @@ python3 tools/agent_tools/responsibility_scope.py --root . --format json \
 - `documents/agent-canon-update-route.md`
 - `documents/agent-canon-submodule-rollback.md`
 - `documents/derived-repo-bootstrap-runbook.md`
-- `documents/mcp-preflight-and-fallback-policy.md`
+- `documents/mcp-preflight-and-alternate route-policy.md`
 - `documents/issue-label-taxonomy.md`
 - `documents/prompt-skill-evaluation-checklist.md`
 - `documents/template-github-remote.md`
@@ -170,7 +170,7 @@ python3 tools/agent_tools/responsibility_scope.py --root . --format json \
 
 OpenAI / Codex の current product evidence、API reference、model selection、
 model upgrade、prompt-upgrade guidance、Codex manual、official-domain web
-fallback は AgentCanon 内で個別 URL や fallback 文書として二重管理しない。
+alternate route は AgentCanon 内で個別 URL や alternate route 文書として二重管理しない。
 host-provided `$openai-docs` skill を正本 route とし、AgentCanon 側には local
 decision artifact だけを残す。
 
@@ -185,7 +185,7 @@ decision artifact だけを残す。
 
 role TOML の model 値や checked-in config の実値は runtime source ですが、
 それらの変更根拠は `$openai-docs` で確認します。README、workflow docs、
-bibliography、configuration guide に OpenAI docs の fallback copy を増やしては
+bibliography、configuration guide に OpenAI docs の alternate route copy を増やしては
 いけません。
 
 ## Runtime Profiles

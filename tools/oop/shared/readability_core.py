@@ -99,8 +99,8 @@ MAX_READABILITY_SCORE = 100
 ERROR_SCORE_PENALTY = 25
 WARN_SCORE_PENALTY = 5
 INFO_SCORE_PENALTY = 2
-FALLBACK_SCORE_PENALTY = 3
-FALLBACK_FINDING_RANK = 9
+UNKNOWN_SEVERITY_SCORE_PENALTY = 3
+UNKNOWN_SEVERITY_FINDING_RANK = 9
 KLOC_NORMALIZER = 1000
 MODERATE_RISK_WARN_OR_ERROR_PER_KLOC = 3
 HIGH_RISK_WARN_OR_ERROR_PER_KLOC = 6
@@ -3612,7 +3612,7 @@ def score(findings: list[Finding]) -> int:
         "info": INFO_SCORE_PENALTY,
     }
     penalty = sum(
-        weights.get(finding.severity, FALLBACK_SCORE_PENALTY)
+        weights.get(finding.severity, UNKNOWN_SEVERITY_SCORE_PENALTY)
         for finding in findings
     )
     return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
@@ -3649,7 +3649,7 @@ def finding_rank(finding: Finding) -> tuple[int, str, int, str]:
     """Sort findings by review priority and location."""
     severity_rank = {"error": 0, "warn": 1, "info": 2}
     return (
-        severity_rank.get(finding.severity, FALLBACK_FINDING_RANK),
+        severity_rank.get(finding.severity, UNKNOWN_SEVERITY_FINDING_RANK),
         finding.path,
         finding.line,
         finding.kind,

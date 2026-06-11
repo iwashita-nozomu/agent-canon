@@ -23,7 +23,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 EDIT_TOOL_NAMES = {"apply_patch", "python", "python3", "Bash", "bash"}
@@ -88,25 +87,11 @@ def tool_command(payload: dict[str, object]) -> str:
     return ""
 
 
-def has_tool_signal(payload: dict[str, object]) -> bool:
-    """Return whether one payload looks like a tool hook."""
-    return isinstance(payload.get("tool_name"), str) or bool(tool_command(payload))
-
-
-def uses_event_fallback(payload: dict[str, object]) -> bool:
-    """Return whether to infer a PostToolUse event."""
-    if isinstance(payload.get("hookEventName"), str):
-        return False
-    return payload_status(payload) == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
-
-
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if uses_event_fallback(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 
@@ -215,7 +200,7 @@ def append_log(
             "payload_fingerprint": payload_fingerprint,
             "payload_status": payload_status(payload),
             "event": hook_event_name(payload),
-            "event_fallback": uses_event_fallback(payload),
+            "event_declared": isinstance(payload.get("hookEventName"), str),
             "tool_name": tool_name(payload),
             "root": str(root),
             "status": status,

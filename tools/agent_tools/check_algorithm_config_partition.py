@@ -5,7 +5,7 @@
 # upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
 # downstream implementation ../../tests/agent_tools/test_check_algorithm_config_partition.py tests
 # @dependency-end
-"""Check algorithm config ownership and hidden default/fallback values."""
+"""Check algorithm config ownership and hidden runtime defaults."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ class Finding:
 
 @dataclass(frozen=True)
 class DefaultFinding:
-    """One default or fallback value finding."""
+    """One hidden default-value finding."""
 
     path: str
     line: int
@@ -122,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Check that initialization-only fields are not in SolveConfig, "
             "runtime-only fields are not in InitializeConfig, and defaults are "
-            "owned by explicit config surfaces instead of hidden runtime fallbacks."
+            "owned by explicit config surfaces instead of hidden runtime defaults."
         )
     )
     parser.add_argument("paths", nargs="*", help="Files or directories to analyze.")
@@ -693,7 +693,7 @@ def function_default_findings(
 
 
 class ConfigDefaultVisitor(ast.NodeVisitor):
-    """Collect hidden default and fallback values."""
+    """Collect hidden runtime defaults."""
 
     def __init__(
         self,
@@ -738,7 +738,7 @@ class ConfigDefaultVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
-        """Check fallback-default call idioms."""
+        """Check implicit-default call idioms."""
         name = dotted_name(node.func)
         default_arg: ast.AST | None = None
         kind = ""
@@ -746,15 +746,15 @@ class ConfigDefaultVisitor(ast.NodeVisitor):
         if name.endswith(".get") and len(node.args) >= 2:
             default_arg = node.args[1]
             kind = "mapping-get-default"
-            reason = "mapping get supplies a fallback value outside config ownership"
+            reason = "mapping get supplies an implicit value outside config ownership"
         elif name == "getattr" and len(node.args) >= 3:
             default_arg = node.args[2]
             kind = "getattr-default"
-            reason = "getattr supplies a fallback value outside config ownership"
+            reason = "getattr supplies an implicit value outside config ownership"
         elif name.endswith(".setdefault") and len(node.args) >= 2:
             default_arg = node.args[1]
             kind = "setdefault-default"
-            reason = "setdefault creates a fallback value outside config ownership"
+            reason = "setdefault creates an implicit value outside config ownership"
         elif (
             config_kind_for_expr(
                 node.func,
@@ -789,11 +789,11 @@ class ConfigDefaultVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:  # noqa: N802
-        """Check ``x or default`` style fallbacks."""
+        """Check ``x or default`` style implicit runtime defaults."""
         if isinstance(node.op, ast.Or) and len(node.values) >= 2:
-            fallback = node.values[-1]
+            implicit_default = node.values[-1]
             if is_literalish_default(
-                fallback,
+                implicit_default,
                 local_config_kinds=self.config_kinds,
                 imports=self.imports,
                 module_index=self.module_index,
@@ -801,13 +801,13 @@ class ConfigDefaultVisitor(ast.NodeVisitor):
                 self.findings.append(
                     DefaultFinding(
                         path=self.relative,
-                        line=getattr(fallback, "lineno", node.lineno),
+                        line=getattr(implicit_default, "lineno", node.lineno),
                         scope=enclosing_scope(node),
-                        kind="or-fallback-default",
+                        kind="or-implicit-default",
                         name="<or>",
                         owner=enclosing_config_owner(node, self.config_kinds) or "runtime",
                         severity="error",
-                        reason="boolean or supplies a fallback value outside config ownership",
+                        reason="boolean or supplies an implicit value outside config ownership",
                         guidance=(
                             "thread the value through InitializeConfig/SolveConfig "
                             "or fail when absent"

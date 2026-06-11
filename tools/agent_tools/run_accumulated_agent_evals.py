@@ -176,6 +176,8 @@ def build_producers(
                 "--root",
                 str(root),
                 "--accumulate",
+                "--run-id",
+                run_id,
             ),
         ),
         EvalProducer(

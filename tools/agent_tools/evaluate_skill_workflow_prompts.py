@@ -23,11 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 from eval_manifest_paths import eval_manifest_path, relative_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
@@ -206,8 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help=(
             "Directory for accumulated detailed reports. Defaults to the mounted "
-            "AgentCanon log archive eval-results/skill-workflow-prompt path, "
-            "falling back to a non-repository state path when no archive is mounted."
+            "AgentCanon log archive eval-results/skill-workflow-prompt path."
         ),
     )
     parser.add_argument(

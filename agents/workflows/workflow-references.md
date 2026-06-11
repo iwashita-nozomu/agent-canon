@@ -21,10 +21,10 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 ## OpenAI And Codex Product Source Route
 
 OpenAI / Codex の現在情報、API reference、model selection、model upgrade、
-prompt-upgrade guidance、Codex manual、official-domain web fallback は、この
-workflow bibliography で個別 URL や fallback 文書として二重管理しない。
+prompt-upgrade guidance、Codex manual、official-domain web alternate route は、この
+workflow bibliography で個別 URL や alternate route 文書として二重管理しない。
 host-provided `$openai-docs` skill を正本 route とし、そこが指定する
-Codex manual helper、Docs MCP、latest-model page、bundled fallback
+Codex manual helper、Docs MCP、latest-model page、bundled alternate route
 references を使う。
 
 OpenAI / Codex の current product evidence をこの文書へ source-by-source で
@@ -43,7 +43,7 @@ OpenAI / Codex の current product evidence をこの文書へ source-by-source 
 - [Secrets - GitHub Docs](https://docs.github.com/en/actions/concepts/security/secrets)
   - `AGENT_CANON_REPO_TOKEN` のような secret は workflow 側で明示的に渡す必要があること、最小権限の根拠です。
 - [REST API endpoints for deploy keys - GitHub Docs](https://docs.github.com/en/rest/deploy-keys/deploy-keys)
-  - private AgentCanon を PAT ではなく read-only deploy key で読む fallback の根拠です。
+  - private AgentCanon を PAT ではなく read-only deploy key で読む alternate route の根拠です。
 
 ## System Development, Security, Release, And Operations
 

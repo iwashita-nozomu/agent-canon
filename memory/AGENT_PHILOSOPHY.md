@@ -201,6 +201,24 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: User reported agents tend to ignore tool warnings; current workflow monitor has behavior events but no dedicated unresolved-warning gate.
 
+- 2026-06-11 | interaction-observation | Before ordinary tasks, agents should repair expected AgentCanon repository-structure drift using the structure-refactor pre-task route instead of recreating missing paths or choosing nearby directories.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User requested a skill for AgentCanon expected repo structure drift before tasks.
+
+- 2026-06-11 | interaction-observation | RunBundle and Agent report collection routes should be exposed in bootstrap and dashboard output so agents do not search raw logs or invent parallel archive paths.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User noted the route for collecting past RunBundles and Agent reports was weak.
+
+- 2026-06-11 | interaction-observation | For substantive document additions or revisions, agents should run structure analysis before adding prose; typo, link, and format-only edits can skip the gate with an explicit reason.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User stated document additions/revisions should also perform structure analysis.
+
 ## Task Retrospectives
 
 

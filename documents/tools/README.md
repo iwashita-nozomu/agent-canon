@@ -57,7 +57,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/run_accumulated_agent_evals.py`
   - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は `reports/agent-eval-runs/<run-id>/` に退避します。PR / CI gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
 - `tools/agent_tools/github_publish.py`
-  - `gh` で GitHub repo を確認し、`origin` が同じ `owner/name` を指す場合だけ branch push、PR create/update、PR checks を実行します。`--user-task` は必須で、literal URL push、remote 推測、`.git/config` fallback は使いません。GitHub publish / PR evidence はこの tool と PR gate の責務であり、非重大 hook finding では止めません。
+  - `gh` で GitHub repo を確認し、`origin` が同じ `owner/name` を指す場合だけ branch push、PR create/update、PR checks を実行します。`--user-task` は必須で、literal URL push、remote 推測、`.git/config` alternate route は使いません。GitHub publish / PR evidence はこの tool と PR gate の責務であり、非重大 hook finding では止めません。
 - `tools/agent_tools/repo_structure_contract.py`
   - `documents/repo-structure-contract.toml` を正本にして、top-level から `tree -a -J` で取得した directory / file 構成を AgentCanon-supported profile と比較します。保存済み `tree -J` JSON も `--tree-json` で読めます。期待 path、ignore、profile detection、unexpected top-level severity は tool code ではなく TOML contract から解決します。
 - `tools/agent_tools/render_dependency_manifest_graph.py`
@@ -76,8 +76,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     root instruction / document / report surface の primary owner、candidate
     paths、forbidden paths、required pre-edit checks を compact text または
     JSON で返します。
-  - llama.cpp が使える場合は Local LLM advisory を併記し、使えない場合も
-    `IMPLEMENTATION_SURFACE_ROUTER_WARNING=...` 付き fallback を返します。
+  - llama.cpp が使えない場合は環境構築ミスとして
+    `IMPLEMENTATION_SURFACE_ROUTER=error` と修復 action を返し、implementation
+    path の選択へ進ませません。
 - `agent-canon local-llm extract-prose-ir`
   - 複数 document と複数 term を受け取り、LocalLLM 向け part に分割して prose intermediate representation JSON を作ります。
   - 返す単位は単語 list ではなく、document responsibility、section role、term context、corpus hints、`dsl_seed`、`parts[]` です。

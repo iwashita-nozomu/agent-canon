@@ -54,7 +54,7 @@ outer loop は agile、inner change pass は waterfall です。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
 - `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
 - `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
-- skill を使う run では、`evaluate_skill_workflow_prompts.py --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/` に詳細 report を蓄積します。report file は `<eval_run_id>-<status>-<skill-slug>.md` で採番し、既存 report を上書きしません。
+- skill を使う run では、`evaluate_skill_workflow_prompts.py --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細 report を蓄積します。report file は `<eval_run_id>-<status>-<skill-slug>.md` で採番し、既存 report を上書きしません。
 - skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`evidence/agent-evals/skill_workflow_prompt_eval.toml` を正本にします。
 - prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0`、`EVAL_RUN_ID`、`EVAL_ACCUMULATED_REPORT` が揃うまで loop を閉じません。
 - eval manifest の growth candidate は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs です。既存 prompt surface の coverage を増やす場合は、同じ target / same target の eval entry に checklist を統合し、重複 target の並行 eval を残しません。

@@ -25,7 +25,7 @@ For PR work:
     --title "<title>" \
     --body-file <body.md>
 
-This entrypoint intentionally has no fallback push route.
+This entrypoint requires the verified gh repository and origin remote route.
 EOF
 
 exit 2

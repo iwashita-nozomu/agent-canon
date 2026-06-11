@@ -316,14 +316,41 @@ def emit_bootstrap_output(
     )
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
+        print("TASK_ID_ROUTE_STATUS=explicit")
         print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
+        print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
+        print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")
+    else:
+        print("TASK_ID_ROUTE_STATUS=missing")
+        print("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes")
+        print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
+        print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
     print("IMPLEMENTATION_CODEX_AGENTS=" f"{','.join(codex_agents_for_role(config, 'implementer'))}")
     print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}")
+    print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
+    print(
+        "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
+        "tools/bin/agent-canon local-llm route-implementation-surface "
+        "--request-file <request-or-design-question.txt> --format text"
+    )
+    print("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation")
+    print("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending")
+    print(
+        "PRE_EDIT_REJECTION_COMMAND="
+        "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>"
+    )
+    print("AGENT_REPORT_COLLECTION_STATUS=available")
+    print("AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status")
+    print(
+        "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
+        f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}"
+    )
+    print("AGENT_REPORT_COLLECTION_SYNC_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py sync")
     print("CROSS_CUTTING_DOCUMENT_PACKET=" f"{cross_cutting_document_packet_output(workspace_root)}")
     print(
         "DESIGN_DOCUMENT_PACKET="

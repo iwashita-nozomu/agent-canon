@@ -309,7 +309,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
 
     def test_plan_prefers_subtree_pull_when_local_split_is_remote_ancestor(self) -> None:
-        """Plan should prefer subtree_pull over tree-match fallback when subtree metadata exists."""
+        """Plan should prefer subtree_pull over tree-match snapshot route when subtree metadata exists."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             clone_dir = root / "clone"
@@ -1560,7 +1560,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 cwd=repo,
                 check=True,
             )
-            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "add", "AGENTS.md", ".github", "documents/README.md", "goal.md"],
+                cwd=repo,
+                check=True,
+            )
             subprocess.run(["git", "commit", "-m", "sync root views"], cwd=repo, check=True)
 
             plan = subprocess.run(
@@ -1620,6 +1624,129 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest",
                 latest.stdout,
             )
+            self.assertEqual(latest_check.returncode, 0, latest_check.stdout + latest_check.stderr)
+            self.assertIn("AGENT_CANON_LATEST=pass", latest_check.stdout)
+            self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
+
+    def test_latest_defers_clean_pushed_agentcanon_branch_when_parent_pin_is_stale(self) -> None:
+        """A clean pushed AgentCanon branch checkout should not block on a stale parent gitlink."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (repo / "tools" / "ci").mkdir()
+            shutil.copy2(
+                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                repo / "tools" / "ci" / "check_agent_canon_latest.sh",
+            )
+            submodule = repo / "vendor" / "agent-canon"
+            initial_parent_pin = subprocess.run(
+                ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/worktree-only"],
+                cwd=submodule,
+                check=True,
+            )
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "push", "-u", "origin", "canon-pr/worktree-only"],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "add", "AGENTS.md", ".github", "documents/README.md", "goal.md"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(["git", "commit", "-m", "sync root views"], cwd=repo, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "update-index",
+                    "--cacheinfo",
+                    f"160000,{initial_parent_pin},vendor/agent-canon",
+                ],
+                cwd=repo,
+                check=True,
+            )
+            if subprocess.run(
+                ["git", "diff", "--cached", "--quiet", "--", "vendor/agent-canon"],
+                cwd=repo,
+                check=False,
+            ).returncode != 0:
+                subprocess.run(
+                    ["git", "commit", "-m", "keep stale agent canon parent pin"],
+                    cwd=repo,
+                    check=True,
+                )
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            ensure_latest = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "ensure-latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            latest_check = subprocess.run(
+                ["bash", "tools/ci/check_agent_canon_latest.sh"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=deferred_branch_pr", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_submodule_deferred_branch=canon-pr/worktree-only",
+                plan.stdout,
+            )
+            self.assertEqual(ensure_latest.returncode, 0, ensure_latest.stderr)
+            self.assertIn("agent_canon_latest=deferred_branch_pr", ensure_latest.stdout)
+            self.assertIn("agent_canon_latest_branch=canon-pr/worktree-only", ensure_latest.stdout)
+            self.assertIn("agent_canon_latest_parent_pin_status=stale", ensure_latest.stdout)
+            self.assertNotIn("local_submodule_worktree_differs_from_parent_pin", ensure_latest.stdout)
+            self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr", latest.stdout)
             self.assertEqual(latest_check.returncode, 0, latest_check.stdout + latest_check.stderr)
             self.assertIn("AGENT_CANON_LATEST=pass", latest_check.stdout)
             self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)

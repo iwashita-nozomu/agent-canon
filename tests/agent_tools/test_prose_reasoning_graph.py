@@ -1124,8 +1124,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("experiment_without_hypothesis", rules)
             self.assertNotIn("experiment_without_metric", rules)
 
-    def test_missing_local_llm_ir_uses_warned_non_llm_fallback(self) -> None:
-        """Non-LLM experiment fallback is allowed only with an explicit warning."""
+    def test_missing_local_llm_ir_reports_environment_defect(self) -> None:
+        """Missing LocalLLM IR is an environment defect, not an alternate classifier."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "legacy_experiment.md"
@@ -1141,12 +1141,12 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
 
             rules = diagnostic_rules(db)
-            self.assertIn("non_llm_experiment_plan_fallback", rules)
-            self.assertIn("experiment_without_hypothesis", rules)
-            self.assertIn("experiment_without_metric", rules)
+            self.assertIn("local_llm_experiment_plan_ir_missing", rules)
+            self.assertNotIn("experiment_without_hypothesis", rules)
+            self.assertNotIn("experiment_without_metric", rules)
 
-    def test_missing_local_llm_ir_warns_even_when_fallback_is_negative(self) -> None:
-        """Fallback use is visible even when the non-LLM check finds no plan."""
+    def test_missing_local_llm_ir_reports_even_for_plain_text(self) -> None:
+        """Missing LocalLLM IR is visible even when no experiment claim is obvious."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "plain_report.md"
@@ -1162,7 +1162,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
 
             rules = diagnostic_rules(db)
-            self.assertIn("non_llm_experiment_plan_fallback", rules)
+            self.assertIn("local_llm_experiment_plan_ir_missing", rules)
             self.assertNotIn("experiment_without_hypothesis", rules)
             self.assertNotIn("experiment_without_metric", rules)
 

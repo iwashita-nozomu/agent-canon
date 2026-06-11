@@ -17,6 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_workflow_selection.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from evaluate_workflow_selection import load_manifest  # noqa: E402
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
@@ -39,10 +40,62 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=pass", result.stdout)
-        self.assertIn("WORKFLOW_SELECTION_EVAL_CASES=", result.stdout)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_CASES=500", result.stdout)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_EXPECTED_CASES=500", result.stdout)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_GENERATED_CASES=500", result.stdout)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=none", result.stdout)
+
+    def test_current_manifest_expands_required_task_groups(self) -> None:
+        """The canonical manifest should expand to 20 stable 25-case groups."""
+        manifest = load_manifest(PROJECT_ROOT / "evidence" / "agent-evals" / "workflow_selection_eval.toml")
+        expected_groups = {
+            "routing-advisory",
+            "scoped-lite-code",
+            "scoped-change-behavior",
+            "docs-structure",
+            "markdown-style",
+            "large-refactor",
+            "platform-environment",
+            "research-benchmark",
+            "adaptive-loop",
+            "computational-optimization",
+            "experiment-html-report",
+            "tool-finding-report",
+            "agent-log-analysis",
+            "agent-canon-update",
+            "pr-processing",
+            "repo-structure-drift",
+            "academic-paper",
+            "oop-readability",
+            "user-guided-debugging",
+            "run-report-archive",
+        }
+
+        self.assertEqual(len(manifest.cases), 500)
+        self.assertEqual(manifest.generated_case_count, 500)
+        self.assertEqual(manifest.expected_case_count, 500)
+        self.assertEqual(manifest.expected_generated_case_count, 500)
+        self.assertEqual(manifest.count_failures, ())
+        self.assertEqual({case.group_id for case in manifest.cases}, expected_groups)
+        for group_id in expected_groups:
+            self.assertEqual(
+                sum(1 for case in manifest.cases if case.group_id == group_id),
+                25,
+                group_id,
+            )
+        docs_cases = [case for case in manifest.cases if case.group_id == "docs-structure"]
+        large_cases = [case for case in manifest.cases if case.group_id == "large-refactor"]
+        self.assertTrue(
+            all(
+                {"structure-planning", "prose-reasoning-graph"}.issubset(case.expected_skills)
+                for case in docs_cases
+            )
+        )
+        self.assertTrue(all("subagent-bootstrap" in case.expected_skills for case in large_cases))
 
     def test_accumulates_unique_report_without_prompt_text(self) -> None:
         """Accumulated reports should be uniquely named and not copy raw prompts."""
+        source_run_id = "source-run-42"
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
@@ -56,6 +109,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--accumulate",
+                    "--run-id",
+                    source_run_id,
                 ],
                 check=False,
                 capture_output=True,
@@ -68,12 +123,19 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("WORKFLOW_SELECTION_EVAL_REPORT=", result.stdout)
+        self.assertIn(f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", result.stdout)
         self.assertEqual(len(reports), 1)
         self.assertIn("WORKFLOW_SELECTION_EVAL_RUN_ID=", report_text)
-        self.assertIn("environment-maintenance-container-ci", report_text)
+        self.assertIn(f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", report_text)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_EXPECTED_CASES=500", report_text)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES=500", report_text)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=none", report_text)
+        self.assertIn("routing-advisory-001", report_text)
         self.assertIn("selected skills", report_text)
         self.assertIn("candidate skills", report_text)
-        self.assertNotIn("Docker devcontainer GitHub Actions", report_text)
+        self.assertIn("expected tools", report_text)
+        self.assertIn("observed tools", report_text)
+        self.assertNotIn("実装しないで相談だけ", report_text)
 
     def test_missing_expected_workflow_fails(self) -> None:
         """A manifest expectation not emitted by the classifier should fail."""
@@ -111,6 +173,89 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 1)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=fail", result.stdout)
+
+    def test_advisory_report_words_do_not_force_codex_task_workflow(self) -> None:
+        """Generic report/update words should not trigger codex-task-workflow by themselves."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_runtime_fixture(root)
+            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "\n".join(
+                    [
+                        'catalog_kind = "agent_canon_workflow_selection_eval"',
+                        "version = 1",
+                        "",
+                        "[[cases]]",
+                        'id = "advisory-report-words"',
+                        'prompt = "相談だけ、レポートの確認と更新方針を説明して"',
+                        'expected_workflows = ["routing-only-advisory"]',
+                        'forbidden_workflows = ["codex-task-workflow"]',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=pass", result.stdout)
+
+    def test_count_mismatch_fails_even_when_case_route_passes(self) -> None:
+        """A generated manifest with the wrong expected count should fail closed."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_runtime_fixture(root)
+            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "\n".join(
+                    [
+                        'catalog_kind = "agent_canon_workflow_selection_eval"',
+                        "version = 2",
+                        "expected_case_count = 500",
+                        "expected_generated_case_count = 1",
+                        "",
+                        "[[case_groups]]",
+                        'id = "count-mismatch"',
+                        'expected_workflows = ["codex-task-workflow"]',
+                        "limit = 1",
+                        'prompt_templates = ["{subject} を実装して修正して"]',
+                        'subjects = ["single generated case"]',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_FAILED=0", result.stdout)
+        self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=expected_case_count=500 observed=1", result.stdout)
         self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=fail", result.stdout)
 
     def copy_runtime_fixture(self, root: Path) -> None:

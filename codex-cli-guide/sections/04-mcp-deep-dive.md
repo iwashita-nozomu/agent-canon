@@ -289,7 +289,7 @@ _初期確認手順を用意する。_
 _止め方を決める。_
 
 
-#### 図解: MCPとFallback
+#### 図解: MCPとAlternate route
 
 `server down` → `repo search` → `human ask`
 
@@ -368,7 +368,7 @@ _停止手順を練習する。_
 
 #### 図解: MCPと障害
 
-`detect` → `notify` → `fallback`
+`detect` → `notify` → `alternate route`
 
 _障害時の体験を決める。_
 
@@ -473,7 +473,7 @@ risk: read-only
 owner: platform-team
 allowed_agents: [docs_researcher, pr_explorer]
 forbidden: secrets, production data, write operations
-failure_fallback: use ripgrep in docs/ and ask human for missing context
+failure_alternate route: use ripgrep in docs/ and ask human for missing context
 ```
 
 
@@ -498,7 +498,7 @@ _環境変数は必要最小限にする。_
 _read-only toolに絞る。_
 
 
-#### 図解: STDIO fallback
+#### 図解: STDIO alternate route
 
 `server down` → `grep` → `human ask`
 
@@ -871,7 +871,7 @@ _tool単体で再現する。_
 
 ## MCP追加時のレビューシート
 
-MCPを追加するpull requestには、設定diffだけでなく、目的、owner、server実装場所、認証方式、許可tool、禁止tool、timeout、fallback、AGENTS更新、Hook有無を含める。特にwrite系toolを含む場合は、read系serverと分けるか、初期状態では`enabled = false`にする。
+MCPを追加するpull requestには、設定diffだけでなく、目的、owner、server実装場所、認証方式、許可tool、禁止tool、timeout、alternate route、AGENTS更新、Hook有無を含める。特にwrite系toolを含む場合は、read系serverと分けるか、初期状態では`enabled = false`にする。
 
 
 ```text
@@ -885,7 +885,7 @@ tools  |  `enabled_tools`で絞っているか。  |  必要最小限から始�
 timeout  |  startupとtool timeout。  |  server別に設定する。
 hooks  |  危険toolを検査するか。  |  write系にはhookを付ける。
 docs  |  AGENTS.mdやdocs更新。  |  使い方と禁止事項を書く。
-fallback  |  server停止時の代替手段。  |  人間が困らない状態にする。
+alternate route  |  server停止時の代替手段。  |  人間が困らない状態にする。
 rollback  |  enabled falseや設定削除。  |  戻し方をPRに書く。
 ```
 

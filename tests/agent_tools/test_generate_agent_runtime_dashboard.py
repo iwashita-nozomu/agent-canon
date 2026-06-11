@@ -218,6 +218,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `UserPromptSubmit` | `1` |",
             "| `last_assistant_message` | `1` |",
             ".agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl",
+            ".agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl",
+            "archive-agent-report --report-dir reports/agents/<run-id>",
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
