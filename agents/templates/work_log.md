@@ -22,7 +22,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Wave Event Log
 
-<!-- Append one row for each subagent wave event. Use the same Wave ID as schedule.md, and record budget deltas, spawned/skipped roles, evidence refs, and next action. -->
+<!-- Append one row for each subagent wave event. Use the same Wave ID as schedule.md, and record the same Wave Plan Contract fields plus evidence refs and next action. -->
 
-| Time | Wave ID | Event Kind | Stage | Trigger | Budget Before | Budget After | Spawned Roles | Skipped Roles / Rationale | Refs | Next Action |
-| ---- | ------- | ---------- | ----- | ------- | ------------- | ------------ | ------------- | ------------------------- | ---- | ----------- |
+| Time | Wave ID | Event Kind | Stage | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Refs | Next Action |
+| ---- | ------- | ---------- | ----- | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | ---- | ----------- |

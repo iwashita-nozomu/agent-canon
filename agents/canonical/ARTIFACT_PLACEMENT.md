@@ -68,9 +68,11 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   へ機械的に同期します。特定 run の immutable snapshot が必要なときだけ
   `archive-agent-report --report-dir reports/agents/<run-id>` を使い、push は同じ
   helper の `push` command が担当します。
-- closeout 前に、untracked な report file が `reports/agents/<run-id>/`
-  以外へ残っていないことを確認します。run bundle 外の未追跡 report は
-  `runtime_log_archive_git.py sync` の収集対象外なので、current run の
+- closeout 前に、`task_close.py` が report artifact placement を確認します。
+  tracked durable report は repo canon として許可します。untracked または
+  ignored な generated report file は current run の
+  `reports/agents/<run-id>/` の下だけを許可し、古い run bundle や
+  generated report root に残った file は current run の
   `recovered_orphan_reports/` などへ回収するか、恒久正本なら `documents/` /
   `agents/` / `notes/` へ責務付きで昇格します。
 

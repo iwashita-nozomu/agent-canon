@@ -59,7 +59,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
 - active な subagent 数は spawn budget で縛ります
-- spawn budget は上限であると同時に workflow family の既定 first-wave target です。multi-agent family で family default より少ない wave から始める場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
+- spawn budget は同時 active 数の上限です。first wave を budget まで埋める target ではありません。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します
+- multi-agent family で予定 stage wave を起こさない場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです

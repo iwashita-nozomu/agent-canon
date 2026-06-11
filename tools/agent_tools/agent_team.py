@@ -75,6 +75,26 @@ DEFERRED_SPAWN_ROLE_IDS = {
     "verifier",
     "auditor",
 }
+INITIAL_INTAKE_AGENT_TYPES = (
+    "requirements_organizer",
+    "explorer",
+    "execution_planner",
+)
+DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
+    (
+        "manager_reviewer",
+        "project_reviewer",
+        "docs_workflow_steward",
+        "prompt_config_reviewer",
+        "literature_researcher",
+        "plan_reviewer",
+    ),
+    ("detailed_designer",),
+    ("detailed_design_reviewer", "document_flow_reviewer", "test_designer"),
+    ("spark_worker", "worker"),
+    ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
+    ("ship_reviewer",),
+)
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
@@ -535,15 +555,57 @@ def unique_codex_agents_for_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
     return tuple(agents)
 
 
+def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str]:
+    """Return Codex agent types registered in the local runtime config."""
+    if not agent_root.is_dir():
+        return set()
+    return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
+
+
+def _available_stage_agents(
+    preferred_agents: tuple[str, ...],
+    available_agents: set[str],
+    used_agents: set[str],
+) -> tuple[str, ...]:
+    """Return preferred agent types that are available and not already scheduled."""
+    agents: list[str] = []
+    for agent_type in preferred_agents:
+        if agent_type not in available_agents or agent_type in used_agents:
+            continue
+        agents.append(agent_type)
+        used_agents.add(agent_type)
+    return tuple(agents)
+
+
+def _chunk_agent_wave(
+    agent_types: tuple[str, ...],
+    active_subagents: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Split one stage wave without exceeding the active subagent budget."""
+    if active_subagents < 1:
+        return ()
+    return tuple(
+        agent_types[index : index + active_subagents]
+        for index in range(0, len(agent_types), active_subagents)
+        if agent_types[index : index + active_subagents]
+    )
+
+
 def recommended_initial_subagent_wave(
     roles: tuple[Role, ...],
     active_subagents: int,
 ) -> tuple[str, ...]:
-    """Return executable agent_type values for the first bounded spawn wave."""
+    """Return executable agent_type values for the stage-ready intake wave."""
     if active_subagents < 1:
         return ()
-    initial_roles = tuple(role for role in roles if role.id not in DEFERRED_SPAWN_ROLE_IDS)
-    return unique_codex_agents_for_roles(initial_roles)[:active_subagents]
+    available_agents = set(unique_codex_agents_for_roles(roles))
+    available_agents.update(registered_codex_agent_types())
+    intake_agents = tuple(
+        agent_type
+        for agent_type in INITIAL_INTAKE_AGENT_TYPES
+        if agent_type in available_agents
+    )
+    return intake_agents[:active_subagents]
 
 
 def recommended_dynamic_expansion_waves(
@@ -551,19 +613,25 @@ def recommended_dynamic_expansion_waves(
     active_subagents: int,
     initial_wave: tuple[str, ...],
 ) -> tuple[tuple[str, ...], ...]:
-    """Return executable follow-up agent_type chunks inside the active budget."""
+    """Return executable follow-up stage waves inside the active budget."""
     if active_subagents < 1:
         return ()
-    remaining = tuple(
-        agent
-        for agent in unique_codex_agents_for_roles(roles)
-        if agent not in set(initial_wave)
+    ordered_agents = unique_codex_agents_for_roles(roles)
+    available_agents = set(ordered_agents)
+    used_agents = set(initial_wave)
+    waves: list[tuple[str, ...]] = []
+    for preferred_stage_agents in DYNAMIC_EXPANSION_AGENT_STAGE_WAVES:
+        stage_agents = _available_stage_agents(
+            preferred_stage_agents,
+            available_agents,
+            used_agents,
+        )
+        waves.extend(_chunk_agent_wave(stage_agents, active_subagents))
+    fallback_agents = tuple(
+        agent_type for agent_type in ordered_agents if agent_type not in used_agents
     )
-    return tuple(
-        remaining[index : index + active_subagents]
-        for index in range(0, len(remaining), active_subagents)
-        if remaining[index : index + active_subagents]
-    )
+    waves.extend(_chunk_agent_wave(fallback_agents, active_subagents))
+    return tuple(waves)
 
 
 def format_subagent_wave(agent_types: tuple[str, ...]) -> str:
@@ -987,7 +1055,7 @@ def manifest_run_lines(
             initial_wave,
         )
         lines.append("  spawn_wave_recommendation:")
-        lines.append("    source: 'team_manifest roles filtered by workflow spawn budget'")
+        lines.append("    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'")
         lines.append("    initial_wave_id: WAVE-1")
         lines.append("    initial_wave_agent_types:")
         for agent_type in initial_wave:
@@ -1026,7 +1094,11 @@ def manifest_run_lines(
         lines.append("      - review_gate")
         lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
-        lines.append("      - schedule.md Agent Wave Ledger row with owner, trigger, budget before/after, and gate")
+        lines.append(
+            "      - schedule.md Agent Wave Ledger row with spawn_authority, "
+            "budget, runtime ceilings, paths, validation_route, review_gate, "
+            "handoff_artifacts, and delegated policy ref"
+        )
         lines.append("      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles")
         lines.append("      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy")
         lines.append("    closeout_required_evidence:")

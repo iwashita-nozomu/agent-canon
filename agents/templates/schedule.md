@@ -41,8 +41,8 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- This is the authoritative fanout ledger. Initial Intake Wave is not a total cap. Add one row for the first wave and one row for every mid-task expansion, skipped wave, or delegated child wave. Keep `Delegated Policy Ref` pointing at `team_manifest.yaml#run.delegated_spawn_policy`. -->
 
-| Wave ID | Parent Or Delegate | Trigger | Budget Before | Budget After | Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Review Gate | Status |
-| ------- | ------------------ | ------- | ------------- | ------------ | ------------- | ------------------------- | ------------- | ----------- | ----------- | ----------- | ------ |
+| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |
+| ------- | ------------------ | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | -------------------- | ------ |
 
 ## Reuse And Continuity Constraints
 

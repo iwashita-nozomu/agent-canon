@@ -162,19 +162,22 @@ def write_ready_schedule(report_dir: Path) -> None:
                 "| W1 | T1-C1 | codex | tests | final | done |",
                 "## Agent Wave Ledger",
                 (
-                    "| Wave ID | Parent Or Delegate | Trigger | Budget Before | Budget After | "
-                    "Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | "
-                    "Write Scope | Review Gate | Status |"
+                    "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | "
+                    "Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | "
+                    "Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                    "Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |"
                 ),
                 (
-                    "| ------- | ------------------ | ------- | ------------- | ------------ | "
-                    "------------- | ------------------------- | ------------- | ----------- | "
-                    "----------- | ----------- | ------ |"
+                    "| ------- | ------------------ | --------------- | ------- | ------------- | "
+                    "------------ | ------------------- | ----------------- | ------------- | "
+                    "------------------------- | ------------- | ----------- | ----------- | "
+                    "---------------- | ----------- | ----------------- | -------------------- | ------ |"
                 ),
                 (
-                    "| WAVE-1 | parent | initial_intake | 0/12 | 3/12 | "
+                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 3/12 | 24 | 2 | "
                     "requirements_organizer,explorer,execution_planner | none | reports/agents/run | "
-                    "unrelated | read-only | schedule_review | done |"
+                    "unrelated | read-only | pytest | schedule_review | team_manifest.yaml | "
+                    "team_manifest.yaml#run.delegated_spawn_policy | done |"
                 ),
                 "",
             ]
@@ -215,6 +218,18 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
         "\n".join(
             [
                 "# Workflow Monitoring",
+                "",
+                "## Actual Wave Events",
+                "",
+                (
+                    "- wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
+                    "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
+                    "budget_after=3/12 runtime_max_threads=24 runtime_max_depth=2 "
+                    "spawned_roles=requirements_organizer,explorer,execution_planner "
+                    "skipped_roles=none allowed_paths=reports/agents/run "
+                    "do_not_read=unrelated write_scope=read-only validation_route=pytest "
+                    "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done"
+                ),
                 "",
                 "## Tool Warnings",
                 "",
@@ -599,7 +614,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
-                ["git", "add", "Makefile", "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md"],
+                [
+                    "git",
+                    "add",
+                    "Makefile",
+                    "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                ],
                 cwd=workspace_root,
                 check=True,
             )
@@ -643,9 +663,24 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes", result.stdout)
+            assert result.returncode == 0
+            self.assertIn("RUN_ID=parent-dirty-unrelated", result.stdout)
+            self.assertIn(
+                f"REPORT_DIR={report_root / 'parent-dirty-unrelated'}",
+                result.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes",
+                result.stdout,
+            )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", result.stdout)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow", result.stdout)
+            self.assertNotIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
+                result.stdout,
+            )
+            self.assertTrue(
+                (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
+            )
 
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
@@ -707,7 +742,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(first_wave_match)
             first_wave = cast(re.Match[str], first_wave_match).group(1).split(",")
-            self.assertGreater(len(first_wave), 3)
+            self.assertEqual(
+                first_wave,
+                ["requirements_organizer", "explorer", "execution_planner"],
+            )
+            dynamic_waves_match = re.search(
+                r"^RECOMMENDED_DYNAMIC_EXPANSION_WAVES=(.+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(dynamic_waves_match)
+            dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
+            self.assertIn("WAVE-2=manager_reviewer", dynamic_waves)
+            self.assertNotIn("explorer", dynamic_waves)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -1013,11 +1060,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["expansion_triggers"],
             )
             self.assertIn(
-                "schedule.md Agent Wave Ledger row with owner, trigger, budget before/after, and gate",
+                "schedule.md Agent Wave Ledger row with spawn_authority, budget, runtime ceilings, paths, validation_route, review_gate, handoff_artifacts, and delegated policy ref",
                 delegated_spawn_policy["required_before_spawn"],
             )
             first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
-            self.assertGreater(len(first_wave), 3)
+            self.assertEqual(
+                first_wave,
+                ["requirements_organizer", "explorer", "execution_planner"],
+            )
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assertIn("requirements_organizer", first_wave)
             self.assert_current_checkout_write_policy(write_scope_policy, 2)
@@ -2121,6 +2171,249 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("report_artifact_placement_clean", result.stdout)
+
+    def test_task_close_rejects_other_agent_run_reports(self) -> None:
+        """Only the current run bundle may carry untracked agent reports."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            old_run = workspace_root / "reports" / "agents" / "old-run"
+            old_run.mkdir(parents=True, exist_ok=True)
+            (old_run / "workflow_monitoring.md").write_text("# old run\n", encoding="utf-8")
+            run_id = "test-task-close-current-run-only"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
+            self.assertIn("reports/agents/old-run/workflow_monitoring.md", result.stdout)
+
+    def test_task_close_rejects_ignored_reports_outside_run_bundle(self) -> None:
+        """Ignored generated report roots are still closeout blockers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / ".gitignore").write_text(
+                "reports/dependency-review/\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", ".gitignore"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed ignored report root",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            ignored_report = (
+                workspace_root
+                / "reports"
+                / "dependency-review"
+                / "ignored-run"
+                / "workflow_monitoring.md"
+            )
+            ignored_report.parent.mkdir(parents=True, exist_ok=True)
+            ignored_report.write_text("# ignored report\n", encoding="utf-8")
+            run_id = "test-task-close-ignored-report"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
+            self.assertIn("reports/dependency-review/ignored-run/workflow_monitoring.md", result.stdout)
+
+    def test_task_close_allows_tracked_durable_reports(self) -> None:
+        """Tracked durable reports are repository canon, not run-bundle leakage."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            durable_report = workspace_root / "reports" / "project" / "report.md"
+            durable_report.parent.mkdir(parents=True, exist_ok=True)
+            durable_report.write_text("# Durable Report\n", encoding="utf-8")
+            subprocess.run(["git", "add", "reports/project/report.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed durable report",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_id = "test-task-close-tracked-report"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_rejects_missing_actual_wave_event(self) -> None:
+        """The lifecycle status must reconcile schedule rows with observed wave events."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_id = "test-task-close-missing-wave-event"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            (report_dir / "workflow_monitoring.md").write_text(
+                "\n".join(
+                    [
+                        "# Workflow Monitoring",
+                        "",
+                        "## Actual Wave Events",
+                        "",
+                        "## Tool Warnings",
+                        "",
+                        "- tool_warnings_status: none",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
+            self.assertIn("workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout)
+            self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:
         """task_close should fail when only a chunk is complete."""

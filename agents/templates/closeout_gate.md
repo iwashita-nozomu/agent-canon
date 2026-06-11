@@ -165,10 +165,10 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Report Artifact Placement Evidence
 
-<!-- Before closeout, run task_close.py or `git ls-files --others --exclude-standard -- reports` and confirm generated report files are either under `reports/agents/<run-id>/`, a documented ignored generated root, or a tracked durable canon path. Untracked report files outside the run-bundle root are blockers because they are not collected by runtime_log_archive_git.py sync. -->
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify generated report placement. Tracked durable reports are allowed. Untracked or ignored generated report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles or generated report roots outside the current run are blockers because runtime_log_archive_git.py sync/archive closes the current run bundle, not orphan outputs. -->
 
 - report_artifact_placement_status:
-- report_artifact_untracked_outside_run_bundle:
+- report_artifact_outside_current_run_bundle:
 - report_artifact_recovery_evidence:
 
 ## Agent Evaluation Evidence

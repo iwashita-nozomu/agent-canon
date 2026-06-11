@@ -22,6 +22,9 @@ from report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    report_artifact_placement_blockers,
+    token_fields,
+    wave_reconciliation_blockers,
 )
 
 
@@ -109,17 +112,6 @@ def markdown_section_text(path: Path, heading: str) -> str:
         if in_section:
             selected.append(line)
     return "\n".join(selected)
-
-
-def token_fields(line: str) -> dict[str, str]:
-    """Parse whitespace-separated key=value fields from one evidence line."""
-    data: dict[str, str] = {}
-    for token in line.split():
-        if "=" not in token:
-            continue
-        key, value = token.split("=", 1)
-        data[key.strip()] = value.strip("`'\"")
-    return data
 
 
 def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str, ...]:
@@ -222,24 +214,6 @@ def current_diff_ref(workspace: Path) -> str:
     return f"{head}-dirty-{diff_hash}"
 
 
-def untracked_report_artifacts(workspace: Path) -> list[str]:
-    """Return untracked report artifacts that are outside the run-bundle root."""
-    result = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", "reports"],
-        cwd=workspace,
-        check=False,
-        capture_output=True,
-    )
-    if result.returncode != 0 or not result.stdout:
-        return []
-    paths = [
-        raw_path.decode("utf-8", errors="surrogateescape")
-        for raw_path in result.stdout.split(b"\0")
-        if raw_path
-    ]
-    return sorted(path for path in paths if not path.startswith("reports/agents/"))
-
-
 def active_run_name(report_dir: Path) -> str | None:
     """Return the active run marker for a report root, or None when absent."""
     active_run_path = report_dir.parent / ".active_run"
@@ -321,14 +295,25 @@ def main() -> int:
         workflow_monitoring_path
     )
     request_contract = parse_markdown_status(request_contract_path)
-    schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
+    schedule_text = schedule_path.read_text(encoding="utf-8")
+    workflow_monitoring_text = (
+        workflow_monitoring_path.read_text(encoding="utf-8")
+        if workflow_monitoring_path.is_file()
+        else ""
+    )
+    schedule_blockers = check_schedule_artifact(schedule_text)
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
     final_review_blockers = (
         check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
         if final_review_path.is_file()
         else ["final_review.md:missing"]
     )
-    report_artifact_blockers = untracked_report_artifacts(workspace)
+    report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
+    wave_reconciliation = wave_reconciliation_blockers(
+        schedule_text,
+        workflow_monitoring_text,
+        subagent_lifecycle,
+    )
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -435,6 +420,7 @@ def main() -> int:
             "planned_vs_actual_wave_status"
         )
         in {"reconciled", "not_applicable"},
+        "subagent_wave_reconciliation_clean": not wave_reconciliation,
         "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
         in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
@@ -628,6 +614,10 @@ def main() -> int:
     print(
         "SUBAGENT_CLOSEOUT_STATUS="
         f"{subagent_lifecycle.get('subagent_closeout_status', '')}"
+    )
+    print(
+        "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS="
+        f"{join_blockers(wave_reconciliation)}"
     )
     print(
         "SUBAGENT_OPEN_INSTANCES="

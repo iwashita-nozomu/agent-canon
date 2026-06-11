@@ -528,6 +528,12 @@ fn python_test_blocks(text: &str) -> Vec<TestBlock> {
         let trimmed = line.trim_start();
         let indent = line.len() - trimmed.len();
         if let Some(open_block) = current.take() {
+            if !python_test_header_complete(&open_block.lines) {
+                let mut next_block = open_block;
+                next_block.lines.push((line_no, line.to_string()));
+                current = Some(next_block);
+                continue;
+            }
             if !trimmed.is_empty() && indent <= open_block.def_indent && is_python_test_def(trimmed)
             {
                 blocks.push(open_block.close());
@@ -564,6 +570,10 @@ fn python_test_blocks(text: &str) -> Vec<TestBlock> {
     }
 
     blocks
+}
+
+fn python_test_header_complete(lines: &[(usize, String)]) -> bool {
+    lines.iter().any(|(_, line)| line.trim_end().ends_with(':'))
 }
 
 fn is_python_test_def(trimmed: &str) -> bool {
@@ -818,6 +828,21 @@ mod tests {
         assert!(findings
             .iter()
             .any(|finding| { finding.check == "missing-oracle" && finding.line == Some(1) }));
+    }
+
+    #[test]
+    fn accepts_multiline_python_test_function_header_with_unittest_assertion() {
+        let file = ScannedFile {
+            path: PathBuf::from("/repo/tests/test_multiline.py"),
+            text: "def test_runs(\n    self,\n) -> None:\n    self.assertEqual(result, 0)\n"
+                .to_string(),
+        };
+
+        let findings = analyze_test_file(Path::new("/repo"), &file);
+
+        assert!(!findings
+            .iter()
+            .any(|finding| finding.check == "missing-oracle"));
     }
 
     #[test]
