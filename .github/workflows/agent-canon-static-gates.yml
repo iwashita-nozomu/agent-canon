@@ -36,6 +36,7 @@ permissions:
 
 env:
   AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+  AGENT_CANON_HOOK_ARCHIVE_DIR: ${{ runner.temp }}/agent-canon-log-archive
 
 concurrency:
   group: agent-canon-static-gates-${{ github.ref }}
@@ -64,6 +65,9 @@ jobs:
 
       - name: Install static gate dependencies
         run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Prepare runtime log archive
+        run: mkdir -p "${AGENT_CANON_HOOK_ARCHIVE_DIR}"
 
       - name: Install Rust gate components
         run: rustup component add rustfmt clippy
