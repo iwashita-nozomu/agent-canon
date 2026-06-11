@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -108,6 +109,9 @@ def ready_closeout_evidence_lines(
         "- fresh_subagents_required: yes",
         "- reuse_for_new_task: forbidden",
         "- previous_task_subagent_reuse: none",
+        "- agent_wave_ledger_status: complete",
+        "- planned_vs_actual_wave_status: reconciled",
+        "- dynamic_spawn_policy_status: applied",
         "- subagent_closeout_status: closed",
         "- open_subagent_instances: none",
         "- close_agent_evidence: parent_direct_no_open_subagents",
@@ -156,6 +160,22 @@ def write_ready_schedule(report_dir: Path) -> None:
                 "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
                 "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
                 "| W1 | T1-C1 | codex | tests | final | done |",
+                "## Agent Wave Ledger",
+                (
+                    "| Wave ID | Parent Or Delegate | Trigger | Budget Before | Budget After | "
+                    "Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | "
+                    "Write Scope | Review Gate | Status |"
+                ),
+                (
+                    "| ------- | ------------------ | ------- | ------------- | ------------ | "
+                    "------------- | ------------------------- | ------------- | ----------- | "
+                    "----------- | ----------- | ------ |"
+                ),
+                (
+                    "| WAVE-1 | parent | initial_intake | 0/12 | 3/12 | "
+                    "requirements_organizer,explorer,execution_planner | none | reports/agents/run | "
+                    "unrelated | read-only | schedule_review | done |"
+                ),
                 "",
             ]
         ),
@@ -666,6 +686,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
@@ -673,6 +694,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=12", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=4", result.stdout)
+            self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
+            self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
+            self.assertIn(
+                "DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger",
+                result.stdout,
+            )
+            first_wave_match = re.search(
+                r"^RECOMMENDED_INITIAL_SUBAGENT_WAVE=(.+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(first_wave_match)
+            first_wave = cast(re.Match[str], first_wave_match).group(1).split(",")
+            self.assertGreater(len(first_wave), 3)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -697,10 +732,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
+            spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             self.assertEqual(spawn_budget["active_subagents"], 12)
             self.assertEqual(spawn_budget["max_write_subagents"], 4)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(spawn_budget["runtime_max_depth"], 2)
+            self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
+            self.assertEqual(
+                manifest["run"]["delegated_spawn_policy"]["dynamic_mid_task_spawn"],
+                "allowed",
+            )
+            self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
+            self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assert_current_checkout_write_policy(write_scope_policy, 4)
             self.assert_abstract_design_prompt_contracts(manifest)
 
@@ -739,6 +783,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
@@ -896,6 +941,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
+            self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
+            self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
+            self.assertIn(
+                "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events",
+                result.stdout,
+            )
+            self.assertIn("RECOMMENDED_INITIAL_SUBAGENT_WAVE=", result.stdout)
+            self.assertIn("RECOMMENDED_DYNAMIC_EXPANSION_WAVES=", result.stdout)
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
             self.assertIn("PLANNED_ACTIVE_ROLE_COUNT=", result.stdout)
             self.assertIn(
@@ -920,6 +973,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
+            delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
+            spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             handoff_context_policy = manifest["run"]["handoff_context_policy"]
             implementation_gate_defaults = manifest["run"]["implementation_gate_defaults"]
@@ -931,16 +986,48 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 spawn_budget["max_write_subagents"],
             )
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(spawn_budget["runtime_max_depth"], 2)
+            self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
             self.assertLessEqual(
                 spawn_budget["active_subagents"],
                 spawn_budget["runtime_max_threads"],
             )
+            planned_match = re.search(
+                r"^PLANNED_ACTIVE_ROLE_COUNT=(\d+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(planned_match)
+            self.assertEqual(
+                int(cast(re.Match[str], planned_match).group(1)),
+                len(manifest["roles"]),
+            )
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
+            self.assertEqual(delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed")
+            self.assertEqual(
+                delegated_spawn_policy["delegated_child_spawn"],
+                "allowed_with_bounded_packet",
+            )
+            self.assertIn(
+                "validation_failure_requires_parallel_triage",
+                delegated_spawn_policy["expansion_triggers"],
+            )
+            self.assertIn(
+                "schedule.md Agent Wave Ledger row with owner, trigger, budget before/after, and gate",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
+            self.assertGreater(len(first_wave), 3)
+            self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
+            self.assertIn("requirements_organizer", first_wave)
             self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assertIn("spawn_budget:", manifest_text)
             self.assertIn("active_subagents: 10", manifest_text)
             self.assertIn("max_write_subagents: 2", manifest_text)
             self.assertIn("runtime_max_threads: 24", manifest_text)
+            self.assertIn("runtime_max_depth: 2", manifest_text)
+            self.assertIn("spawn_wave_recommendation:", manifest_text)
+            self.assertIn("delegated_spawn_policy:", manifest_text)
             self.assertIn("max_write_subagents_scope: 'write-capable subagents only'", manifest_text)
             self.assertIn("write_scope_policy:", manifest_text)
             self.assertIn("parent_managed: true", manifest_text)

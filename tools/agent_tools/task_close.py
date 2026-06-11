@@ -410,6 +410,14 @@ def main() -> int:
             "previous_task_subagent_reuse"
         )
         == "none",
+        "agent_wave_ledger_status": subagent_lifecycle.get("agent_wave_ledger_status")
+        in {"complete", "not_applicable"},
+        "planned_vs_actual_wave_status": subagent_lifecycle.get(
+            "planned_vs_actual_wave_status"
+        )
+        in {"reconciled", "not_applicable"},
+        "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
+        in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
         == "closed",
         "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")

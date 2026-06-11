@@ -21,14 +21,19 @@ from agent_team import (
     TeamConfig,
     auto_language_specialists,
     codex_agent_model_matrix_for_roles,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     enable_choices,
     expand_enabled_specialists,
+    format_subagent_wave,
+    format_subagent_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
+    recommended_dynamic_expansion_waves,
+    recommended_initial_subagent_wave,
     resolve_cross_cutting_document_packet,
     resolve_report_root,
     resolve_role_document_packet,
@@ -307,6 +312,7 @@ def emit_bootstrap_output(
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
+    print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(
         "START_DECLARATION="
@@ -320,6 +326,19 @@ def emit_bootstrap_output(
         print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
+        print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
+        print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
+        print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
+        print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
+        active_budget = context.workflow_active_spawn_budget or 0
+        initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
+        expansion_waves = recommended_dynamic_expansion_waves(
+            runtime.roles,
+            active_budget,
+            initial_wave,
+        )
+        print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
+        print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
         print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")

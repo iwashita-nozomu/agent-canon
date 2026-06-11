@@ -69,7 +69,10 @@ def table_body_rows(text: str, heading: str) -> list[str]:
         cells = [cell.strip() for cell in stripped.strip("|").split("|")]
         if not cells or all(not cell or set(cell) <= {"-"} for cell in cells):
             continue
-        if any(cell in {"Clause ID", "Source Bucket", "Stage", "Unit ID"} for cell in cells):
+        if any(
+            cell in {"Clause ID", "Source Bucket", "Stage", "Unit ID", "Wave ID", "Time"}
+            for cell in cells
+        ):
             continue
         rows.append(stripped)
     return rows
@@ -98,6 +101,7 @@ def check_schedule_artifact(text: str) -> list[str]:
         ("## Stage Plan", "stage_plan_empty"),
         ("## Clause Coverage", "clause_coverage_empty"),
         ("## Planned Work Units", "planned_work_units_empty"),
+        ("## Agent Wave Ledger", "agent_wave_ledger_empty"),
     )
     for heading, slug in required_tables:
         if not table_body_rows(text, heading):

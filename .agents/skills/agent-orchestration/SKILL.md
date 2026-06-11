@@ -29,7 +29,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - workflow active budget and family default first-wave target: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
    - stage wave plan: owner-owned bounded waves within the active budget; parent may delegate a stage owner to spawn child subagents when the handoff packet fixes owner, input packet, expected output, write scope, validation route, and review gate
    - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
-   - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap; if a multi-agent family starts with fewer than the family default target, record the rate-limit, blocked-role, irrelevant-role, or parent-direct reason in `schedule.md` / `workflow_monitoring.md`
+   - Initial Intake Wave is the first responsibilities wave, not the total concurrent-subagent cap; if a multi-agent family starts with fewer than the family default target, record the rate-limit, blocked-role, irrelevant-role, or parent-direct reason in `schedule.md` / `workflow_monitoring.md`
    - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first

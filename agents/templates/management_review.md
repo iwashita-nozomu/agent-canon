@@ -33,7 +33,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Routing Review
 
-<!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. -->
+<!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. Return revise if the fanout ledger does not prove that Initial Intake Wave is treated as a first wave rather than a total cap, or if a dynamic expansion wave lacks budget and scope evidence. -->
 
 ## Context And Library Sweep Review
 

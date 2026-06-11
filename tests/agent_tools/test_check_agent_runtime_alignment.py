@@ -19,6 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from agent_team import (  # noqa: E402
     TaskCatalog,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
@@ -104,6 +105,33 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             "active_subagents exceeds runtime max_threads",
         ):
             workflow_spawn_budget(catalog, "bad-runtime-budget")
+
+    def test_workflow_spawn_budget_allows_active_equal_runtime_threads(self) -> None:
+        """Workflow active budget may equal the runtime max_threads boundary."""
+        runtime_max_threads = codex_runtime_max_threads()
+        catalog = TaskCatalog(
+            raw={},
+            workflow_families=(
+                {
+                    "id": "boundary-budget",
+                    "spawn_budget": {
+                        "active_subagents": runtime_max_threads,
+                        "max_write_subagents": 1,
+                    },
+                },
+            ),
+            tasks=(),
+            review_packs=(),
+        )
+
+        self.assertEqual(
+            workflow_spawn_budget(catalog, "boundary-budget"),
+            (runtime_max_threads, 1),
+        )
+
+    def test_runtime_max_depth_is_exposed_for_spawn_policy(self) -> None:
+        """The generator must expose max_depth for delegated spawn policies."""
+        self.assertEqual(codex_runtime_max_depth(), 2)
 
     def test_template_workspace_can_use_agent_canon_shared_docs(self) -> None:
         """Derived workspaces need not expose shared AgentCanon docs at root."""

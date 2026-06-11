@@ -61,7 +61,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Three-Agent Intake は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の3責務を固定し、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と bounded handoff packet を渡します
+- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します

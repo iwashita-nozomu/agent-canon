@@ -91,9 +91,23 @@ Subagent の context budget は correctness gate です。parent は handoff pro
 
 role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary だけを渡します。Python API / typing review は `python_reviewer` に分け、数学 canon の full context は渡しません。
 
-## Initial Three-Agent Intake
+## Wave Plan Contract
 
-Initial Three-Agent Intake は repo-changing task の初期責務を3つに分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` を handoff prompt に含めます。
+Every subagent wave must be recorded with the same compact contract across
+`team_manifest.yaml`, `schedule.md`, `workflow_monitoring.md`, and
+`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`,
+`spawn_budget.active_subagents`, `spawn_budget.max_write_subagents`,
+`runtime_max_threads`, `runtime_max_depth`, `allowed_paths`, `do_not_read`,
+`write_scope`, `validation_route`, `review_gate`, and `handoff_artifacts`.
+Mid-task expansion uses the same contract; it is not an exception path.
+`task_start.py` and `bootstrap_agent_run.py` emit
+`RECOMMENDED_INITIAL_SUBAGENT_WAVE` and `RECOMMENDED_DYNAMIC_EXPANSION_WAVES`;
+these values are executable Codex `agent_type` lists for the parent to pass to
+the runtime spawn tool.
+
+## Initial Intake Wave
+
+Initial Intake Wave は repo-changing task の初期責務を要件、調査、実行計画に分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの初期 wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer

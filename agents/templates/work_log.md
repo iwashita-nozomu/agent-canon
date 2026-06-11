@@ -19,3 +19,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 ## Entries
 
 <!-- Append one line per meaningful step with time, kind, request clause IDs, refs, and next action. -->
+
+## Wave Event Log
+
+<!-- Append one row for each subagent wave event. Use the same Wave ID as schedule.md, and record budget deltas, spawned/skipped roles, evidence refs, and next action. -->
+
+| Time | Wave ID | Event Kind | Stage | Trigger | Budget Before | Budget After | Spawned Roles | Skipped Roles / Rationale | Refs | Next Action |
+| ---- | ------- | ---------- | ----- | ------- | ------------- | ------------ | ------------- | ------------------------- | ---- | ----------- |
