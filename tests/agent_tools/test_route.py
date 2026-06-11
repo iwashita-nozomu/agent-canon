@@ -132,6 +132,44 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-log-analysis", decision["skills"])
         self.assertIn("agent-log-analysis", decision["matched_skills"])
 
+    def test_prompt_routes_root_design_followup_to_task_routing(self) -> None:
+        """Broad follow-up redesign prompts should not fall through to matched=none."""
+        result = self.run_route(
+            "--prompt",
+            "根本の設計から見直してください",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertNotIn("comprehensive-development", decision["matched_skills"])
+        self.assertNotIn("change-review", decision["matched_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
+        """Routing-context redesign prompts should activate the broader review stack."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "スキルとツールのルーティングを根本の設計から見直し、"
+                "全体レビューして修正し、構造解析も行う"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("comprehensive-development", decision["matched_skills"])
+        self.assertIn("structure-planning", decision["matched_skills"])
+        self.assertIn("change-review", decision["matched_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_does_not_route_standalone_toolcall_work_to_log_analysis(self) -> None:
         """Standalone ToolCall implementation text should not imply log analysis."""
         result = self.run_route(
