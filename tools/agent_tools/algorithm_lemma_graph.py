@@ -11,12 +11,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 STATIC_EDGE_STATUSES = frozenset(
     {
@@ -135,6 +135,36 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def algorithm_fingerprint(ir_payload: dict[str, object]) -> str:
+    """Return a stable fingerprint for algorithm-derived lemma groups.
+
+    The fingerprint deliberately follows the Algorithm Expansion IR, not a
+    hand-edited proof overlay. If the algorithm expansion changes, generated
+    lemma groups derived from the old IR must be regenerated or treated as
+    stale.
+    """
+    fingerprint_payload = {
+        "root_path": ir_payload.get("root_path", ""),
+        "root_symbol": ir_payload.get("root_symbol", ""),
+        "target_theorem": ir_payload.get("target_theorem", ""),
+        "nodes": ir_payload.get("nodes", []),
+        "edges": ir_payload.get("edges", []),
+        "code_facts": ir_payload.get("code_facts", []),
+        "static_checks": ir_payload.get("static_checks", []),
+        "backend_assumptions": ir_payload.get("backend_assumptions", []),
+        "obligations": ir_payload.get("obligations", []),
+        "goal_directed_slice": ir_payload.get("goal_directed_slice", []),
+        "selected_local_obligations": ir_payload.get("selected_local_obligations", []),
+    }
+    encoded = json.dumps(
+        fingerprint_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def slug(value: str) -> str:
     """Return a stable identifier fragment."""
     normalized = re.sub(r"[^0-9A-Za-z_]+", "_", value.strip())
@@ -142,7 +172,7 @@ def slug(value: str) -> str:
     return normalized or "unnamed"
 
 
-def read_ir_payload(path: str | None) -> dict[str, Any]:
+def read_ir_payload(path: str | None) -> dict[str, object]:
     """Read Algorithm Expansion IR JSON from a file or stdin."""
     if path is None or path == "-":
         raw = sys.stdin.read()
@@ -170,7 +200,7 @@ def proof_status_for_grain(grain: str) -> str:
     return "unverified"
 
 
-def node_profiles(node: dict[str, Any], obligation: dict[str, Any]) -> tuple[str, ...]:
+def node_profiles(node: dict[str, object], obligation: dict[str, object]) -> tuple[str, ...]:
     """Infer theorem target profiles for one lemma node."""
     profiles: set[str] = {"all"}
     math_role = str(node.get("math_role", ""))
@@ -241,7 +271,7 @@ def make_target_node(profile: str, theorem: str) -> LemmaNode:
     )
 
 
-def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_obligation_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, object], ...]:
     """Build raw lemma-node dictionaries from IR obligations."""
     ir_nodes = {
         str(node.get("node_id")): node
@@ -255,7 +285,7 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
         source_node_id = str(fact.get("source_node_id") or "")
         if source_node_id:
             code_facts_by_node.setdefault(source_node_id, []).append(str(fact.get("fact_id", "")))
-    raw_nodes: list[dict[str, Any]] = []
+    raw_nodes: list[dict[str, object]] = []
     for obligation in ir_payload.get("obligations", []):
         if not isinstance(obligation, dict):
             continue
@@ -292,9 +322,9 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
     return tuple(raw_nodes)
 
 
-def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_backend_assumption_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, object], ...]:
     """Build raw lemma-node dictionaries from IR backend assumption overlays."""
-    raw_nodes: list[dict[str, Any]] = []
+    raw_nodes: list[dict[str, object]] = []
     for assumption in ir_payload.get("backend_assumptions", []):
         if not isinstance(assumption, dict):
             continue
@@ -327,9 +357,9 @@ def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str
     return tuple(raw_nodes)
 
 
-def build_backend_profile_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_backend_profile_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, object], ...]:
     """Build lemma nodes for concrete backend profile records from lean/."""
-    raw_nodes: list[dict[str, Any]] = []
+    raw_nodes: list[dict[str, object]] = []
     for assumption in ir_payload.get("backend_assumptions", []):
         if not isinstance(assumption, dict):
             continue
@@ -380,9 +410,9 @@ def build_backend_profile_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, A
     return tuple(raw_nodes)
 
 
-def build_code_fact_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+def build_code_fact_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, object], ...]:
     """Build lemma graph nodes for code-derived expression/default facts."""
-    raw_nodes: list[dict[str, Any]] = []
+    raw_nodes: list[dict[str, object]] = []
     for fact in ir_payload.get("code_facts", []):
         if not isinstance(fact, dict):
             continue
@@ -473,7 +503,7 @@ def dedupe_edges(edges: list[LemmaEdge]) -> tuple[LemmaEdge, ...]:
 
 
 def build_dependency_edges(
-    ir_payload: dict[str, Any],
+    ir_payload: dict[str, object],
     lemma_by_ir_node: dict[str, str],
 ) -> tuple[LemmaEdge, ...]:
     """Build lemma dependency edges from IR implementation edges."""
@@ -511,7 +541,7 @@ def build_dependency_edges(
 
 
 def build_backend_assumption_edges(
-    backend_nodes: tuple[dict[str, Any], ...],
+    backend_nodes: tuple[dict[str, object], ...],
     lemma_by_ir_node: dict[str, str],
 ) -> tuple[LemmaEdge, ...]:
     """Connect precision lemmas to the backend assumptions they consume."""
@@ -540,8 +570,8 @@ def build_backend_assumption_edges(
 
 
 def build_backend_profile_edges(
-    backend_nodes: tuple[dict[str, Any], ...],
-    profile_nodes: tuple[dict[str, Any], ...],
+    backend_nodes: tuple[dict[str, object], ...],
+    profile_nodes: tuple[dict[str, object], ...],
 ) -> tuple[LemmaEdge, ...]:
     """Connect backend assumptions to concrete profile records."""
     assumption_by_id = {
@@ -569,7 +599,7 @@ def build_backend_profile_edges(
 
 
 def build_code_fact_edges(
-    code_fact_nodes: tuple[dict[str, Any], ...],
+    code_fact_nodes: tuple[dict[str, object], ...],
     lemma_by_ir_node: dict[str, str],
 ) -> tuple[LemmaEdge, ...]:
     """Connect implementation lemmas to code-derived expression facts."""
@@ -737,7 +767,7 @@ def validate_graph(
     )
 
 
-def build_lemma_graph(ir_payload: dict[str, Any], profiles: tuple[str, ...]) -> LemmaGraphReport:
+def build_lemma_graph(ir_payload: dict[str, object], profiles: tuple[str, ...]) -> LemmaGraphReport:
     """Build the lemma dependency graph."""
     theorem = str(ir_payload.get("target_theorem", "target theorem"))
     root = f"{ir_payload.get('root_path', '')}::{ir_payload.get('root_symbol', '')}"

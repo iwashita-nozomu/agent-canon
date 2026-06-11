@@ -17,7 +17,6 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 
 @dataclass(frozen=True)
@@ -240,7 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def as_tuple(value: object) -> tuple[Any, ...]:
+def as_tuple(value: object) -> tuple[object, ...]:
     """Return list-like JSON values as tuples."""
     if isinstance(value, list | tuple):
         return tuple(value)

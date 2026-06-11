@@ -22,6 +22,9 @@ from report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    report_artifact_placement_blockers,
+    token_fields,
+    wave_reconciliation_blockers,
 )
 
 
@@ -109,17 +112,6 @@ def markdown_section_text(path: Path, heading: str) -> str:
         if in_section:
             selected.append(line)
     return "\n".join(selected)
-
-
-def token_fields(line: str) -> dict[str, str]:
-    """Parse whitespace-separated key=value fields from one evidence line."""
-    data: dict[str, str] = {}
-    for token in line.split():
-        if "=" not in token:
-            continue
-        key, value = token.split("=", 1)
-        data[key.strip()] = value.strip("`'\"")
-    return data
 
 
 def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str, ...]:
@@ -303,12 +295,24 @@ def main() -> int:
         workflow_monitoring_path
     )
     request_contract = parse_markdown_status(request_contract_path)
-    schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
+    schedule_text = schedule_path.read_text(encoding="utf-8")
+    workflow_monitoring_text = (
+        workflow_monitoring_path.read_text(encoding="utf-8")
+        if workflow_monitoring_path.is_file()
+        else ""
+    )
+    schedule_blockers = check_schedule_artifact(schedule_text)
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
     final_review_blockers = (
         check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
         if final_review_path.is_file()
         else ["final_review.md:missing"]
+    )
+    report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
+    wave_reconciliation = wave_reconciliation_blockers(
+        schedule_text,
+        workflow_monitoring_text,
+        subagent_lifecycle,
     )
 
     checks = {
@@ -410,6 +414,15 @@ def main() -> int:
             "previous_task_subagent_reuse"
         )
         == "none",
+        "agent_wave_ledger_status": subagent_lifecycle.get("agent_wave_ledger_status")
+        in {"complete", "not_applicable"},
+        "planned_vs_actual_wave_status": subagent_lifecycle.get(
+            "planned_vs_actual_wave_status"
+        )
+        in {"reconciled", "not_applicable"},
+        "subagent_wave_reconciliation_clean": not wave_reconciliation,
+        "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
+        in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
         == "closed",
         "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")
@@ -489,6 +502,7 @@ def main() -> int:
         "work_log_complete": not work_log_blockers,
         "final_review_artifact_complete": not final_review_blockers,
         "report_active_run_match": active_run_matches(active_run, report_dir),
+        "report_artifact_placement_clean": not report_artifact_blockers,
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -602,6 +616,10 @@ def main() -> int:
         f"{subagent_lifecycle.get('subagent_closeout_status', '')}"
     )
     print(
+        "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS="
+        f"{join_blockers(wave_reconciliation)}"
+    )
+    print(
         "SUBAGENT_OPEN_INSTANCES="
         f"{subagent_lifecycle.get('open_subagent_instances', '')}"
     )
@@ -662,6 +680,11 @@ def main() -> int:
     print(f"FINAL_REVIEW_ARTIFACT_BLOCKERS={join_blockers(final_review_blockers)}")
     print(f"REPORT_ACTIVE_RUN={active_run or ''}")
     print(f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}")
+    print(
+        "REPORT_ARTIFACT_PLACEMENT_CLEAN="
+        f"{'yes' if not report_artifact_blockers else 'no'}"
+    )
+    print(f"REPORT_ARTIFACT_PLACEMENT_BLOCKERS={join_blockers(report_artifact_blockers)}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

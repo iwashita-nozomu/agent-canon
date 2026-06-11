@@ -263,7 +263,7 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
     if not path.is_file():
         return [f"{check.path}:missing"]
     text = path.read_text(encoding="utf-8")
-    if check.require_filled and ("<!--" in text or is_placeholder_only_section(text)):
+    if check.require_filled and is_placeholder_only_section(text):
         blockers.append(f"{check.path}:template_or_placeholder_remaining")
     for section in check.required_sections:
         if not section_has_content(text, section):

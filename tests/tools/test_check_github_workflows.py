@@ -284,7 +284,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                     "workflow=<family>",
                     "skills=$agent-orchestration",
                     "review=<...>",
-                    "route.py --prompt",
+                    "agent-canon local-llm route-skill",
                     "PR Mutation Authority",
                     "Authority / blocker notes",
                     "GitHub Automation Output",

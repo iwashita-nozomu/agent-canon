@@ -26,16 +26,17 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
    - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`
    - runtime nesting ceiling: `.codex/config.toml` `[agents].max_depth`, currently `2` for one bounded child-subagent layer
-   - workflow active budget and family default first-wave target: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
+   - workflow active budget ceiling: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
    - stage wave plan: owner-owned bounded waves within the active budget; parent may delegate a stage owner to spawn child subagents when the handoff packet fixes owner, input packet, expected output, write scope, validation route, and review gate
    - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
-   - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap; if a multi-agent family starts with fewer than the family default target, record the rate-limit, blocked-role, irrelevant-role, or parent-direct reason in `schedule.md` / `workflow_monitoring.md`
+   - Initial Intake Wave is the first responsibilities wave, not a target that fills the family budget; later roles are dynamic expansion waves triggered by evidence and stage gates
    - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
-   - put `$agent-orchestration` first
-   - preserve every user-provided `$skill-name`
-   - for `repo-changing execution`, add `$codex-task-workflow`
-   - add `$subagent-bootstrap` only when the task is Shared canon, Large delivery, high-risk, multi-step, or explicitly uses subagents
+   - when prompt-derived routing is needed, run `agent-canon local-llm route-skill --prompt "<user request>" --format json`; use `ACTIVE_SKILLS` for the current stage and carry `DEFERRED_SKILLS` as dynamic wave triggers instead of listing every possible skill up front
+   - use `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` only as the Python compatibility mirror
+   - put `$agent-orchestration` first and preserve every user-provided `$skill-name`
+   - add `$codex-task-workflow` when repo-changing execution starts, not as advisory-only boilerplate
+   - add `$subagent-bootstrap` only when an explicit handoff/wave is ready or the task shape requires subagent bootstrap evidence
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
      - nontrivial or substantive document creation/addition/revision where section order, reader path, claim support, source map, canonical route, or document responsibility changes -> `$prose-reasoning-graph` as the common structure-first graph/DSL gate; for typo/link/format-only edits, use `$md-style-check` and record why structure analysis was skipped
@@ -71,7 +72,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - `review=<...>` plus the minimal specialist / reviewer stack that matches that family
    - the starter command when the scenario asks for kickoff guidance
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`
-1. For PR-producing repository tasks, carry that first routing declaration into the PR body, run bundle, or linked comment with `skills=$agent-orchestration` first and the result of `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` when prompt-derived routing is relevant.
+1. For PR-producing repository tasks, carry that first routing declaration into the PR body, run bundle, or linked comment with `skills=$agent-orchestration` first and the result of `agent-canon local-llm route-skill --prompt "<user request>" --format json` when prompt-derived routing is relevant.
 1. Mention Codex implementation routing only when implementation is in scope. Read `agents/canonical/CODEX_SUBAGENTS.md` before assigning agents.
 1. For Routine docs or Focused code, parent-direct implementation is allowed after the risk class and check matrix are fixed. If the user requested subagent coding delegation, parent-direct is a alternate route only after the write-capable subagent route is blocked and recorded. For subagent implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved slices derived from the Abstract Design Frame and design trace that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
 1. Do not use `explorer` or broad read-only review to re-check properties that a tool has already checked. Subagents receive compact tool artifacts and bounded finding paths; if the tool output is missing an abstraction needed for routing, extend or repair the tool contract instead of compensating with bulk prose reading.

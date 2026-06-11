@@ -11,19 +11,19 @@ from __future__ import annotations
 
 import json
 import tempfile
+import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
-import tomllib
-
 from agent_team import (
     ROOT,
     Role,
     RunBundleSpec,
     TaskCatalog,
     TeamConfig,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
@@ -51,9 +51,9 @@ EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 INITIAL_INTAKE_MARKERS = {
-    "requirements_organizer": "Initial three-agent intake role: own user-request clauses",
-    "explorer": "Initial three-agent intake role: own evidence, reuse, and stale-surface inventory",
-    "execution_planner": "Initial three-agent intake role: own stage order and artifact routing",
+    "requirements_organizer": "Initial intake wave role: own user-request clauses",
+    "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
+    "execution_planner": "Initial intake wave role: own stage order",
 }
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
@@ -448,7 +448,9 @@ def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
-        ensure("Initial Three-Agent Intake" in text, f"{path} missing initial intake contract")
+        ensure("Initial Intake Wave" in text, f"{path} missing initial intake contract")
+        ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
+        ensure("Agent Wave Ledger" in text, f"{path} missing Agent Wave Ledger contract")
         for role_id in INITIAL_INTAKE_MARKERS:
             ensure(role_id in text, f"{path} missing initial intake role {role_id}")
         ensure(
@@ -625,6 +627,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         str(task["family"]),
     )
     expected_runtime_max_threads = codex_runtime_max_threads()
+    expected_runtime_max_depth = codex_runtime_max_depth()
     ensure(
         spawn_budget.get("active_subagents") == expected_active,
         f"task {task_id} manifest run.spawn_budget.active_subagents mismatch",
@@ -638,12 +641,103 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest run.spawn_budget.runtime_max_threads mismatch",
     )
     ensure(
+        spawn_budget.get("runtime_max_depth") == expected_runtime_max_depth,
+        f"task {task_id} manifest run.spawn_budget.runtime_max_depth mismatch",
+    )
+    ensure(
+        spawn_budget.get("initial_three_agent_intake_is_total_cap") is False,
+        f"task {task_id} manifest must state initial intake is not a total cap",
+    )
+    ensure(
         "workflow_families[].spawn_budget" in str(spawn_budget.get("source", "")),
         f"task {task_id} manifest run.spawn_budget source missing catalog reference",
     )
     ensure(
         spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
         f"task {task_id} manifest run.spawn_budget max_write scope unclear",
+    )
+    delegated_spawn_policy = run.get("delegated_spawn_policy")
+    ensure(
+        isinstance(delegated_spawn_policy, dict),
+        f"task {task_id} manifest missing run.delegated_spawn_policy",
+    )
+    ensure(
+        delegated_spawn_policy.get("dynamic_mid_task_spawn") == "allowed",
+        f"task {task_id} manifest must allow dynamic mid-task spawn",
+    )
+    ensure(
+        delegated_spawn_policy.get("delegated_child_spawn") == "allowed_with_bounded_packet",
+        f"task {task_id} manifest delegated child spawn policy mismatch",
+    )
+    required_fields = delegated_spawn_policy.get("handoff_required_fields")
+    expected_handoff_fields = {
+        "owner",
+        "child_role",
+        "input_packet",
+        "expected_output",
+        "write_scope",
+        "validation_route",
+        "review_gate",
+        "remaining_spawn_budget",
+    }
+    ensure(
+        isinstance(required_fields, list)
+        and expected_handoff_fields.issubset({str(item) for item in required_fields}),
+        f"task {task_id} manifest delegated spawn handoff fields incomplete",
+    )
+    spawn_wave_recommendation = run.get("spawn_wave_recommendation")
+    ensure(
+        isinstance(spawn_wave_recommendation, dict),
+        f"task {task_id} manifest missing run.spawn_wave_recommendation",
+    )
+    initial_wave = spawn_wave_recommendation.get("initial_wave_agent_types")
+    dynamic_expansion_waves = spawn_wave_recommendation.get("dynamic_expansion_waves")
+    manifest_roles = manifest.get("roles")
+    total_agent_candidates: list[str] = []
+    if isinstance(manifest_roles, list):
+        for role in manifest_roles:
+            if not isinstance(role, dict):
+                continue
+            codex_agents = role.get("codex_agents")
+            if not isinstance(codex_agents, list):
+                continue
+            for agent_type in codex_agents:
+                if isinstance(agent_type, str) and agent_type not in total_agent_candidates:
+                    total_agent_candidates.append(agent_type)
+    ensure(
+        isinstance(initial_wave, list) and len(initial_wave) >= 1,
+        f"task {task_id} manifest must recommend at least one initial agent type",
+    )
+    if expected_active > 4 and len(total_agent_candidates) > 3:
+        dynamic_agent_candidates: list[str] = []
+        if isinstance(dynamic_expansion_waves, list):
+            for wave in dynamic_expansion_waves:
+                if not isinstance(wave, dict):
+                    continue
+                agent_types = wave.get("agent_types")
+                if not isinstance(agent_types, list):
+                    continue
+                for agent_type in agent_types:
+                    if (
+                        isinstance(agent_type, str)
+                        and agent_type not in dynamic_agent_candidates
+                    ):
+                        dynamic_agent_candidates.append(agent_type)
+        ensure(
+            initial_wave == ["requirements_organizer", "explorer", "execution_planner"],
+            f"task {task_id} manifest must use the stage-ready Initial Intake Wave",
+        )
+        ensure(
+            len(dynamic_agent_candidates) >= 1,
+            f"task {task_id} manifest must expose dynamic expansion waves",
+        )
+        ensure(
+            len(set(initial_wave + dynamic_agent_candidates)) > 3,
+            f"task {task_id} manifest must not collapse multi-agent work to initial intake",
+        )
+    ensure(
+        len(initial_wave) <= expected_active,
+        f"task {task_id} manifest initial wave exceeds active spawn budget",
     )
     write_scope_policy = run.get("write_scope_policy")
     ensure(
@@ -675,6 +769,24 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "fresh_subagents_required: true" in manifest_text
         and "reuse_for_new_task: forbidden" in manifest_text,
         f"task {task_id} manifest missing fresh subagent lifecycle policy",
+    )
+    lifecycle_policy = run.get("subagent_lifecycle_policy")
+    ensure(
+        isinstance(lifecycle_policy, dict),
+        f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
+    )
+    ensure(
+        lifecycle_policy.get("mid_task_user_input_policy")
+        == "parent_checkpoint_then_route_delta",
+        f"task {task_id} manifest missing mid-task user input checkpoint policy",
+    )
+    ensure(
+        lifecycle_policy.get("same_task_delta_reuse") == "allowed_with_updated_packet",
+        f"task {task_id} manifest missing same-task delta reuse policy",
+    )
+    ensure(
+        lifecycle_policy.get("scope_change_reuse") == "forbidden_spawn_fresh_wave",
+        f"task {task_id} manifest missing scope-change fresh wave policy",
     )
     ensure(
         "prompt_contract:" in manifest_text,

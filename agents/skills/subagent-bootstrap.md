@@ -108,5 +108,6 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。
 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起こします。
+active task の途中追加指示は別扱いです。parent は追加指示を `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類し、same-task delta なら run bundle、Agent Wave Ledger、workflow monitoring に checkpoint と updated packet path を残してから run-local active subagent へ再配送できます。scope、allowed paths、owner、review gate が変わるなら既存 agent へ継ぎ足さず fresh follow-up wave を起こします。
 subagent handoff prompt には `team_manifest.yaml` の `run.subagent_lifecycle_policy` を含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` に close evidence を残します。

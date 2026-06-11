@@ -219,6 +219,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User stated document additions/revisions should also perform structure analysis.
 
+- 2026-06-11 | interaction-observation | 途中追加の user 指示は新規 task と同じ扱いにせず、same active task delta と scope change を parent checkpoint で分類してから subagent wave へ再配送する。
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User observed that multi-agent work tends to break when additional instructions arrive mid-task.
+
 ## Task Retrospectives
 
 
