@@ -3,7 +3,6 @@
 # responsibility Emits a reproducible KKT solver-chain equation section from Algorithm IR facts.
 # upstream implementation algorithm_expansion_ir.py emits Algorithm Expansion IR JSON.
 # upstream implementation algorithm_lemma_graph.py consumes the same IR facts for proof graphs.
-# downstream design ../../notes/themes/pdipm_convergence_proof.md consumes generated equation sections.
 # downstream design ../../documents/tools/kkt_equation_section.md documents generated equation adoption guardrails.
 # downstream implementation ../../tests/agent_tools/test_kkt_equation_section.py tests the generator.
 # @dependency-end

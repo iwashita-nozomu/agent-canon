@@ -7,6 +7,7 @@ upstream design ../documents/semantic_index.md semantic-index tool design and ge
 upstream design ../documents/search-coordination.md coordinated search and bounded context-pack policy.
 upstream design ../documents/dependency-manifest-design.md dependency header and dependency graph policy.
 downstream design ../documents/tools/README.md documents operator-facing tool entrypoints.
+downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.
 downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the semantic vector cache.
 downstream implementation ../rust/agent-canon/src/local_llm.rs routes local LLM and llama.cpp tools.
