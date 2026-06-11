@@ -3,6 +3,7 @@
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
 # downstream design ../../documents/tools/route.md reader-facing route tool documentation
@@ -37,6 +38,32 @@ AREA_DATA: tuple[AreaData, ...] = (
         "classify_runtime_surface",
         ("python3 tools/agent_tools/route.py --area surface",),
         ("profile_surface_resolver.py", "runtime-surface-minimize", "tool_profile_visibility.py"),
+    ),
+    (
+        "structure",
+        "repository structure",
+        "Classify repo-root, shared-canon, project runtime view, and personal runtime surfaces before refactors.",
+        "classify_structure_refactor_surface",
+        (
+            "python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json",
+            "python3 tools/agent_tools/responsibility_scope.py --root <root> --format json",
+            "python3 tools/agent_tools/import_responsibility.py --root <root> --format json",
+        ),
+        (
+            "structure-refactor",
+            "repo-refactor",
+            "repo_refactor_skill",
+            "refactor",
+            "repository-refactor",
+            "repo-structure",
+            "repository-structure",
+            "responsibility-scope",
+            "personal-runtime-surface",
+            "codex-personal-runtime",
+            "codex-config-surface",
+            "dot-codex-surface",
+            "~/.codex",
+        ),
     ),
     (
         "profile",
@@ -302,13 +329,23 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
     ),
     (
         "structure-refactor",
-        "directory layout, source ownership, or path responsibility is in scope",
+        "repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope",
         (
+            ("レポ", "リファクタ"),
+            ("repo", "refactor"),
+            ("repository", "refactor"),
+            ("repo", "structure"),
+            ("repository", "structure"),
             ("ディレクトリ", "構成"),
             ("directory", "structure"),
             ("path", "layout"),
-            ("repo", "structure"),
+            ("path", "responsibility"),
+            ("source", "ownership"),
             ("構成", "考え直"),
+            ("~/.codex",),
+            (".codex", "config"),
+            ("codex", "personal", "runtime"),
+            ("personal", "runtime", "surface"),
         ),
     ),
     (

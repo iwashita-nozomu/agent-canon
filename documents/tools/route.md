@@ -3,6 +3,7 @@
 responsibility Documents route tool usage.
 upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 upstream design ../tool-skill-routing-refactor.md defines short naming policy
+upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
 downstream implementation ../../tests/agent_tools/test_route.py validates route behavior
 @dependency-end
 -->
@@ -17,6 +18,7 @@ small command surface:
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed README.md
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
+python3 tools/agent_tools/route.py --name repo_refactor_skill.py
 tools/bin/agent-canon local-llm route-skill --prompt "fix skill routing with multi-agent evidence" --format json
 python3 tools/agent_tools/route.py --list --format markdown
 ```
@@ -37,6 +39,12 @@ Prompt skill routing is owned by the Rust
 `SKILLS` list plus `ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS`
 for dynamic wave triggers. The Python `route.py --prompt ...` path remains a
 compatibility mirror for older call sites.
+
+Repository-refactor aliases such as `repo_refactor_skill.py`,
+`repo/refactor`, and personal Codex runtime boundary prompts involving
+`~/.codex` route to the `structure` area and `$structure-refactor`. Do not add a
+parallel public repo-refactor skill unless `route.py --name <candidate>` returns
+`STATUS=unknown` after the structure route has been considered.
 
 Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are
 log-analysis tasks. `agent-canon local-llm route-skill ... --format json`

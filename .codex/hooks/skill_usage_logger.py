@@ -3,6 +3,7 @@
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
 # upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.
+# upstream design ../../agents/skills/codex-task-workflow.md Codex task workflow routing boundary.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook logging.
 # @dependency-end
@@ -207,19 +208,15 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("コード", "直して"),
         ("implementation", "fix"),
         ("patch", "repo"),
-        ("修正",),
-        ("修正して",),
-        ("直して",),
         ("small fix",),
         ("patch",),
-        ("実装して",),
+        ("実装して", "repo"),
+        ("修正して", "repo"),
+        ("直して", "repo"),
         ("public behavior",),
         ("narrow behavior",),
         ("regression case",),
         ("小規模",),
-        ("チェック",),
-        ("報告",),
-        ("更新",),
     ),
     "change-review": (
         ("change-review",),
@@ -405,9 +402,6 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "runtime_log_archive_git.py",
         "oop-readability-check",
         "mechanical verdict",
-        "実装して",
-        "修正して",
-        "直して",
         "デバッグ",
     ),
     "comprehensive-development": ("comprehensive development", "repo-wide", "包括的", "500", "tooling rearchitecture"),

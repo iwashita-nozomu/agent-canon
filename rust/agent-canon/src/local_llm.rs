@@ -3,6 +3,7 @@
 // upstream design ../../../documents/local-llm-responsibility-analysis.md local LLM responsibility boundary
 // upstream design ../../../documents/search-coordination.md coordinated search provider contract
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
+// upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 // upstream design ../../../agent-canon-environment.toml records local LLM CLI environment commands
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
 // downstream design ../../../tools/README.md documents root tool entrypoints
@@ -1034,13 +1035,23 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
         ),
         (
             "structure-refactor",
-            "directory layout, source ownership, or path responsibility is in scope",
+            "repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope",
             vec![
+                vec!["レポ", "リファクタ"],
+                vec!["repo", "refactor"],
+                vec!["repository", "refactor"],
+                vec!["repo", "structure"],
+                vec!["repository", "structure"],
                 vec!["ディレクトリ", "構成"],
                 vec!["directory", "structure"],
                 vec!["path", "layout"],
-                vec!["repo", "structure"],
+                vec!["path", "responsibility"],
+                vec!["source", "ownership"],
                 vec!["構成", "考え直"],
+                vec!["~/.codex"],
+                vec![".codex", "config"],
+                vec!["codex", "personal", "runtime"],
+                vec!["personal", "runtime", "surface"],
             ],
         ),
         (
@@ -1472,6 +1483,37 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
                 ("責務", 2),
                 ("responsibility-scope", 5),
                 ("root view", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "personal_codex_runtime",
+            "User-level Codex configuration, skills, rules, and hook trust state",
+            &[
+                "$HOME/.codex/config.toml",
+                "$HOME/.codex/skills/",
+                "$HOME/.codex/rules/",
+                "project .codex symlink targets for comparison only",
+            ],
+            &[
+                "repo-local mirror of personal Codex state",
+                "auth, history, sessions, logs, or caches unless explicitly required",
+                "shared AgentCanon policy for a user-only runtime setting",
+            ],
+            &[
+                "inspect non-secret ~/.codex config keys and skill IDs",
+                "readlink -f .codex/config.toml .agents/skills",
+                "agent-canon local-llm route-skill --prompt <request> --format json",
+            ],
+            &[
+                ("~/.codex", 9),
+                ("$home/.codex", 9),
+                ("home/.codex", 9),
+                ("personal codex", 6),
+                ("personal runtime", 6),
+                ("user codex", 5),
+                ("user-level codex", 5),
+                ("個人", 4),
             ],
         ),
         surface_candidate(
@@ -2955,6 +2997,19 @@ mod tests {
     }
 
     #[test]
+    fn skill_route_matches_repo_refactor_and_personal_codex_boundary() {
+        let prompt = "レポのリファクタスキルを定義して ~/.codex も見て修正して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
     fn skill_route_json_schema_includes_wave_fields() {
         let decision = decide_skill_route(
             "md-style-check と agent-learning の routing gap を直して",
@@ -2985,6 +3040,23 @@ mod tests {
         let prompt = prompt_for_implementation_surface_route(request, &candidates);
         assert!(prompt.contains("implementation-surface router"));
         assert!(prompt.contains("Return JSON only"));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_personal_codex_runtime() {
+        let request =
+            "~/.codex の config と user skill が repo routing と衝突していないか見て修正する";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "personal_codex_runtime");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("$HOME/.codex/config.toml")));
+        assert!(candidates[0]
+            .forbidden_paths
+            .iter()
+            .any(|path| path.contains("auth")));
     }
 
     #[test]

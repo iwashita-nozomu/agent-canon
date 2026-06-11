@@ -32,6 +32,10 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
    run in parallel, assign each target object to an owner/wave, and record
    `blocked_by`, allowed files, validation, and whether the slice is single-agent
    or parallel-safe.
+   `$structure-refactor` owns structure surface classification, root/scope
+   contract, path mapping, and runtime boundary; this skill owns repair batch
+   sizing, `blocked_by`, sequential / parallel wave choice, and write-capable
+   subagent orchestration.
 1. Choose repair scope granularity from tool-generated `scope_candidates`, not
    from a fixed file/function rule. Optimize for the fewest coherent writer
    waves and tool reruns while preserving behavior contract clarity, write-scope

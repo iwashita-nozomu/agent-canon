@@ -167,6 +167,33 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("change-review", decision["matched_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
+    def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(self) -> None:
+        """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
+        result = self.run_route(
+            "--prompt",
+            "レポのリファクタスキルを定義して ~/.codex も見て修正して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_repo_refactor_name_alias_routes_to_structure_area(self) -> None:
+        """Proposed repo/refactor helper names should not create a new public skill."""
+        result = self.run_route("--name", "repo_refactor_skill.py")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CANONICAL_AREA=structure", result.stdout)
+        self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
+
+        slash_result = self.run_route("--name", "repo/refactor")
+        self.assertEqual(slash_result.returncode, 0, slash_result.stdout + slash_result.stderr)
+        self.assertIn("CANONICAL_AREA=structure", slash_result.stdout)
+
     def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
         """Routing-context redesign prompts should activate the broader review stack."""
         result = self.run_route(
