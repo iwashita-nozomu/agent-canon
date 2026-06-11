@@ -21,10 +21,11 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
@@ -39,11 +40,14 @@ from runtime_log_paths import (  # noqa: E402
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
 HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
+HOOK_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
+CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
 FINGERPRINT_HEX_LENGTH = 12
 RUN_ID_DIGEST_LENGTH = 10
 RUN_ID_NONCE_LENGTH = 10
 NAMESPACE_HASH_LENGTH = 8
 MAX_NAMESPACE_LENGTH = 80
+GIT_HEAD_TIMEOUT_SECONDS = 5
 
 
 def safe_slug(value: str) -> str:
@@ -54,7 +58,7 @@ def safe_slug(value: str) -> str:
 
 def utc_now() -> str:
     """Return one UTC timestamp for hook log entries."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def compact_timestamp(timestamp: str) -> str:
@@ -78,6 +82,30 @@ def short_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:NAMESPACE_HASH_LENGTH]
 
 
+def codex_trace_key() -> str:
+    """Return the current Codex chat/session trace key when available."""
+    for env_name in CODEX_TRACE_ENV_NAMES:
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def source_git_head(source_root: Path) -> str:
+    """Return the source repository HEAD SHA when it is available."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_HEAD_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 @dataclass(frozen=True)
 class HookLogContext:
     """Resolve one hook's Canon-owned append-only log destination."""
@@ -86,13 +114,20 @@ class HookLogContext:
     hook_name: str
     override_path: str = ""
 
+    def source_root(self) -> Path:
+        """Return the repository whose hook evidence should be keyed."""
+        override = os.environ.get(HOOK_SOURCE_ROOT_ENV, "").strip()
+        if override:
+            return Path(override).resolve()
+        return self.active_root.resolve()
+
     def canon_root(self) -> Path:
         """Return the AgentCanon checkout that owns durable hook evidence."""
-        return agent_canon_root(self.active_root)
+        return agent_canon_root(self.source_root())
 
     def durable_results_dir(self) -> Path:
         """Return the durable hook-result archive directory."""
-        return hook_results_dir(self.active_root, self.canon_root())
+        return hook_results_dir(self.source_root(), self.canon_root())
 
     def results_dir(self) -> Path:
         """Return the hook-result directory."""
@@ -128,7 +163,7 @@ class HookLogContext:
 
     def compose_project_name(self) -> str:
         """Return the generated devcontainer Compose project name when available."""
-        compose = self.active_root.resolve() / ".devcontainer" / "docker-compose.generated.yml"
+        compose = self.source_root() / ".devcontainer" / "docker-compose.generated.yml"
         if not compose.is_file():
             return ""
         try:
@@ -156,7 +191,15 @@ class HookLogContext:
         """Append one JSONL entry."""
         path = self.result_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        entry.setdefault("source_repo_key", repo_log_key(self.active_root))
+        source_root = self.source_root()
+        entry.setdefault("source_repo_key", repo_log_key(source_root))
+        trace_key = codex_trace_key()
+        if trace_key:
+            entry.setdefault("codex_trace_key", trace_key)
+            entry.setdefault("codex_thread_id", trace_key)
+        git_head = source_git_head(source_root)
+        if git_head:
+            entry.setdefault("source_git_head", git_head)
         with path.open("a", encoding="utf-8") as stream:
             json.dump(entry, stream, sort_keys=True, default=str)
             stream.write("\n")

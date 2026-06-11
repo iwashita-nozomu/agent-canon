@@ -179,7 +179,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Runtime Log Archive Evidence
 
-<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+<!-- Archive the active run with `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`, then `python3 tools/agent_tools/runtime_log_archive_git.py push`, and run `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Use broad `sync` only when intentionally collecting accumulated runtime families. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths or committed foreign repo-key trees. Record whether archive/push committed or was a no-op, and include the archive branch and repo key. -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:
@@ -190,6 +190,9 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - runtime_log_archive_branch_match:
 - runtime_log_archive_dirty:
 - runtime_log_archive_foreign_dirty:
+- runtime_log_archive_foreign_dirty_keys:
+- runtime_log_archive_foreign_tree:
+- runtime_log_archive_foreign_tree_keys:
 - runtime_log_archive_commit:
 - runtime_log_archive_push:
 

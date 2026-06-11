@@ -55,6 +55,11 @@ In short: work in `reports/agents/<run-id>/`; retain across runs in
 status` prints the resolved `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`,
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR` values for the current source repo.
+The isolation key is `<repo-key>`; Codex chat/session identifiers and Git HEAD
+SHAs are trace metadata, not archive branch selectors. Hook JSONL and immutable
+run-bundle manifests record `codex_trace_key` when `CODEX_THREAD_ID`,
+`CODEX_SESSION_ID`, or `CODEX_CONVERSATION_ID` is available, and record
+`source_git_head` when the source repository has a readable HEAD.
 
 Normal hook writers use:
 
@@ -107,6 +112,11 @@ and `thread_id` so chat-local raw evidence and cross-chat analysis stay
 traceable without storing prompt text.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
 devcontainer/Compose metadata, or the existing host/repo alternate route.
+When AgentCanon runs as `vendor/agent-canon` inside a template or derived repo,
+hook workflow-monitor evidence resolves the parent repo
+`reports/agents/.active_run` before any submodule-local pointer. That prevents
+submodule hook calls from writing active-task evidence into stale AgentCanon
+source report bundles.
 
 The initial import from the former in-tree log surface is preserved under:
 
@@ -176,6 +186,10 @@ can append log lines while the sync command itself is running. It skips
 `.active_run`, cache files, Python cache directories, and oversized single
 files. The source repo's ignored `reports/agents/` directory remains run-local
 working evidence; the log archive is the durable accumulated store.
+For current task closeout, prefer the immutable snapshot path:
+`archive-agent-report --report-dir reports/agents/<run-id>` followed by `push`.
+Use broad `sync` when intentionally collecting accumulated runtime families,
+not as a substitute for archiving the active run bundle.
 
 Before task closeout, run:
 
@@ -185,11 +199,14 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 
 `check-clean` must report `RUNTIME_LOG_ARCHIVE_CLEAN=yes`,
 `RUNTIME_LOG_ARCHIVE_BRANCH_MATCH=yes`, `RUNTIME_LOG_ARCHIVE_DIRTY=no`, and
-`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`. `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes`
-means logs for a different `<repo-key>` were written while the archive worktree
-was on the current source repository's `logs/<repo-key>` branch. Treat that as
-a log repository operation blocker, not as optional cleanup: sync or migrate
-the listed foreign key before unlocking the run bundle.
+`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`. It must also report
+`RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no`; that line catches already committed
+foreign repo-key directories, not only uncommitted dirt. A foreign dirty or
+foreign tree finding means logs for a different `<repo-key>` were written while
+the archive worktree was on the current source repository's `logs/<repo-key>`
+branch. Treat that as a log repository operation blocker, not as optional
+cleanup: migrate the listed foreign key to its own `logs/<repo-key>` branch
+before unlocking the run bundle.
 
 To print the resolved placement without writing anything, run:
 

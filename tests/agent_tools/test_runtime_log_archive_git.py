@@ -247,6 +247,60 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
 
+    def test_check_clean_rejects_committed_foreign_repo_key_tree(self) -> None:
+        """check-clean should fail when a clean branch already contains another repo key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            other_key = repo_log_key(other_source)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
+            foreign_log.parent.mkdir(parents=True)
+            foreign_log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-committed-foreign",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": other_key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "-C", str(archive), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(archive), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(archive), "add", "hook-runs"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "-C", str(archive), "commit", "-m", "Commit foreign tree"],
+                check=True,
+                capture_output=True,
+            )
+
+            clean_check = self.run_tool(
+                "check-clean",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(clean_check.returncode, 0, clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", clean_check.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={other_key}", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=yes", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
+
     def test_status_reports_archive_level_dirty_paths(self) -> None:
         """Status should separate archive-level tool or policy dirt from repo-key logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -505,6 +559,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             archive = mounted_log_archive_root(canon) / "agent-reports" / key / "run-1" / snapshot
             self.assertTrue((archive / "verification.txt").exists())
             self.assertTrue((archive / "archive_manifest.json").exists())
+            manifest = json.loads((archive / "archive_manifest.json").read_text(encoding="utf-8"))
+            self.assertIn("codex_trace_key", manifest)
+            self.assertIn("source_git_head", manifest)
             index_path = mounted_log_archive_root(canon) / "agent-reports" / key / "index.jsonl"
             first_index = index_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(first_index), 1)
