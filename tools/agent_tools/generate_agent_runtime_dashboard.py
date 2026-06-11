@@ -1909,6 +1909,8 @@ def evidence_location_lines(root: Path) -> list[str]:
         f"- evidence_root: `{root.as_posix()}`",
         "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
+        "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
+        "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",

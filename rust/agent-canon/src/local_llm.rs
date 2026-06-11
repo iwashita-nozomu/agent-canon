@@ -693,14 +693,19 @@ fn run_route_implementation_surface(args: &LocalLlmArgs) -> i32 {
 
     let executable = find_llama_cli(&parsed.llama_cli);
     if executable.is_empty() {
-        print_implementation_surface_route_error(
-            &parsed,
-            &request,
-            &digest,
-            "local_llm_required_unavailable",
-            "LocalLLM command is required for implementation-surface routing, but llama-cli was not found.",
-        );
-        return 1;
+        let decision = SurfaceRouteDecision {
+            request,
+            prompt_digest: digest,
+            model: parsed.model,
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
+        };
+        match parsed.format {
+            RouteOutputFormat::Json => print_implementation_surface_route_json(&decision),
+            RouteOutputFormat::Text => print_implementation_surface_route_text(&decision),
+        }
+        return 0;
     }
     let command = LlamaCommand {
         executable,
@@ -2342,6 +2347,33 @@ mod tests {
         assert!(!payload["candidates"]
             .as_array()
             .expect("candidates")
+            .is_empty());
+    }
+
+    #[test]
+    fn implementation_surface_route_fallback_is_structured_without_llm() {
+        let request = "Agents are writing implementation into the wrong directory.";
+        let candidates = implementation_surface_candidates(request);
+        let decision = SurfaceRouteDecision {
+            request: request.to_string(),
+            prompt_digest: "fallback123".to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
+        };
+
+        let payload = implementation_surface_route_payload(&decision);
+
+        assert_eq!(payload["status"], "deterministic_candidate_fallback");
+        assert!(payload["primary_paths"]
+            .as_array()
+            .expect("primary paths")
+            .iter()
+            .any(|path| path.as_str().expect("path").contains("responsibility")));
+        assert!(!payload["forbidden_paths"]
+            .as_array()
+            .expect("forbidden paths")
             .is_empty());
     }
 

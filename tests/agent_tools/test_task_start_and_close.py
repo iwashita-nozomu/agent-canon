@@ -896,12 +896,34 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
+            self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
+            self.assertIn("PLANNED_ACTIVE_ROLE_COUNT=", result.stdout)
+            self.assertIn(
+                "SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default",
+                result.stdout,
+            )
+            self.assertIn("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending", result.stdout)
+            self.assertIn("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation", result.stdout)
+            self.assertIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout)
+            self.assertIn("AGENT_REPORT_COLLECTION_STATUS=available", result.stdout)
+            self.assertIn(
+                "AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status",
+                result.stdout,
+            )
+            self.assertIn(
+                "AGENT_REPORT_ARCHIVE_RUN_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py "
+                "archive-agent-report --report-dir",
+                result.stdout,
+            )
             manifest_text = (
                 report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
+            handoff_context_policy = manifest["run"]["handoff_context_policy"]
+            implementation_gate_defaults = manifest["run"]["implementation_gate_defaults"]
+            agent_report_collection = manifest["run"]["agent_report_collection"]
             self.assertEqual(spawn_budget["active_subagents"], 10)
             self.assertEqual(spawn_budget["max_write_subagents"], 2)
             self.assertGreater(
@@ -928,6 +950,71 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("fresh_subagents_required: true", manifest_text)
             self.assertIn("reuse_for_new_task: forbidden", manifest_text)
             self.assertIn("previous_task_subagent_reuse: forbidden", manifest_text)
+            self.assertTrue(handoff_context_policy["compact_artifacts_first"])
+            self.assertTrue(handoff_context_policy["require_allowed_paths"])
+            self.assertTrue(handoff_context_policy["require_do_not_read"])
+            self.assertEqual(
+                implementation_gate_defaults["tool_reuse_ledger_status"],
+                "required_before_custom_implementation",
+            )
+            self.assertEqual(
+                implementation_gate_defaults["pre_edit_rejection_prediction_status"],
+                "pending",
+            )
+            self.assertEqual(
+                agent_report_collection["status_command"],
+                "python3 tools/agent_tools/runtime_log_archive_git.py status",
+            )
+            self.assertIn(
+                "archive-agent-report --report-dir",
+                agent_report_collection["archive_current_run_command"],
+            )
+            self.assertEqual(
+                agent_report_collection["archive_index"],
+                ".agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl",
+            )
+
+    def test_bootstrap_warns_when_multi_agent_task_lacks_task_id(self) -> None:
+        """A repo-wide bootstrap without --task-id should not silently lose fan-out evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "review agent routing with multiple agents and implementation repair",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-bootstrap-missing-task-id",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("START_DECLARATION=workflow=Unspecified", result.stdout)
+            self.assertIn("TASK_ID_ROUTE_STATUS=missing", result.stdout)
+            self.assertIn("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes", result.stdout)
+            self.assertIn("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12", result.stdout)
+            self.assertIn(
+                "SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family",
+                result.stdout,
+            )
+            manifest_text = (
+                report_root / "test-bootstrap-missing-task-id" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn("subagent_lifecycle_policy", manifest_text)
 

@@ -59,6 +59,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
 - active な subagent 数は spawn budget で縛ります
+- spawn budget は上限であると同時に workflow family の既定 first-wave target です。multi-agent family で family default より少ない wave から始める場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
@@ -85,6 +86,8 @@ Subagent の context budget は correctness gate です。parent は handoff pro
 - `canon_refs`: 必要な AgentCanon / project canon の節だけ。文書 tree 全体を辿らせません。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
+- `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic fallback output を渡し、path を chat 印象で選びません。
+- `tool_reuse_ledger` と `pre_edit_rejection_prediction`: write-capable `spark_worker` / `worker` には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
 
 role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary だけを渡します。Python API / typing review は `python_reviewer` に分け、数学 canon の full context は渡しません。
 

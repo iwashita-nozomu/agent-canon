@@ -20,16 +20,16 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. First classify the request into one of these modes:
    - `repo-changing execution`: the user is asking to edit the repo, start the run, or produce a concrete kickoff command now
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
-1. For repo-changing execution where the implementation owner is not already fixed by an explicit path and source packet, run `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` before selecting edit paths. Use `PRIMARY_SURFACE`, `PRIMARY_PATHS`, `FORBIDDEN_PATHS`, and `REQUIRED_PRE_EDIT_CHECKS` as the source packet seed. If the command returns `IMPLEMENTATION_SURFACE_ROUTER=error`, repair the LocalLLM environment before selecting implementation paths.
+1. For repo-changing execution where the implementation owner is not already fixed by an explicit path and source packet, run `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` before selecting edit paths. Use `PRIMARY_SURFACE`, `PRIMARY_PATHS`, `FORBIDDEN_PATHS`, and `REQUIRED_PRE_EDIT_CHECKS` as the source packet seed, and pass `PRIMARY_PATHS` into write-capable `allowed_paths` plus `FORBIDDEN_PATHS` into `do_not_read`. If LocalLLM is unavailable, use the deterministic fallback output or record a router-unavailable blocker; do not select implementation paths from chat impression.
 1. Before reading broad prose, scanning raw logs, or spawning a subagent, check whether a canonical tool already owns the needed judgment. If yes, call the tool first, trust its compact pass/finding output for the covered property, and read only the exact file slice needed to repair a finding.
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
    - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`
    - runtime nesting ceiling: `.codex/config.toml` `[agents].max_depth`, currently `2` for one bounded child-subagent layer
-   - workflow active budget: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
+   - workflow active budget and family default first-wave target: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
    - stage wave plan: owner-owned bounded waves within the active budget; parent may delegate a stage owner to spawn child subagents when the handoff packet fixes owner, input packet, expected output, write scope, validation route, and review gate
    - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
-   - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap
+   - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap; if a multi-agent family starts with fewer than the family default target, record the rate-limit, blocked-role, irrelevant-role, or parent-direct reason in `schedule.md` / `workflow_monitoring.md`
    - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
@@ -38,7 +38,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - add `$subagent-bootstrap` only when the task is Shared canon, Large delivery, high-risk, multi-step, or explicitly uses subagents
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
-     - nontrivial document creation or revision where paragraph flow, claim support, or document responsibility matters -> `$prose-reasoning-graph` as the common structure-first graph/DSL gate
+     - nontrivial or substantive document creation/addition/revision where section order, reader path, claim support, source map, canonical route, or document responsibility changes -> `$prose-reasoning-graph` as the common structure-first graph/DSL gate; for typo/link/format-only edits, use `$md-style-check` and record why structure analysis was skipped
      - README, workflow, guide, migration, or other general explanatory reader-facing docs -> `$long-form-writing` as the DSL-to-prose projection adapter; do not select it by length alone
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
@@ -50,6 +50,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - README, workflow, guide, migration, or specification docs keep their domain projection adapter; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
      - large refactor -> `$refactor-loop`
      - directory layout, directory README responsibility, root view, path mapping, responsibility-scope map, or source-tree ownership refactor -> `$structure-refactor` plus `$refactor-loop`
+     - expected AgentCanon repo structure, root view, `vendor/agent-canon/`, `.gitmodules`, or canonical path drift before an ordinary task -> `$structure-refactor` pre-task repair route; add `$agent-canon-update` for AgentCanon-owned root-view or submodule drift
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`

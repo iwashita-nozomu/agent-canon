@@ -875,6 +875,24 @@ def manifest_run_lines(
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
         "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
         "fresh run-local agent for each new task or stage wave.'",
+        "  handoff_context_policy:",
+        "    compact_artifacts_first: true",
+        "    require_allowed_paths: true",
+        "    require_do_not_read: true",
+        "    require_expected_output_schema: true",
+        "    inactive_profile_docs: not_applicable",
+        "    broad_cross_cutting_packet: available_not_default_read",
+        "  implementation_gate_defaults:",
+        "    implementation_surface_route_status: pending",
+        "    implementation_surface_route_command: 'tools/bin/agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text'",
+        "    tool_reuse_ledger_status: required_before_custom_implementation",
+        "    pre_edit_rejection_prediction_status: pending",
+        "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
+        "  agent_report_collection:",
+        "    status_command: 'python3 tools/agent_tools/runtime_log_archive_git.py status'",
+        f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
+        "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
+        "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
     ]
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
@@ -1076,11 +1094,13 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "do not edit repository files"
     )
     return (
-        f"You are the {role.id} role for {family_name}. Read the run-level "
-        "subagent_prompt_packet, cross_cutting_document_packet, and your document_packet before "
-        f"work. {write_scope}. Return findings or outputs tied to request_clause_ids, artifact "
-        "paths, dependency-file headers for every edited or created text file, remaining planned "
-        "work, and the next required gate."
+        f"You are the {role.id} role for {family_name}. Start from compact artifacts and the "
+        "bounded role_document_packet named in the handoff; load cross_cutting_document_packet "
+        "entries only when the selected route or review gate makes them active, otherwise mark "
+        f"them not_applicable. Use allowed_paths and do_not_read as hard context bounds. {write_scope}. "
+        "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
+        "headers for every edited or created text file, remaining planned work, and the next "
+        "required gate."
     )
 
 
@@ -1093,7 +1113,14 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
         "subagent_lifecycle_policy",
         "cross_cutting_document_packet",
         "role_document_packet",
+        "compact_artifacts",
+        "allowed_paths",
+        "do_not_read",
         "expected_output_artifacts",
+        "expected_output_schema",
+        "implementation_surface_route",
+        "tool_reuse_ledger",
+        "pre_edit_rejection_prediction",
         "dependency_files_header_plan",
         "next_review_gate",
     ]

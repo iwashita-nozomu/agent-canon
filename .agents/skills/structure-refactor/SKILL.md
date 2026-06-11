@@ -1,6 +1,6 @@
 ---
 name: structure-refactor
-description: Use when repository directory structure, directory responsibilities, canonical README ownership, path layout, root views, or responsibility-scope maps must be refactored using recursive directory README analysis, dependency manifests, and behavior-preserving move/rename gates.
+description: Use when repository directory structure, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, or responsibility-scope maps must be repaired or refactored using structure contracts, recursive directory README analysis, dependency manifests, and behavior-preserving move/rename gates.
 ---
 <!--
 @dependency-start
@@ -17,8 +17,15 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
 # Structure Refactor
 
 1. Read `agents/skills/structure-refactor.md`.
-1. Use this for directory layout refactors, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, and responsibility-scope map changes.
-1. Always pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup`; add `$subagent-bootstrap` when the user requests multi-agent work or the refactor touches shared canon.
+1. Use this for directory layout refactors, pre-task repair of AgentCanon expected repository-structure drift, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, and responsibility-scope map changes.
+1. Pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup` when the evidence shows a real source-layout refactor, directory README/prose ownership change, or stale document-canon cleanup. For pre-task expected-layout drift, start with the compact structure repair checks below and add those paired skills only after the repair action requires them.
+1. For pre-task structure repair, classify the checkout before reading broad packets or recreating missing paths:
+   - run `python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json`; in template or derived roots where the contract is not a root view, add `--contract vendor/agent-canon/documents/repo-structure-contract.toml`
+   - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json`
+   - run `python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json` when import boundaries are implicated
+   - follow `agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path Triage` before creating or ignoring any missing path
+   - if drift is AgentCanon-owned root views or submodule state, route to `$agent-canon-update`, `make agent-canon-ensure-latest`, and `bash tools/sync_agent_canon.sh link-root` / `check` before ordinary task work
+1. Record the pre-task repair contract with `structure_repair_root`, detected repo profile, drift symptom, expected owner, contract/scope/import artifacts, repair action, and ordinary task status.
 1. Build a recursive directory responsibility graph before editing:
    - collect every directory `README.md`, `AGENTS.md`, and dependency manifest under the proposed root
    - run `agent-canon structured-analysis document-inventory --root <root>`

@@ -172,14 +172,21 @@ LocalLLM advisory は `LOCAL_LLM_ROUTE_ADVISORY_BEGIN` /
 primary surface、forbidden paths、required checks を実装前の source packet
 として使い、同じ判定を広い文書読解や subagent に再実行させません。
 
-LocalLLM 実行環境が壊れている場合は次の error surface を返して非 0 終了します。
+`llama-cli` が見つからない場合は、編集前 routing を止めずに deterministic
+candidate fallback を返します。この出力は LocalLLM advisory ではありませんが、
+`PRIMARY_*` / `FORBIDDEN_PATHS` / `REQUIRED_PRE_EDIT_CHECKS` を source packet
+seed として使えます。
 
 ```text
-IMPLEMENTATION_SURFACE_ROUTER=error
-IMPLEMENTATION_SURFACE_ROUTER_SCHEMA=agent_canon.local_llm.implementation_surface_route.error.v1
-IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE=local_llm_required_unavailable
-IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION=repair LocalLLM environment before running implementation-surface routing
+IMPLEMENTATION_SURFACE_ROUTER=pass
+IMPLEMENTATION_SURFACE_ROUTER_STATUS=deterministic_candidate_fallback
+PRIMARY_SURFACE=...
+FORBIDDEN_PATHS=...
+REQUIRED_PRE_EDIT_CHECKS=...
 ```
+
+prompt 生成、model invocation、または advisory parsing 自体の失敗は error surface
+のままです。
 
 ## Prose IR Contract
 

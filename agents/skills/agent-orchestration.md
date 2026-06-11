@@ -35,10 +35,10 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 ## Decision Order
 
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
-1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、`IMPLEMENTATION_SURFACE_ROUTER=error` が出た場合は implementation path を選ぶ前に LocalLLM 環境を修復する
+1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流す。LocalLLM が無い場合は deterministic fallback output を使うか、router unavailable blocker として記録し、chat 印象で implementation path を選ばない
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の compact output を信頼し、修正に必要な path / line / bounded slice だけを読む
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
-1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget、stage wave は parent が active budget 内で切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Three-Agent Intake は初期責務 wave であり、総同時起動数の cap ではありません
+1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget かつ family 既定 first-wave target、stage wave は parent が active budget 内で切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Three-Agent Intake は初期責務 wave であり、総同時起動数の cap ではありません。family default より少ない wave で始める場合は理由を `schedule.md` / `workflow_monitoring.md` に残します
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. `agents/skills/README.md` から必要最小限の public skill を足す
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
@@ -97,7 +97,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - `$agent-orchestration` は routing skill として常に先頭に置きます
 - `repo-changing execution` では `$codex-task-workflow` を足します
 - `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の時だけ足します
-- 非自明な文書作成・改稿で paragraph flow、claim support、または document responsibility が問題になる場合は、共通の構造先行 gate として `prose-reasoning-graph` を足します
+- 非自明または substantive な文書作成・追記・改稿で section order、reader path、claim support、source map、canonical route、または document responsibility が変わる場合は、共通の構造先行 gate として `prose-reasoning-graph` を足します。typo / link / format-only では `md-style-check` を使い、構造解析を省略した理由を残します
 - file / document responsibility の判定結果から DSL->文章 adapter を選びます。README、workflow、guide、migration、specification などの一般説明 prose では `long-form-writing` を足します。これは長さではなく責務による選択です
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
@@ -111,6 +111,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - research-backed implementation や比較改善では `research-workflow` を使います
 - large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
 - directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
+- task 開始前に expected AgentCanon repo structure、root view、`vendor/agent-canon/`、`.gitmodules`、または canonical path の欠落 / 移動 / stale state が疑われる場合は、通常 task の前に `structure-refactor` の pre-task structure repair route を使います。AgentCanon-owned root view / submodule drift なら `agent-canon-update` も併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します

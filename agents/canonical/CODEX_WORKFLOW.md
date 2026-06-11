@@ -22,11 +22,12 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 ## Start Here
 
 1. `AGENTS.md` を読む
-1. AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。親 repo の無関係な dirty state だけを理由に skip しない
-1. Base Runtime Packet を読む。Routine docs / Focused code では必要最小限の packet に絞ってよい
-1. Cross-Cutting Packet を読む。profile 外の packet は `not_applicable` として扱う
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
+1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の compact output を取る
+1. AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。親 repo の無関係な dirty state だけを理由に skip しない。clean な submodule branch checkout と stale parent gitlink の mismatch は warning/evidence として扱い、dirty / detached / unpushed / divergent source state だけを fail-closed blocker にする
+1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
+1. Cross-Cutting Packet は選択 route、review gate、または compact tool finding が必要にした slice だけ読む。packet 全体を tree traversal の既定入力にしない
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
@@ -63,6 +64,7 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - submodule repo では、親 repo の無関係な dirty state は `make agent-canon-ensure-latest` を block しません。判断対象は AgentCanon update surface です。
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、gate / preflight が parent gitlink を stage または commit して検査を続行します。
+- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後に `make agent-canon-ensure-latest` を再実行することが closeout blocker です。
 - `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で current branch に GitHub main を取り込み、AgentCanon PR に出します。
 - local checkout branch は valid な shared-canon work surface です。local checkout に積まれた commit は消して最新化する対象ではなく、GitHub `main` を merge して conflict を解き、通常の AgentCanon PR として review / merge します。機械 evidence として `merge-main-into-current-preserve-dirty` の `agent_canon_merge_source_sha`、`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、`agent_canon_merge_remote_main_verified=yes` を run bundle、PR body、または work log に残します。
 - update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
@@ -90,8 +92,11 @@ body when evidence is needed.
 ### Context Sweep
 
 実装、設計変更、文書改訂、実験計画の前に、会話だけを根拠に進めません。
-topic keyword search は risk class に合わせます。Large delivery / Shared canon は広く、
-Routine docs / Focused code は関連 directory と dependency header の範囲に絞ります。
+ただし context sweep は packet tree の総読解ではありません。先に task topic、runtime
+profile、implementation surface router、semantic-index / context-pack、dependency review
+の compact output で責務 bucket を絞り、選ばれなかった profile / document bucket は
+`not_applicable` として扱います。Large delivery / Shared canon でも、まず bounded
+responsibility route を残してから必要 slice だけを読む。
 
 - `documents/`
 - `issues/`
@@ -455,8 +460,16 @@ bundle 出力には少なくとも次が含まれます。
 - `DESIGN_DOCUMENT_PACKET`
 - `IMPLEMENTATION_DOCUMENT_PACKET`
 - `WORKFLOW_SUBAGENT_PROMPT_PACKET`
+- `IMPLEMENTATION_SURFACE_ROUTE_STATUS` と route command
+- `TOOL_REUSE_LEDGER_STATUS`
+- `PRE_EDIT_REJECTION_PREDICTION_STATUS`
+- task id / fan-out budget / active role evidence
 
 parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
+handoff には `allowed_paths`、`do_not_read`、compact artifact path、expected output schema、
+`PRIMARY_PATHS` / `FORBIDDEN_PATHS`、reuse ledger、pre-edit rejection prediction を含めます。
+`cross_cutting_document_packet` は利用可能な reference list であり、全 role が最初に読む
+既定 packet ではありません。
 
 研究・実験つき変更:
 
