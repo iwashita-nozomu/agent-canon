@@ -691,6 +691,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest missing run.spawn_wave_recommendation",
     )
     initial_wave = spawn_wave_recommendation.get("initial_wave_agent_types")
+    dynamic_expansion_waves = spawn_wave_recommendation.get("dynamic_expansion_waves")
     manifest_roles = manifest.get("roles")
     total_agent_candidates: list[str] = []
     if isinstance(manifest_roles, list):
@@ -708,9 +709,31 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest must recommend at least one initial agent type",
     )
     if expected_active > 4 and len(total_agent_candidates) > 3:
+        dynamic_agent_candidates: list[str] = []
+        if isinstance(dynamic_expansion_waves, list):
+            for wave in dynamic_expansion_waves:
+                if not isinstance(wave, dict):
+                    continue
+                agent_types = wave.get("agent_types")
+                if not isinstance(agent_types, list):
+                    continue
+                for agent_type in agent_types:
+                    if (
+                        isinstance(agent_type, str)
+                        and agent_type not in dynamic_agent_candidates
+                    ):
+                        dynamic_agent_candidates.append(agent_type)
         ensure(
-            len(initial_wave) > 3,
-            f"task {task_id} manifest must not collapse multi-agent tasks to three agents",
+            initial_wave == ["requirements_organizer", "explorer", "execution_planner"],
+            f"task {task_id} manifest must use the stage-ready Initial Intake Wave",
+        )
+        ensure(
+            len(dynamic_agent_candidates) >= 1,
+            f"task {task_id} manifest must expose dynamic expansion waves",
+        )
+        ensure(
+            len(set(initial_wave + dynamic_agent_candidates)) > 3,
+            f"task {task_id} manifest must not collapse multi-agent work to initial intake",
         )
     ensure(
         len(initial_wave) <= expected_active,
