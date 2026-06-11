@@ -2057,6 +2057,71 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("diff_check_latest_diff_ref", result.stdout)
 
+    def test_task_close_rejects_untracked_reports_outside_run_bundle(self) -> None:
+        """Generated report files outside reports/agents should block closeout."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            stray_report = (
+                workspace_root
+                / "reports"
+                / "dependency-review"
+                / "agent-canon-pr"
+                / "workflow_monitoring.md"
+            )
+            stray_report.parent.mkdir(parents=True, exist_ok=True)
+            stray_report.write_text("# stray report\n", encoding="utf-8")
+            run_id = "test-task-close-stray-report"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
+            self.assertIn(
+                "reports/dependency-review/agent-canon-pr/workflow_monitoring.md",
+                result.stdout,
+            )
+            self.assertIn("report_artifact_placement_clean", result.stdout)
+
     def test_task_close_rejects_chunk_only_completion(self) -> None:
         """task_close should fail when only a chunk is complete."""
         with tempfile.TemporaryDirectory() as tmp_dir:

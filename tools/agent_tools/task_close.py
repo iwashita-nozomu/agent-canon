@@ -222,6 +222,24 @@ def current_diff_ref(workspace: Path) -> str:
     return f"{head}-dirty-{diff_hash}"
 
 
+def untracked_report_artifacts(workspace: Path) -> list[str]:
+    """Return untracked report artifacts that are outside the run-bundle root."""
+    result = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", "reports"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0 or not result.stdout:
+        return []
+    paths = [
+        raw_path.decode("utf-8", errors="surrogateescape")
+        for raw_path in result.stdout.split(b"\0")
+        if raw_path
+    ]
+    return sorted(path for path in paths if not path.startswith("reports/agents/"))
+
+
 def active_run_name(report_dir: Path) -> str | None:
     """Return the active run marker for a report root, or None when absent."""
     active_run_path = report_dir.parent / ".active_run"
@@ -310,6 +328,7 @@ def main() -> int:
         if final_review_path.is_file()
         else ["final_review.md:missing"]
     )
+    report_artifact_blockers = untracked_report_artifacts(workspace)
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -497,6 +516,7 @@ def main() -> int:
         "work_log_complete": not work_log_blockers,
         "final_review_artifact_complete": not final_review_blockers,
         "report_active_run_match": active_run_matches(active_run, report_dir),
+        "report_artifact_placement_clean": not report_artifact_blockers,
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -670,6 +690,11 @@ def main() -> int:
     print(f"FINAL_REVIEW_ARTIFACT_BLOCKERS={join_blockers(final_review_blockers)}")
     print(f"REPORT_ACTIVE_RUN={active_run or ''}")
     print(f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}")
+    print(
+        "REPORT_ARTIFACT_PLACEMENT_CLEAN="
+        f"{'yes' if not report_artifact_blockers else 'no'}"
+    )
+    print(f"REPORT_ARTIFACT_PLACEMENT_BLOCKERS={join_blockers(report_artifact_blockers)}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

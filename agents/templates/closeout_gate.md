@@ -163,6 +163,14 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
 
+## Report Artifact Placement Evidence
+
+<!-- Before closeout, run task_close.py or `git ls-files --others --exclude-standard -- reports` and confirm generated report files are either under `reports/agents/<run-id>/`, a documented ignored generated root, or a tracked durable canon path. Untracked report files outside the run-bundle root are blockers because they are not collected by runtime_log_archive_git.py sync. -->
+
+- report_artifact_placement_status:
+- report_artifact_untracked_outside_run_bundle:
+- report_artifact_recovery_evidence:
+
 ## Agent Evaluation Evidence
 
 <!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
