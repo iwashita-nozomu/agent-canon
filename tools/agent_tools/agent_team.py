@@ -1028,11 +1028,17 @@ def manifest_run_lines(
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
         "    previous_task_subagent_reuse: forbidden",
+        "    mid_task_user_input_policy: parent_checkpoint_then_route_delta",
+        "    same_task_delta_reuse: allowed_with_updated_packet",
+        "    scope_change_reuse: forbidden_spawn_fresh_wave",
+        "    new_task_reuse: forbidden_spawn_fresh_run",
         "    close_before_user_completion: true",
         "    closeout_gate_key: subagents_closed",
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
         "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
-        "fresh run-local agent for each new task or stage wave.'",
+        "fresh run-local agent for each new task. Same-task user deltas require a parent "
+        "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
+        "send_input; scope changes spawn a fresh wave.'",
         "  handoff_context_policy:",
         "    compact_artifacts_first: true",
         "    require_allowed_paths: true",

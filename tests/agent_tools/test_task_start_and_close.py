@@ -1107,6 +1107,23 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("fresh_subagents_required: true", manifest_text)
             self.assertIn("reuse_for_new_task: forbidden", manifest_text)
             self.assertIn("previous_task_subagent_reuse: forbidden", manifest_text)
+            lifecycle_policy = manifest["run"]["subagent_lifecycle_policy"]
+            self.assertEqual(
+                lifecycle_policy["mid_task_user_input_policy"],
+                "parent_checkpoint_then_route_delta",
+            )
+            self.assertEqual(
+                lifecycle_policy["same_task_delta_reuse"],
+                "allowed_with_updated_packet",
+            )
+            self.assertEqual(
+                lifecycle_policy["scope_change_reuse"],
+                "forbidden_spawn_fresh_wave",
+            )
+            self.assertEqual(
+                lifecycle_policy["new_task_reuse"],
+                "forbidden_spawn_fresh_run",
+            )
             self.assertTrue(handoff_context_policy["compact_artifacts_first"])
             self.assertTrue(handoff_context_policy["require_allowed_paths"])
             self.assertTrue(handoff_context_policy["require_do_not_read"])
@@ -1222,6 +1239,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 self.assertIn("workflow_focus:", manifest_text)
                 self.assertIn("reviewer_prompt:", manifest_text)
                 self.assertIn("subagent_lifecycle_policy:", manifest_text)
+                self.assertIn("mid_task_user_input_policy:", manifest_text)
                 self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
                 self.assertIn("prompt_contract:", manifest_text)
                 manifest = yaml.safe_load(manifest_text)

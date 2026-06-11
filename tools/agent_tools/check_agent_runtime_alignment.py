@@ -770,6 +770,24 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         and "reuse_for_new_task: forbidden" in manifest_text,
         f"task {task_id} manifest missing fresh subagent lifecycle policy",
     )
+    lifecycle_policy = run.get("subagent_lifecycle_policy")
+    ensure(
+        isinstance(lifecycle_policy, dict),
+        f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
+    )
+    ensure(
+        lifecycle_policy.get("mid_task_user_input_policy")
+        == "parent_checkpoint_then_route_delta",
+        f"task {task_id} manifest missing mid-task user input checkpoint policy",
+    )
+    ensure(
+        lifecycle_policy.get("same_task_delta_reuse") == "allowed_with_updated_packet",
+        f"task {task_id} manifest missing same-task delta reuse policy",
+    )
+    ensure(
+        lifecycle_policy.get("scope_change_reuse") == "forbidden_spawn_fresh_wave",
+        f"task {task_id} manifest missing scope-change fresh wave policy",
+    )
     ensure(
         "prompt_contract:" in manifest_text,
         f"task {task_id} manifest missing role prompt_contract",
