@@ -23,7 +23,6 @@ python3 tools/agent_tools/algorithm_expansion_ir.py \
   --root . \
   --python-symbol python/jax_util/optimizers/pdipm.py::_solve \
   --target-theorem "PDIPM local floor-limited convergence" \
-  --max-depth 10 \
   --format json \
 | python3 tools/agent_tools/algorithm_lemma_graph.py \
   --target-profile local_convergence \
@@ -56,6 +55,24 @@ materializes these profiles:
 - `local_convergence`: solve and state-transition lemmas.
 - `fp32_floor`: precision/backend-floor assumptions and lemmas.
 - `solver_chain`: KKT, MINRES, LOBPCG, preconditioner, and rank-r solver lemmas.
+- `reduced_kkt`: reduced-KKT equation and bridge lemmas.
+- `step_update`: implemented step-map and residual-recompute lemmas.
+- `floor_preserving_step`: fraction-to-boundary and positivity-floor lemmas.
+- `minres_defaults`: MINRES default tolerance, stopping, and dtype-floor facts.
+- `pdipm_initialization_path`: reset/cold-start and initial inequality repair
+  facts.
+
+Code-derived facts become `code_fact` lemma nodes. Backend profile records from
+the proof-only profile library become `backend_profile` lemma nodes connected
+from the backend assumption node. These nodes are structural evidence, not
+mathematical proof completion.
+
+Each graph also records `source_ir_fingerprint`, a stable hash of the Algorithm
+Expansion IR fields that determine generated lemma groups. Generated lemmas are
+owned by that fingerprint. If the algorithm changes and the IR fingerprint
+changes, regenerate the IR and lemma graph, then rebuild the proof-status
+overlay; do not carry IR-backed generated lemmas forward by editing prose or
+labels.
 
 Profiles do not prove the claims. They create explicit target nodes and
 `target_requires` edges so that a proof note can choose one theorem target and

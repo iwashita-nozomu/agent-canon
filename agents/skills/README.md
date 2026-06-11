@@ -67,6 +67,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
 | `literature-survey` | 先行研究、関連文献、反証候補の整理 | `agents/skills/literature-survey.md` | `.agents/skills/literature-survey/SKILL.md` |
 | `formal-proof-workflow` | 自然言語 claim を形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence へ接続する | `agents/skills/formal-proof-workflow.md` | `.agents/skills/formal-proof-workflow/SKILL.md` |
+| `algorithm-proof-exploration` | 証明義務を入力に、IR / lemma graph / algorithmic blocker frontier でアルゴリズム選択と必要な algorithm change を探索し、formal-proof へ渡す | `agents/skills/algorithm-proof-exploration.md` | `.agents/skills/algorithm-proof-exploration/SKILL.md` |
 | `research-workflow` | 外部調査、比較設計、run loop、decision state の整理 | `agents/skills/research-workflow.md` | `.agents/skills/research-workflow/SKILL.md` |
 | `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
 | `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
@@ -107,6 +108,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - repo-changing task では `$agent-orchestration`、`$codex-task-workflow`、`$subagent-bootstrap` の順で使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
+- アルゴリズムの収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは `algorithm-proof-exploration` を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は `formal-proof-workflow` へ接続します。
 - README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として見ます。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
 - paper section まで含む論文 draft では `paper-writing` を先に見ます。
@@ -134,6 +136,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
+- AST 由来の Algorithm Expansion IR、LemmaGraph、proof status から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
 - `memory/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。

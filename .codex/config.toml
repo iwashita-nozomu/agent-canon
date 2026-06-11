@@ -52,6 +52,14 @@ path = "../.agents/skills/agent-update-branch/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/algorithm-flowchart/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/algorithm-proof-exploration/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/change-review/SKILL.md"
 enabled = true
 

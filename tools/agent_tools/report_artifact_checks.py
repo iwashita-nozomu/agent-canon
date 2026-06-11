@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 
-
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 APPROVE_DECISION_PATTERN = re.compile(
     r"^(?:[-*]\s*)?(?:decision\s*:\s*)?approve\s*$",

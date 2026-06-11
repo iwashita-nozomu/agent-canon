@@ -20,6 +20,11 @@ downstream implementation agent_tools/search_index.py builds repo-local semantic
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
+downstream implementation agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+downstream implementation agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
+downstream implementation agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
+downstream implementation agent_tools/algorithm_flowchart.py renders proof-state flowcharts from Algorithm IR facts
+downstream implementation agent_tools/kkt_equation_section.py renders KKT equation sections from Algorithm IR facts
 downstream implementation ../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 @dependency-end
 -->
@@ -67,6 +72,7 @@ python3 tools/agent_tools/repo_structure_contract.py
 python3 tools/agent_tools/render_dependency_manifest_graph.py
 python3 tools/agent_tools/classify_path_risk.py
 python3 tools/agent_tools/formal_proof.py --help
+python3 tools/agent_tools/lean_proof_env.py --help
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
@@ -118,6 +124,10 @@ validation checks; the manual GitHub smoke workflow uses the same classifier.
 unverified proof plans, existing-proof search queries, target-language theorem
 scaffolds, and checker commands. It never upgrades a claim to verified without
 proof-assistant evidence.
+`lean_proof_env.py` creates a reusable Lean 4 Lake package with Mathlib and
+Aesop, then dry-runs or executes `lake update` / `lake env lean` checks for
+generated proof stubs. Use it as the AgentCanon-owned proof environment instead
+of adding ad hoc Mathlib dependencies to a topic-local theorem package.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -219,6 +229,11 @@ findings for resilient test planning.
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では responsibility-based semantic / local-LLM search を先に走らせた後の比較 evidence として併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
+  - `lean_proof_env.py` は Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。個別 proof package に ad hoc な Mathlib 依存を入れず、環境責務をこの tool に集約します。
+  - `ir_graph_correspondence.py` は Algorithm Expansion IR の `assignment_equation` / `return_equation` を lemma graph の code-fact node、consumption edge、target chain、任意の `proof_status.json` adoption に照合します。反復単位は `source_symbol` と `equation_tags` で group 化し、証明で使う中間計算式が IR 由来であることを確認します。
+  - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。
+  - `algorithm_flowchart.py` は Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影し、実装されている反復法と proof-state overlay を Markdown / Mermaid / JSON artifact として出します。図は navigation evidence であり、証明済み判定は proof checker と `proof_path_analyzer.py` に戻します。`--view runtime|core` は proof-only node / label を runtime 図から外します。
+  - `kkt_equation_section.py` は Algorithm Expansion IR の `code_facts` を検査し、PDIPM/KKT/MINRES solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、KKT 式を proof note に手書きで足す経路を避けます。
   - `agent-canon test-design check` は既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
