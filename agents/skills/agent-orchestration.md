@@ -38,9 +38,10 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流す。LocalLLM が無い場合は deterministic fallback output を使うか、router unavailable blocker として記録し、chat 印象で implementation path を選ばない
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の compact output を信頼し、修正に必要な path / line / bounded slice だけを読む
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
-1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget かつ family 既定 first-wave target、stage wave は parent が active budget 内で切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Intake Wave は初期責務 wave であり、総同時起動数の cap ではありません。family default より少ない wave で始める場合は理由を `schedule.md` / `workflow_monitoring.md` に残します
+1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget ceiling、stage wave は parent が current stage の evidence と dependency order から切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Intake Wave は初期責務 wave であり、family budget を埋める target ではありません。後続 role / skill は dynamic expansion wave として evidence gate で追加します
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. `agents/skills/README.md` から必要最小限の public skill を足す
+1. prompt-derived skill routing が必要なら `agent-canon local-llm route-skill --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`python3 tools/agent_tools/route.py --prompt ...` は互換 mirror です
+1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。初期 update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
@@ -52,8 +53,8 @@ mode の意味:
 - `repo-changing execution`
   - repo を今から触る
   - run bundle や kickoff command が必要
-  - `$codex-task-workflow` を足す
-  - `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の時だけ足す
+  - `$codex-task-workflow` は execution stage で足す
+  - `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の handoff / wave が ready になった stage で足す
   - task-shape skill は `$agent-orchestration` の後に足す
 - `routing-only/advisory`
   - workflow family、skill、review、starter guidance だけを先に決める
@@ -69,8 +70,8 @@ mode の意味:
 - 必要な role / specialist
 - review と handoff の最小構成
 - repo-editing task なら、workflow family ごとの順序。`Scoped Change Lite` は cheap-first local route、full staged route は requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation
-- 最初の作業 update 用の `workflow=<family>`, `skills=<...>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置く
-- PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
+- 最初の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
+- PR を作る task では、同じ routing 宣言と `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
 - `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
@@ -95,8 +96,8 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - user が明示した `$skill-name` は preserve します
 - `$agent-orchestration` は routing skill として常に先頭に置きます
-- `repo-changing execution` では `$codex-task-workflow` を足します
-- `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の時だけ足します
+- `repo-changing execution` が始まる stage では `$codex-task-workflow` を足します
+- `$subagent-bootstrap` は explicit handoff / wave が ready になった stage、または Shared canon / Large delivery / high-risk / multi-step / explicit subagent work で bootstrap evidence が必要な stage だけ足します
 - 非自明または substantive な文書作成・追記・改稿で section order、reader path、claim support、source map、canonical route、または document responsibility が変わる場合は、共通の構造先行 gate として `prose-reasoning-graph` を足します。typo / link / format-only では `md-style-check` を使い、構造解析を省略した理由を残します
 - file / document responsibility の判定結果から DSL->文章 adapter を選びます。README、workflow、guide、migration、specification などの一般説明 prose では `long-form-writing` を足します。これは長さではなく責務による選択です
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します

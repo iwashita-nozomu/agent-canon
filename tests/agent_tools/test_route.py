@@ -11,11 +11,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
+AGENT_CANON_DEBUG = PROJECT_ROOT / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
 
 
 class RouteToolTest(unittest.TestCase):
@@ -25,6 +27,18 @@ class RouteToolTest(unittest.TestCase):
         """Run route.py with arguments."""
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def run_rust_skill_route(self, *args: str) -> subprocess.CompletedProcess[str]:
+        """Run the Rust-backed skill router."""
+        if not AGENT_CANON_DEBUG.is_file():
+            self.skipTest("Rust agent-canon debug binary is not built")
+        return subprocess.run(
+            [str(AGENT_CANON_DEBUG), "local-llm", "route-skill", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -98,6 +112,10 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(decision["skills"][0], "agent-orchestration")
         self.assertIn("codex-task-workflow", decision["skills"])
         self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("agent-orchestration", decision["active_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
@@ -255,6 +273,37 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("pr-processing", decision["skills"])
         self.assertIn("pr-processing", decision["matched_skills"])
+
+    def test_prompt_skill_route_matches_rust_harness(self) -> None:
+        """Python compatibility prompt routing should match the Rust skill router."""
+        prompt = (
+            "スキルとツールのルーティングを根本の設計から見直し、"
+            "マルチエージェントでログのレポートを残す"
+        )
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        for key in (
+            "route",
+            "mode",
+            "skills",
+            "active_skills",
+            "deferred_skills",
+            "matched_skills",
+        ):
+            self.assertEqual(python_decision[key], rust_decision[key], key)
 
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""

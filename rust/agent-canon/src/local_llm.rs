@@ -37,6 +37,7 @@ enum LocalLlmCommand {
     ClassifyResponsibility,
     ExtractProseIr,
     RouteImplementationSurface,
+    RouteSkill,
     Search,
     BuildIndex,
     Eval,
@@ -96,6 +97,7 @@ impl LocalLlmArgs {
             "route-implementation-surface" | "implementation-surface" => {
                 LocalLlmCommand::RouteImplementationSurface
             }
+            "route-skill" | "skill-route" => LocalLlmCommand::RouteSkill,
             "search" => LocalLlmCommand::Search,
             "build-index" | "index" => LocalLlmCommand::BuildIndex,
             "eval" => LocalLlmCommand::Eval,
@@ -124,6 +126,9 @@ fn run_invocation(args: &LocalLlmArgs) -> i32 {
     }
     if args.command == LocalLlmCommand::RouteImplementationSurface {
         return run_route_implementation_surface(args);
+    }
+    if args.command == LocalLlmCommand::RouteSkill {
+        return run_route_skill(args);
     }
     let Ok(invocation) = build_invocation(args) else {
         eprintln!("LOCAL_LLM_CLI=fail");
@@ -218,6 +223,16 @@ struct RouteImplementationSurfaceArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct RouteSkillArgs {
+    root: PathBuf,
+    prompt_parts: Vec<String>,
+    prompt_files: Vec<PathBuf>,
+    prompt_stdin: bool,
+    mode: String,
+    format: RouteOutputFormat,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SurfaceCandidate {
     surface: String,
     owner: String,
@@ -236,6 +251,25 @@ struct SurfaceRouteDecision {
     llm_status: String,
     llm_output: String,
     candidates: Vec<SurfaceCandidate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteMatch {
+    skill: &'static str,
+    reason: &'static str,
+    explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteDecision {
+    route: &'static str,
+    mode: String,
+    skills: Vec<String>,
+    active_skills: Vec<String>,
+    deferred_skills: Vec<String>,
+    matched_skills: Vec<String>,
+    reasons: Vec<String>,
+    evidence: String,
 }
 
 impl ClassifyArgs {
@@ -526,6 +560,101 @@ impl RouteImplementationSurfaceArgs {
     }
 }
 
+impl RouteSkillArgs {
+    fn parse(root: PathBuf, args: &[String]) -> Result<Self, String> {
+        let mut parsed = Self {
+            root,
+            prompt_parts: Vec::new(),
+            prompt_files: Vec::new(),
+            prompt_stdin: false,
+            mode: "repo-changing".to_string(),
+            format: RouteOutputFormat::Text,
+        };
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--root" => {
+                    parsed.root = value_path(args, index, "--root")?;
+                    index += 2;
+                }
+                "--prompt" | "--request" | "--purpose" | "--task" => {
+                    parsed
+                        .prompt_parts
+                        .push(value_string(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-file" | "--request-file" | "--query-file" => {
+                    parsed
+                        .prompt_files
+                        .push(value_path(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-stdin" | "--request-stdin" | "--query-stdin" => {
+                    parsed.prompt_stdin = true;
+                    index += 1;
+                }
+                "--mode" => {
+                    let mode = value_string(args, index, "--mode")?;
+                    match mode.as_str() {
+                        "repo-changing" | "routing-only" => parsed.mode = mode,
+                        value => {
+                            return Err(format!(
+                                "--mode must be repo-changing or routing-only, got {value}"
+                            ))
+                        }
+                    }
+                    index += 2;
+                }
+                "--format" => {
+                    parsed.format = match value_string(args, index, "--format")?.as_str() {
+                        "text" => RouteOutputFormat::Text,
+                        "json" => RouteOutputFormat::Json,
+                        value => return Err(format!("--format must be text or json, got {value}")),
+                    };
+                    index += 2;
+                }
+                unknown if unknown.starts_with('-') => {
+                    return Err(format!("unknown argument {unknown}"))
+                }
+                text => {
+                    parsed.prompt_parts.push(text.to_string());
+                    index += 1;
+                }
+            }
+        }
+        Ok(parsed)
+    }
+
+    fn prompt_text(&self) -> Result<String, String> {
+        let mut parts = self.prompt_parts.clone();
+        for prompt_file in &self.prompt_files {
+            let path = rooted_path(&self.root, prompt_file);
+            if !path.is_file() {
+                return Err(format!("prompt-file-not-found:{}", prompt_file.display()));
+            }
+            parts.push(fs::read_to_string(&path).map_err(|error| {
+                format!("prompt-file-read-failed:{}:{error}", prompt_file.display())
+            })?);
+        }
+        if self.prompt_stdin {
+            let mut stdin_text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin_text)
+                .map_err(|error| format!("prompt-stdin-read-failed:{error}"))?;
+            parts.push(stdin_text);
+        }
+        let prompt = parts
+            .iter()
+            .map(|part| part.trim())
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if prompt.is_empty() {
+            return Err("prompt-required".to_string());
+        }
+        Ok(prompt)
+    }
+}
+
 impl LlamaCommand {
     fn args(&self) -> Vec<String> {
         vec![
@@ -745,6 +874,473 @@ fn run_route_implementation_surface(args: &LocalLlmArgs) -> i32 {
         RouteOutputFormat::Text => print_implementation_surface_route_text(&decision),
     }
     0
+}
+
+fn run_route_skill(args: &LocalLlmArgs) -> i32 {
+    let parsed = match RouteSkillArgs::parse(args.root.clone(), &args.passthrough) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let prompt = match parsed.prompt_text() {
+        Ok(prompt) => prompt,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let decision = decide_skill_route(&prompt, &parsed.mode);
+    match parsed.format {
+        RouteOutputFormat::Json => print_skill_route_json(&decision),
+        RouteOutputFormat::Text => print_skill_route_text(&decision),
+    }
+    0
+}
+
+fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision {
+    let active_mode = infer_skill_route_mode(prompt, requested_mode);
+    let matches = matched_skill_routes(prompt);
+    let matched_skills = matches
+        .iter()
+        .map(|item| item.skill.to_string())
+        .collect::<Vec<_>>();
+    let mut skills = vec!["agent-orchestration".to_string()];
+    if active_mode == "repo-changing" {
+        skills.push("codex-task-workflow".to_string());
+    }
+    skills.extend(matched_skills.iter().cloned());
+    let skills = ordered_unique_strings(skills);
+
+    let mut active_skills = vec!["agent-orchestration".to_string()];
+    for item in &matches {
+        if item.explicit || is_current_stage_skill(item.skill) {
+            active_skills.push(item.skill.to_string());
+        }
+    }
+    let active_skills = ordered_unique_strings(active_skills);
+    let deferred_skills = skills
+        .iter()
+        .filter(|skill| !active_skills.contains(skill))
+        .cloned()
+        .collect::<Vec<_>>();
+    let reasons = matches
+        .iter()
+        .map(|item| format!("{}:{}", item.skill, item.reason))
+        .collect::<Vec<_>>();
+    let evidence = format!(
+        "mode={};matched={};active={};deferred={}",
+        active_mode,
+        if matched_skills.is_empty() {
+            "none".to_string()
+        } else {
+            matched_skills.join(",")
+        },
+        active_skills.join(","),
+        if deferred_skills.is_empty() {
+            "none".to_string()
+        } else {
+            deferred_skills.join(",")
+        }
+    );
+    SkillRouteDecision {
+        route: "skill-selection",
+        mode: active_mode,
+        skills,
+        active_skills,
+        deferred_skills,
+        matched_skills,
+        reasons,
+        evidence,
+    }
+}
+
+fn matched_skill_routes(prompt: &str) -> Vec<SkillRouteMatch> {
+    let text = prompt.to_lowercase();
+    let mut matches = Vec::new();
+    for (skill, reason, groups) in skill_route_rules() {
+        let explicit = public_skill_name_mentioned(&text, skill);
+        if explicit || groups.iter().any(|group| text_matches_group(&text, group)) {
+            matches.push(SkillRouteMatch {
+                skill,
+                reason: if explicit {
+                    "prompt explicitly names public skill"
+                } else {
+                    reason
+                },
+                explicit,
+            });
+        }
+    }
+    matches
+}
+
+fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>>)> {
+    vec![
+        (
+            "agent-orchestration",
+            "workflow, skill, subagent, or stage routing is part of the request",
+            vec![
+                vec!["どのスキル"],
+                vec!["どのskill"],
+                vec!["スキル選択"],
+                vec!["skill selection"],
+                vec!["routing", "skill"],
+                vec!["ルーティング", "スキル"],
+                vec!["マルチエージェント"],
+                vec!["サブエージェント", "起動"],
+                vec!["subagent", "routing"],
+                vec!["workflow=", "skills="],
+                vec!["根本", "設計", "見直"],
+            ],
+        ),
+        (
+            "task-routing",
+            "skill/tool routing architecture or route contract design is in scope",
+            vec![
+                vec!["ルーティング", "改善"],
+                vec!["routing", "redesign"],
+                vec!["routing", "architecture"],
+                vec!["route", "contract"],
+                vec!["skill", "tool", "routing"],
+                vec!["スキル選択", "ルーティング"],
+                vec!["スキル", "ツール", "ルーティング"],
+                vec!["根本", "設計", "見直"],
+            ],
+        ),
+        (
+            "comprehensive-development",
+            "repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation",
+            vec![
+                vec!["根本", "設計", "ルーティング"],
+                vec!["根本", "設計", "routing"],
+                vec!["全体", "レビュー", "修正"],
+                vec!["architecture", "redesign"],
+                vec!["workflow", "tools", "docs"],
+                vec!["repo-wide", "routing"],
+            ],
+        ),
+        (
+            "structure-planning",
+            "nontrivial design or document structure must be fixed before edits",
+            vec![
+                vec!["構造解析"],
+                vec!["文書", "構造", "解析"],
+                vec!["設計", "構造"],
+                vec!["structure", "contract"],
+                vec!["根本", "設計", "構造"],
+            ],
+        ),
+        (
+            "structure-refactor",
+            "directory layout, source ownership, or path responsibility is in scope",
+            vec![
+                vec!["ディレクトリ", "構成"],
+                vec!["directory", "structure"],
+                vec!["path", "layout"],
+                vec!["repo", "structure"],
+                vec!["構成", "考え直"],
+            ],
+        ),
+        (
+            "subagent-bootstrap",
+            "explicit subagent or multi-agent execution requires run-local specialist routing",
+            vec![
+                vec!["マルチエージェント"],
+                vec!["サブエージェント"],
+                vec!["subagent"],
+                vec!["multi-agent"],
+            ],
+        ),
+        (
+            "agent-learning",
+            "user feedback or recurrence prevention should become durable agent learning",
+            vec![
+                vec!["人間からのフィードバック"],
+                vec!["runtime feedback"],
+                vec!["再発防止"],
+                vec!["こういう止まり方"],
+                vec!["フィードバック", "修正"],
+                vec!["feedback", "repair"],
+                vec!["memory", "feedback"],
+            ],
+        ),
+        (
+            "agent-log-analysis",
+            "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
+            vec![
+                vec!["routing miss"],
+                vec!["selection gap"],
+                vec!["routing", "coverage"],
+                vec!["toolcall", "skillcall", "coverage"],
+                vec!["toolcall", "skillcall", "routing"],
+                vec!["toolcall", "skillcall", "miss"],
+                vec!["toolcall", "skillcall", "50"],
+                vec!["toolcall", "skillcall", "されない"],
+                vec!["ルーティング", "ログ"],
+                vec!["ログ", "skill"],
+                vec!["ログ", "tool"],
+                vec!["toolcall", "skillcall", "ルーティング"],
+                vec!["runbundle", "agent", "レポート"],
+                vec!["run bundle", "agent", "report"],
+                vec!["過去", "agent", "レポート"],
+            ],
+        ),
+        (
+            "agent-canon-update",
+            "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
+            vec![
+                vec!["ensure-latest"],
+                vec!["parent", "pin", "vendor"],
+                vec!["submodule", "pin"],
+                vec!["agentcanon", "update"],
+                vec!["agent-canon", "update"],
+                vec!["vendor/agent-canon"],
+            ],
+        ),
+        (
+            "change-review",
+            "review findings or implementation changes need findings-first review",
+            vec![
+                vec!["全体", "レビュー"],
+                vec!["review", "findings"],
+                vec!["diff", "review"],
+                vec!["コード", "レビュー"],
+                vec!["根本", "設計", "レビュー"],
+            ],
+        ),
+        (
+            "md-style-check",
+            "Markdown style, links, headings, or docs lint are in scope",
+            vec![
+                vec!["md-style"],
+                vec!["docs-check"],
+                vec!["agent-canon", "docs"],
+                vec!["docs", "format"],
+                vec!["docs", "check"],
+                vec!["markdownlint"],
+                vec!["markdown", "lint"],
+                vec!["markdown", "heading"],
+                vec!["markdown", "link"],
+                vec!["markdown", "formatter"],
+                vec!["format_markdown"],
+                vec!["formatter", "adjacent"],
+                vec!["フォーマッタ"],
+                vec!["フォーマット", "周辺"],
+                vec!["通してすらない"],
+                vec!["マークダウン", "体裁"],
+                vec!["マークダウン", "リンク"],
+            ],
+        ),
+        (
+            "oop-readability-check",
+            "OOP readability or readability guard evidence is in scope",
+            vec![
+                vec!["oop", "readability"],
+                vec!["oop", "可読"],
+                vec!["オブジェクト指向", "可読"],
+                vec!["readability", "guard"],
+                vec!["readability", "check"],
+                vec!["可読性", "class"],
+                vec!["可読性", "method"],
+            ],
+        ),
+        (
+            "result-artifact-writeout",
+            "raw results, reports, manifests, or accumulated evidence must be written out",
+            vec![
+                vec!["結果書き出し"],
+                vec!["結果を書き出"],
+                vec!["result writeout"],
+                vec!["artifact", "evidence"],
+                vec!["artifact", "report"],
+                vec!["run bundle", "evidence"],
+                vec!["蓄積分析", "レポート"],
+                vec!["ログ", "レポート", "残"],
+            ],
+        ),
+        (
+            "prose-reasoning-graph",
+            "prose structure graphing, diagnostics, or rewrite handoff is in scope",
+            vec![
+                vec!["文章構造", "graph"],
+                vec!["文章構造", "グラフ"],
+                vec!["段落", "接続"],
+                vec!["段落", "統合"],
+                vec!["dsl", "文章"],
+                vec!["prose", "graph"],
+                vec!["prose", "reasoning"],
+                vec!["rewrite", "packet"],
+                vec!["claim", "evidence", "graph"],
+            ],
+        ),
+        (
+            "pr-processing",
+            "pull request, merge queue, conflict repair, or issue triage processing is in scope",
+            vec![
+                vec!["pr", "処理"],
+                vec!["pr", "merge"],
+                vec!["pr", "マージ"],
+                vec!["pull request"],
+                vec!["pull request", "merge"],
+                vec!["merge queue"],
+                vec!["queue cleanup"],
+                vec!["conflict", "解消"],
+                vec!["コンフリクト", "解消"],
+                vec!["issue", "triage"],
+                vec!["issue", "処理"],
+                vec!["branch protection"],
+                vec!["required checks"],
+            ],
+        ),
+    ]
+}
+
+fn text_matches_group(text: &str, group: &[&str]) -> bool {
+    group.iter().all(|term| text.contains(&term.to_lowercase()))
+}
+
+fn public_skill_name_mentioned(text: &str, skill: &str) -> bool {
+    for (index, _) in text.match_indices(skill) {
+        let before = if index == 0 {
+            None
+        } else {
+            text[..index].chars().next_back()
+        };
+        let after = text[index + skill.len()..].chars().next();
+        let before_ok = before.is_none_or(|value| value == '$' || !is_skill_word_char(value));
+        let after_ok = after.is_none_or(|value| !is_skill_word_char(value));
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_skill_word_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || value == '_' || value == '-'
+}
+
+fn infer_skill_route_mode(prompt: &str, requested_mode: &str) -> String {
+    if requested_mode == "repo-changing" {
+        return requested_mode.to_string();
+    }
+    let text = prompt.to_lowercase();
+    let repo_changing_terms = [
+        "修正",
+        "実装",
+        "リファクタ",
+        "変更",
+        "直して",
+        "見直",
+        "fix",
+        "implement",
+        "refactor",
+        "repo-changing",
+    ];
+    if repo_changing_terms.iter().any(|term| text.contains(term)) {
+        "repo-changing".to_string()
+    } else {
+        requested_mode.to_string()
+    }
+}
+
+fn is_current_stage_skill(skill: &str) -> bool {
+    matches!(
+        skill,
+        "agent-orchestration"
+            | "task-routing"
+            | "agent-canon-update"
+            | "agent-log-analysis"
+            | "structure-planning"
+            | "structure-refactor"
+    )
+}
+
+fn ordered_unique_strings(values: Vec<String>) -> Vec<String> {
+    let mut result = Vec::new();
+    for value in values {
+        if !result.contains(&value) {
+            result.push(value);
+        }
+    }
+    result
+}
+
+fn skill_route_payload(decision: &SkillRouteDecision) -> Value {
+    json!({
+        "schema": "agent_canon.local_llm.skill_route.v1",
+        "route": decision.route,
+        "mode": decision.mode,
+        "skills": decision.skills,
+        "active_skills": decision.active_skills,
+        "deferred_skills": decision.deferred_skills,
+        "matched_skills": decision.matched_skills,
+        "reasons": decision.reasons,
+        "evidence": decision.evidence,
+    })
+}
+
+fn print_skill_route_json(decision: &SkillRouteDecision) {
+    match serde_json::to_string_pretty(&skill_route_payload(decision)) {
+        Ok(rendered) => println!("{rendered}"),
+        Err(error) => eprintln!("SKILL_ROUTER_ERROR=json-render-failed:{error}"),
+    }
+}
+
+fn print_skill_route_text(decision: &SkillRouteDecision) {
+    println!("ROUTE={}", decision.route);
+    println!("SCHEMA=agent_canon.local_llm.skill_route.v1");
+    println!("MODE={}", decision.mode);
+    println!(
+        "SKILLS={}",
+        decision
+            .skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "ACTIVE_SKILLS={}",
+        decision
+            .active_skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "DEFERRED_SKILLS={}",
+        if decision.deferred_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision
+                .deferred_skills
+                .iter()
+                .map(|skill| format!("${skill}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+    );
+    println!(
+        "MATCHED_SKILLS={}",
+        if decision.matched_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision.matched_skills.join(",")
+        }
+    );
+    println!(
+        "REASONS={}",
+        if decision.reasons.is_empty() {
+            "-".to_string()
+        } else {
+            decision.reasons.join(";")
+        }
+    );
+    println!("EVIDENCE={}", decision.evidence);
 }
 
 fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
@@ -2151,6 +2747,7 @@ fn build_invocation(args: &LocalLlmArgs) -> Result<PythonInvocation, String> {
         LocalLlmCommand::RouteImplementationSurface => {
             return Err("native-rust-command".to_string())
         }
+        LocalLlmCommand::RouteSkill => return Err("native-rust-command".to_string()),
         LocalLlmCommand::Search => (source_root.join("tools/agent_tools/search.py"), Vec::new()),
         LocalLlmCommand::BuildIndex => (
             source_root.join("tools/agent_tools/search_index.py"),
@@ -2223,7 +2820,7 @@ fn has_option_value(args: &[String], name: &str) -> bool {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|route-implementation-surface|search|build-index|eval> [--root <repo-root>] [tool args...]"
+        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|route-implementation-surface|route-skill|search|build-index|eval> [--root <repo-root>] [tool args...]"
     );
     eprintln!(
         "examples: agent-canon local-llm classify-responsibility --print-prompt tools/agent_tools/search.py"
@@ -2236,6 +2833,9 @@ fn print_usage() {
     );
     eprintln!(
         "          agent-canon local-llm route-implementation-surface --request-file reports/task.txt --format text"
+    );
+    eprintln!(
+        "          agent-canon local-llm route-skill --prompt \"fix skill routing\" --format json"
     );
 }
 
@@ -2304,6 +2904,73 @@ mod tests {
             vec![PathBuf::from("reports/task.txt")]
         );
         assert_eq!(route_args.format, RouteOutputFormat::Json);
+    }
+
+    #[test]
+    fn parses_skill_route_prompt() {
+        let args = vec![
+            "route-skill".to_string(),
+            "--root".to_string(),
+            "fixture".to_string(),
+            "--prompt".to_string(),
+            "スキルとツールのルーティングを根本から見直す".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
+        ];
+        let parsed = LocalLlmArgs::parse(&args).expect("parse local llm args");
+
+        assert_eq!(parsed.command, LocalLlmCommand::RouteSkill);
+        assert_eq!(parsed.root, PathBuf::from("fixture"));
+        let route_args =
+            RouteSkillArgs::parse(parsed.root.clone(), &parsed.passthrough).expect("parse route");
+        assert_eq!(route_args.format, RouteOutputFormat::Json);
+        assert_eq!(
+            route_args.prompt_parts,
+            vec!["スキルとツールのルーティングを根本から見直す".to_string()]
+        );
+    }
+
+    #[test]
+    fn skill_route_splits_active_and_deferred_skill_waves() {
+        let prompt = "スキルとツールのルーティングを根本の設計から見直し、マルチエージェントでログのレポートを残す";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert_eq!(decision.route, "skill-selection");
+        assert!(decision.skills.contains(&"codex-task-workflow".to_string()));
+        assert!(decision.skills.contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"agent-orchestration".to_string()));
+        assert!(decision.active_skills.contains(&"task-routing".to_string()));
+        assert!(!decision
+            .active_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"codex-task-workflow".to_string()));
+        assert!(decision.evidence.contains("active=agent-orchestration"));
+    }
+
+    #[test]
+    fn skill_route_json_schema_includes_wave_fields() {
+        let decision = decide_skill_route(
+            "md-style-check と agent-learning の routing gap を直して",
+            "routing-only",
+        );
+        let payload = skill_route_payload(&decision);
+
+        assert_eq!(payload["schema"], "agent_canon.local_llm.skill_route.v1");
+        assert_eq!(payload["route"], "skill-selection");
+        assert!(payload["active_skills"].is_array());
+        assert!(payload["deferred_skills"].is_array());
+        assert!(payload["matched_skills"]
+            .as_array()
+            .expect("matched skills array")
+            .iter()
+            .any(|value| value == "md-style-check"));
     }
 
     #[test]

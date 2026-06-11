@@ -24,7 +24,9 @@ from agent_team import (
     codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
+    current_stage_skills,
     default_specialists_for_task,
+    deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
     format_subagent_wave,
@@ -301,9 +303,11 @@ def emit_task_start_output(
     """Print the machine-readable task-start summary."""
     review_roles = selected_review_roles(runtime.roles)
     selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    active_skills = current_stage_skills(selected_skills)
+    deferred_skills = deferred_stage_skills(selected_skills)
     start_declaration = (
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(selected_skills) or '-'}, "
+        f"skills={','.join(active_skills) or '-'}, "
         f"review={','.join(review_roles) or '-'}"
     )
     request_contract_path = context.report_dir / "user_request_contract.md"
@@ -345,6 +349,8 @@ def emit_task_start_output(
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(f"ACTIVE_SKILLS={','.join(active_skills)}")
+    print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
     print(f"START_DECLARATION={start_declaration}")
     print("IMPLEMENTATION_CODEX_AGENTS=" f"{','.join(codex_agents_for_role(config, 'implementer'))}")
     print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}")

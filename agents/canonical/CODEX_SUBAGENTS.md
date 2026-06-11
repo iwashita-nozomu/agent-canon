@@ -144,7 +144,7 @@ requires explicit spawn authorization, "checked by read-only roles" means
 spawn the roles only after authorization; otherwise persist their handoff
 packets and block implementation until the authorization question is resolved.
 
-Default pre-goal wave:
+Candidate pre-goal roles:
 
 - `requirements_organizer`: derive a conservative Objective, non-goals,
   constraints, and Exit Criteria from the user request and durable repo notes.
@@ -154,6 +154,10 @@ Default pre-goal wave:
   `goal_loop.py plan` exists.
 - `plan_reviewer`: verify that the candidate goal is checkable and that the
   first slice has evidence gates and rollback boundaries.
+
+These are not a predeclared bundle. Start with the roles needed for the
+current stage, keep unused roles as dynamic wave triggers, and add them only
+when goal evidence, dependency state, or review separation requires them.
 
 Constraints:
 

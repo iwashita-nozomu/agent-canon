@@ -759,6 +759,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
+            self.assertIn(
+                "ACTIVE_SKILLS=$agent-orchestration,$comprehensive-development",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
+                result.stdout,
+            )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
@@ -772,6 +780,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT=", result.stdout)
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
+            self.assertIn(
+                "skills=$agent-orchestration,$comprehensive-development",
+                result.stdout,
+            )
             self.assertIn("cpp_reviewer", result.stdout)
             manifest_text = (report_root / "test-task-start" / "team_manifest.yaml").read_text(
                 encoding="utf-8",
@@ -856,6 +868,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
+                result.stdout,
+            )
+            self.assertIn(
+                "ACTIVE_SKILLS=$agent-orchestration,$refactor-loop",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
                 result.stdout,
             )
 

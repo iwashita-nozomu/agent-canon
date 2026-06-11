@@ -95,6 +95,15 @@ DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
     ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
     ("ship_reviewer",),
 )
+CURRENT_STAGE_SKILLS = {
+    "$agent-orchestration",
+    "$research-workflow",
+    "$environment-maintenance",
+    "$comprehensive-development",
+    "$adaptive-improvement-loop",
+    "$refactor-loop",
+    "$paper-writing",
+}
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
@@ -632,6 +641,17 @@ def recommended_dynamic_expansion_waves(
     )
     waves.extend(_chunk_agent_wave(fallback_agents, active_subagents))
     return tuple(waves)
+
+
+def current_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+    """Return public skills to declare for the current stage only."""
+    return tuple(skill for skill in selected_skills if skill in CURRENT_STAGE_SKILLS)
+
+
+def deferred_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+    """Return selected public skills that should wait for dynamic wave triggers."""
+    active = set(current_stage_skills(selected_skills))
+    return tuple(skill for skill in selected_skills if skill not in active)
 
 
 def format_subagent_wave(agent_types: tuple[str, ...]) -> str:

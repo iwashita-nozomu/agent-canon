@@ -24,7 +24,9 @@ from agent_team import (
     codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
+    current_stage_skills,
     default_specialists_for_task,
+    deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
     format_subagent_wave,
@@ -300,6 +302,8 @@ def emit_bootstrap_output(
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    active_skills = current_stage_skills(selected_skills)
+    deferred_skills = deferred_stage_skills(selected_skills)
     review_roles = selected_review_roles(runtime.roles)
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
@@ -314,10 +318,12 @@ def emit_bootstrap_output(
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(f"ACTIVE_SKILLS={','.join(active_skills)}")
+    print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
     print(
         "START_DECLARATION="
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(selected_skills)}, "
+        f"skills={','.join(active_skills) or '-'}, "
         f"review={','.join(review_roles) or '-'}"
     )
     if args.task_id is not None:
@@ -397,7 +403,7 @@ def record_bootstrap_monitoring(
         signals=[
             (
                 f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(selected_skills)}, "
+                f"skills={','.join(current_stage_skills(selected_skills)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
             "stage owner routing active_roles=" f"{','.join(role.id for role in roles)}",

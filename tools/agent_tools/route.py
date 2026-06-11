@@ -272,6 +272,7 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
             ("routing", "architecture"),
             ("route", "contract"),
             ("skill", "tool", "routing"),
+            ("スキル選択", "ルーティング"),
             ("スキル", "ツール", "ルーティング"),
             ("根本", "設計", "見直"),
         ),
@@ -297,6 +298,17 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
             ("設計", "構造"),
             ("structure", "contract"),
             ("根本", "設計", "構造"),
+        ),
+    ),
+    (
+        "structure-refactor",
+        "directory layout, source ownership, or path responsibility is in scope",
+        (
+            ("ディレクトリ", "構成"),
+            ("directory", "structure"),
+            ("path", "layout"),
+            ("repo", "structure"),
+            ("構成", "考え直"),
         ),
     ),
     (
@@ -512,6 +524,8 @@ class SkillRouteDecision:
     route: str
     mode: str
     skills: tuple[str, ...]
+    active_skills: tuple[str, ...]
+    deferred_skills: tuple[str, ...]
     matched_skills: tuple[str, ...]
     reasons: tuple[str, ...]
     evidence: str
@@ -665,6 +679,18 @@ def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
+def is_current_stage_skill(skill: str) -> bool:
+    """Return whether one matched skill belongs in the initial routing wave."""
+    return skill in {
+        "agent-orchestration",
+        "task-routing",
+        "agent-canon-update",
+        "agent-log-analysis",
+        "structure-planning",
+        "structure-refactor",
+    }
+
+
 def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     active_mode = infer_mode(prompt, mode)
@@ -674,11 +700,29 @@ def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
     if active_mode == "repo-changing":
         base_skills.append("codex-task-workflow")
     skills = ordered_unique((*base_skills, *matched_skills))
-    evidence = f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'}"
+    active_skills = ordered_unique(
+        (
+            "agent-orchestration",
+            *(
+                match.skill
+                for match in matches
+                if match.reason == "prompt explicitly names public skill"
+                or is_current_stage_skill(match.skill)
+            ),
+        )
+    )
+    deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
+    evidence = (
+        f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
+        f"active={','.join(active_skills)};"
+        f"deferred={','.join(deferred_skills) if deferred_skills else 'none'}"
+    )
     return SkillRouteDecision(
         route="skill-selection",
         mode=active_mode,
         skills=skills,
+        active_skills=active_skills,
+        deferred_skills=deferred_skills,
         matched_skills=matched_skills,
         reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
         evidence=evidence,
@@ -742,6 +786,14 @@ class RouteRenderer:
                     f"- Route: `{decision.route}`",
                     f"- Mode: `{decision.mode}`",
                     f"- Skills: {skills}",
+                    "- Active skills: "
+                    + ", ".join(f"`${skill}`" for skill in decision.active_skills),
+                    "- Deferred skills: "
+                    + (
+                        ", ".join(f"`${skill}`" for skill in decision.deferred_skills)
+                        if decision.deferred_skills
+                        else "`none`"
+                    ),
                     f"- Matched skills: `{','.join(decision.matched_skills) or 'none'}`",
                     f"- Reasons: {reasons}",
                     f"- Evidence: `{decision.evidence}`",
@@ -752,6 +804,13 @@ class RouteRenderer:
                 f"ROUTE={decision.route}",
                 f"MODE={decision.mode}",
                 f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
+                f"ACTIVE_SKILLS={','.join(f'${skill}' for skill in decision.active_skills)}",
+                "DEFERRED_SKILLS="
+                + (
+                    ",".join(f"${skill}" for skill in decision.deferred_skills)
+                    if decision.deferred_skills
+                    else "-"
+                ),
                 f"MATCHED_SKILLS={','.join(decision.matched_skills) or '-'}",
                 f"REASONS={';'.join(decision.reasons) or '-'}",
                 f"EVIDENCE={decision.evidence}",
