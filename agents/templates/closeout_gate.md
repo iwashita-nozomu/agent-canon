@@ -136,11 +136,16 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Subagent Lifecycle Evidence
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. -->
+<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Mid-task user instructions must be classified as same_active_task_delta, scope_or_contract_change, or new_task; same-task deltas need a run-bundle checkpoint and updated packet path before any run-local send_input, while scope changes need a fresh follow-up wave. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. For dynamic fanout, reconcile every schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and closed run-local agent ids. -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
 - previous_task_subagent_reuse:
+- mid_task_user_input_status:
+- same_task_delta_packet_evidence:
+- agent_wave_ledger_status:
+- planned_vs_actual_wave_status:
+- dynamic_spawn_policy_status:
 - subagent_closeout_status:
 - open_subagent_instances:
 - close_agent_evidence:
@@ -159,6 +164,14 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Canonical Tree-Head Evidence
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
+
+## Report Artifact Placement Evidence
+
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify generated report placement. Tracked durable reports are allowed. Untracked or ignored generated report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles or generated report roots outside the current run are blockers because runtime_log_archive_git.py sync/archive closes the current run bundle, not orphan outputs. -->
+
+- report_artifact_placement_status:
+- report_artifact_outside_current_run_bundle:
+- report_artifact_recovery_evidence:
 
 ## Agent Evaluation Evidence
 

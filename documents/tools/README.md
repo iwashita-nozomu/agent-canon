@@ -10,6 +10,7 @@ downstream implementation ../../tools/agent_tools/responsibility_scope.py valida
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
+downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
@@ -42,6 +43,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 
 - `tools/catalog.yaml`
   - canonical、compatibility wrapper、optional、maintainer-only、retired tool の構造化カタログです。
+- [Dependency Tools And Licenses](dependency-tools-and-licenses.md)
+  - dependency manifest tools、shared runtime tools、外部 toolchain、default local LLM model の用途と license evidence をまとめた人間向け一覧です。
 - `tools/agent_tools/tool_catalog.py`
   - catalog の schema、path、説明、docs/tests、default wiring、retired legacy 混入を検査し、`--format markdown` で対応表を出します。
 - `tools/agent_tools/tool_drift.py`

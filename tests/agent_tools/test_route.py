@@ -11,11 +11,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
+AGENT_CANON_DEBUG = PROJECT_ROOT / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
 
 
 class RouteToolTest(unittest.TestCase):
@@ -25,6 +27,18 @@ class RouteToolTest(unittest.TestCase):
         """Run route.py with arguments."""
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def run_rust_skill_route(self, *args: str) -> subprocess.CompletedProcess[str]:
+        """Run the Rust-backed skill router."""
+        if not AGENT_CANON_DEBUG.is_file():
+            self.skipTest("Rust agent-canon debug binary is not built")
+        return subprocess.run(
+            [str(AGENT_CANON_DEBUG), "local-llm", "route-skill", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -98,6 +112,10 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(decision["skills"][0], "agent-orchestration")
         self.assertIn("codex-task-workflow", decision["skills"])
         self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("agent-orchestration", decision["active_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
@@ -131,6 +149,71 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("agent-log-analysis", decision["skills"])
         self.assertIn("agent-log-analysis", decision["matched_skills"])
+
+    def test_prompt_routes_root_design_followup_to_task_routing(self) -> None:
+        """Broad follow-up redesign prompts should not fall through to matched=none."""
+        result = self.run_route(
+            "--prompt",
+            "根本の設計から見直してください",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertNotIn("comprehensive-development", decision["matched_skills"])
+        self.assertNotIn("change-review", decision["matched_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(self) -> None:
+        """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
+        result = self.run_route(
+            "--prompt",
+            "レポのリファクタスキルを定義して ~/.codex も見て修正して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_repo_refactor_name_alias_routes_to_structure_area(self) -> None:
+        """Proposed repo/refactor helper names should not create a new public skill."""
+        result = self.run_route("--name", "repo_refactor_skill.py")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CANONICAL_AREA=structure", result.stdout)
+        self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
+
+        slash_result = self.run_route("--name", "repo/refactor")
+        self.assertEqual(slash_result.returncode, 0, slash_result.stdout + slash_result.stderr)
+        self.assertIn("CANONICAL_AREA=structure", slash_result.stdout)
+
+    def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
+        """Routing-context redesign prompts should activate the broader review stack."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "スキルとツールのルーティングを根本の設計から見直し、"
+                "全体レビューして修正し、構造解析も行う"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("comprehensive-development", decision["matched_skills"])
+        self.assertIn("structure-planning", decision["matched_skills"])
+        self.assertIn("change-review", decision["matched_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_does_not_route_standalone_toolcall_work_to_log_analysis(self) -> None:
         """Standalone ToolCall implementation text should not imply log analysis."""
@@ -217,6 +300,37 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("pr-processing", decision["skills"])
         self.assertIn("pr-processing", decision["matched_skills"])
+
+    def test_prompt_skill_route_matches_rust_harness(self) -> None:
+        """Python compatibility prompt routing should match the Rust skill router."""
+        prompt = (
+            "スキルとツールのルーティングを根本の設計から見直し、"
+            "マルチエージェントでログのレポートを残す"
+        )
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        for key in (
+            "route",
+            "mode",
+            "skills",
+            "active_skills",
+            "deferred_skills",
+            "matched_skills",
+        ):
+            self.assertEqual(python_decision[key], rust_decision[key], key)
 
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""

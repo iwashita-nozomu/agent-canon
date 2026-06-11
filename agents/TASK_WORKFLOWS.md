@@ -61,7 +61,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Three-Agent Intake は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の3責務を固定し、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と bounded handoff packet を渡します
+- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
@@ -93,7 +93,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙します。read-only diff-check agent は Shared canon / Large delivery / high-risk work で必須にします
 - Shared canon / Large delivery / high-risk workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
-- skill selection は `$agent-orchestration` を先頭に置き、repo-changing execution では `$codex-task-workflow` と `$subagent-bootstrap` を足し、さらに task-shape skill を最小限だけ追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
+- skill selection は `agent-canon local-llm route-skill --prompt "<request>" --format json` の `ACTIVE_SKILLS` を current stage、`DEFERRED_SKILLS` を dynamic wave trigger として扱います。task-shape skill は `$agent-orchestration` を先頭に置き、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
 - parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
 - user-facing completion は、全 active clause、全 planned work unit、mechanical completion loop、diff-check agent approval、final review、validation、closeout gate、commit / push が揃ったときだけ返します
@@ -224,6 +224,7 @@ spawn budget ルール:
 - write-capable subagent の上限は family ごとの `max_write_subagents`、parent-managed write-scope ledger、integration order、review gate で縛ります
 - 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
+- active task の途中で user が追加指示を出した場合は、parent がまず `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類します。same-task delta は `schedule.md` Agent Wave Ledger と `workflow_monitoring.md` に checkpoint を足し、updated packet path を渡したうえで current run-local subagent へ再配送できます。scope、allowed paths、owner、review gate が変わる場合は既存 agent に継ぎ足さず、spawn budget 内の fresh follow-up wave にします。new task は fresh run bundle と fresh subagents に切り替えます。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
 concurrent spawn budget:

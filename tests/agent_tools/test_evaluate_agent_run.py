@@ -70,6 +70,24 @@ def write_planning_artifacts(report_dir: Path) -> None:
             "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
             "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
             "| W1 | C1 | codex | tests | closeout | complete |",
+            "## Agent Wave Ledger",
+            (
+                "| Wave ID | Spawn Authority | Trigger | Budget Before | Budget After | "
+                "Runtime Max Threads | Runtime Max Depth | Spawned Roles | Skipped Roles | "
+                "Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | "
+                "Handoff Artifacts | Status |"
+            ),
+            (
+                "| ------- | --------------- | ------- | ------------- | ------------ | "
+                "------------------- | ----------------- | ------------- | ------------- | "
+                "------------- | ----------- | ----------- | ---------------- | ----------- | "
+                "----------------- | ------ |"
+            ),
+            (
+                "| WAVE-1 | parent | unit-test | 4 | 3 | 24 | 2 | worker | none | "
+                "tests/agent_tools/test_evaluate_agent_run.py | none | read-only | "
+                "pytest | final_review.md | workflow_monitoring.md | complete |"
+            ),
             "",
         ],
     )

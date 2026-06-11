@@ -67,6 +67,9 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
    slice と、root 修正後に並列化できる independent downstream slice を分け、
    各 target object に owner wave、`blocked_by`、allowed files、validation
    signal、single-agent / parallel-safe の判定を付けます。
+   `structure-refactor` が構造 surface 分類、root/scope contract、path mapping、
+   runtime boundary を所有し、この skill が repair batch sizing、`blocked_by`、
+   sequential / parallel wave choice、write-capable subagent orchestration を所有します。
 1. repair scope の粒度は、file / function / class に固定しません。
    `Change Impact Packet` の `scope_candidates` から、wave 数、tool rerun 数、
    write conflict risk、token budget、validation cost、semantic risk を見て

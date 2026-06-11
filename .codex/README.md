@@ -107,6 +107,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
 - write-capable subagent は既定 1 体です。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、spawn budget 内で複数 writer を並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
+- active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
