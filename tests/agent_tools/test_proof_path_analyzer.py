@@ -25,7 +25,6 @@ def sample_graph() -> dict[str, object]:
     """Return a compact lemma graph payload."""
     return {
         "status": "lemma_graph_built",
-        "source_ir_fingerprint": "sample-ir-fingerprint",
         "root": "python/app.py::_solve",
         "theorem": "local_convergence",
         "target_profiles": ["local_convergence"],
@@ -126,7 +125,6 @@ def sample_status() -> dict[str, object]:
             }
         ],
         "schema": "test-proof-status",
-        "source_ir_fingerprints": ["sample-ir-fingerprint"],
     }
 
 
@@ -180,8 +178,6 @@ class ProofPathAnalyzerTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertTrue(payload["validation"]["valid"])
         self.assertTrue(payload["validation"]["connected"])
-        self.assertTrue(payload["validation"]["algorithm_fingerprint_valid"])
-        self.assertTrue(payload["fingerprint_valid"])
         self.assertFalse(payload["proof_complete"])
         self.assertTrue(payload["frontier_minimal"])
         self.assertEqual(payload["open_witness_count"], 1)
@@ -282,6 +278,18 @@ class ProofPathAnalyzerTest(unittest.TestCase):
             "unadopted_verified_fragment",
         )
 
+    def test_namespaced_lean_theorem_counts_as_adopted(self) -> None:
+        """Lean namespace plus theorem declaration should adopt qualified status rows."""
+        result = self.run_tool(
+            sample_graph(),
+            sample_status(),
+            adoption_text="namespace Proof\n\ntheorem step_handoff : True := by trivial\n",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["unadopted_verified_fragment_count"], 0)
+
     def test_stale_implementation_token_fails(self) -> None:
         """Implementation surfaces must match graph tokens or real files."""
         status = sample_status()
@@ -333,21 +341,6 @@ class ProofPathAnalyzerTest(unittest.TestCase):
         self.assertEqual(
             payload["external_assumptions"][0]["next_witness"],
             "external IREE-FP32 backend axiom",
-        )
-
-    def test_stale_algorithm_fingerprint_fails(self) -> None:
-        """Proof-status overlays must match the algorithm IR fingerprint."""
-        status = sample_status()
-        status["source_ir_fingerprints"] = ["old-ir-fingerprint"]
-
-        result = self.run_tool(sample_graph(), status)
-
-        self.assertNotEqual(result.returncode, 0)
-        payload = json.loads(result.stdout)
-        self.assertFalse(payload["fingerprint_valid"])
-        self.assertIn(
-            "stale_algorithm_lemma_group",
-            {finding["kind"] for finding in payload["findings"]},
         )
 
     def test_operational_assumption_is_reported_without_opening_witness(self) -> None:

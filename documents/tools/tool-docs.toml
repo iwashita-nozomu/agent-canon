@@ -149,6 +149,13 @@ language = "python"
 summary = "Algorithm Expansion IR extractor documentation, including AST-only recursion, instance interactions, and local proof-obligation grain."
 
 [[tool]]
+id = "algorithm-ir-to-lean"
+tool = "rust/agent-canon/src/algorithm_ir_to_lean.rs"
+doc = "documents/tools/algorithm_ir_to_lean.md"
+language = "rust"
+summary = "Algorithm IR to Lean lowering documentation, including expression_ast, control facts, and post-IR projection normalization."
+
+[[tool]]
 id = "algorithm-lemma-graph"
 tool = "tools/agent_tools/algorithm_lemma_graph.py"
 doc = "documents/tools/algorithm_lemma_graph.md"

@@ -257,13 +257,14 @@ def graph_node_ids(graphs: tuple[dict[str, object], ...]) -> set[str]:
 
 
 def graph_consumers_by_fact(graphs: tuple[dict[str, object], ...]) -> dict[str, set[str]]:
-    """Return graph lemma ids that consume each code fact lemma id."""
+    """Return graph lemma ids that consume or directly require each code fact lemma id."""
     consumers: dict[str, set[str]] = {}
+    accepted_edge_kinds = {"lemma_consumes_code_fact", "target_requires"}
     for graph in graphs:
         for edge in as_tuple(graph.get("lemma_edges")):
             if not isinstance(edge, dict):
                 continue
-            if str(edge.get("edge_kind", "")) != "lemma_consumes_code_fact":
+            if str(edge.get("edge_kind", "")) not in accepted_edge_kinds:
                 continue
             target = str(edge.get("target_lemma_id", ""))
             source = str(edge.get("source_lemma_id", ""))
@@ -427,7 +428,10 @@ def build_findings(
                     severity="error",
                     kind="missing_code_fact_consumption_edge",
                     fact_id=row.fact_id,
-                    message=f"No `lemma_consumes_code_fact` edge targets `{row.lemma_id}`.",
+                    message=(
+                        "No `lemma_consumes_code_fact` or direct `target_requires` "
+                        f"edge targets `{row.lemma_id}`."
+                    ),
                 )
             )
         elif not row.on_target_chain:

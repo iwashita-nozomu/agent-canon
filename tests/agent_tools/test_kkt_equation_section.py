@@ -89,29 +89,29 @@ def sample_ir_payload() -> dict[str, object]:
                 "-(diag_s_inv @ (r_c_used + diag_lam @ ds))",
             ),
             code_fact(
-                "_kkt_preconditioned_system",
+                "_kkt_regularized_h",
                 "regularized_h",
                 "LinOp(lambda v: problem.Hv @ v + primal_regularization * v)",
                 source_path="python/jax_util/solvers/kkt.py",
             ),
             code_fact(
-                "_kkt_preconditioned_system",
+                "_kkt_update_preconditioners",
                 "schur_base",
                 "problem.Bv * h_inv_approx * problem.BTv",
                 source_path="python/jax_util/solvers/kkt.py",
             ),
             code_fact(
-                "_kkt_preconditioned_system",
+                "_kkt_update_preconditioners",
                 "schur_mv",
                 "LinOp(lambda v: schur_base @ v + dual_regularization * v)",
                 source_path="python/jax_util/solvers/kkt.py",
             ),
             code_fact(
-                "_run_kkt_solve",
+                "_kkt_run_minres",
                 "preconditioner",
                 (
                     "rank_r_preconditioner.make_block_diagonal("
-                    "system.h_inv_approx, system.s_inv_approx)"
+                    "h_inv_approx, s_inv_approx)"
                 ),
                 source_path="python/jax_util/solvers/kkt.py",
             ),
@@ -128,10 +128,10 @@ def sample_ir_payload() -> dict[str, object]:
                 source_path="python/jax_util/solvers/kkt.py",
             ),
             code_fact(
-                "_run_kkt_solve",
+                "_kkt_run_minres",
                 "solver_answer",
                 (
-                    "runtime.request.solver_algorithm(minres.Problem(Mv=kkt_operator, "
+                    "solver_algorithm(minres.Problem(Mv=kkt_operator, "
                     "rhs=rhs), minres_state, solve_config.solver_solve)"
                 ),
                 source_path="python/jax_util/solvers/kkt.py",
@@ -155,23 +155,23 @@ def sample_ir_payload() -> dict[str, object]:
                 source_path="python/jax_util/solvers/kkt.py",
             ),
             code_fact(
-                "_minres_setup_values",
+                "_minres_transformed_system",
                 "solve_b",
-                "derived_minv_sqrt @ physical_b",
+                "minv_sqrt @ physical_b",
                 source_path="python/jax_util/solvers/minres.py",
             ),
             code_fact(
-                "_minres_setup_values",
+                "_minres_transformed_system",
                 "solve_x0",
-                "derived_msqrt @ physical_x0",
+                "msqrt @ physical_x0",
                 source_path="python/jax_util/solvers/minres.py",
             ),
             code_fact(
-                "_minres_setup_values",
+                "_minres_transformed_system",
                 "solve_mv",
                 (
-                    "LinOp(lambda y: derived_minv_sqrt @ "
-                    "(problem.Mv @ (derived_minv_sqrt @ y)))"
+                    "LinOp(lambda y: minv_sqrt @ "
+                    "(physical_proj @ (problem.Mv @ (physical_proj @ (minv_sqrt @ y)))))"
                 ),
                 source_path="python/jax_util/solvers/minres.py",
             ),
@@ -214,7 +214,7 @@ class KktEquationSectionTest(unittest.TestCase):
         self.assertIn("dlam_eq := getattr(kkt_answer, 'lam')", result.stdout)
         self.assertIn("ds := -(residuals.r_ineq + linearization.j_ineq @ dx)", result.stdout)
         self.assertIn("regularized_h := LinOp(lambda v: problem.Hv @ v", result.stdout)
-        self.assertIn("solve_mv := LinOp(lambda y: derived_minv_sqrt @", result.stdout)
+        self.assertIn("solve_mv := LinOp(lambda y: minv_sqrt @", result.stdout)
         self.assertIn("unregularized_top := problem.Hv @ x", result.stdout)
         self.assertIn("Proof Obligations Separated From Runtime Flow", result.stdout)
         self.assertNotIn("Proof boundary", result.stdout)

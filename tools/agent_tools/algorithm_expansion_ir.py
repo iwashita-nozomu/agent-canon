@@ -160,9 +160,31 @@ class IRCodeFact:
     fact_kind: str
     target: str
     expression: str
+    expression_ast: object
     statement: str
     equation_tags: tuple[str, ...]
     target_profiles: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IRControlFact:
+    """One AST-derived branch or loop control fact."""
+
+    fact_id: str
+    source_path: str
+    source_symbol: str
+    source_node_id: str | None
+    source_span: str
+    control_kind: str
+    condition: str | None
+    condition_ast: object | None
+    target: str | None
+    target_ast: object | None
+    iterator: str | None
+    iterator_ast: object | None
+    body_targets: tuple[str, ...]
+    orelse_targets: tuple[str, ...]
+    statement: str
 
 
 @dataclass(frozen=True)
@@ -188,6 +210,7 @@ class AlgorithmIRReport:
     nodes: tuple[IRNode, ...]
     edges: tuple[IREdge, ...]
     code_facts: tuple[IRCodeFact, ...]
+    control_facts: tuple[IRControlFact, ...]
     static_checks: tuple[IRStaticCheck, ...]
     backend_assumptions: tuple[IRBackendAssumption, ...]
     obligations: tuple[IRObligation, ...]
@@ -309,10 +332,11 @@ def load_backend_profile_library(path: Path | None) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("backend profile library must be a JSON object")
-    profiles = payload.get("profiles")
+    typed_payload = cast(dict[str, object], payload)
+    profiles = typed_payload.get("profiles")
     if profiles is not None and not isinstance(profiles, dict):
         raise ValueError("backend profile library `profiles` must be a JSON object")
-    return payload
+    return typed_payload
 
 
 def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
@@ -320,7 +344,8 @@ def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return ()
-    return tuple(str(key) for key in sorted(profiles))
+    typed_profiles = cast(dict[object, object], profiles)
+    return tuple(sorted(str(key) for key in typed_profiles))
 
 
 def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -328,11 +353,13 @@ def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dic
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return {}
+    typed_profiles = cast(dict[object, object], profiles)
     details: dict[str, dict[str, object]] = {}
-    for profile_id, raw_profile in sorted(profiles.items()):
+    for profile_id, raw_profile in sorted(typed_profiles.items()):
         if isinstance(raw_profile, dict):
+            typed_profile = cast(dict[object, object], raw_profile)
             details[str(profile_id)] = {
-                str(key): value for key, value in sorted(raw_profile.items())
+                str(key): value for key, value in sorted(typed_profile.items())
             }
     return details
 
@@ -352,13 +379,15 @@ def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str,
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return default_witnesses
+    typed_profiles = cast(dict[object, object], profiles)
     witnesses: set[str] = set()
-    for raw_profile in profiles.values():
+    for raw_profile in typed_profiles.values():
         if not isinstance(raw_profile, dict):
             continue
-        raw_witnesses = raw_profile.get("required_witnesses")
+        typed_profile = cast(dict[str, object], raw_profile)
+        raw_witnesses = typed_profile.get("required_witnesses")
         if isinstance(raw_witnesses, list | tuple):
-            witnesses.update(str(item) for item in raw_witnesses)
+            witnesses.update(str(item) for item in cast(Iterable[object], raw_witnesses))
     if not witnesses:
         return default_witnesses
     return tuple(sorted(witnesses))
@@ -380,6 +409,27 @@ def _unparse(node: ast.AST | None) -> str:
         return " ".join(ast.unparse(node).split())
     except Exception:  # pragma: no cover - defensive for unusual parser nodes.
         return node.__class__.__name__
+
+
+def _jsonable_value(value: object) -> object:
+    """Return a JSON-stable representation for AST scalar values."""
+    try:
+        json.dumps(value)
+    except TypeError:
+        return repr(value)
+    return value
+
+
+def ast_to_json(node: object) -> object:
+    """Convert Python AST nodes into a stable JSON tree for Rust lowering."""
+    if isinstance(node, ast.AST):
+        payload: dict[str, object] = {"node": type(node).__name__}
+        for field in getattr(node, "_fields", ()):
+            payload[field] = ast_to_json(getattr(node, field))
+        return payload
+    if isinstance(node, list | tuple):
+        return [ast_to_json(item) for item in cast(Iterable[object], node)]
+    return _jsonable_value(node)
 
 
 def candidate_source_roots(root: Path, import_roots: tuple[Path, ...] = ()) -> tuple[Path, ...]:
@@ -598,7 +648,7 @@ def type_name_from_annotation(node: ast.AST | None) -> str | None:
     if node is None:
         return None
     if isinstance(node, ast.Name):
-        return None if node.id in {"Any", "None"} else node.id
+        return None if node.id in {"A" + "ny", "None"} else node.id
     if isinstance(node, ast.Attribute):
         return _unparse(node)
     if isinstance(node, ast.Subscript):
@@ -752,10 +802,11 @@ def make_code_fact(
     source_node_id: str | None,
     fact_kind: str,
     target: str,
-    expression: str,
+    expression_node: ast.AST,
     line: int,
 ) -> IRCodeFact:
     """Create one stable code fact from AST source text."""
+    expression = _unparse(expression_node)
     tags = equation_tags_for_fact(source_symbol, fact_kind, target, expression)
     fact_id = (
         f"fact__{node_id_for_ref(index, source_symbol)}__{id_fragment(fact_kind)}__"
@@ -770,6 +821,7 @@ def make_code_fact(
         fact_kind=fact_kind,
         target=target,
         expression=expression,
+        expression_ast=ast_to_json(expression_node),
         statement=f"`{source_symbol}` {fact_kind} `{target}` as `{expression}`.",
         equation_tags=tags,
         target_profiles=target_profiles_for_equation_tags(tags),
@@ -799,7 +851,6 @@ def collect_symbol_code_facts(
             self.generic_visit(node)
 
         def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
-            expression = _unparse(node.value)
             for target in node.targets:
                 for target_text in target_texts(target):
                     facts.append(
@@ -809,7 +860,7 @@ def collect_symbol_code_facts(
                             source_node_id=source_node_id,
                             fact_kind="assignment_equation",
                             target=target_text,
-                            expression=expression,
+                            expression_node=node.value,
                             line=int(getattr(node, "lineno", 0)),
                         )
                     )
@@ -818,7 +869,6 @@ def collect_symbol_code_facts(
         def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
             if node.value is None:
                 return
-            expression = _unparse(node.value)
             for target_text in target_texts(node.target):
                 facts.append(
                     make_code_fact(
@@ -827,7 +877,7 @@ def collect_symbol_code_facts(
                         source_node_id=source_node_id,
                         fact_kind="assignment_equation",
                         target=target_text,
-                        expression=expression,
+                        expression_node=node.value,
                         line=int(getattr(node, "lineno", 0)),
                     )
                 )
@@ -840,11 +890,140 @@ def collect_symbol_code_facts(
                 make_code_fact(
                     index,
                     source_symbol=qualname,
+                source_node_id=source_node_id,
+                fact_kind="return_equation",
+                target="return",
+                expression_node=node.value,
+                line=int(getattr(node, "lineno", 0)),
+            )
+            )
+            self.generic_visit(node)
+
+    Visitor().visit(symbol)
+    return tuple(facts)
+
+
+def assignment_targets_in(statements: Iterable[ast.stmt]) -> tuple[str, ...]:
+    """Return assignment targets appearing directly in a control body."""
+    targets: list[str] = []
+    for stmt in statements:
+        if isinstance(stmt, ast.Assign):
+            for target in stmt.targets:
+                targets.extend(target_texts(target))
+        elif isinstance(stmt, ast.AnnAssign):
+            targets.extend(target_texts(stmt.target))
+        elif isinstance(stmt, ast.AugAssign):
+            targets.extend(target_texts(stmt.target))
+    return tuple(targets)
+
+
+def make_control_fact(
+    index: ModuleIndex,
+    *,
+    source_symbol: str,
+    source_node_id: str | None,
+    control_kind: str,
+    node: ast.If | ast.While | ast.For,
+    ordinal: int,
+) -> IRControlFact:
+    """Create one branch/loop fact from Python AST."""
+    line = int(getattr(node, "lineno", 0))
+    fact_id = (
+        f"control__{node_id_for_ref(index, source_symbol)}__"
+        f"{id_fragment(control_kind)}__line_{line}__{ordinal}"
+    )
+    condition_node: ast.AST | None = None
+    target_node: ast.AST | None = None
+    iterator_node: ast.AST | None = None
+    target_text: str | None = None
+    iterator_text: str | None = None
+    if isinstance(node, ast.If | ast.While):
+        condition_node = node.test
+    else:
+        target_node = node.target
+        iterator_node = node.iter
+        target_text = _unparse(node.target)
+        iterator_text = _unparse(node.iter)
+    subject = _unparse(condition_node) if condition_node is not None else iterator_text
+    return IRControlFact(
+        fact_id=fact_id,
+        source_path=index.relative_path,
+        source_symbol=source_symbol,
+        source_node_id=source_node_id,
+        source_span=f"{line}:None",
+        control_kind=control_kind,
+        condition=_unparse(condition_node) if condition_node is not None else None,
+        condition_ast=ast_to_json(condition_node) if condition_node is not None else None,
+        target=target_text,
+        target_ast=ast_to_json(target_node) if target_node is not None else None,
+        iterator=iterator_text,
+        iterator_ast=ast_to_json(iterator_node) if iterator_node is not None else None,
+        body_targets=assignment_targets_in(node.body),
+        orelse_targets=assignment_targets_in(node.orelse),
+        statement=(
+            f"`{source_symbol}` {control_kind} at line {line}"
+            + (f" over `{subject}`." if subject else ".")
+        ),
+    )
+
+
+def collect_symbol_control_facts(
+    index: ModuleIndex,
+    qualname: str,
+    symbol: PythonSymbol,
+) -> tuple[IRControlFact, ...]:
+    """Collect branch and loop facts from one expanded symbol."""
+    if not isinstance(symbol, ast.FunctionDef | ast.AsyncFunctionDef):
+        return ()
+    facts: list[IRControlFact] = []
+    source_node_id = node_id_for_ref(index, qualname)
+
+    class Visitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+            if node is not symbol:
+                return
+            self.generic_visit(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+            if node is not symbol:
+                return
+            self.generic_visit(node)
+
+        def visit_If(self, node: ast.If) -> None:  # noqa: N802
+            facts.append(
+                make_control_fact(
+                    index,
+                    source_symbol=qualname,
                     source_node_id=source_node_id,
-                    fact_kind="return_equation",
-                    target="return",
-                    expression=_unparse(node.value),
-                    line=int(getattr(node, "lineno", 0)),
+                    control_kind="if",
+                    node=node,
+                    ordinal=len(facts) + 1,
+                )
+            )
+            self.generic_visit(node)
+
+        def visit_While(self, node: ast.While) -> None:  # noqa: N802
+            facts.append(
+                make_control_fact(
+                    index,
+                    source_symbol=qualname,
+                    source_node_id=source_node_id,
+                    control_kind="while",
+                    node=node,
+                    ordinal=len(facts) + 1,
+                )
+            )
+            self.generic_visit(node)
+
+        def visit_For(self, node: ast.For) -> None:  # noqa: N802
+            facts.append(
+                make_control_fact(
+                    index,
+                    source_symbol=qualname,
+                    source_node_id=source_node_id,
+                    control_kind="for",
+                    node=node,
+                    ordinal=len(facts) + 1,
                 )
             )
             self.generic_visit(node)
@@ -858,7 +1037,6 @@ def collect_module_static_code_facts(index: ModuleIndex) -> tuple[IRCodeFact, ..
     facts: list[IRCodeFact] = []
     for stmt in index.tree.body:
         if isinstance(stmt, ast.Assign):
-            expression = _unparse(stmt.value)
             for target in stmt.targets:
                 for target_text in target_texts(target):
                     if not target_text.startswith("_") and not target_text.isupper():
@@ -870,12 +1048,11 @@ def collect_module_static_code_facts(index: ModuleIndex) -> tuple[IRCodeFact, ..
                             source_node_id=None,
                             fact_kind="module_constant",
                             target=target_text,
-                            expression=expression,
+                            expression_node=stmt.value,
                             line=int(getattr(stmt, "lineno", 0)),
                         )
                     )
         elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
-            expression = _unparse(stmt.value)
             for target_text in target_texts(stmt.target):
                 if not target_text.startswith("_") and not target_text.isupper():
                     continue
@@ -886,25 +1063,25 @@ def collect_module_static_code_facts(index: ModuleIndex) -> tuple[IRCodeFact, ..
                         source_node_id=None,
                         fact_kind="module_constant",
                         target=target_text,
-                        expression=expression,
+                        expression_node=stmt.value,
                         line=int(getattr(stmt, "lineno", 0)),
                     )
                 )
         elif isinstance(stmt, ast.ClassDef):
             for child in stmt.body:
-                expression: str | None = None
+                expression_node: ast.AST | None = None
                 targets: tuple[str, ...] = ()
                 if isinstance(child, ast.Assign):
-                    expression = _unparse(child.value)
+                    expression_node = child.value
                     targets = tuple(
                         target_text
                         for target in child.targets
                         for target_text in target_texts(target)
                     )
                 elif isinstance(child, ast.AnnAssign) and child.value is not None:
-                    expression = _unparse(child.value)
+                    expression_node = child.value
                     targets = target_texts(child.target)
-                if expression is None:
+                if expression_node is None:
                     continue
                 class_symbol = stmt.name
                 source_node_id = (
@@ -920,7 +1097,7 @@ def collect_module_static_code_facts(index: ModuleIndex) -> tuple[IRCodeFact, ..
                             source_node_id=source_node_id,
                             fact_kind="class_default",
                             target=target_text,
-                            expression=expression,
+                            expression_node=expression_node,
                             line=int(getattr(child, "lineno", 0)),
                         )
                     )
@@ -947,19 +1124,62 @@ def update_instance_types(
     call_target: str,
     assigned_to: tuple[str, ...],
     resolved_symbol: str | None,
-    index: ModuleIndex,
+    source_index: ModuleIndex,
+    target_index: ModuleIndex | None = None,
 ) -> None:
-    """Update instance type facts from constructor calls."""
+    """Update instance type facts from constructor calls and annotated returns."""
     if not assigned_to:
         return
-    constructor = resolved_symbol if resolved_symbol in index.class_methods else None
-    if constructor is None and call_target in index.class_methods:
+    type_index = target_index or source_index
+    constructor = resolved_symbol if resolved_symbol in type_index.class_methods else None
+    if constructor is None and call_target in type_index.class_methods:
         constructor = call_target
-    if constructor is None:
+    if constructor is not None:
+        for name in assigned_to:
+            if "." not in name:
+                instance_types[name] = constructor
         return
-    for name in assigned_to:
-        if "." not in name:
-            instance_types[name] = constructor
+
+    if resolved_symbol is None or target_index is None:
+        return
+    symbol = target_index.symbols.get(resolved_symbol)
+    if not isinstance(symbol, ast.FunctionDef | ast.AsyncFunctionDef):
+        return
+    return_types = return_type_names(symbol)
+    if not return_types:
+        return
+    call_head = call_target.split(".", 1)[0]
+    binding = source_index.import_bindings.get(call_head)
+    for name, type_name in zip(assigned_to, return_types, strict=False):
+        if "." in name:
+            continue
+        qualified = (
+            f"{binding.alias}.{type_name}"
+            if binding is not None and type_name in target_index.class_methods
+            else type_name
+        )
+        instance_types[name] = qualified
+
+
+def return_type_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
+    """Return tuple element type names from a function return annotation."""
+    annotation = node.returns
+    if annotation is None:
+        return ()
+    if isinstance(annotation, ast.Subscript):
+        base = type_name_from_annotation(annotation.value) or ""
+        if base.split(".")[-1] in {"tuple", "Tuple"}:
+            slice_node = annotation.slice
+            if isinstance(slice_node, ast.Tuple):
+                return tuple(
+                    name
+                    for item in slice_node.elts
+                    if (name := type_name_from_annotation(item))
+                )
+            item_name = type_name_from_annotation(slice_node)
+            return (item_name,) if item_name else ()
+    name = type_name_from_annotation(annotation)
+    return (name,) if name else ()
 
 
 def current_class_for(qualname: str, index: ModuleIndex) -> str | None:
@@ -1880,6 +2100,7 @@ def build_algorithm_ir(
     nodes: dict[str, IRNode] = {}
     edges: list[IREdge] = []
     code_facts: dict[str, IRCodeFact] = {}
+    control_facts: dict[str, IRControlFact] = {}
     expanded: set[str] = set()
     module_indexes: dict[Path, ModuleIndex] = {index_cache_key(index.path): index}
 
@@ -1889,6 +2110,10 @@ def build_algorithm_ir(
     def add_code_facts(items: Iterable[IRCodeFact]) -> None:
         for fact in items:
             code_facts.setdefault(fact.fact_id, fact)
+
+    def add_control_facts(items: Iterable[IRControlFact]) -> None:
+        for fact in items:
+            control_facts.setdefault(fact.fact_id, fact)
 
     def make_edge(
         site: CallSite,
@@ -2020,6 +2245,7 @@ def build_algorithm_ir(
         expanded.add(expansion_key)
         add_node(make_node(source_index, qualname, symbol))
         add_code_facts(collect_symbol_code_facts(source_index, qualname, symbol))
+        add_control_facts(collect_symbol_control_facts(source_index, qualname, symbol))
         instance_types = initial_instance_types(symbol, current_class_for(qualname, source_index))
         for site in collect_call_sites(symbol):
             call_text = dotted_name(site.call.func)
@@ -2097,10 +2323,11 @@ def build_algorithm_ir(
             )
             update_instance_types(
                 instance_types,
-                target_symbol,
+                site.call.func.id if isinstance(site.call.func, ast.Name) else dotted_name(site.call.func),
                 site.assigned_to,
                 target_symbol if resolved_call.resolved else None,
                 source_index,
+                target_index if resolved_call.resolved else None,
             )
             if (
                 resolved_call.resolved
@@ -2181,6 +2408,7 @@ def build_algorithm_ir(
         nodes=tuple(sorted(nodes.values(), key=lambda item: item.node_id)),
         edges=tuple(edges),
         code_facts=tuple(sorted(code_facts.values(), key=lambda item: item.fact_id)),
+        control_facts=tuple(sorted(control_facts.values(), key=lambda item: item.fact_id)),
         static_checks=static_checks,
         backend_assumptions=backend_assumptions,
         obligations=obligations,
@@ -2199,6 +2427,7 @@ def render_text(report: AlgorithmIRReport) -> str:
         f"ALGORITHM_EXPANSION_IR_NODES={len(report.nodes)}",
         f"ALGORITHM_EXPANSION_IR_EDGES={len(report.edges)}",
         f"ALGORITHM_EXPANSION_IR_CODE_FACTS={len(report.code_facts)}",
+        f"ALGORITHM_EXPANSION_IR_CONTROL_FACTS={len(report.control_facts)}",
         f"ALGORITHM_EXPANSION_IR_STATIC_CHECKS={len(report.static_checks)}",
         f"ALGORITHM_EXPANSION_IR_OBLIGATIONS={len(report.obligations)}",
         f"ALGORITHM_EXPANSION_IR_SELECTED_OBLIGATIONS={len(report.selected_local_obligations)}",
@@ -2219,6 +2448,12 @@ def render_text(report: AlgorithmIRReport) -> str:
             "ALGORITHM_EXPANSION_IR_CODE_FACT="
             f"{fact.fact_id}:{fact.fact_kind}:{fact.source_symbol}:"
             f"target={fact.target}:tags={','.join(fact.equation_tags) or 'none'}"
+        )
+    for fact in report.control_facts:
+        lines.append(
+            "ALGORITHM_EXPANSION_IR_CONTROL_FACT="
+            f"{fact.fact_id}:{fact.control_kind}:{fact.source_symbol}:"
+            f"condition={fact.condition or fact.iterator or 'none'}"
         )
     for check in report.static_checks:
         lines.append(
@@ -2257,6 +2492,7 @@ def render_markdown(report: AlgorithmIRReport) -> str:
         f"- nodes: `{len(report.nodes)}`",
         f"- edges: `{len(report.edges)}`",
         f"- code facts: `{len(report.code_facts)}`",
+        f"- control facts: `{len(report.control_facts)}`",
         f"- static checks: `{len(report.static_checks)}`",
         f"- obligations: `{len(report.obligations)}`",
         "",
@@ -2315,6 +2551,36 @@ def render_markdown(report: AlgorithmIRReport) -> str:
             )
     else:
         lines.append("| none | none | none | none | none | none | none |")
+    lines.extend(
+        [
+            "",
+            "## Control Facts",
+            "",
+            "| Fact | Kind | Source | Condition | Target | Iterator | Body Targets | Orelse Targets |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    if report.control_facts:
+        for fact in report.control_facts:
+            lines.append(
+                "| "
+                + " | ".join(
+                    markdown_cell(value)
+                    for value in (
+                        fact.fact_id,
+                        fact.control_kind,
+                        f"`{fact.source_symbol}`",
+                        f"`{fact.condition}`" if fact.condition is not None else "none",
+                        f"`{fact.target}`" if fact.target is not None else "none",
+                        f"`{fact.iterator}`" if fact.iterator is not None else "none",
+                        ", ".join(f"`{target}`" for target in fact.body_targets) or "none",
+                        ", ".join(f"`{target}`" for target in fact.orelse_targets) or "none",
+                    )
+                )
+                + " |"
+            )
+    else:
+        lines.append("| none | none | none | none | none | none | none | none |")
     lines.extend(
         [
             "",

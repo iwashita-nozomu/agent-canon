@@ -23,6 +23,8 @@ downstream implementation ../../tools/agent_tools/search_index.py builds repo-lo
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
+downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
 downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
 downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
@@ -73,15 +75,19 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/formal_proof.py`
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
 - `tools/agent_tools/lean_proof_env.py`
-  - Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。topic-local theorem package に一時的な Mathlib 依存を入れず、環境責務をこの tool に集約します。
+  - Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。探索・fallback はこの tool、durable theorem surface は topic-local Lake package の依存として固定します。
+- `documents/tools/lean_capability_matrix.md`
+  - Lean core、Mathlib、Aesop、theorem search、Lake 環境の使い分けを記録する proof-task 向け能力表です。特定アルゴリズム名に寄せず、方程式、反復、順序、線形/多項式不等式、構造分解、既存定理探索をどう Lean に渡すかを決めます。
 - `tools/agent_tools/proof_path_analyzer.py`
   - `algorithm_lemma_graph.py` の lemma graph と topic-local `proof_status.json` を読み、checked fragment の採用漏れ、裸の `unverified` frontier、stale implementation token、重複 B-label、target-chain 切断を検査します。数学的 witness が未接続な箇所は open witness として残し、artifact integrity と proof completion を分けて報告します。
 - `tools/agent_tools/ir_graph_correspondence.py`
   - Algorithm Expansion IR の `assignment_equation` / `return_equation` が lemma graph の code-fact node、`lemma_consumes_code_fact` edge、target chain、必要なら `proof_status.json` の `code_derived_facts` に対応しているかを検査します。反復法は `source_symbol` と `equation_tags` で grouped iteration unit として報告します。
+- `agent-canon algorithm-ir-to-lean`
+  - Algorithm Expansion IR の `expression_ast`、`control_facts`、構造体 projection を Rust で Lean route artifact へ変換し、手書き抽象ではなく実装由来の evaluation order を証明テーマへ渡します。
 - `tools/agent_tools/algorithm_flowchart.py`
   - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。`--view runtime|core` は proof-only node / label を runtime 図から外し、実装経路の確認に使います。
 - `tools/agent_tools/kkt_equation_section.py`
-  - Algorithm Expansion IR の `code_facts` を検査し、PDIPM/KKT/MINRES solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、KKT 式を proof note に手書きで足す経路を避けます。
+  - Algorithm Expansion IR の `code_facts` を検査し、reduced block-system / KKT / iterative-solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、solver-chain 式を proof note に手書きで足す経路を避けます。
 - `agent-canon test-design check`
   - Rust CLI の test design 診断入口です。既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。説明文書は [test_design.md](test_design.md) です。
 - `agent-canon local-llm classify-responsibility`

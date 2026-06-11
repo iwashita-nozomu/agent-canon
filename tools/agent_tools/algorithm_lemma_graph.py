@@ -108,7 +108,6 @@ class LemmaGraphReport:
 
     status: str
     source_ir_status: str
-    source_ir_fingerprint: str
     root: str
     theorem: str
     target_profiles: tuple[str, ...]
@@ -418,7 +417,32 @@ def build_code_fact_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, obje
         if not isinstance(fact, dict):
             continue
         fact_id = str(fact.get("fact_id", "code_fact"))
-        profiles = tuple_of_strings(fact.get("target_profiles")) or ("all",)
+        source_symbol = str(fact.get("source_symbol", ""))
+        source_path = str(fact.get("source_path", ""))
+        equation_tags = set(tuple_of_strings(fact.get("equation_tags")))
+        profile_set = set(tuple_of_strings(fact.get("target_profiles")) or ("all",))
+        if source_symbol.startswith("_pdipm_") or source_symbol in {
+            "_compute_residuals",
+            "_pdipm_convergence",
+        }:
+            profile_set.add("local_convergence")
+        if any(
+            token in source_path or token in source_symbol.lower()
+            for token in ("solvers/", "kkt", "minres", "lobpcg", "preconditioner", "rank_r")
+        ):
+            profile_set.add("solver_chain")
+        if "step_update" in equation_tags:
+            profile_set.add("step_update")
+            profile_set.add("local_convergence")
+        if "reduced_kkt" in equation_tags:
+            profile_set.add("reduced_kkt")
+            profile_set.add("local_convergence")
+            profile_set.add("solver_chain")
+        if "floor_preserving_step" in equation_tags:
+            profile_set.add("floor_preserving_step")
+            profile_set.add("fp32_floor")
+            profile_set.add("local_convergence")
+        profiles = tuple(profile for profile in KNOWN_TARGET_PROFILES if profile in profile_set)
         raw_nodes.append(
             {
                 "lemma": LemmaNode(
@@ -434,8 +458,8 @@ def build_code_fact_nodes(ir_payload: dict[str, object]) -> tuple[dict[str, obje
                         else ()
                     ),
                     source_edges=(),
-                    source_symbols=(str(fact.get("source_symbol", "")),),
-                    source_paths=(str(fact.get("source_path", "")),),
+                    source_symbols=(source_symbol,),
+                    source_paths=(source_path,),
                     source_code_facts=(fact_id,),
                     math_role="implementation_equation_fact",
                     residual_unit="none",
@@ -747,9 +771,6 @@ def build_lemma_graph(ir_payload: dict[str, object], profiles: tuple[str, ...]) 
     """Build the lemma dependency graph."""
     theorem = str(ir_payload.get("target_theorem", "target theorem"))
     root = f"{ir_payload.get('root_path', '')}::{ir_payload.get('root_symbol', '')}"
-    source_ir_fingerprint = str(
-        ir_payload.get("algorithm_fingerprint") or algorithm_fingerprint(ir_payload)
-    )
     target_profiles = profiles or KNOWN_TARGET_PROFILES
     raw_obligation_nodes = build_obligation_nodes(ir_payload)
     raw_backend_nodes = build_backend_assumption_nodes(ir_payload)
@@ -787,7 +808,6 @@ def build_lemma_graph(ir_payload: dict[str, object], profiles: tuple[str, ...]) 
     return LemmaGraphReport(
         status="lemma_graph_built" if validation.valid else "lemma_graph_invalid",
         source_ir_status=str(ir_payload.get("status", "unknown")),
-        source_ir_fingerprint=source_ir_fingerprint,
         root=root,
         theorem=theorem,
         target_profiles=target_profiles,
@@ -804,7 +824,6 @@ def render_text(report: LemmaGraphReport) -> str:
         f"LEMMA_GRAPH={report.status}",
         f"LEMMA_GRAPH_ROOT={report.root}",
         f"LEMMA_GRAPH_THEOREM={report.theorem}",
-        f"LEMMA_GRAPH_SOURCE_IR_FINGERPRINT={report.source_ir_fingerprint}",
         f"LEMMA_GRAPH_NODES={len(report.lemma_nodes)}",
         f"LEMMA_GRAPH_EDGES={len(report.lemma_edges)}",
         f"LEMMA_GRAPH_TARGETS={len(report.target_chains)}",
@@ -843,7 +862,6 @@ def render_markdown(report: LemmaGraphReport) -> str:
         "",
         f"- root: `{report.root}`",
         f"- theorem: `{report.theorem}`",
-        f"- source IR fingerprint: `{report.source_ir_fingerprint}`",
         f"- status: `{report.status}`",
         f"- nodes: `{len(report.lemma_nodes)}`",
         f"- edges: `{len(report.lemma_edges)}`",
