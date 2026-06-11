@@ -59,6 +59,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
 - active な subagent 数は spawn budget で縛ります
+- spawn budget は同時 active 数の上限です。first wave を budget まで埋める target ではありません。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します
+- multi-agent family で予定 stage wave を起こさない場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
@@ -72,6 +74,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
 - 新規 user request では前 task の subagent instance を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
+- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint を追記し、updated packet path と unchanged role scope がある場合だけ run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は existing agent へ継ぎ足さず fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
 
@@ -85,12 +88,28 @@ Subagent の context budget は correctness gate です。parent は handoff pro
 - `canon_refs`: 必要な AgentCanon / project canon の節だけ。文書 tree 全体を辿らせません。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
+- `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic fallback output を渡し、path を chat 印象で選びません。
+- `tool_reuse_ledger` と `pre_edit_rejection_prediction`: write-capable `spark_worker` / `worker` には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
 
 role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary だけを渡します。Python API / typing review は `python_reviewer` に分け、数学 canon の full context は渡しません。
 
-## Initial Three-Agent Intake
+## Wave Plan Contract
 
-Initial Three-Agent Intake は repo-changing task の初期責務を3つに分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` を handoff prompt に含めます。
+Every subagent wave must be recorded with the same compact contract across
+`team_manifest.yaml`, `schedule.md`, `workflow_monitoring.md`, and
+`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`,
+`spawn_budget.active_subagents`, `spawn_budget.max_write_subagents`,
+`runtime_max_threads`, `runtime_max_depth`, `allowed_paths`, `do_not_read`,
+`write_scope`, `validation_route`, `review_gate`, and `handoff_artifacts`.
+Mid-task expansion uses the same contract; it is not an exception path.
+`task_start.py` and `bootstrap_agent_run.py` emit
+`RECOMMENDED_INITIAL_SUBAGENT_WAVE` and `RECOMMENDED_DYNAMIC_EXPANSION_WAVES`;
+these values are executable Codex `agent_type` lists for the parent to pass to
+the runtime spawn tool.
+
+## Initial Intake Wave
+
+Initial Intake Wave は repo-changing task の初期責務を要件、調査、実行計画に分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの初期 wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer
@@ -126,7 +145,7 @@ requires explicit spawn authorization, "checked by read-only roles" means
 spawn the roles only after authorization; otherwise persist their handoff
 packets and block implementation until the authorization question is resolved.
 
-Default pre-goal wave:
+Candidate pre-goal roles:
 
 - `requirements_organizer`: derive a conservative Objective, non-goals,
   constraints, and Exit Criteria from the user request and durable repo notes.
@@ -136,6 +155,10 @@ Default pre-goal wave:
   `goal_loop.py plan` exists.
 - `plan_reviewer`: verify that the candidate goal is checkable and that the
   first slice has evidence gates and rollback boundaries.
+
+These are not a predeclared bundle. Start with the roles needed for the
+current stage, keep unused roles as dynamic wave triggers, and add them only
+when goal evidence, dependency state, or review separation requires them.
 
 Constraints:
 
@@ -153,9 +176,8 @@ Constraints:
 - Handoffs must include `agents/workflows/codex-goals-workflow.md`,
   `agents/workflows/goal-plan-implementation-loop.md`, the candidate `goal.md`
   or goal artifact, and `team_manifest.yaml` lifecycle policy.
-- When repo MCP exposes `goal.plan`, use it with `goal.loop_status` to hand the
-  next unchecked work units to `execution_planner` instead of summarizing a
-  large `goal.md` by chat.
+- Use `goal_loop.py plan` to hand the next unchecked work units to
+  `execution_planner` instead of summarizing a large `goal.md` by chat.
 
 ## Codex Command Surface
 
@@ -176,7 +198,7 @@ Constraints:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `spark_worker` first for narrow slices derived from the Abstract Design Frame and design trace; `worker` fallback for broad or ambiguous implementation |
+| `implementer` | `spark_worker` first for narrow slices derived from the Abstract Design Frame and design trace; `worker` alternate route for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
@@ -337,7 +359,7 @@ workflow docs、task catalog に role list や model list を重複管理しま�
 
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
-  この文書は個別 source URL や fallback reference を保持しません。
+  この文書は個別 source URL や alternate route reference を保持しません。
 - この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と Abstract Design Frame から導かれた設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います

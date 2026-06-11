@@ -124,8 +124,6 @@ ENVIRONMENT_PATHS = (
     ExpectedPath(".github/workflows/ci.yml", "github_environment", "file"),
     ExpectedPath(".github/workflows/docker-build.yml", "github_environment", "file"),
     ExpectedPath(".github/scripts/checkout_agent_canon_submodule.sh", "github_environment", "file", executable=True),
-    ExpectedPath("mcp/repo_mcp_server.sh", "mcp_environment", "file", executable=True),
-    ExpectedPath("mcp/repo_mcp_server.py", "mcp_environment", "file"),
 )
 
 CONTENT_MARKERS = (

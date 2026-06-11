@@ -8,6 +8,8 @@ upstream design ../TASK_WORKFLOWS.md workflow routing contract
 upstream design ../workflows/README.md workflow catalog routing guide
 upstream design ../workflows/implementation-waterfall-workflow.md implementation gate contract
 upstream design ../../AGENTS.md bounded handoff and subagent packet rules
+upstream design ../canonical/CODEX_SUBAGENTS.md Codex runtime surface and subagent config ownership
+upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root runtime surface policy
 upstream design refactor-loop.md behavior-preserving refactor loop
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md graph-backed prose and README analysis
@@ -17,20 +19,27 @@ downstream implementation ../../.agents/skills/structure-refactor/SKILL.md expos
 
 ## Purpose
 
-`structure-refactor` is the skill for changing repository directory structure
-by responsibility. It treats directories, directory READMEs, dependency
-manifests, root views, responsibility scopes, imports, and reader navigation as
-one refactor surface.
+`structure-refactor` is the skill for changing or repairing repository
+structure by responsibility. It treats repo roots, directories, directory
+READMEs, dependency manifests, AgentCanon shared surfaces, project runtime
+views, responsibility scopes, imports, and reader navigation as one refactor
+surface. It also classifies personal Codex runtime state such as `~/.codex`
+when that state may explain routing or skill discovery, while keeping personal
+state out of shared repository canon unless the user explicitly asks for a
+personal runtime edit.
 
 The skill boundary is mechanical. It does not own generic behavior-preserving
 refactor mechanics; use
 `refactor-loop` for safety contracts, `dependency-analysis` for impact packets,
 `prose-reasoning-graph` for README / prose graph diagnostics, and
 `document-canon-cleanup` for stale or duplicate document surfaces. Those paired
-skills define the boundary of this skill: select `structure-refactor` only when
-the directory layout itself is part of the requested change or when mechanical
-evidence shows a responsibility conflict that documentation edits alone cannot
-repair; the next section defines that mechanical evidence packet.
+skills define the boundary of this skill: select `structure-refactor` when the
+repository layout itself is part of the requested change, when a task cannot
+start because AgentCanon's expected repository structure no longer matches the
+checkout, when project `.codex` views and personal `~/.codex` state must be
+separated before routing or subagent work, or when mechanical evidence shows a
+responsibility conflict that documentation edits alone cannot repair; the next
+section defines that mechanical evidence packet.
 
 ## Evidence Sources
 
@@ -39,6 +48,17 @@ source packet:
 
 - `responsibility-scope.toml` and `responsibility_scope.py` show primary scope
   ownership, `exclude_paths`, required coverage, and overlap findings.
+- `documents/repo-structure-contract.toml` and
+  `repo_structure_contract.py` show whether the checkout still satisfies the
+  expected standalone, template, or derived-repository layout before a task
+  creates, moves, or ignores paths.
+- Project `.codex/config.toml`, `.codex/agents/*.toml`, `.agents/skills/`,
+  and their symlink targets show the repo-local Codex runtime surface. In this
+  template those paths are AgentCanon shared views.
+- `~/.codex/config.toml`, `~/.codex/skills/`, user rules, and hook trust state
+  are personal runtime surfaces. Inspect only keys, paths, and skill IDs needed
+  for conflict triage; do not print secrets, auth state, history, logs, or
+  cache contents. Do not mirror personal state into the repo.
 - `import_responsibility.py` shows whether directories still need distinct
   import boundaries.
 - Recursive directory `README.md`, `AGENTS.md`, and dependency manifests show
@@ -51,13 +71,50 @@ source packet:
 
 ## Use When
 
-- A user asks to refactor directory structure, not only update explanatory docs.
+- A user asks to refactor repository structure, repo layout, or a repo-refactor
+  skill, not only update explanatory docs.
 - The evidence sources above show that directory responsibilities must be
   split, merged, or moved.
 - A directory README no longer matches the files below it.
 - `responsibility-scope.toml` or root-view layout creates overlapping ownership.
 - A shared canon path, root symlink view, tool directory, skill directory, or
   document hierarchy is being reorganized.
+- A prompt, skill, tool, subagent, or hook routing issue may come from a
+  boundary between project `.codex` / `.agents` views and personal `~/.codex`
+  configuration.
+- A repo task is about to start, but expected AgentCanon paths, template root
+  views, `vendor/agent-canon/`, `.gitmodules`, root `AGENTS.md`, or documented
+  source/owned directories are missing, stale, moved, or unexpectedly local.
+- An agent is tempted to recreate a missing file or implement in a nearby
+  directory because the expected canonical path is absent.
+
+## Pre-Task Structure Repair Contract
+
+Use this mode before the ordinary task when the checkout no longer matches the
+structure AgentCanon expects:
+
+```text
+structure_repair_root=<repo-root>
+structure_surface=<repo-source|agentcanon-shared|project-runtime-view|personal-runtime|mixed|unknown>
+detected_repo_profile=<standalone-agent-canon|template|derived|unknown>
+drift_symptom=<missing-path|wrong-root-view|submodule-state|scope-overlap|stale-document-route|personal-runtime-conflict|project-user-config-conflict|other>
+expected_owner=<agent-canon|template|derived-repo|personal-runtime|unknown>
+contract_check=<artifact path>
+scope_check=<artifact path>
+import_check=<artifact path|not_applicable>
+personal_runtime_check=<artifact path|not_applicable>
+missing_path_triage=<artifact path>
+repair_action=<link-root|agent-canon-update|responsibility-scope-fix|document-route-fix|project-runtime-fix|personal-runtime-fix|structure-refactor|defer>
+ordinary_task_status=<blocked_until_repair|allowed_after_repair|deferred_with_issue>
+```
+
+If a missing path is involved, follow `CODEX_WORKFLOW.md` `Missing File Or Path
+Triage` before recreating anything. For AgentCanon-owned root views or submodule
+state, use the AgentCanon update route instead of creating a template-local
+replacement. For `~/.codex`, treat user config, user skills, hook trust state,
+history, logs, auth, and caches as personal runtime state. Only edit those
+files when the user explicitly asks to fix personal Codex configuration and the
+planned change is not a shared repo contract.
 
 ## Required Structure Contract
 
@@ -65,6 +122,7 @@ Write this before moving files:
 
 ```text
 structure_refactor_root=<repo-or-subtree>
+structure_surface=<repo-source|agentcanon-shared|project-runtime-view|personal-runtime|mixed>
 behavior_contract=<what must keep working>
 directory_responsibility_graph=<artifact path>
 primary_responsibility_map=<directory -> responsibility>
@@ -74,12 +132,47 @@ forbidden_semantic_delta=<behavior, policy, API, validation changes not allowed>
 path_mapping=<old path -> new path, or unchanged with reason>
 scope_delta=<responsibility-scope additions/removals/exclude_paths>
 reader_delta=<README/index/navigation updates>
+runtime_boundary=<project .codex/.agents views vs personal ~/.codex state>
 validation_gate=<scope/import/docs/tests/build commands>
 ```
 
 ## Default Sequence
 
 1. Identify the requested root and non-goals.
+1. Route before reading broad prose. For prompt-derived routing, run
+   `agent-canon local-llm route-skill --prompt "<request>" --format json`.
+   For proposed tool or skill names such as `repo_refactor_skill.py`, run
+   `python3 tools/agent_tools/route.py --name <candidate>`. If these tools do
+   not route repo-refactor or `~/.codex` boundary work to
+   `structure-refactor`, fix the deterministic router before compensating with
+   more instructions.
+1. If this is a pre-task drift repair, classify the repository structure before
+   reading broad document packets:
+
+```bash
+python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json \
+  > <run>/repo_structure_contract.json
+```
+
+   In template or derived roots where the contract is not a checked-in root
+   view, pass the vendored contract explicitly:
+
+```bash
+python3 tools/agent_tools/repo_structure_contract.py --root <root> \
+  --contract vendor/agent-canon/documents/repo-structure-contract.toml \
+  --format json > <run>/repo_structure_contract.json
+```
+
+   If the result shows only AgentCanon-owned root view or submodule drift, route
+   to `agent-canon-update`, `make agent-canon-ensure-latest`, and
+   `bash tools/sync_agent_canon.sh link-root` / `check` before continuing the
+   ordinary task. If the result shows real source-layout conflict, continue with
+   the structure refactor sequence below.
+1. If `~/.codex` is implicated, inspect only non-secret routing metadata:
+   user config keys, project entries, user skill IDs, and project `.codex`
+   symlink targets. Classify the outcome as `no_conflict`,
+   `personal-runtime-fix`, `project-runtime-fix`, or `defer`. Do not scan
+   personal history, sessions, auth, logs, or caches for structure evidence.
 1. Collect recursive directory evidence:
    - every directory `README.md`
    - relevant `AGENTS.md` / `ROOT_AGENTS.md`
@@ -117,19 +210,16 @@ python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path> 
 
 1. Propose the smallest responsibility-preserving path mapping.
 
-1. Split work into waves:
-   - root/scope contract wave
-   - directory move wave
-   - import/link repair wave
-   - README/index repair wave
-   - stale-path sweep wave
-
+1. Hand wave planning to `refactor-loop`. This skill owns the validated
+   structure surface classification, root/scope contract, path mapping, runtime
+   boundary, and structure validation gates. `refactor-loop` owns repair batch
+   sizing, `blocked_by`, sequential/parallel wave choice, and write-capable
+   subagent orchestration.
 1. Use write-capable subagents only for disjoint waves with explicit
-   `allowed_paths`; keep root/scope contract and final judgment with the parent
-   or reviewer.
-
-1. After each wave, rerun scope, import, document inventory, dependency header,
-   and docs checks before starting the next wave.
+   `allowed_paths`; keep root/scope contract, personal-runtime boundary, and
+   final judgment with the parent or reviewer. After each wave, rerun the
+   relevant scope, import, document inventory, dependency header, docs, and
+   runtime alignment checks before starting the next wave.
 
 ## Move Rules
 

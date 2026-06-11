@@ -46,7 +46,7 @@ python3 tools/agent_tools/noncanonical_document_inventory.py \
 
 ## Classification Rules
 
-- `accumulated_eval_result`: `.agent-canon/archive/<env-key>/eval-results/` の蓄積結果。正本 policy ではなく evidence。
+- `accumulated_eval_result`: `.agent-canon/log-archive/eval-results/` の蓄積結果。正本 policy ではなく evidence。
 - `generated_report`: `reports/` 配下。再生成または evidence として扱い、source policy にしません。
 - `closed_issue_record`: `issues/closed/` 配下。履歴 record として保持し、新 scope は新 issue にします。
 - `missing_dependency_manifest`: 文書として残すなら dependency header を足し、artifact なら source tree 外へ移します。

@@ -34,10 +34,10 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 ## External Evaluation Basis
 
 - OpenAI / Codex の agent eval、trace grading、Codex 運用 guidance は
-  workflow 文書内で個別 URL や fallback 文書として二重管理しません。
+  workflow 文書内で個別 URL や alternate route 文書として二重管理しません。
   更新時は `$openai-docs` の source route を使い、Codex manual helper、
-  Docs MCP、official-domain web fallback、または `$openai-docs` が指定する
-  bundled fallback references で確認します。
+  Docs MCP、official-domain web alternate route、または `$openai-docs` が指定する
+  bundled alternate route references で確認します。
 - この workflow の local authority は、外部 doc の写しではなく
   `evidence/agent-evals/agent_behavior_eval.toml`、
   `reports/agents/<run-id>/agent_evaluation.md`、
@@ -125,9 +125,22 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 この artifact は conversation summary ではなく、workflow が実際に観測した signals と介入を記録します。
 `workflow_monitor.py` を使うと、監視項目を手書きではなく機械的に蓄積できます。
 `bootstrap_agent_run.py` / `task_start.py` は routing と preflight の初期 signals を自動追記します。
-`check_mcp_inventory.py --report-dir <run>` と `run_repo_dependency_review.sh --report-dir <run>` はそれぞれ MCP preflight と dependency review の evidence を追記します。
+`run_repo_dependency_review.sh --report-dir <run>` は dependency review の evidence を追記します。
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
+
+### Runtime Feedback Closure Loop
+
+user / reviewer が agent の動き、routing、自己改善、tool 化、prompt の弱さを指摘した場合、parent はその場で `$agent-learning` を有効化します。指摘を chat 上の反省で終わらせず、次の順で閉じます。
+
+1. `workflow_monitor.py --runtime-feedback` で `source=... target=... action=... evidence=...` を記録する
+1. 指摘の反映先を `skill prompt`、`workflow prompt`、`tool/checker`、`eval rubric`、`memory`、`issue`、`no_op` のどれかに分類する
+1. `action=no_op` 以外では、`skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` の少なくとも 1 つを `applied` または `recorded` にする
+1. prompt / tool / eval を更新した場合は、対応する test、checker、prompt eval、または workflow eval を同じ run で再実行する
+1. memory に残す場合は `log_agent_learning.py` で短い observation に圧縮し、raw chat を貼らない
+1. `evaluate_agent_run.py --write` が `AGENT_EVALUATION_STATUS=pass` になるまで closeout しない
+
+この loop は「最終 retrospective で思い出す」ものではなく、フィードバックを受けた時点で実行する作業です。`runtime_feedback=observed` があるのに improvement decision がすべて `not_applicable` の run は、agent evaluation で revise になります。
 
 ### Hook And Tool Protocol Feedback
 
@@ -160,7 +173,6 @@ protocol_feedback_reason=<short-reason>
 
 - `skills=` または `$agent-orchestration` など、選択した skill surface
 - stage owner、subagent routing、または `parent_direct_reason` / `trivial_direct_edit`
-- MCP preflight 結果、または `mcp_preflight_not_required`
 - repo dependency intake 結果、または `repo_dependency_intake_not_required`
 - web research / external research 結果、または `web_research_not_required`
 - behavior event: skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check のいずれか

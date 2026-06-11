@@ -6,7 +6,7 @@ upstream design ../canonical/CODEX_SUBAGENTS.md pre-goal subagent routing contra
 upstream design adaptive-improvement-workflow.md goal loop source of truth
 downstream design goal-plan-implementation-loop.md defines efficient iteration cadence
 upstream implementation ../../.codex/config.toml enables Codex goals feature
-downstream implementation ../../mcp/repo_mcp_server.py exposes goal loop status
+upstream implementation ../../tools/agent_tools/goal_loop.py exposes goal loop status
 @dependency-end
 -->
 
@@ -29,11 +29,10 @@ contract.
   repo's active goal with another repo's goal.
 - Codex `goals` is the interactive session view of the same objective and
   criteria.
-- MCP `goal.loop_status` is the mechanical close/continue gate for repo-level
-  loops.
-- MCP `goal.plan` is the mechanical next-slice work-unit surface when the repo
-  server provides it.
-- `tools/agent_tools/goal_loop.py` is the file parser and command-line fallback.
+- `tools/agent_tools/goal_loop.py status` is the mechanical close/continue gate
+  for repo-level loops.
+- `tools/agent_tools/goal_loop.py plan` is the mechanical next-slice work-unit
+  surface.
 
 ## Preflight
 
@@ -41,7 +40,6 @@ Run this at task intake when the task uses a goal or adaptive loop:
 
 ```bash
 codex features list | grep '^goals'
-python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
 python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
   --report-out reports/agents/<run-id>/goal_work_breakdown.md
@@ -53,13 +51,6 @@ surface:
 ```bash
 codex features enable goals
 codex --enable goals
-```
-
-If repo MCP is available, also read MCP status:
-
-```bash
-# Via repo MCP: goal.loop_status
-# Via repo MCP: goal.plan
 ```
 
 `NEXT_ACTION=run_next_iteration` means the task is not complete. Continue the
@@ -177,8 +168,6 @@ evidence, or repo-owned state.
 1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
    TODO draft. The output lists unchecked Exit Criteria and Backlog items as
    `GW*` work units with evidence hints.
-   If MCP `goal.plan` is available, use the MCP output as the same mechanical
-   work-unit surface and record it with `goal.loop_status`.
    The first iteration must be large enough to move a coherent task slice:
    prompt-to-artifact checklist, reuse / consolidation / deletion survey,
    implementation over the selected related surfaces, and validation evidence.
@@ -204,9 +193,8 @@ evidence, or repo-owned state.
    `user_request_contract.md`, put all `GW*` work units into `schedule.md`, and
    record the `/goal` / `/plan` state in `work_log.md` or
    `workflow_monitoring.md`.
-1. Start implementation only after `goal_loop.py status` and MCP
-   `goal.loop_status` agree on the next action and the normal workflow gate
-   allows implementation.
+1. Start implementation only after `goal_loop.py status` reports the next
+   action and the normal workflow gate allows implementation.
 
 If any of these surfaces disagree, stop and repair the contract before editing:
 
@@ -214,7 +202,6 @@ If any of these surfaces disagree, stop and repair the contract before editing:
 - top-level `goal.md`
 - Plan-mode output
 - run-bundle `user_request_contract.md`
-- MCP `goal.loop_status`
 
 Do not use `/goal` as an implementation shortcut. It is an autonomous
 continuation aid after Plan mode has fixed the contract and evidence map.
@@ -264,8 +251,8 @@ When starting a goal-driven task:
    rather than only one tiny "next item" task.
 1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
    implementation edit.
-1. Run `goal_loop.py status` and MCP `goal.loop_status`.
-1. Record both outputs in the run bundle or workflow monitoring artifact.
+1. Run `goal_loop.py status`.
+1. Record the output in the run bundle or workflow monitoring artifact.
 
 Do not create a Codex-only goal that is absent from `goal.md`. Do not mark a
 Codex goal done unless the matching `goal.md` criterion has evidence and
@@ -279,7 +266,6 @@ At the start and end of each iteration:
 1. Run `goal_loop.py status`.
 1. Run `goal_loop.py plan` and refresh the run-bundle `goal_work_breakdown.md`
    if unchecked items changed.
-1. Run MCP `goal.loop_status` when available.
 1. If any surface says work remains, continue the loop instead of returning a
    completion report.
 
@@ -287,7 +273,7 @@ If Codex goals and `goal.md` disagree, repair `goal.md` or the Codex goal view
 before changing code. The repo-owned `goal.md` wins for durable state.
 If `goal.md` resolves into `vendor/agent-canon/`, run
 `bash tools/sync_agent_canon.sh link-root` or replace it with a repo-local
-contract before trusting `goal.loop_status`.
+contract before trusting `goal_loop.py status`.
 
 ## Efficiency Rule
 
@@ -310,7 +296,6 @@ invalid.
 Before user-facing completion:
 
 - `goal_loop.py status` must report a close action.
-- MCP `goal.loop_status` must not report `NEXT_ACTION=run_next_iteration`.
 - Codex goals must have no unchecked item that maps to active `goal.md` Exit
   Criteria or Backlog.
 - Validation evidence must be attached to every closed criterion.

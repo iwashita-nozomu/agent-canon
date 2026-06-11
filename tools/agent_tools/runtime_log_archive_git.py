@@ -19,14 +19,15 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
-    _log_environment_key,
     agent_report_archive_dir,
+    log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
 )
@@ -54,6 +55,19 @@ class ArchiveContext:
     env_key: str
     branch: str
     remote: str
+
+
+@dataclass(frozen=True)
+class ArchiveStatusSummary:
+    """Structured dirty-state summary for the archive clone."""
+
+    current_branch: str
+    dirty: bool
+    branch_matches: bool
+    dirty_keys: tuple[str, ...]
+    current_key_dirty: bool
+    foreign_dirty_keys: tuple[str, ...]
+    global_dirty: bool
 
 
 class ArchiveGitError(RuntimeError):
@@ -93,6 +107,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = subparsers.add_parser("status", help="Print archive clone, branch, and dirty state.")
     status.add_argument("--porcelain", action="store_true", help="Include git status --porcelain output.")
+
+    check_clean = subparsers.add_parser(
+        "check-clean",
+        help="Fail unless the archive clone is on the expected branch and has no uncommitted log artifacts.",
+    )
+    check_clean.add_argument(
+        "--porcelain",
+        action="store_true",
+        help="Include git status --porcelain output on failure.",
+    )
 
     agent_reports = subparsers.add_parser(
         "archive-agent-reports",
@@ -263,7 +287,7 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         else mounted_log_archive_root(canon_root).resolve()
     )
     key = repo_log_key(source_root)
-    env_key = _log_environment_key(canon_root)
+    env_key = log_environment_key(canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,
@@ -295,7 +319,92 @@ def current_branch(context: ArchiveContext) -> str:
 
 def porcelain_status(context: ArchiveContext) -> str:
     """Return porcelain status output for the archive clone."""
-    return git(context.archive_root, ["status", "--porcelain"], check=False).stdout
+    return git(
+        context.archive_root,
+        ["status", "--porcelain", "--untracked-files=all"],
+        check=False,
+    ).stdout
+
+
+def porcelain_path(line: str) -> str:
+    """Extract a path from one non-z porcelain status line."""
+    if len(line) < 4:
+        return ""
+    path = line[3:]
+    if " -> " in path:
+        path = path.rsplit(" -> ", 1)[-1]
+    return path.strip()
+
+
+def dirty_key_for_path(path: str) -> tuple[str, bool]:
+    """Return (repo_key, global_dirty) for one archive-relative dirty path."""
+    parts = Path(path).parts
+    if len(parts) >= 2 and parts[0] in {"hook-runs", "codex-runtime", "agent-reports"}:
+        if parts[1] != "legacy-import":
+            return parts[1], False
+    if parts and parts[0] in {
+        ".gitattributes",
+        "README.md",
+        "eval-results",
+        "legacy-import",
+        "reports",
+        "tools",
+    }:
+        return "", True
+    return "", False
+
+
+def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
+    """Return structured archive dirty-state information."""
+    current = current_branch(context)
+    status = porcelain_status(context)
+    dirty_keys: set[str] = set()
+    global_dirty = False
+    for line in status.splitlines():
+        key, is_global = dirty_key_for_path(porcelain_path(line))
+        if key:
+            dirty_keys.add(key)
+        if is_global:
+            global_dirty = True
+    foreign_keys = tuple(sorted(key for key in dirty_keys if key != context.repo_key))
+    return ArchiveStatusSummary(
+        current_branch=current,
+        dirty=bool(status.strip()),
+        branch_matches=current == context.branch,
+        dirty_keys=tuple(sorted(dirty_keys)),
+        current_key_dirty=context.repo_key in dirty_keys,
+        foreign_dirty_keys=foreign_keys,
+        global_dirty=global_dirty,
+    )
+
+
+def print_status_summary(context: ArchiveContext, summary: ArchiveStatusSummary) -> None:
+    """Print stable structured archive status lines."""
+    print(f"RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH={summary.current_branch}")
+    print(f"RUNTIME_LOG_ARCHIVE_EXPECTED_BRANCH={context.branch}")
+    print(f"RUNTIME_LOG_ARCHIVE_BRANCH_MATCH={'yes' if summary.branch_matches else 'no'}")
+    print(f"RUNTIME_LOG_ARCHIVE_DIRTY={'yes' if summary.dirty else 'no'}")
+    print(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={','.join(summary.dirty_keys)}")
+    print(f"RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY={'yes' if summary.current_key_dirty else 'no'}")
+    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS={','.join(summary.foreign_dirty_keys)}")
+    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY={'yes' if summary.foreign_dirty_keys else 'no'}")
+    print(f"RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY={'yes' if summary.global_dirty else 'no'}")
+
+
+def archive_next_action(context: ArchiveContext, summary: ArchiveStatusSummary) -> str:
+    """Return the next operation for a non-clean archive state."""
+    if not summary.branch_matches:
+        return f"run runtime_log_archive_git.py ensure for source repo {context.repo_key}"
+    if summary.foreign_dirty_keys:
+        return (
+            "commit or migrate foreign repo-key log paths before closeout: "
+            + ",".join(summary.foreign_dirty_keys)
+        )
+    if summary.global_dirty:
+        return "commit or revert archive-level dirty paths before closeout"
+    if summary.dirty:
+        return "run runtime_log_archive_git.py sync, then check-clean"
+    return "none"
 
 
 def safe_archive_relative_path(value: str) -> Path:
@@ -401,7 +510,9 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
 def print_context(context: ArchiveContext) -> None:
     """Print stable context lines."""
     run_local_agent_reports = context.source_root / DEFAULT_AGENT_REPORT_ROOT
-    archive_agent_reports = agent_report_archive_dir(context.source_root, context.canon_root)
+    archive_agent_reports = (
+        context.archive_root / DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key
+    )
     print(f"RUNTIME_LOG_ARCHIVE_SOURCE_ROOT={context.source_root}")
     print(f"RUNTIME_LOG_ARCHIVE_CANON_ROOT={context.canon_root}")
     print(f"RUNTIME_LOG_ARCHIVE_ROOT={context.archive_root}")
@@ -440,13 +551,38 @@ def command_status(context: ArchiveContext, args: argparse.Namespace) -> int:
         print("RUNTIME_LOG_ARCHIVE_STATUS=invalid")
         return 1
     status = porcelain_status(context)
-    print(f"RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH={current_branch(context)}")
-    print(f"RUNTIME_LOG_ARCHIVE_DIRTY={'yes' if status.strip() else 'no'}")
+    summary = archive_status_summary(context)
+    print_status_summary(context, summary)
+    print(f"RUNTIME_LOG_ARCHIVE_NEXT_ACTION={archive_next_action(context, summary)}")
     if args.porcelain:
         for line in status.splitlines():
             print(f"RUNTIME_LOG_ARCHIVE_PORCELAIN={line}")
     print("RUNTIME_LOG_ARCHIVE_STATUS=pass")
     return 0
+
+
+def command_check_clean(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Fail unless the archive clone is on the expected branch and clean."""
+    print_context(context)
+    if not context.archive_root.exists():
+        print("RUNTIME_LOG_ARCHIVE_CLEAN=no")
+        print("RUNTIME_LOG_ARCHIVE_STATUS=missing")
+        return 1
+    if not is_archive_clone(context.archive_root):
+        print("RUNTIME_LOG_ARCHIVE_CLEAN=no")
+        print("RUNTIME_LOG_ARCHIVE_STATUS=invalid")
+        return 1
+    status = porcelain_status(context)
+    summary = archive_status_summary(context)
+    print_status_summary(context, summary)
+    clean = summary.branch_matches and not summary.dirty
+    print(f"RUNTIME_LOG_ARCHIVE_NEXT_ACTION={archive_next_action(context, summary)}")
+    if args.porcelain:
+        for line in status.splitlines():
+            print(f"RUNTIME_LOG_ARCHIVE_PORCELAIN={line}")
+    print(f"RUNTIME_LOG_ARCHIVE_CLEAN={'yes' if clean else 'no'}")
+    print("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass" if clean else "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail")
+    return 0 if clean else 1
 
 
 def command_import_legacy(context: ArchiveContext, args: argparse.Namespace) -> int:
@@ -604,11 +740,13 @@ def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:
             if not line.strip():
                 continue
             try:
-                existing = json.loads(line)
+                existing = cast(object, json.loads(line))
             except json.JSONDecodeError:
                 continue
-            if isinstance(existing, dict) and existing.get("archive_id") == key:
-                return False
+            if isinstance(existing, dict):
+                existing_payload = cast(dict[str, object], existing)
+                if existing_payload.get("archive_id") == key:
+                    return False
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, sort_keys=True) + "\n")
     return True
@@ -678,10 +816,13 @@ def command_archive_agent_report(context: ArchiveContext, args: argparse.Namespa
     manifest_text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     if manifest_path.exists():
         try:
-            existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            existing_manifest = cast(object, json.loads(manifest_path.read_text(encoding="utf-8")))
         except json.JSONDecodeError as exc:
             raise ArchiveGitError(f"archive manifest is not valid JSON: {manifest_path}") from exc
-        if not isinstance(existing_manifest, dict) or existing_manifest.get("archive_id") != archive_id:
+        existing_manifest_payload = (
+            cast(dict[str, object], existing_manifest) if isinstance(existing_manifest, dict) else {}
+        )
+        if existing_manifest_payload.get("archive_id") != archive_id:
             raise ArchiveGitError(f"archive manifest conflict: {manifest_path}")
     else:
         manifest_path.write_text(manifest_text, encoding="utf-8")
@@ -843,7 +984,7 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
         git(context.archive_root, ["commit", "-m", message])
         committed = "yes"
     if not args.no_pull and remote_branch_exists(context, context.branch):
-        git(context.archive_root, ["pull", "--rebase", "origin", context.branch])
+        git(context.archive_root, ["pull", "--rebase", "--autostash", "origin", context.branch])
     git(context.archive_root, ["push", "-u", "origin", context.branch])
 
     print_context(context)
@@ -887,6 +1028,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_ensure(context, args)
         if args.command == "status":
             return command_status(context, args)
+        if args.command == "check-clean":
+            return command_check_clean(context, args)
         if args.command == "import-legacy":
             return command_import_legacy(context, args)
         if args.command == "import-eval-results":

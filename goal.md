@@ -31,13 +31,13 @@ Make convention compliance mechanically checkable and workflow-enforced across A
 
 ## Workflow
 
-1. Confirm MCP inventory and `goal.loop_status` before each iteration.
+1. Confirm `goal_loop.py status` before each iteration.
 1. Run the convention checker and prompt eval before editing, then use findings to update this Goal.
 1. Strengthen `check_convention_compliance.py` before expanding prose prompts.
 1. Update skill / workflow prompts only for routing behavior that cannot be enforced by the tool.
 1. Add or update evals for every prompt behavior that must remain prompt-driven.
 1. Use read-only review to audit tool coverage, prompt coverage, workflow hook coverage, and Goal accuracy.
-1. Close only when all Exit Criteria are checked, `goal_loop.py status` and MCP `goal.loop_status` report `NEXT_ACTION=close_goal_loop`, and repo validation passes.
+1. Close only when all Exit Criteria are checked, `goal_loop.py status` reports `NEXT_ACTION=close_goal_loop`, and repo validation passes.
 
 ## Exit Criteria
 

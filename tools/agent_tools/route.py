@@ -3,6 +3,7 @@
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
 # downstream design ../../documents/tools/route.md reader-facing route tool documentation
@@ -37,6 +38,32 @@ AREA_DATA: tuple[AreaData, ...] = (
         "classify_runtime_surface",
         ("python3 tools/agent_tools/route.py --area surface",),
         ("profile_surface_resolver.py", "runtime-surface-minimize", "tool_profile_visibility.py"),
+    ),
+    (
+        "structure",
+        "repository structure",
+        "Classify repo-root, shared-canon, project runtime view, and personal runtime surfaces before refactors.",
+        "classify_structure_refactor_surface",
+        (
+            "python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json",
+            "python3 tools/agent_tools/responsibility_scope.py --root <root> --format json",
+            "python3 tools/agent_tools/import_responsibility.py --root <root> --format json",
+        ),
+        (
+            "structure-refactor",
+            "repo-refactor",
+            "repo_refactor_skill",
+            "refactor",
+            "repository-refactor",
+            "repo-structure",
+            "repository-structure",
+            "responsibility-scope",
+            "personal-runtime-surface",
+            "codex-personal-runtime",
+            "codex-config-surface",
+            "dot-codex-surface",
+            "~/.codex",
+        ),
     ),
     (
         "profile",
@@ -111,14 +138,6 @@ AREA_DATA: tuple[AreaData, ...] = (
             "agent_canon_update_planner.py",
             "canon-update-lite",
         ),
-    ),
-    (
-        "mcp",
-        "MCP",
-        "Check MCP inventory without turning optional surfaces into default work.",
-        "check_mcp_inventory_when_required",
-        ("python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server",),
-        ("mcp_optional_preflight.py", "mcp-profile"),
     ),
     (
         "goal",
@@ -268,6 +287,65 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
             ("サブエージェント", "起動"),
             ("subagent", "routing"),
             ("workflow=", "skills="),
+            ("根本", "設計", "見直"),
+        ),
+    ),
+    (
+        "task-routing",
+        "skill/tool routing architecture or route contract design is in scope",
+        (
+            ("ルーティング", "改善"),
+            ("routing", "redesign"),
+            ("routing", "architecture"),
+            ("route", "contract"),
+            ("skill", "tool", "routing"),
+            ("スキル選択", "ルーティング"),
+            ("スキル", "ツール", "ルーティング"),
+            ("根本", "設計", "見直"),
+        ),
+    ),
+    (
+        "comprehensive-development",
+        "repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation",
+        (
+            ("根本", "設計", "ルーティング"),
+            ("根本", "設計", "routing"),
+            ("全体", "レビュー", "修正"),
+            ("architecture", "redesign"),
+            ("workflow", "tools", "docs"),
+            ("repo-wide", "routing"),
+        ),
+    ),
+    (
+        "structure-planning",
+        "nontrivial design or document structure must be fixed before edits",
+        (
+            ("構造解析",),
+            ("文書", "構造", "解析"),
+            ("設計", "構造"),
+            ("structure", "contract"),
+            ("根本", "設計", "構造"),
+        ),
+    ),
+    (
+        "structure-refactor",
+        "repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope",
+        (
+            ("レポ", "リファクタ"),
+            ("repo", "refactor"),
+            ("repository", "refactor"),
+            ("repo", "structure"),
+            ("repository", "structure"),
+            ("ディレクトリ", "構成"),
+            ("directory", "structure"),
+            ("path", "layout"),
+            ("path", "responsibility"),
+            ("source", "ownership"),
+            ("構成", "考え直"),
+            ("~/.codex",),
+            (".codex", "config"),
+            ("codex", "personal", "runtime"),
+            ("personal", "runtime", "surface"),
         ),
     ),
     (
@@ -294,15 +372,68 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
         ),
     ),
     (
+        "agent-log-analysis",
+        "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
+        (
+            ("routing miss",),
+            ("selection gap",),
+            ("routing", "coverage"),
+            ("toolcall", "skillcall", "coverage"),
+            ("toolcall", "skillcall", "routing"),
+            ("toolcall", "skillcall", "miss"),
+            ("toolcall", "skillcall", "50"),
+            ("toolcall", "skillcall", "されない"),
+            ("ルーティング", "ログ"),
+            ("ログ", "skill"),
+            ("ログ", "tool"),
+            ("toolcall", "skillcall", "ルーティング"),
+            ("runbundle", "agent", "レポート"),
+            ("run bundle", "agent", "report"),
+            ("過去", "agent", "レポート"),
+        ),
+    ),
+    (
+        "agent-canon-update",
+        "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
+        (
+            ("ensure-latest",),
+            ("parent", "pin", "vendor"),
+            ("submodule", "pin"),
+            ("agentcanon", "update"),
+            ("agent-canon", "update"),
+            ("vendor/agent-canon",),
+        ),
+    ),
+    (
+        "change-review",
+        "review findings or implementation changes need findings-first review",
+        (
+            ("全体", "レビュー"),
+            ("review", "findings"),
+            ("diff", "review"),
+            ("コード", "レビュー"),
+            ("根本", "設計", "レビュー"),
+        ),
+    ),
+    (
         "md-style-check",
         "Markdown style, links, headings, or docs lint are in scope",
         (
             ("md-style",),
             ("docs-check",),
+            ("agent-canon", "docs"),
+            ("docs", "format"),
+            ("docs", "check"),
             ("markdownlint",),
             ("markdown", "lint"),
             ("markdown", "heading"),
             ("markdown", "link"),
+            ("markdown", "formatter"),
+            ("format_markdown",),
+            ("formatter", "adjacent"),
+            ("フォーマッタ",),
+            ("フォーマット", "周辺"),
+            ("通してすらない",),
             ("マークダウン", "体裁"),
             ("マークダウン", "リンク"),
         ),
@@ -430,6 +561,8 @@ class SkillRouteDecision:
     route: str
     mode: str
     skills: tuple[str, ...]
+    active_skills: tuple[str, ...]
+    deferred_skills: tuple[str, ...]
     matched_skills: tuple[str, ...]
     reasons: tuple[str, ...]
     evidence: str
@@ -583,6 +716,18 @@ def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
+def is_current_stage_skill(skill: str) -> bool:
+    """Return whether one matched skill belongs in the initial routing wave."""
+    return skill in {
+        "agent-orchestration",
+        "task-routing",
+        "agent-canon-update",
+        "agent-log-analysis",
+        "structure-planning",
+        "structure-refactor",
+    }
+
+
 def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     active_mode = infer_mode(prompt, mode)
@@ -592,11 +737,29 @@ def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
     if active_mode == "repo-changing":
         base_skills.append("codex-task-workflow")
     skills = ordered_unique((*base_skills, *matched_skills))
-    evidence = f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'}"
+    active_skills = ordered_unique(
+        (
+            "agent-orchestration",
+            *(
+                match.skill
+                for match in matches
+                if match.reason == "prompt explicitly names public skill"
+                or is_current_stage_skill(match.skill)
+            ),
+        )
+    )
+    deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
+    evidence = (
+        f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
+        f"active={','.join(active_skills)};"
+        f"deferred={','.join(deferred_skills) if deferred_skills else 'none'}"
+    )
     return SkillRouteDecision(
         route="skill-selection",
         mode=active_mode,
         skills=skills,
+        active_skills=active_skills,
+        deferred_skills=deferred_skills,
         matched_skills=matched_skills,
         reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
         evidence=evidence,
@@ -660,6 +823,14 @@ class RouteRenderer:
                     f"- Route: `{decision.route}`",
                     f"- Mode: `{decision.mode}`",
                     f"- Skills: {skills}",
+                    "- Active skills: "
+                    + ", ".join(f"`${skill}`" for skill in decision.active_skills),
+                    "- Deferred skills: "
+                    + (
+                        ", ".join(f"`${skill}`" for skill in decision.deferred_skills)
+                        if decision.deferred_skills
+                        else "`none`"
+                    ),
                     f"- Matched skills: `{','.join(decision.matched_skills) or 'none'}`",
                     f"- Reasons: {reasons}",
                     f"- Evidence: `{decision.evidence}`",
@@ -670,6 +841,13 @@ class RouteRenderer:
                 f"ROUTE={decision.route}",
                 f"MODE={decision.mode}",
                 f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
+                f"ACTIVE_SKILLS={','.join(f'${skill}' for skill in decision.active_skills)}",
+                "DEFERRED_SKILLS="
+                + (
+                    ",".join(f"${skill}" for skill in decision.deferred_skills)
+                    if decision.deferred_skills
+                    else "-"
+                ),
                 f"MATCHED_SKILLS={','.join(decision.matched_skills) or '-'}",
                 f"REASONS={';'.join(decision.reasons) or '-'}",
                 f"EVIDENCE={decision.evidence}",

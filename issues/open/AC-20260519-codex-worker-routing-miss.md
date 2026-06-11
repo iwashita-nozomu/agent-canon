@@ -10,7 +10,7 @@ upstream design ../../agents/skills/agent-orchestration.md defines initial routi
 downstream design ../../agents/canonical/CODEX_SUBAGENTS.md should make worker selection evidence harder to skip.
 downstream design ../../agents/skills/agent-orchestration.md should require citing the selected implementation role when code is delegated.
 downstream implementation ../../.codex/agents/spark_worker.toml defines the intended narrow implementation role.
-downstream implementation ../../.codex/agents/worker.toml defines the broader implementation fallback role.
+downstream implementation ../../.codex/agents/worker.toml defines the broader implementation alternate route role.
 @dependency-end
 -->
 
@@ -22,7 +22,7 @@ evidence: reports/dependency-review/agent-selection-routing-20260519/search_hits
 affected_surfaces: agents/canonical/CODEX_SUBAGENTS.md, agents/TASK_WORKFLOWS.md, agents/skills/agent-orchestration.md, .codex/agents/spark_worker.toml, .codex/agents/worker.toml
 edit_scope: reports/dependency-review/agent-selection-routing-20260519/dependency_edit_scope.txt
 required_action: Add a routing evidence step that makes Codex cite why implementation delegation selected spark_worker or worker before spawning the implementation agent.
-close_condition: A workflow, skill, or eval gate fails or flags implementation delegation when a narrow design-traced slice skips the configured spark_worker role without an explicit fallback reason.
+close_condition: A workflow, skill, or eval gate fails or flags implementation delegation when a narrow design-traced slice skips the configured spark_worker role without an explicit alternate route reason.
 github_issue: pending
 
 ## Finding
@@ -51,7 +51,7 @@ before spawning the implementation agent.
 
 The immediate code result was usable, but the routing violated the intended
 cost and latency split. It also obscured whether the implementation slice was
-truly narrow enough for `spark_worker`, because no explicit fallback rationale
+truly narrow enough for `spark_worker`, because no explicit alternate route rationale
 was recorded before using `worker`.
 
 ## Required Fix
@@ -61,7 +61,7 @@ line before spawn:
 
 1. identify whether the slice is narrow/design-traced or broad/ambiguous;
 1. cite the selected implementation role;
-1. cite `spark_worker` skip/fallback reason when `worker` is chosen for a
+1. cite `spark_worker` skip/alternate route reason when `worker` is chosen for a
    bounded implementation slice;
 1. record that evidence in the run bundle or workflow-monitoring output.
 

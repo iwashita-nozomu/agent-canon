@@ -66,10 +66,10 @@ python3 tools/agent_tools/github_publish.py publish-pr \
 The tool verifies `origin` with `gh repo view` and `git remote get-url origin`.
 If verification fails, fix the remote or the explicit `--repo` and rerun the
 same tool. Do not infer the destination repository from PR context, branch
-naming, template repository names, `.git/config` fallback, or literal URL push.
+naming, template repository names, `.git/config` alternate route, or literal URL push.
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 ```
 
 ## Commit Message Note

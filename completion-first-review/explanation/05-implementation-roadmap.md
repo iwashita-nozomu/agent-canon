@@ -85,12 +85,12 @@ Add:
 
 - `mcp_status.md` or JSON equivalent,
 - MCP capability catalog,
-- fallback evidence policy,
+- alternate route evidence policy,
 - goal snapshot requirements.
 
 Acceptance:
 
-- MCP pass, fail, fallback, and not-applicable are distinct,
+- MCP pass, fail, alternate route, and not-applicable are distinct,
 - goal-driven task cannot close while `NEXT_ACTION=run_next_iteration`,
 - ignored/local `goal.md` has a reviewable run-bundle snapshot,
 - repeated MCP failure can become self-growth feedback.

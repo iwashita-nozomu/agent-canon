@@ -5,6 +5,7 @@
 # upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds lemma graphs.
 # upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py emits source IR.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof graph workflow.
+# downstream design ../../documents/tools/algorithm_lemma_graph.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ def sample_ir_payload() -> dict[str, object]:
                 "runtime_object": "direction_or_solve",
                 "residual_unit": "outer_ipm_residual_unit",
                 "precision_model": "none",
+                "equation_tags": ["step_update"],
             },
             {
                 "node_id": "python_app_kkt_py___solve",
@@ -44,6 +46,7 @@ def sample_ir_payload() -> dict[str, object]:
                 "runtime_object": "direction_or_solve",
                 "residual_unit": "kkt_residual_unit",
                 "precision_model": "none",
+                "equation_tags": ["reduced_kkt"],
             },
             {
                 "node_id": "python_app_pdipm_py___certificate",
@@ -53,6 +56,7 @@ def sample_ir_payload() -> dict[str, object]:
                 "runtime_object": "certificate",
                 "residual_unit": "certificate_unit",
                 "precision_model": "none",
+                "equation_tags": [],
             },
             {
                 "node_id": "python_app_pdipm_py___fp32_floor",
@@ -62,6 +66,7 @@ def sample_ir_payload() -> dict[str, object]:
                 "runtime_object": "unknown",
                 "residual_unit": "outer_ipm_residual_unit",
                 "precision_model": "dtype_or_backend_floor",
+                "equation_tags": ["floor_preserving_step"],
             },
         ],
         "edges": [
@@ -124,6 +129,18 @@ def sample_ir_payload() -> dict[str, object]:
                     "variables and evidence obligations."
                 ),
                 "profile_variable": "backend_profile",
+                "profile_library_path": "lean/lib/backend_profiles.json",
+                "profile_ids": ["iree_fp32_strict"],
+                "profile_details": {
+                    "iree_fp32_strict": {
+                        "description": "IREE FP32 profile",
+                        "required_witnesses": [
+                            "dtype",
+                            "denormal_mode",
+                            "lowered_ir_or_backend_flag_evidence",
+                        ],
+                    }
+                },
                 "owning_surface": "algorithm_expansion_ir",
                 "scope": "proof_only_overlay",
                 "applies_to_nodes": ["python_app_pdipm_py___fp32_floor"],
@@ -131,6 +148,34 @@ def sample_ir_payload() -> dict[str, object]:
                 "checker_route": "record_as_backend_assumption",
                 "status": "unverified",
             }
+        ],
+        "code_facts": [
+            {
+                "fact_id": "fact__python_app_pdipm_py___solve__assignment_equation__line_10__x_next",
+                "source_path": "python/app/pdipm.py",
+                "source_symbol": "_solve",
+                "source_node_id": "python_app_pdipm_py___solve",
+                "source_span": "10:None",
+                "fact_kind": "assignment_equation",
+                "target": "x_next",
+                "expression": "x + alpha * dx",
+                "statement": "`_solve` assignment_equation `x_next` as `x + alpha * dx`.",
+                "equation_tags": ["step_update"],
+                "target_profiles": ["all", "local_convergence", "step_update"],
+            },
+            {
+                "fact_id": "fact__python_app_minres_py__solveconfig__class_default__line_5__maxiter",
+                "source_path": "python/app/minres.py",
+                "source_symbol": "SolveConfig",
+                "source_node_id": "python_app_minres_py__SolveConfig",
+                "source_span": "5:None",
+                "fact_kind": "class_default",
+                "target": "maxiter",
+                "expression": "200",
+                "statement": "`SolveConfig` class_default `maxiter` as `200`.",
+                "equation_tags": ["minres_defaults"],
+                "target_profiles": ["all", "solver_chain", "minres_defaults"],
+            },
         ],
     }
 
@@ -162,11 +207,21 @@ class AlgorithmLemmaGraphTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "lemma_graph_built")
+        self.assertRegex(payload["source_ir_fingerprint"], r"^[0-9a-f]{64}$")
         self.assertTrue(payload["validation"]["valid"])
         lemma_ids = {node["lemma_id"] for node in payload["lemma_nodes"]}
         self.assertIn("lemma__python_app_pdipm_py_solve", lemma_ids)
         self.assertIn("lemma__python_app_kkt_py_solve", lemma_ids)
         self.assertIn("lemma__asm_backend_profile_target", lemma_ids)
+        self.assertIn("lemma__backend_profile__iree_fp32_strict", lemma_ids)
+        self.assertIn(
+            "lemma__fact_python_app_pdipm_py_solve_assignment_equation_line_10_x_next",
+            lemma_ids,
+        )
+        self.assertIn(
+            "lemma__fact_python_app_minres_py_solveconfig_class_default_line_5_maxiter",
+            lemma_ids,
+        )
         self.assertNotEqual(
             "lemma__python_app_pdipm_py_solve",
             "lemma__python_app_kkt_py_solve",
@@ -184,6 +239,23 @@ class AlgorithmLemmaGraphTest(unittest.TestCase):
                 edge["source_lemma_id"] == "lemma__python_app_pdipm_py_fp32_floor"
                 and edge["target_lemma_id"] == "lemma__asm_backend_profile_target"
                 and edge["edge_kind"] == "backend_profile_dependency"
+                for edge in payload["lemma_edges"]
+            )
+        )
+        self.assertTrue(
+            any(
+                edge["source_lemma_id"] == "lemma__asm_backend_profile_target"
+                and edge["target_lemma_id"] == "lemma__backend_profile__iree_fp32_strict"
+                and edge["edge_kind"] == "backend_profile_record"
+                for edge in payload["lemma_edges"]
+            )
+        )
+        self.assertTrue(
+            any(
+                edge["source_lemma_id"] == "lemma__python_app_pdipm_py_solve"
+                and edge["target_lemma_id"]
+                == "lemma__fact_python_app_pdipm_py_solve_assignment_equation_line_10_x_next"
+                and edge["edge_kind"] == "lemma_consumes_code_fact"
                 for edge in payload["lemma_edges"]
             )
         )
@@ -209,6 +281,35 @@ class AlgorithmLemmaGraphTest(unittest.TestCase):
             ["lemma__python_app_pdipm_py_certificate"],
         )
         self.assertTrue(chains[0]["connected"])
+
+    def test_equation_target_profiles_select_code_fact_nodes(self) -> None:
+        """Equation-specific profiles should select matching code-derived facts."""
+        for profile, expected in (
+            (
+                "step_update",
+                "lemma__fact_python_app_pdipm_py_solve_assignment_equation_line_10_x_next",
+            ),
+            (
+                "minres_defaults",
+                "lemma__fact_python_app_minres_py_solveconfig_class_default_line_5_maxiter",
+            ),
+            ("floor_preserving_step", "lemma__python_app_pdipm_py_fp32_floor"),
+            ("reduced_kkt", "lemma__python_app_kkt_py_solve"),
+        ):
+            with self.subTest(profile=profile):
+                result = self.run_tool(
+                    "--target-profile",
+                    profile,
+                    "--format",
+                    "json",
+                    stdin=json.dumps(sample_ir_payload()),
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["target_profiles"], [profile])
+                self.assertTrue(payload["target_chains"][0]["connected"])
+                self.assertIn(expected, payload["target_chains"][0]["lemma_ids"])
 
     def test_markdown_and_dot_outputs_are_available(self) -> None:
         """Reader and graphviz formats should render stable graph sections."""

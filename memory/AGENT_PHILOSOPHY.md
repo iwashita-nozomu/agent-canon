@@ -209,12 +209,61 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User feedback: 設計を行う際にスコープを絞り杉です。もっと抽象的に設計するべきです
 
+- 2026-06-08 | interaction-observation | runtime feedback を記録しても improvement decision に接続しなければ自己成長 flow は弱い。user/reviewer 指摘を受けた時点で target/action を分類し、action=no_op 以外は skill/config/workflow/memory decision の少なくとも 1 つを applied または recorded にする
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-08 user feedback: 自己成長のフローが弱いです
+
+- 2026-06-08 | interaction-observation | runtime log repository operation is incomplete when agents only emit logs locally. Log archive API compatibility, dirty-state visibility, sync/push evidence, and closeout gates must be treated as part of the agent workflow, not as optional cleanup.
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-08 user feedback: ログリポジトリの運用が甘いです
+
+- 2026-06-08 | interaction-observation | Tool warnings are likely to be ignored when they are emitted only as transient stdout/stderr and are not converted into owned, status-bearing workflow obligations before closeout.
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: User reported agents tend to ignore tool warnings; current workflow monitor has behavior events but no dedicated unresolved-warning gate.
+
 - 2026-06-08 | interaction-observation | When using prose-reasoning-graph for document revision, close diagnostics through DSL/projection artifacts and rewrite packets before projecting to reader-facing prose; do not iterate by direct prose edits first.
 
   - source: chat
   - scope: repo-wide
   - confidence: tentative
   - evidence: User pointed out that the skill already requires DSL/projection-stage closure before prose projection during time-series probabilistic distribution design document work.
+
+- 2026-06-11 | interaction-observation | Before ordinary tasks, agents should repair expected AgentCanon repository-structure drift using the structure-refactor pre-task route instead of recreating missing paths or choosing nearby directories.
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User requested a skill for AgentCanon expected repo structure drift before tasks.
+
+- 2026-06-11 | interaction-observation | RunBundle and Agent report collection routes should be exposed in bootstrap and dashboard output so agents do not search raw logs or invent parallel archive paths.
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User noted the route for collecting past RunBundles and Agent reports was weak.
+
+- 2026-06-11 | interaction-observation | For substantive document additions or revisions, agents should run structure analysis before adding prose; typo, link, and format-only edits can skip the gate with an explicit reason.
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User stated document additions/revisions should also perform structure analysis.
+
+- 2026-06-11 | interaction-observation | 途中追加の user 指示は新規 task と同じ扱いにせず、same active task delta と scope change を parent checkpoint で分類してから subagent wave へ再配送する。
+
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User observed that multi-agent work tends to break when additional instructions arrive mid-task.
 
 ## Task Retrospectives
 

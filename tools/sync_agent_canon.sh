@@ -910,7 +910,19 @@ cmd_plan() {
   fi
 
   if [ "$prefix_mode" = "submodule" ]; then
-    if [ "$local_tree" = "$remote_sha" ]; then
+    if [ "$local_tree" != "$submodule_worktree_head" ] \
+      && [ "$submodule_worktree_status" = "clean" ] \
+      && [ "$submodule_worktree_head" != "$remote_sha" ] \
+      && git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$submodule_worktree_head"; then
+      submodule_deferred_ref="$(submodule_deferred_branch_pr_ref "$submodule_worktree_head" "$submodule_worktree_head" clean || true)"
+      if [ -n "$submodule_deferred_ref" ]; then
+        route="deferred_branch_pr"
+      elif [ "$local_tree" = "$remote_sha" ]; then
+        route="already_current_submodule"
+      else
+        route="local_contains_remote"
+      fi
+    elif [ "$local_tree" = "$remote_sha" ]; then
       route="already_current_submodule"
     elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
       submodule_deferred_ref="$(submodule_deferred_branch_pr_ref "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" || true)"
@@ -1080,6 +1092,19 @@ cmd_ensure_latest() {
     echo "agent_canon_remote=$remote_sha"
     if [ "$worktree_commit" != "$local_commit" ]; then
       submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+      if [ -z "$submodule_status" ] && [ -n "$submodule_branch" ] && [ "$worktree_commit" != "$remote_sha" ] && git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$worktree_commit"; then
+        submodule_deferred_ref="$(submodule_deferred_branch_pr_ref "$worktree_commit" "$worktree_commit" clean || true)"
+        if [ -n "$submodule_deferred_ref" ]; then
+          echo "agent_canon_latest=deferred_branch_pr"
+          echo "agent_canon_latest_branch=${submodule_deferred_ref%%:*}"
+          echo "agent_canon_latest_remote_branch=${submodule_deferred_ref#*:}"
+          echo "agent_canon_latest_remote_branch_match=yes"
+          echo "agent_canon_latest_parent_pin_status=stale"
+          echo "agent_canon_latest_next=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+          cmd_link_root
+          return
+        fi
+      fi
       if [ "$worktree_commit" = "$remote_sha" ] && [ -z "$submodule_status" ]; then
         echo "agent_canon_latest=parent_pin_pending"
         cmd_link_root 1

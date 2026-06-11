@@ -26,12 +26,67 @@ Markdown Lint チェッカー（.markdownlint.json 規格準拠）
 """
 
 import json
+import os
 import re
+import subprocess
 import sys
 import glob
 from pathlib import Path
 from typing import List, Tuple, Dict
 import argparse
+
+
+def forward_cli_to_rust(args: List[str]) -> int:
+    """Forward legacy CLI use to the unified Rust docs checker."""
+    root = Path(__file__).resolve().parents[2]
+    rust_args: list[str] = []
+    index = 0
+    while index < len(args):
+        value = args[index]
+        if value in ("--check", "--verbose"):
+            index += 1
+            continue
+        if value == "--json":
+            rust_args.extend(["--format", "json"])
+            index += 1
+            continue
+        if value == "--fix":
+            return forward_cli_to_rust_format(args[index + 1 :])
+        rust_args.append(value)
+        index += 1
+    caller_chain = f"ppid={os.getppid()}"
+    print("AGENT_CANON_FORWARDER=deprecated", file=sys.stderr)
+    print("AGENT_CANON_FORWARDER_SEVERITY=fix-now", file=sys.stderr)
+    print(f"AGENT_CANON_FORWARDER_CALLER_CHAIN={caller_chain}", file=sys.stderr)
+    print(
+        "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs check",
+        file=sys.stderr,
+    )
+    completed = subprocess.run(
+        [str(root / "tools/bin/agent-canon"), "docs", "check", *rust_args],
+        cwd=Path.cwd(),
+        check=False,
+    )
+    return completed.returncode
+
+
+def forward_cli_to_rust_format(args: List[str]) -> int:
+    """Forward legacy lint --fix use to the unified Rust formatter."""
+    root = Path(__file__).resolve().parents[2]
+    caller_chain = f"ppid={os.getppid()}"
+    print("AGENT_CANON_FORWARDER=deprecated", file=sys.stderr)
+    print("AGENT_CANON_FORWARDER_SEVERITY=fix-now", file=sys.stderr)
+    print(f"AGENT_CANON_FORWARDER_CALLER_CHAIN={caller_chain}", file=sys.stderr)
+    print(
+        "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs format",
+        file=sys.stderr,
+    )
+    completed = subprocess.run(
+        [str(root / "tools/bin/agent-canon"), "docs", "format", *args],
+        cwd=Path.cwd(),
+        check=False,
+    )
+    return completed.returncode
 
 
 class MarkdownLinter:
@@ -285,4 +340,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(forward_cli_to_rust(sys.argv[1:]) or 0)

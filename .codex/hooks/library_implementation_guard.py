@@ -20,17 +20,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 MANIFEST_PATH = "responsibility-scope.toml"
@@ -149,12 +144,10 @@ def has_tool_signal(payload: dict[str, object]) -> bool:
 
 
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name, with PostToolUse fallback for tool-shaped input."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if payload_status(payload) == PAYLOAD_STATUS_VALID and has_tool_signal(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 

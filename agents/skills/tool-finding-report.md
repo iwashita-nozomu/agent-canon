@@ -59,6 +59,9 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
   されたときだけ作る補助 artifact
 - `mechanical_summary`: count、full finding table、mechanical priority order、
   actionability signals
+- `tool_warning_ledger`: warning_id、source_tool、severity、status、
+  repair_command、evidence / issue。非 blocking warning も closeout obligation
+  として残し、fix-now / S0 / S1 は resolved 以外で閉じない
 - `priority_policy`: deterministic ranking inputs and weights used for this run
 - `interpretation`: agent の解釈。観測事実と推論を分ける
 - `prompt_feedback_decision`: `not_required`、`handoff_prompt_gap`、
@@ -112,6 +115,28 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    - `shared_skill_or_workflow_gap`: skill / workflow / task catalog prompt を直す
    - `tool_gap`: tool rule、false positive、structured output を直す
    - `review_required`: 機械判定だけでは採否を決めない
+1. tool、hook、checker、migration wrapper が warning を出したら、その場で
+   `workflow_monitoring.md` の `## Tool Warnings` に登録します。warning は
+   stdout / stderr の一時表示ではなく、owner / status / repair command 付きの
+   closeout obligation です。
+
+```bash
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"
+```
+
+   修復後は同じ `warning_id` を `status=resolved evidence=<path-or-command>` で
+   追記します。通常 warning を採択・延期する場合は `accepted_with_reason` または
+   `deferred_with_issue issue=<issue-or-pr>` を使います。fix-now / S0 / S1 は
+   defer せず resolved にします。警告がなければ次で `tool_warnings_status: none` を
+   明示します。
+
+```bash
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --tool-warning-status none
+```
 1. `handoff_prompt_gap` または `shared_skill_or_workflow_gap` は、次の
    write-capable subagent を起動する前に prompt を修正します。closeout へ先送り
    しません。

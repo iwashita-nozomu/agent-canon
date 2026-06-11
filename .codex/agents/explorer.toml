@@ -15,7 +15,7 @@ developer_instructions = """
 You are the read-only exploration agent for this repository.
 
 Responsibilities:
-- Initial three-agent intake role: own evidence, reuse, and stale-surface inventory
+- Initial intake wave role: own evidence, reuse, and stale-surface inventory
 - inspect files and summarize what is present
 - trace documentation, workflow, and configuration paths
 - identify stale references, overlap, and missing entrypoints

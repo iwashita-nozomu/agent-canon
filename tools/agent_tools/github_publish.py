@@ -222,7 +222,7 @@ def clean_slug(slug: str) -> str | None:
 
 
 def gh_repo_metadata(runner: Runner, repo: str | None) -> Mapping[str, object]:
-    """Return repository metadata from gh without falling back to git config parsing."""
+    """Return repository metadata from gh without git config parsing."""
     command = ["gh", "repo", "view"]
     if repo:
         command.append(repo)
@@ -262,7 +262,7 @@ def verify_remote(
                 f"remote {remote!r} points at {remote_slug or '<unrecognized>'}, "
                 f"but gh resolved {name_with_owner}"
             ),
-            next_action="fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push",
+            next_action="fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
         )
     return RemoteVerification(
         repo=name_with_owner,
@@ -364,7 +364,7 @@ def base_summary(args: argparse.Namespace, verification: RemoteVerification, bra
         "remote": verification.remote,
         "remote_url": verification.remote_url,
         "branch": branch,
-        "no_fallback_route": "gh_verified_remote_required",
+        "verified_remote_policy": "gh_verified_remote_required",
     }
 
 
@@ -388,7 +388,7 @@ def perform_push(
     result = run_command(
         runner,
         command,
-        next_action="fix_git_push_auth_or_remote_without_using_a_literal_url_fallback",
+        next_action="fix_git_push_auth_or_remote_before_retrying_verified_push",
     )
     summary = base_summary(args, verification, branch)
     summary.update(
@@ -476,7 +476,7 @@ def perform_pr(
     result = run_command(
         runner,
         command,
-        next_action="fix_gh_pr_create_auth_or_repository_permissions_without_fallback_route",
+        next_action="fix_gh_pr_create_auth_or_repository_permissions_before_retrying_verified_pr_create",
     )
     summary.update(
         {
@@ -538,7 +538,7 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
         "pr_url",
         "pr_selector",
         "next_action",
-        "no_fallback_route",
+        "verified_remote_policy",
     ]
     lines = []
     for key in keys:
@@ -577,7 +577,7 @@ def failure_summary(
         "remote_verified": False,
         "error": message[:MAX_ERROR_CHARS],
         "next_action": next_action,
-        "no_fallback_route": "gh_verified_remote_required",
+        "verified_remote_policy": "gh_verified_remote_required",
     }
 
 

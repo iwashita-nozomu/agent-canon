@@ -21,7 +21,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Subagent Adequacy Review
 
-<!-- Check that the chosen subagents are appropriate for requirements, research, planning, design, and implementation. -->
+<!-- Check that the chosen subagents are appropriate for requirements, research, planning, design, and implementation. Return revise if any Agent Wave Ledger row lacks spawn_budget, allowed_paths, do_not_read, write_scope, review_gate, or closeout evidence path. -->
 
 ## Completion Boundary Review
 

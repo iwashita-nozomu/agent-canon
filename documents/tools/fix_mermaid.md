@@ -1,15 +1,21 @@
 <!--
 @dependency-start
-responsibility Documents fix_mermaid.py tool usage and contract.
-upstream implementation ../../tools/docs/fix_mermaid.py rewrites Mermaid fenced blocks.
-upstream implementation ../../tools/docs/format_markdown.py invokes the Mermaid formatter.
+responsibility Documents legacy fix_mermaid forwarder usage and contract.
+upstream implementation ../../rust/agent-canon/src/docs.rs rewrites Mermaid fenced blocks and runs adjacent checks.
+upstream implementation ../../tools/docs/fix_mermaid.py forwards legacy CLI calls.
 downstream implementation ../../tests/tools/test_fix_mermaid.py validates formatter behavior.
 @dependency-end
 -->
 
 # fix_mermaid.py
 
-`fix_mermaid.py` rewrites Mermaid fenced code blocks inside Markdown files. It
+`fix_mermaid.py` is a legacy CLI forwarder. The canonical command is:
+
+```bash
+tools/bin/agent-canon docs fix-mermaid <paths...>
+```
+
+The Rust command rewrites Mermaid fenced code blocks inside Markdown files. It
 normalizes typoed Mermaid fence languages such as `mermeid` to `mermaid`, then
 renames Mermaid-reserved node ids when they are used as flowchart node ids.
 
@@ -29,14 +35,17 @@ flowchart LR
   mermaid_fix --> markdown_format[finish Markdown formatting]
 ```
 
-`format_markdown.py` invokes this formatter before trailing-space and blank-line
-normalization, so the standard Markdown formatter also fixes Mermaid blocks.
+`tools/bin/agent-canon docs format` invokes this formatter before
+trailing-space and blank-line normalization, so the standard Markdown formatter
+also fixes Mermaid blocks.
 
 ## Usage
 
 ```bash
-python3 tools/docs/fix_mermaid.py documents/tools/prose_reasoning_graph.md
-python3 tools/docs/format_markdown.py documents/tools/prose_reasoning_graph.md
+tools/bin/agent-canon docs fix-mermaid documents/tools/prose_reasoning_graph.md
+tools/bin/agent-canon docs format documents/tools/prose_reasoning_graph.md
 ```
 
-The command rewrites files in place and prints compact change summaries.
+The command rewrites files in place, prints compact change summaries, and runs
+the adjacent docs check after writing repairs. The old Python entrypoint prints a
+forwarder warning and then executes this Rust command.

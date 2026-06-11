@@ -4,6 +4,7 @@
 # responsibility Tests AST-only Algorithm Expansion IR tooling.
 # upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm IR.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines Algorithm IR workflow.
+# downstream design ../../documents/tools/algorithm_expansion_ir.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations
@@ -143,8 +144,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::solve",
-                "--max-depth",
-                "4",
                 "--format",
                 "json",
             )
@@ -157,6 +156,7 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
             self.assertIn("obligations", payload)
             self.assertIn("static_checks", payload)
             self.assertIn("backend_assumptions", payload)
+            self.assertIn("code_facts", payload)
             self.assertIn("goal_directed_slice", payload)
             symbols = {node["source_symbol"] for node in payload["nodes"]}
             self.assertIn("solve", symbols)
@@ -224,6 +224,7 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                     "residual_unit",
                     "precision_model",
                     "iteration_scope",
+                    "equation_tags",
                     "proof_relevance",
                     "selected_obligation_id",
                     "assumption_id",
@@ -270,6 +271,14 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                     "proof_effect",
                 },
             )
+            self.assertTrue(
+                any(
+                    fact["fact_kind"] == "assignment_equation"
+                    and fact["source_symbol"] == "solve"
+                    and fact["target"] == "next_state"
+                    for fact in payload["code_facts"]
+                )
+            )
 
     def test_constructor_assignment_enables_later_method_resolution(self) -> None:
         """Constructor assignment should type later instance method calls."""
@@ -281,8 +290,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::solve_from_constructor",
-                "--max-depth",
-                "2",
                 "--format",
                 "json",
             )
@@ -322,8 +329,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::solve_with_import_alias",
-                "--max-depth",
-                "1",
                 "--format",
                 "json",
             )
@@ -354,8 +359,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::solve_with_relative_import",
-                "--max-depth",
-                "1",
                 "--format",
                 "json",
             )
@@ -408,8 +411,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 str(dependency_root),
                 "--python-symbol",
                 f"{source}::solve",
-                "--max-depth",
-                "1",
                 "--format",
                 "json",
             )
@@ -441,8 +442,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::solve_with_callback",
-                "--max-depth",
-                "2",
                 "--format",
                 "json",
             )
@@ -474,8 +473,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::Wrapper.run",
-                "--max-depth",
-                "2",
                 "--format",
                 "json",
             )
@@ -516,6 +513,7 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
             self.assertIn("# Algorithm Expansion IR", result.stdout)
             self.assertIn("## Nodes", result.stdout)
             self.assertIn("## Edges", result.stdout)
+            self.assertIn("## Code Facts", result.stdout)
             self.assertIn("## Static Checks", result.stdout)
             self.assertIn("## Backend Assumptions", result.stdout)
             self.assertIn("## Obligations", result.stdout)
@@ -552,10 +550,106 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
             self.assertIn("backend_profile", assumption["profile_variable"])
             self.assertIn("profile_library_path", assumption)
             self.assertIn("profile_ids", assumption)
+            self.assertIn("profile_details", assumption)
             self.assertIn("denormal_mode", assumption["required_witnesses"])
             self.assertIn(
                 "read from the backend profile library by the IR builder",
                 assumption["statement"],
+            )
+
+    def test_equation_tags_and_defaults_are_code_facts(self) -> None:
+        """Expression/default facts should expose proof-topic equation tags."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "pkg" / "pdipm_like.py"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    _MINRES_DTYPE_RTOL_FACTOR = 64.0
+
+                    class SolveConfig:
+                        maxiter: int = 200
+                        rtol: str = "1e-12"
+                        reorthogonalization: str = "full"
+
+                    def _pdipm_reduced_kkt_rhs_top(residuals, linearization):
+                        rhs_top = residuals.r_dual - linearization.j_ineq
+                        return rhs_top
+
+                    def _pdipm_fraction_to_boundary_step_lengths(s, lam_ineq, ds, dlam):
+                        alpha_pri = s + ds
+                        alpha_dual = lam_ineq + dlam
+                        return alpha_pri, alpha_dual
+
+                    def _pdipm_apply_primal_dual_step(carry, direction, alpha_pri, alpha_dual):
+                        x_next = carry.x + alpha_pri * direction.dx
+                        return x_next
+
+                    def _step_update(carry, direction):
+                        alpha_pri, alpha_dual = _pdipm_fraction_to_boundary_step_lengths(
+                            carry.s,
+                            carry.lam_ineq,
+                            direction.ds,
+                            direction.dlam,
+                        )
+                        return _pdipm_apply_primal_dual_step(
+                            carry,
+                            direction,
+                            alpha_pri,
+                            alpha_dual,
+                        )
+
+                    def _minres_effective_stopping(config):
+                        runtime_rtol = config.rtol
+                        return runtime_rtol
+                    """
+                ).lstrip(),
+                encoding="utf-8",
+            )
+
+            result = self.run_tool(
+                root,
+                "--python-symbol",
+                f"{source}::_step_update",
+                "--target-theorem",
+                "PDIPM local floor-limited convergence with MINRES defaults",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            node_tags = {
+                tag
+                for node in payload["nodes"]
+                for tag in node.get("equation_tags", [])
+            }
+            self.assertIn("step_update", node_tags)
+            self.assertIn("floor_preserving_step", node_tags)
+            facts = payload["code_facts"]
+            self.assertTrue(
+                any(
+                    fact["target"] == "_MINRES_DTYPE_RTOL_FACTOR"
+                    and "minres_defaults" in fact["equation_tags"]
+                    for fact in facts
+                )
+            )
+            self.assertTrue(
+                any(
+                    fact["source_symbol"] == "SolveConfig"
+                    and fact["target"] == "maxiter"
+                    and fact["expression"] == "200"
+                    for fact in facts
+                )
+            )
+            self.assertTrue(
+                any(
+                    fact["source_symbol"] == "_step_update"
+                    and fact["fact_kind"] == "assignment_equation"
+                    and "step_update" in fact["target_profiles"]
+                    for fact in facts
+                )
             )
 
     def test_backend_profile_library_is_read_by_ir_builder(self) -> None:
@@ -619,8 +713,6 @@ class AlgorithmExpansionIRTest(unittest.TestCase):
                 root,
                 "--python-symbol",
                 f"{source}::initialize",
-                "--max-depth",
-                "2",
                 "--format",
                 "json",
             )

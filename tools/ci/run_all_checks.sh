@@ -18,6 +18,7 @@
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+# upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill YAML frontmatter
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
@@ -211,6 +212,12 @@ else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
+if "$PYTHON_BIN" tools/agent_tools/check_skill_frontmatter.py 2>&1; then
+  echo "✅ runtime skill frontmatter checks 成功"
+else
+  echo "❌ runtime skill frontmatter checks 失敗"
+  EXIT_CODE=1
+fi
 if "$PYTHON_BIN" tools/agent_tools/tool_catalog.py 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
@@ -281,7 +288,7 @@ echo ""
 
 # 1. Markdown / link checks
 echo "1️⃣  documentation checks を実行中..."
-if bash tools/ci/run_docs_checks.sh 2>&1; then
+if tools/bin/agent-canon docs check 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"

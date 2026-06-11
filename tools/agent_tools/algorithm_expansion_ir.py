@@ -50,7 +50,6 @@ STATIC_EDGE_STATUSES = frozenset(
         "static_resolution_gap",
     }
 )
-DEFAULT_MAX_DEPTH = 3
 
 
 @dataclass(frozen=True)
@@ -69,6 +68,7 @@ class IRNode:
     residual_unit: str
     precision_model: str
     iteration_scope: str
+    equation_tags: tuple[str, ...]
     proof_relevance: str
     selected_obligation_id: str | None
     assumption_id: str | None
@@ -139,12 +139,30 @@ class IRBackendAssumption:
     profile_variable: str
     profile_library_path: str
     profile_ids: tuple[str, ...]
+    profile_details: dict[str, dict[str, object]]
     owning_surface: str
     scope: str
     applies_to_nodes: tuple[str, ...]
     required_witnesses: tuple[str, ...]
     checker_route: str
     status: str
+
+
+@dataclass(frozen=True)
+class IRCodeFact:
+    """One AST-derived equation, default, or constant fact."""
+
+    fact_id: str
+    source_path: str
+    source_symbol: str
+    source_node_id: str | None
+    source_span: str
+    fact_kind: str
+    target: str
+    expression: str
+    statement: str
+    equation_tags: tuple[str, ...]
+    target_profiles: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -166,10 +184,10 @@ class AlgorithmIRReport:
     root_path: str
     root_symbol: str
     target_theorem: str
-    max_depth: int
     backend_profile_library: str
     nodes: tuple[IRNode, ...]
     edges: tuple[IREdge, ...]
+    code_facts: tuple[IRCodeFact, ...]
     static_checks: tuple[IRStaticCheck, ...]
     backend_assumptions: tuple[IRBackendAssumption, ...]
     obligations: tuple[IRObligation, ...]
@@ -232,12 +250,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Root algorithm symbol in path.py::qualname form.",
     )
     parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=DEFAULT_MAX_DEPTH,
-        help="Maximum same-module recursive expansion depth.",
-    )
-    parser.add_argument(
         "--import-root",
         action="append",
         default=[],
@@ -297,11 +309,10 @@ def load_backend_profile_library(path: Path | None) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("backend profile library must be a JSON object")
-    library = cast(dict[str, object], payload)
-    profiles = library.get("profiles")
+    profiles = payload.get("profiles")
     if profiles is not None and not isinstance(profiles, dict):
         raise ValueError("backend profile library `profiles` must be a JSON object")
-    return library
+    return payload
 
 
 def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
@@ -309,8 +320,21 @@ def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return ()
-    profile_map = cast(dict[object, object], profiles)
-    return tuple(sorted(str(key) for key in profile_map))
+    return tuple(str(key) for key in sorted(profiles))
+
+
+def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dict[str, object]]:
+    """Return stable profile detail payloads from a proof-only profile library."""
+    profiles = profile_library.get("profiles")
+    if not isinstance(profiles, dict):
+        return {}
+    details: dict[str, dict[str, object]] = {}
+    for profile_id, raw_profile in sorted(profiles.items()):
+        if isinstance(raw_profile, dict):
+            details[str(profile_id)] = {
+                str(key): value for key, value in sorted(raw_profile.items())
+            }
+    return details
 
 
 def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str, ...]:
@@ -328,16 +352,13 @@ def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str,
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return default_witnesses
-    profile_map = cast(dict[object, object], profiles)
     witnesses: set[str] = set()
-    for raw_profile in profile_map.values():
+    for raw_profile in profiles.values():
         if not isinstance(raw_profile, dict):
             continue
-        profile = cast(dict[str, object], raw_profile)
-        raw_witnesses = profile.get("required_witnesses")
+        raw_witnesses = raw_profile.get("required_witnesses")
         if isinstance(raw_witnesses, list | tuple):
-            witness_values = cast(list[object] | tuple[object, ...], raw_witnesses)
-            witnesses.update(str(item) for item in witness_values)
+            witnesses.update(str(item) for item in raw_witnesses)
     if not witnesses:
         return default_witnesses
     return tuple(sorted(witnesses))
@@ -546,6 +567,14 @@ def node_id_for(qualname: str) -> str:
     return "".join(char if char.isalnum() or char == "_" else "_" for char in qualname)
 
 
+def id_fragment(value: str) -> str:
+    """Return a stable lower-case id fragment."""
+    normalized = "".join(char.lower() if char.isalnum() else "_" for char in value)
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized.strip("_") or "value"
+
+
 def node_id_for_ref(index: ModuleIndex, qualname: str) -> str:
     """Return a stable node id for one source path and qualname."""
     return node_id_for(f"{index.relative_path}::{qualname}")
@@ -691,6 +720,211 @@ def collect_callable_reference_sites(node: PythonSymbol) -> tuple[CallableRefere
         seen.add(key)
         deduped.append(site)
     return tuple(deduped)
+
+
+def target_texts(target: ast.AST) -> tuple[str, ...]:
+    """Return source-like targets for an assignment fact."""
+    if isinstance(target, ast.Name | ast.Attribute | ast.Subscript):
+        return (_unparse(target),)
+    if isinstance(target, ast.Tuple | ast.List):
+        names: list[str] = []
+        for element in target.elts:
+            names.extend(target_texts(element))
+        return tuple(names)
+    return ()
+
+
+def equation_tags_for_fact(
+    source_symbol: str,
+    fact_kind: str,
+    target: str,
+    expression: str,
+) -> tuple[str, ...]:
+    """Return equation tags for one AST-derived fact."""
+    text = f"{source_symbol} {fact_kind} {target} {expression}"
+    return equation_tags_for_symbol(text, fact_kind)
+
+
+def make_code_fact(
+    index: ModuleIndex,
+    *,
+    source_symbol: str,
+    source_node_id: str | None,
+    fact_kind: str,
+    target: str,
+    expression: str,
+    line: int,
+) -> IRCodeFact:
+    """Create one stable code fact from AST source text."""
+    tags = equation_tags_for_fact(source_symbol, fact_kind, target, expression)
+    fact_id = (
+        f"fact__{node_id_for_ref(index, source_symbol)}__{id_fragment(fact_kind)}__"
+        f"line_{line}__{id_fragment(target)[:48]}"
+    )
+    return IRCodeFact(
+        fact_id=fact_id,
+        source_path=index.relative_path,
+        source_symbol=source_symbol,
+        source_node_id=source_node_id,
+        source_span=f"{line}:None",
+        fact_kind=fact_kind,
+        target=target,
+        expression=expression,
+        statement=f"`{source_symbol}` {fact_kind} `{target}` as `{expression}`.",
+        equation_tags=tags,
+        target_profiles=target_profiles_for_equation_tags(tags),
+    )
+
+
+def collect_symbol_code_facts(
+    index: ModuleIndex,
+    qualname: str,
+    symbol: PythonSymbol,
+) -> tuple[IRCodeFact, ...]:
+    """Collect local assignment and return equations from one expanded symbol."""
+    if not isinstance(symbol, ast.FunctionDef | ast.AsyncFunctionDef):
+        return ()
+    facts: list[IRCodeFact] = []
+    source_node_id = node_id_for_ref(index, qualname)
+
+    class Visitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+            if node is not symbol:
+                return
+            self.generic_visit(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+            if node is not symbol:
+                return
+            self.generic_visit(node)
+
+        def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
+            expression = _unparse(node.value)
+            for target in node.targets:
+                for target_text in target_texts(target):
+                    facts.append(
+                        make_code_fact(
+                            index,
+                            source_symbol=qualname,
+                            source_node_id=source_node_id,
+                            fact_kind="assignment_equation",
+                            target=target_text,
+                            expression=expression,
+                            line=int(getattr(node, "lineno", 0)),
+                        )
+                    )
+            self.generic_visit(node)
+
+        def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
+            if node.value is None:
+                return
+            expression = _unparse(node.value)
+            for target_text in target_texts(node.target):
+                facts.append(
+                    make_code_fact(
+                        index,
+                        source_symbol=qualname,
+                        source_node_id=source_node_id,
+                        fact_kind="assignment_equation",
+                        target=target_text,
+                        expression=expression,
+                        line=int(getattr(node, "lineno", 0)),
+                    )
+                )
+            self.generic_visit(node)
+
+        def visit_Return(self, node: ast.Return) -> None:  # noqa: N802
+            if node.value is None:
+                return
+            facts.append(
+                make_code_fact(
+                    index,
+                    source_symbol=qualname,
+                    source_node_id=source_node_id,
+                    fact_kind="return_equation",
+                    target="return",
+                    expression=_unparse(node.value),
+                    line=int(getattr(node, "lineno", 0)),
+                )
+            )
+            self.generic_visit(node)
+
+    Visitor().visit(symbol)
+    return tuple(facts)
+
+
+def collect_module_static_code_facts(index: ModuleIndex) -> tuple[IRCodeFact, ...]:
+    """Collect module constants and class defaults used as proof parameters."""
+    facts: list[IRCodeFact] = []
+    for stmt in index.tree.body:
+        if isinstance(stmt, ast.Assign):
+            expression = _unparse(stmt.value)
+            for target in stmt.targets:
+                for target_text in target_texts(target):
+                    if not target_text.startswith("_") and not target_text.isupper():
+                        continue
+                    facts.append(
+                        make_code_fact(
+                            index,
+                            source_symbol="<module>",
+                            source_node_id=None,
+                            fact_kind="module_constant",
+                            target=target_text,
+                            expression=expression,
+                            line=int(getattr(stmt, "lineno", 0)),
+                        )
+                    )
+        elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
+            expression = _unparse(stmt.value)
+            for target_text in target_texts(stmt.target):
+                if not target_text.startswith("_") and not target_text.isupper():
+                    continue
+                facts.append(
+                    make_code_fact(
+                        index,
+                        source_symbol="<module>",
+                        source_node_id=None,
+                        fact_kind="module_constant",
+                        target=target_text,
+                        expression=expression,
+                        line=int(getattr(stmt, "lineno", 0)),
+                    )
+                )
+        elif isinstance(stmt, ast.ClassDef):
+            for child in stmt.body:
+                expression: str | None = None
+                targets: tuple[str, ...] = ()
+                if isinstance(child, ast.Assign):
+                    expression = _unparse(child.value)
+                    targets = tuple(
+                        target_text
+                        for target in child.targets
+                        for target_text in target_texts(target)
+                    )
+                elif isinstance(child, ast.AnnAssign) and child.value is not None:
+                    expression = _unparse(child.value)
+                    targets = target_texts(child.target)
+                if expression is None:
+                    continue
+                class_symbol = stmt.name
+                source_node_id = (
+                    node_id_for_ref(index, class_symbol)
+                    if class_symbol in index.symbols
+                    else None
+                )
+                for target_text in targets:
+                    facts.append(
+                        make_code_fact(
+                            index,
+                            source_symbol=class_symbol,
+                            source_node_id=source_node_id,
+                            fact_kind="class_default",
+                            target=target_text,
+                            expression=expression,
+                            line=int(getattr(child, "lineno", 0)),
+                        )
+                    )
+    return tuple(facts)
 
 
 def initial_instance_types(node: PythonSymbol, current_class: str | None) -> dict[str, str]:
@@ -1124,6 +1358,63 @@ def classify_math_role(symbol: str, node_kind: str, source_text: str = "") -> st
     return "implementation_bookkeeping"
 
 
+def equation_tags_for_symbol(symbol: str, node_kind: str, source_text: str = "") -> tuple[str, ...]:
+    """Return proof-topic equation tags visible from one symbol name."""
+    lowered = f"{symbol} {node_kind} {source_text}".lower()
+    tags: set[str] = set()
+    if any(token in lowered for token in ("reduced_kkt", "rhs_top", "solve_direction")):
+        tags.add("reduced_kkt")
+    if any(token in lowered for token in ("step_update", "apply_primal_dual_step")):
+        tags.add("step_update")
+    if any(
+        token in lowered
+        for token in ("fraction_to_boundary", "safe_interior", "positivity_floor")
+    ):
+        tags.add("floor_preserving_step")
+    if any(
+        token in lowered
+        for token in (
+            "minres",
+            "runtime_rtol",
+            "runtime_atol",
+            "dtype_rtol_floor",
+            "resolve_tolerance",
+        )
+    ):
+        tags.add("minres_defaults")
+    if any(token in lowered for token in ("initial_values", "cold_start", "reset")):
+        tags.add("pdipm_initialization_path")
+    return tuple(sorted(tags))
+
+
+def target_profiles_for_equation_tags(tags: tuple[str, ...]) -> tuple[str, ...]:
+    """Map equation tags to lemma-graph target profiles."""
+    profiles: set[str] = {"all"}
+    if "reduced_kkt" in tags:
+        profiles.update(("local_convergence", "solver_chain", "reduced_kkt"))
+    if "step_update" in tags:
+        profiles.update(("local_convergence", "step_update"))
+    if "floor_preserving_step" in tags:
+        profiles.update(("local_convergence", "fp32_floor", "floor_preserving_step"))
+    if "minres_defaults" in tags:
+        profiles.update(("solver_chain", "minres_defaults"))
+    if "pdipm_initialization_path" in tags:
+        profiles.update(("local_convergence", "pdipm_initialization_path"))
+    order = (
+        "all",
+        "certificate_soundness",
+        "local_convergence",
+        "fp32_floor",
+        "solver_chain",
+        "reduced_kkt",
+        "step_update",
+        "floor_preserving_step",
+        "minres_defaults",
+        "pdipm_initialization_path",
+    )
+    return tuple(profile for profile in order if profile in profiles)
+
+
 def runtime_object_for(symbol: str) -> str:
     """Return a coarse runtime object label for one symbol."""
     leaf = symbol.rsplit(".", 1)[-1]
@@ -1311,6 +1602,11 @@ def make_node(index: ModuleIndex, qualname: str, symbol: PythonSymbol) -> IRNode
     math_role = classify_math_role(qualname, symbol.__class__.__name__, source_text)
     precision_model = precision_model_for(qualname)
     proof_relevance = proof_relevance_for(math_role, precision_model)
+    equation_tags = equation_tags_for_symbol(
+        qualname,
+        symbol.__class__.__name__,
+        source_text,
+    )
     return IRNode(
         node_id=node_id_for_ref(index, qualname),
         source_path=index.relative_path,
@@ -1324,6 +1620,7 @@ def make_node(index: ModuleIndex, qualname: str, symbol: PythonSymbol) -> IRNode
         residual_unit=residual_unit_for(qualname, math_role),
         precision_model=precision_model,
         iteration_scope=iteration_scope_for(qualname, math_role),
+        equation_tags=equation_tags,
         proof_relevance=proof_relevance,
         selected_obligation_id=(
             obligation_id_for(qualname) if proof_relevance == "required" else None
@@ -1338,6 +1635,7 @@ def make_external_node(index: ModuleIndex, call_text: str) -> IRNode:
     math_role = classify_math_role(call_text, "ExternalCall")
     precision_model = precision_model_for(call_text)
     proof_relevance = proof_relevance_for(math_role, precision_model)
+    equation_tags = equation_tags_for_symbol(call_text, "ExternalCall")
     return IRNode(
         node_id=external_node_id(call_text),
         source_path=index.relative_path,
@@ -1351,6 +1649,7 @@ def make_external_node(index: ModuleIndex, call_text: str) -> IRNode:
         residual_unit=residual_unit_for(call_text, math_role),
         precision_model=precision_model,
         iteration_scope=iteration_scope_for(call_text, math_role),
+        equation_tags=equation_tags,
         proof_relevance=proof_relevance,
         selected_obligation_id=(
             obligation_id_for(call_text) if proof_relevance == "required" else None
@@ -1375,6 +1674,7 @@ def make_static_instance_gap_node(index: ModuleIndex, call_text: str) -> IRNode:
         residual_unit="none",
         precision_model="none",
         iteration_scope="global_or_initialization",
+        equation_tags=(),
         proof_relevance="excluded",
         selected_obligation_id=None,
         assumption_id=None,
@@ -1400,6 +1700,7 @@ def obligation_search_queries(node: IRNode, target_theorem: str) -> tuple[str, .
         terms.append(node.residual_unit)
     if node.precision_model != "none":
         terms.append(node.precision_model)
+    terms.extend(node.equation_tags)
     return (" ".join(term for term in terms if term and term != "unknown"),)
 
 
@@ -1481,6 +1782,7 @@ def backend_assumptions_for(
             profile_variable="backend_profile",
             profile_library_path=profile_library_path,
             profile_ids=backend_profile_ids(profile_library),
+            profile_details=backend_profile_details(profile_library),
             owning_surface="algorithm_expansion_ir",
             scope="proof_only_overlay",
             applies_to_nodes=precision_node_ids,
@@ -1568,7 +1870,6 @@ def static_check_for_edge(edge: IREdge) -> IRStaticCheck | None:
 def build_algorithm_ir(
     root_symbol: str,
     index: ModuleIndex,
-    max_depth: int,
     target_theorem: str,
     root: Path,
     import_roots: tuple[Path, ...] = (),
@@ -1578,11 +1879,16 @@ def build_algorithm_ir(
     """Build an Algorithm Expansion IR from a root AST symbol."""
     nodes: dict[str, IRNode] = {}
     edges: list[IREdge] = []
+    code_facts: dict[str, IRCodeFact] = {}
     expanded: set[str] = set()
     module_indexes: dict[Path, ModuleIndex] = {index_cache_key(index.path): index}
 
     def add_node(node: IRNode) -> None:
         nodes.setdefault(node.node_id, node)
+
+    def add_code_facts(items: Iterable[IRCodeFact]) -> None:
+        for fact in items:
+            code_facts.setdefault(fact.fact_id, fact)
 
     def make_edge(
         site: CallSite,
@@ -1706,13 +2012,14 @@ def build_algorithm_ir(
             status=instance_edge_status("callable_variant", True, "self", None),
         )
 
-    def expand_with_edges(source_index: ModuleIndex, qualname: str, depth: int) -> None:
+    def expand_with_edges(source_index: ModuleIndex, qualname: str) -> None:
         expansion_key = f"{source_index.relative_path}::{qualname}"
-        if depth > max_depth or expansion_key in expanded:
+        if expansion_key in expanded:
             return
         symbol = find_symbol(source_index, qualname)
         expanded.add(expansion_key)
         add_node(make_node(source_index, qualname, symbol))
+        add_code_facts(collect_symbol_code_facts(source_index, qualname, symbol))
         instance_types = initial_instance_types(symbol, current_class_for(qualname, source_index))
         for site in collect_call_sites(symbol):
             call_text = dotted_name(site.call.func)
@@ -1736,7 +2043,7 @@ def build_algorithm_ir(
                             target_symbol,
                         )
                     )
-                    expand_with_edges(source_index, target_symbol, depth + 1)
+                    expand_with_edges(source_index, target_symbol)
                 continue
             resolved_call = resolve_call_symbol(
                 source_index,
@@ -1800,7 +2107,7 @@ def build_algorithm_ir(
                 and target_index is not None
                 and target_symbol not in target_index.class_methods
             ):
-                expand_with_edges(target_index, target_symbol, depth + 1)
+                expand_with_edges(target_index, target_symbol)
         for site in collect_callable_reference_sites(symbol):
             resolved_call = resolve_callable_reference(
                 source_index,
@@ -1835,9 +2142,11 @@ def build_algorithm_ir(
                 )
             )
             if resolved_call.resolved and target_symbol not in target_index.class_methods:
-                expand_with_edges(target_index, target_symbol, depth + 1)
+                expand_with_edges(target_index, target_symbol)
 
-    expand_with_edges(index, root_symbol, 0)
+    expand_with_edges(index, root_symbol)
+    for loaded_index in tuple(module_indexes.values()):
+        add_code_facts(collect_module_static_code_facts(loaded_index))
     static_checks = tuple(
         check
         for edge in edges
@@ -1868,10 +2177,10 @@ def build_algorithm_ir(
         root_path=index.relative_path,
         root_symbol=root_symbol,
         target_theorem=target_theorem,
-        max_depth=max_depth,
         backend_profile_library=backend_profile_library_path,
         nodes=tuple(sorted(nodes.values(), key=lambda item: item.node_id)),
         edges=tuple(edges),
+        code_facts=tuple(sorted(code_facts.values(), key=lambda item: item.fact_id)),
         static_checks=static_checks,
         backend_assumptions=backend_assumptions,
         obligations=obligations,
@@ -1889,6 +2198,7 @@ def render_text(report: AlgorithmIRReport) -> str:
         f"ALGORITHM_EXPANSION_IR_BACKEND_PROFILE_LIBRARY={report.backend_profile_library}",
         f"ALGORITHM_EXPANSION_IR_NODES={len(report.nodes)}",
         f"ALGORITHM_EXPANSION_IR_EDGES={len(report.edges)}",
+        f"ALGORITHM_EXPANSION_IR_CODE_FACTS={len(report.code_facts)}",
         f"ALGORITHM_EXPANSION_IR_STATIC_CHECKS={len(report.static_checks)}",
         f"ALGORITHM_EXPANSION_IR_OBLIGATIONS={len(report.obligations)}",
         f"ALGORITHM_EXPANSION_IR_SELECTED_OBLIGATIONS={len(report.selected_local_obligations)}",
@@ -1903,6 +2213,12 @@ def render_text(report: AlgorithmIRReport) -> str:
             "ALGORITHM_EXPANSION_IR_EDGE="
             f"{edge.edge_id}:{edge.source_symbol}->{edge.target_symbol}:{edge.edge_kind}:"
             f"line={edge.line}:resolved={str(edge.resolved).lower()}"
+        )
+    for fact in report.code_facts:
+        lines.append(
+            "ALGORITHM_EXPANSION_IR_CODE_FACT="
+            f"{fact.fact_id}:{fact.fact_kind}:{fact.source_symbol}:"
+            f"target={fact.target}:tags={','.join(fact.equation_tags) or 'none'}"
         )
     for check in report.static_checks:
         lines.append(
@@ -1940,14 +2256,15 @@ def render_markdown(report: AlgorithmIRReport) -> str:
         f"- backend profile library: `{report.backend_profile_library or 'none'}`",
         f"- nodes: `{len(report.nodes)}`",
         f"- edges: `{len(report.edges)}`",
+        f"- code facts: `{len(report.code_facts)}`",
         f"- static checks: `{len(report.static_checks)}`",
         f"- obligations: `{len(report.obligations)}`",
         "",
         "## Nodes",
         "",
         "| Node | Source Symbol | Role | Unit | Runtime Object | Precision | Iteration | "
-        "Relevance | Obligation |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "Equation Tags | Relevance | Obligation |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for node in report.nodes:
         lines.append(
@@ -1962,12 +2279,42 @@ def render_markdown(report: AlgorithmIRReport) -> str:
                     node.runtime_object,
                     node.precision_model,
                     node.iteration_scope,
+                    ", ".join(node.equation_tags) or "none",
                     node.proof_relevance,
                     node.selected_obligation_id or "none",
                 )
             )
             + " |"
         )
+    lines.extend(
+        [
+            "",
+            "## Code Facts",
+            "",
+            "| Fact | Kind | Source | Target | Expression | Equation Tags | Profiles |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    if report.code_facts:
+        for fact in report.code_facts:
+            lines.append(
+                "| "
+                + " | ".join(
+                    markdown_cell(value)
+                    for value in (
+                        fact.fact_id,
+                        fact.fact_kind,
+                        f"`{fact.source_symbol}`",
+                        f"`{fact.target}`",
+                        f"`{fact.expression}`",
+                        ", ".join(fact.equation_tags) or "none",
+                        ", ".join(fact.target_profiles),
+                    )
+                )
+                + " |"
+            )
+    else:
+        lines.append("| none | none | none | none | none | none | none |")
     lines.extend(
         [
             "",
@@ -2127,7 +2474,6 @@ def main() -> int:
     report = build_algorithm_ir(
         qualname,
         index,
-        int(args.max_depth),
         str(args.target_theorem),
         root,
         import_roots,

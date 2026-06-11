@@ -3,6 +3,7 @@
 // upstream design ../../../documents/local-llm-responsibility-analysis.md local LLM responsibility boundary
 // upstream design ../../../documents/search-coordination.md coordinated search provider contract
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
+// upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 // upstream design ../../../agent-canon-environment.toml records local LLM CLI environment commands
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
 // downstream design ../../../tools/README.md documents root tool entrypoints
@@ -36,6 +37,8 @@ const PROMPT_DIGEST_LENGTH: usize = 12;
 enum LocalLlmCommand {
     ClassifyResponsibility,
     ExtractProseIr,
+    RouteImplementationSurface,
+    RouteSkill,
     Search,
     BuildIndex,
     Eval,
@@ -92,6 +95,10 @@ impl LocalLlmArgs {
         let command = match raw_command.as_str() {
             "classify-responsibility" | "review-file" => LocalLlmCommand::ClassifyResponsibility,
             "extract-prose-ir" | "prose-ir" => LocalLlmCommand::ExtractProseIr,
+            "route-implementation-surface" | "implementation-surface" => {
+                LocalLlmCommand::RouteImplementationSurface
+            }
+            "route-skill" | "skill-route" => LocalLlmCommand::RouteSkill,
             "search" => LocalLlmCommand::Search,
             "build-index" | "index" => LocalLlmCommand::BuildIndex,
             "eval" => LocalLlmCommand::Eval,
@@ -117,6 +124,12 @@ fn run_invocation(args: &LocalLlmArgs) -> i32 {
     }
     if args.command == LocalLlmCommand::ExtractProseIr {
         return run_extract_prose_ir(args);
+    }
+    if args.command == LocalLlmCommand::RouteImplementationSurface {
+        return run_route_implementation_surface(args);
+    }
+    if args.command == LocalLlmCommand::RouteSkill {
+        return run_route_skill(args);
     }
     let Ok(invocation) = build_invocation(args) else {
         eprintln!("LOCAL_LLM_CLI=fail");
@@ -189,6 +202,75 @@ struct ProseIrDocument {
     responsibility: String,
     kind: String,
     text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RouteOutputFormat {
+    Text,
+    Json,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RouteImplementationSurfaceArgs {
+    root: PathBuf,
+    request_parts: Vec<String>,
+    request_files: Vec<PathBuf>,
+    request_stdin: bool,
+    model: String,
+    llama_cli: String,
+    predict_tokens: usize,
+    format: RouteOutputFormat,
+    print_prompt: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RouteSkillArgs {
+    root: PathBuf,
+    prompt_parts: Vec<String>,
+    prompt_files: Vec<PathBuf>,
+    prompt_stdin: bool,
+    mode: String,
+    format: RouteOutputFormat,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SurfaceCandidate {
+    surface: String,
+    owner: String,
+    score: i64,
+    rationale: Vec<String>,
+    canonical_paths: Vec<String>,
+    forbidden_paths: Vec<String>,
+    required_checks: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SurfaceRouteDecision {
+    request: String,
+    prompt_digest: String,
+    model: String,
+    llm_status: String,
+    llm_output: String,
+    candidates: Vec<SurfaceCandidate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteMatch {
+    skill: &'static str,
+    reason: &'static str,
+    explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteDecision {
+    route: &'static str,
+    mode: String,
+    skills: Vec<String>,
+    active_skills: Vec<String>,
+    deferred_skills: Vec<String>,
+    matched_skills: Vec<String>,
+    reasons: Vec<String>,
+    evidence: String,
 }
 
 impl ClassifyArgs {
@@ -373,6 +455,207 @@ impl ProseIrArgs {
     }
 }
 
+impl RouteImplementationSurfaceArgs {
+    fn parse(root: PathBuf, args: &[String]) -> Result<Self, String> {
+        let mut parsed = Self {
+            root,
+            request_parts: Vec::new(),
+            request_files: Vec::new(),
+            request_stdin: false,
+            model: env::var("AGENT_CANON_LOCAL_LLM_MODEL")
+                .unwrap_or_else(|_| DEFAULT_MODEL.to_string()),
+            llama_cli: env::var("AGENT_CANON_LLAMA_CLI").unwrap_or_default(),
+            predict_tokens: DEFAULT_PREDICT_TOKENS,
+            format: RouteOutputFormat::Text,
+            print_prompt: false,
+        };
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--root" => {
+                    parsed.root = value_path(args, index, "--root")?;
+                    index += 2;
+                }
+                "--request" | "--purpose" | "--task" => {
+                    parsed
+                        .request_parts
+                        .push(value_string(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--request-file" | "--query-file" => {
+                    parsed
+                        .request_files
+                        .push(value_path(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--request-stdin" | "--query-stdin" => {
+                    parsed.request_stdin = true;
+                    index += 1;
+                }
+                "--model" => {
+                    parsed.model = value_string(args, index, "--model")?;
+                    index += 2;
+                }
+                "--llama-cli" => {
+                    parsed.llama_cli = value_string(args, index, "--llama-cli")?;
+                    index += 2;
+                }
+                "--predict-tokens" => {
+                    parsed.predict_tokens = parse_usize(args, index, "--predict-tokens")?;
+                    index += 2;
+                }
+                "--format" => {
+                    parsed.format = match value_string(args, index, "--format")?.as_str() {
+                        "text" => RouteOutputFormat::Text,
+                        "json" => RouteOutputFormat::Json,
+                        value => return Err(format!("--format must be text or json, got {value}")),
+                    };
+                    index += 2;
+                }
+                "--print-prompt" => {
+                    parsed.print_prompt = true;
+                    index += 1;
+                }
+                unknown if unknown.starts_with('-') => {
+                    return Err(format!("unknown argument {unknown}"))
+                }
+                text => {
+                    parsed.request_parts.push(text.to_string());
+                    index += 1;
+                }
+            }
+        }
+        Ok(parsed)
+    }
+
+    fn request_text(&self) -> Result<String, String> {
+        let mut parts = self.request_parts.clone();
+        for request_file in &self.request_files {
+            let path = rooted_path(&self.root, request_file);
+            if !path.is_file() {
+                return Err(format!("request-file-not-found:{}", request_file.display()));
+            }
+            parts.push(fs::read_to_string(&path).map_err(|error| {
+                format!(
+                    "request-file-read-failed:{}:{error}",
+                    request_file.display()
+                )
+            })?);
+        }
+        if self.request_stdin {
+            let mut stdin_text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin_text)
+                .map_err(|error| format!("request-stdin-read-failed:{error}"))?;
+            parts.push(stdin_text);
+        }
+        let request = parts
+            .iter()
+            .map(|part| part.trim())
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if request.is_empty() {
+            return Err("request-required".to_string());
+        }
+        Ok(request)
+    }
+}
+
+impl RouteSkillArgs {
+    fn parse(root: PathBuf, args: &[String]) -> Result<Self, String> {
+        let mut parsed = Self {
+            root,
+            prompt_parts: Vec::new(),
+            prompt_files: Vec::new(),
+            prompt_stdin: false,
+            mode: "repo-changing".to_string(),
+            format: RouteOutputFormat::Text,
+        };
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--root" => {
+                    parsed.root = value_path(args, index, "--root")?;
+                    index += 2;
+                }
+                "--prompt" | "--request" | "--purpose" | "--task" => {
+                    parsed
+                        .prompt_parts
+                        .push(value_string(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-file" | "--request-file" | "--query-file" => {
+                    parsed
+                        .prompt_files
+                        .push(value_path(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-stdin" | "--request-stdin" | "--query-stdin" => {
+                    parsed.prompt_stdin = true;
+                    index += 1;
+                }
+                "--mode" => {
+                    let mode = value_string(args, index, "--mode")?;
+                    match mode.as_str() {
+                        "repo-changing" | "routing-only" => parsed.mode = mode,
+                        value => {
+                            return Err(format!(
+                                "--mode must be repo-changing or routing-only, got {value}"
+                            ))
+                        }
+                    }
+                    index += 2;
+                }
+                "--format" => {
+                    parsed.format = match value_string(args, index, "--format")?.as_str() {
+                        "text" => RouteOutputFormat::Text,
+                        "json" => RouteOutputFormat::Json,
+                        value => return Err(format!("--format must be text or json, got {value}")),
+                    };
+                    index += 2;
+                }
+                unknown if unknown.starts_with('-') => {
+                    return Err(format!("unknown argument {unknown}"))
+                }
+                text => {
+                    parsed.prompt_parts.push(text.to_string());
+                    index += 1;
+                }
+            }
+        }
+        Ok(parsed)
+    }
+
+    fn prompt_text(&self) -> Result<String, String> {
+        let mut parts = self.prompt_parts.clone();
+        for prompt_file in &self.prompt_files {
+            let path = rooted_path(&self.root, prompt_file);
+            if !path.is_file() {
+                return Err(format!("prompt-file-not-found:{}", prompt_file.display()));
+            }
+            parts.push(fs::read_to_string(&path).map_err(|error| {
+                format!("prompt-file-read-failed:{}:{error}", prompt_file.display())
+            })?);
+        }
+        if self.prompt_stdin {
+            let mut stdin_text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin_text)
+                .map_err(|error| format!("prompt-stdin-read-failed:{error}"))?;
+            parts.push(stdin_text);
+        }
+        let prompt = parts
+            .iter()
+            .map(|part| part.trim())
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if prompt.is_empty() {
+            return Err("prompt-required".to_string());
+        }
+        Ok(prompt)
+    }
+}
+
 impl LlamaCommand {
     fn args(&self) -> Vec<String> {
         vec![
@@ -510,6 +793,1072 @@ fn run_extract_prose_ir(args: &LocalLlmArgs) -> i32 {
     }
     println!("{rendered}");
     0
+}
+
+fn run_route_implementation_surface(args: &LocalLlmArgs) -> i32 {
+    let parsed = match RouteImplementationSurfaceArgs::parse(args.root.clone(), &args.passthrough) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let request = match parsed.request_text() {
+        Ok(request) => request,
+        Err(message) => {
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let candidates = implementation_surface_candidates(&request);
+    let prompt = prompt_for_implementation_surface_route(&request, &candidates);
+    let digest = prompt_digest(&prompt);
+    if parsed.print_prompt {
+        println!("IMPLEMENTATION_SURFACE_ROUTER=prompt");
+        println!("IMPLEMENTATION_SURFACE_ROUTER_MODEL={}", parsed.model);
+        println!("IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA={digest}");
+        println!("{prompt}");
+        return 0;
+    }
+
+    let executable = find_llama_cli(&parsed.llama_cli);
+    if executable.is_empty() {
+        let decision = SurfaceRouteDecision {
+            request,
+            prompt_digest: digest,
+            model: parsed.model,
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
+        };
+        match parsed.format {
+            RouteOutputFormat::Json => print_implementation_surface_route_json(&decision),
+            RouteOutputFormat::Text => print_implementation_surface_route_text(&decision),
+        }
+        return 0;
+    }
+    let command = LlamaCommand {
+        executable,
+        model: parsed.model.clone(),
+        prompt: prompt.clone(),
+        predict_tokens: parsed.predict_tokens,
+    };
+    let llm_output = match run_llama_prompt(&command) {
+        Ok((raw_output, raw_stderr)) => {
+            if raw_stderr.trim().is_empty() {
+                raw_output
+            } else {
+                format!("{}\n\n[stderr]\n{}", raw_output.trim(), raw_stderr.trim())
+            }
+        }
+        Err(message) => {
+            print_implementation_surface_route_error(
+                &parsed,
+                &request,
+                &digest,
+                "local_llm_route_failed",
+                &message,
+            );
+            return 1;
+        }
+    };
+    let decision = SurfaceRouteDecision {
+        request,
+        prompt_digest: digest,
+        model: parsed.model,
+        llm_status: "local_llm_advisory".to_string(),
+        llm_output,
+        candidates,
+    };
+    match parsed.format {
+        RouteOutputFormat::Json => print_implementation_surface_route_json(&decision),
+        RouteOutputFormat::Text => print_implementation_surface_route_text(&decision),
+    }
+    0
+}
+
+fn run_route_skill(args: &LocalLlmArgs) -> i32 {
+    let parsed = match RouteSkillArgs::parse(args.root.clone(), &args.passthrough) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let prompt = match parsed.prompt_text() {
+        Ok(prompt) => prompt,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let decision = decide_skill_route(&prompt, &parsed.mode);
+    match parsed.format {
+        RouteOutputFormat::Json => print_skill_route_json(&decision),
+        RouteOutputFormat::Text => print_skill_route_text(&decision),
+    }
+    0
+}
+
+fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision {
+    let active_mode = infer_skill_route_mode(prompt, requested_mode);
+    let matches = matched_skill_routes(prompt);
+    let matched_skills = matches
+        .iter()
+        .map(|item| item.skill.to_string())
+        .collect::<Vec<_>>();
+    let mut skills = vec!["agent-orchestration".to_string()];
+    if active_mode == "repo-changing" {
+        skills.push("codex-task-workflow".to_string());
+    }
+    skills.extend(matched_skills.iter().cloned());
+    let skills = ordered_unique_strings(skills);
+
+    let mut active_skills = vec!["agent-orchestration".to_string()];
+    for item in &matches {
+        if item.explicit || is_current_stage_skill(item.skill) {
+            active_skills.push(item.skill.to_string());
+        }
+    }
+    let active_skills = ordered_unique_strings(active_skills);
+    let deferred_skills = skills
+        .iter()
+        .filter(|skill| !active_skills.contains(skill))
+        .cloned()
+        .collect::<Vec<_>>();
+    let reasons = matches
+        .iter()
+        .map(|item| format!("{}:{}", item.skill, item.reason))
+        .collect::<Vec<_>>();
+    let evidence = format!(
+        "mode={};matched={};active={};deferred={}",
+        active_mode,
+        if matched_skills.is_empty() {
+            "none".to_string()
+        } else {
+            matched_skills.join(",")
+        },
+        active_skills.join(","),
+        if deferred_skills.is_empty() {
+            "none".to_string()
+        } else {
+            deferred_skills.join(",")
+        }
+    );
+    SkillRouteDecision {
+        route: "skill-selection",
+        mode: active_mode,
+        skills,
+        active_skills,
+        deferred_skills,
+        matched_skills,
+        reasons,
+        evidence,
+    }
+}
+
+fn matched_skill_routes(prompt: &str) -> Vec<SkillRouteMatch> {
+    let text = prompt.to_lowercase();
+    let mut matches = Vec::new();
+    for (skill, reason, groups) in skill_route_rules() {
+        let explicit = public_skill_name_mentioned(&text, skill);
+        if explicit || groups.iter().any(|group| text_matches_group(&text, group)) {
+            matches.push(SkillRouteMatch {
+                skill,
+                reason: if explicit {
+                    "prompt explicitly names public skill"
+                } else {
+                    reason
+                },
+                explicit,
+            });
+        }
+    }
+    matches
+}
+
+fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>>)> {
+    vec![
+        (
+            "agent-orchestration",
+            "workflow, skill, subagent, or stage routing is part of the request",
+            vec![
+                vec!["どのスキル"],
+                vec!["どのskill"],
+                vec!["スキル選択"],
+                vec!["skill selection"],
+                vec!["routing", "skill"],
+                vec!["ルーティング", "スキル"],
+                vec!["マルチエージェント"],
+                vec!["サブエージェント", "起動"],
+                vec!["subagent", "routing"],
+                vec!["workflow=", "skills="],
+                vec!["根本", "設計", "見直"],
+            ],
+        ),
+        (
+            "task-routing",
+            "skill/tool routing architecture or route contract design is in scope",
+            vec![
+                vec!["ルーティング", "改善"],
+                vec!["routing", "redesign"],
+                vec!["routing", "architecture"],
+                vec!["route", "contract"],
+                vec!["skill", "tool", "routing"],
+                vec!["スキル選択", "ルーティング"],
+                vec!["スキル", "ツール", "ルーティング"],
+                vec!["根本", "設計", "見直"],
+            ],
+        ),
+        (
+            "comprehensive-development",
+            "repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation",
+            vec![
+                vec!["根本", "設計", "ルーティング"],
+                vec!["根本", "設計", "routing"],
+                vec!["全体", "レビュー", "修正"],
+                vec!["architecture", "redesign"],
+                vec!["workflow", "tools", "docs"],
+                vec!["repo-wide", "routing"],
+            ],
+        ),
+        (
+            "structure-planning",
+            "nontrivial design or document structure must be fixed before edits",
+            vec![
+                vec!["構造解析"],
+                vec!["文書", "構造", "解析"],
+                vec!["設計", "構造"],
+                vec!["structure", "contract"],
+                vec!["根本", "設計", "構造"],
+            ],
+        ),
+        (
+            "structure-refactor",
+            "repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope",
+            vec![
+                vec!["レポ", "リファクタ"],
+                vec!["repo", "refactor"],
+                vec!["repository", "refactor"],
+                vec!["repo", "structure"],
+                vec!["repository", "structure"],
+                vec!["ディレクトリ", "構成"],
+                vec!["directory", "structure"],
+                vec!["path", "layout"],
+                vec!["path", "responsibility"],
+                vec!["source", "ownership"],
+                vec!["構成", "考え直"],
+                vec!["~/.codex"],
+                vec![".codex", "config"],
+                vec!["codex", "personal", "runtime"],
+                vec!["personal", "runtime", "surface"],
+            ],
+        ),
+        (
+            "subagent-bootstrap",
+            "explicit subagent or multi-agent execution requires run-local specialist routing",
+            vec![
+                vec!["マルチエージェント"],
+                vec!["サブエージェント"],
+                vec!["subagent"],
+                vec!["multi-agent"],
+            ],
+        ),
+        (
+            "agent-learning",
+            "user feedback or recurrence prevention should become durable agent learning",
+            vec![
+                vec!["人間からのフィードバック"],
+                vec!["runtime feedback"],
+                vec!["再発防止"],
+                vec!["こういう止まり方"],
+                vec!["フィードバック", "修正"],
+                vec!["feedback", "repair"],
+                vec!["memory", "feedback"],
+            ],
+        ),
+        (
+            "agent-log-analysis",
+            "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
+            vec![
+                vec!["routing miss"],
+                vec!["selection gap"],
+                vec!["routing", "coverage"],
+                vec!["toolcall", "skillcall", "coverage"],
+                vec!["toolcall", "skillcall", "routing"],
+                vec!["toolcall", "skillcall", "miss"],
+                vec!["toolcall", "skillcall", "50"],
+                vec!["toolcall", "skillcall", "されない"],
+                vec!["ルーティング", "ログ"],
+                vec!["ログ", "skill"],
+                vec!["ログ", "tool"],
+                vec!["toolcall", "skillcall", "ルーティング"],
+                vec!["runbundle", "agent", "レポート"],
+                vec!["run bundle", "agent", "report"],
+                vec!["過去", "agent", "レポート"],
+            ],
+        ),
+        (
+            "agent-canon-update",
+            "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
+            vec![
+                vec!["ensure-latest"],
+                vec!["parent", "pin", "vendor"],
+                vec!["submodule", "pin"],
+                vec!["agentcanon", "update"],
+                vec!["agent-canon", "update"],
+                vec!["vendor/agent-canon"],
+            ],
+        ),
+        (
+            "change-review",
+            "review findings or implementation changes need findings-first review",
+            vec![
+                vec!["全体", "レビュー"],
+                vec!["review", "findings"],
+                vec!["diff", "review"],
+                vec!["コード", "レビュー"],
+                vec!["根本", "設計", "レビュー"],
+            ],
+        ),
+        (
+            "md-style-check",
+            "Markdown style, links, headings, or docs lint are in scope",
+            vec![
+                vec!["md-style"],
+                vec!["docs-check"],
+                vec!["agent-canon", "docs"],
+                vec!["docs", "format"],
+                vec!["docs", "check"],
+                vec!["markdownlint"],
+                vec!["markdown", "lint"],
+                vec!["markdown", "heading"],
+                vec!["markdown", "link"],
+                vec!["markdown", "formatter"],
+                vec!["format_markdown"],
+                vec!["formatter", "adjacent"],
+                vec!["フォーマッタ"],
+                vec!["フォーマット", "周辺"],
+                vec!["通してすらない"],
+                vec!["マークダウン", "体裁"],
+                vec!["マークダウン", "リンク"],
+            ],
+        ),
+        (
+            "oop-readability-check",
+            "OOP readability or readability guard evidence is in scope",
+            vec![
+                vec!["oop", "readability"],
+                vec!["oop", "可読"],
+                vec!["オブジェクト指向", "可読"],
+                vec!["readability", "guard"],
+                vec!["readability", "check"],
+                vec!["可読性", "class"],
+                vec!["可読性", "method"],
+            ],
+        ),
+        (
+            "result-artifact-writeout",
+            "raw results, reports, manifests, or accumulated evidence must be written out",
+            vec![
+                vec!["結果書き出し"],
+                vec!["結果を書き出"],
+                vec!["result writeout"],
+                vec!["artifact", "evidence"],
+                vec!["artifact", "report"],
+                vec!["run bundle", "evidence"],
+                vec!["蓄積分析", "レポート"],
+                vec!["ログ", "レポート", "残"],
+            ],
+        ),
+        (
+            "prose-reasoning-graph",
+            "prose structure graphing, diagnostics, or rewrite handoff is in scope",
+            vec![
+                vec!["文章構造", "graph"],
+                vec!["文章構造", "グラフ"],
+                vec!["段落", "接続"],
+                vec!["段落", "統合"],
+                vec!["dsl", "文章"],
+                vec!["prose", "graph"],
+                vec!["prose", "reasoning"],
+                vec!["rewrite", "packet"],
+                vec!["claim", "evidence", "graph"],
+            ],
+        ),
+        (
+            "pr-processing",
+            "pull request, merge queue, conflict repair, or issue triage processing is in scope",
+            vec![
+                vec!["pr", "処理"],
+                vec!["pr", "merge"],
+                vec!["pr", "マージ"],
+                vec!["pull request"],
+                vec!["pull request", "merge"],
+                vec!["merge queue"],
+                vec!["queue cleanup"],
+                vec!["conflict", "解消"],
+                vec!["コンフリクト", "解消"],
+                vec!["issue", "triage"],
+                vec!["issue", "処理"],
+                vec!["branch protection"],
+                vec!["required checks"],
+            ],
+        ),
+    ]
+}
+
+fn text_matches_group(text: &str, group: &[&str]) -> bool {
+    group.iter().all(|term| text.contains(&term.to_lowercase()))
+}
+
+fn public_skill_name_mentioned(text: &str, skill: &str) -> bool {
+    for (index, _) in text.match_indices(skill) {
+        let before = if index == 0 {
+            None
+        } else {
+            text[..index].chars().next_back()
+        };
+        let after = text[index + skill.len()..].chars().next();
+        let before_ok = before.is_none_or(|value| value == '$' || !is_skill_word_char(value));
+        let after_ok = after.is_none_or(|value| !is_skill_word_char(value));
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_skill_word_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || value == '_' || value == '-'
+}
+
+fn infer_skill_route_mode(prompt: &str, requested_mode: &str) -> String {
+    if requested_mode == "repo-changing" {
+        return requested_mode.to_string();
+    }
+    let text = prompt.to_lowercase();
+    let repo_changing_terms = [
+        "修正",
+        "実装",
+        "リファクタ",
+        "変更",
+        "直して",
+        "見直",
+        "fix",
+        "implement",
+        "refactor",
+        "repo-changing",
+    ];
+    if repo_changing_terms.iter().any(|term| text.contains(term)) {
+        "repo-changing".to_string()
+    } else {
+        requested_mode.to_string()
+    }
+}
+
+fn is_current_stage_skill(skill: &str) -> bool {
+    matches!(
+        skill,
+        "agent-orchestration"
+            | "task-routing"
+            | "agent-canon-update"
+            | "agent-log-analysis"
+            | "structure-planning"
+            | "structure-refactor"
+    )
+}
+
+fn ordered_unique_strings(values: Vec<String>) -> Vec<String> {
+    let mut result = Vec::new();
+    for value in values {
+        if !result.contains(&value) {
+            result.push(value);
+        }
+    }
+    result
+}
+
+fn skill_route_payload(decision: &SkillRouteDecision) -> Value {
+    json!({
+        "schema": "agent_canon.local_llm.skill_route.v1",
+        "route": decision.route,
+        "mode": decision.mode,
+        "skills": decision.skills,
+        "active_skills": decision.active_skills,
+        "deferred_skills": decision.deferred_skills,
+        "matched_skills": decision.matched_skills,
+        "reasons": decision.reasons,
+        "evidence": decision.evidence,
+    })
+}
+
+fn print_skill_route_json(decision: &SkillRouteDecision) {
+    match serde_json::to_string_pretty(&skill_route_payload(decision)) {
+        Ok(rendered) => println!("{rendered}"),
+        Err(error) => eprintln!("SKILL_ROUTER_ERROR=json-render-failed:{error}"),
+    }
+}
+
+fn print_skill_route_text(decision: &SkillRouteDecision) {
+    println!("ROUTE={}", decision.route);
+    println!("SCHEMA=agent_canon.local_llm.skill_route.v1");
+    println!("MODE={}", decision.mode);
+    println!(
+        "SKILLS={}",
+        decision
+            .skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "ACTIVE_SKILLS={}",
+        decision
+            .active_skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "DEFERRED_SKILLS={}",
+        if decision.deferred_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision
+                .deferred_skills
+                .iter()
+                .map(|skill| format!("${skill}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+    );
+    println!(
+        "MATCHED_SKILLS={}",
+        if decision.matched_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision.matched_skills.join(",")
+        }
+    );
+    println!(
+        "REASONS={}",
+        if decision.reasons.is_empty() {
+            "-".to_string()
+        } else {
+            decision.reasons.join(";")
+        }
+    );
+    println!("EVIDENCE={}", decision.evidence);
+}
+
+fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
+    let lower = request.to_lowercase();
+    let mut candidates = vec![
+        surface_candidate(
+            &lower,
+            "agentcanon_local_llm_tool",
+            "AgentCanon shared tool implementation",
+            &[
+                "rust/agent-canon/src/local_llm.rs",
+                "tools/catalog.yaml",
+                "documents/tools/agent-canon.md",
+                "documents/local-llm-responsibility-analysis.md",
+                "rust/agent-canon/src/local_llm.rs tests",
+            ],
+            &[
+                "project-local scripts for reusable AgentCanon routing",
+                "new Python helper when the Rust local-llm CLI can be extended",
+            ],
+            &[
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml local_llm",
+                "tools/bin/agent-canon local-llm route-implementation-surface --request <task>",
+                "python3 tools/agent_tools/tool_catalog.py",
+            ],
+            &[
+                ("implementation surface", 7),
+                ("route-implementation-surface", 7),
+                ("local llm", 6),
+                ("local-llm", 6),
+                ("llm", 3),
+                ("router", 5),
+                ("ルーター", 5),
+                ("実装前", 4),
+                ("責務判定", 5),
+                ("責務", 2),
+                ("判定", 2),
+                ("tool", 2),
+                ("ツール", 2),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "agent_runtime_instructions",
+            "AgentCanon root runtime instruction surface",
+            &[
+                "ROOT_AGENTS.md",
+                "AGENTS.md root shared view after sync_agent_canon.sh link-root",
+                "documents/SHARED_RUNTIME_SURFACES.md",
+            ],
+            &[
+                "editing root AGENTS.md as an independent truth surface when it is a shared view",
+                "duplicating tool-owned deterministic rules as prose-only guardrails",
+            ],
+            &[
+                "bash tools/sync_agent_canon.sh link-root",
+                "tools/bin/agent-canon docs check ROOT_AGENTS.md",
+            ],
+            &[
+                ("agents.md", 6),
+                ("agent.md", 6),
+                ("root_agents", 5),
+                ("root agents", 5),
+                ("agent instruction", 4),
+                ("runtime entrypoint", 4),
+                ("エージェント", 3),
+                ("指示", 3),
+                ("agent", 1),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "skill_workflow_policy",
+            "AgentCanon skill and workflow routing policy",
+            &[
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "agents/skills/agent-orchestration.md",
+                ".agents/skills/codex-task-workflow/SKILL.md",
+                "agents/skills/codex-task-workflow.md",
+                "agents/TASK_WORKFLOWS.md",
+            ],
+            &[
+                "subagent handoff prose that reimplements a canonical router result",
+                "task-local workflow copy",
+            ],
+            &[
+                "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "python3 tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                ("skill", 4),
+                ("スキル", 4),
+                ("workflow", 3),
+                ("ワークフロー", 3),
+                ("routing", 3),
+                ("ルーティング", 3),
+                ("handoff", 3),
+                ("subagent", 3),
+                ("サブエージェント", 3),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "directory_repository_responsibility",
+            "Repository and directory responsibility contract",
+            &[
+                "responsibility-scope.toml",
+                "documents/repo-structure-contract.toml",
+                "documents/SHARED_RUNTIME_SURFACES.md",
+                "documents/responsibility-scope-management.md",
+            ],
+            &[
+                "moving files before ownership and root-view contracts are checked",
+                "using raw rg hits as ownership authority",
+            ],
+            &[
+                "python3 tools/agent_tools/responsibility_scope.py",
+                "python3 tools/agent_tools/repo_structure_contract.py",
+                "agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --format text",
+            ],
+            &[
+                ("directory", 4),
+                ("ディレクトリ", 5),
+                ("repository", 3),
+                ("リポジトリ", 3),
+                ("repo", 2),
+                ("ownership", 4),
+                ("owner", 2),
+                ("責務", 2),
+                ("responsibility-scope", 5),
+                ("root view", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "personal_codex_runtime",
+            "User-level Codex configuration, skills, rules, and hook trust state",
+            &[
+                "$HOME/.codex/config.toml",
+                "$HOME/.codex/skills/",
+                "$HOME/.codex/rules/",
+                "project .codex symlink targets for comparison only",
+            ],
+            &[
+                "repo-local mirror of personal Codex state",
+                "auth, history, sessions, logs, or caches unless explicitly required",
+                "shared AgentCanon policy for a user-only runtime setting",
+            ],
+            &[
+                "inspect non-secret ~/.codex config keys and skill IDs",
+                "readlink -f .codex/config.toml .agents/skills",
+                "agent-canon local-llm route-skill --prompt <request> --format json",
+            ],
+            &[
+                ("~/.codex", 9),
+                ("$home/.codex", 9),
+                ("home/.codex", 9),
+                ("personal codex", 6),
+                ("personal runtime", 6),
+                ("user codex", 5),
+                ("user-level codex", 5),
+                ("個人", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "documentation_canon",
+            "Reader-facing canonical documentation surface",
+            &[
+                "documents/",
+                "documents/tools/",
+                "agents/skills/",
+                "README.md or ROOT_AGENTS.md only when listed as the canonical shared view",
+            ],
+            &[
+                "generated reports as source canon",
+                "parallel dated design copies",
+            ],
+            &[
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
+            ],
+            &[
+                ("document", 3),
+                ("documentation", 4),
+                ("docs", 3),
+                ("文書", 4),
+                ("設計", 3),
+                ("readme", 3),
+                ("正本", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "deterministic_checker_or_formatter",
+            "Deterministic checker, formatter, or structured-analysis tool",
+            &[
+                "rust/agent-canon/src/docs.rs",
+                "rust/agent-canon/src/structured_analysis.rs",
+                "tools/catalog.yaml",
+                "documents/tools/",
+            ],
+            &[
+                "prompt-only rule for behavior that a checker can decide",
+                "manual prose review as the only validation route",
+            ],
+            &[
+                "tools/bin/agent-canon docs -h",
+                "tools/bin/agent-canon structured-analysis --help",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml",
+            ],
+            &[
+                ("deterministic", 4),
+                ("決定論", 5),
+                ("checker", 4),
+                ("チェック", 4),
+                ("formatter", 4),
+                ("フォーマッタ", 5),
+                ("structured", 3),
+                ("構造化", 4),
+                ("warning", 3),
+                ("警告", 3),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "environment_or_ci_surface",
+            "Environment, CI, and GitHub Actions surface",
+            &[
+                "docker/",
+                ".github/workflows/",
+                "agent-canon-environment.toml",
+                "documents/runtime-profiles-and-check-matrix.md",
+            ],
+            &["tool or skill docs for environment behavior that CI must enforce"],
+            &[
+                "tools/ci/check_agent_canon_pr.sh",
+                "tools/bin/agent-canon docs check docker/ .github/workflows/",
+            ],
+            &[
+                ("docker", 4),
+                ("devcontainer", 4),
+                ("github action", 5),
+                ("githubaction", 5),
+                ("ci", 3),
+                ("environment", 3),
+                ("環境", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "report_or_runtime_artifact",
+            "Run-bundle report, evidence, or append-only runtime artifact",
+            &[
+                "reports/agents/<run-id>/",
+                ".agent-canon/log-archive/",
+                "documents/runtime-log-archive.md",
+            ],
+            &[
+                "committing generated evidence as source canon",
+                "overwriting append-only runtime logs",
+            ],
+            &[
+                "python3 tools/agent_tools/runtime_log_archive_git.py status",
+                "python3 tools/agent_tools/eval_accumulation_check.py --compact-out <path>",
+            ],
+            &[
+                ("report", 3),
+                ("reports", 3),
+                ("ログ", 4),
+                ("log", 2),
+                ("evidence", 4),
+                ("run bundle", 5),
+                ("artifact", 3),
+            ],
+        ),
+    ];
+    candidates.sort_by(|left, right| {
+        right
+            .score
+            .cmp(&left.score)
+            .then_with(|| left.surface.cmp(&right.surface))
+    });
+    candidates.retain(|candidate| candidate.score > 0);
+    if candidates.is_empty() {
+        candidates.push(SurfaceCandidate {
+            surface: "needs_responsibility_survey".to_string(),
+            owner: "Route unknown until responsibility search narrows the surface".to_string(),
+            score: 0,
+            rationale: vec!["no_keyword_surface_match".to_string()],
+            canonical_paths: vec![
+                "run agent-canon local-llm search --purpose <request>".to_string(),
+                "run agent-canon semantic-index context-pack --query-file <file>".to_string(),
+            ],
+            forbidden_paths: vec![
+                "new helper/module before the responsibility survey completes".to_string(),
+            ],
+            required_checks: vec![
+                "agent-canon local-llm search --purpose <request> --providers llm,tool,header-deps,code-deps,vector --format text".to_string(),
+                "bounded rg -l only after the responsibility route narrows candidate paths".to_string(),
+            ],
+        });
+    }
+    candidates
+}
+
+fn surface_candidate(
+    lower_request: &str,
+    surface: &str,
+    owner: &str,
+    canonical_paths: &[&str],
+    forbidden_paths: &[&str],
+    required_checks: &[&str],
+    keywords: &[(&str, i64)],
+) -> SurfaceCandidate {
+    let mut score = 0;
+    let mut rationale = Vec::new();
+    for (keyword, weight) in keywords {
+        if lower_request.contains(&keyword.to_lowercase()) {
+            score += weight;
+            rationale.push(format!("matched_keyword:{keyword}"));
+        }
+    }
+    SurfaceCandidate {
+        surface: surface.to_string(),
+        owner: owner.to_string(),
+        score,
+        rationale,
+        canonical_paths: canonical_paths
+            .iter()
+            .map(|value| value.to_string())
+            .collect(),
+        forbidden_paths: forbidden_paths
+            .iter()
+            .map(|value| value.to_string())
+            .collect(),
+        required_checks: required_checks
+            .iter()
+            .map(|value| value.to_string())
+            .collect(),
+    }
+}
+
+fn prompt_for_implementation_surface_route(
+    request: &str,
+    candidates: &[SurfaceCandidate],
+) -> String {
+    let mut lines = vec![
+        "You are the AgentCanon implementation-surface router.".to_string(),
+        "Decide where an implementation should live before any file edit.".to_string(),
+        "Use repository responsibility, canonical shared surfaces, tool ownership, skill ownership, and root-view policy.".to_string(),
+        "Prefer existing canonical surfaces. Do not invent a new helper, module, skill, or directory unless every listed candidate is inadequate.".to_string(),
+        "Return JSON only with schema agent_canon.local_llm.implementation_surface_route.v1.".to_string(),
+        "Required JSON keys: schema, primary_surface, canonical_paths, forbidden_paths, required_pre_edit_checks, rationale, confidence, unresolved_questions.".to_string(),
+        "If the request spans several surfaces, choose the implementation owner as primary and list doc/skill/runtime updates as secondary paths.".to_string(),
+        String::new(),
+        "Request:".to_string(),
+        request.to_string(),
+        String::new(),
+        "Deterministic candidate surfaces from the Rust router:".to_string(),
+    ];
+    for candidate in candidates.iter().take(5) {
+        lines.push(format!("- surface: {}", candidate.surface));
+        lines.push(format!("  owner: {}", candidate.owner));
+        lines.push(format!("  score: {}", candidate.score));
+        lines.push(format!(
+            "  canonical_paths: {}",
+            candidate.canonical_paths.join("; ")
+        ));
+        lines.push(format!(
+            "  forbidden_paths: {}",
+            candidate.forbidden_paths.join("; ")
+        ));
+        lines.push(format!(
+            "  required_checks: {}",
+            candidate.required_checks.join("; ")
+        ));
+        lines.push(format!("  rationale: {}", candidate.rationale.join("; ")));
+    }
+    lines.join("\n")
+}
+
+fn print_implementation_surface_route_json(decision: &SurfaceRouteDecision) {
+    let payload = implementation_surface_route_payload(decision);
+    match serde_json::to_string_pretty(&payload) {
+        Ok(rendered) => println!("{rendered}"),
+        Err(error) => {
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR=json-render-failed:{error}");
+        }
+    }
+}
+
+fn print_implementation_surface_route_error(
+    parsed: &RouteImplementationSurfaceArgs,
+    request: &str,
+    prompt_digest: &str,
+    code: &str,
+    message: &str,
+) {
+    match parsed.format {
+        RouteOutputFormat::Json => {
+            let payload = json!({
+                "schema": "agent_canon.local_llm.implementation_surface_route.error.v1",
+                "status": "error",
+                "error_code": code,
+                "message": message,
+                "required_action": "repair LocalLLM environment before running implementation-surface routing",
+                "model": parsed.model.as_str(),
+                "prompt_sha": prompt_digest,
+                "request": request,
+            });
+            match serde_json::to_string_pretty(&payload) {
+                Ok(rendered) => eprintln!("{rendered}"),
+                Err(error) => {
+                    eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR=json-render-failed:{error}")
+                }
+            }
+        }
+        RouteOutputFormat::Text => {
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER=error");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_SCHEMA=agent_canon.local_llm.implementation_surface_route.error.v1");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE={code}");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR={message}");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION=repair LocalLLM environment before running implementation-surface routing");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_MODEL={}", parsed.model);
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA={prompt_digest}");
+        }
+    }
+}
+
+fn print_implementation_surface_route_text(decision: &SurfaceRouteDecision) {
+    let primary = decision
+        .candidates
+        .first()
+        .expect("implementation surface candidates are never empty");
+    println!("IMPLEMENTATION_SURFACE_ROUTER=pass");
+    println!(
+        "IMPLEMENTATION_SURFACE_ROUTER_SCHEMA=agent_canon.local_llm.implementation_surface_route.v1"
+    );
+    println!(
+        "IMPLEMENTATION_SURFACE_ROUTER_STATUS={}",
+        decision.llm_status
+    );
+    println!("IMPLEMENTATION_SURFACE_ROUTER_MODEL={}", decision.model);
+    println!(
+        "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA={}",
+        decision.prompt_digest
+    );
+    println!("PRIMARY_SURFACE={}", primary.surface);
+    println!("PRIMARY_OWNER={}", primary.owner);
+    println!("PRIMARY_SCORE={}", primary.score);
+    println!("PRIMARY_PATHS={}", primary.canonical_paths.join(" | "));
+    println!("FORBIDDEN_PATHS={}", primary.forbidden_paths.join(" | "));
+    println!(
+        "REQUIRED_PRE_EDIT_CHECKS={}",
+        primary.required_checks.join(" | ")
+    );
+    for (index, candidate) in decision.candidates.iter().take(5).enumerate() {
+        println!("CANDIDATE_{}_SURFACE={}", index + 1, candidate.surface);
+        println!("CANDIDATE_{}_SCORE={}", index + 1, candidate.score);
+        println!(
+            "CANDIDATE_{}_RATIONALE={}",
+            index + 1,
+            candidate.rationale.join(" | ")
+        );
+    }
+    if !decision.llm_output.trim().is_empty() {
+        println!("LOCAL_LLM_ROUTE_ADVISORY_BEGIN");
+        println!("{}", decision.llm_output.trim());
+        println!("LOCAL_LLM_ROUTE_ADVISORY_END");
+    }
+}
+
+fn implementation_surface_route_payload(decision: &SurfaceRouteDecision) -> Value {
+    let primary = decision
+        .candidates
+        .first()
+        .expect("implementation surface candidates are never empty");
+    let candidates: Vec<Value> = decision
+        .candidates
+        .iter()
+        .map(|candidate| {
+            json!({
+                "surface": candidate.surface,
+                "owner": candidate.owner,
+                "score": candidate.score,
+                "rationale": candidate.rationale,
+                "canonical_paths": candidate.canonical_paths,
+                "forbidden_paths": candidate.forbidden_paths,
+                "required_checks": candidate.required_checks,
+            })
+        })
+        .collect();
+    json!({
+        "schema": "agent_canon.local_llm.implementation_surface_route.v1",
+        "status": decision.llm_status,
+        "model": decision.model,
+        "prompt_sha": decision.prompt_digest,
+        "request": decision.request,
+        "primary_surface": primary.surface,
+        "primary_owner": primary.owner,
+        "primary_paths": primary.canonical_paths,
+        "forbidden_paths": primary.forbidden_paths,
+        "required_pre_edit_checks": primary.required_checks,
+        "candidates": candidates,
+        "llm_output_raw": decision.llm_output,
+    })
 }
 
 fn read_prose_ir_document(
@@ -1390,6 +2739,24 @@ fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCo
     }
 }
 
+fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> {
+    let output = Command::new(&command.executable)
+        .args(command.args())
+        .output()
+        .map_err(|error| format!("llama-launch-failed:{error}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        Ok((stdout, stderr))
+    } else {
+        Err(format!(
+            "llama-exit-status:{}:{}",
+            output.status.code().unwrap_or(1),
+            stderr.trim()
+        ))
+    }
+}
+
 fn relative_path(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .map(|relative| relative.to_string_lossy().to_string())
@@ -1419,6 +2786,10 @@ fn build_invocation(args: &LocalLlmArgs) -> Result<PythonInvocation, String> {
     let (script, prefix_args) = match args.command {
         LocalLlmCommand::ClassifyResponsibility => return Err("native-rust-command".to_string()),
         LocalLlmCommand::ExtractProseIr => return Err("native-rust-command".to_string()),
+        LocalLlmCommand::RouteImplementationSurface => {
+            return Err("native-rust-command".to_string())
+        }
+        LocalLlmCommand::RouteSkill => return Err("native-rust-command".to_string()),
         LocalLlmCommand::Search => (source_root.join("tools/agent_tools/search.py"), Vec::new()),
         LocalLlmCommand::BuildIndex => (
             source_root.join("tools/agent_tools/search_index.py"),
@@ -1491,7 +2862,7 @@ fn has_option_value(args: &[String], name: &str) -> bool {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|search|build-index|eval> [--root <repo-root>] [tool args...]"
+        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|route-implementation-surface|route-skill|search|build-index|eval> [--root <repo-root>] [tool args...]"
     );
     eprintln!(
         "examples: agent-canon local-llm classify-responsibility --print-prompt tools/agent_tools/search.py"
@@ -1501,6 +2872,12 @@ fn print_usage() {
     );
     eprintln!(
         "          agent-canon local-llm search --purpose \"find responsibility scope tooling\""
+    );
+    eprintln!(
+        "          agent-canon local-llm route-implementation-surface --request-file reports/task.txt --format text"
+    );
+    eprintln!(
+        "          agent-canon local-llm route-skill --prompt \"fix skill routing\" --format json"
     );
 }
 
@@ -1544,6 +2921,199 @@ mod tests {
         assert_eq!(invocation.args[0], "build");
         assert_eq!(invocation.args[1], "--root");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn parses_implementation_surface_route_request_file() {
+        let args = vec![
+            "route-implementation-surface".to_string(),
+            "--root".to_string(),
+            "fixture".to_string(),
+            "--request-file".to_string(),
+            "reports/task.txt".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
+        ];
+        let parsed = LocalLlmArgs::parse(&args).expect("parse local llm args");
+
+        assert_eq!(parsed.command, LocalLlmCommand::RouteImplementationSurface);
+        assert_eq!(parsed.root, PathBuf::from("fixture"));
+        let route_args =
+            RouteImplementationSurfaceArgs::parse(parsed.root.clone(), &parsed.passthrough)
+                .expect("parse route args");
+        assert_eq!(
+            route_args.request_files,
+            vec![PathBuf::from("reports/task.txt")]
+        );
+        assert_eq!(route_args.format, RouteOutputFormat::Json);
+    }
+
+    #[test]
+    fn parses_skill_route_prompt() {
+        let args = vec![
+            "route-skill".to_string(),
+            "--root".to_string(),
+            "fixture".to_string(),
+            "--prompt".to_string(),
+            "スキルとツールのルーティングを根本から見直す".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
+        ];
+        let parsed = LocalLlmArgs::parse(&args).expect("parse local llm args");
+
+        assert_eq!(parsed.command, LocalLlmCommand::RouteSkill);
+        assert_eq!(parsed.root, PathBuf::from("fixture"));
+        let route_args =
+            RouteSkillArgs::parse(parsed.root.clone(), &parsed.passthrough).expect("parse route");
+        assert_eq!(route_args.format, RouteOutputFormat::Json);
+        assert_eq!(
+            route_args.prompt_parts,
+            vec!["スキルとツールのルーティングを根本から見直す".to_string()]
+        );
+    }
+
+    #[test]
+    fn skill_route_splits_active_and_deferred_skill_waves() {
+        let prompt = "スキルとツールのルーティングを根本の設計から見直し、マルチエージェントでログのレポートを残す";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert_eq!(decision.route, "skill-selection");
+        assert!(decision.skills.contains(&"codex-task-workflow".to_string()));
+        assert!(decision.skills.contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"agent-orchestration".to_string()));
+        assert!(decision.active_skills.contains(&"task-routing".to_string()));
+        assert!(!decision
+            .active_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"codex-task-workflow".to_string()));
+        assert!(decision.evidence.contains("active=agent-orchestration"));
+    }
+
+    #[test]
+    fn skill_route_matches_repo_refactor_and_personal_codex_boundary() {
+        let prompt = "レポのリファクタスキルを定義して ~/.codex も見て修正して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_json_schema_includes_wave_fields() {
+        let decision = decide_skill_route(
+            "md-style-check と agent-learning の routing gap を直して",
+            "routing-only",
+        );
+        let payload = skill_route_payload(&decision);
+
+        assert_eq!(payload["schema"], "agent_canon.local_llm.skill_route.v1");
+        assert_eq!(payload["route"], "skill-selection");
+        assert!(payload["active_skills"].is_array());
+        assert!(payload["deferred_skills"].is_array());
+        assert!(payload["matched_skills"]
+            .as_array()
+            .expect("matched skills array")
+            .iter()
+            .any(|value| value == "md-style-check"));
+    }
+
+    #[test]
+    fn implementation_surface_route_prioritizes_local_llm_tool() {
+        let request = "実装前に責務判定するルーターを local LLM で作り、AGENTS.md にも書く";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "agentcanon_local_llm_tool");
+        assert!(candidates
+            .iter()
+            .any(|candidate| candidate.surface == "agent_runtime_instructions"));
+        let prompt = prompt_for_implementation_surface_route(request, &candidates);
+        assert!(prompt.contains("implementation-surface router"));
+        assert!(prompt.contains("Return JSON only"));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_personal_codex_runtime() {
+        let request =
+            "~/.codex の config と user skill が repo routing と衝突していないか見て修正する";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "personal_codex_runtime");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("$HOME/.codex/config.toml")));
+        assert!(candidates[0]
+            .forbidden_paths
+            .iter()
+            .any(|path| path.contains("auth")));
+    }
+
+    #[test]
+    fn implementation_surface_route_payload_is_structured() {
+        let request = "Skill routing should choose where to edit before implementation.";
+        let candidates = implementation_surface_candidates(request);
+        let decision = SurfaceRouteDecision {
+            request: request.to_string(),
+            prompt_digest: "abc123".to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            llm_status: "local_llm_advisory".to_string(),
+            llm_output: String::new(),
+            candidates,
+        };
+
+        let payload = implementation_surface_route_payload(&decision);
+
+        assert_eq!(
+            payload["schema"],
+            "agent_canon.local_llm.implementation_surface_route.v1"
+        );
+        assert!(payload["primary_surface"].as_str().is_some());
+        assert!(!payload["required_pre_edit_checks"]
+            .as_array()
+            .expect("required checks")
+            .is_empty());
+        assert!(!payload["candidates"]
+            .as_array()
+            .expect("candidates")
+            .is_empty());
+    }
+
+    #[test]
+    fn implementation_surface_route_fallback_is_structured_without_llm() {
+        let request = "Agents are writing implementation into the wrong directory.";
+        let candidates = implementation_surface_candidates(request);
+        let decision = SurfaceRouteDecision {
+            request: request.to_string(),
+            prompt_digest: "fallback123".to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
+        };
+
+        let payload = implementation_surface_route_payload(&decision);
+
+        assert_eq!(payload["status"], "deterministic_candidate_fallback");
+        assert!(payload["primary_paths"]
+            .as_array()
+            .expect("primary paths")
+            .iter()
+            .any(|path| path.as_str().expect("path").contains("responsibility")));
+        assert!(!payload["forbidden_paths"]
+            .as_array()
+            .expect("forbidden paths")
+            .is_empty());
     }
 
     #[test]

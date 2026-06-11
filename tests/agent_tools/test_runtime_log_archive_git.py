@@ -87,6 +87,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH=logs/{key}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(
+            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon) / 'agent-reports' / key}",
+            result.stdout,
+        )
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", result.stdout)
 
     def test_ensure_status_and_push_logs_branch(self) -> None:
@@ -140,11 +144,35 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=yes", status.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={key}", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY=yes", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", status.stdout)
+
+            dirty_clean_check = self.run_tool(
+                "check-clean",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(dirty_clean_check.returncode, 0, dirty_clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", dirty_clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", dirty_clean_check.stdout)
 
             push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(push.returncode, 0, push.stdout + push.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", push.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_PUSH=pass", push.stdout)
+
+            clean_check = self.run_tool(
+                "check-clean",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(clean_check.returncode, 0, clean_check.stdout + clean_check.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass", clean_check.stdout)
             self.assertEqual(
                 subprocess.run(
                     ["git", "-C", str(archive), "config", "--get", "user.email"],
@@ -162,6 +190,94 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(remote_ref.returncode, 0, remote_ref.stderr)
+
+    def test_status_reports_foreign_repo_key_dirty_paths(self) -> None:
+        """status/check-clean should expose dirty paths for another repo key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            other_key = repo_log_key(other_source)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard.jsonl"
+            foreign_log.parent.mkdir(parents=True)
+            foreign_log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-foreign",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": other_key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = self.run_tool(
+                "status",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={other_key}", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY=no", status.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS={other_key}", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes", status.stdout)
+            self.assertNotIn(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={key}", status.stdout)
+
+            clean_check = self.run_tool(
+                "check-clean",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(clean_check.returncode, 0, clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
+
+    def test_status_reports_archive_level_dirty_paths(self) -> None:
+        """Status should separate archive-level tool or policy dirt from repo-key logs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            tool_path = archive / "tools" / "runtime_log_dashboard.py"
+            tool_path.parent.mkdir(parents=True)
+            tool_path.write_text("# dashboard tool update\n", encoding="utf-8")
+
+            status = self.run_tool(
+                "status",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=yes", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY_KEYS=", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY=no", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY=yes", status.stdout)
+            self.assertIn("commit or revert archive-level dirty paths", status.stdout)
 
     def test_archive_agent_reports_copies_run_bundles(self) -> None:
         """archive-agent-reports should copy reports/agents into the log branch."""

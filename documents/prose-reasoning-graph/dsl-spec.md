@@ -162,7 +162,7 @@ document structure. A directory node is not itself prose source truth. The
 structured-analysis adapter derives a `directory_responsibility` node from, in
 priority order, the directory `README.md` dependency-manifest responsibility,
 the `README.md` title, descendant artifact dependency-manifest
-responsibilities, or a path-only fallback.
+responsibilities, or a path-only alternate route.
 
 The projection must preserve evidence edges. The directory node connects to the
 derived responsibility node with `has_responsibility`; README and child
@@ -558,20 +558,29 @@ Projection order must use this priority:
 1. Requested profile constraints such as `writing`, `logic`, `experiment`,
    `report`, `academic`, `paper`, or `all`.
 1. Phase preferences when the profile asks for genre move order.
-1. Discourse edges with `order_kind=adjacency_preferred`.
-1. Confidence score.
+1. Discourse edges with `order_kind=adjacency_preferred` as soft queue
+   priorities, not hard topological constraints.
+1. Confidence score for soft ordering evidence.
 1. Source order as the final stable tie-breaker.
 
-If the selected ordering subgraph has a cycle, the projection must record a
-diagnostic instead of silently dropping edges. A reorder edit operation may
-propose a priority topological sort, but the rewrite packet must preserve
-source ids and explain which constraints were relaxed.
+If the hard selected ordering constraints have a cycle, the projection must
+record a diagnostic instead of silently dropping edges. A reorder edit
+operation may propose a priority topological sort, but the rewrite packet must
+preserve source ids and explain which hard constraints were relaxed. Soft
+`adjacency_preferred` conflicts influence priority and cannot by themselves
+force a topology cycle.
 
-Current MVP projection exports emit nodes, edges, diagnostics, and edit
-operations. Projection-view implementations should extend that export with
-derived macro views while still emitting source anchors, selected ordering
+Current MVP projection exports emit nodes, edges, diagnostics, edit operations,
+and `selected_ordering`. The `selected_ordering` object is the whole-document
+sentence-anchor order produced by priority topological sort over the selected
+ordering subgraph. Writing adapters use `selected_ordering.ordered_anchors` as
+the DSL-to-prose input sequence, giving the LLM a deterministic reader-order
+contract for the entire source text. Projection-view implementations should
+extend that export with derived
+macro views while still emitting source anchors, selected ordering
 edges, diagnostics, and edit operations. Full internal analysis nodes are
-optional unless the receiving skill or reviewer asks for a debug export.
+available through debug-oriented projection exports for receiving skills and
+reviewers that need complete graph evidence.
 
 ## Profiles And Skill Handoff
 
@@ -660,6 +669,9 @@ emits:
 - `presentation_format_candidate`: a projection view has a presentation feature
   subgraph showing that a non-prose form such as a list, table, figure, or
   equation may communicate the same anchored content better than prose.
+- `selected_ordering_cycle`: hard selected-ordering constraints contain a cycle
+  that must be relaxed, split, or corrected before reader-order projection is
+  treated as settled.
 
 The canonical-graph and projection-view contract reserves these rule ids for
 implementations that enforce the new projection model:
@@ -667,8 +679,6 @@ implementations that enforce the new projection model:
 - `missing_implicit_premise`: a text unit requires an unstated premise.
 - `missing_warrant`: a support relation lacks the warrant that licenses the
   inference.
-- `projection_cycle`: the selected ordering subgraph contains a cycle that must
-  be contracted or relaxed before reader-order projection.
 
 New diagnostics must define severity, target type, triggering condition,
 suggested action shape, and false-positive boundary in this directory before

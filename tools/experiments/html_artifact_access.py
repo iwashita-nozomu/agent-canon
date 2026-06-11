@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
         "--ssh-host",
         default="",
         help=(
-            "SSH target for the HPC host. Optional; falls back to "
+            "SSH target for the HPC host. Optional; derives from "
             f"${SSH_HOST_ENV_VAR}, SSH_CONNECTION, or {SSH_HOST_PLACEHOLDER}."
         ),
     )

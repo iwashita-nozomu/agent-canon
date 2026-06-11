@@ -11,7 +11,7 @@ downstream implementation ../../tools/agent_tools/goal_loop.py generates work br
 
 This workflow prevents goal-driven work from spending too long in planning.
 The goal loop should alternate between a short planning checkpoint and a
-concrete implementation slice until `goal.loop_status` allows closeout.
+concrete implementation slice until `goal_loop.py status` allows closeout.
 
 ## Core Rule
 
@@ -26,7 +26,7 @@ blocked by an actual design gap.
   Goal Work Breakdown rows.
 - Evidence checkpoint: run the task-relevant commands and mark only proven
   `goal.md` items.
-- Next-action checkpoint: read `goal_loop.py status` and MCP `goal.loop_status`.
+- Next-action checkpoint: read `goal_loop.py status`.
 
 If `NEXT_ACTION=run_next_iteration`, immediately choose the next slice instead
 of returning a partial status as completion.

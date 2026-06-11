@@ -35,7 +35,9 @@ packets for existing writing, research, review, experiment, and artifact skills.
 - Existing prose should be converted into a graph/DSL-like intermediate form.
 - Paragraph order, paragraph-to-paragraph connection, or paragraph-internal
   naturalness needs evidence before rewrite.
-- A draft needs split, merge, bridge, or reorder operations.
+- A draft or substantive document addition/revision needs split, merge, bridge,
+  reorder, responsibility-coverage, or reader-path decisions before prose is
+  added.
 - A paper, scholarly note, report, or experiment plan needs logic-hole,
   citation/evidence, or experiment-design triage before drafting.
 - An LLM should receive a compact rewrite packet rather than re-inferring the
@@ -43,9 +45,12 @@ packets for existing writing, research, review, experiment, and artifact skills.
 
 ## Standard Sequence
 
-This skill is the structure-first writing gate. For nontrivial document creation
-or revision, do not ask a writing skill to draft reader-facing prose from raw
-notes while graph findings are still open.
+This skill is the structure-first writing gate. For nontrivial or substantive
+document creation or revision, do not ask a writing skill to draft
+reader-facing prose from raw notes while graph findings are still open. Typos,
+link fixes, Markdown formatting, and other format-only edits may skip this gate
+when they do not change section order, responsibility coverage, claim/support,
+reader path, source map, or canonical route.
 
 1. Encode the draft or source packet into the graph/DSL.
 1. Analyze the graph.
@@ -93,6 +98,11 @@ notes while graph findings are still open.
    `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
    only diagnostics and no edit-operation ids.
 1. Export `skill-handoff` and pass it to the receiving skill or reviewer.
+1. For DSL-to-prose projection, pass the `project --out` payload's
+   `selected_ordering.ordered_anchors` to the receiving writing skill as the
+   whole-document sentence sequence. The ordering is a priority topological sort
+   over the selected ordering subgraph, so the LLM receives a deterministic reader-order contract
+   before it writes sentences or sections.
 1. If diagnostics include a verification route, verify before rewrite:
    `logic-gap-review` checks inference validity, `$literature-survey` and
    `citation-evidence-review` check external evidence, `$formal-proof-workflow`

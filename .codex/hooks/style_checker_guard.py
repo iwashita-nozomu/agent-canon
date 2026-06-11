@@ -4,8 +4,7 @@
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/ci/run_all_checks.sh runs Python ruff style checks.
-# upstream implementation ../../tools/docs/check_markdown_lint.py checks Markdown style.
-# upstream implementation ../../tools/docs/check_markdown_math.py checks Markdown math notation.
+# upstream implementation ../../rust/agent-canon/src/docs.rs checks Markdown style and math notation.
 # upstream implementation ../../codex-cli-guide/tools/validate_split.py checks generated Codex guide split coherence.
 # upstream implementation ../../tools/oop/cpp/readability.py checks C++ readability style.
 # upstream implementation ../../tools/validation/notebook_quality.py checks notebook quality.
@@ -29,7 +28,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
@@ -39,7 +37,7 @@ EDIT_COMMAND_PATTERN = re.compile(
     r"papermill|git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
 CHECKER_COMMAND_RE = re.compile(
-    r"(?is)(style_checker_guard\.py|check_markdown_lint\.py|check_markdown_math\.py|"
+    r"(?is)(style_checker_guard\.py|agent-canon docs check|"
     r"tools/validation/notebook_quality\.py|notebook_quality(?:_guard)?\.py|"
     r"tools/oop/python/readability\.py|tools/oop/cpp/readability\.py|"
     r"python3?\s+-m\s+ruff\s+(?:check|format)|ruff\s+(?:check|format))"
@@ -147,25 +145,11 @@ def tool_command(payload: dict[str, object]) -> str:
     return ""
 
 
-def has_tool_signal(payload: dict[str, object]) -> bool:
-    """Return whether one payload looks like a tool hook payload."""
-    return isinstance(payload.get("tool_name"), str) or bool(tool_command(payload))
-
-
-def uses_event_fallback(payload: dict[str, object]) -> bool:
-    """Return whether to infer a PostToolUse event."""
-    if isinstance(payload.get("hookEventName"), str):
-        return False
-    return payload_status(payload) == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
-
-
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if uses_event_fallback(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 
@@ -270,29 +254,19 @@ def markdown_commands(root: Path, paths: tuple[str, ...]) -> tuple[StyleCommand,
     standard_paths = tuple(path for path in paths if path not in generated_guide_paths)
     commands: list[StyleCommand] = []
     if standard_paths:
-        commands.extend(
-            (
-                StyleCommand(
-                    checker="markdown_lint",
-                    family="markdown",
-                    command=(
-                        "python3",
-                        str(root / "tools" / "docs" / "check_markdown_lint.py"),
-                        "--check",
-                        *standard_paths,
-                    ),
-                    paths=standard_paths,
+        commands.append(
+            StyleCommand(
+                checker="agent_canon_docs_check",
+                family="markdown",
+                command=(
+                    str(root / "tools" / "bin" / "agent-canon"),
+                    "docs",
+                    "check",
+                    "--root",
+                    str(root),
+                    *standard_paths,
                 ),
-                StyleCommand(
-                    checker="markdown_math",
-                    family="markdown",
-                    command=(
-                        "python3",
-                        str(root / "tools" / "docs" / "check_markdown_math.py"),
-                        *standard_paths,
-                    ),
-                    paths=standard_paths,
-                ),
+                paths=standard_paths,
             )
         )
     if generated_guide_paths:
@@ -455,7 +429,7 @@ def append_style_log(
             "payload_fingerprint": payload_fingerprint,
             "payload_status": payload_status(payload),
             "event": hook_event_name(payload),
-            "event_fallback": uses_event_fallback(payload),
+            "event_declared": isinstance(payload.get("hookEventName"), str),
             "tool_name": tool_name(payload),
             "root": str(active_root),
             "candidate_roots": [str(plan.root) for plan in plans],

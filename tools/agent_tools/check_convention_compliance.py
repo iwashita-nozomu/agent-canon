@@ -11,6 +11,7 @@
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
@@ -124,6 +125,13 @@ TOOL_GATES = {
         "tools/agent_tools/evaluate_agent_run.py",
         ("evidence/agent-evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
     ),
+    "skill_frontmatter": (
+        "tools/agent_tools/check_skill_frontmatter.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/ci/check_github_workflows.py",
+        ),
+    ),
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
         ("tools/ci/run_all_checks.sh", "evidence/agent-evals/skill_workflow_prompt_eval.toml"),
@@ -175,8 +183,8 @@ TOOL_GATES = {
         ),
     ),
     "runtime_profile_inventory": (
-        "tools/agent_tools/check_runtime_profile_inventory.py",
-        ("tools/ci/run_docs_checks.sh",),
+        "rust/agent-canon/src/docs.rs",
+        ("documents/tools/agent-canon.md",),
     ),
 }
 
@@ -186,7 +194,7 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
     "tools/agent_tools/github_publish.py",
     "gh repo view",
     "git remote get-url origin",
-    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push",
+    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
     "literal URL push is not a standard route",
     "hardcoded repository name",
 )
@@ -356,7 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def readable_path(root: Path, relative_path: str) -> Path | None:
-    """Return the readable root path, falling back to vendored AgentCanon docs."""
+    """Return the readable root or vendored AgentCanon document path."""
     candidates = (root / relative_path, root / "vendor" / "agent-canon" / relative_path)
     for candidate in candidates:
         if candidate.is_file():
@@ -385,7 +393,7 @@ def check_tool_gates(root: Path) -> list[Finding]:
     """Verify each mechanical convention gate exists and is referenced."""
     findings: list[Finding] = []
     for gate_name, (tool_path, references) in TOOL_GATES.items():
-        if not (root / tool_path).is_file():
+        if readable_path(root, tool_path) is None:
             findings.append(
                 Finding("tool_gate", tool_path, f"{gate_name}:missing-tool")
             )

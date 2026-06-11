@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @dependency-start
-# responsibility Runs docs checks CI automation.
+# responsibility Forwards legacy docs checks CI automation to the unified Rust docs tool.
 # upstream design ../README.md shared automation index
+# upstream implementation ../../rust/agent-canon/src/docs.rs unified Rust docs check implementation
 # @dependency-end
 
 set -euo pipefail
@@ -9,53 +10,10 @@ set -euo pipefail
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$WORKSPACE_ROOT"
 
-PYTHON_BIN="${PYTHON_BIN:-}"
-if [ -z "$PYTHON_BIN" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN="python3"
-  elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN="python"
-  else
-    echo "python3 or python is required to run documentation checks" >&2
-    exit 127
-  fi
-fi
+caller_chain="$(ps -o command= -p "${PPID:-0}" 2>/dev/null || true)"
+echo "AGENT_CANON_FORWARDER=deprecated" >&2
+echo "AGENT_CANON_FORWARDER_SEVERITY=fix-now" >&2
+echo "AGENT_CANON_FORWARDER_CALLER_CHAIN=${caller_chain:-unknown}" >&2
+echo "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs check" >&2
 
-MARKDOWN_TARGETS=(
-  README.md
-  QUICK_START.md
-  AGENTS.md
-  agents
-  docker
-  documents
-  scripts
-  .github
-  .agents/skills
-  .codex/README.md
-)
-EXISTING_MARKDOWN_TARGETS=()
-for target in "${MARKDOWN_TARGETS[@]}"; do
-  if [ -e "$target" ]; then
-    EXISTING_MARKDOWN_TARGETS+=("$target")
-  fi
-done
-
-echo "════════════════════════════════════════════════════════════════"
-echo "📝 Documentation checks"
-echo "════════════════════════════════════════════════════════════════"
-echo ""
-
-if [ "${#EXISTING_MARKDOWN_TARGETS[@]}" -eq 0 ]; then
-  echo "DOCS_CHECKS=skip"
-  echo "No documentation targets exist in this checkout."
-  exit 0
-fi
-
-"$PYTHON_BIN" tools/docs/check_markdown_lint.py "${EXISTING_MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" tools/docs/check_markdown_math.py "${EXISTING_MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" tools/docs/audit_and_fix_links.py --check "${EXISTING_MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" tools/docs/check_bootstrap_docs.py
-"$PYTHON_BIN" tools/agent_tools/check_runtime_profile_inventory.py
-
-echo ""
-echo "Documentation checks completed successfully"
+exec tools/bin/agent-canon docs check "$@"

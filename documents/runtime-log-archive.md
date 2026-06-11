@@ -106,7 +106,7 @@ path segment. The summary payload also records `conversation_id`, `session_id`,
 and `thread_id` so chat-local raw evidence and cross-chat analysis stay
 traceable without storing prompt text.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
-devcontainer/Compose metadata, or the existing host/repo fallback.
+devcontainer/Compose metadata, or the existing host/repo alternate route.
 
 The initial import from the former in-tree log surface is preserved under:
 
@@ -130,7 +130,7 @@ legacy-import/eval-results/
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 ```
 
-If the mount is absent, hooks fall back to a local state directory outside the
+If the mount is absent, hooks use a local state directory outside the
 repository tree. Set `AGENT_CANON_HOOK_ARCHIVE_DIR` to route logs to another
 archive root. Existing `AGENT_CANON_HOOK_RESULTS_DIR` and per-hook
 `*_HOOK_LOG_PATH` variables remain explicit test/debug overrides.
@@ -145,6 +145,7 @@ or not a Git clone.
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
 python3 tools/agent_tools/runtime_log_archive_git.py push
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 Do not copy raw hook JSONL or accumulated eval reports back into AgentCanon
@@ -170,10 +171,25 @@ python3 tools/agent_tools/runtime_log_archive_git.py sync
 `sync` ensures the archive clone, copies current `reports/agents/` run bundles
 to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
 summaries, and agent reports, then commits and pushes the source repository's
-`logs/<repo-key>` branch. It skips `.active_run`, cache files, Python cache
-directories, and oversized single files. The source repo's ignored
-`reports/agents/` directory remains run-local working evidence; the log archive
-is the durable accumulated store.
+`logs/<repo-key>` branch. Its pull/rebase step uses Git autostash because hooks
+can append log lines while the sync command itself is running. It skips
+`.active_run`, cache files, Python cache directories, and oversized single
+files. The source repo's ignored `reports/agents/` directory remains run-local
+working evidence; the log archive is the durable accumulated store.
+
+Before task closeout, run:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
+```
+
+`check-clean` must report `RUNTIME_LOG_ARCHIVE_CLEAN=yes`,
+`RUNTIME_LOG_ARCHIVE_BRANCH_MATCH=yes`, `RUNTIME_LOG_ARCHIVE_DIRTY=no`, and
+`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`. `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes`
+means logs for a different `<repo-key>` were written while the archive worktree
+was on the current source repository's `logs/<repo-key>` branch. Treat that as
+a log repository operation blocker, not as optional cleanup: sync or migrate
+the listed foreign key before unlocking the run bundle.
 
 To print the resolved placement without writing anything, run:
 

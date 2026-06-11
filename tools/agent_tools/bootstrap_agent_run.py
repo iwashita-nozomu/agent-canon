@@ -21,14 +21,21 @@ from agent_team import (
     TeamConfig,
     auto_language_specialists,
     codex_agent_model_matrix_for_roles,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
+    current_stage_skills,
     default_specialists_for_task,
+    deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
+    format_subagent_wave,
+    format_subagent_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
+    recommended_dynamic_expansion_waves,
+    recommended_initial_subagent_wave,
     resolve_cross_cutting_document_packet,
     resolve_report_root,
     resolve_role_document_packet,
@@ -295,6 +302,8 @@ def emit_bootstrap_output(
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    active_skills = current_stage_skills(selected_skills)
+    deferred_skills = deferred_stage_skills(selected_skills)
     review_roles = selected_review_roles(runtime.roles)
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
@@ -307,23 +316,66 @@ def emit_bootstrap_output(
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
+    print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(f"ACTIVE_SKILLS={','.join(active_skills)}")
+    print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
     print(
         "START_DECLARATION="
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(selected_skills)}, "
+        f"skills={','.join(active_skills) or '-'}, "
         f"review={','.join(review_roles) or '-'}"
     )
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
+        print("TASK_ID_ROUTE_STATUS=explicit")
         print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
+        print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
+        print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
+        print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
+        print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
+        active_budget = context.workflow_active_spawn_budget or 0
+        initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
+        expansion_waves = recommended_dynamic_expansion_waves(
+            runtime.roles,
+            active_budget,
+            initial_wave,
+        )
+        print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
+        print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
+        print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
+        print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")
+    else:
+        print("TASK_ID_ROUTE_STATUS=missing")
+        print("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes")
+        print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
+        print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
     print("IMPLEMENTATION_CODEX_AGENTS=" f"{','.join(codex_agents_for_role(config, 'implementer'))}")
     print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}")
+    print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
+    print(
+        "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
+        "tools/bin/agent-canon local-llm route-implementation-surface "
+        "--request-file <request-or-design-question.txt> --format text"
+    )
+    print("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation")
+    print("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending")
+    print(
+        "PRE_EDIT_REJECTION_COMMAND="
+        "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>"
+    )
+    print("AGENT_REPORT_COLLECTION_STATUS=available")
+    print("AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status")
+    print(
+        "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
+        f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}"
+    )
+    print("AGENT_REPORT_COLLECTION_SYNC_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py sync")
     print("CROSS_CUTTING_DOCUMENT_PACKET=" f"{cross_cutting_document_packet_output(workspace_root)}")
     print(
         "DESIGN_DOCUMENT_PACKET="
@@ -351,7 +403,7 @@ def record_bootstrap_monitoring(
         signals=[
             (
                 f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(selected_skills)}, "
+                f"skills={','.join(current_stage_skills(selected_skills)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
             "stage owner routing active_roles=" f"{','.join(role.id for role in roles)}",

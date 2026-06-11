@@ -31,11 +31,13 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
+- tool_warnings_resolved: no
 - mechanical_completion_loop_complete: no
 - subagents_closed: no
 - diff_check_agent_complete: no
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
+- runtime_log_archive_synced: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -60,11 +62,13 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
+- tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
 - diff_check_agent_complete: yes
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
+- runtime_log_archive_synced: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -86,7 +90,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## AgentCanon Latest And CI Gate Evidence
 
-<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass` unless the only blocker is a documented environment/toolchain issue and full-repo pyright plus ruff fallback evidence is recorded as `environment_blocked_with_full_static_fallback`. -->
+<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass`; documented environment/toolchain issues require environment repair before user-facing completion. -->
 
 - agent_canon_latest_command:
 - agent_canon_latest_status:
@@ -106,6 +110,14 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
 
+## Tool Warning Evidence
+
+<!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->
+
+- tool_warning_monitoring_status:
+- tool_warning_open_items:
+- tool_warning_resolution_evidence:
+
 ## Mechanical Completion Loop Evidence
 
 <!-- Record each finalization loop iteration: planned work units and active clauses inspected, latest diff inspected, validation / dependency / static-analysis evidence checked, diff-check agent decision, fix-now findings applied, and the reason the loop stopped. Do not mark complete until no planned work, review finding, validation failure, dependency failure, static-analysis failure, commit / push item, canon-sync item, or follow-up decision remains in this task scope. -->
@@ -124,11 +136,16 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Subagent Lifecycle Evidence
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. -->
+<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Mid-task user instructions must be classified as same_active_task_delta, scope_or_contract_change, or new_task; same-task deltas need a run-bundle checkpoint and updated packet path before any run-local send_input, while scope changes need a fresh follow-up wave. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. For dynamic fanout, reconcile every schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and closed run-local agent ids. -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
 - previous_task_subagent_reuse:
+- mid_task_user_input_status:
+- same_task_delta_packet_evidence:
+- agent_wave_ledger_status:
+- planned_vs_actual_wave_status:
+- dynamic_spawn_policy_status:
 - subagent_closeout_status:
 - open_subagent_instances:
 - close_agent_evidence:
@@ -148,9 +165,33 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
 
+## Report Artifact Placement Evidence
+
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify generated report placement. Tracked durable reports are allowed. Untracked or ignored generated report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles or generated report roots outside the current run are blockers because runtime_log_archive_git.py sync/archive closes the current run bundle, not orphan outputs. -->
+
+- report_artifact_placement_status:
+- report_artifact_outside_current_run_bundle:
+- report_artifact_recovery_evidence:
+
 ## Agent Evaluation Evidence
 
 <!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
+
+## Runtime Log Archive Evidence
+
+<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+
+- runtime_log_archive_sync_command:
+- runtime_log_archive_sync_status:
+- runtime_log_archive_check_clean_command:
+- runtime_log_archive_check_clean_status:
+- runtime_log_archive_repo_key:
+- runtime_log_archive_branch:
+- runtime_log_archive_branch_match:
+- runtime_log_archive_dirty:
+- runtime_log_archive_foreign_dirty:
+- runtime_log_archive_commit:
+- runtime_log_archive_push:
 
 ## Evidence
 

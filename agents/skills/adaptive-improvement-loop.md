@@ -33,7 +33,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - 最初に top-level `goal.md` を更新し、今回の `Objective`、`Exit Criteria`、`Backlog`、`Loop Log` を固定します。これを tool 追加や prompt 修正より後回しにせず、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で確認します。
 - user が goal-driven intent を示したが exact objective を渡していない場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent fan-out、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
-- repo MCP が利用可能な場合は、各 iteration の開始前と closeout 前に MCP tool `goal.loop_status` を見ます。`NEXT_ACTION=run_next_iteration` の間は次 backlog iteration へ進み、user-facing completion にしません。
+- 各 iteration の開始前と closeout 前に `python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` を見ます。`NEXT_ACTION=run_next_iteration` の間は次 backlog iteration へ進み、user-facing completion にしません。
 - outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
 - Goal-driven iteration では `plan -> implementation -> evidence -> next-action` の短い loop を使い、次 slice が実装可能になったら planning を止めて編集へ戻ります。
 - 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
@@ -41,7 +41,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
 - skill を使う run では `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`EVAL_RUN_ID` と `EVAL_ACCUMULATED_REPORT` を evidence にします。
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `evidence/agent-evals/skill_workflow_prompt_eval.toml` に固定します。
-- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
+- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
 - eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
 - agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
 - 利用中に得られた user / reviewer feedback は、raw prose のまま放置せず `workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、同じ iteration 内で対象 skill prompt、workflow prompt、eval、memory のいずれかへ還元します。
@@ -53,7 +53,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
-- MCP `goal.loop_status` または `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り loop を閉じません。
+- `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り loop を閉じません。
 - 改善を採用しないときも、`What We Learned:` を note に残します。
 
 ## Required Records
@@ -86,7 +86,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `Two-Run Path Comparison:`
 - `Execution Path Efficiency Decision:`
 - `Agent Behavior Eval Result:`
-- `MCP Goal Loop Status:`
+- `Goal Loop Status:`
 
 ## Boundary
 

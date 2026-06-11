@@ -76,14 +76,15 @@ make agent-canon-latest
 ```
 
 The command responsibility split is maintained in
-`documents/agent-canon-update-route.md`. Keep `merge-main-into-current` on the
-AgentCanon PR branch route, not in the normal parent pin update sequence.
+`documents/agent-canon-update-route.md`. Keep
+`merge-main-into-current-preserve-dirty` on the AgentCanon PR branch route,
+not in the normal parent pin update sequence.
 
 `make agent-canon-latest` は safe な AgentCanon `main` 更新、root view check、
 親 repo update TODO acknowledge まで進めます。local shared-canon branch、dirty
 submodule、diverged history、merge conflict がある場合は、その場で破壊的に直さず
 `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md`、
-`AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current`、
+`AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty`、
 `NEXT_ACTION=run_agentcanon_conflict_workflow` を出します。この出力を見た parent agent は
 AgentCanon conflict workflow に入り、branch commit、merge-main、PR、post-merge latest を
 順に処理します。
@@ -92,14 +93,14 @@ local checkout branch に shared-canon commit がある場合、その checkout 
 正規の AgentCanon PR 入力です。親 repo の gitlink を戻したり、submodule を remote
 main へ checkout し直して差分を消すのではなく、current branch に GitHub `main` を
 merge し、conflict を submodule 内で解消してから同じ branch を PR に出します。
-この merge は任意の自己申告ではなく、`merge-main-into-current` が
+この merge は任意の自己申告ではなく、`merge-main-into-current-preserve-dirty` が
 `agent_canon_merge_remote_main_in_post_head=yes` と
 `agent_canon_merge_remote_main_verified=yes` を出すことで保証します。
 
 扱いは次の順に固定します。
 
 1. `vendor/agent-canon/` の shared canon 差分を dedicated branch / commit に分ける
-1. 派生 repo 起点なら `bash tools/update_agent_canon.sh merge-main-into-current` を通してから AgentCanon branch を GitHub へ push する
+1. 派生 repo 起点なら `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を通してから AgentCanon branch を GitHub へ push する
 1. standalone AgentCanon repo へ PR を作り、merge する
 1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行する
 1. `bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` を通す
@@ -166,7 +167,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
 - 標準入口は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` です。この tool は `gh repo view` と `git remote get-url origin` が同じ `owner/name` を指す場合だけ publish / PR 操作へ進み、stdout に `REMOTE_VERIFIED=yes` と user task を出します。
 - `git status --short --branch` は branch 状態の補助 evidence として見ますが、push 先 repository の決定には使いません。
-- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata を読む fallback へ降りません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
+- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata から push 先を推定しません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
 - literal URL push is not a standard route. GitHub publish / PR 作業は `github_publish.py` の verified remote route に戻します。
 - PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
 
@@ -206,7 +207,7 @@ python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --git
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/ci/check_github_workflows.py
-bash tools/ci/run_docs_checks.sh
+tools/bin/agent-canon docs check
 bash tools/ci/run_all_checks.sh --quick
 ```
 
@@ -309,7 +310,7 @@ normal AgentCanon branch に積み、AgentCanon PR で review / merge します�
 local submodule divergence や unsafe local submodule state で `ensure-latest` が止まった場合も、この branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 
@@ -390,7 +391,7 @@ Scope:
 
 Validation:
 - python3 tools/ci/check_github_workflows.py: pass
-- make docs-check: pass
+- tools/bin/agent-canon docs check: pass
 - make ci: pass
 ```
 

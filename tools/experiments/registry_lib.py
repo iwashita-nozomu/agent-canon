@@ -10,11 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 
 DEFAULTS_KEY_ORDER = (

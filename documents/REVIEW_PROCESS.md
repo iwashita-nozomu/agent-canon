@@ -75,10 +75,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - CMake project なら `cmake -S . -B build`
   - CMake project なら `cmake --build build`
   - test target があれば `ctest --test-dir build`
-- Markdown 差分を含む場合は、少なくとも `make docs-check` を実行します。
+- Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。
 - checkpoint review と final acceptance review では、変更ファイルだけでなく全 repo に `bash tools/agent_tools/run_repo_dependency_review.sh` を適用し、`change_review.md` または `final_review.md` に `REPO_DEPENDENCY_REVIEW=pass` と checked path count を残します。
 - final acceptance review 前に、read-only diff-check agent に最新 diff、run bundle、request contract、schedule、dependency evidence、validation evidence を渡し、parent 自己レビューではなく独立 review decision を artifact に残します。
-- `make docs-check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
+- `tools/bin/agent-canon docs check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
 - README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
 - 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。
 - 論文や thesis chapter では、さらに `citation_evidence_reviewer` を省略しません。
@@ -105,7 +105,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. 学術文章では notation review で、記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認します。
 1. 学術文章では logic-gap review で、claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認します。
 1. 実装中に checkpoint review を入れ、decision が `approve` でない限り implementer に戻します。
-1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary fallback、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
+1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary alternate route、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書が最新実装と一致し、削除済み・置換済みの挙動や手順を reader に案内していないことを確認します。文書が現行実装を説明できていなければ `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation boundary が Boundary Map と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
@@ -169,7 +169,7 @@ findings は少なくとも次に分けます。
 - `fix now`
   - この変更で直さないと回帰や矛盾が残るもの
   - 修正後は、どんなに小さい差分でも full required review set を再実行する
-  - 旧実装、移行用の別経路、temporary fallback、copied implementation、古い説明のままの README / guide / workflow を残すもの
+  - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
   - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
 - `follow-up`
   - 今回の受け入れを阻害しないが、後続で管理すべきもの

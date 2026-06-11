@@ -1,6 +1,6 @@
 ---
 name: pr-processing
-description: Use when processing GitHub pull requests or issue queues: inventory open PRs, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs.
+description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
 ---
 <!--
 @dependency-start

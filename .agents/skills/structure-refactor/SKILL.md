@@ -1,6 +1,6 @@
 ---
 name: structure-refactor
-description: Use when repository directory structure, directory responsibilities, canonical README ownership, path layout, root views, or responsibility-scope maps must be refactored using recursive directory README analysis, dependency manifests, and behavior-preserving move/rename gates.
+description: Use when repository structure, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be repaired or refactored using structure contracts, recursive directory README analysis, dependency manifests, and behavior-preserving move/rename gates.
 ---
 <!--
 @dependency-start
@@ -9,6 +9,8 @@ upstream design ../../../agents/skills/structure-refactor.md documents the human
 upstream design ../../../agents/skills/refactor-loop.md defines behavior-preserving refactor gates
 upstream design ../../../agents/skills/dependency-analysis.md defines change-impact packets
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines directory README graph evidence
+upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md documents Codex runtime surface ownership
+upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime views
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 upstream implementation ../../../tools/agent_tools/import_responsibility.py validates import boundaries
 @dependency-end
@@ -17,8 +19,17 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
 # Structure Refactor
 
 1. Read `agents/skills/structure-refactor.md`.
-1. Use this for directory layout refactors, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, and responsibility-scope map changes.
-1. Always pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup`; add `$subagent-bootstrap` when the user requests multi-agent work or the refactor touches shared canon.
+1. Use this for repo-refactor requests, directory layout refactors, pre-task repair of AgentCanon expected repository-structure drift, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, project `.codex` / `.agents` view changes, personal `~/.codex` boundary triage, and responsibility-scope map changes.
+1. Route before reading broad prose. Use `agent-canon local-llm route-skill --prompt "<request>" --format json` for prompt-derived skill routing and `python3 tools/agent_tools/route.py --name <candidate>` for proposed route names. If repo-refactor or `~/.codex` boundary prompts do not route here, fix the deterministic router instead of adding prose-only workarounds.
+1. Pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup` when the evidence shows a real source-layout refactor, directory README/prose ownership change, or stale document-canon cleanup. For pre-task expected-layout drift, start with the compact structure repair checks below and add those paired skills only after the repair action requires them.
+1. For pre-task structure repair, classify the checkout before reading broad packets or recreating missing paths:
+   - run `python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json`; in template or derived roots where the contract is not a root view, add `--contract vendor/agent-canon/documents/repo-structure-contract.toml`
+   - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json`
+   - run `python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json` when import boundaries are implicated
+   - follow `agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path Triage` before creating or ignoring any missing path
+   - if drift is AgentCanon-owned root views or submodule state, route to `$agent-canon-update`, `make agent-canon-ensure-latest`, and `bash tools/sync_agent_canon.sh link-root` / `check` before ordinary task work
+1. If `~/.codex` is implicated, inspect only non-secret routing metadata: config keys, project entries, user skill IDs, and project `.codex` symlink targets. Do not read or print auth, history, sessions, logs, or caches. Treat `~/.codex` as personal runtime state and edit it only when the user explicitly asked for a personal Codex configuration fix.
+1. Record the pre-task repair contract with `structure_repair_root`, `structure_surface`, detected repo profile, drift symptom, expected owner, contract/scope/import/personal-runtime artifacts, repair action, runtime boundary, and ordinary task status.
 1. Build a recursive directory responsibility graph before editing:
    - collect every directory `README.md`, `AGENTS.md`, and dependency manifest under the proposed root
    - run `agent-canon structured-analysis document-inventory --root <root>`
@@ -31,13 +42,8 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
    - merge directories when their READMEs describe the same primary responsibility and no separate validation/import boundary remains
    - keep cross-directory evidence or runtime surfaces in their own primary scope, and remove overlap by `exclude_paths` or explicit path mapping
 1. Do not move files until reverse edges, import paths, public root views, docs links, and generated artifact paths have a repair plan.
-1. Use multi-agent routing for nontrivial structure refactors:
-   - `explorer`: recursive README / manifest / scope graph inventory
-   - `detailed_designer`: path mapping and responsibility delta
-   - `worker` or `spark_worker`: one disjoint move/update wave
-   - `document_flow_reviewer`: reader path and README consistency
-   - `python_reviewer` / `cpp_reviewer`: import/build fallout
-   - `project_reviewer`: final tree ownership and stale-surface sweep
+1. Hand dynamic wave planning to `$refactor-loop`. This skill owns the validated structure surface classification, path mapping, runtime boundary, and structure validation gates; `$refactor-loop` owns repair batch sizing, `blocked_by`, sequential/parallel wave choice, and write-capable subagent orchestration.
+1. For nontrivial structure refactors, use separate agents for recursive responsibility inventory, path mapping / structural design review, write-capable disjoint move/update waves, document-flow review, language-specific import/build fallout, and final stale-surface sweep. Each handoff must include `allowed_paths`, the structure contract, runtime boundary, validation commands, and explicit non-goals.
 1. After each move/update wave, rerun:
    - `python3 tools/agent_tools/responsibility_scope.py --root <root>`
    - `python3 tools/agent_tools/import_responsibility.py --root <root>`

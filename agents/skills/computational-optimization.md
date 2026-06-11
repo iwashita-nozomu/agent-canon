@@ -66,7 +66,7 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 
 ## Validation Rules
 
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU fallback をしません。
+- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route をしません。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
 - Final value だけでなく、first bad iteration、finite state、residual components、reference norm、tolerance、status flag を確認します。
 - Constraint つき問題では objective だけでなく feasibility と KKT / complementarity を分けます。

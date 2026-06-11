@@ -36,7 +36,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 MODE_ENV = "AGENT_CANON_OOP_HOOK_MODE"
@@ -103,16 +102,8 @@ def payload_status(payload: dict[str, object]) -> str:
 
 
 def has_tool_signal(payload: dict[str, object]) -> bool:
-    """Return whether one payload looks like a tool hook without an event name."""
+    """Return whether one payload carries tool identity or command fields."""
     return isinstance(payload.get("tool_name"), str) or bool(tool_command(payload))
-
-
-def uses_event_fallback(payload: dict[str, object]) -> bool:
-    """Return whether the hook should infer a post-tool event name."""
-    if isinstance(payload.get("hookEventName"), str):
-        return False
-    status = payload_status(payload)
-    return status == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
 
 
 def repo_root() -> Path:
@@ -130,12 +121,10 @@ def repo_root() -> Path:
 
 
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if uses_event_fallback(payload):
-        return TOOL_EVENT_FALLBACK
     return "UnknownHookEvent"
 
 
@@ -449,8 +438,6 @@ def run_oop_checks(root: Path, check_mode: CheckMode) -> list[AnalyzerResult]:
 
 def should_check(payload: dict[str, object]) -> bool:
     """Return whether the hook payload should trigger OOP checks."""
-    if uses_event_fallback(payload) and not has_tool_signal(payload):
-        return True
     event = hook_event_name(payload)
     if event == "Stop":
         return True
@@ -575,8 +562,8 @@ def analyzer_log_payload(
         "tool_name": tool_name(payload),
         "payload_status": payload_status(payload),
         "payload_fingerprint": payload_fingerprint,
-        "payload_fallback": payload_status(payload) == PAYLOAD_STATUS_EMPTY,
-        "event_fallback": uses_event_fallback(payload),
+        "payload_empty": payload_status(payload) == PAYLOAD_STATUS_EMPTY,
+        "event_declared": isinstance(payload.get("hookEventName"), str),
         "check_requested": checked,
         "checked": logged_checked(checked, results),
         "skip_reason": _log_skip_reason(payload, checked, results),
@@ -603,8 +590,6 @@ def _log_append_hook_log(root: Path, entry: dict[str, object]) -> None:
     """Append one JSONL hook log entry without blocking the hook on logging errors."""
     if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
         return
-    if not entry.get("checked"):
-        return
     try:
         HookLogContext(root, "oop_readability_guard", os.environ.get(LOG_PATH_ENV, "").strip()).append(
             entry
@@ -617,6 +602,8 @@ def main() -> int:
     """Warn on changed-source OOP findings without blocking tool execution."""
     payload = load_payload()
     root = repo_root()
+    if payload_status(payload) == PAYLOAD_STATUS_EMPTY:
+        return 0
     checked = should_check(payload)
     check_mode = check_mode_from_environment()
     if not checked:

@@ -28,7 +28,7 @@ The corrected order is:
 1. **P-1: Completion judgment rules and completion-verifier tooling**
 2. P0: Agent settings and runtime invariants
 3. P1: Tool, evidence, and verifier implementation
-4. P2: MCP, goal loop, and fallback evidence
+4. P2: MCP, goal loop, and alternate route evidence
 5. P3: Self-growth state machine
 6. P4: Surface ownership, AgentCanon sync, and submodule pin discipline
 7. P5: Workflow and skill contracts
@@ -50,7 +50,7 @@ P-1 must answer these questions before any runtime or workflow tuning is conside
 - Which evidence is explicitly not accepted?
 - Which reviewer independence conditions are required?
 - Which MCP states are acceptable?
-- Which fallback states are acceptable?
+- Which alternate route states are acceptable?
 - Which self-growth repair states are acceptable?
 - Which tool decides final completion?
 - Which report is allowed to be user-facing?
@@ -89,7 +89,7 @@ Lowest trust:
 - pass token typed into Markdown,
 - pasted command output without command metadata,
 - vague reviewer approval with no diff ref,
-- statement that MCP passed without MCP or fallback artifact.
+- statement that MCP passed without MCP or alternate route artifact.
 
 Medium trust:
 
@@ -181,7 +181,7 @@ Examples:
 - If profile is `strict`, reviewer independence is mandatory.
 - If profile is `release`, fresh clone evidence is mandatory.
 - If profile is `advisory`, repo validation evidence should not be fabricated.
-- If profile requires MCP, MCP pass or accepted fallback must be recorded.
+- If profile requires MCP, MCP pass or accepted alternate route must be recorded.
 
 This means runtime configuration should not decide completion. Runtime configuration should satisfy completion.
 

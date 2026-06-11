@@ -6,7 +6,6 @@
 # downstream implementation tools/install_llama_cpp.sh installs local LLM llama.cpp tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
 # downstream implementation rust/agent-canon/src/local_llm.rs implements the local LLM CLI entrypoint
-# downstream implementation rust/agent-canon/src/mcp_inventory.rs implements Rust MCP preflight tooling
 # downstream implementation rust/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling
 # downstream implementation tools/agent_tools/prose_reasoning_graph.py creates prose graph DBs under user-home cache by default
 # @dependency-end
@@ -70,41 +69,6 @@ post_create_command = "bash tools/install_llama_cpp.sh --allow-fetch"
 canon_update_command = "bash tools/install_llama_cpp.sh --skip-missing-source --force"
 default_model_selector = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
 model_fetch_policy = "lazy llama.cpp Hugging Face cache; never commit model weights"
-
-[mcp_preflight]
-owner = "agent-canon"
-policy_command = "agent-canon mcp-preflight-policy --request-kind <kind>"
-inventory_command = "agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache"
-run_bundle_evidence_command = "python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>"
-session_cache_path = "reports/agents/.mcp_inventory_cache.json"
-cache_ttl_seconds = 86400
-cache_invalidates_on = [
-  ".codex/config.toml",
-  "mcp/",
-  "rust/agent-canon/src/mcp_inventory.rs",
-  "tools/agent_tools/check_mcp_inventory.py",
-]
-skip_request_kinds = [
-  "consultation",
-  "brainstorming",
-  "routing-only",
-  "explanation-only",
-  "github-actions-read",
-  "github-read",
-  "ci-read",
-  "pr-read",
-  "issue-read",
-]
-required_request_kinds = [
-  "repo-read",
-  "repo-write",
-  "validation",
-  "implementation",
-  "pr-mutation",
-  "issue-sync",
-  "agent-canon-sync",
-  "adaptive-loop",
-]
 
 [json_cli_tools]
 owner = "agent-canon"

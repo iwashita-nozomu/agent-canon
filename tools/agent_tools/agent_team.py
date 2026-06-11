@@ -12,18 +12,13 @@ import hashlib
 import json
 import re
 import subprocess
+import tomllib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
@@ -73,6 +68,42 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
     "tools/catalog.yaml",
 )
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
+DEFERRED_SPAWN_ROLE_IDS = {
+    "implementer",
+    "change_reviewer",
+    "final_reviewer",
+    "verifier",
+    "auditor",
+}
+INITIAL_INTAKE_AGENT_TYPES = (
+    "requirements_organizer",
+    "explorer",
+    "execution_planner",
+)
+DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
+    (
+        "manager_reviewer",
+        "project_reviewer",
+        "docs_workflow_steward",
+        "prompt_config_reviewer",
+        "literature_researcher",
+        "plan_reviewer",
+    ),
+    ("detailed_designer",),
+    ("detailed_design_reviewer", "document_flow_reviewer", "test_designer"),
+    ("spark_worker", "worker"),
+    ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
+    ("ship_reviewer",),
+)
+CURRENT_STAGE_SKILLS = {
+    "$agent-orchestration",
+    "$research-workflow",
+    "$environment-maintenance",
+    "$comprehensive-development",
+    "$adaptive-improvement-loop",
+    "$refactor-loop",
+    "$paper-writing",
+}
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
@@ -502,15 +533,138 @@ def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, in
 
 def codex_runtime_max_threads() -> int:
     """Return the configured runtime max_threads from .codex/config.toml."""
+    return codex_runtime_agent_int("max_threads")
+
+
+def codex_runtime_max_depth() -> int:
+    """Return the configured runtime max_depth from .codex/config.toml."""
+    return codex_runtime_agent_int("max_depth")
+
+
+def codex_runtime_agent_int(key: str) -> int:
+    """Return one configured integer from the Codex [agents] runtime section."""
     config_path = ROOT / ".codex" / "config.toml"
     data = tomllib.loads(config_path.read_text(encoding="utf-8"))
     agents = data.get("agents")
     if not isinstance(agents, dict):
         raise RuntimeError("missing [agents] section in .codex/config.toml")
-    max_threads = agents.get("max_threads")
-    if not isinstance(max_threads, int) or max_threads < 1:
-        raise RuntimeError("agents.max_threads must be an integer >= 1")
-    return max_threads
+    value = agents.get(key)
+    if not isinstance(value, int) or value < 1:
+        raise RuntimeError(f"agents.{key} must be an integer >= 1")
+    return value
+
+
+def unique_codex_agents_for_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
+    """Return unique Codex agent types in permanent-role order."""
+    agents: list[str] = []
+    for role in roles:
+        for codex_agent in role.codex_agents:
+            if codex_agent not in agents:
+                agents.append(codex_agent)
+    return tuple(agents)
+
+
+def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str]:
+    """Return Codex agent types registered in the local runtime config."""
+    if not agent_root.is_dir():
+        return set()
+    return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
+
+
+def _available_stage_agents(
+    preferred_agents: tuple[str, ...],
+    available_agents: set[str],
+    used_agents: set[str],
+) -> tuple[str, ...]:
+    """Return preferred agent types that are available and not already scheduled."""
+    agents: list[str] = []
+    for agent_type in preferred_agents:
+        if agent_type not in available_agents or agent_type in used_agents:
+            continue
+        agents.append(agent_type)
+        used_agents.add(agent_type)
+    return tuple(agents)
+
+
+def _chunk_agent_wave(
+    agent_types: tuple[str, ...],
+    active_subagents: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Split one stage wave without exceeding the active subagent budget."""
+    if active_subagents < 1:
+        return ()
+    return tuple(
+        agent_types[index : index + active_subagents]
+        for index in range(0, len(agent_types), active_subagents)
+        if agent_types[index : index + active_subagents]
+    )
+
+
+def recommended_initial_subagent_wave(
+    roles: tuple[Role, ...],
+    active_subagents: int,
+) -> tuple[str, ...]:
+    """Return executable agent_type values for the stage-ready intake wave."""
+    if active_subagents < 1:
+        return ()
+    available_agents = set(unique_codex_agents_for_roles(roles))
+    available_agents.update(registered_codex_agent_types())
+    intake_agents = tuple(
+        agent_type
+        for agent_type in INITIAL_INTAKE_AGENT_TYPES
+        if agent_type in available_agents
+    )
+    return intake_agents[:active_subagents]
+
+
+def recommended_dynamic_expansion_waves(
+    roles: tuple[Role, ...],
+    active_subagents: int,
+    initial_wave: tuple[str, ...],
+) -> tuple[tuple[str, ...], ...]:
+    """Return executable follow-up stage waves inside the active budget."""
+    if active_subagents < 1:
+        return ()
+    ordered_agents = unique_codex_agents_for_roles(roles)
+    available_agents = set(ordered_agents)
+    used_agents = set(initial_wave)
+    waves: list[tuple[str, ...]] = []
+    for preferred_stage_agents in DYNAMIC_EXPANSION_AGENT_STAGE_WAVES:
+        stage_agents = _available_stage_agents(
+            preferred_stage_agents,
+            available_agents,
+            used_agents,
+        )
+        waves.extend(_chunk_agent_wave(stage_agents, active_subagents))
+    fallback_agents = tuple(
+        agent_type for agent_type in ordered_agents if agent_type not in used_agents
+    )
+    waves.extend(_chunk_agent_wave(fallback_agents, active_subagents))
+    return tuple(waves)
+
+
+def current_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+    """Return public skills to declare for the current stage only."""
+    return tuple(skill for skill in selected_skills if skill in CURRENT_STAGE_SKILLS)
+
+
+def deferred_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+    """Return selected public skills that should wait for dynamic wave triggers."""
+    active = set(current_stage_skills(selected_skills))
+    return tuple(skill for skill in selected_skills if skill not in active)
+
+
+def format_subagent_wave(agent_types: tuple[str, ...]) -> str:
+    """Render one wave as a comma-separated agent_type list."""
+    return ",".join(agent_types)
+
+
+def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
+    """Render follow-up waves in a machine-readable compact form."""
+    return ";".join(
+        f"WAVE-{index + 2}={format_subagent_wave(wave)}"
+        for index, wave in enumerate(waves)
+    )
 
 
 def default_specialists_for_task(
@@ -874,11 +1028,35 @@ def manifest_run_lines(
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
         "    previous_task_subagent_reuse: forbidden",
+        "    mid_task_user_input_policy: parent_checkpoint_then_route_delta",
+        "    same_task_delta_reuse: allowed_with_updated_packet",
+        "    scope_change_reuse: forbidden_spawn_fresh_wave",
+        "    new_task_reuse: forbidden_spawn_fresh_run",
         "    close_before_user_completion: true",
         "    closeout_gate_key: subagents_closed",
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
         "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
-        "fresh run-local agent for each new task or stage wave.'",
+        "fresh run-local agent for each new task. Same-task user deltas require a parent "
+        "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
+        "send_input; scope changes spawn a fresh wave.'",
+        "  handoff_context_policy:",
+        "    compact_artifacts_first: true",
+        "    require_allowed_paths: true",
+        "    require_do_not_read: true",
+        "    require_expected_output_schema: true",
+        "    inactive_profile_docs: not_applicable",
+        "    broad_cross_cutting_packet: available_not_default_read",
+        "  implementation_gate_defaults:",
+        "    implementation_surface_route_status: pending",
+        "    implementation_surface_route_command: 'tools/bin/agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text'",
+        "    tool_reuse_ledger_status: required_before_custom_implementation",
+        "    pre_edit_rejection_prediction_status: pending",
+        "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
+        "  agent_report_collection:",
+        "    status_command: 'python3 tools/agent_tools/runtime_log_archive_git.py status'",
+        f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
+        "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
+        "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
     ]
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
@@ -893,7 +1071,65 @@ def manifest_run_lines(
         lines.append(f"    active_subagents: {active_subagents}")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append(f"    runtime_max_threads: {codex_runtime_max_threads()}")
+        lines.append(f"    runtime_max_depth: {codex_runtime_max_depth()}")
+        lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
+        initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
+        expansion_waves = recommended_dynamic_expansion_waves(
+            spec.roles,
+            active_subagents,
+            initial_wave,
+        )
+        lines.append("  spawn_wave_recommendation:")
+        lines.append("    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'")
+        lines.append("    initial_wave_id: WAVE-1")
+        lines.append("    initial_wave_agent_types:")
+        for agent_type in initial_wave:
+            lines.append(f"      - {agent_type}")
+        lines.append("    dynamic_expansion_waves:")
+        if expansion_waves:
+            for index, wave in enumerate(expansion_waves, start=2):
+                lines.append(f"      - wave_id: WAVE-{index}")
+                lines.append("        agent_types:")
+                for agent_type in wave:
+                    lines.append(f"          - {agent_type}")
+        else:
+            lines.append("      - wave_id: none")
+            lines.append("        agent_types: []")
+        lines.append("  delegated_spawn_policy:")
+        lines.append("    dynamic_mid_task_spawn: allowed")
+        lines.append("    delegated_child_spawn: allowed_with_bounded_packet")
+        lines.append("    owner: parent_or_delegated_stage_owner")
+        lines.append("    child_role_budget_inheritance: active_budget_remaining_after_parent_wave")
+        lines.append("    active_budget_source: 'run.spawn_budget.active_subagents'")
+        lines.append("    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'")
+        lines.append("    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'")
+        lines.append("    expansion_triggers:")
+        lines.append("      - new_independent_stage")
+        lines.append("      - review_finding_opens_independent_scope")
+        lines.append("      - validation_failure_requires_parallel_triage")
+        lines.append("      - disjoint_write_scope_available")
+        lines.append("      - blocked_role_replacement")
+        lines.append("    handoff_required_fields:")
+        lines.append("      - owner")
+        lines.append("      - child_role")
+        lines.append("      - input_packet")
+        lines.append("      - expected_output")
+        lines.append("      - write_scope")
+        lines.append("      - validation_route")
+        lines.append("      - review_gate")
+        lines.append("      - remaining_spawn_budget")
+        lines.append("    required_before_spawn:")
+        lines.append(
+            "      - schedule.md Agent Wave Ledger row with spawn_authority, "
+            "budget, runtime ceilings, paths, validation_route, review_gate, "
+            "handoff_artifacts, and delegated policy ref"
+        )
+        lines.append("      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles")
+        lines.append("      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy")
+        lines.append("    closeout_required_evidence:")
+        lines.append("      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status")
+        lines.append("      - closed run-local agent ids or parent_direct_no_subagents rationale")
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
         lines.append("    disjoint_write_scopes_required: true")
@@ -1080,11 +1316,13 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "do not edit repository files"
     )
     return (
-        f"You are the {role.id} role for {family_name}. Read the run-level "
-        "subagent_prompt_packet, cross_cutting_document_packet, and your document_packet before "
-        f"work. {write_scope}. Return findings or outputs tied to request_clause_ids, artifact "
-        "paths, dependency-file headers for every edited or created text file, remaining planned "
-        "work, and the next required gate."
+        f"You are the {role.id} role for {family_name}. Start from compact artifacts and the "
+        "bounded role_document_packet named in the handoff; load cross_cutting_document_packet "
+        "entries only when the selected route or review gate makes them active, otherwise mark "
+        f"them not_applicable. Use allowed_paths and do_not_read as hard context bounds. {write_scope}. "
+        "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
+        "headers for every edited or created text file, remaining planned work, and the next "
+        "required gate."
     )
 
 
@@ -1097,7 +1335,14 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
         "subagent_lifecycle_policy",
         "cross_cutting_document_packet",
         "role_document_packet",
+        "compact_artifacts",
+        "allowed_paths",
+        "do_not_read",
         "expected_output_artifacts",
+        "expected_output_schema",
+        "implementation_surface_route",
+        "tool_reuse_ledger",
+        "pre_edit_rejection_prediction",
         "dependency_files_header_plan",
         "next_review_gate",
     ]

@@ -60,7 +60,7 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("No markdown math notation issues found", result.stdout)
+            self.assertIn("DOCS_CHECK=pass", result.stdout)
 
     def test_fails_on_legacy_latex_delimiters(self) -> None:
         """Legacy LaTeX delimiters should be rejected."""
@@ -82,8 +82,8 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn(r"Inline math must use `$...$`, not `\(...\)`", result.stdout)
-            self.assertIn(r"Display math must use `$$...$$`, not `\[...\]`", result.stdout)
+            self.assertIn(r"inline math must use `$...$`, not `\(...\)`", result.stderr)
+            self.assertIn(r"display math must use `$$...$$`, not `\[...\]`", result.stderr)
 
     def test_fails_on_inline_double_dollar_math(self) -> None:
         """Inline math should not use display delimiters."""
@@ -97,7 +97,7 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("Inline math must use `$...$`, not `$$...$$`", result.stdout)
+            self.assertIn("inline math must use `$...$`, not `$$...$$`", result.stderr)
 
     def test_fails_on_standalone_single_dollar_display(self) -> None:
         """Display math should not use single-dollar delimiters on its own line."""
@@ -112,7 +112,7 @@ class CheckMarkdownMathTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn(
-                "Display math must use `$$...$$`, not `$...$` on its own line", result.stdout
+                "display math must use `$$...$$`, not `$...$` on its own line", result.stderr
             )
 
     def test_fails_on_single_dollar_block_delimiters(self) -> None:
@@ -128,7 +128,7 @@ class CheckMarkdownMathTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn(
-                "Display math must use `$$...$$`, not `$` block delimiters", result.stdout
+                "display math must use `$$...$$`, not `$` block delimiters", result.stderr
             )
 
 

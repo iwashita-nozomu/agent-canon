@@ -169,7 +169,7 @@ def run_agent_canon_preflight(
             status="blocked_shared_canon_workflow",
             reason=detail or "make agent-canon-ensure-latest failed",
             next_step=(
-                "commit_agentcanon_branch_then_merge-main-into-current_then_open_agent-canon_PR_"
+                "commit_agentcanon_branch_then_merge-main-into-current-preserve-dirty_then_open_agent-canon_PR_"
                 "then_after_merge_run_make_agent-canon-ensure-latest"
             ),
             checklist_path=checklist_path,

@@ -19,7 +19,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
-MCP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_mcp_inventory.py"
 
 
 class WorkflowMonitorTest(unittest.TestCase):
@@ -71,9 +70,128 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("runtime_feedback=observed", text)
             self.assertIn("target=.agents/skills/agent-learning/SKILL.md", text)
             self.assertIn("action=prompt_repair", text)
+            self.assertIn("## Tool Warnings", text)
+            self.assertIn("- tool_warnings_status: pending", text)
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- memory_learning_decision: not_applicable", text)
+
+    def test_monitor_appends_structured_tool_warning(self) -> None:
+        """Tool warnings should be recorded as closeout-obligating ledger rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--tool-warning",
+                    (
+                        "warning_id=W1 source_tool=legacy-forwarder "
+                        "severity=fix-now status=open message=deprecated_wrapper "
+                        "repair_command=agent-canon_cli"
+                    ),
+                    "--timestamp",
+                    "2026-04-30 12:00 JST",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("## Tool Warnings", text)
+            self.assertIn("tool_warning=recorded", text)
+            self.assertIn("warning_id=W1", text)
+            self.assertIn("status=open", text)
+            self.assertIn("- tool_warnings_status: open", text)
+
+    def test_monitor_sets_no_tool_warning_status(self) -> None:
+        """Runs with no observed warning should mark the ledger explicitly none."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--tool-warning-status",
+                    "none",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("- tool_warnings_status: none", text)
+
+    def test_monitor_preserves_parallel_tool_warning_updates(self) -> None:
+        """Concurrent tool warning updates should not lose ledger rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            processes = [
+                subprocess.Popen(
+                    [
+                        sys.executable,
+                        str(MONITOR_SCRIPT),
+                        "--report-dir",
+                        str(report_dir),
+                        "--tool-warning",
+                        (
+                            f"warning_id=W{index} source_tool=checker "
+                            "severity=warning status=open message=warning "
+                            "repair_command=repair"
+                        ),
+                    ],
+                    cwd=PROJECT_ROOT,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for index in range(6)
+            ]
+
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=10)
+                self.assertEqual(process.returncode, 0, stdout + stderr)
+
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            for index in range(6):
+                self.assertIn(f"warning_id=W{index}", text)
+            self.assertIn("- tool_warnings_status: open", text)
+
+    def test_monitor_rejects_tool_warning_without_routeable_fields(self) -> None:
+        """Tool warning rows should have enough fields to repair or defer."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--tool-warning",
+                    "warning_id=W1 source_tool=checker status=open",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tool warning must include required keys", result.stderr)
 
     def test_monitor_rejects_runtime_feedback_without_target_action(self) -> None:
         """Runtime feedback should be routeable to a concrete update surface."""
@@ -220,49 +338,6 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
-
-    def test_mcp_inventory_records_monitoring_when_report_dir_is_given(self) -> None:
-        """MCP inventory checks should record pass evidence when directed to a run."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            report_dir = root / "reports" / "agents" / "run-2"
-            codex = root / "fake-codex"
-            codex.write_text(
-                "#!/usr/bin/env bash\n"
-                "printf '%s\\n' '[{\"name\":\"repo_mcp_server\","
-                "\"enabled\":true,\"command\":\"bash\","
-                "\"args\":[\"mcp/repo_mcp_server.sh\"]}]'\n",
-                encoding="utf-8",
-            )
-            codex.chmod(0o755)
-            mcp_dir = root / "mcp"
-            mcp_dir.mkdir()
-            (mcp_dir / "repo_mcp_server.sh").write_text(
-                "#!/usr/bin/env bash\n",
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(MCP_SCRIPT),
-                    "--codex-bin",
-                    str(codex),
-                    "--require",
-                    "repo_mcp_server",
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
-            self.assertIn("mcp_inventory=pass", text)
-            self.assertIn("check_mcp_inventory.py recorded MCP inventory pass", text)
 
 
 if __name__ == "__main__":
