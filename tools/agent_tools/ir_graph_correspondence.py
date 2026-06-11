@@ -18,7 +18,6 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 DEFAULT_FACT_KINDS = ("assignment_equation", "return_equation")
 PROOF_STATUS_BUCKETS = (
@@ -91,7 +90,7 @@ class CorrespondenceReport:
     iteration_units: tuple[IterationUnit, ...]
     facts: tuple[FactCoverage, ...]
     findings: tuple[CorrespondenceFinding, ...]
-    validation: dict[str, Any]
+    validation: dict[str, object]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -156,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_json(path: str) -> dict[str, Any]:
+def load_json(path: str) -> dict[str, object]:
     """Load a JSON object from path."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -164,7 +163,7 @@ def load_json(path: str) -> dict[str, Any]:
     return payload
 
 
-def as_tuple(value: object) -> tuple[Any, ...]:
+def as_tuple(value: object) -> tuple[object, ...]:
     """Return tuple-like JSON values as tuples."""
     if isinstance(value, list | tuple):
         return tuple(value)
@@ -188,7 +187,7 @@ def lemma_id_for_fact(fact_id: str) -> str:
     return f"lemma__{slug(fact_id)}"
 
 
-def selected_by_profile(fact: dict[str, Any], profiles: tuple[str, ...]) -> bool:
+def selected_by_profile(fact: dict[str, object], profiles: tuple[str, ...]) -> bool:
     """Return whether a fact belongs to any selected theorem profile."""
     if not profiles:
         return True
@@ -196,7 +195,7 @@ def selected_by_profile(fact: dict[str, Any], profiles: tuple[str, ...]) -> bool
     return bool(fact_profiles.intersection(profiles))
 
 
-def selected_by_tags(fact: dict[str, Any], tags: tuple[str, ...]) -> bool:
+def selected_by_tags(fact: dict[str, object], tags: tuple[str, ...]) -> bool:
     """Return whether a fact has any requested equation tag."""
     if not tags:
         return True
@@ -204,7 +203,7 @@ def selected_by_tags(fact: dict[str, Any], tags: tuple[str, ...]) -> bool:
     return bool(fact_tags.intersection(tags))
 
 
-def selected_by_symbol(fact: dict[str, Any], symbols: tuple[str, ...]) -> bool:
+def selected_by_symbol(fact: dict[str, object], symbols: tuple[str, ...]) -> bool:
     """Return whether a fact comes from any requested source symbol."""
     if not symbols:
         return True
@@ -212,16 +211,16 @@ def selected_by_symbol(fact: dict[str, Any], symbols: tuple[str, ...]) -> bool:
 
 
 def selected_ir_facts(
-    irs: tuple[dict[str, Any], ...],
+    irs: tuple[dict[str, object], ...],
     *,
     fact_kinds: tuple[str, ...],
     profiles: tuple[str, ...],
     tags: tuple[str, ...],
     symbols: tuple[str, ...],
     fact_ids: tuple[str, ...],
-) -> tuple[dict[str, Any], ...]:
+) -> tuple[dict[str, object], ...]:
     """Return IR code facts selected for correspondence checking."""
-    selected: list[dict[str, Any]] = []
+    selected: list[dict[str, object]] = []
     seen: set[str] = set()
     fact_kind_set = set(fact_kinds)
     fact_id_set = set(fact_ids)
@@ -247,7 +246,7 @@ def selected_ir_facts(
     return tuple(selected)
 
 
-def graph_node_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
+def graph_node_ids(graphs: tuple[dict[str, object], ...]) -> set[str]:
     """Return all lemma graph node ids."""
     return {
         str(node.get("lemma_id", ""))
@@ -257,7 +256,7 @@ def graph_node_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
     }
 
 
-def graph_consumers_by_fact(graphs: tuple[dict[str, Any], ...]) -> dict[str, set[str]]:
+def graph_consumers_by_fact(graphs: tuple[dict[str, object], ...]) -> dict[str, set[str]]:
     """Return graph lemma ids that consume each code fact lemma id."""
     consumers: dict[str, set[str]] = {}
     for graph in graphs:
@@ -273,7 +272,7 @@ def graph_consumers_by_fact(graphs: tuple[dict[str, Any], ...]) -> dict[str, set
     return consumers
 
 
-def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...], profiles: tuple[str, ...]) -> set[str]:
+def graph_target_chain_ids(graphs: tuple[dict[str, object], ...], profiles: tuple[str, ...]) -> set[str]:
     """Return all lemma ids on selected target chains."""
     selected: set[str] = set()
     profile_set = set(profiles)
@@ -289,7 +288,7 @@ def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...], profiles: tuple[s
     return selected
 
 
-def proof_status_adoptions(proof_status: dict[str, Any] | None) -> dict[str, set[str]]:
+def proof_status_adoptions(proof_status: dict[str, object] | None) -> dict[str, set[str]]:
     """Return proof-status rows that adopt each raw fact id or lemma id."""
     if proof_status is None:
         return {}
@@ -335,7 +334,7 @@ def coverage_status(
 
 
 def build_fact_coverage(
-    facts: tuple[dict[str, Any], ...],
+    facts: tuple[dict[str, object], ...],
     *,
     node_ids: set[str],
     consumers_by_fact: dict[str, set[str]],

@@ -20,7 +20,6 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 STATUS_PRIORITY = {
     "unprovable_under_assumptions": 90,
@@ -188,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def read_json_file(path: str) -> dict[str, Any]:
+def read_json_file(path: str) -> dict[str, object]:
     """Read a JSON object from path or stdin."""
     raw = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
     payload = json.loads(raw)
@@ -197,7 +196,7 @@ def read_json_file(path: str) -> dict[str, Any]:
     return payload
 
 
-def build_ir_payload_from_symbol(args: argparse.Namespace) -> dict[str, Any]:
+def build_ir_payload_from_symbol(args: argparse.Namespace) -> dict[str, object]:
     """Build Algorithm Expansion IR without importing the target module."""
     from algorithm_expansion_ir import (  # type: ignore[import-not-found]
         build_algorithm_ir,
@@ -275,12 +274,12 @@ def short_symbol(symbol: str) -> str:
 
 
 def lemma_graph_statuses(
-    graphs: Iterable[dict[str, Any]],
-) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, dict[str, Any]]]:
+    graphs: Iterable[dict[str, object]],
+) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, dict[str, object]]]:
     """Map IR nodes and facts to lemma graph proof statuses."""
     node_statuses: dict[str, set[str]] = defaultdict(set)
     fact_statuses: dict[str, set[str]] = defaultdict(set)
-    lemma_by_id: dict[str, dict[str, Any]] = {}
+    lemma_by_id: dict[str, dict[str, object]] = {}
     for graph in graphs:
         for lemma in graph.get("lemma_nodes", []):
             if not isinstance(lemma, dict):
@@ -297,8 +296,8 @@ def lemma_graph_statuses(
 
 
 def proof_status_overlay(
-    proof_status: dict[str, Any] | None,
-    lemma_by_id: dict[str, dict[str, Any]],
+    proof_status: dict[str, object] | None,
+    lemma_by_id: dict[str, dict[str, object]],
     fact_source_node: dict[str, str],
 ) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, int]]:
     """Map proof_status overlay rows to IR nodes and facts."""
@@ -366,7 +365,7 @@ def combine_status_maps(*maps: dict[str, set[str]]) -> dict[str, set[str]]:
     return combined
 
 
-def flow_label_for_node(node: dict[str, Any], proof_status: str, *, view: str) -> str:
+def flow_label_for_node(node: dict[str, object], proof_status: str, *, view: str) -> str:
     """Build a compact block label for an IR node."""
     symbol = short_symbol(str(node.get("source_symbol", "")))
     role = str(node.get("math_role", "unknown"))
@@ -382,7 +381,7 @@ def flow_label_for_node(node: dict[str, Any], proof_status: str, *, view: str) -
     return "\n".join(pieces)
 
 
-def flow_label_for_fact(fact: dict[str, Any], proof_status: str, *, view: str) -> str:
+def flow_label_for_fact(fact: dict[str, object], proof_status: str, *, view: str) -> str:
     """Build a compact block label for a code fact."""
     target = str(fact.get("target", "fact"))
     expression = str(fact.get("expression", "")).strip()
@@ -400,7 +399,7 @@ def flow_label_for_fact(fact: dict[str, Any], proof_status: str, *, view: str) -
     )
 
 
-def should_render_edge(edge: dict[str, Any], *, view: str) -> bool:
+def should_render_edge(edge: dict[str, object], *, view: str) -> bool:
     """Return whether an IR edge belongs in the selected flowchart view."""
     if view == "proof":
         return True
@@ -408,7 +407,7 @@ def should_render_edge(edge: dict[str, Any], *, view: str) -> bool:
 
 
 def should_render_node(
-    node: dict[str, Any],
+    node: dict[str, object],
     *,
     view: str,
     include_bookkeeping: bool,
@@ -432,7 +431,7 @@ def should_render_node(
     return str(node.get("proof_relevance", "required")) != "excluded"
 
 
-def should_render_fact(fact: dict[str, Any], *, view: str) -> bool:
+def should_render_fact(fact: dict[str, object], *, view: str) -> bool:
     """Return whether one IR code fact belongs in the selected flowchart view."""
     if view != "core":
         return True
@@ -441,9 +440,9 @@ def should_render_fact(fact: dict[str, Any], *, view: str) -> bool:
 
 
 def build_flowchart_report(
-    ir_payload: dict[str, Any],
-    lemma_graphs: tuple[dict[str, Any], ...],
-    proof_status_payload: dict[str, Any] | None,
+    ir_payload: dict[str, object],
+    lemma_graphs: tuple[dict[str, object], ...],
+    proof_status_payload: dict[str, object] | None,
     *,
     include_code_facts: bool,
     include_bookkeeping: bool,

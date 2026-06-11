@@ -16,7 +16,6 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 TERMINAL_FRONTIER_STATUSES = frozenset(
     {
@@ -147,7 +146,7 @@ class ProofPathReport:
     duplicate_frontier_labels: tuple[str, ...]
     bare_unverified_frontier_count: int
     findings: tuple[ProofPathFinding, ...]
-    validation: dict[str, Any]
+    validation: dict[str, object]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -183,7 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_json(path: str) -> dict[str, Any]:
+def load_json(path: str) -> dict[str, object]:
     """Load a JSON object."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -191,7 +190,7 @@ def load_json(path: str) -> dict[str, Any]:
     return payload
 
 
-def as_tuple(value: object) -> tuple[Any, ...]:
+def as_tuple(value: object) -> tuple[object, ...]:
     """Return JSON-ish sequences as tuples."""
     if isinstance(value, list | tuple):
         return tuple(value)
@@ -203,7 +202,7 @@ def as_str_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in as_tuple(value))
 
 
-def graph_connectivity(path: str, graph: dict[str, Any]) -> GraphConnectivity:
+def graph_connectivity(path: str, graph: dict[str, object]) -> GraphConnectivity:
     """Recompute graph endpoint and target-chain connectivity."""
     node_ids = {
         str(node.get("lemma_id"))
@@ -257,7 +256,7 @@ def graph_connectivity(path: str, graph: dict[str, Any]) -> GraphConnectivity:
     )
 
 
-def graph_text_corpus(graphs: tuple[dict[str, Any], ...]) -> str:
+def graph_text_corpus(graphs: tuple[dict[str, object], ...]) -> str:
     """Return a searchable text corpus from lemma graph nodes."""
     parts: list[str] = []
     for graph in graphs:
@@ -278,7 +277,7 @@ def graph_text_corpus(graphs: tuple[dict[str, Any], ...]) -> str:
     return "\n".join(parts)
 
 
-def graph_node_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
+def graph_node_ids(graphs: tuple[dict[str, object], ...]) -> set[str]:
     """Return all lemma node ids from all graphs."""
     return {
         str(node.get("lemma_id", ""))
@@ -288,7 +287,7 @@ def graph_node_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
     }
 
 
-def graph_adjacency(graphs: tuple[dict[str, Any], ...]) -> dict[str, set[str]]:
+def graph_adjacency(graphs: tuple[dict[str, object], ...]) -> dict[str, set[str]]:
     """Return dependency adjacency across all graph edges."""
     adjacency: dict[str, set[str]] = {}
     for graph in graphs:
@@ -302,7 +301,7 @@ def graph_adjacency(graphs: tuple[dict[str, Any], ...]) -> dict[str, set[str]]:
     return adjacency
 
 
-def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
+def graph_target_chain_ids(graphs: tuple[dict[str, object], ...]) -> set[str]:
     """Return node ids selected by target chains."""
     selected: set[str] = set()
     for graph in graphs:
@@ -317,7 +316,7 @@ def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
     return selected
 
 
-def graph_source_ir_fingerprints(graphs: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
+def graph_source_ir_fingerprints(graphs: tuple[dict[str, object], ...]) -> tuple[str, ...]:
     """Return source Algorithm Expansion IR fingerprints recorded by graphs."""
     return tuple(
         sorted(
@@ -330,7 +329,7 @@ def graph_source_ir_fingerprints(graphs: tuple[dict[str, Any], ...]) -> tuple[st
     )
 
 
-def expected_source_ir_fingerprints(proof_status: dict[str, Any]) -> tuple[str, ...]:
+def expected_source_ir_fingerprints(proof_status: dict[str, object]) -> tuple[str, ...]:
     """Return proof-status fingerprints that generated lemma overlays must match."""
     if isinstance(proof_status.get("source_ir_fingerprint"), str):
         return (str(proof_status["source_ir_fingerprint"]),)
@@ -354,7 +353,7 @@ def descendant_node_ids(adjacency: dict[str, set[str]], roots: tuple[str, ...]) 
     return descendants
 
 
-def ir_text_corpus(irs: tuple[dict[str, Any], ...]) -> str:
+def ir_text_corpus(irs: tuple[dict[str, object], ...]) -> str:
     """Return searchable text from Algorithm Expansion IR files."""
     parts: list[str] = []
     for ir in irs:
@@ -400,12 +399,12 @@ def adoption_text(paths: tuple[str, ...]) -> str:
     return "\n".join(chunks)
 
 
-def entries(payload: dict[str, Any], key: str) -> tuple[dict[str, Any], ...]:
+def entries(payload: dict[str, object], key: str) -> tuple[dict[str, object], ...]:
     """Return proof-status entry dictionaries."""
     return tuple(item for item in as_tuple(payload.get(key)) if isinstance(item, dict))
 
 
-def code_derived_facts(item: dict[str, Any]) -> tuple[CodeDerivedFact, ...]:
+def code_derived_facts(item: dict[str, object]) -> tuple[CodeDerivedFact, ...]:
     """Return normalized code-derived facts from a proof-status row."""
     facts: list[CodeDerivedFact] = []
     for raw_fact in as_tuple(item.get("code_derived_facts")):
@@ -444,7 +443,7 @@ def duplicate_label_names(pairs: tuple[tuple[str, str], ...]) -> tuple[str, ...]
     return tuple(sorted(label for label, names in label_to_names.items() if len(names) > 1))
 
 
-def duplicate_b_labels(proof_status: dict[str, Any], text_paths: tuple[str, ...]) -> tuple[str, ...]:
+def duplicate_b_labels(proof_status: dict[str, object], text_paths: tuple[str, ...]) -> tuple[str, ...]:
     """Return B-labels that collide within a single frontier source."""
     duplicates: set[str] = set()
     status_pairs: list[tuple[str, str]] = []
@@ -470,7 +469,7 @@ def duplicate_b_labels(proof_status: dict[str, Any], text_paths: tuple[str, ...]
     return tuple(sorted(duplicates))
 
 
-def bare_unverified_frontiers(proof_status: dict[str, Any], text_paths: tuple[str, ...]) -> tuple[str, ...]:
+def bare_unverified_frontiers(proof_status: dict[str, object], text_paths: tuple[str, ...]) -> tuple[str, ...]:
     """Return frontier rows that use bare unverified as a terminal outcome."""
     bad: list[str] = []
     for item in entries(proof_status, "open_frontier"):
@@ -510,7 +509,7 @@ def token_is_valid(token: str, corpus: str) -> bool:
     return token in corpus
 
 
-def stale_implementation_tokens(proof_status: dict[str, Any], corpus: str) -> tuple[str, ...]:
+def stale_implementation_tokens(proof_status: dict[str, object], corpus: str) -> tuple[str, ...]:
     """Return implementation tokens not present in graph text or the filesystem."""
     stale: set[str] = set()
     for bucket in (

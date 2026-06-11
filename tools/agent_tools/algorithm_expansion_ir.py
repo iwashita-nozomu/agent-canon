@@ -15,7 +15,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 PythonSymbol = ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
 BUILTIN_BOOKKEEPING_CALLS = frozenset(
@@ -139,7 +139,7 @@ class IRBackendAssumption:
     profile_variable: str
     profile_library_path: str
     profile_ids: tuple[str, ...]
-    profile_details: dict[str, dict[str, Any]]
+    profile_details: dict[str, dict[str, object]]
     owning_surface: str
     scope: str
     applies_to_nodes: tuple[str, ...]
@@ -300,7 +300,7 @@ def parse_python_symbol_reference(reference: str) -> tuple[Path, str]:
     return path, qualname
 
 
-def load_backend_profile_library(path: Path | None) -> dict[str, Any]:
+def load_backend_profile_library(path: Path | None) -> dict[str, object]:
     """Load a proof-only backend profile library if one is available."""
     if path is None or not str(path):
         return {}
@@ -315,7 +315,7 @@ def load_backend_profile_library(path: Path | None) -> dict[str, Any]:
     return payload
 
 
-def backend_profile_ids(profile_library: dict[str, Any]) -> tuple[str, ...]:
+def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
     """Return profile ids from a proof-only profile library."""
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
@@ -323,12 +323,12 @@ def backend_profile_ids(profile_library: dict[str, Any]) -> tuple[str, ...]:
     return tuple(str(key) for key in sorted(profiles))
 
 
-def backend_profile_details(profile_library: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dict[str, object]]:
     """Return stable profile detail payloads from a proof-only profile library."""
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return {}
-    details: dict[str, dict[str, Any]] = {}
+    details: dict[str, dict[str, object]] = {}
     for profile_id, raw_profile in sorted(profiles.items()):
         if isinstance(raw_profile, dict):
             details[str(profile_id)] = {
@@ -337,7 +337,7 @@ def backend_profile_details(profile_library: dict[str, Any]) -> dict[str, dict[s
     return details
 
 
-def backend_required_witnesses(profile_library: dict[str, Any]) -> tuple[str, ...]:
+def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str, ...]:
     """Return the union of required witnesses from the backend profile library."""
     default_witnesses = (
         "dtype",
@@ -1750,7 +1750,7 @@ def backend_assumptions_for(
     target_theorem: str,
     *,
     profile_library_path: str,
-    profile_library: dict[str, Any],
+    profile_library: dict[str, object],
 ) -> tuple[IRBackendAssumption, ...]:
     """Return proof-only backend assumptions selected by the theorem target."""
     node_tuple = tuple(nodes)
@@ -1874,7 +1874,7 @@ def build_algorithm_ir(
     root: Path,
     import_roots: tuple[Path, ...] = (),
     backend_profile_library_path: str = "",
-    backend_profile_library: dict[str, Any] | None = None,
+    backend_profile_library: dict[str, object] | None = None,
 ) -> AlgorithmIRReport:
     """Build an Algorithm Expansion IR from a root AST symbol."""
     nodes: dict[str, IRNode] = {}
