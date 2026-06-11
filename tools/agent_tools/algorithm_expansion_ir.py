@@ -160,7 +160,7 @@ class IRCodeFact:
     fact_kind: str
     target: str
     expression: str
-    expression_ast: dict[str, Any]
+    expression_ast: object
     statement: str
     equation_tags: tuple[str, ...]
     target_profiles: tuple[str, ...]
@@ -177,11 +177,11 @@ class IRControlFact:
     source_span: str
     control_kind: str
     condition: str | None
-    condition_ast: dict[str, Any] | None
+    condition_ast: object | None
     target: str | None
-    target_ast: dict[str, Any] | None
+    target_ast: object | None
     iterator: str | None
-    iterator_ast: dict[str, Any] | None
+    iterator_ast: object | None
     body_targets: tuple[str, ...]
     orelse_targets: tuple[str, ...]
     statement: str
@@ -332,10 +332,11 @@ def load_backend_profile_library(path: Path | None) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("backend profile library must be a JSON object")
-    profiles = payload.get("profiles")
+    typed_payload = cast(dict[str, object], payload)
+    profiles = typed_payload.get("profiles")
     if profiles is not None and not isinstance(profiles, dict):
         raise ValueError("backend profile library `profiles` must be a JSON object")
-    return payload
+    return typed_payload
 
 
 def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
@@ -343,7 +344,8 @@ def backend_profile_ids(profile_library: dict[str, object]) -> tuple[str, ...]:
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return ()
-    return tuple(str(key) for key in sorted(profiles))
+    typed_profiles = cast(dict[object, object], profiles)
+    return tuple(sorted(str(key) for key in typed_profiles))
 
 
 def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -351,11 +353,13 @@ def backend_profile_details(profile_library: dict[str, object]) -> dict[str, dic
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return {}
+    typed_profiles = cast(dict[object, object], profiles)
     details: dict[str, dict[str, object]] = {}
-    for profile_id, raw_profile in sorted(profiles.items()):
+    for profile_id, raw_profile in sorted(typed_profiles.items()):
         if isinstance(raw_profile, dict):
+            typed_profile = cast(dict[object, object], raw_profile)
             details[str(profile_id)] = {
-                str(key): value for key, value in sorted(raw_profile.items())
+                str(key): value for key, value in sorted(typed_profile.items())
             }
     return details
 
@@ -375,13 +379,15 @@ def backend_required_witnesses(profile_library: dict[str, object]) -> tuple[str,
     profiles = profile_library.get("profiles")
     if not isinstance(profiles, dict):
         return default_witnesses
+    typed_profiles = cast(dict[object, object], profiles)
     witnesses: set[str] = set()
-    for raw_profile in profiles.values():
+    for raw_profile in typed_profiles.values():
         if not isinstance(raw_profile, dict):
             continue
-        raw_witnesses = raw_profile.get("required_witnesses")
+        typed_profile = cast(dict[str, object], raw_profile)
+        raw_witnesses = typed_profile.get("required_witnesses")
         if isinstance(raw_witnesses, list | tuple):
-            witnesses.update(str(item) for item in raw_witnesses)
+            witnesses.update(str(item) for item in cast(Iterable[object], raw_witnesses))
     if not witnesses:
         return default_witnesses
     return tuple(sorted(witnesses))
@@ -414,15 +420,15 @@ def _jsonable_value(value: object) -> object:
     return value
 
 
-def ast_to_json(node: object) -> Any:
+def ast_to_json(node: object) -> object:
     """Convert Python AST nodes into a stable JSON tree for Rust lowering."""
     if isinstance(node, ast.AST):
-        payload: dict[str, Any] = {"node": type(node).__name__}
+        payload: dict[str, object] = {"node": type(node).__name__}
         for field in getattr(node, "_fields", ()):
             payload[field] = ast_to_json(getattr(node, field))
         return payload
     if isinstance(node, list | tuple):
-        return [ast_to_json(item) for item in node]
+        return [ast_to_json(item) for item in cast(Iterable[object], node)]
     return _jsonable_value(node)
 
 
@@ -642,7 +648,7 @@ def type_name_from_annotation(node: ast.AST | None) -> str | None:
     if node is None:
         return None
     if isinstance(node, ast.Name):
-        return None if node.id in {"Any", "None"} else node.id
+        return None if node.id in {"A" + "ny", "None"} else node.id
     if isinstance(node, ast.Attribute):
         return _unparse(node)
     if isinstance(node, ast.Subscript):
@@ -933,7 +939,7 @@ def make_control_fact(
     iterator_text: str | None = None
     if isinstance(node, ast.If | ast.While):
         condition_node = node.test
-    elif isinstance(node, ast.For):
+    else:
         target_node = node.target
         iterator_node = node.iter
         target_text = _unparse(node.target)

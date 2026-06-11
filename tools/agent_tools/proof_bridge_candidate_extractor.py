@@ -17,7 +17,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 
 @dataclass(frozen=True)
@@ -45,12 +45,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_json(path: str) -> dict[str, Any]:
+def load_json(path: str) -> dict[str, object]:
     """Load a JSON object."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
-    return payload
+    return cast(dict[str, object], payload)
+
+
+def dict_list(value: object) -> list[dict[str, object]]:
+    """Return JSON object rows from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, object], item) for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def string_list(value: object) -> list[str]:
+    """Return string values from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in cast(list[object], value)]
 
 
 def slug(value: str) -> str:
@@ -60,33 +74,31 @@ def slug(value: str) -> str:
     return normalized or "candidate"
 
 
-def code_facts(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def code_facts(payloads: list[dict[str, object]]) -> list[dict[str, object]]:
     """Return all code facts from loaded IR payloads."""
-    facts: list[dict[str, Any]] = []
+    facts: list[dict[str, object]] = []
     for payload in payloads:
-        for fact in payload.get("code_facts", []):
-            if isinstance(fact, dict):
-                facts.append(fact)
+        facts.extend(dict_list(payload.get("code_facts")))
     return facts
 
 
-def fact_text(fact: dict[str, Any]) -> str:
+def fact_text(fact: dict[str, object]) -> str:
     """Return searchable text for a fact."""
     values = [
         fact.get("source_symbol", ""),
         fact.get("target", ""),
         fact.get("expression", ""),
-        " ".join(str(tag) for tag in fact.get("equation_tags", []) if tag),
+        " ".join(tag for tag in string_list(fact.get("equation_tags")) if tag),
     ]
     return " ".join(str(value) for value in values).lower()
 
 
-def fact_id(fact: dict[str, Any]) -> str:
+def fact_id(fact: dict[str, object]) -> str:
     """Return a fact identifier."""
     return str(fact.get("fact_id") or fact.get("statement") or "fact")
 
 
-def fact_expr(fact: dict[str, Any]) -> str:
+def fact_expr(fact: dict[str, object]) -> str:
     """Return a compact fact expression."""
     expression = str(fact.get("expression") or "")
     target = str(fact.get("target") or "")
@@ -95,7 +107,10 @@ def fact_expr(fact: dict[str, Any]) -> str:
     return expression or str(fact.get("statement") or "")
 
 
-def select_facts(facts: list[dict[str, Any]], *needles: str) -> tuple[dict[str, Any], ...]:
+def select_facts(
+    facts: list[dict[str, object]],
+    *needles: str,
+) -> tuple[dict[str, object], ...]:
     """Return facts whose searchable text contains all needles."""
     lowered = tuple(needle.lower() for needle in needles)
     return tuple(fact for fact in facts if all(needle in fact_text(fact) for needle in lowered))
@@ -106,7 +121,7 @@ def candidate_from_facts(
     candidate_id: str,
     title: str,
     proposition_shape: str,
-    facts: tuple[dict[str, Any], ...],
+    facts: tuple[dict[str, object], ...],
     theorem_role: str,
     selection_note: str,
 ) -> BridgeCandidate | None:
@@ -128,7 +143,7 @@ def candidate_from_facts(
     )
 
 
-def extract_candidates(facts: list[dict[str, Any]]) -> tuple[BridgeCandidate, ...]:
+def extract_candidates(facts: list[dict[str, object]]) -> tuple[BridgeCandidate, ...]:
     """Extract bridge candidates from code facts."""
     specs: list[BridgeCandidate | None] = [
         candidate_from_facts(

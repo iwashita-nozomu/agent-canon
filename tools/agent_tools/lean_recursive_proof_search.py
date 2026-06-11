@@ -16,7 +16,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 
 @dataclass(frozen=True)
@@ -43,24 +43,38 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_config(path: Path) -> dict[str, Any]:
+def load_config(path: Path) -> dict[str, object]:
     """Load JSON config."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("config must be a JSON object")
-    return payload
+    return cast(dict[str, object], payload)
 
 
-def lean_script(config: dict[str, Any], target: dict[str, Any], tactic: str) -> str:
+def string_list(value: object) -> list[str]:
+    """Return string values from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in cast(list[object], value)]
+
+
+def dict_list(value: object) -> list[dict[str, object]]:
+    """Return JSON object rows from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, object], item) for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def lean_script(config: dict[str, object], target: dict[str, object], tactic: str) -> str:
     """Build a Lean stdin script for one target."""
-    imports = "\n".join(f"import {item}" for item in config.get("imports", []))
-    opens = "\n".join(f"open {item}" for item in config.get("opens", []))
-    options = "\n".join(str(item) for item in config.get("options", []))
+    imports = "\n".join(f"import {item}" for item in string_list(config.get("imports")))
+    opens = "\n".join(f"open {item}" for item in string_list(config.get("opens")))
+    options = "\n".join(string_list(config.get("options")))
     prelude = str(config.get("prelude", ""))
     binders = str(target.get("binders", "")).strip()
     statement = str(target["statement"]).strip()
     setup = str(target.get("setup", "")).strip()
-    body_lines = []
+    body_lines: list[str] = []
     if setup:
         body_lines.append(setup)
     body_lines.append(tactic)
@@ -82,11 +96,17 @@ example
 """
 
 
-def run_lean(config_path: Path, config: dict[str, Any], target: dict[str, Any]) -> TargetResult:
+def run_lean(
+    config_path: Path,
+    config: dict[str, object],
+    target: dict[str, object],
+) -> TargetResult:
     """Run Lean for one target."""
     tactic = str(target.get("tactic", "aesop?"))
-    cwd = Path(config.get("cwd") or config_path.parent)
-    command = [str(part) for part in config.get("command", ["lake", "env", "lean", "--stdin"])]
+    cwd_value = config.get("cwd")
+    cwd = Path(str(cwd_value)) if cwd_value else config_path.parent
+    raw_command = config.get("command")
+    command = string_list(raw_command) or ["lake", "env", "lean", "--stdin"]
     proc = subprocess.run(
         command,
         cwd=cwd,
@@ -113,7 +133,7 @@ def run_lean(config_path: Path, config: dict[str, Any], target: dict[str, Any]) 
         stderr=proc.stderr,
         suggested_proof=suggested,
         unresolved_goals=tuple(unresolved),
-        next_targets=tuple(str(item) for item in target.get("next_targets", [])),
+        next_targets=tuple(string_list(target.get("next_targets"))),
     )
 
 
@@ -153,7 +173,7 @@ def render_text(results: list[TargetResult]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_markdown(results: list[TargetResult], config: dict[str, Any]) -> str:
+def render_markdown(results: list[TargetResult], config: dict[str, object]) -> str:
     """Render Markdown report."""
     lines = [
         "# Recursive Lean Proof Search",
@@ -184,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config_path = Path(args.config)
     config = load_config(config_path)
-    results = [run_lean(config_path, config, target) for target in config.get("targets", [])]
+    results = [run_lean(config_path, config, target) for target in dict_list(config.get("targets"))]
     if args.format == "json":
         rendered = json.dumps(
             {
