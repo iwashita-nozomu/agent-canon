@@ -700,6 +700,34 @@ class ProseReasoningGraphTest(unittest.TestCase):
 
             self.assertNotIn("topic_jump_without_bridge", diagnostic_rules(db))
 
+    def test_display_math_block_is_not_bridge_or_merge_target(self) -> None:
+        """Display math blocks are structured presentation, not prose transitions."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "math.md"
+            db = root / "graph.sqlite"
+            source.write_text(
+                textwrap.dedent(
+                    r"""
+                    # Equation
+
+                    The target law is defined first.
+
+                    $$
+                    \Pi(A) = \mathbb{P}(X \in A \mid D)
+                    $$
+
+                    The finite-grid law is then read as a restriction.
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+
+            self.assertNotIn("topic_jump_without_bridge", diagnostic_rules(db))
+            self.assertNotIn("merge_paragraphs", operation_payloads(db))
+
     def test_dependency_header_comment_is_not_an_edit_target(self) -> None:
         """Dependency headers are metadata, not prose rewrite targets."""
         with tempfile.TemporaryDirectory() as tmp_dir:
