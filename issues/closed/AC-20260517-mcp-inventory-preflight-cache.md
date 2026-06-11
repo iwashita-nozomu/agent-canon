@@ -5,12 +5,9 @@
 responsibility Records the operational finding that MCP inventory checks are too noisy when repeated for every repository task.
 upstream design ../README.md defines AgentCanon operational issue conventions.
 upstream design ../../.codex/README.md documents MCP inventory preflight.
-upstream design ../../mcp/README.md documents AgentCanon repo MCP ownership.
+upstream design ../../documents/codex-configuration-reference.md documents MCP configuration boundaries.
+upstream design ../../documents/template-agent-canon-audit-resolution.md records repo-local MCP inventory retirement.
 upstream design ../../agents/skills/codex-task-workflow.md routes MCP preflight for repository tasks.
-upstream implementation ../../tools/agent_tools/check_mcp_inventory.py checks configured Codex MCP inventory.
-downstream implementation ../../.codex/hooks/mcp_session_context.sh should communicate the scoped preflight rule.
-downstream implementation ../../tests/agent_tools/test_check_mcp_inventory.py should verify any cache or evidence behavior.
-downstream implementation ../../tests/agent_tools/test_codex_hooks.py should verify hook context wording.
 @dependency-end
 -->
 
@@ -19,7 +16,7 @@ status: resolved
 source: user
 severity: S2
 evidence: .codex/hooks/mcp_session_context.sh
-affected_surfaces: agent-canon-environment.toml, rust/agent-canon/src/mcp_inventory.rs, .codex/hooks/mcp_session_context.sh, .codex/README.md, mcp/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, tools/agent_tools/check_mcp_inventory.py, tests/agent_tools/test_check_mcp_inventory.py, tests/agent_tools/test_codex_hooks.py
+affected_surfaces: agent-canon-environment.toml, .codex/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, documents/codex-configuration-reference.md, documents/template-agent-canon-audit-resolution.md
 edit_scope: reports/dependency-review/mcp-inventory-preflight-20260517/dependency_edit_scope.txt
 required_action: Replace per-message MCP inventory repetition with Rust session-scoped or run-scoped evidence while preserving fail-closed repair behavior when MCP configuration is missing or stale.
 close_condition: Rust MCP preflight docs, hook context, checker behavior, environment TOML, and tests define when cached evidence is valid, when revalidation is required, and how run bundles record the evidence.

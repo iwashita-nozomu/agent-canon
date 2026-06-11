@@ -157,15 +157,14 @@ python3 tools/agent_tools/doc_start.py \
 最低限:
 
 ```bash
-make docs-check
+tools/bin/agent-canon docs check
 ```
 
 必要なら:
 
 ```bash
 make agent-checks
-python3 tools/docs/check_markdown_lint.py documents notes
-python3 tools/docs/audit_and_fix_links.py --check documents notes
+tools/bin/agent-canon docs check documents notes
 ```
 
 ## Relationship To Other Workflows

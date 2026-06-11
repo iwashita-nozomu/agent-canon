@@ -33,7 +33,6 @@ REQUIRED_CLOSEOUT_ISSUES = {
     106,
     114,
     115,
-    116,
     117,
     118,
     119,

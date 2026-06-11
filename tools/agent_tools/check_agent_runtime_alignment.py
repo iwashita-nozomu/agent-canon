@@ -232,10 +232,6 @@ def validate_project_hooks() -> None:
         "mcp_session_context.sh" not in hooks_text,
         "mcp_session_context.sh must not be wired as a startup hook",
     )
-    ensure(
-        (ROOT / ".codex" / "hooks" / "mcp_session_context.sh").is_file(),
-        "mcp_session_context.sh must exist as an optional context helper",
-    )
     for hook_script in (
         "log_archive_mount_warning.py",
         "prompt_secret_guard.py",

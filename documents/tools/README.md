@@ -13,6 +13,7 @@ downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py man
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
+downstream implementation ../../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
@@ -78,8 +79,18 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。`--view runtime|core` は proof-only node / label を runtime 図から外し、実装経路の確認に使います。
 - `tools/agent_tools/kkt_equation_section.py`
   - Algorithm Expansion IR の `code_facts` を検査し、PDIPM/KKT/MINRES solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、KKT 式を proof note に手書きで足す経路を避けます。
+- `agent-canon test-design check`
+  - Rust CLI の test design 診断入口です。既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。説明文書は [test_design.md](test_design.md) です。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `agent-canon local-llm route-implementation-surface`
+  - 実装前の置き場所 router です。`--request-file`、`--request-stdin`、または
+    `--request` で依頼文を渡し、repo / directory / tool / skill / workflow /
+    root instruction / document / report surface の primary owner、candidate
+    paths、forbidden paths、required pre-edit checks を compact text または
+    JSON で返します。
+  - llama.cpp が使える場合は Local LLM advisory を併記し、使えない場合も
+    `IMPLEMENTATION_SURFACE_ROUTER_WARNING=...` 付き fallback を返します。
 - `agent-canon local-llm extract-prose-ir`
   - 複数 document と複数 term を受け取り、LocalLLM 向け part に分割して prose intermediate representation JSON を作ります。
   - 返す単位は単語 list ではなく、document responsibility、section role、term context、corpus hints、`dsl_seed`、`parts[]` です。
@@ -151,8 +162,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - full confidence が必要な時に主要なチェックをまとめて実行します。small docs / focused code では check matrix に従って個別 check を選びます。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
-- `tools/ci/run_docs_checks.sh`
-  - repo-wide の Markdown 体裁とリンク監査をまとめて実行します。
+- `tools/bin/agent-canon docs check`
+  - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
@@ -174,20 +185,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     最新化した template / derived repo は、DevContainer を作り直したあと
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
-  - `mcp-preflight-policy` は prompt / user request の種類から MCP preflight
-    が必要かを機械判定します。GitHub Actions run、PR check、GitHub Issue を
-    読むだけなら `agent-canon mcp-preflight-policy --request-kind
-    github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
-  - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
-    MCP evidence が必要な workflow、または MCP surface を変更する task
-    で `agent-canon mcp-inventory --root . --require repo_mcp_server
-    --session-cache` を使い、同じ session / unchanged MCP surface での
-    繰り返し確認を cache hit にします。local Cargo が lockfile を読めない
-    環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime
-    behavior が scope でない限り Python / shell gate で検証を続けます。
   - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
-    入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
-    Python 実装は互換 engine として残します。
+    入口です。`route-implementation-surface` は実装前に primary owner と
+    required pre-edit checks を返します。`search`、`build-index`、`eval`
+    もこの CLI surface から呼び、Python 実装は互換 engine として残します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -213,20 +214,16 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
 - `tools/run_pytest_with_logs.sh`
   - Python テストをログ付きで実行します。
-- `tools/docs/check_markdown_lint.py`
-  - Markdown の体裁確認です。
-- `tools/docs/audit_and_fix_links.py`
-  - Markdown のリンク監査です。
+- `tools/bin/agent-canon docs format`
+  - Markdown の機械整形を実行し、同じ入口で隣接 check まで閉じます。
 - `tools/docs/fix_markdown_code_blocks.py`
   - 言語未指定の fenced code block を補正します。
 - `tools/docs/fix_markdown_headers.py`
   - Markdown header level の飛びを補正します。
-- `tools/docs/fix_markdown_math.py`
-  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正します。
-- `tools/docs/fix_mermaid.py`
-  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避けます。
-- `tools/docs/format_markdown.py`
-  - 軽い整形と Mermaid fenced block 補正をまとめて当てます。
+- `tools/bin/agent-canon docs fix-math`
+  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正し、隣接 check を実行します。
+- `tools/bin/agent-canon docs fix-mermaid`
+  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避け、隣接 check を実行します。
 - `tools/docs/fix_markdown_docs.py`
   - conservatively な Markdown 整形を当てます。
 - `tools/docs/find_similar_documents.py`
@@ -366,9 +363,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
 - Codex `goals` feature
-  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は MCP `goal.loop_status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
-- `mcp/repo_mcp_server.py` の `goal.loop_status`
-  - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
+  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
   - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-report|archive-agent-reports|push` を使います。

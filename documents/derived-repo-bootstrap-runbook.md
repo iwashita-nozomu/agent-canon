@@ -4,7 +4,7 @@ responsibility Documents shortest safe onboarding path for repositories that ven
 upstream design ./SHARED_RUNTIME_SURFACES.md defines root view ownership.
 upstream design ./agent-canon-parent-repo-latest-checklist.md defines freshness and TODO handling.
 upstream design ./agent-canon-submodule-rollback.md defines rollback.
-upstream design ./mcp-preflight-and-fallback-policy.md defines MCP triage.
+upstream design ./codex-configuration-reference.md defines MCP configuration boundaries.
 downstream implementation ../tools/agent_tools/parent_repo_readiness.py validates derived repo readiness.
 @dependency-end
 -->
@@ -33,7 +33,7 @@ bash tools/sync_agent_canon.sh check
 ## Source Of Truth
 
 AgentCanon-owned shared surfaces are sourced from `vendor/agent-canon/`:
-`AGENTS.md`, `.agents/`, `.codex/`, `agents/`, `tools/`, `mcp/`,
+`AGENTS.md`, `.agents/`, `.codex/`, `agents/`, `tools/`,
 and shared policy docs. Project implementation, experiments, reports, scripts,
 runtime data, and `goal.md` remain repo-local.
 
@@ -44,7 +44,7 @@ runtime data, and `goal.md` remain repo-local.
 | `vendor/agent-canon` missing | `git submodule update --init --recursive` |
 | root symlink/copy drift | `bash tools/sync_agent_canon.sh check` |
 | stale AgentCanon pin | `make agent-canon-ensure-latest` |
-| MCP unavailable | `documents/mcp-preflight-and-fallback-policy.md` |
+| MCP unavailable | `documents/codex-configuration-reference.md` |
 | GitHub auth or workflow failure | `python3 tools/ci/check_github_workflows.py` |
 | need rollback | `documents/agent-canon-submodule-rollback.md` |
 

@@ -18,9 +18,30 @@ Usage: format_markdown.py [paths...]
 If no paths given, formats common doc directories: README.md, documents/, notes/, reviews/.
 """
 import sys
+import os
+import subprocess
 from pathlib import Path
 
 from fix_mermaid import fix_mermaid_markdown
+
+
+def forward_cli_to_rust(args: list[str]) -> int:
+    """Forward legacy CLI use to the unified Rust docs formatter."""
+    root = Path(__file__).resolve().parents[2]
+    caller_chain = f"ppid={os.getppid()}"
+    print("AGENT_CANON_FORWARDER=deprecated", file=sys.stderr)
+    print("AGENT_CANON_FORWARDER_SEVERITY=fix-now", file=sys.stderr)
+    print(f"AGENT_CANON_FORWARDER_CALLER_CHAIN={caller_chain}", file=sys.stderr)
+    print(
+        "AGENT_CANON_FORWARDER_CANONICAL=tools/bin/agent-canon docs format",
+        file=sys.stderr,
+    )
+    completed = subprocess.run(
+        [str(root / "tools/bin/agent-canon"), "docs", "format", *args],
+        cwd=Path.cwd(),
+        check=False,
+    )
+    return completed.returncode
 
 
 def process_text(text: str) -> str:
@@ -90,4 +111,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(forward_cli_to_rust(sys.argv[1:]))

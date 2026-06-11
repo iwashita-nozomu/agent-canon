@@ -553,12 +553,12 @@ entries:
       - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: agent-canon-local-llm
-    summary: Provides the Rust CLI for single-file responsibility review plus local LLM search, index, and eval routing.
+    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, prose IR extraction, local LLM search, index, and eval routing.
     path: rust/agent-canon/src/local_llm.rs
     family: root
     role: runner
     status: canonical
-    command: tools/bin/agent-canon local-llm classify-responsibility --print-prompt <file>
+    command: tools/bin/agent-canon local-llm route-implementation-surface --request-file <task.txt>
     writes: true
     default_wiring:
       ci: false
@@ -572,6 +572,27 @@ entries:
       - agent-canon-environment.toml
     tests:
       - rust/agent-canon/src/local_llm.rs
+
+  - id: test-design-check
+    summary: Runs Rust-native diagnostics for brittle or under-specified test design before code changes.
+    path: rust/agent-canon/src/test_design.rs
+    family: root
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon test-design check <test-paths...>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/test_design.md
+      - documents/coding-conventions-testing.md
+      - references/test-design-flexibility.md
+      - agents/skills/test-design.md
+    tests:
+      - rust/agent-canon/src/test_design.rs
 
   - id: file-resp-llm
     summary: Keeps the Python compatibility prompt helper for local LLM responsibility review internals.
@@ -885,7 +906,7 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: agent-canon-cli
-    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, and MCP preflight tools.
+    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
     path: tools/bin/agent-canon
     family: root
     role: runner
@@ -898,30 +919,11 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/agent-canon.md
       - documents/rust-agent-tool-migration.md
       - .codex/README.md
-      - mcp/README.md
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
-
-  - id: agent-canon-mcp-preflight
-    summary: Rust MCP preflight classifier and session-cached inventory checker.
-    path: rust/agent-canon/src/mcp_inventory.rs
-    family: root
-    role: checker
-    status: canonical
-    command: tools/bin/agent-canon mcp-preflight-policy --request-kind github-actions-read
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - .codex/README.md
-      - mcp/README.md
-      - documents/rust-agent-tool-migration.md
-      - agent-canon-environment.toml
-    tests:
-      - rust/agent-canon/src/mcp_inventory.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1210,12 +1212,12 @@ entries:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
   - id: fix-markdown-math
-    summary: Rewrites Markdown math notation to the repo-standard dollar delimiters.
+    summary: Legacy CLI forwarder for Markdown math notation repair; use agent-canon docs fix-math.
     path: tools/docs/fix_markdown_math.py
     family: docs
     role: helper
-    status: canonical
-    command: python3 tools/docs/fix_markdown_math.py <files...>
+    status: compatibility_wrapper
+    command: tools/bin/agent-canon docs fix-math <files...>
     writes: true
     callable_by_default: false
     default_wiring:
@@ -1230,12 +1232,12 @@ entries:
       - tests/tools/test_fix_markdown_math.py
 
   - id: fix-mermaid
-    summary: Rewrites Mermaid fenced blocks in Markdown documents.
+    summary: Legacy CLI forwarder for Mermaid fenced block repair; use agent-canon docs fix-mermaid.
     path: tools/docs/fix_mermaid.py
     family: docs
     role: helper
-    status: canonical
-    command: python3 tools/docs/fix_mermaid.py <files...>
+    status: compatibility_wrapper
+    command: tools/bin/agent-canon docs fix-mermaid <files...>
     writes: true
     callable_by_default: false
     default_wiring:
@@ -1250,12 +1252,12 @@ entries:
       - tests/tools/test_fix_mermaid.py
 
   - id: run-docs-checks
-    summary: Runs the shared Markdown, math, and link documentation checks.
+    summary: Legacy shell forwarder for the unified Rust documentation check.
     path: tools/ci/run_docs_checks.sh
     family: ci
     role: runner
-    status: canonical
-    command: bash tools/ci/run_docs_checks.sh
+    status: compatibility_wrapper
+    command: tools/bin/agent-canon docs check
     writes: false
     default_wiring:
       ci: false

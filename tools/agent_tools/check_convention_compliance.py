@@ -183,8 +183,8 @@ TOOL_GATES = {
         ),
     ),
     "runtime_profile_inventory": (
-        "tools/agent_tools/check_runtime_profile_inventory.py",
-        ("tools/ci/run_docs_checks.sh",),
+        "rust/agent-canon/src/docs.rs",
+        ("documents/tools/agent-canon.md",),
     ),
 }
 

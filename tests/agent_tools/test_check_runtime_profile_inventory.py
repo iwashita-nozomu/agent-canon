@@ -45,7 +45,7 @@ def write_minimal_inventory(path: Path) -> None:
         "check_matrix": [
             {
                 "changed_surface": "Markdown docs only",
-                "required_check": ["`make docs-check`"],
+                "required_check": ["`tools/bin/agent-canon docs check`"],
             }
         ],
         "closeout_rule": ["closeout"],

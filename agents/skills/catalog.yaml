@@ -90,7 +90,7 @@ skill_families:
     canonical_doc: agents/skills/html-experiment-report.md
     shim: .agents/skills/html-experiment-report/SKILL.md
   - id: test-design
-    purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
+    purpose: Statically diagnose brittle tests and design resilient behavior contracts, oracles, property/metamorphic candidates, and adversarial cases before implementation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
   - id: refactor-loop

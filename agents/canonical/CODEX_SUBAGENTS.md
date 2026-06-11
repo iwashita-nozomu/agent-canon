@@ -153,9 +153,8 @@ Constraints:
 - Handoffs must include `agents/workflows/codex-goals-workflow.md`,
   `agents/workflows/goal-plan-implementation-loop.md`, the candidate `goal.md`
   or goal artifact, and `team_manifest.yaml` lifecycle policy.
-- When repo MCP exposes `goal.plan`, use it with `goal.loop_status` to hand the
-  next unchecked work units to `execution_planner` instead of summarizing a
-  large `goal.md` by chat.
+- Use `goal_loop.py plan` to hand the next unchecked work units to
+  `execution_planner` instead of summarizing a large `goal.md` by chat.
 
 ## Codex Command Surface
 

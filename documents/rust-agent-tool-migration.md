@@ -246,42 +246,6 @@ It reports:
 
 ## MCP Preflight Rust Tools
 
-MCP preflight routing is now part of the Rust CLI because it is a stable,
-machine-readable routing boundary used before expensive repository work.
-
-Use this for request classification:
-
-```bash
-agent-canon mcp-preflight-policy --request-kind github-actions-read
-```
-
-`consultation`, `brainstorming`, `routing-only`, `explanation-only`,
-`github-actions-read`, `github-read`, `pr-read`, and `issue-read` return
-`MCP_PREFLIGHT_DECISION=skip`. Local repo state or mutation kinds such as
-`repo-read`, `implementation`, `validation`, `pr-mutation`, `issue-sync`, and
-`agent-canon-sync` return `required`.
-
-Use this for repository-task inventory:
-
-```bash
-agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
-```
-
-In template or derived repositories:
-
-```bash
-agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
-```
-
-The session cache lives under ignored `reports/agents/.mcp_inventory_cache.json`.
-It is valid only for the same root, required server set, `codex` binary, and
-MCP runtime surface fingerprint. Changes to `.codex/config.toml`, `mcp/`,
-`rust/agent-canon/src/mcp_inventory.rs`, or
-`tools/agent_tools/check_mcp_inventory.py` invalidate the cache.
-
-The Python `tools/agent_tools/check_mcp_inventory.py` remains as a compatibility
-entrypoint when a run bundle needs direct `workflow_monitoring.md` evidence.
-
 ## Local LLM Rust CLI
 
 Local LLM responsibility review is now a Rust CLI command:
@@ -313,8 +277,6 @@ cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D war
 cargo test --manifest-path rust/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
-agent-canon mcp-preflight-policy --request-kind github-actions-read
-agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
 agent-canon local-llm --help
 agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs
 python3 tools/agent_tools/tool_catalog.py

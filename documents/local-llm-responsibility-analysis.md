@@ -2,8 +2,8 @@
 
 <!--
 @dependency-start
-responsibility Documents local LLM responsibility review, prose IR extraction, graph handoff, and result-surface boundaries.
-coverage local_llm_design_trace requires command surface; result surface; authority boundary; prompt contract; Prose IR|intermediate representation; graph DB|SQLite|nodes table; skill integration
+responsibility Documents local LLM responsibility review, implementation-surface routing, prose IR extraction, graph handoff, and result-surface boundaries.
+coverage local_llm_design_trace requires command surface; result surface; authority boundary; prompt contract; implementation surface routing; Prose IR|intermediate representation; graph DB|SQLite|nodes table; skill integration
 upstream design responsibility-scope-management.md responsibility scope policy
 upstream design rust-agent-tool-migration.md compiled tool installation boundary
 upstream design prose-reasoning-graph/dsl-spec.md prose graph DSL and IR vocabulary
@@ -37,6 +37,7 @@ PR readiness、citation approval、document acceptance を決める authority
 
 - 決定論的に規定できる処理は agent task ではなく tool task です。
 - Local LLM は source document や corpus term を直接正本化せず、structured IR を返します。
+- 実装前の置き場所判定は、agent の印象ではなく tool が責務候補を構造化し、Local LLM はその候補を advisory に解釈します。
 - tool stdout は stats と artifact path に絞り、巨大 JSON や graph 全体を chat に流しません。
 - corpus 管理と既存文書からの DSL seed 抽出は、固定辞書ではなく Local LLM task です。
 - Local LLM の候補は prose graph DSL、dependency header、structured-analysis、
@@ -46,10 +47,15 @@ PR readiness、citation approval、document acceptance を決める authority
 
 ## 責務
 
-Local LLM command surface が担う責務は 2 つです。
+Local LLM command surface が担う責務は 3 つです。
 
 - `classify-responsibility`:
   単一 file の責務記述を advisory に確認します。
+- `route-implementation-surface`:
+  実装前に、repo / directory / tool / skill / workflow / root instruction /
+  document / report surface のどこを primary owner とするかを構造化します。
+  llama.cpp が使える場合は Local LLM advisory を付け、使えない場合も
+  warning 付き deterministic fallback を返します。
 - `extract-prose-ir`:
   複数 document と複数 term から Prose IR を抽出し、graph seed と corpus hint を返します。
 
@@ -57,6 +63,7 @@ Local LLM command surface が担う責務は 2 つです。
 
 - repo-wide ownership の確定。
 - dependency closure の確定。
+- 実装承認、PR readiness、merge 判断。
 - prose graph diagnostics の採否。
 - rewrite の採否。
 - reviewer / workflow の承認判断。
@@ -136,6 +143,35 @@ agent-canon local-llm extract-prose-ir \
 `search` と `build-index` は search-coordination の provider routing に従います。
 `eval` は prompt と compatibility surface の確認用です。これらは
 `extract-prose-ir` の DSL authority ではありません。
+
+### route-implementation-surface
+
+```bash
+agent-canon local-llm route-implementation-surface \
+  --request-file reports/agents/<run-id>/query.txt \
+  --format text
+```
+
+長い request は `--request-file` または `--request-stdin` で渡します。
+この command は編集前に primary implementation owner と secondary update
+surface を切り分けます。出力は compact text または JSON です。
+
+text mode は次の machine-readable keys を返します。
+
+```text
+IMPLEMENTATION_SURFACE_ROUTER=pass
+IMPLEMENTATION_SURFACE_ROUTER_STATUS=fallback_without_local_llm
+IMPLEMENTATION_SURFACE_ROUTER_WARNING=local_llm_unavailable: ...
+PRIMARY_SURFACE=agentcanon_local_llm_tool
+PRIMARY_PATHS=rust/agent-canon/src/local_llm.rs | tools/catalog.yaml | ...
+FORBIDDEN_PATHS=...
+REQUIRED_PRE_EDIT_CHECKS=...
+```
+
+LLM が利用できる場合は `LOCAL_LLM_ROUTE_ADVISORY_BEGIN` /
+`LOCAL_LLM_ROUTE_ADVISORY_END` に JSON advisory を出します。agent は
+primary surface、forbidden paths、required checks を実装前の source packet
+として使い、同じ判定を広い文書読解や subagent に再実行させません。
 
 ## Prose IR Contract
 
@@ -324,7 +360,7 @@ model availability に依存しません。
 ```bash
 cargo test --manifest-path rust/agent-canon/Cargo.toml local_llm
 python3 -m unittest tests/agent_tools/test_prose_reasoning_graph.py
-make docs-check
+tools/bin/agent-canon docs check
 ```
 
 prompt contract を変える場合は、`local_llm.rs` の prompt regression test を更新し、

@@ -133,9 +133,7 @@ remote 名や一台の host path に合わせて変えません。
 - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - `tools/shared/error_handler.py`
 - `tools/validation/triplet_validator.py`
-- `tools/docs/audit_and_fix_links.py`
-- `tools/docs/check_markdown_lint.py`
-- `tools/docs/check_markdown_math.py`
+- `tools/bin/agent-canon docs check`
 - `tools/agent_tools/bootstrap_agent_run.py`
 - `tools/agent_tools/smoke_test_research_perspective_pack.py`
 - `tools/agent_tools/validate_role_write_scope.py`

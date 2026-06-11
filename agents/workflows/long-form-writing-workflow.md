@@ -110,7 +110,7 @@ python3 tools/agent_tools/doc_start.py \
 - 別 instance の `reviewer`
   - docs completeness review を使い、読者に必要な情報の欠落を探す
 
-`make docs-check`、lint、link check は体裁や壊れた参照の検出には使えますが、読みやすさや reader flow の accept evidence にはしません。可読性は `document_flow_reviewer` と completeness reviewer の judgement を正本にします。
+`tools/bin/agent-canon docs check` は体裁や壊れた参照の検出には使えますが、読みやすさや reader flow の accept evidence にはしません。可読性は `document_flow_reviewer` と completeness reviewer の judgement を正本にします。
 
 追加条件:
 
@@ -125,15 +125,14 @@ python3 tools/agent_tools/doc_start.py \
 最低限:
 
 ```bash
-make docs-check
+tools/bin/agent-canon docs check
 ```
 
 必要なら:
 
 ```bash
 make agent-checks
-python3 tools/docs/check_markdown_lint.py documents notes
-python3 tools/docs/audit_and_fix_links.py --check documents notes
+tools/bin/agent-canon docs check documents notes
 ```
 
 validation command が通っても readability は自動では pass しません。closeout では agent review artifact に可読性 judgement が残っていることを確認します。
