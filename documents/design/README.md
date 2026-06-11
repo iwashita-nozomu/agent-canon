@@ -19,6 +19,9 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
   - Python structural duplicate analysis and module-group dependency priority
+- [algorithm-ir-to-lean.md](algorithm-ir-to-lean.md)
+  - Generic Python AST Algorithm IR to Lean lowering architecture
+  - Python / Rust responsibility boundary and structure projection policy
 - [../remote-execution-repo-contract.md](../remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 

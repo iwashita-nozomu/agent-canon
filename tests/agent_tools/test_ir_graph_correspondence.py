@@ -87,7 +87,6 @@ def sample_graph(include_fact_node: bool = True) -> dict[str, object]:
         )
     return {
         "status": "lemma_graph_valid",
-        "source_ir_fingerprint": "sample",
         "lemma_nodes": nodes,
         "lemma_edges": [
             {

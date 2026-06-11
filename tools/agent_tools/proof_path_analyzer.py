@@ -124,9 +124,6 @@ class ProofPathReport:
 
     status: str
     graph_connectivity: tuple[GraphConnectivity, ...]
-    graph_source_ir_fingerprints: tuple[str, ...]
-    expected_source_ir_fingerprints: tuple[str, ...]
-    fingerprint_valid: bool
     proof_complete: bool
     verified_fragment_count: int
     unadopted_verified_fragment_count: int
@@ -317,29 +314,6 @@ def graph_target_chain_ids(graphs: tuple[dict[str, Any], ...]) -> set[str]:
     return selected
 
 
-def graph_source_ir_fingerprints(graphs: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
-    """Return source Algorithm Expansion IR fingerprints recorded by graphs."""
-    return tuple(
-        sorted(
-            {
-                str(graph.get("source_ir_fingerprint", ""))
-                for graph in graphs
-                if graph.get("source_ir_fingerprint")
-            }
-        )
-    )
-
-
-def expected_source_ir_fingerprints(proof_status: dict[str, Any]) -> tuple[str, ...]:
-    """Return proof-status fingerprints that generated lemma overlays must match."""
-    if isinstance(proof_status.get("source_ir_fingerprint"), str):
-        return (str(proof_status["source_ir_fingerprint"]),)
-    values = proof_status.get("source_ir_fingerprints")
-    if isinstance(values, list | tuple):
-        return tuple(sorted(str(value) for value in values if value))
-    return ()
-
-
 def descendant_node_ids(adjacency: dict[str, set[str]], roots: tuple[str, ...]) -> set[str]:
     """Return all graph descendants reachable from roots."""
     descendants: set[str] = set()
@@ -398,6 +372,22 @@ def adoption_text(paths: tuple[str, ...]) -> str:
     for path in paths:
         chunks.append(Path(path).read_text(encoding="utf-8"))
     return "\n".join(chunks)
+
+
+def theorem_adopted(theorem: str, corpus: str) -> bool:
+    """Return whether one theorem name appears in adoption text.
+
+    Lean files commonly declare `namespace Foo` and then `theorem bar`, while
+    proof status rows store the fully qualified theorem name `Foo.bar`.
+    """
+    if theorem in corpus:
+        return True
+    namespace, _, short_name = theorem.rpartition(".")
+    if not namespace or not short_name:
+        return False
+    namespace_re = re.compile(rf"\bnamespace\s+{re.escape(namespace)}\b")
+    declaration_re = re.compile(rf"\b(?:theorem|lemma)\s+{re.escape(short_name)}\b")
+    return bool(namespace_re.search(corpus) and declaration_re.search(corpus))
 
 
 def entries(payload: dict[str, Any], key: str) -> tuple[dict[str, Any], ...]:
@@ -637,18 +627,13 @@ def build_report(
     node_ids = graph_node_ids(graphs)
     adjacency = graph_adjacency(graphs)
     target_chain_ids = graph_target_chain_ids(graphs)
-    graph_fingerprints = graph_source_ir_fingerprints(graphs)
-    expected_fingerprints = expected_source_ir_fingerprints(proof_status)
-    fingerprint_valid = not expected_fingerprints or set(expected_fingerprints).issubset(
-        set(graph_fingerprints)
-    )
 
     checked = entries(proof_status, "checked_fragments")
     unadopted = tuple(
         str(item.get("theorem", ""))
         for item in checked
         if str(item.get("status", "")) == "verified"
-        and str(item.get("theorem", "")) not in adoption_corpus
+        and not theorem_adopted(str(item.get("theorem", "")), adoption_corpus)
     )
     open_frontier = entries(proof_status, "open_frontier")
     operational_assumption_rows = entries(proof_status, "operational_assumptions")
@@ -788,21 +773,6 @@ def build_report(
                 subject=label,
             )
         )
-    if not fingerprint_valid:
-        findings.append(
-            ProofPathFinding(
-                finding_id=f"stale-algorithm-fingerprint-{len(findings) + 1}",
-                severity="error",
-                kind="stale_algorithm_lemma_group",
-                message=(
-                    "proof_status source_ir_fingerprints are absent from the "
-                    "supplied lemma graphs; regenerate Algorithm Expansion IR, "
-                    "lemma graphs, and proof-status overlay before adopting "
-                    "these lemmas"
-                ),
-                subject=", ".join(expected_fingerprints),
-            )
-        )
     for row in frontier_minimality:
         if not row.minimal:
             findings.append(
@@ -841,9 +811,6 @@ def build_report(
     return ProofPathReport(
         status="proof_path_valid" if valid else "proof_path_invalid",
         graph_connectivity=connectivity,
-        graph_source_ir_fingerprints=graph_fingerprints,
-        expected_source_ir_fingerprints=expected_fingerprints,
-        fingerprint_valid=fingerprint_valid,
         proof_complete=proof_complete,
         verified_fragment_count=sum(1 for item in checked if item.get("status") == "verified"),
         unadopted_verified_fragment_count=len(unadopted),
@@ -871,7 +838,6 @@ def build_report(
             "connected": graph_valid,
             "proof_complete": proof_complete,
             "frontier_minimal": frontier_minimal,
-            "algorithm_fingerprint_valid": fingerprint_valid,
         },
     )
 
@@ -883,7 +849,6 @@ def render_text(report: ProofPathReport) -> str:
         f"PROOF_PATH_VALID={str(report.validation['valid']).lower()}",
         f"PROOF_PATH_CONNECTED={str(report.validation['connected']).lower()}",
         f"PROOF_PATH_COMPLETE={str(report.proof_complete).lower()}",
-        f"PROOF_PATH_ALGORITHM_FINGERPRINT_VALID={str(report.fingerprint_valid).lower()}",
         f"PROOF_PATH_FRONTIER_MINIMAL={str(report.frontier_minimal).lower()}",
         f"PROOF_PATH_OPEN_WITNESSES={report.open_witness_count}",
         f"PROOF_PATH_OPERATIONAL_ASSUMPTIONS={report.operational_assumption_count}",
@@ -912,7 +877,6 @@ def render_markdown(report: ProofPathReport) -> str:
         f"- status: `{report.status}`",
         f"- graph connected: `{report.validation['connected']}`",
         f"- proof complete: `{report.proof_complete}`",
-        f"- algorithm fingerprint valid: `{report.fingerprint_valid}`",
         f"- frontier minimal: `{report.frontier_minimal}`",
         f"- verified fragments: `{report.verified_fragment_count}`",
         f"- open witnesses: `{report.open_witness_count}`",
@@ -920,14 +884,6 @@ def render_markdown(report: ProofPathReport) -> str:
         f"- external assumptions: `{report.external_assumption_count}`",
         f"- unprovable-under-assumption rows: `{report.unprovable_count}`",
         f"- code-derived facts: `{report.code_fact_count}`",
-        "",
-        "## Algorithm Fingerprints",
-        "",
-        "| Kind | Fingerprints |",
-        "| --- | --- |",
-        f"| graph source IR | `{', '.join(report.graph_source_ir_fingerprints) or 'none'}` |",
-        f"| proof status expected | `{', '.join(report.expected_source_ir_fingerprints) or 'none'}` |",
-        f"| valid | `{report.fingerprint_valid}` |",
         "",
         "## Graph Connectivity",
         "",

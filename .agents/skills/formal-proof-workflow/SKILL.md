@@ -10,9 +10,11 @@ upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill 
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
 upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams
 upstream implementation ../../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs
+upstream implementation ../../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers IR facts into Lean route artifacts
 upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
@@ -45,6 +47,34 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    initialization-path facts, and solver defaults should be represented as
    code-derived facts and connected to lemma graph nodes before they are cited
    in a proof status table.
+   For checker-facing implementation path models, generate Lean route artifacts
+   from the current Algorithm Expansion IR with
+   `tools/bin/agent-canon algorithm-ir-to-lean`. Do not introduce a
+   hand-written algorithm-specific operation record as the proof entrypoint
+   when IR `expression_ast` and `control_facts` can supply the evaluation order.
+   Structure access must be handled by the post-IR Rust projection pass, while
+   theorem-specific typed interpretations stay in proof theme files.
+   For target-critical code shape, do not leave implementation-local functions
+   as arbitrary proof axioms merely because the first trace generator is shallow.
+   Residual bundles, next-state construction, step-length formulas, KKT
+   reconstruction, stopping residual aggregation, and other target-facing code
+   path functions must be implemented as Lean functions whose fields correspond
+   to the implementation data flow.  Use axioms only for explicit architecture
+   or backend semantics boundaries, or for problem-owned analytic functions
+   that are top-level theorem assumptions.  If an IR extraction cannot yet emit
+   the needed function body, either improve the extractor or add a small
+   checker-facing function with a dependency edge to the IR fact; do not return
+   an arbitrary function axiom as a proof frontier.
+   State implementation-derived theorems over the data types used by the
+   implementation path, or over an explicit decoded view of those data types
+   with a checked binding lemma.  Do not replace implementation residuals,
+   statuses, solver answers, finite-precision values, or certificates by a
+   convenient surrogate type such as `Nat`, `Real`, or an unconstrained record
+   unless the code path already uses that type or a theorem proves the coercion,
+   decode, unit conversion, or projection from the implementation type.  If the
+   implementation uses finite precision, prove arithmetic claims over the
+   rounded value model and `decode` relation consumed by the theorem, not over a
+   field abstraction that the runtime values do not satisfy.
    For target-critical assignment and return equations, run
    `python3 tools/agent_tools/ir_graph_correspondence.py` on the current
    Algorithm Expansion IR and LemmaGraph before writing or adopting a proof
@@ -52,14 +82,29 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    a `lemma_consumes_code_fact` edge, and target-chain coverage; use
    `--require-proof-status-adoption` when the theorem claims to consume that
    intermediate formula.
-   For reduced KKT / KKT / MINRES solver-chain equation prose, run
-   `python3 tools/agent_tools/kkt_equation_section.py` against the current
-   PDIPM/KKT/MINRES Algorithm Expansion IR files. If required evidence is
+   For reduced KKT / block-system / iterative-solver-chain equation prose, run
+   `python3 tools/agent_tools/kkt_equation_section.py` or the relevant equation
+   section generator against the current Algorithm Expansion IR files. If required evidence is
    missing, fix IR extraction or implementation shape before writing prose.
    The generated section must substitute displayed implementation equations
    from matched IR `code_facts[*].expression` entries. Do not mirror those
    runtime formulas by hand in the proof note; link to or regenerate the
    generated section instead.
+   After extraction, hand-translate theorem-critical equations into candidate
+   typed Lean propositions and bridge theorems. IR facts identify the code
+   equations; Lean propositions state possible mathematical meanings. Generate
+   multiple bridge candidates at the abstraction level required by the target
+   theorem, check or refute them when possible, and classify each candidate
+   before choosing the route used by the final theorem. Do not leave
+   theorem-critical returned values unconstrained when the current IR contains
+   equations that determine or bound them.
+   Candidate selection is recursive and target-driven: state the final
+   proposition `P`, run the appropriate proof search (`aesop?`, `aesop`,
+   `simp?`, `exact?`, or the Lean capability route), inspect the unsolved goals
+   and missing hypotheses, generate bridge candidates for those exact gaps,
+   prove/refute them from generated Lean functions and IR facts, then rerun the
+   proof of `P`. A flat candidate inventory is only input to this loop, not the
+   proof workflow outcome.
 1. After any algorithm update that changes initialization, cold-start,
    Phase-I, basin-entry, or selected-scope-entry logic, regenerate the Algorithm
    Expansion IR, lemma graphs, and proof-status overlay before reporting back.
@@ -110,10 +155,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    Rewrite those as lemmas/witnesses derived from `Problem + Config` and the
    generated path, or classify the stronger theorem as `refuted` /
    `unprovable_under_assumptions`.
-   For PDIPM specifically, injected mathematical assumptions are limited to the
-   optimization `Problem` and `InitializeConfig`; implementation trace and
-   backend/runtime semantics are architecture assumptions, not problem
-   assumptions.
+   Algorithm-specific injected mathematical assumptions are limited to the target
+   algorithm's public problem/input object and configuration object;
+   implementation trace and backend/runtime semantics are architecture
+   assumptions, not problem assumptions.
    For optimization problems, "differentiable" refers to the target `Problem`
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
@@ -121,11 +166,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Convert Algorithm Expansion IR into a Lemma Dependency Graph with
    `python3 tools/agent_tools/algorithm_lemma_graph.py --target-profile <profile> --format json|markdown`.
    Retain `proof_lemma_graph`, `proof_target_chains`, and graph validation
-   evidence before writing proof text. Generated lemma groups are owned by the
-   Algorithm Expansion IR fingerprint recorded as `source_ir_fingerprint`; copy
-   adopted fingerprints into `proof_status.json` as `source_ir_fingerprints`
-   and let `proof_path_analyzer.py` reject stale lemma groups after algorithm
-   changes.
+   evidence before writing proof text. After algorithm changes, regenerate IR,
+   lemma graphs, and proof-status overlays from the current root; do not carry
+   old IR-backed generated lemma groups forward by fingerprint or prose edits.
 1. If the task asks what iterative algorithm is implemented or where proof
    holes sit on the implementation path, use `$algorithm-flowchart` after IR,
    LemmaGraph, and proof-status generation. The chart is navigation evidence,
@@ -148,6 +191,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    proof attempts, adoption decisions, and missing frontier as graph overlay.
    A reader-facing `verified` claim requires a checker-backed certified
    subgraph, not merely a candidate proof path.
+1. Propositionize the full target-facing algorithm route before returning an
+   algorithmic blocker. For an iterative solver this means, at minimum, the
+   stopping scalar, state update, step-length or acceptance selection,
+   direction construction, nested solver return/certificate, residual or merit
+   recomputation, and final scalar binding must each have theorem-specific Lean
+   propositions or a checker-backed reason why the IR cannot expose them. A
+   route fact such as "function A calls function B" is not enough when the
+   target theorem depends on the value returned by B. Continue expanding until
+   the remaining row is a semantic mechanism, such as a contraction theorem,
+   residual-merit selection, problem-class analytic bound, backend boundary, or
+   checker-backed refutation. Do not return a blocker while an unpropositionized
+   generated equation on the target path could still determine the missing
+   value.
 1. Advance proof exploration from the frontier, not from prose order:
    choose the next target-chain node with no certified incoming proof, reduce it
    to the weakest local proposition that would advance the final theorem, and
@@ -222,7 +278,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
-1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, prefer Mathlib-backed formalization unless the proof theme explicitly needs a dependency-free core fragment. Include Mathlib docs, LeanSearch/Loogle/Moogle-style tools, Zulip archive, and in-editor tactic search when available. Use Aesop as the default bounded automation attempt for routine propositional, constructor, relation-composition, and library-lemma search obligations: first try `aesop?` / `aesop` on the normalized local subgoal, inspect the generated proof, minimize it when possible, and keep the checker log. If `import Aesop` / `import Mathlib` is unavailable in a topic-local proof package, do not add an ad hoc dependency there; first route the check through `python3 tools/agent_tools/lean_proof_env.py smoke|check-file --env-dir reports/formal-proof/lean-proof-env` as the AgentCanon-owned proof environment. Add Mathlib to the topic-local package only when that package itself owns a Mathlib-based theory. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
+1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, and Moogle-style tools. For active proof themes, pin Mathlib/Aesop once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or narrowing evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use
@@ -341,7 +397,7 @@ module recursively initializes lower solvers, stopping predicates, or
 preconditioners.
 
 1. Record `root_initialize` and `root_config_type`, such as
-   `pdipm.initialize` with `pdipm.InitializeConfig`, or standalone
+   a root optimizer `initialize` with its `InitializeConfig`, or standalone
    `minres.initialize` with `minres.InitializeConfig`.
 1. For each child `InitializeConfig` field, record an expansion edge with
    `child_config_field`, `child_initialize`, `proof_scope`, `selection_rule`,

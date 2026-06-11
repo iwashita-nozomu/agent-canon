@@ -9,6 +9,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
+mod algorithm_ir_to_lean;
 mod docs;
 mod local_llm;
 mod migration_audit;
@@ -43,6 +44,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "docs" {
         std::process::exit(docs::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "algorithm-ir-to-lean" {
+        std::process::exit(algorithm_ir_to_lean::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "local-llm" {
@@ -87,7 +92,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | docs <check|format|fix-math|fix-mermaid> [paths...] | test-design <check> [paths...] | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | structured-analysis <build|analyze|document-inventory|import-document-inventory> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | docs <check|format|fix-math|fix-mermaid> [paths...] | test-design <check> [paths...] | algorithm-ir-to-lean --algorithm-ir <path> --namespace <Lean.Namespace> --out <path> | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | structured-analysis <build|analyze|document-inventory|import-document-inventory> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

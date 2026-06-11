@@ -13,7 +13,9 @@ upstream implementation ../../../tools/agent_tools/algorithm_lemma_graph.py buil
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays.
 upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 upstream implementation ../../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
+upstream implementation ../../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers IR facts into Lean route artifacts.
 upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
+upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
 @dependency-end
 -->
 
@@ -31,30 +33,64 @@ upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits
 1. Build Algorithm Expansion IR from the public root consumed by the theorem:
    `initialize`, `solve`, `step`, or a certificate-returning function.
    Use saturated AST expansion; do not add caller-chosen recursion-depth knobs.
+1. Preserve code shape as executable proof functions before theorem search.
+   When the target theorem talks about a concrete implementation path, every
+   target-facing data transformation on that path must appear as a Lean
+   function or generated trace function, not as an arbitrary axiom: residual
+   aggregation, residual recomputation, step-length selection, next-state
+   update, KKT reconstruction, and stopping metric construction are all code
+   shape.  If the current IR-to-Lean bridge only exposes an opaque evaluator,
+   add or improve a checker-facing adapter that mirrors the implementation
+   fields and record the IR source facts it consumes.  Leave axioms only for
+   explicit backend/runtime semantics or problem-owned analytic functions
+   admitted at the top-level theorem.
 1. Treat the implemented algorithm itself as an operational assumption:
    `trace follows A_impl / Step_impl` extracted from IR. Convergence,
    certificate soundness, finite termination, and residual reachability are
    lemmas derived from that assumption, not assumptions.
 1. Convert the IR into one or more Lemma Dependency Graph profiles. Keep
    generated IR-backed nodes synchronized only by regenerating IR after source
-   code changes. Generated lemma groups are owned by the Algorithm Expansion IR
-   fingerprint. If the algorithm changes and that fingerprint changes, reset
-   generated lemma groups and rebuild the proof-status overlay instead of
-   carrying old lemmas forward by hand.
+   code changes. If the algorithm changes, reset generated lemma groups and
+   rebuild the proof-status overlay from the current IR instead of carrying old
+   lemmas forward by hand.
+   Also regenerate the checker-facing Lean route artifacts with
+   `tools/bin/agent-canon algorithm-ir-to-lean`; do not continue a proof
+   route through a hand-written operation abstraction when the implementation path
+   can be represented from current IR `expression_ast` and `control_facts`.
+   Structure access must be normalized by the Rust post-IR projection pass, not
+   by algorithm-specific generated shapes.
 1. When the user asks what iterative algorithm is currently implemented or
    which blocks are proved/open, run `$algorithm-flowchart` after IR and
    LemmaGraph generation. The Mermaid chart is visualization evidence; proof
    completion still comes from checker-backed fragments.
    Use `--view runtime` or `--view core --include-code-facts` when the chart
    must show implementation flow without proof-only labels or branches.
-1. For reduced KKT / KKT / MINRES solver-chain equations, use
-   `python3 tools/agent_tools/kkt_equation_section.py` with the current
-   PDIPM/KKT/MINRES Algorithm Expansion IR files. Missing required evidence is
+1. For reduced block-system / KKT / iterative-solver-chain equations, use
+   `python3 tools/agent_tools/kkt_equation_section.py` or the relevant
+   equation-section generator with the current Algorithm Expansion IR files. Missing required evidence is
    an IR extraction or code-shape issue, not a reason to hand-maintain proof
    prose. The generated section owns the displayed implementation formulas by
    substituting matched IR `code_facts[*].expression` values; proof notes should
    link to that section instead of carrying parallel hand-written runtime
    equations.
+1. Hand-translate theorem-critical IR equations into candidate typed
+   mathematical Lean propositions. IR fact extraction tells which equations are
+   present; the skill must still explore which proposition states the useful
+   mathematical guarantee. Do not freeze on the first bridge shape. Generate
+   multiple bridge candidates at the abstraction level required by the target
+   theorem, check or refute them when possible, and classify each candidate
+   before choosing the next proof route. Do not leave theorem-critical returned
+   values unconstrained when the current IR contains equations that determine or
+   bound them.
+1. Drive candidate selection recursively from the final theorem, not from a
+   flat list. State the current target proposition `P`, run the checker/tactic
+   search (`aesop?`, `aesop`, `simp?`, `exact?`, or the route selected by
+   `$formal-proof-workflow`), record the unsolved subgoals or missing
+   hypotheses, translate each missing item into candidate bridge propositions,
+   check whether current Lean functions / generated IR facts can prove or
+   refute those candidates, then rerun the target proof. Repeat until `P` is
+   proved, refuted, shown unprovable under the current top-level assumptions, or
+   reduced to a strictly smaller named witness.
 1. For theorem-critical intermediate formulas, use
    `python3 tools/agent_tools/ir_graph_correspondence.py` after LemmaGraph
    generation. Check assignment and return equations per iteration unit
@@ -74,6 +110,17 @@ upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits
 1. Do not treat a failed single-lemma formal-proof route as an algorithm
    failure. Hand proof-route alternatives to `$formal-proof-workflow`; use its checker-backed
    outcome to decide whether an algorithm change is actually needed.
+1. Before classifying a current algorithmic choice as the blocker, require
+   `$formal-proof-workflow` to propositionize every target-facing algorithm
+   block whose returned value can affect the theorem. For iterative solvers,
+   this includes the initializer, stopping scalar, step-length or acceptance
+   selection, direction construction, nested solver certificate, state update,
+   residual/merit recomputation, and final scalar binding. If any such block is
+   still only a route call or unconstrained theorem variable, send it back as a
+   smaller formal-proof witness. An algorithmic blocker is visible only when
+   the remaining gap is a semantic mechanism such as missing contraction,
+   missing residual-merit selection, missing problem-class bound, missing
+   backend boundary, or checker-backed refutation.
 1. When formal-proof returns a missing witness or assumption-insufficiency
    result, classify whether the gap is better solved by changing the algorithm,
    adding a runtime certificate, narrowing the problem class, or leaving an

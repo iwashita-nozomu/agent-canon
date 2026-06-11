@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Run recursive Lean proof-search targets and record unresolved goals.
+
+@dependency-start
+responsibility Runs target-driven Lean tactic attempts from a JSON proof-search plan.
+upstream design ../../agents/skills/formal-proof-workflow.md defines recursive target-driven proof search.
+downstream design ../../documents/tools/lean_recursive_proof_search.md documents CLI usage.
+@dependency-end
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class TargetResult:
+    """One Lean target attempt result."""
+
+    name: str
+    status: str
+    returncode: int
+    tactic: str
+    stdout: str
+    stderr: str
+    suggested_proof: str
+    unresolved_goals: tuple[str, ...]
+    next_targets: tuple[str, ...]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Create CLI parser."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", required=True, help="Proof-search target JSON.")
+    parser.add_argument("--format", choices=("json", "markdown", "text"), default="text")
+    parser.add_argument("--out")
+    return parser
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    """Load JSON config."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("config must be a JSON object")
+    return payload
+
+
+def lean_script(config: dict[str, Any], target: dict[str, Any], tactic: str) -> str:
+    """Build a Lean stdin script for one target."""
+    imports = "\n".join(f"import {item}" for item in config.get("imports", []))
+    opens = "\n".join(f"open {item}" for item in config.get("opens", []))
+    options = "\n".join(str(item) for item in config.get("options", []))
+    prelude = str(config.get("prelude", ""))
+    binders = str(target.get("binders", "")).strip()
+    statement = str(target["statement"]).strip()
+    setup = str(target.get("setup", "")).strip()
+    body_lines = []
+    if setup:
+        body_lines.append(setup)
+    body_lines.append(tactic)
+    body = "\n  ".join(body_lines)
+    return f"""{imports}
+
+{opens}
+
+{options}
+
+{prelude}
+
+noncomputable section
+
+example
+    {binders} :
+    {statement} := by
+  {body}
+"""
+
+
+def run_lean(config_path: Path, config: dict[str, Any], target: dict[str, Any]) -> TargetResult:
+    """Run Lean for one target."""
+    tactic = str(target.get("tactic", "aesop?"))
+    cwd = Path(config.get("cwd") or config_path.parent)
+    command = [str(part) for part in config.get("command", ["lake", "env", "lean", "--stdin"])]
+    proc = subprocess.run(
+        command,
+        cwd=cwd,
+        input=lean_script(config, target, tactic),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    output = "\n".join(part for part in (proc.stdout, proc.stderr) if part)
+    suggested = extract_suggestion(output)
+    unresolved = extract_unresolved_goals(output)
+    if proc.returncode == 0:
+        status = "verified"
+    elif unresolved:
+        status = "unverified_with_next_goals"
+    else:
+        status = "failed_no_structured_goals"
+    return TargetResult(
+        name=str(target["name"]),
+        status=status,
+        returncode=proc.returncode,
+        tactic=tactic,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        suggested_proof=suggested,
+        unresolved_goals=tuple(unresolved),
+        next_targets=tuple(str(item) for item in target.get("next_targets", [])),
+    )
+
+
+def extract_suggestion(output: str) -> str:
+    """Extract Lean's `Try this` suggestion when present."""
+    marker = "Try this:"
+    if marker not in output:
+        return ""
+    tail = output.split(marker, 1)[1]
+    if "error:" in tail:
+        return tail.split("error:", 1)[0].strip()
+    return tail.strip()
+
+
+def extract_unresolved_goals(output: str) -> list[str]:
+    """Extract compact unresolved-goal snippets from Lean output."""
+    goals: list[str] = []
+    chunks = output.split("unsolved goals")
+    for chunk in chunks[1:]:
+        snippet = chunk.strip()
+        if not snippet:
+            continue
+        goals.append(snippet[:3000])
+    if "Initial goal:" in output:
+        goals.append(output.split("Initial goal:", 1)[1].strip()[:3000])
+    return goals
+
+
+def render_text(results: list[TargetResult]) -> str:
+    """Render stable text."""
+    lines = [f"LEAN_RECURSIVE_PROOF_TARGETS={len(results)}"]
+    for result in results:
+        lines.append(
+            "LEAN_RECURSIVE_PROOF_TARGET="
+            f"{result.name}:{result.status}:next={','.join(result.next_targets) or 'none'}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def render_markdown(results: list[TargetResult], config: dict[str, Any]) -> str:
+    """Render Markdown report."""
+    lines = [
+        "# Recursive Lean Proof Search",
+        "",
+        f"- target theorem: `{config.get('target_theorem', 'unspecified')}`",
+        f"- targets: `{len(results)}`",
+        "",
+        "| Target | Status | Next Targets | Suggested Proof |",
+        "| --- | --- | --- | --- |",
+    ]
+    for result in results:
+        suggestion = result.suggested_proof.replace("|", "\\|").replace("\n", "<br>")
+        lines.append(
+            f"| `{result.name}` | `{result.status}` | "
+            f"`{', '.join(result.next_targets) or 'none'}` | {suggestion or '`none`'} |"
+        )
+    for result in results:
+        if not result.unresolved_goals:
+            continue
+        lines.extend(["", f"## `{result.name}` Unresolved Goals", ""])
+        for index, goal in enumerate(result.unresolved_goals, start=1):
+            lines.extend([f"### Goal {index}", "", "```text", goal, "```"])
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run CLI."""
+    args = build_parser().parse_args(argv)
+    config_path = Path(args.config)
+    config = load_config(config_path)
+    results = [run_lean(config_path, config, target) for target in config.get("targets", [])]
+    if args.format == "json":
+        rendered = json.dumps(
+            {
+                "status": "lean_recursive_proof_search_complete",
+                "target_theorem": config.get("target_theorem", ""),
+                "results": [asdict(result) for result in results],
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+    elif args.format == "markdown":
+        rendered = render_markdown(results, config)
+    else:
+        rendered = render_text(results)
+    if args.out:
+        Path(args.out).write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
+    return 0 if all(result.returncode == 0 for result in results) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

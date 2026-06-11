@@ -10,7 +10,9 @@ upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds 
 upstream implementation ../../tools/agent_tools/proof_path_analyzer.py validates proof-status overlays.
 upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 upstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
+upstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers IR facts into Lean route artifacts.
 upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
+upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
 downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
@@ -109,12 +111,16 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - keep multiple profiles for one algorithm when needed
    - use graph nodes and edges for auxiliary lemmas, bridge lemmas, assumptions, failed routes, and adoption decisions
    - treat generated lemma groups as products of the Algorithm Expansion IR.
-     They carry the IR fingerprint emitted by `algorithm_lemma_graph.py`.
-     If the algorithm changes and the IR fingerprint changes, reset generated
-     lemma groups and proof-status adoption for those IR-backed nodes by
-     regenerating IR, regenerating graphs, and rebuilding the overlay. Do not
-     carry old generated lemmas across an algorithm change by editing labels or
-     prose.
+     If the algorithm changes, reset generated lemma groups and proof-status
+     adoption for those IR-backed nodes by regenerating IR, regenerating graphs,
+     and rebuilding the overlay. Do not carry old generated lemmas across an
+     algorithm change by editing labels or prose.
+   - generate checker-facing Lean route artifacts with
+     `tools/bin/agent-canon algorithm-ir-to-lean`; do not introduce a
+     hand-written algorithm-specific operation abstraction as a new proof
+     entrypoint when current IR `expression_ast` and `control_facts` can supply the
+     implementation evaluation order. Structure access must be handled by the
+     post-IR Rust projection pass, not by algorithm-specific generated shapes.
 1. Algorithm Flowchart:
    - use `python3 tools/agent_tools/algorithm_flowchart.py` after IR and
      LemmaGraph generation when a human or agent needs to see the implemented
@@ -136,9 +142,9 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - if an equation fact is absent from the graph or lacks a
      `lemma_consumes_code_fact` edge, fix IR extraction or graph generation
      before writing proof prose or Lean bridge lemmas
-   - for reduced KKT / KKT / MINRES solver-chain equations, use
-     `python3 tools/agent_tools/kkt_equation_section.py` with the current
-     PDIPM/KKT/MINRES Algorithm Expansion IR files
+   - for reduced block-system / KKT / iterative-solver-chain equations, use
+     `python3 tools/agent_tools/kkt_equation_section.py` or the relevant
+     equation-section generator with the current Algorithm Expansion IR files
    - if the generator fails because a required code fact is missing, classify
      the gap as IR extraction weakness or code-shape opacity before writing
      proof prose
@@ -146,6 +152,23 @@ current IR / assumption ledger から導けないことを checker-backed に示
      matched IR `code_facts[*].expression`; proof notes should link to the
      generated section instead of carrying parallel hand-written runtime
      equations
+   - theorem-critical IR equations must be hand-translated into candidate typed
+     mathematical Lean propositions. IR extraction tells which equations are
+     present; this skill explores which bridge proposition is useful for the
+     target theorem. Do not freeze on one bridge shape. Generate multiple
+     bridge candidates at the abstraction level required by the target theorem,
+     check or refute them when possible, and classify each candidate before
+     choosing the next route. Do not leave theorem-critical returned values
+     unconstrained when the current IR contains equations that determine or
+     bound them.
+   - candidate selection is recursive and target-driven. State the current
+     target proposition `P`, run checker/tactic search such as `aesop?`,
+     inspect unsolved subgoals or missing hypotheses, translate those gaps into
+     bridge candidates, check whether current Lean functions / generated IR
+     facts prove or refute each candidate, and rerun the proof of `P`. Repeat
+     until `P` is proved, refuted, shown unprovable under the current top-level
+     assumptions, or reduced to a strictly smaller named witness. A flat
+     candidate list is only input to this loop.
 1. Algorithm frontier extraction:
    - choose graph frontier nodes by their algorithmic impact, not prose order
    - normalize each target-facing blocker to implementation identity,
@@ -179,6 +202,16 @@ current IR / assumption ledger から導けないことを checker-backed に示
     named witness back to formal-proof before classifying an algorithmic
      blocker; do not turn a proof-search queue item into algorithm-change
      guidance
+  - current algorithmic choice を blocker と分類する前に、target theorem に効く
+    algorithm block をすべて `$formal-proof-workflow` 側で命題化させます。
+    initializer、stopping scalar、step length / acceptance selection、
+    direction construction、nested solver certificate、state update、
+    residual / merit recomputation、final scalar binding の返却値が theorem に影響するなら、
+    route call や unconstrained theorem variable のまま blocker にしてはいけません。
+    その場合は、より小さい formal-proof witness として戻します。algorithmic blocker として
+    返せるのは、残る穴が missing contraction、missing residual-merit selection、
+    missing problem-class bound、missing backend boundary、checker-backed refutation などの
+    semantic mechanism まで縮約された場合だけです。
 1. Algorithmic blocker exploration:
    - when a target-facing blocker remains after formal-proof exploration,
      classify whether it comes from missing problem assumptions, missing
