@@ -35,6 +35,7 @@ class WorkflowSelectionCase:
     """One deterministic workflow selection eval case."""
 
     case_id: str
+    group_id: str
     description: str
     prompt: str
     expected_workflows: tuple[str, ...]
@@ -47,6 +48,7 @@ class PromptIntakeSignalsProtocol(Protocol):
     """Typed subset returned by the prompt-intake classifier."""
 
     skills: tuple[str, ...]
+    selected_workflows: tuple[str, ...]
     candidate_skills: tuple[str, ...]
     candidate_workflows: tuple[str, ...]
     candidate_tools: tuple[str, ...]
@@ -90,15 +92,31 @@ class WorkflowSelectionBundle:
     """All workflow selection eval data for one run."""
 
     run_id: str
+    requested_run_id: str
     status: str
     root: Path
     manifest: Path
     results: tuple[WorkflowSelectionResult, ...]
+    expected_case_count: int | None
+    expected_generated_case_count: int | None
+    generated_case_count: int
+    count_failures: tuple[str, ...]
 
     @property
     def failed_count(self) -> int:
         """Return failed case count."""
         return sum(1 for result in self.results if not result.passed)
+
+
+@dataclass(frozen=True)
+class WorkflowSelectionManifest:
+    """Expanded workflow selection manifest data."""
+
+    cases: tuple[WorkflowSelectionCase, ...]
+    expected_case_count: int | None
+    expected_generated_case_count: int | None
+    generated_case_count: int
+    count_failures: tuple[str, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -108,6 +126,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST)
     parser.add_argument("--report-out", default="")
     parser.add_argument("--accumulate", action="store_true")
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional parent run-bundle or CI gate id recorded inside accumulated reports.",
+    )
     parser.add_argument(
         "--results-dir",
         default="",
@@ -131,14 +154,48 @@ def string_list(value: object, field: str) -> tuple[str, ...]:
     return tuple(cast(list[str], items))
 
 
-def load_cases(path: Path) -> tuple[WorkflowSelectionCase, ...]:
-    """Load workflow selection eval cases."""
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    raw_cases = data.get("cases")
-    if not isinstance(raw_cases, list) or not raw_cases:
-        raise ValueError("manifest must define at least one [[cases]] entry")
+def optional_count(value: object, field: str) -> int | None:
+    """Return an optional non-negative integer manifest count."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def positive_count(value: object, field: str) -> int:
+    """Return a required positive integer manifest count."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{field} must be a positive integer")
+    return value
+
+
+def format_group_prompt(template: str, subject: str, group_id: str) -> str:
+    """Format one generated prompt template."""
+    try:
+        prompt = template.format(subject=subject)
+    except KeyError as exc:
+        raise ValueError(
+            f"case group {group_id} template uses unsupported field {exc.args[0]!r}"
+        ) from exc
+    except (IndexError, ValueError) as exc:
+        raise ValueError(f"case group {group_id} has invalid prompt template") from exc
+    prompt = prompt.strip()
+    if not prompt:
+        raise ValueError(f"case group {group_id} generated an empty prompt")
+    return prompt
+
+
+def load_explicit_cases(
+    raw_cases: object,
+    seen_ids: set[str],
+) -> list[WorkflowSelectionCase]:
+    """Load explicit workflow selection cases."""
+    if raw_cases is None:
+        return []
+    if not isinstance(raw_cases, list):
+        raise ValueError("cases must be a list of tables")
     cases: list[WorkflowSelectionCase] = []
-    seen_ids: set[str] = set()
     for index, raw_case in enumerate(cast(list[object], raw_cases), start=1):
         if not isinstance(raw_case, dict):
             raise ValueError(f"case {index} must be a table")
@@ -158,6 +215,7 @@ def load_cases(path: Path) -> tuple[WorkflowSelectionCase, ...]:
         cases.append(
             WorkflowSelectionCase(
                 case_id=case_id,
+                group_id=str(entry.get("group_id") or "explicit"),
                 description=str(entry.get("description") or ""),
                 prompt=prompt,
                 expected_workflows=expected_workflows,
@@ -169,7 +227,112 @@ def load_cases(path: Path) -> tuple[WorkflowSelectionCase, ...]:
                 expected_tools=string_list(entry.get("expected_tools"), f"{case_id}.expected_tools"),
             )
         )
-    return tuple(cases)
+    return cases
+
+
+def load_case_groups(
+    raw_groups: object,
+    seen_ids: set[str],
+) -> tuple[list[WorkflowSelectionCase], int]:
+    """Expand generated workflow selection case groups."""
+    if raw_groups is None:
+        return [], 0
+    if not isinstance(raw_groups, list):
+        raise ValueError("case_groups must be a list of tables")
+    cases: list[WorkflowSelectionCase] = []
+    generated_count = 0
+    for index, raw_group in enumerate(cast(list[object], raw_groups), start=1):
+        if not isinstance(raw_group, dict):
+            raise ValueError(f"case group {index} must be a table")
+        entry = cast(dict[str, object], raw_group)
+        group_id = str(entry.get("id") or "").strip()
+        if not group_id:
+            raise ValueError(f"case group {index} must define id")
+        templates = string_list(entry.get("prompt_templates"), f"{group_id}.prompt_templates")
+        subjects = string_list(entry.get("subjects"), f"{group_id}.subjects")
+        if not templates:
+            raise ValueError(f"case group {group_id} must define prompt_templates")
+        if not subjects:
+            raise ValueError(f"case group {group_id} must define subjects")
+        expected_workflows = string_list(entry.get("expected_workflows"), f"{group_id}.expected_workflows")
+        if not expected_workflows:
+            raise ValueError(f"case group {group_id} must define expected_workflows")
+        requested_limit = entry.get("limit")
+        limit = (
+            positive_count(requested_limit, f"{group_id}.limit")
+            if requested_limit is not None
+            else len(templates) * len(subjects)
+        )
+        if len(templates) * len(subjects) < limit:
+            raise ValueError(
+                f"case group {group_id} has {len(templates) * len(subjects)} prompt combinations "
+                f"but limit={limit}"
+            )
+        group_count = 0
+        for subject in subjects:
+            for template in templates:
+                if group_count >= limit:
+                    break
+                group_count += 1
+                case_id = f"{group_id}-{group_count:03d}"
+                if case_id in seen_ids:
+                    raise ValueError(f"duplicate case id: {case_id}")
+                seen_ids.add(case_id)
+                cases.append(
+                    WorkflowSelectionCase(
+                        case_id=case_id,
+                        group_id=group_id,
+                        description=str(entry.get("description") or ""),
+                        prompt=format_group_prompt(template, subject, group_id),
+                        expected_workflows=expected_workflows,
+                        forbidden_workflows=string_list(
+                            entry.get("forbidden_workflows"),
+                            f"{group_id}.forbidden_workflows",
+                        ),
+                        expected_skills=string_list(entry.get("expected_skills"), f"{group_id}.expected_skills"),
+                        expected_tools=string_list(entry.get("expected_tools"), f"{group_id}.expected_tools"),
+                    )
+                )
+            if group_count >= limit:
+                break
+        generated_count += group_count
+    return cases, generated_count
+
+
+def load_manifest(path: Path) -> WorkflowSelectionManifest:
+    """Load and expand one workflow selection eval manifest."""
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    seen_ids: set[str] = set()
+    cases = load_explicit_cases(data.get("cases"), seen_ids)
+    generated_cases, generated_case_count = load_case_groups(data.get("case_groups"), seen_ids)
+    cases.extend(generated_cases)
+    if not cases:
+        raise ValueError("manifest must define at least one [[cases]] or [[case_groups]] entry")
+    expected_case_count = optional_count(data.get("expected_case_count"), "expected_case_count")
+    expected_generated_case_count = optional_count(
+        data.get("expected_generated_case_count"),
+        "expected_generated_case_count",
+    )
+    count_failures: list[str] = []
+    if expected_case_count is not None and expected_case_count != len(cases):
+        count_failures.append(f"expected_case_count={expected_case_count} observed={len(cases)}")
+    if expected_generated_case_count is not None and expected_generated_case_count != generated_case_count:
+        count_failures.append(
+            f"expected_generated_case_count={expected_generated_case_count} "
+            f"observed={generated_case_count}"
+        )
+    return WorkflowSelectionManifest(
+        cases=tuple(cases),
+        expected_case_count=expected_case_count,
+        expected_generated_case_count=expected_generated_case_count,
+        generated_case_count=generated_case_count,
+        count_failures=tuple(count_failures),
+    )
+
+
+def load_cases(path: Path) -> tuple[WorkflowSelectionCase, ...]:
+    """Load workflow selection eval cases."""
+    return load_manifest(path).cases
 
 
 def load_skill_usage_logger(root: Path) -> SkillUsageLoggerProtocol:
@@ -190,7 +353,9 @@ def evaluate_case(logger: SkillUsageLoggerProtocol, case: WorkflowSelectionCase)
     signals = logger.prompt_intake_signals(
         {"hookEventName": "UserPromptSubmit", "prompt": case.prompt}
     )
-    observed_workflows = tuple(signals.candidate_workflows)
+    observed_workflows = tuple(
+        dict.fromkeys(tuple(signals.selected_workflows) + tuple(signals.candidate_workflows))
+    )
     selected_skills = tuple(signals.skills)
     candidate_skills = tuple(signals.candidate_skills)
     observed_skills = tuple(dict.fromkeys(selected_skills + candidate_skills))
@@ -212,15 +377,21 @@ def evaluate_case(logger: SkillUsageLoggerProtocol, case: WorkflowSelectionCase)
     )
 
 
-def run_id_for(manifest: Path, results: tuple[WorkflowSelectionResult, ...]) -> str:
+def run_id_for(
+    manifest: Path,
+    results: tuple[WorkflowSelectionResult, ...],
+    requested_run_id: str,
+) -> str:
     """Return one unique workflow selection eval run id."""
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     digest_source = "\n".join(
         [
             manifest.as_posix(),
+            requested_run_id,
             *(f"{item.case.case_id}:{item.passed}:{item.observed_workflows}" for item in results),
             *(f"{item.case.case_id}:selected:{item.selected_skills}" for item in results),
             *(f"{item.case.case_id}:candidate:{item.candidate_skills}" for item in results),
+            *(f"{item.case.case_id}:tools:{item.observed_tools}" for item in results),
             timestamp,
         ]
     )
@@ -228,24 +399,31 @@ def run_id_for(manifest: Path, results: tuple[WorkflowSelectionResult, ...]) -> 
     return f"workflow-selection-eval-{timestamp}-{digest}"
 
 
-def evaluate(root: Path, manifest: Path) -> WorkflowSelectionBundle:
+def evaluate(root: Path, manifest: Path, requested_run_id: str = "") -> WorkflowSelectionBundle:
     """Evaluate one workflow selection manifest."""
     resolved_root = root.resolve()
     resolved_manifest = resolve_eval_manifest(resolved_root, manifest).resolve()
     logger = load_skill_usage_logger(resolved_root)
-    results = tuple(evaluate_case(logger, case) for case in load_cases(resolved_manifest))
-    status = "pass" if all(result.passed for result in results) else "fail"
+    manifest_data = load_manifest(resolved_manifest)
+    results = tuple(evaluate_case(logger, case) for case in manifest_data.cases)
+    status = "pass" if all(result.passed for result in results) and not manifest_data.count_failures else "fail"
     return WorkflowSelectionBundle(
-        run_id=run_id_for(resolved_manifest, results),
+        run_id=run_id_for(resolved_manifest, results, requested_run_id),
+        requested_run_id=requested_run_id,
         status=status,
         root=resolved_root,
         manifest=resolved_manifest,
         results=results,
+        expected_case_count=manifest_data.expected_case_count,
+        expected_generated_case_count=manifest_data.expected_generated_case_count,
+        generated_case_count=manifest_data.generated_case_count,
+        count_failures=manifest_data.count_failures,
     )
 
 
 def render_report(bundle: WorkflowSelectionBundle) -> str:
     """Render a Markdown report without copying raw prompt text."""
+    count_failures = "; ".join(bundle.count_failures) if bundle.count_failures else "none"
     lines = [
         "# Workflow Selection Eval",
         "",
@@ -257,30 +435,41 @@ def render_report(bundle: WorkflowSelectionBundle) -> str:
         "-->",
         "",
         f"WORKFLOW_SELECTION_EVAL_RUN_ID={bundle.run_id}",
+        f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={bundle.requested_run_id or 'none'}",
         f"WORKFLOW_SELECTION_EVAL_STATUS={bundle.status}",
         f"WORKFLOW_SELECTION_EVAL_CASES={len(bundle.results)}",
+        f"WORKFLOW_SELECTION_EVAL_EXPECTED_CASES={bundle.expected_case_count if bundle.expected_case_count is not None else 'none'}",
+        f"WORKFLOW_SELECTION_EVAL_GENERATED_CASES={bundle.generated_case_count}",
+        f"WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES={bundle.expected_generated_case_count if bundle.expected_generated_case_count is not None else 'none'}",
+        f"WORKFLOW_SELECTION_EVAL_COUNT_FAILURES={count_failures}",
         f"WORKFLOW_SELECTION_EVAL_FAILED={bundle.failed_count}",
-        f"manifest: `{bundle.manifest.relative_to(bundle.root).as_posix()}`",
+        f"manifest: `{display_path(bundle.root, bundle.manifest)}`",
         "",
         (
-            "| case | status | expected workflows | observed workflows | selected skills | "
-            "candidate skills | missing | forbidden seen |"
+            "| group | case | status | expected workflows | observed workflows | selected skills | "
+            "candidate skills | expected tools | observed tools | missing workflows | forbidden workflows | "
+            "missing skills | missing tools |"
         ),
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for result in bundle.results:
         lines.append(
             "| "
             + " | ".join(
                 [
+                    f"`{result.case.group_id}`",
                     f"`{result.case.case_id}`",
                     "`pass`" if result.passed else "`fail`",
                     comma(result.case.expected_workflows),
                     comma(result.observed_workflows),
                     comma(result.selected_skills),
                     comma(result.candidate_skills),
+                    comma(result.case.expected_tools),
+                    comma(result.observed_tools),
                     comma(result.missing_workflows),
                     comma(result.forbidden_workflows_seen),
+                    comma(result.missing_skills),
+                    comma(result.missing_tools),
                 ]
             )
             + " |"
@@ -291,6 +480,14 @@ def render_report(bundle: WorkflowSelectionBundle) -> str:
 def comma(values: Sequence[str]) -> str:
     """Return a comma-joined table value."""
     return ", ".join(f"`{value}`" for value in values) if values else "`none`"
+
+
+def display_path(root: Path, path: Path) -> str:
+    """Return a root-relative path where possible."""
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def write_report(path: Path, bundle: WorkflowSelectionBundle) -> Path:
@@ -319,7 +516,7 @@ def accumulated_report_path(results_dir: Path, bundle: WorkflowSelectionBundle) 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run workflow selection evals."""
     args = build_parser().parse_args(argv)
-    bundle = evaluate(args.root, Path(args.manifest))
+    bundle = evaluate(args.root, Path(args.manifest), requested_run_id=str(args.run_id))
     report_paths: list[Path] = []
     if args.report_out:
         report_paths.append(write_report(Path(args.report_out), bundle))
@@ -331,7 +528,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         )
     print(f"WORKFLOW_SELECTION_EVAL_RUN_ID={bundle.run_id}")
+    print(f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={bundle.requested_run_id or 'none'}")
     print(f"WORKFLOW_SELECTION_EVAL_CASES={len(bundle.results)}")
+    print(f"WORKFLOW_SELECTION_EVAL_EXPECTED_CASES={bundle.expected_case_count if bundle.expected_case_count is not None else 'none'}")
+    print(f"WORKFLOW_SELECTION_EVAL_GENERATED_CASES={bundle.generated_case_count}")
+    print(f"WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES={bundle.expected_generated_case_count if bundle.expected_generated_case_count is not None else 'none'}")
+    print(
+        "WORKFLOW_SELECTION_EVAL_COUNT_FAILURES="
+        + ("; ".join(bundle.count_failures) if bundle.count_failures else "none")
+    )
     print(f"WORKFLOW_SELECTION_EVAL_FAILED={bundle.failed_count}")
     for path in report_paths:
         print(f"WORKFLOW_SELECTION_EVAL_REPORT={path}")
