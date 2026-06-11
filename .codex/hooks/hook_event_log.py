@@ -119,7 +119,12 @@ class HookLogContext:
         compose_name = self.compose_project_name()
         if compose_name:
             return safe_slug(compose_name)
-        return self.fallback_namespace()
+        if self.override_path:
+            return "direct-log-override"
+        raise RuntimeError(
+            "hook runtime namespace is required; set "
+            f"{HOOK_RUN_NAMESPACE_ENV}, DEVCONTAINER_PROJECT_NAME, or COMPOSE_PROJECT_NAME"
+        )
 
     def compose_project_name(self) -> str:
         """Return the generated devcontainer Compose project name when available."""
@@ -134,12 +139,6 @@ class HookLogContext:
         except OSError:
             return ""
         return ""
-
-    def fallback_namespace(self) -> str:
-        """Return a stable namespace when the runtime did not provide one."""
-        root = self.active_root.resolve()
-        hostname = os.environ.get("HOSTNAME", "").strip() or "host"
-        return safe_slug(f"{root.name}-{hostname}-{short_hash(str(root))}")
 
     def run_id(self, timestamp: str, payload_fingerprint: str) -> str:
         """Return a unique hook run id."""

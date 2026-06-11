@@ -25,7 +25,7 @@ DESIGN_DIR = ROOT / "documents" / "design"
 REPORT = ROOT / "reports" / "design_organize_report.txt"
 
 
-def detect_submodule(text: str, path: Path):
+def detect_submodule(text: str) -> str | None:
     # Heuristics: look for explicit code paths like `python/jax_util/...`
     m = re.search(r"`([^`/]+/[^`]+(?:/[^`]*)?)`", text)
     if m:
@@ -34,15 +34,7 @@ def detect_submodule(text: str, path: Path):
         parts = candidate.split("/")
         if parts:
             return parts[0] if parts[0] != "python" else (parts[1] if len(parts) > 1 else "python")
-
-    # fallback: look for keywords
-    keywords = ["jax_util", "optimizers", "solvers", "hlo", "experiments", "neuralnetwork"]
-    for k in keywords:
-        if k in text or k in str(path):
-            return k if k != "hlo" else "jax_util"
-
-    # default
-    return "misc"
+    return None
 
 
 def main():
@@ -67,7 +59,10 @@ def main():
             continue
 
         text = p.read_text(encoding="utf-8")
-        sub = detect_submodule(text, p)
+        sub = detect_submodule(text)
+        if sub is None:
+            report_lines.append(f"UNRESOLVED (no explicit code path): {p}")
+            continue
         found_submodules.add(sub)
         target_dir = DESIGN_DIR / sub
         target_dir.mkdir(parents=True, exist_ok=True)

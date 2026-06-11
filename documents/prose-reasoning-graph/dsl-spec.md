@@ -162,7 +162,7 @@ document structure. A directory node is not itself prose source truth. The
 structured-analysis adapter derives a `directory_responsibility` node from, in
 priority order, the directory `README.md` dependency-manifest responsibility,
 the `README.md` title, descendant artifact dependency-manifest
-responsibilities, or a path-only fallback.
+responsibilities, or a path-only alternate route.
 
 The projection must preserve evidence edges. The directory node connects to the
 derived responsibility node with `has_responsibility`; README and child

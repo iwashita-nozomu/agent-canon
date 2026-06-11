@@ -291,7 +291,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(payload["default_findings"][0]["kind"], "keyword-parameter-default")
 
     def test_config_default_is_warning_not_runtime_error(self) -> None:
-        """Config-owned defaults are visible migration targets, not hidden fallbacks."""
+        """Config-owned defaults are visible migration targets, not hidden runtime defaults."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "solver.py"
@@ -315,7 +315,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(payload["summary"]["runtime_default_errors"], 0)
             self.assertEqual(payload["summary"]["config_default_warnings"], 1)
 
-    def test_mapping_get_fallback_is_flagged(self) -> None:
+    def test_mapping_get_implicit_default_is_flagged(self) -> None:
         """Mapping defaults should fail instead of inventing policy at read time."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -364,7 +364,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["runtime_default_errors"], 0)
 
-    def test_amp_config_constructor_fallback_is_resolved_from_ast(self) -> None:
+    def test_amp_config_constructor_implicit_default_is_resolved_from_ast(self) -> None:
         """Amp-derived config constructors remain visible through AST resolution."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -390,7 +390,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             kinds = {finding["kind"] for finding in payload["default_findings"]}
-            self.assertIn("or-fallback-default", kinds)
+            self.assertIn("or-implicit-default", kinds)
             self.assertIn("empty-config-constructor", kinds)
 
     def test_direct_protocol_config_import_is_resolved_from_ast(self) -> None:
@@ -419,7 +419,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             kinds = {finding["kind"] for finding in payload["default_findings"]}
-            self.assertIn("or-fallback-default", kinds)
+            self.assertIn("or-implicit-default", kinds)
             self.assertIn("empty-config-constructor", kinds)
 
     def test_unimported_amp_name_is_not_treated_as_protocol(self) -> None:

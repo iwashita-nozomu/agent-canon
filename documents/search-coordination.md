@@ -118,9 +118,9 @@ Because dependency review is the authority for edit-scope expansion, raw `rg`
 hits do not decide the edit surface until dependency review expands and checks
 them.
 
-After dependency expansion, cache repair is the fallback for the responsibility
+After dependency expansion, cache repair is the alternate route for the responsibility
 pass itself. If the SQLite cache is missing or stale, build it immediately and
-retry the same bounded semantic-index command before falling back to exact
+retry the same bounded semantic-index command before using exact
 search:
 
 ```bash

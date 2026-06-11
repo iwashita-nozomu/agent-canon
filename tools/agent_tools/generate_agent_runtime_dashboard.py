@@ -620,7 +620,6 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
             ".agent-canon/log-archive/eval-results/**/*.md",
-            ".agent-canon/archive/*/eval-results/**/*.md",
         )
         paths: set[Path] = set()
         for pattern in patterns:
@@ -1910,6 +1909,8 @@ def evidence_location_lines(root: Path) -> list[str]:
         f"- evidence_root: `{root.as_posix()}`",
         "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
+        "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
+        "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
@@ -2728,10 +2729,10 @@ def blocking_next_action_count(summary: RuntimeDashboardSummary) -> int:
     return sum(1 for action in dashboard_next_actions(summary) if action.priority in {"P0", "P1"})
 
 
-def top_counter_key(counter: Counter[str], fallback: str) -> str:
+def top_counter_key(counter: Counter[str], default_key: str) -> str:
     """Return the most common key from a counter."""
     if not counter:
-        return fallback
+        return default_key
     return counter.most_common(1)[0][0]
 
 

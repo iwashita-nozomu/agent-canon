@@ -220,16 +220,7 @@ pub fn group_for_path(path: &str, contract: Option<&ModuleGroupContract>) -> Str
         }
         return "__unassigned__".to_string();
     }
-    fallback_group_for_path(path)
-}
-
-pub fn fallback_group_for_path(path: &str) -> String {
-    let normalized = normalize_path(path);
-    let path = Path::new(&normalized);
-    path.parent()
-        .map(|parent| parent.to_string_lossy().replace('\\', "/"))
-        .filter(|parent| !parent.is_empty())
-        .unwrap_or_else(|| ".".to_string())
+    "__missing_contract__".to_string()
 }
 
 fn parse_contract(text: &str) -> Result<ModuleGroupContract, String> {

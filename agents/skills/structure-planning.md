@@ -39,6 +39,9 @@ slide production workflow for PPT/deck layout, writing skills for drafts, and
 - Source evidence must be mapped to sections, slides, visuals, claims, or
   refactor slices so the agent does not invent unsupported structure while
   drafting or editing.
+- A substantive document addition or revision could change section order,
+  document responsibility, claim/support, reader path, source map, or canonical
+  route.
 - A generated artifact could be mistaken for policy, classification, merge,
   deletion, ownership, or behavior-change authority.
 
@@ -68,6 +71,11 @@ experiment scripts, or refactor edits.
 ## Default Sequence
 
 1. Fix the audience and decision context.
+1. For document additions or revisions, decide whether the edit is substantive.
+   If section order, responsibility, claim/support, reader path, source map, or
+   canonical route changes, create the structure contract before prose edits;
+   if it is typo / link / formatting only, record `structure_contract=skipped`
+   with that reason.
 1. Choose the first artifact: figure, table, ponchi-e/concept diagram, slide,
    summary card, first section, experiment slice, or refactor slice.
 1. For reader-facing documents, reports, plans, workflow guides, and refactor

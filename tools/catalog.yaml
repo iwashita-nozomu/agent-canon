@@ -432,7 +432,7 @@ entries:
       - tests/agent_tools/test_issue_sync.py
 
   - id: github-publish
-    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and no fallback push route.
+    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
     path: tools/agent_tools/github_publish.py
     family: agent_tools
     role: sync

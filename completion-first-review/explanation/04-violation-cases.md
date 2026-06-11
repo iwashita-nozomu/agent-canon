@@ -22,7 +22,7 @@ These cases should become fixtures under a future `evidence/agent-evals/negative
 | V001 | `tool_call=make ci static_analysis=pass` appears in monitoring but no command evidence exists | Token-only validation can be fabricated | Behavior event schema requires command, exit code, evidence path, and hashes |
 | V002 | Runtime feedback is written only in retrospective | Feedback never enters self-growth repair loop | `runtime_feedback=observed` requires self-growth repair manifest |
 | V003 | Prompt contains required keywords but no actionable procedure | Regex eval passes meaningless text | Workflow/skill contract validates states, artifacts, and commands |
-| V004 | MCP is unavailable but `mcp_inventory=pass` is recorded | False MCP pass hides runtime failure | MCP status artifact or shell fallback artifact required |
+| V004 | MCP is unavailable but `mcp_inventory=pass` is recorded | False MCP pass hides runtime failure | MCP status artifact or shell alternate route artifact required |
 | V005 | Agent memory is edited but not committed/pushed through AgentCanon | Learning does not propagate | Memory change requires AgentCanon commit/push and superproject pin evidence |
 | V006 | Root symlink view is edited directly | Source of truth is bypassed | Surface classification rejects root view direct edit |
 | V007 | Research task is closed as scoped change | Research evidence and claim review omitted | Routing validator detects missing research workflow or rejected reason |

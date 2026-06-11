@@ -234,7 +234,6 @@ struct SurfaceRouteDecision {
     prompt_digest: String,
     model: String,
     llm_status: String,
-    llm_warning: Option<String>,
     llm_output: String,
     candidates: Vec<SurfaceCandidate>,
 }
@@ -693,43 +692,51 @@ fn run_route_implementation_surface(args: &LocalLlmArgs) -> i32 {
     }
 
     let executable = find_llama_cli(&parsed.llama_cli);
-    let (llm_status, llm_warning, llm_output) = if executable.is_empty() {
-        (
-            "fallback_without_local_llm".to_string(),
-            Some("local_llm_unavailable: llama-cli not found; using deterministic surface candidates".to_string()),
-            String::new(),
-        )
-    } else {
-        let command = LlamaCommand {
-            executable,
-            model: parsed.model.clone(),
-            prompt: prompt.clone(),
-            predict_tokens: parsed.predict_tokens,
+    if executable.is_empty() {
+        let decision = SurfaceRouteDecision {
+            request,
+            prompt_digest: digest,
+            model: parsed.model,
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
         };
-        match run_llama_prompt(&command) {
-            Ok((raw_output, raw_stderr)) => {
-                let combined = if raw_stderr.trim().is_empty() {
-                    raw_output
-                } else {
-                    format!("{}\n\n[stderr]\n{}", raw_output.trim(), raw_stderr.trim())
-                };
-                ("local_llm_advisory".to_string(), None, combined)
+        match parsed.format {
+            RouteOutputFormat::Json => print_implementation_surface_route_json(&decision),
+            RouteOutputFormat::Text => print_implementation_surface_route_text(&decision),
+        }
+        return 0;
+    }
+    let command = LlamaCommand {
+        executable,
+        model: parsed.model.clone(),
+        prompt: prompt.clone(),
+        predict_tokens: parsed.predict_tokens,
+    };
+    let llm_output = match run_llama_prompt(&command) {
+        Ok((raw_output, raw_stderr)) => {
+            if raw_stderr.trim().is_empty() {
+                raw_output
+            } else {
+                format!("{}\n\n[stderr]\n{}", raw_output.trim(), raw_stderr.trim())
             }
-            Err(message) => (
-                "fallback_after_local_llm_error".to_string(),
-                Some(format!(
-                    "local_llm_error:{message}; using deterministic surface candidates"
-                )),
-                String::new(),
-            ),
+        }
+        Err(message) => {
+            print_implementation_surface_route_error(
+                &parsed,
+                &request,
+                &digest,
+                "local_llm_route_failed",
+                &message,
+            );
+            return 1;
         }
     };
     let decision = SurfaceRouteDecision {
         request,
         prompt_digest: digest,
         model: parsed.model,
-        llm_status,
-        llm_warning,
+        llm_status: "local_llm_advisory".to_string(),
         llm_output,
         candidates,
     };
@@ -1099,6 +1106,44 @@ fn print_implementation_surface_route_json(decision: &SurfaceRouteDecision) {
     }
 }
 
+fn print_implementation_surface_route_error(
+    parsed: &RouteImplementationSurfaceArgs,
+    request: &str,
+    prompt_digest: &str,
+    code: &str,
+    message: &str,
+) {
+    match parsed.format {
+        RouteOutputFormat::Json => {
+            let payload = json!({
+                "schema": "agent_canon.local_llm.implementation_surface_route.error.v1",
+                "status": "error",
+                "error_code": code,
+                "message": message,
+                "required_action": "repair LocalLLM environment before running implementation-surface routing",
+                "model": parsed.model.as_str(),
+                "prompt_sha": prompt_digest,
+                "request": request,
+            });
+            match serde_json::to_string_pretty(&payload) {
+                Ok(rendered) => eprintln!("{rendered}"),
+                Err(error) => {
+                    eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR=json-render-failed:{error}")
+                }
+            }
+        }
+        RouteOutputFormat::Text => {
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER=error");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_SCHEMA=agent_canon.local_llm.implementation_surface_route.error.v1");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE={code}");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_ERROR={message}");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION=repair LocalLLM environment before running implementation-surface routing");
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_MODEL={}", parsed.model);
+            eprintln!("IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA={prompt_digest}");
+        }
+    }
+}
+
 fn print_implementation_surface_route_text(decision: &SurfaceRouteDecision) {
     let primary = decision
         .candidates
@@ -1117,9 +1162,6 @@ fn print_implementation_surface_route_text(decision: &SurfaceRouteDecision) {
         "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA={}",
         decision.prompt_digest
     );
-    if let Some(warning) = &decision.llm_warning {
-        println!("IMPLEMENTATION_SURFACE_ROUTER_WARNING={warning}");
-    }
     println!("PRIMARY_SURFACE={}", primary.surface);
     println!("PRIMARY_OWNER={}", primary.owner);
     println!("PRIMARY_SCORE={}", primary.score);
@@ -1168,7 +1210,6 @@ fn implementation_surface_route_payload(decision: &SurfaceRouteDecision) -> Valu
     json!({
         "schema": "agent_canon.local_llm.implementation_surface_route.v1",
         "status": decision.llm_status,
-        "warning": decision.llm_warning,
         "model": decision.model,
         "prompt_sha": decision.prompt_digest,
         "request": decision.request,
@@ -2287,8 +2328,7 @@ mod tests {
             request: request.to_string(),
             prompt_digest: "abc123".to_string(),
             model: DEFAULT_MODEL.to_string(),
-            llm_status: "fallback_without_local_llm".to_string(),
-            llm_warning: Some("local_llm_unavailable".to_string()),
+            llm_status: "local_llm_advisory".to_string(),
             llm_output: String::new(),
             candidates,
         };
@@ -2307,6 +2347,33 @@ mod tests {
         assert!(!payload["candidates"]
             .as_array()
             .expect("candidates")
+            .is_empty());
+    }
+
+    #[test]
+    fn implementation_surface_route_fallback_is_structured_without_llm() {
+        let request = "Agents are writing implementation into the wrong directory.";
+        let candidates = implementation_surface_candidates(request);
+        let decision = SurfaceRouteDecision {
+            request: request.to_string(),
+            prompt_digest: "fallback123".to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            llm_status: "deterministic_candidate_fallback".to_string(),
+            llm_output: "llama-cli not found; using deterministic candidate ranking".to_string(),
+            candidates,
+        };
+
+        let payload = implementation_surface_route_payload(&decision);
+
+        assert_eq!(payload["status"], "deterministic_candidate_fallback");
+        assert!(payload["primary_paths"]
+            .as_array()
+            .expect("primary paths")
+            .iter()
+            .any(|path| path.as_str().expect("path").contains("responsibility")));
+        assert!(!payload["forbidden_paths"]
+            .as_array()
+            .expect("forbidden paths")
             .is_empty());
     }
 

@@ -109,7 +109,7 @@ def iter_markdown_files(paths: list[str]) -> list[Path]:
 
 
 def build_name_index() -> dict[str, list[Path]]:
-    """Build a filename index for fallback resolution."""
+    """Build a filename index for explicit unique-name resolution."""
     name_index: dict[str, list[Path]] = {}
     for path in ROOT.rglob("*"):
         if not path.is_file():

@@ -16,21 +16,13 @@ echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 overlay_current_tree() {
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete --exclude .git --exclude .state --exclude .cache/huggingface --exclude .cache/llama.cpp --exclude '*.gguf' --exclude '*.safetensors' --exclude 'pytorch_model*.bin' --exclude 'model-*.bin' --exclude vendor/local-llm-server/llama-cpp/cache --exclude vendor/local-llm-server/llama-cpp/models --exclude vendor/local-llm-server/llama-cpp/runtime "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
-    return
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "fresh_clone_overlay=fail"
+    echo "fresh_clone_overlay_error=rsync_required"
+    echo "fresh_clone_overlay_next_action=install rsync via docker/Dockerfile or host requirements"
+    exit 1
   fi
-
-  echo "fresh_clone_overlay=tar_fallback_no_rsync"
-  echo "fresh_clone_overlay_note=install rsync via docker/Dockerfile for canonical container runs"
-  find "${CLONE_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-  (
-    cd "${ROOT_DIR}"
-    tar --exclude='./.git' --exclude='*/.git' --exclude='./.state' --exclude='./.cache/huggingface' --exclude='./.cache/llama.cpp' --exclude='*.gguf' --exclude='*.safetensors' --exclude='pytorch_model*.bin' --exclude='model-*.bin' --exclude='./vendor/local-llm-server/llama-cpp/cache' --exclude='./vendor/local-llm-server/llama-cpp/models' --exclude='./vendor/local-llm-server/llama-cpp/runtime' -cf - .
-  ) | (
-    cd "${CLONE_DIR}"
-    tar -xf -
-  )
+  rsync -a --delete --exclude .git --exclude .state --exclude .cache/huggingface --exclude .cache/llama.cpp --exclude '*.gguf' --exclude '*.safetensors' --exclude 'pytorch_model*.bin' --exclude 'model-*.bin' --exclude vendor/local-llm-server/llama-cpp/cache --exclude vendor/local-llm-server/llama-cpp/models --exclude vendor/local-llm-server/llama-cpp/runtime "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 }
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
@@ -86,7 +78,7 @@ git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
 git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"
-  printf "fresh clone fallback marker\n" > .fresh-clone-agent-canon-marker
+  printf "fresh clone update marker\n" > .fresh-clone-agent-canon-marker
   git add .fresh-clone-agent-canon-marker
   git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon snapshot" >/dev/null
   git push origin main >/dev/null
@@ -106,7 +98,7 @@ bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
-  printf "fresh clone no-subtree fallback marker\n" > .fresh-clone-agent-canon-no-subtree-marker
+  printf "fresh clone no-subtree update marker\n" > .fresh-clone-agent-canon-no-subtree-marker
   git add .fresh-clone-agent-canon-no-subtree-marker
   git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon without subtree" >/dev/null
   git push origin main >/dev/null

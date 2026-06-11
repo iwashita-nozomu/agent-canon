@@ -194,8 +194,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_WARNINGS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
-    def test_unmounted_archive_without_legacy_eval_dirs_is_nonblocking(self) -> None:
-        """Fresh CI checkouts without the external archive should not fail."""
+    def test_unmounted_archive_is_environment_error(self) -> None:
+        """Fresh CI checkouts must mount the external archive before validation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             results_dir = root / "agents" / "evals" / "results"
@@ -206,10 +206,10 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("EVAL_ACCUMULATION_SKILL_REPORTS=0", result.stdout)
-            self.assertIn("EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=0", result.stdout)
-            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION=error", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_ERROR_CODE=log_archive_required", result.stdout)
+            self.assertIn("NEXT_ACTION=mount_.agent-canon/log-archive_or_set_AGENT_CANON_HOOK_ARCHIVE_DIR", result.stdout)
 
     def test_missing_skill_eval_report_fails(self) -> None:
         """At least one accumulated skill eval report is required."""

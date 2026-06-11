@@ -36,7 +36,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 DEFAULT_POLICY_PATH = "helper_inventory_guard_policy.json"
 DEFAULT_GUARD_MODE = "policy"
 GUARD_MODES = {"policy", "block-new", "report", "off"}
@@ -113,23 +112,10 @@ def _tool_command(payload: dict[str, object]) -> str:
     return ""
 
 
-def _has_tool_signal(payload: dict[str, object]) -> bool:
-    return isinstance(payload.get("tool_name"), str) or bool(_tool_command(payload))
-
-
-def _uses_event_fallback(payload: dict[str, object]) -> bool:
-    if isinstance(payload.get("hookEventName"), str):
-        return False
-    status = _payload_status(payload)
-    return status == PAYLOAD_STATUS_VALID and _has_tool_signal(payload)
-
-
 def _hook_event_name(payload: dict[str, object]) -> str:
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if _uses_event_fallback(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 
@@ -141,8 +127,6 @@ def _tool_name(payload: dict[str, object]) -> str:
 
 
 def _should_check(payload: dict[str, object]) -> bool:
-    if _uses_event_fallback(payload) and not _has_tool_signal(payload):
-        return True
     command = _tool_command(payload)
     if READ_ONLY_COMMAND_PATTERN.search(command):
         return False
@@ -154,19 +138,12 @@ def _should_check(payload: dict[str, object]) -> bool:
     return _tool_name(payload) in EDIT_TOOL_NAMES or bool(EDIT_COMMAND_PATTERN.search(command))
 
 
-def _agentcanon_default_policy_path() -> Path:
-    return Path(__file__).resolve().parents[2] / DEFAULT_POLICY_PATH
-
-
 def _policy_candidates(root: Path) -> list[tuple[Path, str]]:
     override = os.environ.get(POLICY_PATH_ENV, "").strip()
     if override:
         return [(Path(override), "override")]
     repo_policy = root / DEFAULT_POLICY_PATH
-    agentcanon_policy = _agentcanon_default_policy_path()
-    if repo_policy.resolve() == agentcanon_policy.resolve():
-        return [(agentcanon_policy, "agentcanon-default")]
-    return [(repo_policy, "repo-local"), (agentcanon_policy, "agentcanon-default")]
+    return [(repo_policy, "repo-local")]
 
 
 def _default_domain_limits() -> dict[str, dict[str, int]]:
@@ -218,18 +195,18 @@ def _policy_with_defaults(
 
 def _load_policy(root: Path) -> dict[str, object]:
     candidates = _policy_candidates(root)
-    fallback_path = candidates[-1][0]
     for path, scope in candidates:
         if not path.is_file():
             continue
         try:
             loaded = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            return _default_policy(path, f"invalid:{type(exc).__name__}")
+            raise ValueError(f"helper inventory policy is invalid: {path}: {type(exc).__name__}") from exc
         if not isinstance(loaded, dict):
-            return _default_policy(path, "invalid")
+            raise ValueError(f"helper inventory policy must be a JSON object: {path}")
         return _policy_with_defaults(loaded, path, scope)
-    return _default_policy(fallback_path, "missing")
+    missing = ", ".join(str(path) for path, _scope in candidates)
+    raise FileNotFoundError(f"helper inventory policy is required: {missing}")
 
 
 def _guard_mode(policy: dict[str, object]) -> str:
@@ -279,7 +256,7 @@ def run_inventory(root: Path, policy: dict[str, object]) -> tuple[list[str], int
     """Run the helper inventory command and return command, status, and output."""
     command = _inventory_command(root, policy)
     if not Path(command[1]).is_file():
-        return command, 0, json.dumps({"records": [], "tool_status": "missing"})
+        return command, 2, f"helper inventory command is required: {command[1]}"
     result = subprocess.run(
         command,
         cwd=root,
@@ -413,7 +390,38 @@ def main() -> int:
     root = repo_root()
     if _payload_status(payload) == PAYLOAD_STATUS_EMPTY:
         return 0
-    policy = _load_policy(root)
+    if not _should_check(payload):
+        return 0
+    try:
+        policy = _load_policy(root)
+    except (FileNotFoundError, ValueError) as exc:
+        _append_log(
+            root,
+            {
+                "timestamp": _utc_now(),
+                "event": _hook_event_name(payload),
+                "tool_name": _tool_name(payload),
+                "payload_status": _payload_status(payload),
+                "checked": False,
+                "policy_status": "error",
+                "policy_error": str(exc),
+                "status": "fail",
+            },
+        )
+        json.dump(
+            {
+                "decision": "block",
+                "reason": str(exc),
+                "next_action": "repair_helper_inventory_policy_then_retry",
+                "remediation": [
+                    "Create helper_inventory_guard_policy.json at the active repository root or set AGENT_CANON_HELPER_INVENTORY_POLICY.",
+                    "Re-run the helper inventory hook after the policy exists.",
+                ],
+            },
+            sys.stdout,
+        )
+        sys.stdout.write("\n")
+        return 0
     mode = _guard_mode(policy)
     changed_paths = git_changed_python_paths(root)
     checked = _should_run_inventory(payload, policy, mode, changed_paths)

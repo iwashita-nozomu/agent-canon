@@ -26,8 +26,8 @@ upstream design ../explanation/00-completion-first-principle.md completion-first
   - Behavior events are schema-valid.
   - Validation evidence includes command metadata.
 
-- [ ] **P2: MCP, goal loop, and fallback evidence**
-  - MCP pass/fail/fallback/not-applicable are separate.
+- [ ] **P2: MCP, goal loop, and alternate route evidence**
+  - MCP pass/fail/alternate route/not-applicable are separate.
   - goal loop status controls closeout for goal-driven work.
 
 - [ ] **P3: Self-growth state machine**

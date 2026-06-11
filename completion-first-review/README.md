@@ -51,7 +51,7 @@ The previous framing placed agent settings at the top. This review changes the o
 
 ## Review stance
 
-This is intentionally not a convenience-first document. It is a strictness-first and contradiction-resistance review. The goal is to make the repo harder to accidentally mark complete when required evidence, reviewer independence, MCP fallback status, or self-growth replay evidence is missing.
+This is intentionally not a convenience-first document. It is a strictness-first and contradiction-resistance review. The goal is to make the repo harder to accidentally mark complete when required evidence, reviewer independence, MCP alternate route status, or self-growth replay evidence is missing.
 
 ## Central thesis
 

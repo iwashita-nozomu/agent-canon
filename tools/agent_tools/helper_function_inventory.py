@@ -1011,7 +1011,7 @@ def role_scores(
     add_common_body_role_scores(scores, evidence, calls, features)
     add_function_body_role_scores(scores, evidence, features)
     if not scores:
-        add_role_score(scores, evidence, "general_helper", 1, "fallback")
+        add_role_score(scores, evidence, "general_helper", 1, "unclassified")
     return scores, evidence
 
 
@@ -1164,7 +1164,7 @@ def class_role_scores(
     add_common_body_role_scores(scores, evidence, calls, features)
     add_class_body_role_scores(scores, evidence, features)
     if not scores:
-        add_role_score(scores, evidence, "general_helper", 1, "fallback")
+        add_role_score(scores, evidence, "general_helper", 1, "unclassified")
     return scores, evidence
 
 

@@ -345,7 +345,7 @@ Hook には「毎回確実に動いてほしい deterministic 処理」を置き
 - 禁止 tool の事前 block
 - OOP guard の中間 block と呼び出しログ
 - notebook-as-test misuse の中間 block と呼び出しログ
-- skill usage の `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` 追記
+- skill usage の `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` 追記
 - tool 結果の監査ログ化
 - permission request の追加 review
 
@@ -391,7 +391,7 @@ enabled = true
 関連 key:
 
 - `project_doc_max_bytes`
-- `project_doc_fallback_filenames`
+- `project_doc_alternate route_filenames`
 - `project_root_markers`
 - `include_environment_context`
 - `include_permissions_instructions`

@@ -31,6 +31,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Mandatory Checklist
 
 - `summary statement` で argument、purpose、reader を先に固定する
+- 実質的な文書追記・修正では、reader-facing prose を足す前に対象文書の responsibility、reader path、section order、source map、上位 / 下位 canon との関係を構造解析する。typo、link、format-only、機械的な表記揺れ修正だけなら `md-style-check` で足りる
 - section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph flow や transition choice が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile general` または `--profile academic-argument` を使う
 - 非自明な一般説明文書の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る。既存 repo Markdown なら `check-document` で prose diagnostics と document-canon diagnostics を同時に出す
@@ -51,11 +52,12 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Default Sequence
 
 1. `summary statement` を短く書く
+1. 文書追記・修正が substantive かを判定する。section、責務、claim/support、reader path、source map、canonical route が変わるなら構造解析 gate を必須にし、typo / format-only ならその理由を残して省略する
 1. 必要なら `structure-planning` で first section、source-to-structure map、section order、invalid interpretation を固定する
 1. workflow、dependency、ownership、routing、state、review gate、handoff の説明がある場合は、first visual として Mermaid 図を置くか、`visual_plan=text-only` の理由を残す
 1. paragraph order / transition evidence が必要なら discourse-relations JSONL を構造 contract に添付する
 1. roadmap と section contract を作る
-1. 非自明な一般説明文書なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
+1. 非自明または substantive な一般説明文書の追記・修正なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. 必要なら `python3 tools/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
 1. reader order で draft する
 1. DSL / projection から prose に射影した後、同じ graph check を再実行し、射影後だけの finding は `dsl_to_prose_prompt_defect` として記録する

@@ -68,4 +68,4 @@ python3 tools/experiments/html_artifact_access.py \
 ```
 
 Use `--port` when the default port is already in use. Use a staging copy only as
-a fallback when the SSH host cannot route to the container IP.
+a alternate route when the SSH host cannot route to the container IP.

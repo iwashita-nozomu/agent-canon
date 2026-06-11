@@ -510,7 +510,9 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
 def print_context(context: ArchiveContext) -> None:
     """Print stable context lines."""
     run_local_agent_reports = context.source_root / DEFAULT_AGENT_REPORT_ROOT
-    archive_agent_reports = agent_report_archive_dir(context.source_root, context.canon_root)
+    archive_agent_reports = (
+        context.archive_root / DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key
+    )
     print(f"RUNTIME_LOG_ARCHIVE_SOURCE_ROOT={context.source_root}")
     print(f"RUNTIME_LOG_ARCHIVE_CANON_ROOT={context.canon_root}")
     print(f"RUNTIME_LOG_ARCHIVE_ROOT={context.archive_root}")

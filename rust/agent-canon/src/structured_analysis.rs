@@ -1317,7 +1317,7 @@ fn collect_warning_rows(source: &Connection) -> rusqlite::Result<Vec<WarningRow>
             let source_id: String = row.get(0)?;
             let target_payload: String = row.get(8)?;
             Ok(WarningRow {
-                id: format!("warning:{}", hash_or_fallback(&source_id, 20)),
+                id: format!("warning:{}", stable_id_fragment(&source_id, 20)),
                 source_layer: row.get(1)?,
                 severity: row.get(2)?,
                 rule: row.get(3)?,
@@ -1825,7 +1825,7 @@ fn insert_artifact_diagnostic(
     connection.execute(
         "INSERT OR REPLACE INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES (?, 'artifact', ?, '', ?, ?, ?, ?)",
         params![
-            format!("diag:artifact:{}:{}", rule, hash_or_fallback(target_node_id, 20)),
+            format!("diag:artifact:{}:{}", rule, stable_id_fragment(target_node_id, 20)),
             target_node_id,
             severity,
             rule,
@@ -2008,18 +2008,7 @@ fn initialize_graph_schema(connection: &Connection) -> rusqlite::Result<()> {
 fn analysis_document_id(connection: &Connection) -> rusqlite::Result<String> {
     let mut statement =
         connection.prepare("SELECT id FROM documents WHERE id = 'doc:analysis' LIMIT 1")?;
-    if let Some(row) = statement
-        .query_map([], |row| row.get::<_, String>(0))?
-        .next()
-    {
-        return row;
-    }
-    let mut fallback = connection.prepare("SELECT id FROM documents ORDER BY id LIMIT 1")?;
-    match fallback.query_row([], |row| row.get::<_, String>(0)) {
-        Ok(value) => Ok(value),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok("doc:analysis".to_string()),
-        Err(error) => Err(error),
-    }
+    statement.query_row([], |row| row.get::<_, String>(0))
 }
 
 fn import_inventory_payload(
@@ -2303,7 +2292,7 @@ fn artifact_directory_id(path: &str) -> String {
     if path == "." {
         return "artifact:directory:root".to_string();
     }
-    format!("artifact:directory:{}", hash_or_fallback(path, 20))
+    format!("artifact:directory:{}", stable_id_fragment(path, 20))
 }
 
 fn artifact_directory_responsibility_id(path: &str) -> String {
@@ -2312,19 +2301,19 @@ fn artifact_directory_responsibility_id(path: &str) -> String {
     }
     format!(
         "artifact:directory-responsibility:{}",
-        hash_or_fallback(path, 20)
+        stable_id_fragment(path, 20)
     )
 }
 
 fn artifact_file_id(path: &str) -> String {
-    format!("artifact:file:{}", hash_or_fallback(path, 20))
+    format!("artifact:file:{}", stable_id_fragment(path, 20))
 }
 
 fn artifact_edge_id(kind: &str, from_node_id: &str, to_node_id: &str) -> String {
     format!(
         "artifact:edge:{}:{}",
         kind,
-        hash_or_fallback(&format!("{from_node_id}\t{to_node_id}"), 20)
+        stable_id_fragment(&format!("{from_node_id}\t{to_node_id}"), 20)
     )
 }
 
@@ -2361,7 +2350,7 @@ fn short_hash(value: &str, length: usize) -> Result<String, String> {
     Ok(hash[..length].to_string())
 }
 
-fn hash_or_fallback(value: &str, length: usize) -> String {
+fn stable_id_fragment(value: &str, length: usize) -> String {
     short_hash(value, length).unwrap_or_else(|_| value.replace(['/', '\\', ':', '\t'], "_"))
 }
 

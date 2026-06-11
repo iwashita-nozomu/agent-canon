@@ -255,7 +255,7 @@ The contract is intentionally small. A repository should use design-level groups
 that humans and agents can reason about, usually on the order of tens of groups,
 not a generated group for every file.
 
-If the contract is missing, tools may fall back to parent-directory grouping for
+If the contract is missing, tools may use parent-directory grouping for
 exploratory output, but required checks must fail until the parent repo provides
 the contract.
 
@@ -265,7 +265,7 @@ keeps the graph aligned with the parent-owned design contract instead of letting
 tests, generated files, vendored tools, or temporary Python files expand the
 node set.
 
-The fallback parent-directory grouping is only a bootstrap heuristic. Examples:
+The alternate route parent-directory grouping is only a bootstrap heuristic. Examples:
 
 - `python/jax_util/base/linearoperator.py` belongs to
   `python/jax_util/base`;

@@ -41,7 +41,17 @@ jobs:
           python-version: "3.11"
 
       - name: Install dashboard dependencies
-        run: python3 -m pip install --upgrade tomli
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Prepare runtime log archive
+        run: mkdir -p .agent-canon/log-archive
+
+      - name: Run accumulated eval producers
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          python3 "${canon_root}/tools/agent_tools/run_accumulated_agent_evals.py" \
+            --root "${canon_root}" \
+            --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Validate accumulated evidence
         run: |

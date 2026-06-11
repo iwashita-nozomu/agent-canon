@@ -17,11 +17,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 DEFAULT_MANIFEST = Path("documents/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/SHARED_RUNTIME_SURFACES.md")

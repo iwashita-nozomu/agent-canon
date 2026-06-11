@@ -21,13 +21,11 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-import tempfile
 from pathlib import Path
 
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
-LEGACY_LOG_ARCHIVE_PARENT = Path(".agent-canon") / "archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
 CODEX_RUNTIME_SUMMARY_FILE = "summary.jsonl"
@@ -61,7 +59,7 @@ def repo_log_key(root: Path) -> str:
 
 
 def _log_environment_key(root: Path) -> str:
-    """Return the local environment key used by legacy fallback archives."""
+    """Return the local environment key used by legacy mounted archives."""
     override = os.environ.get(LOG_ENV_ENV, "").strip()
     if override:
         return safe_slug(override)
@@ -81,11 +79,6 @@ def log_environment_key(root: Path) -> str:
 def mounted_log_archive_root(canon_root: Path) -> Path:
     """Return the preferred AgentCanon-local log archive mount path."""
     return canon_root / LOG_ARCHIVE_PARENT
-
-
-def legacy_mounted_log_archive_root(canon_root: Path) -> Path:
-    """Return the previous env-keyed archive mount path."""
-    return canon_root / LEGACY_LOG_ARCHIVE_PARENT / _log_environment_key(canon_root)
 
 
 def is_agent_canon_root(root: Path) -> bool:
@@ -112,18 +105,6 @@ def agent_canon_root(root: Path) -> Path:
     return marker_root if marker_root is not None else resolved
 
 
-def state_log_archive_root(canon_root: Path) -> Path:
-    """Return the non-repository fallback log archive root."""
-    env_key = _log_environment_key(canon_root)
-    xdg_state_home = os.environ.get("XDG_STATE_HOME", "").strip()
-    if xdg_state_home:
-        return Path(xdg_state_home) / "agent-canon" / "archive" / env_key
-    home = os.environ.get("HOME", "").strip()
-    if home:
-        return Path(home) / ".local" / "state" / "agent-canon" / "archive" / env_key
-    return Path(tempfile.gettempdir()) / "agent-canon" / "archive" / env_key
-
-
 def _log_archive_root(canon_root: Path) -> Path:
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
@@ -132,10 +113,10 @@ def _log_archive_root(canon_root: Path) -> Path:
     mount = mounted_log_archive_root(canon_root)
     if mount.is_dir():
         return mount
-    legacy_mount = legacy_mounted_log_archive_root(canon_root)
-    if legacy_mount.is_dir():
-        return legacy_mount
-    return state_log_archive_root(canon_root)
+    raise RuntimeError(
+        "AgentCanon log archive root is required; set "
+        f"{HOOK_ARCHIVE_DIR_ENV} or mount {mounted_log_archive_root(canon_root)}"
+    )
 
 
 def hook_results_dir(active_root: Path, canon_root: Path) -> Path:

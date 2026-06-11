@@ -18,11 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 DEFAULT_MANIFEST = Path("documents/agent-canon-update-tasks.toml")
 DEFAULT_STATE_PATH = Path(".agent-canon/update-state.toml")

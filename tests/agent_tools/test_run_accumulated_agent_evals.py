@@ -56,8 +56,11 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
         for producer in producers:
             self.assertIn("--accumulate", producer.command)
         prompt = next(producer for producer in producers if producer.name == "skill-workflow-prompt")
+        workflow = next(producer for producer in producers if producer.name == "workflow-selection")
         self.assertIn("--run-id", prompt.command)
         self.assertIn("run-123", prompt.command)
+        self.assertIn("--run-id", workflow.command)
+        self.assertIn("run-123", workflow.command)
         self.assertIn("--skill-used", prompt.command)
         self.assertIn("agent-orchestration", prompt.command)
         self.assertIn("result-artifact-writeout", prompt.command)

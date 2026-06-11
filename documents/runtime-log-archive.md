@@ -106,7 +106,7 @@ path segment. The summary payload also records `conversation_id`, `session_id`,
 and `thread_id` so chat-local raw evidence and cross-chat analysis stay
 traceable without storing prompt text.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
-devcontainer/Compose metadata, or the existing host/repo fallback.
+devcontainer/Compose metadata, or the existing host/repo alternate route.
 
 The initial import from the former in-tree log surface is preserved under:
 
@@ -130,7 +130,7 @@ legacy-import/eval-results/
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 ```
 
-If the mount is absent, hooks fall back to a local state directory outside the
+If the mount is absent, hooks use a local state directory outside the
 repository tree. Set `AGENT_CANON_HOOK_ARCHIVE_DIR` to route logs to another
 archive root. Existing `AGENT_CANON_HOOK_RESULTS_DIR` and per-hook
 `*_HOOK_LOG_PATH` variables remain explicit test/debug overrides.

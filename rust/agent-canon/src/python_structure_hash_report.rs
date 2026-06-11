@@ -10,9 +10,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use crate::python_module_groups::{
-    fallback_group_for_path, group_for_path, load_default_contract, ModuleGroupContract,
-};
+use crate::python_module_groups::{group_for_path, load_default_contract, ModuleGroupContract};
 
 const INTERNAL_STRUCT_INLINE_FIELD_LIMIT: usize = 6;
 
@@ -2736,7 +2734,7 @@ fn finding_source_groups(finding: &Finding, contract: Option<&ModuleGroupContrac
         .collect::<Vec<_>>();
     let assigned = groups
         .iter()
-        .filter(|group| group.as_str() != "__unassigned__")
+        .filter(|group| !matches!(group.as_str(), "__unassigned__" | "__missing_contract__"))
         .cloned()
         .collect::<Vec<_>>();
     if assigned.is_empty() {
@@ -2747,11 +2745,7 @@ fn finding_source_groups(finding: &Finding, contract: Option<&ModuleGroupContrac
 }
 
 fn file_group(path: &str, contract: Option<&ModuleGroupContract>) -> String {
-    if contract.is_some() {
-        group_for_path(path, contract)
-    } else {
-        fallback_group_for_path(path)
-    }
+    group_for_path(path, contract)
 }
 
 fn import_target_counts(findings: &[Finding], root: &Path) -> BTreeMap<String, usize> {
@@ -3495,6 +3489,22 @@ def build_api():
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("pkg/core")).expect("core dir");
         fs::create_dir_all(root.join("pkg/app")).expect("app dir");
+        fs::create_dir_all(root.join("documents/design")).expect("design dir");
+        fs::write(
+            root.join("documents/design/python-module-groups.toml"),
+            r#"
+[[module_group]]
+id = "pkg/core"
+label = "Core"
+submodules = ["pkg/core"]
+
+[[module_group]]
+id = "pkg/app"
+label = "App"
+submodules = ["pkg/app"]
+"#,
+        )
+        .expect("module group contract");
         fs::write(root.join("pkg/core/base.py"), "class Base:\n    pass\n").expect("base.py");
         fs::write(
             root.join("pkg/app/use.py"),

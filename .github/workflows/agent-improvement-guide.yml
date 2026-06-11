@@ -51,6 +51,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Prepare runtime log archive
+        run: mkdir -p .agent-canon/log-archive
+
       - name: Generate improvement guide
         id: guide
         run: |

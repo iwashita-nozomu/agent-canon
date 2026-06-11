@@ -26,7 +26,6 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-TOOL_EVENT_FALLBACK = "PostToolUse"
 DISABLE_ENV = "AGENT_CANON_DISABLE_LOG_SURFACE_INVENTORY_GUARD"
 BASELINE_ENV = "AGENT_CANON_LOG_SURFACE_INVENTORY_BASELINE"
 TOOL_TIMEOUT_SECONDS = 60
@@ -67,25 +66,11 @@ def tool_command(payload: dict[str, object]) -> str:
     return ""
 
 
-def has_tool_signal(payload: dict[str, object]) -> bool:
-    """Return whether one payload looks like a post-tool event."""
-    return isinstance(payload.get("tool_name"), str) or bool(tool_command(payload))
-
-
-def uses_event_fallback(payload: dict[str, object]) -> bool:
-    """Return whether to infer a PostToolUse event from tool-shaped payload."""
-    if isinstance(payload.get("hookEventName"), str):
-        return False
-    return payload_status(payload) == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
-
-
 def hook_event_name(payload: dict[str, object]) -> str:
-    """Return the hook event name."""
+    """Return the declared hook event name."""
     value = payload.get("hookEventName")
     if isinstance(value, str):
         return value
-    if uses_event_fallback(payload):
-        return TOOL_EVENT_FALLBACK
     return ""
 
 

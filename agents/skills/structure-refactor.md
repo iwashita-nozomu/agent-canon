@@ -17,20 +17,22 @@ downstream implementation ../../.agents/skills/structure-refactor/SKILL.md expos
 
 ## Purpose
 
-`structure-refactor` is the skill for changing repository directory structure
-by responsibility. It treats directories, directory READMEs, dependency
-manifests, root views, responsibility scopes, imports, and reader navigation as
-one refactor surface.
+`structure-refactor` is the skill for changing or repairing repository
+directory structure by responsibility. It treats directories, directory READMEs,
+dependency manifests, root views, responsibility scopes, imports, and reader
+navigation as one refactor surface.
 
 The skill boundary is mechanical. It does not own generic behavior-preserving
 refactor mechanics; use
 `refactor-loop` for safety contracts, `dependency-analysis` for impact packets,
 `prose-reasoning-graph` for README / prose graph diagnostics, and
 `document-canon-cleanup` for stale or duplicate document surfaces. Those paired
-skills define the boundary of this skill: select `structure-refactor` only when
-the directory layout itself is part of the requested change or when mechanical
-evidence shows a responsibility conflict that documentation edits alone cannot
-repair; the next section defines that mechanical evidence packet.
+skills define the boundary of this skill: select `structure-refactor` when the
+directory layout itself is part of the requested change, when a task cannot
+start because AgentCanon's expected repository structure no longer matches the
+checkout, or when mechanical evidence shows a responsibility conflict that
+documentation edits alone cannot repair; the next section defines that
+mechanical evidence packet.
 
 ## Evidence Sources
 
@@ -39,6 +41,10 @@ source packet:
 
 - `responsibility-scope.toml` and `responsibility_scope.py` show primary scope
   ownership, `exclude_paths`, required coverage, and overlap findings.
+- `documents/repo-structure-contract.toml` and
+  `repo_structure_contract.py` show whether the checkout still satisfies the
+  expected standalone, template, or derived-repository layout before a task
+  creates, moves, or ignores paths.
 - `import_responsibility.py` shows whether directories still need distinct
   import boundaries.
 - Recursive directory `README.md`, `AGENTS.md`, and dependency manifests show
@@ -58,6 +64,34 @@ source packet:
 - `responsibility-scope.toml` or root-view layout creates overlapping ownership.
 - A shared canon path, root symlink view, tool directory, skill directory, or
   document hierarchy is being reorganized.
+- A repo task is about to start, but expected AgentCanon paths, template root
+  views, `vendor/agent-canon/`, `.gitmodules`, root `AGENTS.md`, or documented
+  source/owned directories are missing, stale, moved, or unexpectedly local.
+- An agent is tempted to recreate a missing file or implement in a nearby
+  directory because the expected canonical path is absent.
+
+## Pre-Task Structure Repair Contract
+
+Use this mode before the ordinary task when the checkout no longer matches the
+structure AgentCanon expects:
+
+```text
+structure_repair_root=<repo-root>
+detected_repo_profile=<standalone-agent-canon|template|derived|unknown>
+drift_symptom=<missing-path|wrong-root-view|submodule-state|scope-overlap|stale-document-route|other>
+expected_owner=<agent-canon|template|derived-repo|unknown>
+contract_check=<artifact path>
+scope_check=<artifact path>
+import_check=<artifact path|not_applicable>
+missing_path_triage=<artifact path>
+repair_action=<link-root|agent-canon-update|responsibility-scope-fix|document-route-fix|structure-refactor|defer>
+ordinary_task_status=<blocked_until_repair|allowed_after_repair|deferred_with_issue>
+```
+
+If a missing path is involved, follow `CODEX_WORKFLOW.md` `Missing File Or Path
+Triage` before recreating anything. For AgentCanon-owned root views or submodule
+state, use the AgentCanon update route instead of creating a template-local
+replacement.
 
 ## Required Structure Contract
 
@@ -80,6 +114,28 @@ validation_gate=<scope/import/docs/tests/build commands>
 ## Default Sequence
 
 1. Identify the requested root and non-goals.
+1. If this is a pre-task drift repair, classify the repository structure before
+   reading broad document packets:
+
+```bash
+python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json \
+  > <run>/repo_structure_contract.json
+```
+
+   In template or derived roots where the contract is not a checked-in root
+   view, pass the vendored contract explicitly:
+
+```bash
+python3 tools/agent_tools/repo_structure_contract.py --root <root> \
+  --contract vendor/agent-canon/documents/repo-structure-contract.toml \
+  --format json > <run>/repo_structure_contract.json
+```
+
+   If the result shows only AgentCanon-owned root view or submodule drift, route
+   to `agent-canon-update`, `make agent-canon-ensure-latest`, and
+   `bash tools/sync_agent_canon.sh link-root` / `check` before continuing the
+   ordinary task. If the result shows real source-layout conflict, continue with
+   the structure refactor sequence below.
 1. Collect recursive directory evidence:
    - every directory `README.md`
    - relevant `AGENTS.md` / `ROOT_AGENTS.md`

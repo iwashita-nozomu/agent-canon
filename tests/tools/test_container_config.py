@@ -350,7 +350,7 @@ def test_devcontainer_only_source_checkout_passes(tmp_path: Path) -> None:
     assert "CONTAINER_CONFIG_CHECKED=.devcontainer" in result.stdout
 
 
-def test_devcontainer_only_requires_source_fallback(tmp_path: Path) -> None:
+def test_devcontainer_only_requires_source_route(tmp_path: Path) -> None:
     """Devcontainer source must not require repo-local docker/ when docker/ is absent."""
     write_valid_devcontainer_only(tmp_path)
     script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"

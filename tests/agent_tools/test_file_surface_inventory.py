@@ -31,6 +31,8 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             canon_tools.mkdir(parents=True)
             (canon_tools / "tool.py").write_text("VALUE = 1\n", encoding="utf-8")
             (root / "tools").symlink_to(canon_tools, target_is_directory=True)
+            self.init_git(root, "product.md", "tools")
+            self.init_git(root / "vendor" / "agent-canon", "tools/tool.py")
             json_out = root / "reports" / "inventory.json"
             markdown_out = root / "reports" / "inventory.md"
 
@@ -76,6 +78,7 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             canon = root / "vendor" / "agent-canon"
             canon.mkdir(parents=True)
             (canon / "README.md").write_text("# Canon\n", encoding="utf-8")
+            self.init_git(canon, "README.md")
             result = subprocess.run(
                 [
                     sys.executable,
@@ -165,6 +168,13 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             test_source.mkdir(parents=True)
             (test_source / "test_check_bootstrap_docs.py").write_text("VALUE = 1\n")
             self.write_file(root, "tests/tools/test_check_bootstrap_docs.py", "VALUE = 1\n")
+            self.init_git(
+                root,
+                ".github/workflows/agent-coordination.yml",
+                "tests/tools/test_check_bootstrap_docs.py",
+                "vendor/agent-canon/documents/shared-runtime-surfaces.toml",
+                "vendor/agent-canon/tests/tools/test_check_bootstrap_docs.py",
+            )
             json_out = root / "inventory.json"
 
             result = subprocess.run(
@@ -202,6 +212,11 @@ class FileSurfaceInventoryTest(unittest.TestCase):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+
+    def init_git(self, root: Path, *paths: str) -> None:
+        """Initialize one fixture Git worktree and track selected paths."""
+        subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "add", *paths], cwd=root, check=True, capture_output=True)
 
 
 if __name__ == "__main__":

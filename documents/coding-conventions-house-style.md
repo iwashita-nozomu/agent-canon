@@ -92,7 +92,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 - 数値アルゴリズムには既知解または参照実装との比較テストを必須にします。
 - shape、dtype、単調改善、不変量、例外系のうち、対象機能に関係する項目を省略してはなりません。
-- refine、prepare、cache、fallback を持つ実装では、互換性または改善方向のテストを必須にします。
+- refine、prepare、cache、alternate route を持つ実装では、互換性または改善方向のテストを必須にします。
 - 乱数を使うテストでは seed の固定を必須にします。
 - テスト用の参照実装では、可読性を優先した NumPy/Python ループを許可します。ただし本実装の複写にしてはなりません。
 
