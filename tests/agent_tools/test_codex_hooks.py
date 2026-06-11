@@ -3198,7 +3198,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertEqual(log_entry["policy_status"], "error")
         self.assertIn("helper inventory policy is required", str(log_entry["policy_error"]))
-        self.assertIn("repair_helper_inventory_policy", payload["next_action"])
+        self.assertIn("repair_helper_inventory_policy", cast(str, payload["next_action"]))
 
     def test_helper_inventory_guard_repo_policy_can_select_report_mode(self) -> None:
         """Repo-local policy may loosen the default blocking behavior explicitly."""

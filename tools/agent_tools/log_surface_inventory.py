@@ -434,9 +434,17 @@ def tracked_surface_files(root: Path) -> tuple[Path, ...]:
     """Return tracked files matching known hook/skill/tool surfaces."""
     tracked_paths = git_tracked_files(root)
     if not tracked_paths:
-        raise RuntimeError(f"git tracked surface inventory is required: {root}")
+        return filesystem_surface_files(root)
     tracked = tuple(root / path for path in tracked_paths)
     return tuple(path for path in tracked if surface_kind(path.relative_to(root)) is not None)
+
+
+def filesystem_surface_files(root: Path) -> tuple[Path, ...]:
+    """Return surface files from known globs when Git metadata is unavailable."""
+    files: list[Path] = []
+    for pattern in HOOK_PATTERNS + SKILL_PATTERNS + TOOL_PATTERNS + RUST_TOOL_PATTERNS:
+        files.extend(path for path in root.glob(pattern) if path.is_file())
+    return tuple(files)
 
 
 def should_skip(relative: Path) -> bool:
