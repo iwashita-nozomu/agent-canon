@@ -9,8 +9,8 @@ responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
 upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
-upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
-upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by proof-frontier shape
+upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
+upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams
 upstream implementation ../../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs
@@ -240,6 +240,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    unprovable under the current assumptions, or explicitly remains open with a
    smaller named witness. Do not close out a proof note with an open frontier
    row whose remaining obligation is empty or only says "unverified".
+   If the smaller named witness is a function-level guarantee whose absence is
+   the stated reason a caller-side lemma or target theorem edge is open, do not
+   return it to the user. Continue recursively until that function guarantee is
+   verified, refuted, proved unprovable under the current assumptions, or
+   reduced to an explicit external boundary that no available repository/code/
+   tool action can advance.
+   If the named witness points to a callee function, do not return the function
+   name as a blocker. Expand that callee's implementation-derived input/output
+   relation, return binding, loop-exit condition, stopping predicate,
+   breakdown or exception predicate, and nested solver or callback return
+   values until the caller-needed property is reduced to a Lean proposition or
+   checker-backed countermodel. A bare "callee quality unproved" row is not a
+   terminal outcome.
 1. When the user asks to run, prove, or show the theorem, treat
    `unverified_with_next_witness` as an in-turn work queue, not as a
    user-facing terminal result. Each frontier row must end as `verified`,
@@ -278,7 +291,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
-1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, and Moogle-style tools. For active proof themes, pin Mathlib/Aesop once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
+1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or narrowing evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use
@@ -286,6 +299,25 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    falsifying the target conclusion; use `unprovable_under_assumptions` only
    with a checked independence result or a model / witness showing that the
    assumptions do not entail the target claim.
+1. For a function-level guarantee, separate "not yet derived" from
+   "cannot be guaranteed".  If the proof packet says a function cannot
+   guarantee a property, formalize the property over that function's
+   implementation-derived input/output relation and prove one of:
+   a checked counterexample/trace falsifies the property, or a checked model
+   satisfies the current top-level assumptions while falsifying the property.
+   Then prove the propagation edge showing that this failed function guarantee
+   prevents the caller-side lemma and target theorem edge from being
+   established.  Without that refutation, report the row as
+   `unverified_with_next_witness`, not as a terminal blocker.
+   A function guarantee row whose status is `guarantee_unconnected` is not
+   user-facing progress when it blocks a caller lemma or target theorem edge.
+   Treat it as an in-turn proof work item: recursively expand callees, improve
+   IR/Lean function generation, try alternate bridge propositions, run
+   counterexample search, or invoke algorithm exploration for a code change.
+   Return to the user only after this function guarantee is terminal
+   (`verified`, `refuted`, or `unprovable_under_assumptions`) or after a
+   checked external-boundary witness proves the remaining work cannot be
+   advanced in the current repository/tool environment.
 1. When a checked fragment is adopted, register it in the package-retained proof trace with consumed fragments, checker command, and any remaining implementation-instantiation obligations instead of hiding those boundaries in prose.
 1. Normalize top-level implementation-derived theorem statements to
    `ImplementedTrace -> ProblemWitnesses -> BackendWitnesses -> Convergence`.

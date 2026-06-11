@@ -125,6 +125,45 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    result, classify whether the gap is better solved by changing the algorithm,
    adding a runtime certificate, narrowing the problem class, or leaving an
    external assumption boundary.
+1. Function-level blockers must be reported as a causal chain, not as a flat
+   missing-lemma inventory.  For each recursive function on the target path,
+   state `function`, `unguaranteed property`, `why that output can be wrong or
+   insufficient`, `which caller-side lemma becomes unprovable`, and `which
+   target theorem edge fails`.  Example shape:
+   `minres._run_minres_solve cannot guarantee requested physical residual for
+   the current preconditioned KKT operator -> kkt._solve cannot bound direction
+   error -> pdipm._pdipm_step cannot prove outer residual decrease -> finite
+   localOptimal reachability remains unproved`.  If a function calls another
+   function, recursively expand the callee until the gap is a problem/config
+   witness, backend semantics boundary, or algorithmic choice.  Do not stop at
+   "solver precision unverified" when a caller-visible output and failed
+   downstream lemma can be named.
+   A callee name is never itself the algorithmic blocker. Before reporting an
+   algorithmic blocker, expand the callee's generated equations into the
+   smallest relevant function predicates: input/output relation, return
+   binding, loop-exit reason, stopping predicate, breakdown or exception
+   predicate, and nested solver or callback output relation. Only after those
+   predicates are verified, refuted, proved unprovable under the current
+   top-level assumptions, or reduced to an external backend boundary may the
+   blocker be returned.
+   Distinguish `guarantee_unconnected` from `guarantee_refuted`.
+   `guarantee_unconnected` means the current IR / Lean function path has not
+   yet proved the property; it is a work queue.  `guarantee_refuted` means a
+   checker-backed theorem, counterexample, model, or implementation trace shows
+   the property is false for the current top-level assumptions and code path.
+   Do not write "cannot guarantee" as a terminal blocker unless the refutation
+   is checked.  If the returned blocker says a function cannot provide a
+   guarantee, include the exact refutation theorem or model and prove that this
+   missing function guarantee makes the caller-side lemma and target theorem
+   edge fail.
+   Do not return user-facing progress with a function guarantee still marked
+   `guarantee_unconnected` when that unconnected guarantee is the reason a
+   caller-side lemma or target theorem edge is open.  Re-enter the recursive
+   function frontier immediately: generate the next callee/function property,
+   prove it, refute it, prove it unprovable under the current top-level
+   assumptions, or change the algorithm and regenerate IR/graphs.  A smaller
+   named witness is not a user-facing stopping point for this class of gap; it
+   is the next in-turn work item.
 1. Do not solve a frontier by injecting assumptions unrelated to the target
    algorithm inputs. For a fixed algorithm, all mathematical assumptions live at
    the theorem top level and are over the target `Problem` and config object.
@@ -181,6 +220,10 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    `$formal-proof-workflow`, not as algorithmic completion. Re-enter that named
    witness until the proof workflow returns `verified`, `refuted`,
    `unprovable_under_assumptions`, or a strictly smaller frontier witness.
+   If the strictly smaller witness is another function-level guarantee whose
+   absence blocks a caller lemma or target edge, do not return it to the user;
+   continue the same recursion until that function guarantee is terminal or no
+   repository/code/tool action can advance it.
 1. If an algorithm change is needed, continue until either the current
    assumptions are proved insufficient or the changed algorithm has a
    checker-backed proof of the target theorem. A proposed change alone is only

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Creates and checks AgentCanon Lean proof environments with Mathlib/Aesop.
-# upstream design ../../agents/skills/formal-proof-workflow.md requires Mathlib/Aesop before hand-built Lean scaffolds.
+# responsibility Creates and checks AgentCanon Lean proof environments with proof-search, theorem-search, and counterexample tools.
+# upstream design ../../agents/skills/formal-proof-workflow.md requires checked Lean automation and counterexample routes before hand-built proof scaffolds.
 # downstream design ../../documents/tools/lean_proof_env.md documents the CLI contract.
 # downstream implementation ../../tests/agent_tools/test_lean_proof_env.py tests generated environment files and dry-run commands.
 # @dependency-end
-"""Create or check a reusable Lean 4 proof environment with Mathlib and Aesop."""
+"""Create or check a reusable Lean 4 proof environment for agent proof work."""
 
 from __future__ import annotations
 
@@ -34,6 +34,14 @@ class CommandResult:
 
 
 @dataclass(frozen=True)
+class CommandSpec:
+    """Checker command plus the success condition expected by this tool."""
+
+    parts: tuple[str, ...]
+    expected_counterexample: bool = False
+
+
+@dataclass(frozen=True)
 class LeanProofEnvResult:
     """Machine-readable result for Lean proof environment setup/checks."""
 
@@ -57,8 +65,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=("init", "smoke", "check-file"),
-        help="Initialize the env, write/check the smoke theorem, or check a Lean file.",
+        choices=(
+            "init",
+            "smoke",
+            "agent-smoke",
+            "counterexample-smoke",
+            "all-smoke",
+            "check-file",
+        ),
+        help=(
+            "Initialize the env, run proof-search smoke, run agent-interface "
+            "smoke, run counterexample smoke, run all smokes, or check a Lean file."
+        ),
     )
     parser.add_argument(
         "--env-dir",
@@ -111,7 +129,7 @@ def lakefile_text(package_name: str, module_name: str, mathlib_rev: str) -> str:
             "@dependency-start",
             "responsibility Defines the AgentCanon reusable Lean proof environment.",
             "upstream implementation tools/agent_tools/lean_proof_env.py generates this file.",
-            "downstream implementation AgentCanonLeanProofEnv.lean imports Mathlib and Aesop.",
+            "downstream implementation AgentCanonLeanProofEnv.lean imports Mathlib, Aesop, Plausible, and LeanSearchClient.",
             "@dependency-end",
             "-/",
             "",
@@ -136,21 +154,25 @@ def module_text() -> str:
         [
             "/-",
             "@dependency-start",
-            "responsibility Re-exports Mathlib and Aesop for AgentCanon proof tasks.",
+            "responsibility Re-exports Mathlib, Aesop, Plausible, and LeanSearchClient for AgentCanon proof tasks.",
             "upstream implementation lean_proof_env.py generates this module.",
-            "downstream implementation AgentCanonLeanProofEnvSmoke.lean smoke-checks Aesop automation.",
+            "downstream implementation AgentCanonLeanProofEnvSmoke.lean smoke-checks proof-search automation.",
+            "downstream implementation AgentCanonLeanProofEnvAgent.lean smoke-checks agent theorem-search imports.",
+            "downstream implementation AgentCanonLeanProofEnvCounterexample.lean smoke-checks counterexample discovery.",
             "@dependency-end",
             "-/",
             "",
             "import Mathlib",
             "import Aesop",
+            "import Plausible",
+            "import LeanSearchClient",
             "",
         ]
     )
 
 
 def smoke_text(module_name: str) -> str:
-    """Return a small checked theorem that exercises Aesop."""
+    """Return checked theorems that exercise local proof-search tactics."""
     return "\n".join(
         [
             f"import {module_name}",
@@ -169,7 +191,67 @@ def smoke_text(module_name: str) -> str:
             "    (hab : a <= b) (hbc : b <= c) : a <= c := by",
             "  exact Nat.le_trans hab hbc",
             "",
+            "theorem omega_index_example {i j k : Int}",
+            "    (hij : i <= j) (hjk : j <= k) : i <= k := by",
+            "  omega",
+            "",
+            "theorem linarith_budget_example {a b c : Real}",
+            "    (hab : a <= b) (hbc : b <= c) : a <= c := by",
+            "  linarith",
+            "",
+            "theorem grind_symmetry_example {a b : Nat}",
+            "    (h : a = b) : b = a := by",
+            "  grind",
+            "",
+            "#eval Plausible.Testable.check <|",
+            "  forall (xs : Array Nat), xs.size = xs.size",
+            "",
             "end AgentCanonLeanProofEnvSmoke",
+            "",
+        ]
+    )
+
+
+def agent_smoke_text(module_name: str) -> str:
+    """Return a checked file for agent-facing theorem-search interfaces."""
+    return "\n".join(
+        [
+            f"import {module_name}",
+            "",
+            "namespace AgentCanonLeanProofEnvAgent",
+            "",
+            "set_option leansearchclient.backend \"leansearch\"",
+            "",
+            "#check LeanSearchClient.SearchResult",
+            "#check LeanSearchClient.SearchServer",
+            "#check LeanSearchClient.leanSearchServer",
+            "",
+            "theorem leansearchclient_import_surface_ready : True := by",
+            "  trivial",
+            "",
+            "end AgentCanonLeanProofEnvAgent",
+            "",
+        ]
+    )
+
+
+def counterexample_text(module_name: str) -> str:
+    """Return a Plausible probe that is expected to find a counterexample."""
+    return "\n".join(
+        [
+            f"import {module_name}",
+            "",
+            "namespace AgentCanonLeanProofEnvCounterexample",
+            "",
+            "/--",
+            "This command is intentionally false. The environment check succeeds",
+            "only when Plausible finds a concrete counterexample and Lean exits",
+            "with a failing check.",
+            "-/",
+            "#eval Plausible.Testable.check <|",
+            "  forall (xs ys : Array Nat), xs.size = ys.size -> xs = ys",
+            "",
+            "end AgentCanonLeanProofEnvCounterexample",
             "",
         ]
     )
@@ -193,20 +275,42 @@ def shell_join(parts: Sequence[str]) -> str:
     return shlex.join(tuple(parts))
 
 
-def run_command(parts: Sequence[str], cwd: Path) -> CommandResult:
+def render_command(spec: CommandSpec) -> str:
+    """Return the report command string for a checker command spec."""
+    command = shell_join(spec.parts)
+    if spec.expected_counterexample:
+        return f"{command} # expected Plausible counterexample"
+    return command
+
+
+def run_command(spec: CommandSpec, cwd: Path) -> CommandResult:
     """Run a command and capture output."""
     completed = subprocess.run(
-        tuple(parts),
+        spec.parts,
         cwd=cwd,
         check=False,
         capture_output=True,
         text=True,
     )
+    stdout = completed.stdout
+    stderr = completed.stderr
+    returncode = completed.returncode
+    if spec.expected_counterexample:
+        combined_output = f"{stdout}\n{stderr}"
+        if completed.returncode != 0 and "Found a counter-example!" in combined_output:
+            returncode = 0
+        else:
+            returncode = 1
+            stderr = (
+                stderr
+                + "\nExpected Plausible to find a counterexample, but the expected "
+                "counterexample marker was absent."
+            )
     return CommandResult(
-        command=shell_join(parts),
-        returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
+        command=render_command(spec),
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
     )
 
 
@@ -227,23 +331,48 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         if write_generated(path, text, bool(args.force)):
             created_files.append(str(path))
 
-    lean_file: Path | None = None
-    if args.action == "smoke":
-        lean_file = env_dir / f"{module_name}Smoke.lean"
-        if write_generated(lean_file, smoke_text(module_name), bool(args.force)):
-            created_files.append(str(lean_file))
+    lean_files: list[Path] = []
+    counterexample_files: set[Path] = set()
+    if args.action in {"smoke", "all-smoke"}:
+        smoke_file = env_dir / f"{module_name}Smoke.lean"
+        if write_generated(smoke_file, smoke_text(module_name), bool(args.force)):
+            created_files.append(str(smoke_file))
+        lean_files.append(smoke_file)
+    if args.action in {"agent-smoke", "all-smoke"}:
+        agent_file = env_dir / f"{module_name}Agent.lean"
+        if write_generated(agent_file, agent_smoke_text(module_name), bool(args.force)):
+            created_files.append(str(agent_file))
+        lean_files.append(agent_file)
+    if args.action in {"counterexample-smoke", "all-smoke"}:
+        counterexample_file = env_dir / f"{module_name}Counterexample.lean"
+        if write_generated(
+            counterexample_file, counterexample_text(module_name), bool(args.force)
+        ):
+            created_files.append(str(counterexample_file))
+        lean_files.append(counterexample_file)
+        counterexample_files.add(counterexample_file)
     elif args.action == "check-file":
         if not args.lean_file:
             raise ValueError("--lean-file is required for check-file")
-        lean_file = Path(args.lean_file).resolve()
+        lean_files.append(Path(args.lean_file).resolve())
 
-    commands: list[tuple[str, ...]] = []
-    if args.action in {"smoke", "check-file"}:
-        commands.append(("lake", "update"))
-        commands.append(("lake", "build"))
-        if lean_file is None:
-            raise ValueError("internal error: lean_file was not selected")
-        commands.append(("lake", "env", "lean", str(lean_file)))
+    commands: list[CommandSpec] = []
+    if args.action in {
+        "smoke",
+        "agent-smoke",
+        "counterexample-smoke",
+        "all-smoke",
+        "check-file",
+    }:
+        commands.append(CommandSpec(("lake", "update")))
+        commands.append(CommandSpec(("lake", "build")))
+        for lean_file in lean_files:
+            commands.append(
+                CommandSpec(
+                    ("lake", "env", "lean", str(lean_file)),
+                    expected_counterexample=lean_file in counterexample_files,
+                )
+            )
 
     command_results: list[CommandResult] = []
     status = "initialized"
@@ -256,12 +385,13 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
                 break
         else:
             status = "checked"
-    elif args.action in {"smoke", "check-file"}:
+    elif commands:
         status = "dry_run"
 
     notes = (
         "This environment belongs to AgentCanon proof tooling, not to an individual theorem package.",
-        "Use check-file for Mathlib/Aesop-backed proof stubs generated outside this Lake package.",
+        "Use smoke for local proof-search tactics, agent-smoke for LeanSearchClient imports, and counterexample-smoke for Plausible counterexample discovery.",
+        "Use check-file for Mathlib/Aesop/Plausible/LeanSearchClient-backed proof stubs generated outside this Lake package.",
     )
     return LeanProofEnvResult(
         action=str(args.action),
@@ -272,10 +402,10 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         package_name=str(args.package_name),
         module_name=module_name,
         created_or_updated_files=tuple(created_files),
-        commands=tuple(shell_join(command) for command in commands),
+        commands=tuple(render_command(command) for command in commands),
         executed=bool(args.execute),
         command_results=tuple(command_results),
-        lean_file=str(lean_file) if lean_file is not None else None,
+        lean_file=str(lean_files[-1]) if lean_files else None,
         notes=notes,
     )
 

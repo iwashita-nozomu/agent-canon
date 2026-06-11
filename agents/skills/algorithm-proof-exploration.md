@@ -202,6 +202,11 @@ current IR / assumption ledger から導けないことを checker-backed に示
     named witness back to formal-proof before classifying an algorithmic
      blocker; do not turn a proof-search queue item into algorithm-change
      guidance
+  - if the returned witness is a function-level guarantee whose absence blocks
+    a caller lemma or target theorem edge, continue the recursion in the same
+    turn. Do not return it to the user as "still unconnected" unless no
+    repository/code/tool action can advance it and that external boundary is
+    itself checker-backed or explicitly unavailable
   - current algorithmic choice を blocker と分類する前に、target theorem に効く
     algorithm block をすべて `$formal-proof-workflow` 側で命題化させます。
     initializer、stopping scalar、step length / acceptance selection、
@@ -216,6 +221,48 @@ current IR / assumption ledger から導けないことを checker-backed に示
    - when a target-facing blocker remains after formal-proof exploration,
      classify whether it comes from missing problem assumptions, missing
      external evidence, or a current algorithmic choice
+   - function-level blockers must be reported as a causal chain, not as a flat
+     list of missing lemmas.  For each recursive function on the target path,
+     state:
+     `function`, `unguaranteed property`, `why that output can be wrong or
+     insufficient`, `which caller-side lemma becomes unprovable`, and
+     `which target theorem edge fails`.  Example shape:
+     `minres._run_minres_solve cannot guarantee requested physical residual for
+     the current preconditioned KKT operator -> kkt._solve cannot bound
+     direction error -> pdipm._pdipm_step cannot prove outer residual decrease
+     -> finite localOptimal reachability remains unproved`.
+     If a function calls another function, recursively expand the callee until
+     the gap is a problem/config witness, backend semantics boundary, or
+     algorithmic choice.  Do not stop at "solver precision unverified" when a
+     caller-visible output and failed downstream lemma can be named.
+     A callee name is never itself the algorithmic blocker. Before reporting an
+     algorithmic blocker, expand the callee's generated equations into the
+     smallest relevant function predicates: input/output relation, return
+     binding, loop-exit reason, stopping predicate, breakdown / exception
+     predicate, and nested solver / callback output relation. Only after those
+     predicates are verified, refuted, proved unprovable under the current
+     top-level assumptions, or reduced to an external backend boundary may the
+     blocker be returned.
+   - distinguish `guarantee_unconnected` from `guarantee_refuted`.
+     `guarantee_unconnected` means the current IR / Lean function path has not
+     yet proved the property and must be re-entered as a work queue.
+     `guarantee_refuted` means a checker-backed theorem, counterexample,
+     model, or implementation trace shows the property is false under the
+     current top-level assumptions and code path.  Do not report "this
+     function cannot guarantee X" as a terminal blocker unless the refutation
+     is checked.  If a function guarantee is refuted, record the exact
+     refutation theorem or model and prove the propagation:
+     function output guarantee fails, therefore the caller-side lemma cannot
+     be established, therefore the target theorem edge is false or
+     unprovable under the current assumptions.
+   - do not return user-facing progress with a function guarantee still marked
+     `guarantee_unconnected` when that unconnected guarantee is the reason a
+     caller-side lemma or target theorem edge is open.  Re-enter the recursive
+     function frontier immediately: generate the next callee/function property,
+     prove it, refute it, prove it unprovable under the current top-level
+     assumptions, or change the algorithm and regenerate IR/graphs.  A smaller
+     named witness is not a user-facing stopping point for this class of gap;
+     it is the next in-turn work item.
    - for initialization, basin-entry, or selected-scope-entry blockers, first normalize
      the implementation as a selected initializer
      `z_init = Init(Problem, InitializeConfig)`. Do not treat a hard-coded zero,

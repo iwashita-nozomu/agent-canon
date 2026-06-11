@@ -1,7 +1,7 @@
 <!--
 @dependency-start
-responsibility Summarizes Lean/Mathlib/Aesop capabilities for AgentCanon proof workflows.
-upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop proof environments.
+responsibility Summarizes Lean/Mathlib/Aesop/Plausible/LeanSearch capabilities for AgentCanon proof workflows.
+upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../agents/skills/formal-proof-workflow.md routes checker-backed proof attempts.
 upstream design ../../agents/skills/algorithm-proof-exploration.md routes algorithm-derived proof frontiers.
 upstream reference ../../references/agent-canon-technology-bibliography.md records adopted Lean sources.
@@ -32,8 +32,13 @@ Primary and near-primary sources used for this matrix:
 | Searching for Theorems in Mathlib | <https://leanprover-community.github.io/blog/posts/searching-for-theorems-in-mathlib/> | Search workflow and limitations for Mathlib theorem discovery. |
 | Aesop documentation | <https://leanprover-community.github.io/mathlib4_docs/Aesop/Frontend/Tactic.html> | `aesop` / `aesop?` behavior and generated proof suggestion route. |
 | Aesop repository | <https://github.com/leanprover-community/aesop> | Aesop as white-box proof search for Lean 4. |
+| Plausible repository | <https://github.com/leanprover-community/plausible> | Property-based counterexample search integrated with Lean tactics and `#eval` checks. |
 | Loogle | <https://loogle.lean-lang.org/> | Type/signature and pattern search over Lean/Mathlib definitions and theorems. |
 | LeanSearch | <https://leansearch.net/> | Natural-language theorem search over Mathlib4, with privacy caveat. |
+| LeanSearchClient repository | <https://github.com/leanprover-community/LeanSearchClient> | Lean-side command syntax for LeanSearch, LeanStateSearch, and Loogle services. |
+| Pantograph repository | <https://github.com/leanprover/Pantograph> | Machine-to-machine Lean 4 interface candidate for proof-search agents. |
+| Lean REPL repository | <https://github.com/leanprover-community/repl> | JSON stdin/stdout REPL candidate for lightweight Lean agent harnesses. |
+| LeanDojo repository | <https://github.com/lean-dojo/LeanDojo> | Programmatic Lean interaction and theorem-proving benchmark lineage; original package is deprecated in favor of newer LeanDojo work. |
 
 ## Capability Table
 
@@ -48,7 +53,10 @@ Primary and near-primary sources used for this matrix:
 | Positivity and monotonicity | Mathlib `positivity`, `gcongr`, monotonicity lemmas | A proof needs nonnegativity, order-preserving maps, or bound propagation through expressions. | Floor bounds, norm bounds, damping factors, safe denominators. | Requires the positivity/monotonicity premise to be expressible; it cannot invent problem-class facts. |
 | Broad first-order / SMT-style search | Lean `grind` | Constructors, equalities, inequalities, case splits, and small algebraic facts are mixed. | Retrying compact frontier lemmas before declaring an algorithmic blocker. | Use on focused obligations; avoid feeding a whole generated graph into one `grind` goal. |
 | Theorem discovery | `exact?`, `apply?`, `rw?`, `simp?`, Loogle, LeanSearch, Mathlib docs | A statement looks standard or library-backed. | Search for norm/order/algebra/topology lemmas before creating local stubs. | Search is heuristic; absence of a result is not unprovability. |
-| Environment and dependencies | Lake, `lean-toolchain`, `lean_proof_env.py` | A proof needs Mathlib/Aesop or a stable checked environment. | Pin Mathlib/Aesop once for an active proof package; use the reusable proof env for probes and fallback checks. | Do not spend every proof retry rediscovering the same environment boundary. |
+| Counterexample search for over-strong claims | Plausible `plausible`, `Plausible.Testable.check` | The proposition is executable over sampled finite data, or a local encoding can produce sampled witnesses. | Refute too-strong bridge candidates before treating them as algorithm blockers. | A Plausible counterexample refutes the encoded executable claim, not every analytic real-valued theorem. |
+| Agent theorem-search interface | LeanSearchClient import surface, LeanSearch/Loogle service commands | An agent needs a Lean-side theorem-search entrypoint or a service-backed search query. | Retrieve candidate lemmas for focused frontier nodes before writing local stubs. | Service calls are heuristic and may be unavailable; final proof still requires kernel/lake checking. |
+| Machine-to-machine proof interaction | Pantograph, Lean REPL, LeanDojo-style harnesses | The task needs tactic execution state, proof search, benchmark data, or a persistent agent harness. | Future proof-search backend for generated frontier nodes. | Treat as optional backend infrastructure; do not make normal local proof checks depend on heavyweight services. |
+| Environment and dependencies | Lake, `lean-toolchain`, `lean_proof_env.py` | A proof needs Mathlib/Aesop/Plausible/LeanSearchClient or a stable checked environment. | Pin dependencies once for an active proof package; use the reusable proof env for probes and fallback checks. | Do not spend every proof retry rediscovering the same environment boundary. |
 
 ## Default Lean Attempt Order
 
@@ -70,13 +78,17 @@ For each selected frontier node:
      Mathlib order lemmas.
 1. Search existing facts: `exact?`, `apply?`, `rw?`, `simp?`, Loogle,
    LeanSearch, and Mathlib docs.  Adopt only checked suggestions.
+1. Before treating a strong candidate as a blocker, try an executable
+   Plausible counterexample probe when the claim can be sampled without
+   changing the theorem's meaning.
 1. If the frontier remains open, decide whether the failure is an
    implementation/code-fact gap, a missing top-level problem/config property, a
    backend axiom boundary, or an algorithmic blocker.
 
 ## Environment Policy
 
-AgentCanon owns a reusable Mathlib/Aesop proof environment:
+AgentCanon owns a reusable proof environment for Mathlib, Aesop, Plausible, and
+LeanSearchClient:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py smoke \
@@ -84,13 +96,21 @@ python3 tools/agent_tools/lean_proof_env.py smoke \
   --execute
 ```
 
-Use it before saying that Mathlib or Aesop is unavailable.  Generated
+Use `all-smoke` when proving environment readiness for agents:
+
+```bash
+python3 tools/agent_tools/lean_proof_env.py all-smoke \
+  --env-dir reports/formal-proof/lean-proof-env \
+  --execute
+```
+
+Use it before saying that Mathlib, Aesop, Plausible, or LeanSearchClient is unavailable.  Generated
 environment files live under `reports/formal-proof/` and are local artifacts,
 not source.  The source tree should not commit that generated Lake package.
 
 For an active repository proof theme, prefer paying the environment cost once:
-pin Lean and Mathlib/Aesop in the topic-local Lake package, keep `.lake/`
-ignored, and make ordinary proof attempts run through `lake build`.  Use the
+pin Lean and Mathlib/Aesop/Plausible/LeanSearchClient in the topic-local Lake
+package, keep `.lake/` ignored, and make ordinary proof attempts run through `lake build`.  Use the
 reusable proof env for exploratory checks, cross-theme probes, and fallback
 validation, not as a reason to revisit dependency setup every time.
 

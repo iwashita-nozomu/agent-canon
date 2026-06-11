@@ -8,8 +8,8 @@ upstream design algorithm-proof-exploration.md proof-guided algorithm exploratio
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
-upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments.
-upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by proof-frontier shape.
+upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
+upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
 upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams.
 upstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs.
 upstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers IR facts into Lean route artifacts.
@@ -210,6 +210,18 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   同じ loop へ再投入します。`verified`、`refuted`、
   `unprovable_under_assumptions` まで到達するか、より小さい named witness を持つ
   open row へ縮約するまで、proof note を closeout してはいけません。
+- より小さい named witness が、caller lemma または target theorem edge を止めている
+  関数単位の保証である場合は、それを user-facing に返してはいけません。
+  同一 turn 内で callee 展開、IR / Lean 関数生成の改善、bridge proposition の変更、
+  counterexample 探索、または algorithm exploration に戻し、その関数保証が
+  `verified`、`refuted`、`unprovable_under_assumptions`、または現在の
+  repo / tool 環境では進められない checked external boundary に到達するまで続けます。
+- named witness が callee 関数を指す場合は、関数名を blocker として返さず、
+  その callee の実装由来 input/output relation、return binding、loop exit 条件、
+  stopping predicate、breakdown / exception predicate、nested solver / callback の返却値まで
+  再帰展開します。caller 側で必要な性質が callee のどの内部 predicate から来るかを
+  Lean 命題または checker-backed countermodel へ落とすまで、単なる
+  "callee quality unproved" を terminal outcome にしてはいけません。
 - ユーザーが「実行」「示して」「証明して」と依頼した場合、
   `unverified_with_next_witness` は同一 turn 内の作業 queue であり、
   user-facing な終端 outcome ではありません。各 frontier row は
@@ -221,6 +233,21 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   もとで target conclusion が導けないことを、反例 model、independence result、
   または機械検査済み obligation gap で示します。失敗ログや「hard」は outcome では
   ありません。
+- 関数単位の保証については、「まだ導出していない」と「保証不能」を分けます。
+  proof packet が「関数 `f` は性質 `P` を保証できない」と返す場合は、
+  その性質を `f` の実装由来 input/output relation 上で形式化し、現在の
+  top-level assumption と code path を満たしながら `P` を否定する counterexample、
+  implementation trace、または formal model を checker-backed に示します。
+  さらに、その関数保証の失敗により caller-side lemma が立たず、最終 target
+  theorem edge が閉じない propagation edge も証明します。これがない行は
+  terminal blocker ではなく、`unverified_with_next_witness` として再帰展開します。
+- 関数保証行が `guarantee_unconnected` のまま caller lemma または target theorem
+  edge を止めている場合、それは user-facing な進捗ではありません。同一 turn 内の
+  作業 queue として扱い、callee 展開、IR / Lean 関数生成の改善、bridge proposition の
+  作り直し、反例探索、または algorithm exploration に戻します。ユーザーに返せるのは、
+  その関数保証が `verified`、`refuted`、`unprovable_under_assumptions` に到達した場合、
+  または現在の repository / tool 環境では進められないことを checked external boundary として
+  示した場合だけです。
 - user-facing に進捗を返す前に、現在選択した部品証明をすべて終端状態まで
   処理します。部品証明ごとに `verified`、`refuted`、
   `unprovable_under_assumptions`、またはより小さい named witness を持つ
@@ -255,7 +282,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
 - Lean では、`documents/tools/lean_capability_matrix.md` を読み、frontier shape に応じて
-  Lean core、Mathlib、Aesop、`grind`、theorem search を選びます。proof theme が明示的に
+  Lean core、Mathlib、Aesop、Plausible、LeanSearchClient、`grind`、theorem search を選びます。proof theme が明示的に
   core-only を要求しない限り Mathlib-backed route を標準とし、routine な
   propositional / constructor / relation-composition / library-lemma search obligation では
   `aesop?` / `aesop` を既定の bounded automation として試します。Nat/Int arithmetic は
@@ -263,9 +290,11 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   recurrence は `ring_nf` / `nlinarith`、positivity/monotonicity は `positivity` /
   `gcongr` を候補にします。`exact?` / `apply?` / `rw?` / `simp?`、Mathlib docs、
   LeanSearch / Loogle / Moogle 系、Zulip archive で既存 theorem を探し、採用するのは
-  checker で通った proof text だけです。活発な proof theme では Mathlib/Aesop を
-  topic-local Lake package に一度 pin して `lake build` で使えるようにし、探索用・fallback 用には
-  `python3 tools/agent_tools/lean_proof_env.py smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使います。
+  checker で通った proof text だけです。強すぎる executable claim は、blocker 扱いの前に
+  Plausible の counterexample route で refutation を試します。活発な proof theme では
+  Mathlib/Aesop/Plausible/LeanSearchClient を topic-local Lake package に一度 pin して
+  `lake build` で使えるようにし、探索用・fallback 用には
+  `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使います。
 - Isabelle/HOL では AFP、loaded theory、Sledgehammer result、reconstruction proof を分けます。
 - Coq/Rocq では library search、CoqHammer、SMTCoq、Tactician などの適用範囲と限界を記録します。
 - SMT route は first-order / arithmetic / bit-vector / array など solver-friendly な obligation に限り、証明対象全体の代替にしません。
@@ -411,7 +440,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - `<FORMAL_TARGET>` を正式な proposition に置き換える
    - informal proof sketch を assistant-checkable lemmas に分ける
 1. Automation:
-   - Lean では Mathlib/Aesop を標準 automation route とし、`aesop?` / `aesop`、Lean/mathlib tactic search、Isabelle Sledgehammer、CoqHammer、SMT solver などを bounded subgoal に使う
+   - Lean では Mathlib/Aesop/Plausible/LeanSearchClient を標準 automation / theorem-search / counterexample route とし、`aesop?` / `aesop`、Lean/mathlib tactic search、Plausible counterexample probes、Isabelle Sledgehammer、CoqHammer、SMT solver などを bounded subgoal に使う
    - automation result は再構成・最小化・checker log まで確認する
 1. Verification:
    - generated command か project-specific command を実行する
