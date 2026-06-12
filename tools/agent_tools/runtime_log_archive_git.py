@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,8 @@ DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
 CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
 GIT_HEAD_TIMEOUT_SECONDS = 5
+WORKFLOW_CONTEXT_JSON_NAME = "skill_usage_context.json"
+WORKFLOW_CONTEXT_JSON_KEYS = frozenset({"workflows", "report_dir", "timestamp", "source_event"})
 
 
 @dataclass(frozen=True)
@@ -342,6 +345,27 @@ def porcelain_path(line: str) -> str:
     return path.strip()
 
 
+def dirty_paths_for_repo_key(context: ArchiveContext, repo_key: str) -> tuple[str, ...]:
+    """Return dirty archive-relative paths that belong to one repo key."""
+    paths: list[str] = []
+    for line in porcelain_status(context).splitlines():
+        path = porcelain_path(line)
+        key, is_global = dirty_key_for_path(path)
+        if key == repo_key and not is_global:
+            paths.append(path)
+    return tuple(paths)
+
+
+def all_dirty_paths_belong_to_repo_key(context: ArchiveContext, repo_key: str) -> bool:
+    """Return whether every dirty archive path is keyed to one repo."""
+    for line in porcelain_status(context).splitlines():
+        path = porcelain_path(line)
+        key, is_global = dirty_key_for_path(path)
+        if key != repo_key or is_global:
+            return False
+    return True
+
+
 def dirty_key_for_path(path: str) -> tuple[str, bool]:
     """Return (repo_key, global_dirty) for one archive-relative dirty path."""
     parts = Path(path).parts
@@ -532,6 +556,202 @@ def ensure_origin(context: ArchiveContext) -> None:
         git(context.archive_root, ["remote", "set-url", "origin", context.remote])
 
 
+def switch_to_archive_branch(context: ArchiveContext, branch: str) -> None:
+    """Switch the archive clone to one local or remote branch."""
+    if local_branch_exists(context, branch):
+        git(context.archive_root, ["switch", branch])
+        return
+    if remote_branch_exists(context, branch):
+        git(context.archive_root, ["switch", "--track", "-c", branch, f"origin/{branch}"])
+        return
+    if remote_branch_exists(context, "main"):
+        git(context.archive_root, ["switch", "-c", branch, "origin/main"])
+        return
+    git(context.archive_root, ["switch", "-c", branch])
+
+
+def stash_ref_sha(context: ArchiveContext) -> str:
+    """Return the current refs/stash SHA, or an empty string when no stash exists."""
+    result = git(context.archive_root, ["rev-parse", "--verify", "refs/stash"], check=False)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def append_missing_jsonl_lines(target: Path, source: Path) -> None:
+    """Append JSONL lines from source that are not already present in target."""
+    target_bytes = target.read_bytes()
+    source_lines = [line for line in source.read_bytes().splitlines() if line.strip()]
+    existing_lines = set(target_bytes.splitlines())
+    missing_lines = [line for line in source_lines if line not in existing_lines]
+    if not missing_lines:
+        return
+    with target.open("ab") as handle:
+        if target_bytes and not target_bytes.endswith(b"\n"):
+            handle.write(b"\n")
+        for line in missing_lines:
+            handle.write(line + b"\n")
+
+
+def workflow_context_json(path: Path, relative_path: str) -> dict[str, object]:
+    """Load a known workflow context JSON object or fail for unsafe shape."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ArchiveGitError(f"archive context JSON is not mergeable: {relative_path}") from exc
+    if not isinstance(value, dict):
+        raise ArchiveGitError(f"archive context JSON must be an object: {relative_path}")
+    context = cast(dict[str, object], value)
+    unknown_keys = set(context) - WORKFLOW_CONTEXT_JSON_KEYS
+    if unknown_keys:
+        raise ArchiveGitError(
+            f"archive context JSON has unknown keys in {relative_path}: {','.join(sorted(unknown_keys))}"
+        )
+    workflows = context.get("workflows", [])
+    if not isinstance(workflows, list):
+        raise ArchiveGitError(f"archive context JSON has invalid workflows: {relative_path}")
+    workflow_items = cast(list[object], workflows)
+    if not all(isinstance(item, str) for item in workflow_items):
+        raise ArchiveGitError(f"archive context JSON has invalid workflows: {relative_path}")
+    for key in ("report_dir", "timestamp", "source_event"):
+        value = context.get(key, "")
+        if not isinstance(value, str):
+            raise ArchiveGitError(f"archive context JSON has invalid {key}: {relative_path}")
+    return context
+
+
+def workflow_context_scalar(
+    target_context: dict[str, object],
+    source_context: dict[str, object],
+    key: str,
+    *,
+    target_is_newer: bool,
+) -> str:
+    """Merge one scalar context field using timestamp recency."""
+    target_value = cast(str, target_context.get(key, ""))
+    source_value = cast(str, source_context.get(key, ""))
+    if target_value == source_value:
+        return target_value
+    target_timestamp = cast(str, target_context.get("timestamp", ""))
+    source_timestamp = cast(str, source_context.get("timestamp", ""))
+    if target_timestamp == source_timestamp and target_value and source_value:
+        raise ArchiveGitError(f"archive context JSON has conflicting {key} for equal timestamps")
+    newer_value = target_value if target_is_newer else source_value
+    older_value = source_value if target_is_newer else target_value
+    return newer_value or older_value
+
+
+def merge_workflow_context_json(target: Path, source: Path, relative_path: str) -> None:
+    """Merge the short-lived skill usage workflow context snapshot."""
+    target_context = workflow_context_json(target, relative_path)
+    source_context = workflow_context_json(source, relative_path)
+    target_timestamp = cast(str, target_context.get("timestamp", ""))
+    source_timestamp = cast(str, source_context.get("timestamp", ""))
+    target_is_newer = target_timestamp >= source_timestamp
+
+    merged_workflows = list(
+        dict.fromkeys(
+            [
+                *cast(list[str], target_context.get("workflows", [])),
+                *cast(list[str], source_context.get("workflows", [])),
+            ]
+        )
+    )
+    merged = {
+        "report_dir": workflow_context_scalar(
+            target_context,
+            source_context,
+            "report_dir",
+            target_is_newer=target_is_newer,
+        ),
+        "source_event": workflow_context_scalar(
+            target_context,
+            source_context,
+            "source_event",
+            target_is_newer=target_is_newer,
+        ),
+        "timestamp": target_timestamp if target_is_newer else source_timestamp,
+        "workflows": merged_workflows,
+    }
+    target.write_text(json.dumps(merged, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def restore_preserved_dirty_file(archive_root: Path, relative_path: str, preserved: Path) -> None:
+    """Restore one preserved dirty file on the selected archive branch."""
+    target = archive_root / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        shutil.copy2(preserved, target)
+        return
+    if target.read_bytes() == preserved.read_bytes():
+        return
+    if target.suffix == ".jsonl":
+        append_missing_jsonl_lines(target, preserved)
+        return
+    if target.name == WORKFLOW_CONTEXT_JSON_NAME and target.suffix == ".json":
+        merge_workflow_context_json(target, preserved, relative_path)
+        return
+    raise ArchiveGitError(
+        f"archive destination already exists with different content after switching: {relative_path}"
+    )
+
+
+def switch_with_current_key_dirty_paths(context: ArchiveContext, branch: str) -> None:
+    """Move current repo-key dirty archive paths onto the expected branch."""
+    dirty_paths = dirty_paths_for_repo_key(context, context.repo_key)
+    if not dirty_paths:
+        raise ArchiveGitError(
+            f"archive has local changes; commit or stash before switching to {branch}"
+        )
+
+    with tempfile.TemporaryDirectory(prefix="agent-canon-log-preserve-") as temp_dir:
+        preserved_root = Path(temp_dir)
+        for dirty_path in dirty_paths:
+            source = context.archive_root / dirty_path
+            if not source.is_file():
+                raise ArchiveGitError(
+                    f"archive current repo-key dirty path is not a file: {dirty_path}"
+                )
+            destination = preserved_root / dirty_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+        before_stash = stash_ref_sha(context)
+        git(
+            context.archive_root,
+            [
+                "stash",
+                "push",
+                "--include-untracked",
+                "-m",
+                f"Preserve {context.repo_key} runtime logs before switching to {branch}",
+                "--",
+                *dirty_paths,
+            ],
+        )
+        preserved_stash = stash_ref_sha(context)
+        if not preserved_stash or preserved_stash == before_stash:
+            raise ArchiveGitError(
+                f"archive current repo-key changes could not be preserved before switching to {branch}"
+            )
+
+        try:
+            switch_to_archive_branch(context, branch)
+        except ArchiveGitError as exc:
+            raise ArchiveGitError(
+                "archive current repo-key changes were preserved in stash@{0} "
+                f"but switching to {branch} failed: {exc}"
+            ) from exc
+        try:
+            for dirty_path in dirty_paths:
+                restore_preserved_dirty_file(context.archive_root, dirty_path, preserved_root / dirty_path)
+        except ArchiveGitError as exc:
+            raise ArchiveGitError(
+                "archive current repo-key changes were preserved in stash@{0} "
+                f"but restoring them on {branch} failed: {exc}"
+            ) from exc
+        if stash_ref_sha(context) == preserved_stash:
+            git(context.archive_root, ["stash", "drop", "stash@{0}"])
+
+
 def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
     """Ensure the ignored clone exists and is on the source repo log branch."""
     if not context.archive_root.exists():
@@ -548,20 +768,20 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
     current = current_branch(context)
     if current == branch:
         return
-    if porcelain_status(context).strip():
+    summary = archive_status_summary(context)
+    if summary.dirty:
+        if (
+            summary.current_key_dirty
+            and not summary.foreign_dirty_keys
+            and not summary.global_dirty
+            and all_dirty_paths_belong_to_repo_key(context, context.repo_key)
+        ):
+            switch_with_current_key_dirty_paths(context, branch)
+            return
         raise ArchiveGitError(
             f"archive has local changes; commit or stash before switching to {branch}"
         )
-    if local_branch_exists(context, branch):
-        git(context.archive_root, ["switch", branch])
-        return
-    if remote_branch_exists(context, branch):
-        git(context.archive_root, ["switch", "--track", "-c", branch, f"origin/{branch}"])
-        return
-    if remote_branch_exists(context, "main"):
-        git(context.archive_root, ["switch", "-c", branch, "origin/main"])
-        return
-    git(context.archive_root, ["switch", "-c", branch])
+    switch_to_archive_branch(context, branch)
 
 
 def print_context(context: ArchiveContext) -> None:
