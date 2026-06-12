@@ -569,7 +569,10 @@ def test_dockerfile_agent_tooling_fails(tmp_path: Path) -> None:
         + "\nRUN echo https://cli.github.com/packages\n"
         + "RUN apt-get install -y gh\n"
         + "RUN npm install -g @openai/codex\n"
-        + "RUN gh --version && codex --version\n",
+        + "RUN gh --version && codex --version\n"
+        + "RUN curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh\n"
+        + "RUN elan toolchain install leanprover/lean4:v4.30.0\n"
+        + "RUN lean --version && lake build\n",
         encoding="utf-8",
     )
 
@@ -579,6 +582,10 @@ def test_dockerfile_agent_tooling_fails(tmp_path: Path) -> None:
     assert "dockerfile-must-not-configure-github-cli" in result.stdout
     assert "dockerfile-must-not-install-gh" in result.stdout
     assert "dockerfile-must-not-install-codex-cli" in result.stdout
+    assert "dockerfile-must-not-install-lean-via-elan" in result.stdout
+    assert "dockerfile-must-not-run-elan" in result.stdout
+    assert "dockerfile-must-not-smoke-check-lean" in result.stdout
+    assert "dockerfile-must-not-run-lake" in result.stdout
 
 
 def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:
