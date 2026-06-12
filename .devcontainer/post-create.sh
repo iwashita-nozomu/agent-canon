@@ -17,6 +17,9 @@ workspace="${1:-/workspace}"
 node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
 lean_toolchain="${AGENT_CANON_LEAN_TOOLCHAIN:-leanprover/lean4:v4.30.0}"
+elan_version="${AGENT_CANON_ELAN_VERSION:-v4.2.3}"
+elan_x86_64_sha256="${AGENT_CANON_ELAN_X86_64_SHA256:-df0b2b3a439961ffcbb3985214365ffe40f49bc871df04dff268c7d8e21ca8b2}"
+elan_aarch64_sha256="${AGENT_CANON_ELAN_AARCH64_SHA256:-cb69af0803b04157bc30201c29c12fca882bb3ad8b43476b8d2d3064810bc3ac}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
 local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}"
@@ -128,21 +131,59 @@ install_tex_tooling() {
     poppler-utils
 }
 
+elan_linux_asset() {
+  case "$(uname -m)" in
+    x86_64 | amd64)
+      printf '%s\n' "elan-x86_64-unknown-linux-gnu.tar.gz"
+      ;;
+    aarch64 | arm64)
+      printf '%s\n' "elan-aarch64-unknown-linux-gnu.tar.gz"
+      ;;
+    *)
+      echo "Unsupported elan architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+elan_linux_sha256() {
+  case "$(uname -m)" in
+    x86_64 | amd64)
+      printf '%s\n' "$elan_x86_64_sha256"
+      ;;
+    aarch64 | arm64)
+      printf '%s\n' "$elan_aarch64_sha256"
+      ;;
+    *)
+      echo "Unsupported elan architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
 install_lean_toolchain() {
-  local installer
+  local archive
+  local asset
+  local checksum
   local profile_script
   local tool
+  local work_dir
 
   export ELAN_HOME="${ELAN_HOME:-${HOME}/.elan}"
   export PATH="${ELAN_HOME}/bin:${PATH}"
 
   if ! command -v elan >/dev/null 2>&1; then
     apt_install ca-certificates curl
-    installer="$(mktemp)"
-    curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
-      -o "$installer"
-    sh "$installer" -y --default-toolchain "$lean_toolchain" --no-modify-path
-    rm -f "$installer"
+    asset="$(elan_linux_asset)"
+    checksum="$(elan_linux_sha256)"
+    work_dir="$(mktemp -d)"
+    archive="${work_dir}/${asset}"
+    curl -fsSL "https://github.com/leanprover/elan/releases/download/${elan_version}/${asset}" \
+      -o "$archive"
+    printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
+    tar -xzf "$archive" -C "$work_dir" elan-init
+    "${work_dir}/elan-init" -y --default-toolchain "$lean_toolchain" --no-modify-path
+    rm -rf "$work_dir"
   fi
 
   elan toolchain install "$lean_toolchain"

@@ -35,6 +35,27 @@ POST_CREATE_TEX_SNIPPETS = (
     "dvisvgm --version",
     "pdfcrop --version",
 )
+POST_CREATE_LEAN_SNIPPETS = (
+    "AGENT_CANON_LEAN_TOOLCHAIN",
+    "leanprover/lean4:v4.30.0",
+    "AGENT_CANON_ELAN_VERSION",
+    "v4.2.3",
+    "AGENT_CANON_ELAN_X86_64_SHA256",
+    "AGENT_CANON_ELAN_AARCH64_SHA256",
+    "install_lean_toolchain",
+    "leanprover/elan/releases/download",
+    "elan-x86_64-unknown-linux-gnu.tar.gz",
+    "elan-aarch64-unknown-linux-gnu.tar.gz",
+    "sha256sum -c -",
+    "elan-init",
+    "elan toolchain install",
+    "elan default",
+    "for tool in elan lean lake",
+    "/usr/local/bin/${tool}",
+    "elan --version",
+    "lean --version",
+    "lake --version",
+)
 
 
 def run_validator(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -219,6 +240,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "apt_install jq",
                 "jq --version",
                 *POST_CREATE_TEX_SNIPPETS,
+                *POST_CREATE_LEAN_SNIPPETS,
                 "gh --version",
                 "codex --version",
                 "",
@@ -301,6 +323,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "apt_install jq",
                 "jq --version",
                 *POST_CREATE_TEX_SNIPPETS,
+                *POST_CREATE_LEAN_SNIPPETS,
                 "gh --version",
                 "codex --version",
                 "",
@@ -571,6 +594,7 @@ def test_dockerfile_agent_tooling_fails(tmp_path: Path) -> None:
         + "RUN npm install -g @openai/codex\n"
         + "RUN gh --version && codex --version\n"
         + "RUN curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh\n"
+        + "RUN curl -fsSL https://github.com/leanprover/elan/releases/download/v4.2.3/elan-x86_64-unknown-linux-gnu.tar.gz -o /tmp/elan.tar.gz\n"
         + "RUN elan toolchain install leanprover/lean4:v4.30.0\n"
         + "RUN lean --version && lake build\n",
         encoding="utf-8",
@@ -583,6 +607,7 @@ def test_dockerfile_agent_tooling_fails(tmp_path: Path) -> None:
     assert "dockerfile-must-not-install-gh" in result.stdout
     assert "dockerfile-must-not-install-codex-cli" in result.stdout
     assert "dockerfile-must-not-install-lean-via-elan" in result.stdout
+    assert "dockerfile-must-not-install-elan-release" in result.stdout
     assert "dockerfile-must-not-run-elan" in result.stdout
     assert "dockerfile-must-not-smoke-check-lean" in result.stdout
     assert "dockerfile-must-not-run-lake" in result.stdout

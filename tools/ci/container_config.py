@@ -22,12 +22,11 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
-
 
 REQUIRED_APT_PACKAGES = (
     "rsync",
@@ -50,6 +49,10 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     (re.compile(r"\bcargo\s+(build|install|test|clippy|fmt)\b"), "dockerfile-must-not-run-cargo"),
     (re.compile(r"\brustc\s+--version\b"), "dockerfile-must-not-smoke-check-rustc"),
     (re.compile(r"elan-init\.sh"), "dockerfile-must-not-install-lean-via-elan"),
+    (
+        re.compile(r"leanprover/elan/releases/download"),
+        "dockerfile-must-not-install-elan-release",
+    ),
     (re.compile(r"\belan\s+(toolchain|default|self|update)\b"), "dockerfile-must-not-run-elan"),
     (re.compile(r"\blean\s+--version\b"), "dockerfile-must-not-smoke-check-lean"),
     (re.compile(r"\blake\s+(build|update|env)\b"), "dockerfile-must-not-run-lake"),
@@ -88,8 +91,16 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "install_tex_tooling",
     "AGENT_CANON_LEAN_TOOLCHAIN",
     "leanprover/lean4:v4.30.0",
+    "AGENT_CANON_ELAN_VERSION",
+    "v4.2.3",
+    "AGENT_CANON_ELAN_X86_64_SHA256",
+    "AGENT_CANON_ELAN_AARCH64_SHA256",
     "install_lean_toolchain",
-    "elan-init.sh",
+    "leanprover/elan/releases/download",
+    "elan-x86_64-unknown-linux-gnu.tar.gz",
+    "elan-aarch64-unknown-linux-gnu.tar.gz",
+    "sha256sum -c -",
+    "elan-init",
     "elan toolchain install",
     "elan default",
     "for tool in elan lean lake",
