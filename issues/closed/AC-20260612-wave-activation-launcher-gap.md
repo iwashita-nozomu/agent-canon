@@ -15,7 +15,7 @@ downstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboa
 -->
 
 issue_id: AC-20260612-wave-activation-launcher-gap
-status: closed
+status: resolved
 source: user
 severity: S1
 evidence: reports/agents/20260612-091338-diagnose-wave-activation-blockers/wave_activation_diagnosis.md
@@ -23,6 +23,7 @@ affected_surfaces: tools/agent_tools/bootstrap_agent_run.py, tools/agent_tools/t
 edit_scope: reports/agents/20260612-091338-diagnose-wave-activation-blockers/dependency-review/dependency_edit_scope.txt
 required_action: Add an explicit launcher or parent-execution gate that turns recommended waves into actual runtime spawns when authority exists, and expose wave/subagent execution health in compact runtime diagnostics.
 close_condition: A bootstrapped multi-agent task either records actual spawned/skipped wave rows from the recommended waves or emits a clear authority blocker, and the compact dashboard/API reports wave/subagent execution metrics without requiring raw log or run-bundle reading.
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/196
 
 ## Finding
 
