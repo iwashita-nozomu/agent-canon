@@ -141,6 +141,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "agents/canonical",
             "documents/tools",
             "tools/agent_tools",
+            "tools/user",
+            "tools/internal",
             "tools/ci",
             "tests/agent_tools",
             "memory",
@@ -189,6 +191,8 @@ class RepoStructureContractTest(unittest.TestCase):
                     "contents": [
                         {"type": "file", "name": "catalog.yaml"},
                         {"type": "directory", "name": "agent_tools"},
+                        {"type": "directory", "name": "user"},
+                        {"type": "directory", "name": "internal"},
                         {"type": "directory", "name": "ci"},
                     ],
                 },

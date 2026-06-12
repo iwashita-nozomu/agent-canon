@@ -44,40 +44,79 @@ role_values:
   - sync
   - workflow
 
+audience_values:
+  - user
+  - agent
+  - skill
+  - workflow
+  - maintainer
+  - internal
+
+placement_values:
+  - user_entrypoint
+  - skill_helper
+  - workflow_helper
+  - validation_checker
+  - ci_gate
+  - compatibility_wrapper
+  - support_library
+
 families:
   agent_tools:
     root: tools/agent_tools
     summary: Agent workflow, dependency, convention, review, and runtime helpers.
+    audience: agent
+    placement: workflow_helper
   ci:
     root: tools/ci
     summary: CI, GitHub workflow, container, and repository readiness entrypoints.
+    audience: user
+    placement: ci_gate
   docs:
     root: tools/docs
     summary: Markdown, link, design-document, and skill-shim maintenance helpers.
+    audience: skill
+    placement: skill_helper
   oop_python:
     root: tools/oop/python
     summary: Python-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
   oop_cpp:
     root: tools/oop/cpp
     summary: C++-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
   data:
     root: tools/data
     summary: Portable result-data transformations.
+    audience: agent
+    placement: support_library
   hlo:
     root: tools/hlo
     summary: HLO result summarization helpers.
+    audience: agent
+    placement: support_library
   audit:
     root: tools/audit
     summary: Portable audit log schema and writer helpers.
+    audience: internal
+    placement: support_library
   experiments:
     root: tools/experiments
     summary: Shared experiment scaffold, registry, and managed-run helpers.
+    audience: user
+    placement: user_entrypoint
   validation:
     root: tools/validation
     summary: Generic validation helpers used by compatibility wrappers.
+    audience: agent
+    placement: validation_checker
   root:
     root: tools
     summary: Top-level shared automation entrypoints and compatibility wrappers.
+    audience: user
+    placement: user_entrypoint
 
 default_wiring_docs:
   - tools/README.md
@@ -203,6 +242,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/formal_proof.py
     writes: true
     default_wiring:
@@ -224,6 +265,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/lean_proof_env.py
     writes: true
     default_wiring:
@@ -244,6 +287,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_expansion_ir.py
     writes: true
     default_wiring:
@@ -263,6 +308,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: tools/bin/agent-canon algorithm-ir-to-lean
     writes: true
     default_wiring:
@@ -283,6 +330,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_lemma_graph.py
     writes: true
     default_wiring:
@@ -302,6 +351,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_flowchart.py
     writes: true
     default_wiring:
@@ -323,6 +374,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/ir_graph_correspondence.py
     writes: true
     default_wiring:
@@ -343,6 +396,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/kkt_equation_section.py
     writes: true
     default_wiring:
@@ -363,6 +418,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/proof_path_analyzer.py
     writes: true
     default_wiring:
@@ -382,6 +439,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/check_proof_trace_alignment.py
     writes: false
     default_wiring:
@@ -622,6 +681,8 @@ entries:
     family: agent_tools
     role: checker
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/agent_tools/file_responsibility_llm.py --print-prompt <file>
     writes: false
     default_wiring:
@@ -1239,6 +1300,8 @@ entries:
     family: docs
     role: helper
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-math <files...>
     writes: true
     callable_by_default: false
@@ -1259,6 +1322,8 @@ entries:
     family: docs
     role: helper
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-mermaid <files...>
     writes: true
     callable_by_default: false
@@ -1279,6 +1344,8 @@ entries:
     family: ci
     role: runner
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs check
     writes: false
     default_wiring:
@@ -1575,6 +1642,8 @@ entries:
     family: agent_tools
     role: inventory
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/agent_tools/noncanonical_document_inventory.py
     writes: true
     default_wiring:
@@ -1967,6 +2036,8 @@ entries:
     family: root
     role: compatibility
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/check_doc_test_triplet.py
     writes: false
     replacement: tools/validation/triplet_validator.py
