@@ -2497,12 +2497,19 @@ def is_structured_presentation_block(text: str) -> bool:
     """Return true for blocks whose boundary is expected to be visually abrupt."""
     stripped = text.lstrip()
     return bool(
-        re.match(r"(?:```|\||[-*]\s+|\d+[.]\s+)", stripped)
+        is_display_math_block(stripped)
+        or re.match(r"(?:```|\||[-*]\s+|\d+[.]\s+)", stripped)
         or stripped.startswith("<!--")
         or re.match(r"[A-Za-z0-9_]+\s*(?:-->|==>|-.->|---|--)", stripped)
         or re.match(r"(?:flowchart|graph|subgraph|end\b)", stripped)
         or re.match(r"[A-Za-z0-9_]+\[", stripped)
     )
+
+
+def is_display_math_block(text: str) -> bool:
+    """Return true for standalone Markdown display math blocks."""
+    stripped = text.strip()
+    return stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) > 4
 
 
 def safe_identifier(value: str) -> str:
