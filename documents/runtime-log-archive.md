@@ -140,6 +140,14 @@ legacy-import/eval-results/
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 ```
 
+When the archive clone is on a different `logs/<repo-key>` branch, `ensure`
+switches to the current source repo branch. Dirty paths that already belong to
+the same repo key are preserved onto that branch when they are known runtime
+artifacts, including append-only JSONL logs and
+`skill_usage_context.json`. Foreign repo-key paths, archive-level policy/tool
+paths, unknown JSON conflicts, malformed context JSON, and deletions remain
+blockers.
+
 If the mount is absent, hooks use a local state directory outside the
 repository tree. Set `AGENT_CANON_HOOK_ARCHIVE_DIR` to route logs to another
 archive root. Existing `AGENT_CANON_HOOK_RESULTS_DIR` and per-hook
