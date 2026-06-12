@@ -17,7 +17,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.runtime_log_paths import mounted_log_archive_root, repo_log_key
+from tools.agent_tools.runtime_log_paths import (
+    mounted_log_archive_root,
+    repo_log_key,
+    safe_slug,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
@@ -32,10 +36,16 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         source_root: Path,
         canon_root: Path,
         remote: Path,
+        extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run the archive helper with explicit temp paths."""
         env = os.environ.copy()
         env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["AGENT_CANON_LOG_ENV"] = "test-env"
+        for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
+            env.pop(env_name, None)
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(
             [
                 sys.executable,
@@ -54,6 +64,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             text=True,
         )
 
+    def expected_branch(self, source: Path, chat_key: str | None = None) -> str:
+        """Return the deterministic branch expected by run_tool."""
+        chat_segment = safe_slug(chat_key) if chat_key else f"no-chat-{repo_log_key(source)}"
+        return f"logs/test-env-{chat_segment}"
+
     def make_remote(self, root: Path) -> Path:
         """Create a temporary Git remote with a main branch."""
         seed = root / "seed"
@@ -70,7 +85,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         return remote
 
     def test_repo_key_prints_branch_context(self) -> None:
-        """repo-key should show the source-root derived log branch."""
+        """repo-key should show the environment-plus-chat derived log branch."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -78,15 +93,24 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source.mkdir()
             canon.mkdir()
             remote = self.make_remote(root)
+            chat_key = "Chat UUID 1"
 
-            result = self.run_tool("repo-key", source_root=source, canon_root=canon, remote=remote)
+            result = self.run_tool(
+                "repo-key",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                extra_env={"CODEX_THREAD_ID": chat_key},
+            )
 
         key = repo_log_key(source)
+        expected_branch = self.expected_branch(source, chat_key)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={key}", result.stdout)
-        self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn("RUNTIME_LOG_ARCHIVE_BRANCH_KEY=test-env-chat-uuid-1", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
-        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(
             f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon) / 'agent-reports' / key}",
             result.stdout,
@@ -117,10 +141,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     capture_output=True,
                     text=True,
                 ).stdout.strip(),
-                f"logs/{key}",
+                self.expected_branch(source),
             )
 
-            log_path = archive / "hook-runs" / key / "test" / "skill_usage.jsonl"
+            log_path = archive / "hook-runs" / key / "test" / "skill_usage-no-git-head.jsonl"
             log_path.parent.mkdir(parents=True)
             log_path.write_text(
                 json.dumps(
@@ -184,7 +208,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
 
             remote_ref = subprocess.run(
-                ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/logs/{key}"],
+                ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/{self.expected_branch(source)}"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -208,7 +232,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon)
-            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard.jsonl"
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
                 json.dumps(
@@ -263,7 +287,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon)
-            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
                 json.dumps(
@@ -391,11 +415,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
             archive = mounted_log_archive_root(canon)
-            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl"
+            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl"
             runtime_summary.parent.mkdir(parents=True)
             runtime_summary.write_text('{"conversation_id": "thread-1", "thread_id": "thread-1"}\n', encoding="utf-8")
             runtime_index = archive / "codex-runtime" / key / "index.jsonl"
-            runtime_index.write_text('{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary.jsonl"}\n', encoding="utf-8")
+            runtime_index.write_text(
+                '{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary-no-git-head.jsonl"}\n',
+                encoding="utf-8",
+            )
             run_dir = source / "reports" / "agents" / "run-2"
             run_dir.mkdir(parents=True)
             (run_dir / "closeout_gate.md").write_text("closeout=yes\n", encoding="utf-8")
@@ -407,8 +434,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             clone = root / "verification"
             subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
-            subprocess.run(["git", "-C", str(clone), "switch", f"logs/{key}"], check=True, capture_output=True)
-            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl").exists())
+            subprocess.run(["git", "-C", str(clone), "switch", self.expected_branch(source)], check=True, capture_output=True)
+            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl").exists())
             self.assertTrue((clone / "codex-runtime" / key / "index.jsonl").exists())
             self.assertTrue((clone / "agent-reports" / key / "run-2" / "closeout_gate.md").exists())
 
@@ -596,7 +623,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     "ls-tree",
                     "-r",
                     "--name-only",
-                    f"logs/{key}",
+                    self.expected_branch(source),
                     "--",
                     "agent-reports",
                 ],

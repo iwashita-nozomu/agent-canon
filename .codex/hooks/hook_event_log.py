@@ -21,7 +21,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
@@ -34,20 +33,21 @@ if TOOLS_DIR.is_dir():
 
 from runtime_log_paths import (  # noqa: E402
     agent_canon_root,
+    codex_trace_key,
+    hook_log_file_name,
     hook_results_dir,
     repo_log_key,
+    source_git_head,
 )
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
 HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
 HOOK_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
-CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
 FINGERPRINT_HEX_LENGTH = 12
 RUN_ID_DIGEST_LENGTH = 10
 RUN_ID_NONCE_LENGTH = 10
 NAMESPACE_HASH_LENGTH = 8
 MAX_NAMESPACE_LENGTH = 80
-GIT_HEAD_TIMEOUT_SECONDS = 5
 
 
 def safe_slug(value: str) -> str:
@@ -80,30 +80,6 @@ def fingerprint_json(value: object) -> str:
 def short_hash(value: str) -> str:
     """Return a stable short hash for runtime namespace disambiguation."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:NAMESPACE_HASH_LENGTH]
-
-
-def codex_trace_key() -> str:
-    """Return the current Codex chat/session trace key when available."""
-    for env_name in CODEX_TRACE_ENV_NAMES:
-        value = os.environ.get(env_name, "").strip()
-        if value:
-            return value
-    return ""
-
-
-def source_git_head(source_root: Path) -> str:
-    """Return the source repository HEAD SHA when it is available."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=GIT_HEAD_TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
 
 
 @dataclass(frozen=True)
@@ -140,7 +116,10 @@ class HookLogContext:
         """Return this hook's JSONL log path."""
         if self.override_path:
             return Path(self.override_path)
-        return self.results_dir() / self.runtime_namespace() / f"{self.hook_name}.jsonl"
+        return self.results_dir() / self.runtime_namespace() / hook_log_file_name(
+            self.hook_name,
+            self.canon_root(),
+        )
 
     def runtime_namespace(self) -> str:
         """Return the runtime shard name for append-only hook logs."""
@@ -197,6 +176,9 @@ class HookLogContext:
         if trace_key:
             entry.setdefault("codex_trace_key", trace_key)
             entry.setdefault("codex_thread_id", trace_key)
+        canon_head = source_git_head(self.canon_root())
+        if canon_head:
+            entry.setdefault("agent_canon_git_head", canon_head)
         git_head = source_git_head(source_root)
         if git_head:
             entry.setdefault("source_git_head", git_head)
