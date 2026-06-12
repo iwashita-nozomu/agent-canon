@@ -6,6 +6,7 @@
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
+# upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -48,6 +49,10 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     (re.compile(r"\brustup\b"), "dockerfile-must-not-install-rustup"),
     (re.compile(r"\bcargo\s+(build|install|test|clippy|fmt)\b"), "dockerfile-must-not-run-cargo"),
     (re.compile(r"\brustc\s+--version\b"), "dockerfile-must-not-smoke-check-rustc"),
+    (re.compile(r"elan-init\.sh"), "dockerfile-must-not-install-lean-via-elan"),
+    (re.compile(r"\belan\s+(toolchain|default|self|update)\b"), "dockerfile-must-not-run-elan"),
+    (re.compile(r"\blean\s+--version\b"), "dockerfile-must-not-smoke-check-lean"),
+    (re.compile(r"\blake\s+(build|update|env)\b"), "dockerfile-must-not-run-lake"),
     (
         re.compile(r"npm\s+install\s+-g\s+@openai/codex"),
         "dockerfile-must-not-install-codex-via-npm",
@@ -81,6 +86,17 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "apt_install jq",
     "jq --version",
     "install_tex_tooling",
+    "AGENT_CANON_LEAN_TOOLCHAIN",
+    "leanprover/lean4:v4.30.0",
+    "install_lean_toolchain",
+    "elan-init.sh",
+    "elan toolchain install",
+    "elan default",
+    "/usr/local/bin/lean",
+    "/usr/local/bin/lake",
+    "elan --version",
+    "lean --version",
+    "lake --version",
     "latexmk",
     "texlive-latex-recommended",
     "texlive-latex-extra",
