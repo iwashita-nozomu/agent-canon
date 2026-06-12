@@ -985,11 +985,146 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         encoding="utf-8",
     )
     created_files.append(AUTHORITY_FILE_NAME)
+    write_initial_wave_execution_gate(spec)
     unique_created_files: list[str] = []
     for artifact in created_files:
         if artifact not in unique_created_files:
             unique_created_files.append(artifact)
     return tuple(unique_created_files)
+
+
+def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
+    """Record the parent runtime gate for the first recommended subagent wave."""
+    if not spec.workflow_family_id:
+        return
+    active_subagents, _max_write_subagents = workflow_spawn_budget(
+        load_task_catalog(spec.config),
+        spec.workflow_family_id,
+    )
+    initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
+    if not initial_wave:
+        return
+    row = initial_wave_gate_fields(
+        initial_wave=initial_wave,
+        active_subagents=active_subagents,
+    )
+    append_markdown_section_line(
+        spec.report_dir / "schedule.md",
+        "## Agent Wave Ledger",
+        schedule_wave_row(row),
+    )
+    append_markdown_section_line(
+        spec.report_dir / "workflow_monitoring.md",
+        "## Actual Wave Events",
+        workflow_wave_event_line(row),
+    )
+
+
+def initial_wave_gate_fields(
+    *,
+    initial_wave: tuple[str, ...],
+    active_subagents: int,
+) -> dict[str, str]:
+    """Return one schedule/monitor row for a parent-executed WAVE-1 gate."""
+    skipped_roles = ",".join(initial_wave) + ":pending_explicit_runtime_spawn_authority"
+    active_budget = f"{active_subagents}/{active_subagents}"
+    return {
+        "wave_id": "WAVE-1",
+        "parent_or_delegate": "parent",
+        "spawn_authority": "parent_runtime_authority_required",
+        "trigger": "bootstrap_initial_intake_wave",
+        "budget_before": active_budget,
+        "budget_after": active_budget,
+        "runtime_max_threads": str(codex_runtime_max_threads()),
+        "runtime_max_depth": str(codex_runtime_max_depth()),
+        "spawned_roles": "none",
+        "skipped_roles": skipped_roles,
+        "allowed_paths": "team_manifest.yaml,schedule.md,workflow_monitoring.md,user_request_contract.md",
+        "do_not_read": "broad_raw_logs,unrelated_reports",
+        "write_scope": "read_only_intake_until_parent_updates_wave_row",
+        "validation_route": "parent_spawn_or_skip_update_required",
+        "review_gate": "parent_execution_gate",
+        "handoff_artifacts": "team_manifest.yaml#run.spawn_wave_recommendation",
+        "delegated_policy_ref": "team_manifest.yaml#run.delegated_spawn_policy",
+        "status": "blocked_authority_required",
+    }
+
+
+def schedule_wave_row(row: dict[str, str]) -> str:
+    """Return a schedule.md Agent Wave Ledger row."""
+    cells = (
+        row["wave_id"],
+        row["parent_or_delegate"],
+        row["spawn_authority"],
+        row["trigger"],
+        row["budget_before"],
+        row["budget_after"],
+        row["runtime_max_threads"],
+        row["runtime_max_depth"],
+        row["spawned_roles"],
+        row["skipped_roles"],
+        row["allowed_paths"],
+        row["do_not_read"],
+        row["write_scope"],
+        row["validation_route"],
+        row["review_gate"],
+        row["handoff_artifacts"],
+        row["delegated_policy_ref"],
+        row["status"],
+    )
+    return "| " + " | ".join(cells) + " |"
+
+
+def workflow_wave_event_line(row: dict[str, str]) -> str:
+    """Return a workflow_monitoring.md Actual Wave Events token row."""
+    fields = (
+        ("wave_event", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", "authority_blocker"),
+        ("spawn_authority", row["spawn_authority"]),
+        ("trigger", row["trigger"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("runtime_max_threads", row["runtime_max_threads"]),
+        ("runtime_max_depth", row["runtime_max_depth"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("allowed_paths", row["allowed_paths"]),
+        ("do_not_read", row["do_not_read"]),
+        ("write_scope", row["write_scope"]),
+        ("validation_route", row["validation_route"]),
+        ("review_gate", row["review_gate"]),
+        ("handoff_artifacts", row["handoff_artifacts"]),
+        ("status", row["status"]),
+    )
+    return "- " + " ".join(f"{key}={value}" for key, value in fields)
+
+
+def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
+    """Append one line to a level-2 Markdown section if it is not already present."""
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if line in text:
+        return
+    lines = text.splitlines()
+    in_section = False
+    insert_at = len(lines)
+    for index, existing_line in enumerate(lines):
+        stripped = existing_line.strip()
+        if not stripped.startswith("## "):
+            continue
+        if in_section:
+            insert_at = index
+            break
+        in_section = stripped == heading
+    if not in_section:
+        lines.extend(("", heading, "", line))
+    else:
+        while insert_at > 0 and not lines[insert_at - 1].strip():
+            insert_at -= 1
+        lines.insert(insert_at, line)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def build_manifest(spec: RunBundleSpec) -> str:

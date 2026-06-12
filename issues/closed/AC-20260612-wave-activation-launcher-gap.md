@@ -15,7 +15,7 @@ downstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboa
 -->
 
 issue_id: AC-20260612-wave-activation-launcher-gap
-status: open
+status: closed
 source: user
 severity: S1
 evidence: reports/agents/20260612-091338-diagnose-wave-activation-blockers/wave_activation_diagnosis.md
@@ -78,3 +78,36 @@ The run bundle at
 
 Dependency-expanded edit-scope evidence is recorded at
 `reports/agents/20260612-091338-diagnose-wave-activation-blockers/dependency-review/dependency_edit_scope.txt`.
+
+## Resolution
+
+Closed on 2026-06-12.
+
+AgentCanon now uses the mandatory parent execution gate path:
+
+- `tools/agent_tools/agent_team.py` writes an initial `WAVE-1` row into
+  `schedule.md` for workflow-family run bundles.
+- The same helper writes a matching `wave_event=recorded` row into
+  `workflow_monitoring.md` under `## Actual Wave Events`.
+- `bootstrap_agent_run.py` and `task_start.py` print
+  `PARENT_WAVE_EXECUTION_GATE=*` machine keys so parent runtimes can see that
+  implementation must not silently continue without spawned/skipped/blocked
+  wave evidence.
+- `generate_agent_runtime_dashboard.py` reports Wave/subagent execution metrics
+  in the machine summary, compact drilldown, full dashboard, problem component
+  table, and next-action table. The Wave reader uses run-bundle
+  `schedule.md` / `workflow_monitoring.md` artifacts and can run without a
+  mounted raw log archive.
+
+## Validation
+
+- `python3 -m py_compile tools/agent_tools/agent_team.py tools/agent_tools/bootstrap_agent_run.py tools/agent_tools/task_start.py tools/agent_tools/generate_agent_runtime_dashboard.py`
+- `python3 -m ruff check tools/agent_tools/agent_team.py tools/agent_tools/bootstrap_agent_run.py tools/agent_tools/task_start.py tools/agent_tools/generate_agent_runtime_dashboard.py tests/agent_tools/test_task_start_and_close.py tests/agent_tools/test_generate_agent_runtime_dashboard.py`
+- `python3 -m pytest tests/agent_tools/test_generate_agent_runtime_dashboard.py -q`
+- `python3 -m pytest tests/agent_tools/test_task_start_and_close.py -q`
+- Manual bootstrap smoke: `bootstrap_agent_run.py --task-id T12` generated a
+  `WAVE-1` authority-blocker row in `schedule.md` and a matching
+  `wave_event=recorded` row in `workflow_monitoring.md`.
+- Manual compact-dashboard smoke: a run-bundle-only fixture produced
+  `AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS=1` and
+  `AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=1` without `.agent-canon/log-archive`.
