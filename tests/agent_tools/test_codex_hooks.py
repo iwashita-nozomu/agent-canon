@@ -2913,7 +2913,7 @@ class CodexHooksTest(unittest.TestCase):
             )
             durable_logs = sorted(
                 (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
-                    "*/test-container/oop_readability_guard.jsonl"
+                    "*/test-container/oop_readability_guard-*.jsonl"
                 )
             )
             durable_log = durable_logs[0]
@@ -3443,7 +3443,7 @@ class CodexHooksTest(unittest.TestCase):
             )
             log_paths = sorted(
                 (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
-                    "*/test-container/skill_usage.jsonl"
+                    "*/test-container/skill_usage-no-git-head.jsonl"
                 )
             )
             log_path = log_paths[0]
@@ -3507,7 +3507,7 @@ class CodexHooksTest(unittest.TestCase):
                 / "hook-runs"
                 / repo_log_key(source_root)
                 / "test-container"
-                / "skill_usage.jsonl"
+                / f"skill_usage-{source_head[:12]}.jsonl"
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
@@ -3515,6 +3515,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["source_repo_key"], repo_log_key(source_root))
         self.assertEqual(entry["codex_trace_key"], trace_key)
         self.assertEqual(entry["codex_thread_id"], trace_key)
+        self.assertEqual(entry["agent_canon_git_head"], source_head)
         self.assertEqual(entry["source_git_head"], source_head)
 
     def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
@@ -4298,7 +4299,7 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                 },
             )
-            log_path = log_dir / "test-container" / "skill_usage.jsonl"
+            log_path = log_dir / "test-container" / "skill_usage-no-git-head.jsonl"
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(result.stdout, "")

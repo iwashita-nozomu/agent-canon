@@ -41,12 +41,13 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 - run-local task evidence: `reports/agents/<run-id>/`
 - normal cross-run agent report accumulation:
   `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on
-  `logs/<repo-key>`; discover exact paths with
+  `logs/<environment-key>-<chat-key>`; discover exact paths with
   `python3 tools/agent_tools/runtime_log_archive_git.py status`
 - archived agent report snapshot:
   `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
 - accumulated skill / workflow eval: `.agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md`
-- hook result chronology: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
+- hook result chronology:
+  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`
 - experiment reader report: `experiments/report/<run_name>.md`
 - generated triage report: `reports/<tool-or-task>/`

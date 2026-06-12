@@ -34,6 +34,7 @@ from runtime_log_paths import (  # noqa: E402
     codex_runtime_index_path,
     codex_runtime_summary_path,
     repo_log_key,
+    source_git_head,
 )
 
 POST_SAMPLING_RE = re.compile(r"turn_id=(?P<turn_id>\S+).*?total_usage_tokens=(?P<total>\d+)")
@@ -165,10 +166,11 @@ def read_history(path: Path, thread_id: str, cutoff: int | None) -> HistorySumma
             if not line.strip():
                 continue
             try:
-                record = json.loads(line)
+                loaded = cast(object, json.loads(line))
             except json.JSONDecodeError:
                 continue
-            if not isinstance(record, dict) or record.get("session_id") != thread_id:
+            record = cast(dict[str, object], loaded) if isinstance(loaded, dict) else {}
+            if record.get("session_id") != thread_id:
                 continue
             timestamp = record.get("ts")
             if not isinstance(timestamp, int) or not inside_cutoff(timestamp, cutoff):
@@ -189,9 +191,10 @@ def read_history_thread_ids(path: Path, cutoff: int | None) -> set[str]:
             if not line.strip():
                 continue
             try:
-                record = json.loads(line)
+                loaded = cast(object, json.loads(line))
             except json.JSONDecodeError:
                 continue
+            record = cast(dict[str, object], loaded) if isinstance(loaded, dict) else {}
             thread_id = record.get("session_id")
             timestamp = record.get("ts")
             if (
@@ -393,19 +396,25 @@ def read_sessions(paths: Sequence[Path]) -> SessionSummary:
                 if not line.strip():
                     continue
                 try:
-                    event = json.loads(line)
+                    loaded = cast(object, json.loads(line))
                 except json.JSONDecodeError:
                     continue
-                if not isinstance(event, dict) or event.get("type") != "event_msg":
+                event = cast(dict[str, object], loaded) if isinstance(loaded, dict) else {}
+                if event.get("type") != "event_msg":
                     continue
-                payload = event.get("payload")
-                if not isinstance(payload, dict) or payload.get("type") != "token_count":
+                payload_obj = event.get("payload")
+                payload = (
+                    cast(dict[str, object], payload_obj) if isinstance(payload_obj, dict) else {}
+                )
+                if payload.get("type") != "token_count":
                     continue
-                info = payload.get("info")
-                if not isinstance(info, dict):
+                info_obj = payload.get("info")
+                info = cast(dict[str, object], info_obj) if isinstance(info_obj, dict) else {}
+                if not info:
                     continue
-                usage = info.get("total_token_usage")
-                if not isinstance(usage, dict):
+                usage_obj = info.get("total_token_usage")
+                usage = cast(dict[str, object], usage_obj) if isinstance(usage_obj, dict) else {}
+                if not usage:
                     continue
                 total = usage.get("total_tokens")
                 if isinstance(total, int):
@@ -439,6 +448,7 @@ def summary_payload(
         "source_repo_key": repo_log_key(source_root),
         "source_root": source_root.resolve().as_posix(),
         "canon_root": canon_root.resolve().as_posix(),
+        "agent_canon_git_head": source_git_head(canon_root),
         "conversation_id": thread_id,
         "session_id": thread_id,
         "thread_id": thread_id,
@@ -506,10 +516,11 @@ def read_existing_summary_ids(path: Path) -> set[str]:
     with path.open(encoding="utf-8", errors="replace") as stream:
         for line in stream:
             try:
-                record = json.loads(line)
+                loaded = cast(object, json.loads(line))
             except json.JSONDecodeError:
                 continue
-            if isinstance(record, dict) and isinstance(record.get("summary_id"), str):
+            record = cast(dict[str, object], loaded) if isinstance(loaded, dict) else {}
+            if isinstance(record.get("summary_id"), str):
                 ids.add(cast(str, record["summary_id"]))
     return ids
 
@@ -694,7 +705,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         total_history_entries += history.entry_count
         total_sqlite_rows += sqlite_summary.row_count
         total_live_token_turns += len(sqlite_summary.token_turns)
-        total_live_tokens += cast(int, payload["tokens"]["live_total_usage_tokens"])
+        tokens = cast(dict[str, object], payload["tokens"])
+        total_live_tokens += cast(int, tokens["live_total_usage_tokens"])
 
     if args.print_json:
         json_payload: dict[str, object] | list[dict[str, object]]

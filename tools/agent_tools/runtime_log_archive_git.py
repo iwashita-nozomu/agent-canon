@@ -30,9 +30,12 @@ if __package__ in (None, ""):
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
     agent_report_archive_dir,
+    codex_trace_key,
+    log_branch_key,
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
+    source_git_head,
 )
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
@@ -46,8 +49,6 @@ AGENT_REPORT_EXCLUDED_DIRS = frozenset(
 AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.json"})
 DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
-CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
-GIT_HEAD_TIMEOUT_SECONDS = 5
 WORKFLOW_CONTEXT_JSON_NAME = "skill_usage_context.json"
 WORKFLOW_CONTEXT_JSON_KEYS = frozenset({"workflows", "report_dir", "timestamp", "source_event"})
 WORKFLOW_CONTEXT_TIMESTAMP_PATTERN = re.compile(
@@ -64,6 +65,7 @@ class ArchiveContext:
     archive_root: Path
     repo_key: str
     env_key: str
+    branch_key: str
     branch: str
     remote: str
 
@@ -125,7 +127,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("repo-key", help="Print the source repository key and log branch.")
 
-    ensure = subparsers.add_parser("ensure", help="Clone/fetch the archive and switch to logs/<repo-key>.")
+    ensure = subparsers.add_parser(
+        "ensure",
+        help="Clone/fetch the archive and switch to logs/<environment-key>-<chat-key>.",
+    )
     ensure.add_argument("--no-fetch", action="store_true", help="Do not fetch origin before selecting the branch.")
 
     status = subparsers.add_parser("status", help="Print archive clone, branch, and dirty state.")
@@ -143,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     agent_reports = subparsers.add_parser(
         "archive-agent-reports",
-        help="Copy reports/agents run bundles into the source repository's archive branch.",
+        help="Copy reports/agents run bundles into the current runtime archive branch.",
     )
     agent_reports.add_argument(
         "--report-root",
@@ -311,13 +316,15 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
     )
     key = repo_log_key(source_root)
     env_key = log_environment_key(canon_root)
+    branch_key = log_branch_key(source_root, canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,
         archive_root=archive_root,
         repo_key=key,
         env_key=env_key,
-        branch=f"logs/{key}",
+        branch_key=branch_key,
+        branch=f"logs/{branch_key}",
         remote=args.remote,
     )
 
@@ -413,30 +420,6 @@ def archive_tree_keys(context: ArchiveContext) -> tuple[str, ...]:
     return tuple(sorted(keys))
 
 
-def codex_trace_key() -> str:
-    """Return the current Codex chat/session trace key when the runtime exposes one."""
-    for env_name in CODEX_TRACE_ENV_NAMES:
-        value = os.environ.get(env_name, "").strip()
-        if value:
-            return value
-    return ""
-
-
-def source_git_head(source_root: Path) -> str:
-    """Return the source repository HEAD SHA when it is available."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=GIT_HEAD_TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
-
-
 def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
     """Return structured archive dirty-state information."""
     current = current_branch(context)
@@ -484,7 +467,7 @@ def print_status_summary(context: ArchiveContext, summary: ArchiveStatusSummary)
 def archive_next_action(context: ArchiveContext, summary: ArchiveStatusSummary) -> str:
     """Return the next operation for a non-clean archive state."""
     if not summary.branch_matches:
-        return f"run runtime_log_archive_git.py ensure for source repo {context.repo_key}"
+        return f"run runtime_log_archive_git.py ensure for archive branch {context.branch}"
     if summary.foreign_dirty_keys:
         return (
             "commit or migrate foreign repo-key log paths before closeout: "
@@ -878,7 +861,7 @@ def switch_with_current_key_dirty_paths(context: ArchiveContext, branch: str) ->
 
 
 def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
-    """Ensure the ignored clone exists and is on the source repo log branch."""
+    """Ensure the ignored clone exists and is on the runtime log branch."""
     if not context.archive_root.exists():
         context.archive_root.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", context.remote, str(context.archive_root)])
@@ -921,6 +904,7 @@ def print_context(context: ArchiveContext) -> None:
     print(f"RUNTIME_LOG_ARCHIVE_ENV_KEY={context.env_key}")
     print(f"RUNTIME_LOG_ARCHIVE_REMOTE={context.remote}")
     print(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={context.repo_key}")
+    print(f"RUNTIME_LOG_ARCHIVE_BRANCH_KEY={context.branch_key}")
     print(f"RUNTIME_LOG_ARCHIVE_BRANCH={context.branch}")
     print(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={run_local_agent_reports}")
     print(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={context.branch}")
@@ -1205,6 +1189,7 @@ def command_archive_agent_report(context: ArchiveContext, args: argparse.Namespa
         "archive_id": archive_id,
         "archived_at": datetime.now(UTC).isoformat(),
         "codex_trace_key": codex_trace_key(),
+        "agent_canon_git_head": source_git_head(context.canon_root),
         "source_git_head": source_git_head(context.source_root),
         "source_root": str(context.source_root),
         "canon_root": str(context.canon_root),

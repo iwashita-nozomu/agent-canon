@@ -44,27 +44,38 @@ Use this table first when deciding where a report is kept:
 | Purpose | Source During Work | Durable Location | Command |
 | --- | --- | --- | --- |
 | Current task run bundle | `<source-repo>/reports/agents/<run-id>/` | none until archived | `bootstrap_agent_run.py` / task tools create it |
-| Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<repo-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
-| Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<repo-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
-| Hook chronology | hook runtime | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl` on branch `logs/<repo-key>` | hooks write it; `push` or `sync` commits it |
+| Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<environment-key>-<chat-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
+| Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<environment-key>-<chat-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
+| Hook chronology | hook runtime | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on branch `logs/<environment-key>-<chat-key>` | hooks write it; `push` or `sync` commits it |
 | Accumulated eval reports | eval producer output | `.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md` | `run_accumulated_agent_evals.py --run-id <run-id>` |
-| Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
+| Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
 
 In short: work in `reports/agents/<run-id>/`; retain across runs in
-`.agent-canon/log-archive/` on `logs/<repo-key>`. `runtime_log_archive_git.py
-status` prints the resolved `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`,
+`.agent-canon/log-archive/` on `logs/<environment-key>-<chat-key>`.
+`runtime_log_archive_git.py status` prints the resolved
+`RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`,
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR` values for the current source repo.
-The isolation key is `<repo-key>`; Codex chat/session identifiers and Git HEAD
-SHAs are trace metadata, not archive branch selectors. Hook JSONL and immutable
-run-bundle manifests record `codex_trace_key` when `CODEX_THREAD_ID`,
-`CODEX_SESSION_ID`, or `CODEX_CONVERSATION_ID` is available, and record
-`source_git_head` when the source repository has a readable HEAD.
+The branch key is `<environment-key>-<chat-key>`. `<environment-key>` comes
+from `AGENT_CANON_LOG_ENV`, devcontainer / Compose / Codespace metadata, or a
+host fallback. `<chat-key>` comes from `CODEX_THREAD_ID`, `CODEX_SESSION_ID`,
+or `CODEX_CONVERSATION_ID`; non-chat CLI / CI runs use the explicit fallback
+`no-chat-<repo-key>`. The source isolation key remains `<repo-key>` inside the
+branch tree, so one chat branch can still separate parent repo and standalone
+AgentCanon evidence by path.
+
+Hook JSONL filenames and Codex runtime summary filenames carry the AgentCanon
+checkout commit key, not the source repo commit. Hook JSONL, Codex runtime
+summaries, and immutable run-bundle manifests record `agent_canon_git_head`
+when the AgentCanon checkout has a readable HEAD. Existing source provenance
+metadata remains: records also carry `codex_trace_key` when the Codex trace
+environment is available, and `source_git_head` when the source repository has a
+readable HEAD.
 
 Normal hook writers use:
 
 ```text
-.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl
 ```
 
 Normal eval writers use:
@@ -95,7 +106,7 @@ Codex runtime summary exporters use per-chat summary files plus one
 cross-chat index:
 
 ```text
-.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl
+.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl
 .agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl
 ```
 
@@ -106,6 +117,9 @@ Normal `sync` / `archive-agent-reports` copies of agent run reports use:
 ```
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
+`<agent-canon-commit>` is the short HEAD SHA of the AgentCanon checkout that
+provided the hook or exporter code; when no AgentCanon Git HEAD is readable,
+the filename uses `no-git-head`.
 `<conversation-id>` is the Codex thread/session identifier normalized as one
 path segment. The summary payload also records `conversation_id`, `session_id`,
 and `thread_id` so chat-local raw evidence and cross-chat analysis stay
@@ -128,7 +142,9 @@ legacy-import/eval-results/
 ## Branch Policy
 
 - `main` stores archive-level policy, merge attributes, and one-time imports.
-- Normal runtime writes use `logs/<repo-key>` branches.
+- Normal runtime writes use `logs/<environment-key>-<chat-key>` branches.
+- Non-chat CLI / CI runtime writes use
+  `logs/<environment-key>-no-chat-<repo-key>` branches.
 - Source repos do not update AgentCanon source branches or template submodule
   pins when runtime logs change.
 - JSONL files are append-only. The log repo uses `*.jsonl merge=union` so
@@ -189,8 +205,9 @@ python3 tools/agent_tools/runtime_log_archive_git.py sync
 `sync` ensures the archive clone, copies current `reports/agents/` run bundles
 to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
 summaries, and agent reports, then commits and pushes the source repository's
-`logs/<repo-key>` branch. Its pull/rebase step uses Git autostash because hooks
-can append log lines while the sync command itself is running. It skips
+current `logs/<environment-key>-<chat-key>` branch. Its pull/rebase step uses
+Git autostash because hooks can append log lines while the sync command itself
+is running. It skips
 `.active_run`, cache files, Python cache directories, and oversized single
 files. The source repo's ignored `reports/agents/` directory remains run-local
 working evidence; the log archive is the durable accumulated store.
@@ -211,10 +228,9 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 `RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no`; that line catches already committed
 foreign repo-key directories, not only uncommitted dirt. A foreign dirty or
 foreign tree finding means logs for a different `<repo-key>` were written while
-the archive worktree was on the current source repository's `logs/<repo-key>`
-branch. Treat that as a log repository operation blocker, not as optional
-cleanup: migrate the listed foreign key to its own `logs/<repo-key>` branch
-before unlocking the run bundle.
+the archive worktree was on the current runtime branch. Treat that as a log
+repository operation blocker, not as optional cleanup: migrate the listed
+foreign key to the correct runtime branch before unlocking the run bundle.
 
 To print the resolved placement without writing anything, run:
 
@@ -226,7 +242,7 @@ Read these lines first:
 
 ```text
 RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL=<source-repo>/reports/agents
-RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<repo-key>
+RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<environment-key>-<chat-key>
 RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<repo-key>
 ```
 
