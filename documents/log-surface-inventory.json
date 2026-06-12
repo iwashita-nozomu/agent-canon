@@ -572,7 +572,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 72,
+      "line": 76,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -580,7 +580,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 161,
+      "line": 204,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -9508,7 +9508,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 453,
+      "line": 452,
       "path": "tools/agent_tools/kkt_equation_section.py",
       "surface": "tool"
     },
@@ -9516,7 +9516,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 320,
+      "line": 319,
       "path": "tools/agent_tools/kkt_equation_section.py",
       "surface": "tool"
     },
@@ -10988,7 +10988,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 751,
+      "line": 809,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -10996,7 +10996,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "archive_id",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11004,7 +11004,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "archived_at",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11012,7 +11012,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "branch",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11020,7 +11020,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "canon_root",
-      "line": 816,
+      "line": 876,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "codex_trace_key",
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11028,7 +11036,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "destination",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11036,7 +11044,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "file_count",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11044,7 +11052,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11052,7 +11060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "repo_key",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11060,7 +11068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_dir",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11068,7 +11076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11076,7 +11084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11084,7 +11092,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "snapshot_id",
-      "line": 816,
+      "line": 876,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "source_git_head",
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11092,7 +11108,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_root",
-      "line": 816,
+      "line": 876,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11100,7 +11116,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE",
-      "line": 1047,
+      "line": 1107,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11108,7 +11124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT",
-      "line": 855,
+      "line": 915,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11116,7 +11132,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORTS",
-      "line": 956,
+      "line": 1016,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11124,7 +11140,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED",
-      "line": 939,
+      "line": 999,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11132,7 +11148,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
-      "line": 850,
+      "line": 910,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11140,7 +11156,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
-      "line": 937,
+      "line": 997,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11148,7 +11164,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING",
-      "line": 941,
+      "line": 1001,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11156,7 +11172,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES",
-      "line": 853,
+      "line": 913,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11164,7 +11180,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
-      "line": 851,
+      "line": 911,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11172,7 +11188,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
-      "line": 938,
+      "line": 998,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11180,7 +11196,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED",
-      "line": 854,
+      "line": 914,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11188,7 +11204,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES",
-      "line": 852,
+      "line": 912,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11196,7 +11212,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_ROOT",
-      "line": 936,
+      "line": 996,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11204,7 +11220,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_RUN_ID",
-      "line": 848,
+      "line": 908,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11212,7 +11228,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED",
-      "line": 942,
+      "line": 1002,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11220,7 +11236,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT",
-      "line": 849,
+      "line": 909,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11228,7 +11244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_UPDATED",
-      "line": 940,
+      "line": 1000,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11236,350 +11252,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_BRANCH",
-      "line": 522,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH",
-      "line": 385,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CANON_ROOT",
-      "line": 517,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
-      "line": 568,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
-      "line": 572,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
-      "line": 583,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_COMMITTED",
-      "line": 991,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH",
-      "line": 383,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH",
-      "line": 539,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY",
-      "line": 388,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_DIRTY",
-      "line": 386,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_DIRTY_KEYS",
-      "line": 387,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_ENSURE",
-      "line": 540,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_ENV_KEY",
-      "line": 519,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_ERROR",
-      "line": 1046,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EXPECTED_BRANCH",
-      "line": 384,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY",
-      "line": 390,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS",
-      "line": 389,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY",
-      "line": 391,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT",
-      "line": 604,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT",
-      "line": 635,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE",
-      "line": 603,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE",
-      "line": 634,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DESTINATION",
-      "line": 630,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS",
-      "line": 667,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS",
-      "line": 707,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE",
-      "line": 666,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE",
-      "line": 706,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION",
-      "line": 701,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES",
-      "line": 704,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES",
-      "line": 665,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES",
-      "line": 702,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES",
-      "line": 703,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT",
-      "line": 664,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT",
-      "line": 700,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS",
-      "line": 705,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES",
-      "line": 633,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_FILES",
-      "line": 602,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_FILES",
-      "line": 631,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT",
-      "line": 601,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT",
-      "line": 629,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES",
-      "line": 632,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_NEXT_ACTION",
-      "line": 556,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_NEXT_ACTION",
       "line": 579,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
@@ -11587,8 +11259,360 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_PORCELAIN",
-      "line": 559,
+      "field": "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH",
+      "line": 434,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CANON_ROOT",
+      "line": 574,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
+      "line": 625,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
+      "line": 629,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CLEAN",
+      "line": 641,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_COMMITTED",
+      "line": 1051,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH",
+      "line": 432,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH",
+      "line": 596,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY",
+      "line": 437,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_DIRTY",
+      "line": 435,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_DIRTY_KEYS",
+      "line": 436,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_ENSURE",
+      "line": 597,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_ENV_KEY",
+      "line": 576,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_ERROR",
+      "line": 1106,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EXPECTED_BRANCH",
+      "line": 433,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY",
+      "line": 439,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS",
+      "line": 438,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_TREE",
+      "line": 442,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS",
+      "line": 441,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY",
+      "line": 443,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT",
+      "line": 662,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT",
+      "line": 693,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE",
+      "line": 661,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE",
+      "line": 692,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_DESTINATION",
+      "line": 688,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS",
+      "line": 725,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS",
+      "line": 765,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE",
+      "line": 724,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE",
+      "line": 764,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION",
+      "line": 759,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES",
+      "line": 762,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES",
+      "line": 723,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES",
+      "line": 760,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES",
+      "line": 761,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT",
+      "line": 722,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT",
+      "line": 758,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS",
+      "line": 763,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES",
+      "line": 691,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_FILES",
+      "line": 660,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_FILES",
+      "line": 689,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT",
+      "line": 659,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT",
+      "line": 687,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES",
+      "line": 690,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_NEXT_ACTION",
+      "line": 613,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_NEXT_ACTION",
+      "line": 637,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11596,7 +11620,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PORCELAIN",
-      "line": 582,
+      "line": 616,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_PORCELAIN",
+      "line": 640,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11604,7 +11636,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PUSH",
-      "line": 992,
+      "line": 1052,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11612,7 +11644,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REMOTE",
-      "line": 520,
+      "line": 577,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11620,7 +11652,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH",
-      "line": 524,
+      "line": 581,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11628,7 +11660,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR",
-      "line": 525,
+      "line": 582,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11636,7 +11668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL",
-      "line": 526,
+      "line": 583,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11644,7 +11676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL",
-      "line": 523,
+      "line": 580,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11652,7 +11684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_REPO_KEY",
-      "line": 521,
+      "line": 578,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11660,7 +11692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_ROOT",
-      "line": 518,
+      "line": 575,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11668,46 +11700,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SOURCE_ROOT",
-      "line": 516,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
-      "line": 548,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
-      "line": 551,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
-      "line": 560,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
-      "line": 569,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
       "line": 573,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
@@ -11715,8 +11707,40 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 1011,
+      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
+      "line": 605,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
+      "line": 608,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
+      "line": 617,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
+      "line": 626,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_STATUS",
+      "line": 630,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11724,7 +11748,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 1015,
+      "line": 1071,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_SYNC",
+      "line": 1075,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -11732,7 +11764,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC_PUSH",
-      "line": 1010,
+      "line": 1070,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_TREE_KEYS",
+      "line": 440,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },

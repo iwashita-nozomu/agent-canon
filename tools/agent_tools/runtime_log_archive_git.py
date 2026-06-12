@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -42,6 +43,9 @@ AGENT_REPORT_EXCLUDED_DIRS = frozenset(
 )
 AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.json"})
 DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
+REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
+CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
+GIT_HEAD_TIMEOUT_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,8 @@ class ArchiveStatusSummary:
     dirty_keys: tuple[str, ...]
     current_key_dirty: bool
     foreign_dirty_keys: tuple[str, ...]
+    tree_keys: tuple[str, ...]
+    foreign_tree_keys: tuple[str, ...]
     global_dirty: bool
 
 
@@ -339,7 +345,7 @@ def porcelain_path(line: str) -> str:
 def dirty_key_for_path(path: str) -> tuple[str, bool]:
     """Return (repo_key, global_dirty) for one archive-relative dirty path."""
     parts = Path(path).parts
-    if len(parts) >= 2 and parts[0] in {"hook-runs", "codex-runtime", "agent-reports"}:
+    if len(parts) >= 2 and parts[0] in REPO_KEYED_ARCHIVE_FAMILIES:
         if parts[1] != "legacy-import":
             return parts[1], False
     if parts and parts[0] in {
@@ -354,10 +360,50 @@ def dirty_key_for_path(path: str) -> tuple[str, bool]:
     return "", False
 
 
+def archive_tree_keys(context: ArchiveContext) -> tuple[str, ...]:
+    """Return repo-key directory names already present in keyed archive families."""
+    keys: set[str] = set()
+    for family in sorted(REPO_KEYED_ARCHIVE_FAMILIES):
+        family_root = context.archive_root / family
+        try:
+            children = tuple(family_root.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            if child.is_dir() and child.name != "legacy-import":
+                keys.add(child.name)
+    return tuple(sorted(keys))
+
+
+def codex_trace_key() -> str:
+    """Return the current Codex chat/session trace key when the runtime exposes one."""
+    for env_name in CODEX_TRACE_ENV_NAMES:
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def source_git_head(source_root: Path) -> str:
+    """Return the source repository HEAD SHA when it is available."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_HEAD_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
     """Return structured archive dirty-state information."""
     current = current_branch(context)
     status = porcelain_status(context)
+    tree_keys = archive_tree_keys(context)
     dirty_keys: set[str] = set()
     global_dirty = False
     for line in status.splitlines():
@@ -367,6 +413,7 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
         if is_global:
             global_dirty = True
     foreign_keys = tuple(sorted(key for key in dirty_keys if key != context.repo_key))
+    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key != context.repo_key))
     return ArchiveStatusSummary(
         current_branch=current,
         dirty=bool(status.strip()),
@@ -374,6 +421,8 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
         dirty_keys=tuple(sorted(dirty_keys)),
         current_key_dirty=context.repo_key in dirty_keys,
         foreign_dirty_keys=foreign_keys,
+        tree_keys=tree_keys,
+        foreign_tree_keys=foreign_tree_keys,
         global_dirty=global_dirty,
     )
 
@@ -388,6 +437,9 @@ def print_status_summary(context: ArchiveContext, summary: ArchiveStatusSummary)
     print(f"RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY={'yes' if summary.current_key_dirty else 'no'}")
     print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS={','.join(summary.foreign_dirty_keys)}")
     print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY={'yes' if summary.foreign_dirty_keys else 'no'}")
+    print(f"RUNTIME_LOG_ARCHIVE_TREE_KEYS={','.join(summary.tree_keys)}")
+    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={','.join(summary.foreign_tree_keys)}")
+    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE={'yes' if summary.foreign_tree_keys else 'no'}")
     print(f"RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY={'yes' if summary.global_dirty else 'no'}")
 
 
@@ -399,6 +451,11 @@ def archive_next_action(context: ArchiveContext, summary: ArchiveStatusSummary) 
         return (
             "commit or migrate foreign repo-key log paths before closeout: "
             + ",".join(summary.foreign_dirty_keys)
+        )
+    if summary.foreign_tree_keys:
+        return (
+            "migrate committed foreign repo-key log trees before closeout: "
+            + ",".join(summary.foreign_tree_keys)
         )
     if summary.global_dirty:
         return "commit or revert archive-level dirty paths before closeout"
@@ -576,6 +633,7 @@ def command_check_clean(context: ArchiveContext, args: argparse.Namespace) -> in
     summary = archive_status_summary(context)
     print_status_summary(context, summary)
     clean = summary.branch_matches and not summary.dirty
+    clean = clean and not summary.foreign_tree_keys
     print(f"RUNTIME_LOG_ARCHIVE_NEXT_ACTION={archive_next_action(context, summary)}")
     if args.porcelain:
         for line in status.splitlines():
@@ -801,6 +859,8 @@ def command_archive_agent_report(context: ArchiveContext, args: argparse.Namespa
         "schema": AGENT_REPORT_ARCHIVE_SCHEMA,
         "archive_id": archive_id,
         "archived_at": datetime.now(UTC).isoformat(),
+        "codex_trace_key": codex_trace_key(),
+        "source_git_head": source_git_head(context.source_root),
         "source_root": str(context.source_root),
         "canon_root": str(context.canon_root),
         "repo_key": context.repo_key,
