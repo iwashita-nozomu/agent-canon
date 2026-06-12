@@ -84,6 +84,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - token 消費を抑える必要がある場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile (`token-lite` / `token-standard` / `token-deep`) と agent mode (`parent-direct` / `scout-only` / `spark-slice` / `full-stage` / `deep-review`) を先に決めます
 - token 節約は context loading と fan-out の制御であり、active profile が要求する review、dependency analysis、validation、closeout gate を省略する理由にはなりません
 - canonical tool が正本判定を持つ question では、prose 読み込みや subagent 起動の前に tool を呼び、pass / finding の compact output を信頼します。tool-covered property の再判定を subagent に渡さず、必要な場合は tool contract の不足を修正対象にします
+- workflow が user に実行させる command を引用する場合は、`tools/catalog.yaml` の `audience` / `placement` を確認し、skill/helper 専属 tool を user-facing entrypoint として案内しません
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
 - 要件整理では、ユーザーへ戻す前に notes、guardrails、documents、prior logs、local code / tests で解決できる unknown を解決し、根拠を `Resolved From Accumulated Context` に残します
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します

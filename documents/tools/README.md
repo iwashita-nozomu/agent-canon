@@ -11,6 +11,8 @@ downstream implementation ../../tools/agent_tools/issue_sync.py validates local 
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
+downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
+downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
@@ -45,6 +47,12 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 
 - `tools/catalog.yaml`
   - canonical、compatibility wrapper、optional、maintainer-only、retired tool の構造化カタログです。
+  - `audience` は直接呼び出す主体、`placement` は移行先ディレクトリ責務です。family default と entry override を
+    `tools/agent_tools/tool_catalog.py` が機械検証します。
+- `tools/user/`
+  - `audience: user` / `placement: user_entrypoint` の将来移動先です。既存コマンドは互換維持のため、caller 移行が完了するまで現在の path を残します。
+- `tools/internal/`
+  - skill、workflow、compatibility wrapper、support library の将来移動先です。skill 専属 helper は `tools/internal/skills/`、workflow helper は `tools/internal/workflows/`、legacy wrapper は `tools/internal/compatibility/` に寄せます。
 - [Dependency Tools And Licenses](dependency-tools-and-licenses.md)
   - dependency manifest tools、shared runtime tools、外部 toolchain、default local LLM model の用途と license evidence をまとめた人間向け一覧です。
 - `tools/agent_tools/tool_catalog.py`

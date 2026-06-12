@@ -17,6 +17,8 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs st
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
+downstream design user/README.md defines stable user-facing tool entrypoint migration target
+downstream design internal/README.md defines skill, workflow, and compatibility helper migration targets
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
@@ -60,6 +62,38 @@ same-named tool-doc map.
 `documents/tools/tool-docs.toml` maps selected tool entrypoints to one
 reader-facing Markdown file each. The tool and document basenames must match
 so the catalog can be enumerated mechanically.
+
+## Tool Audience And Placement
+
+`tools/catalog.yaml` owns two separate classifications for every effective
+catalog entry:
+
+- `audience` says who should call the tool directly: `user`, `agent`, `skill`,
+  `workflow`, `maintainer`, or `internal`.
+- `placement` says where the implementation or wrapper belongs after
+  migration: `user_entrypoint`, `skill_helper`, `workflow_helper`,
+  `validation_checker`, `ci_gate`, `compatibility_wrapper`, or
+  `support_library`.
+
+Family defaults keep the catalog compact; mixed families override individual
+entries. `tool_catalog.py` validates that every entry has an effective
+audience and placement, and that `status: compatibility_wrapper` entries use
+`placement: compatibility_wrapper`.
+
+```mermaid
+flowchart LR
+    request[Need a tool] --> catalog[tools/catalog.yaml]
+    catalog --> public{audience=user?}
+    public -->|yes| userdir[tools/user/ target]
+    public -->|no| helper{placement}
+    helper --> skill[tools/internal/skills/ target]
+    helper --> workflow[tools/internal/workflows/ target]
+    helper --> compat[tools/internal/compatibility/ target]
+```
+
+The new directories are migration targets, not duplicate registries. Existing
+tool paths stay stable until the catalog entry, tests, docs, and workflow
+callers move together.
 
 Validation entrypoints:
 
