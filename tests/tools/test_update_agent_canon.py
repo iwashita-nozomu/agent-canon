@@ -1285,8 +1285,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(third.returncode, 0, third.stdout + third.stderr)
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", third.stdout)
 
-    def test_latest_routes_dirty_submodule_to_agent_conflict_workflow(self) -> None:
-        """The high-level latest command should not overwrite dirty shared canon work."""
+    def test_latest_preserves_dirty_submodule_and_merges_remote_main(self) -> None:
+        """Latest should preserve dirty shared canon work while merging remote main."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -1297,6 +1297,13 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            remote_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
 
             latest = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "latest"],
@@ -1305,20 +1312,47 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            status = subprocess.run(
+                ["git", "status", "--short", "--untracked-files=all"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            stash_list = subprocess.run(
+                ["git", "stash", "list"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
 
-            self.assertNotEqual(latest.returncode, 0)
+            self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
             self.assertIn("agent_canon_plan_route=submodule_update", latest.stdout)
             self.assertIn("agent_canon_plan_submodule_worktree_status=dirty", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required", latest.stdout)
-            self.assertIn(
-                "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md",
-                latest.stdout,
+            self.assertIn("AGENT_CANON_LATEST_DIRTY_PRESERVE=started", latest.stdout)
+            self.assertIn("agent_canon_merge_dirty_preserve_result=started", latest.stdout)
+            self.assertIn("agent_canon_merge_dirty_restore=applied", latest.stdout)
+            self.assertIn("agent_canon_merge_dirty_stash_dropped=yes", latest.stdout)
+            self.assertIn("agent_canon_merge_remote_main_in_post_head=yes", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_DIRTY_PRESERVE=pass", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass", latest.stdout)
+            self.assertIn("shared surface is in sync", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty", latest.stdout)
+            self.assertIn("NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state", latest.stdout)
+            self.assertTrue((submodule / "remote-marker.txt").is_file())
+            self.assertTrue((submodule / "dirty-marker.txt").is_file())
+            self.assertIn("?? dirty-marker.txt", status)
+            self.assertNotIn("preserve dirty AgentCanon work", stash_list)
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", remote_sha, "HEAD"],
+                    cwd=submodule,
+                    check=False,
+                ).returncode,
+                0,
             )
-            self.assertIn(
-                "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
-                latest.stdout,
-            )
-            self.assertIn("NEXT_ACTION=run_agentcanon_conflict_workflow", latest.stdout)
 
     def test_latest_parks_eval_logs_before_submodule_update(self) -> None:
         """Latest should park accumulated eval logs before applying a safe main update."""

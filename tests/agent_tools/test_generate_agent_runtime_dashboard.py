@@ -80,6 +80,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "### Selection Evidence Drilldown",
             "### Prompt Token Trend Drilldown",
             "### Token Consumption Drilldown",
+            "### Wave And Subagent Execution Drilldown",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "| `rolling_window_observations` | `8` |",
             "| `prompt_chars_per_call_recent` | `27` |",
@@ -87,6 +88,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `candidate_tokens_per_comparison_recent` | `100` |",
             "| `joint_trend_status` | `limited_joint_window` |",
             "| `comparison_count` | `1` |",
+            "AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS=1",
+            "AGENT_RUNTIME_DASHBOARD_WAVE_COMPLETED=1",
+            "| `completed_events` | `1` |",
+            "| `spawned_roles` | `requirements_organizer=1, explorer=1, execution_planner=1` |",
             "| `missing_namespaces` | `test-container=5` |",
             "| `missing_urls` | `https://example.com/paper.pdf=1` |",
             "| `registered_urls` | `https://example.com/reference.html=1` |",
@@ -161,6 +166,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Token Consumption Evidence",
             "token_comparison_status: `present`",
             "average_token_ratio: `0.500`",
+            "## Wave And Subagent Execution",
+            "wave_execution_status: `present`",
         )
         for expected in required:
             self.assertIn(expected, dashboard)
@@ -325,6 +332,43 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("| `prompt_chars_per_call_recent` | `10` |", compact_dashboard)
         self.assertIn("| `token_ratio_recent` | `0.100` |", compact_dashboard)
         self.assertNotIn("legacy-skill", compact_dashboard)
+
+    def test_dashboard_wave_metrics_do_not_require_log_archive(self) -> None:
+        """Wave metrics should come from run-bundle artifacts, not raw logs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_wave_bundle_fixture(
+                root,
+                status="blocked_authority_required",
+                spawn_authority="parent_runtime_authority_required",
+                spawned_roles="none",
+                skipped_roles="requirements_organizer,explorer:pending_parent_spawn",
+            )
+            compact_output = root / "reports" / "compact-dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(root / "reports" / "dashboard.md"),
+                    "--compact-out",
+                    str(compact_output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            compact_dashboard = compact_output.read_text(encoding="utf-8")
+            self.assertFalse((root / ".agent-canon" / "log-archive").exists())
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS=1", compact_dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=1", compact_dashboard)
+        self.assertIn("| `blocked_events` | `1` |", compact_dashboard)
+        self.assertIn("| `skipped_roles` | `requirements_organizer=1, explorer=1` |", compact_dashboard)
 
     def write_fixture(self, root: Path, *, source_root: Path | None = None) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -533,12 +577,80 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def write_workflow_monitor_fixture(self, root: Path) -> None:
         """Write token comparison fixture files."""
+        self.write_wave_bundle_fixture(root)
         workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
-        workflow_report.parent.mkdir(parents=True)
+        text = workflow_report.read_text(encoding="utf-8")
         workflow_report.write_text(
-            "timestamp=2026-05-17T01:02:03Z "
-            "token_efficiency_protocol=active token_footprint_comparison=pass "
-            "baseline_total=200 candidate_total=100 token_ratio=0.500 target_ratio=0.500\n",
+            text
+            + "timestamp=2026-05-17T01:02:03Z "
+            + "token_efficiency_protocol=active token_footprint_comparison=pass "
+            + "baseline_total=200 candidate_total=100 token_ratio=0.500 target_ratio=0.500\n",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def write_wave_bundle_fixture(
+        root: Path,
+        *,
+        status: str = "done",
+        spawn_authority: str = "parent",
+        spawned_roles: str = "requirements_organizer,explorer,execution_planner",
+        skipped_roles: str = "none",
+    ) -> None:
+        """Write a minimal schedule/workflow wave-event fixture."""
+        report_dir = root / "reports" / "agents" / "test"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        schedule_row = (
+            f"| WAVE-1 | parent | {spawn_authority} | initial_intake | 12/12 | "
+            f"9/12 | 24 | 2 | {spawned_roles} | {skipped_roles} | "
+            "reports/agents/test | unrelated | read_only | pytest | "
+            "schedule_review | team_manifest.yaml | "
+            f"team_manifest.yaml#run.delegated_spawn_policy | {status} |"
+        )
+        (report_dir / "schedule.md").write_text(
+            "\n".join(
+                [
+                    "# Schedule",
+                    "",
+                    "## Agent Wave Ledger",
+                    (
+                        "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | "
+                        "Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | "
+                        "Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                        "Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |"
+                    ),
+                    (
+                        "| ------- | ------------------ | --------------- | ------- | ------------- | "
+                        "------------ | ------------------- | ----------------- | ------------- | "
+                        "------------------------- | ------------- | ----------- | ----------- | "
+                        "---------------- | ----------- | ----------------- | -------------------- | ------ |"
+                    ),
+                    schedule_row,
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        (report_dir / "workflow_monitoring.md").write_text(
+            "\n".join(
+                [
+                    "# Workflow Monitoring",
+                    "",
+                    "## Actual Wave Events",
+                    (
+                        "- wave_event=recorded wave_id=WAVE-1 event_kind=spawned "
+                        f"spawn_authority={spawn_authority} trigger=initial_intake "
+                        "budget_before=12/12 budget_after=9/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 "
+                        f"spawned_roles={spawned_roles} skipped_roles={skipped_roles} "
+                        "allowed_paths=reports/agents/test do_not_read=unrelated "
+                        "write_scope=read_only validation_route=pytest "
+                        "review_gate=schedule_review handoff_artifacts=team_manifest.yaml "
+                        f"status={status}"
+                    ),
+                    "",
+                ]
+            ),
             encoding="utf-8",
         )
 
