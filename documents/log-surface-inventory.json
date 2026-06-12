@@ -10780,7 +10780,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 207,
+      "line": 224,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10788,7 +10788,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 237,
+      "line": 291,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 865,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10796,7 +10804,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 237,
+      "line": 865,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10804,7 +10812,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH",
-      "line": 239,
+      "line": 867,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10812,7 +10820,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_DOT",
-      "line": 245,
+      "line": 873,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DEPENDENCY_MANIFEST_GRAPH_HTML",
+      "line": 875,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10820,7 +10836,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_MARKDOWN",
-      "line": 243,
+      "line": 871,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10828,7 +10844,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_SOURCE_CHECK",
-      "line": 241,
+      "line": 869,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -15180,7 +15196,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 628,
+      "line": 655,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15188,7 +15204,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 628,
+      "line": 655,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15196,7 +15212,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 628,
+      "line": 655,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15204,7 +15220,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 628,
+      "line": 655,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15212,7 +15228,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONTAINER_CONFIG_FINDING",
-      "line": 126,
+      "line": 153,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15220,7 +15236,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 653,
+      "line": 680,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15228,7 +15244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 651,
+      "line": 678,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15236,7 +15252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 652,
+      "line": 679,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15244,7 +15260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 645,
+      "line": 672,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
