@@ -20,7 +20,14 @@ interface probe, and generated-stub checker.
 
 Use [lean_capability_matrix.md](lean_capability_matrix.md) before deciding
 whether a proof attempt belongs in a topic-local package or in this reusable
-environment.
+environment. In AgentCanon devcontainers, `.devcontainer/post-create.sh`
+installs `elan`, Lean, and Lake with
+`AGENT_CANON_LEAN_TOOLCHAIN=leanprover/lean4:v4.30.0` by default. The
+devcontainer installs `elan` from the pinned `AGENT_CANON_ELAN_VERSION`
+release asset and verifies the architecture-specific SHA256 checksum before
+running `elan-init`, so this helper can run `lake update`, `lake build`, and
+`lake env lean` in fresh containers without host-global Lean setup or a moving
+installer script.
 
 Initialize the environment without executing Lake:
 

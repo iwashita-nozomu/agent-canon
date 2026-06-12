@@ -91,6 +91,8 @@ Keep the project `Dockerfile` focused on the project runtime.
   convenience.
 - Do not install rustup or run cargo solely for AgentCanon CLI or shared
   analysis-tool migration work.
+- Do not install `elan`, Lean, Lake, or proof-search tooling solely for
+  AgentCanon formal-proof workflows.
 - Do not install TeX / LaTeX tooling solely for Academic Writing agent output.
 - Do not bake host-specific mount paths such as `/mnt/git` into the image.
 - Do not install repository Python dependencies during image build when those
@@ -117,6 +119,12 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
+- Lean theorem-proving tooling used by formal-proof skills, including
+  `elan`, Lean, Lake, and the default `AGENT_CANON_LEAN_TOOLCHAIN`, belongs
+  in `.devcontainer/post-create.sh` when it is only needed for AgentCanon
+  proof tooling. Install `elan` from a pinned release asset with a recorded
+  SHA256 checksum, not by piping a moving installer script. It is agent-side
+  proof infrastructure, not a project runtime dependency.
 - Structured analysis cache rebuilds belong in `.devcontainer/post-create.sh`
   after the AgentCanon Rust CLI is installed. The rebuild uses
   `agent-canon structured-analysis build --root <workspace> --profile
