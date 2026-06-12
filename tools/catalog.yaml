@@ -199,7 +199,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown and DOT reports.
+    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML graph reports.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker

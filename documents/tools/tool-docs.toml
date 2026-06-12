@@ -118,7 +118,7 @@ id = "render-dependency-manifest-graph"
 tool = "tools/agent_tools/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"
 language = "python"
-summary = "Dependency manifest graph Markdown and DOT renderer documentation."
+summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]
 id = "classify-path-risk"
