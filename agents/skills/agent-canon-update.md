@@ -21,9 +21,9 @@ TODO state up to date.
 - `make agent-canon-ensure-latest`, `make agent-canon-latest`,
   `tools/update_agent_canon.sh`, or `tools/sync_agent_canon.sh` is the likely
   entrypoint.
-- A parent repo has AgentCanon submodule pin drift, root-view drift, or pending
-  `.agent-canon/update-state.toml` TODOs.
-- `vendor/agent-canon/` contains local AgentCanon source commits that need an
+- A parent repo has AgentCanon submodule pin drift, root-view drift, safe
+  dirty checkout state, or pending `.agent-canon/update-state.toml` TODOs.
+- `vendor/agent-canon/` contains local AgentCanon source commits that need a
   standalone AgentCanon branch/PR before the parent pin can move.
 
 ## Core References
@@ -50,9 +50,15 @@ make agent-canon-update-plan
 make agent-canon-ensure-latest
 ```
 
-1. If `vendor/agent-canon/` has local source commits or source dirty state,
-   stop the parent pin update path and move that work through an AgentCanon
-   source branch/PR:
+1. Let `make agent-canon-ensure-latest` classify dirty submodule state. When the
+   dirty checkout can be preserved mechanically, it runs the preserve-dirty
+   route, restores the dirty state after merging AgentCanon `main`, repairs root
+   views, and checks shared-surface drift.
+   Do not replace that route with a manual stop-first rule.
+
+1. If `vendor/agent-canon/` has local source commits, or latest reports a
+   detached head, merge conflict, restore conflict, or other unsafe state, move
+   the work through an AgentCanon source branch/PR:
 
 ```bash
 bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty

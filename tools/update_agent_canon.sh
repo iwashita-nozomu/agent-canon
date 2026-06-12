@@ -350,6 +350,56 @@ route_requires_agent_workflow() {
   return 1
 }
 
+can_preserve_dirty_agentcanon_latest() {
+  local route="$1"
+  local prefix_mode="$2"
+  local submodule_worktree_status="$3"
+
+  [ "$prefix_mode" = "submodule" ] || return 1
+  [ "$submodule_worktree_status" = "dirty" ] || return 1
+  case "$route" in
+    already_current_submodule|submodule_update|local_contains_remote|diverged_submodule_history|diverged_local_history|deferred_branch_pr)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+preserve_dirty_agentcanon_latest() {
+  local branch="$1"
+  local route="$2"
+  local preserve_rc=0
+
+  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=started"
+  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE_ROUTE=${route:-unknown}"
+  cmd_merge_main_into_current_preserve_dirty "$branch" || preserve_rc=$?
+  if [ "$preserve_rc" -ne 0 ]; then
+    echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=failed"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_failed"
+    return "$preserve_rc"
+  fi
+  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=pass"
+  if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" link-root; then
+    echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=failed"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_root_view_repair_failed"
+    echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest"
+    return 1
+  fi
+  echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass"
+  if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" check; then
+    echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=failed"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_shared_surface_check_failed"
+    echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest"
+    return 1
+  fi
+  echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass"
+  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty"
+  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
+  echo "NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state"
+  return 0
+}
+
 acknowledge_update_todos_if_available() {
   local todo_tool="$ROOT_DIR/tools/agent_tools/agent_canon_update_todos.py"
   local state_path="$ROOT_DIR/.agent-canon/update-state.toml"
@@ -433,6 +483,10 @@ cmd_latest() {
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
 
   if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
+    if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then
+      preserve_dirty_agentcanon_latest "$branch" "$route"
+      return $?
+    fi
     emit_agentcanon_conflict_workflow_route "route=${route:-unknown};dirty_update_surface=${dirty_update_surface:-unknown};submodule_worktree_status=${submodule_worktree_status:-unknown}"
     return 2
   fi

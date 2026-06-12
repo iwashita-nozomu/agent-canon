@@ -159,6 +159,9 @@ upstream design README.md memory surface index
 - 2026-06-01 | Reader-facing documents, reports, workflow guides, and plans should actively use Mermaid diagrams for nontrivial process, dependency, ownership, routing, state, or review-gate structure when the diagram adds reader value.
   - source: chat
 
+- 2026-06-12 | When improving AgentCanon workflow policy, prioritize removing stale or obsolete conventions and hard-stop assumptions over adding new style-like rules.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
