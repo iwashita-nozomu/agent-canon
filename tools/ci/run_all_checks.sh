@@ -224,6 +224,12 @@ else
   echo "❌ tool catalog checks 失敗"
   EXIT_CODE=1
 fi
+if "$PYTHON_BIN" tools/agent_tools/tool_proof_coverage.py 2>&1; then
+  echo "✅ tool proof coverage checks 成功"
+else
+  echo "❌ tool proof coverage checks 失敗"
+  EXIT_CODE=1
+fi
 if "$PYTHON_BIN" tools/agent_tools/tool_drift.py 2>&1; then
   echo "✅ tool/convention drift checks 成功"
 else

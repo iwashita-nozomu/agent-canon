@@ -142,6 +142,13 @@ language = "python"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
 
 [[tool]]
+id = "tool-proof-coverage"
+tool = "tools/agent_tools/tool_proof_coverage.py"
+doc = "documents/tools/tool_proof_coverage.md"
+language = "python"
+summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
+
+[[tool]]
 id = "algorithm-expansion-ir"
 tool = "tools/agent_tools/algorithm_expansion_ir.py"
 doc = "documents/tools/algorithm_expansion_ir.md"

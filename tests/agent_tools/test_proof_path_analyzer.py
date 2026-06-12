@@ -5,7 +5,7 @@
 # upstream implementation ../../tools/agent_tools/proof_path_analyzer.py analyzes proof paths.
 # upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py emits lemma graphs.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof graph workflow.
-# downstream design ../../documents/tools/proof_path_analyzer.md documents CLI usage.
+# upstream design ../../documents/tools/proof_path_analyzer.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations

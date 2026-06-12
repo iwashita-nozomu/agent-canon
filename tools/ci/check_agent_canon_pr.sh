@@ -160,6 +160,7 @@ run_standalone_static_gate_ci() {
   cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
   cargo test --manifest-path rust/agent-canon/Cargo.toml
   python3 tools/agent_tools/tool_catalog.py
+  python3 tools/agent_tools/tool_proof_coverage.py
   python3 tools/agent_tools/tool_drift.py
   python3 tools/agent_tools/responsibility_scope.py
   BASE_REF="${GITHUB_BASE_REF:-main}"

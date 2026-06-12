@@ -25,6 +25,7 @@ downstream implementation ../../tools/agent_tools/search_index.py builds repo-lo
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
 downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
 downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
@@ -84,6 +85,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
 - `tools/agent_tools/lean_proof_env.py`
   - Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。探索・fallback はこの tool、durable theorem surface は topic-local Lake package の依存として固定します。
+- `tools/agent_tools/tool_proof_coverage.py`
+  - `tools/catalog.yaml` の全 tool に対して behavior / performance の Lean proof obligation を列挙します。通常 mode は coverage を生成し、`--require-lean-verified` は全 tool が checker 済み Lean artifact を持つまで fail します。
 - `documents/tools/lean_capability_matrix.md`
   - Lean core、Mathlib、Aesop、theorem search、Lake 環境の使い分けを記録する proof-task 向け能力表です。特定アルゴリズム名に寄せず、方程式、反復、順序、線形/多項式不等式、構造分解、既存定理探索をどう Lean に渡すかを決めます。
 - `tools/agent_tools/proof_path_analyzer.py`
