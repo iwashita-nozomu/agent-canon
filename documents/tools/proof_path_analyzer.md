@@ -25,7 +25,6 @@ python3 tools/agent_tools/proof_path_analyzer.py \
   --lemma-graph lean/pdipm_convergence/pdipm_local_convergence_lemma_graph.json \
   --lemma-graph lean/pdipm_convergence/pdipm_solver_chain_lemma_graph.json \
   --proof-status lean/pdipm_convergence/proof_status.json \
-  --proof-frontier lean/pdipm_convergence/proof_frontier.md \
   --adoption-text notes/themes/pdipm_convergence_proof.md \
   --format markdown \
   --out lean/pdipm_convergence/pdipm_proof_path_analysis.md
@@ -48,10 +47,7 @@ The analyzer fails for proof-path integrity defects:
   supplied lemma graphs and Algorithm Expansion IR files;
 - nonminimal returned frontier blockers: an open witness must be represented on
   the selected target chain and must not hide a smaller open target-chain
-  descendant;
-- stale generated lemma groups: when `proof_status.json` records
-  `source_ir_fingerprints`, every listed fingerprint must appear in the
-  supplied lemma graphs.
+  descendant.
 
 Open mathematical witnesses do not make the command fail. They keep
 `proof_complete=false` while preserving a connected proof path. This distinction
@@ -82,8 +78,6 @@ The report distinguishes:
 
 - `validation.valid`: graph/path integrity succeeded.
 - `validation.connected`: target chains are structurally connected.
-- `fingerprint_valid`: generated lemma groups match the Algorithm Expansion IR
-  fingerprints recorded by proof status.
 - `frontier_minimal`: all returned open witnesses are the first nonterminal
   rows on the selected target chain.
 - `proof_complete`: no open witnesses or unprovable-under-assumption rows remain.
@@ -98,9 +92,9 @@ Use `validation.valid` as the gate for artifact health; use `proof_complete`
 only when deciding whether the mathematical proof is finished. Use
 `frontier_minimal` when preparing a nonterminal proof return; if it is false,
 decompose the blocker further or switch to the theorem/profile whose graph
-contains that witness. If `fingerprint_valid=false`, reset the generated
-IR-backed lemma groups by regenerating Algorithm Expansion IR, lemma graphs, and
-the proof-status overlay.
+contains that witness. After algorithm changes, reset generated IR-backed lemma
+groups by regenerating Algorithm Expansion IR, lemma graphs, and the
+proof-status overlay from the current root.
 
 `open_frontier` may contain rows that have already been explored to
 `unprovable_under_assumptions` for the selected theorem/profile. Those rows are

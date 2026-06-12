@@ -37,7 +37,7 @@ import unittest
 from pathlib import Path
 from typing import cast
 
-from tools.agent_tools.runtime_log_paths import mounted_log_archive_root
+from tools.agent_tools.runtime_log_paths import mounted_log_archive_root, repo_log_key
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -3458,6 +3458,65 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
         self.assertEqual(entries[0]["observed_text_field_count"], 1)
 
+    def test_skill_usage_logger_honors_source_root_override(self) -> None:
+        """Source-root override should route hook logs to the intended repo key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            active_root = temp_root / "parent"
+            source_root = temp_root / "agent-canon"
+            active_root.mkdir()
+            source_root.mkdir()
+            subprocess.run(["git", "init"], cwd=active_root, check=True, capture_output=True)
+            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=source_root, check=True)
+            (source_root / "README.md").write_text("# Source\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=source_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial"], cwd=source_root, check=True, capture_output=True)
+            source_head = subprocess.run(
+                ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            archive_root = temp_root / ".agent-canon" / "archive"
+            trace_key = "thread-test-1"
+
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=active_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(archive_root),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_HOOK_SOURCE_ROOT": str(source_root),
+                    "CODEX_THREAD_ID": trace_key,
+                },
+            )
+            log_path = (
+                archive_root
+                / "hook-runs"
+                / repo_log_key(source_root)
+                / "test-container"
+                / "skill_usage.jsonl"
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["source_repo_key"], repo_log_key(source_root))
+        self.assertEqual(entry["codex_trace_key"], trace_key)
+        self.assertEqual(entry["codex_thread_id"], trace_key)
+        self.assertEqual(entry["source_git_head"], source_head)
+
     def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
         """No-skill hook payloads should not dirty durable AgentCanon logs."""
         payloads: tuple[dict[str, object], ...] = (
@@ -3858,6 +3917,53 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["workflow_monitor_subagent_event_count"], 1)
         self.assertEqual(entry["workflow_monitor_report_dir"], str(report_dir))
         self.assertIn("subagent_lifecycle_event=close", monitoring)
+
+    def test_skill_usage_logger_prefers_parent_active_run_for_vendored_agentcanon(self) -> None:
+        """Vendored AgentCanon hook runs should not write workflow evidence to stale submodule reports."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent_root = Path(temp_dir) / "project_template"
+            source_root = parent_root / "vendor" / "agent-canon"
+            source_root.mkdir(parents=True)
+            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
+
+            parent_report = parent_root / "reports" / "agents" / "run-current"
+            parent_report.mkdir(parents=True)
+            (parent_report / "workflow_monitoring.md").write_text(
+                "# Workflow Monitoring\n\n## Behavior Events\n",
+                encoding="utf-8",
+            )
+            parent_pointer = parent_root / "reports" / "agents" / ".active_run"
+            parent_pointer.write_text(str(parent_report) + "\n", encoding="utf-8")
+
+            stale_report = source_root / "reports" / "agents" / "run-stale"
+            stale_report.mkdir(parents=True)
+            (stale_report / "workflow_monitoring.md").write_text(
+                "# Workflow Monitoring\n\n## Behavior Events\n",
+                encoding="utf-8",
+            )
+            stale_pointer = source_root / "reports" / "agents" / ".active_run"
+            stale_pointer.write_text(str(stale_report) + "\n", encoding="utf-8")
+
+            log_path = parent_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=source_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "close_agent",
+                        "tool_input": {"target": "agent-123"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["workflow_monitor_report_dir"], str(parent_report))
 
     def test_skill_usage_logger_records_subagent_close_selection(self) -> None:
         """Subagent close logging should record lifecycle target metadata."""

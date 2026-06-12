@@ -71,15 +71,15 @@ evidence.
    do not drop them because they are not success evidence.
 1. Use a unique path or append-only JSONL for repeated runs. Do not overwrite
    detailed eval, hook, skill, or experiment results.
-1. When run-local agent reports need normal cross-run retention, call
-   `python3 tools/agent_tools/runtime_log_archive_git.py sync`; it copies
-   `reports/agents/` into `agent-reports/<repo-key>/` and pushes
-   `logs/<repo-key>`.
-1. When a specific run bundle needs an immutable publication snapshot, call
+1. When the active run-local agent report needs cross-run retention, call
    `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
-   and then `runtime_log_archive_git.py push`. Do not ask an agent to manually
-   rewrite the report into the archive; the tool owns snapshot manifests and
-   `index.jsonl`.
+   and then `runtime_log_archive_git.py push`. The snapshot records the run id,
+   repo key, Codex trace key when exposed, and Git HEAD when available.
+1. Use broad `python3 tools/agent_tools/runtime_log_archive_git.py sync` only
+   when intentionally collecting accumulated runtime families such as hook
+   JSONL, Codex runtime summaries, or all run-local agent reports.
+1. Do not ask an agent to manually rewrite the report into the archive; the
+   tool owns snapshot manifests and `index.jsonl`.
 1. Include enough stable identifiers to group repeats without losing chronology:
    status, exit code, payload / input fingerprint, runtime namespace, branch,
    commit, and tool or hook name when available.

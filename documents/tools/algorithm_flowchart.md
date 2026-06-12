@@ -43,7 +43,7 @@ python3 tools/agent_tools/algorithm_flowchart.py \
   --proof-status lean/pdipm_convergence/proof_status.json \
   --include-code-facts \
   --format markdown \
-  --out lean/pdipm_convergence/pdipm_algorithm_flowchart.md
+  --out lean/pdipm_convergence/pdipm_recursive_minimal_flowchart.md
 ```
 
 For a one-shot AST route, pass `--python-symbol` directly:

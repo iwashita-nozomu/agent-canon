@@ -19,8 +19,8 @@ Use it between `algorithm_lemma_graph.py` and `proof_path_analyzer.py`:
 
 ```bash
 python3 tools/agent_tools/ir_graph_correspondence.py \
-  --algorithm-ir lean/pdipm_convergence/pdipm_run_impl_ir.json \
-  --lemma-graph lean/pdipm_convergence/pdipm_run_impl_local_convergence_lemma_graph.json \
+  --algorithm-ir lean/pdipm_convergence/pdipm_solve_ir.json \
+  --lemma-graph lean/pdipm_convergence/pdipm_local_convergence_lemma_graph.json \
   --proof-status lean/pdipm_convergence/proof_status.json \
   --target-profile local_convergence \
   --equation-tag step_update \
@@ -33,10 +33,10 @@ fact ids explicitly and require adoption:
 
 ```bash
 python3 tools/agent_tools/ir_graph_correspondence.py \
-  --algorithm-ir lean/pdipm_convergence/pdipm_run_impl_ir.json \
-  --lemma-graph lean/pdipm_convergence/pdipm_run_impl_local_convergence_lemma_graph.json \
+  --algorithm-ir lean/pdipm_convergence/pdipm_solve_ir.json \
+  --lemma-graph lean/pdipm_convergence/pdipm_local_convergence_lemma_graph.json \
   --proof-status lean/pdipm_convergence/proof_status.json \
-  --fact-id fact__python_jax_util_optimizers_pdipm__py___PDIPMStepper___step_update__assignment_equation__line_1329__next_residuals \
+  --fact-id fact__python_jax_util_optimizers_pdipm__py___pdipm_step_update__assignment_equation__line_1384__next_residuals \
   --require-proof-status-adoption
 ```
 

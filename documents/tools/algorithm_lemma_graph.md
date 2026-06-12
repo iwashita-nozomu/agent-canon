@@ -65,14 +65,9 @@ materializes these profiles:
 Code-derived facts become `code_fact` lemma nodes. Backend profile records from
 the proof-only profile library become `backend_profile` lemma nodes connected
 from the backend assumption node. These nodes are structural evidence, not
-mathematical proof completion.
-
-Each graph also records `source_ir_fingerprint`, a stable hash of the Algorithm
-Expansion IR fields that determine generated lemma groups. Generated lemmas are
-owned by that fingerprint. If the algorithm changes and the IR fingerprint
-changes, regenerate the IR and lemma graph, then rebuild the proof-status
-overlay; do not carry IR-backed generated lemmas forward by editing prose or
-labels.
+mathematical proof completion. If the algorithm changes, regenerate the IR and
+lemma graph from the current root, then rebuild the proof-status overlay; do not
+carry IR-backed generated lemmas forward by editing prose or labels.
 
 Profiles do not prove the claims. They create explicit target nodes and
 `target_requires` edges so that a proof note can choose one theorem target and

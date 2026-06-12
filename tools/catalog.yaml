@@ -212,6 +212,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/formal_proof.md
+      - documents/tools/lean_capability_matrix.md
       - agents/skills/formal-proof-workflow.md
       - references/agent-canon-technology-bibliography.md
     tests:
@@ -232,6 +233,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/lean_proof_env.md
+      - documents/tools/lean_capability_matrix.md
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_lean_proof_env.py
@@ -254,6 +256,26 @@ entries:
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_algorithm_expansion_ir.py
+
+  - id: algorithm-ir-to-lean
+    summary: Lowers Algorithm Expansion IR expression_ast and control facts into generic Lean route artifacts.
+    path: rust/agent-canon/src/algorithm_ir_to_lean.rs
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: tools/bin/agent-canon algorithm-ir-to-lean
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/algorithm_ir_to_lean.md
+      - documents/design/algorithm-ir-to-lean.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - rust/agent-canon/src/algorithm_ir_to_lean.rs
 
   - id: algorithm-lemma-graph
     summary: Converts Algorithm Expansion IR JSON into theorem-profiled lemma dependency graphs.

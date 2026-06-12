@@ -207,7 +207,6 @@ class AlgorithmLemmaGraphTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "lemma_graph_built")
-        self.assertRegex(payload["source_ir_fingerprint"], r"^[0-9a-f]{64}$")
         self.assertTrue(payload["validation"]["valid"])
         lemma_ids = {node["lemma_id"] for node in payload["lemma_nodes"]}
         self.assertIn("lemma__python_app_pdipm_py_solve", lemma_ids)

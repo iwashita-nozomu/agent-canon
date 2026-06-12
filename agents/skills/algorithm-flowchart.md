@@ -68,7 +68,7 @@ assumption の位置を一目で確認するための visualization layer です
      --proof-status lean/pdipm_convergence/proof_status.json \
      --include-code-facts \
      --format markdown \
-     --out lean/pdipm_convergence/pdipm_algorithm_flowchart.md
+     --out lean/pdipm_convergence/pdipm_recursive_minimal_flowchart.md
    ```
 
    実装経路だけを見せる図では `--view runtime`、数理・solver 中核だけを
