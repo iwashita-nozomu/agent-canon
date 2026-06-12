@@ -339,7 +339,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn(f"hook-runs/{key}/runtime/skill_usage_context.json", remote_tree.stdout)
 
     def test_ensure_rejects_same_key_unmergeable_json_conflict(self) -> None:
-        """Ensure should keep unsafe same-key JSON conflicts as blockers."""
+        """Ensure should keep unsafe same-key JSON conflicts as blockers without partial restore."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -355,8 +355,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source_ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(source_ensure.returncode, 0, source_ensure.stdout + source_ensure.stderr)
             archive = mounted_log_archive_root(canon)
+            log_path = archive / "hook-runs" / key / "runtime" / "skill_usage.jsonl"
             unsafe_path = archive / "hook-runs" / key / "runtime" / "tool_context.json"
-            unsafe_path.parent.mkdir(parents=True)
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text('{"hook_run_id": "target"}\n', encoding="utf-8")
+            unsafe_path.parent.mkdir(parents=True, exist_ok=True)
             unsafe_path.write_text('{"value": "target"}\n', encoding="utf-8")
             initial_push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(initial_push.returncode, 0, initial_push.stdout + initial_push.stderr)
@@ -369,7 +372,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
             self.assertEqual(self.archive_branch(archive), f"logs/{other_key}")
-            unsafe_path.parent.mkdir(parents=True)
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text('{"hook_run_id": "dirty"}\n', encoding="utf-8")
+            unsafe_path.parent.mkdir(parents=True, exist_ok=True)
             unsafe_path.write_text('{"value": "dirty"}\n', encoding="utf-8")
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
@@ -381,7 +386,80 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("but restoring them on", ensure.stdout)
             self.assertIn("archive destination already exists with different content", ensure.stdout)
             self.assertEqual(self.archive_branch(archive), f"logs/{key}")
+            self.assertEqual(log_path.read_text(encoding="utf-8"), '{"hook_run_id": "target"}\n')
             self.assertEqual(unsafe_path.read_text(encoding="utf-8"), '{"value": "target"}\n')
+
+    def test_ensure_rejects_malformed_context_timestamp_before_restore(self) -> None:
+        """Ensure should not auto-merge workflow context JSON with malformed timestamps."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            other_key = repo_log_key(other_source)
+
+            source_ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(source_ensure.returncode, 0, source_ensure.stdout + source_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            context_path = archive / "hook-runs" / key / "runtime" / "skill_usage_context.json"
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change Lite"],
+                        "report_dir": str(source / "reports" / "agents" / "run-old"),
+                        "timestamp": "2026-05-24T00:00:00Z",
+                        "source_event": "PromptSubmit",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            initial_push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(initial_push.returncode, 0, initial_push.stdout + initial_push.stderr)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            self.assertEqual(self.archive_branch(archive), f"logs/{other_key}")
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change"],
+                        "report_dir": str(source / "reports" / "agents" / "run-new"),
+                        "timestamp": "2026-05-25 00:00:00Z",
+                        "source_event": "PostToolUse",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertNotEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertIn("archive context JSON has malformed timestamp", ensure.stdout)
+            self.assertEqual(self.archive_branch(archive), f"logs/{key}")
+            self.assertEqual(
+                json.loads(context_path.read_text(encoding="utf-8")),
+                {
+                    "workflows": ["Scoped Change Lite"],
+                    "report_dir": str(source / "reports" / "agents" / "run-old"),
+                    "timestamp": "2026-05-24T00:00:00Z",
+                    "source_event": "PromptSubmit",
+                },
+            )
 
     def test_ensure_rejects_foreign_dirty_logs_before_branch_switch(self) -> None:
         """Ensure should not switch branches when dirty paths belong to another repo key."""

@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -49,6 +50,9 @@ CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSAT
 GIT_HEAD_TIMEOUT_SECONDS = 5
 WORKFLOW_CONTEXT_JSON_NAME = "skill_usage_context.json"
 WORKFLOW_CONTEXT_JSON_KEYS = frozenset({"workflows", "report_dir", "timestamp", "source_event"})
+WORKFLOW_CONTEXT_TIMESTAMP_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$"
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,16 @@ class ArchiveStatusSummary:
     tree_keys: tuple[str, ...]
     foreign_tree_keys: tuple[str, ...]
     global_dirty: bool
+
+
+@dataclass(frozen=True)
+class RestorePlanEntry:
+    """One validated restore operation for preserved dirty archive content."""
+
+    relative_path: str
+    target: Path
+    planned: Path
+    should_write: bool
 
 
 class ArchiveGitError(RuntimeError):
@@ -576,19 +590,19 @@ def stash_ref_sha(context: ArchiveContext) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
-def append_missing_jsonl_lines(target: Path, source: Path) -> None:
-    """Append JSONL lines from source that are not already present in target."""
+def merged_jsonl_bytes(target: Path, source: Path) -> bytes:
+    """Return JSONL bytes with source lines appended when missing."""
     target_bytes = target.read_bytes()
     source_lines = [line for line in source.read_bytes().splitlines() if line.strip()]
     existing_lines = set(target_bytes.splitlines())
     missing_lines = [line for line in source_lines if line not in existing_lines]
     if not missing_lines:
-        return
-    with target.open("ab") as handle:
-        if target_bytes and not target_bytes.endswith(b"\n"):
-            handle.write(b"\n")
-        for line in missing_lines:
-            handle.write(line + b"\n")
+        return target_bytes
+    parts = [target_bytes]
+    if target_bytes and not target_bytes.endswith(b"\n"):
+        parts.append(b"\n")
+    parts.extend(line + b"\n" for line in missing_lines)
+    return b"".join(parts)
 
 
 def workflow_context_json(path: Path, relative_path: str) -> dict[str, object]:
@@ -615,7 +629,25 @@ def workflow_context_json(path: Path, relative_path: str) -> dict[str, object]:
         value = context.get(key, "")
         if not isinstance(value, str):
             raise ArchiveGitError(f"archive context JSON has invalid {key}: {relative_path}")
+    validate_workflow_context_timestamp(cast(str, context.get("timestamp", "")), relative_path)
     return context
+
+
+def validate_workflow_context_timestamp(value: str, relative_path: str) -> datetime:
+    """Return a parsed UTC timestamp or fail before merge precedence is chosen."""
+    if not value:
+        raise ArchiveGitError(f"archive context JSON has empty timestamp: {relative_path}")
+    if not value.endswith("Z"):
+        raise ArchiveGitError(f"archive context JSON timestamp must end with Z: {relative_path}")
+    if not WORKFLOW_CONTEXT_TIMESTAMP_PATTERN.fullmatch(value):
+        raise ArchiveGitError(f"archive context JSON has malformed timestamp: {relative_path}")
+    try:
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError as exc:
+        raise ArchiveGitError(f"archive context JSON has malformed timestamp: {relative_path}") from exc
+    if parsed.tzinfo is None:
+        raise ArchiveGitError(f"archive context JSON timestamp must include UTC timezone: {relative_path}")
+    return parsed.astimezone(UTC)
 
 
 def workflow_context_scalar(
@@ -639,13 +671,16 @@ def workflow_context_scalar(
     return newer_value or older_value
 
 
-def merge_workflow_context_json(target: Path, source: Path, relative_path: str) -> None:
-    """Merge the short-lived skill usage workflow context snapshot."""
+def merged_workflow_context_json_bytes(target: Path, source: Path, relative_path: str) -> bytes:
+    """Return merged bytes for the short-lived skill usage workflow context snapshot."""
     target_context = workflow_context_json(target, relative_path)
     source_context = workflow_context_json(source, relative_path)
     target_timestamp = cast(str, target_context.get("timestamp", ""))
     source_timestamp = cast(str, source_context.get("timestamp", ""))
-    target_is_newer = target_timestamp >= source_timestamp
+    target_is_newer = (
+        validate_workflow_context_timestamp(target_timestamp, relative_path)
+        >= validate_workflow_context_timestamp(source_timestamp, relative_path)
+    )
 
     merged_workflows = list(
         dict.fromkeys(
@@ -671,27 +706,110 @@ def merge_workflow_context_json(target: Path, source: Path, relative_path: str) 
         "timestamp": target_timestamp if target_is_newer else source_timestamp,
         "workflows": merged_workflows,
     }
-    target.write_text(json.dumps(merged, sort_keys=True) + "\n", encoding="utf-8")
+    return (json.dumps(merged, sort_keys=True) + "\n").encode("utf-8")
 
 
-def restore_preserved_dirty_file(archive_root: Path, relative_path: str, preserved: Path) -> None:
-    """Restore one preserved dirty file on the selected archive branch."""
+def write_restore_plan_file(
+    archive_root: Path,
+    relative_path: str,
+    preserved: Path,
+    planned: Path,
+) -> bool:
+    """Write one planned restore file and return whether archive mutation is needed."""
     target = archive_root / relative_path
-    target.parent.mkdir(parents=True, exist_ok=True)
+    planned.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
-        shutil.copy2(preserved, target)
-        return
+        shutil.copy2(preserved, planned)
+        return True
     if target.read_bytes() == preserved.read_bytes():
-        return
+        return False
     if target.suffix == ".jsonl":
-        append_missing_jsonl_lines(target, preserved)
-        return
+        planned.write_bytes(merged_jsonl_bytes(target, preserved))
+        return target.read_bytes() != planned.read_bytes()
     if target.name == WORKFLOW_CONTEXT_JSON_NAME and target.suffix == ".json":
-        merge_workflow_context_json(target, preserved, relative_path)
-        return
+        planned.write_bytes(merged_workflow_context_json_bytes(target, preserved, relative_path))
+        return target.read_bytes() != planned.read_bytes()
     raise ArchiveGitError(
         f"archive destination already exists with different content after switching: {relative_path}"
     )
+
+
+def build_restore_plan(
+    archive_root: Path,
+    dirty_paths: tuple[str, ...],
+    preserved_root: Path,
+    plan_root: Path,
+) -> tuple[RestorePlanEntry, ...]:
+    """Validate every restore and materialize planned output before mutation."""
+    entries: list[RestorePlanEntry] = []
+    for dirty_path in dirty_paths:
+        planned = plan_root / dirty_path
+        should_write = write_restore_plan_file(
+            archive_root,
+            dirty_path,
+            preserved_root / dirty_path,
+            planned,
+        )
+        entries.append(
+            RestorePlanEntry(
+                relative_path=dirty_path,
+                target=archive_root / dirty_path,
+                planned=planned,
+                should_write=should_write,
+            )
+        )
+    return tuple(entries)
+
+
+def rollback_restore_plan(applied: list[tuple[RestorePlanEntry, Path | None]]) -> tuple[str, ...]:
+    """Restore archive files changed by a failed restore plan application."""
+    errors: list[str] = []
+    for entry, original in reversed(applied):
+        try:
+            if original is None:
+                try:
+                    entry.target.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            entry.target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(original, entry.target)
+        except OSError as exc:
+            errors.append(f"{entry.relative_path}: {exc}")
+    return tuple(errors)
+
+
+def apply_restore_plan(entries: tuple[RestorePlanEntry, ...], original_root: Path) -> None:
+    """Apply a validated restore plan, rolling back any partial writes on failure."""
+    applied: list[tuple[RestorePlanEntry, Path | None]] = []
+    try:
+        for entry in entries:
+            if not entry.should_write:
+                continue
+            original: Path | None = None
+            if entry.target.exists():
+                original = original_root / entry.relative_path
+                original.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(entry.target, original)
+            entry.target.parent.mkdir(parents=True, exist_ok=True)
+            applied.append((entry, original))
+            temp_target = entry.target.with_name(f".{entry.target.name}.agent-canon-restore-tmp")
+            try:
+                shutil.copy2(entry.planned, temp_target)
+                os.replace(temp_target, entry.target)
+            finally:
+                try:
+                    temp_target.unlink()
+                except FileNotFoundError:
+                    pass
+    except OSError as exc:
+        rollback_errors = rollback_restore_plan(applied)
+        rollback_detail = ""
+        if rollback_errors:
+            rollback_detail = f"; rollback errors: {'; '.join(rollback_errors)}"
+        raise ArchiveGitError(
+            f"archive restore plan application failed: {exc}{rollback_detail}"
+        ) from exc
 
 
 def switch_with_current_key_dirty_paths(context: ArchiveContext, branch: str) -> None:
@@ -741,8 +859,15 @@ def switch_with_current_key_dirty_paths(context: ArchiveContext, branch: str) ->
                 f"but switching to {branch} failed: {exc}"
             ) from exc
         try:
-            for dirty_path in dirty_paths:
-                restore_preserved_dirty_file(context.archive_root, dirty_path, preserved_root / dirty_path)
+            plan_root = preserved_root / ".restore-plan"
+            original_root = preserved_root / ".restore-originals"
+            restore_plan = build_restore_plan(
+                context.archive_root,
+                dirty_paths,
+                preserved_root,
+                plan_root,
+            )
+            apply_restore_plan(restore_plan, original_root)
         except ArchiveGitError as exc:
             raise ArchiveGitError(
                 "archive current repo-key changes were preserved in stash@{0} "
