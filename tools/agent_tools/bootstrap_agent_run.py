@@ -338,6 +338,16 @@ def emit_bootstrap_output(
         print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
         active_budget = context.workflow_active_spawn_budget or 0
         initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
+        if initial_wave:
+            print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
+            print("PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required")
+            print(
+                "PARENT_WAVE_EXECUTION_GATE_ARTIFACTS="
+                "schedule.md#Agent Wave Ledger,workflow_monitoring.md#Actual Wave Events"
+            )
+        else:
+            print("PARENT_WAVE_EXECUTION_GATE=not_applicable")
+            print("PARENT_WAVE_EXECUTION_GATE_STATUS=no_initial_wave")
         expansion_waves = recommended_dynamic_expansion_waves(
             runtime.roles,
             active_budget,

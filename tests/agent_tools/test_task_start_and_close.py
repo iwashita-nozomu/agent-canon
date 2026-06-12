@@ -411,6 +411,26 @@ class TaskStartAndCloseTest(unittest.TestCase):
         )
         self.assertNotIn("active_subagents", write_scope_policy)
 
+    def assert_initial_wave_execution_gate(self, report_dir: Path) -> None:
+        """Assert generated run bundles expose the parent wave execution gate."""
+        schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
+        monitoring_text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+        expected_schedule = (
+            "| WAVE-1 | parent | parent_runtime_authority_required | "
+            "bootstrap_initial_intake_wave |"
+        )
+        self.assertIn(expected_schedule, schedule_text)
+        self.assertIn("requirements_organizer,explorer,execution_planner", schedule_text)
+        self.assertIn("blocked_authority_required", schedule_text)
+        self.assertIn("wave_event=recorded wave_id=WAVE-1", monitoring_text)
+        self.assertIn("event_kind=authority_blocker", monitoring_text)
+        self.assertIn("spawn_authority=parent_runtime_authority_required", monitoring_text)
+        self.assertIn("status=blocked_authority_required", monitoring_text)
+        self.assertIn(
+            "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation",
+            monitoring_text,
+        )
+
     def assert_role_prompt_includes(
         self,
         manifest: dict[str, object],
@@ -735,6 +755,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger",
                 result.stdout,
             )
+            self.assertIn(
+                "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
+                result.stdout,
+            )
+            self.assertIn(
+                "PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required",
+                result.stdout,
+            )
+            self.assertIn(
+                "PARENT_WAVE_EXECUTION_GATE_ARTIFACTS="
+                "schedule.md#Agent Wave Ledger,workflow_monitoring.md#Actual Wave Events",
+                result.stdout,
+            )
             first_wave_match = re.search(
                 r"^RECOMMENDED_INITIAL_SUBAGENT_WAVE=(.+)$",
                 result.stdout,
@@ -805,6 +838,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assert_current_checkout_write_policy(write_scope_policy, 4)
+            self.assert_initial_wave_execution_gate(report_root / "test-task-start")
             self.assert_abstract_design_prompt_contracts(manifest)
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
@@ -1014,6 +1048,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events",
                 result.stdout,
             )
+            self.assertIn(
+                "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
+                result.stdout,
+            )
+            self.assertIn(
+                "PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required",
+                result.stdout,
+            )
             self.assertIn("RECOMMENDED_INITIAL_SUBAGENT_WAVE=", result.stdout)
             self.assertIn("RECOMMENDED_DYNAMIC_EXPANSION_WAVES=", result.stdout)
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
@@ -1146,6 +1188,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 agent_report_collection["archive_index"],
                 ".agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl",
+            )
+            self.assert_initial_wave_execution_gate(
+                report_root / "test-bootstrap-spawn-budget"
             )
 
     def test_bootstrap_warns_when_multi_agent_task_lacks_task_id(self) -> None:
