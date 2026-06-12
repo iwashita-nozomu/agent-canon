@@ -4,6 +4,7 @@
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
+# upstream design ../documents/tools/lean_proof_env.md Lean proof environment toolchain contract
 # upstream environment devcontainer.json postCreateCommand entrypoint
 # upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
 # upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
@@ -15,6 +16,7 @@ set -euo pipefail
 workspace="${1:-/workspace}"
 node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
+lean_toolchain="${AGENT_CANON_LEAN_TOOLCHAIN:-leanprover/lean4:v4.30.0}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
 local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}"
@@ -124,6 +126,48 @@ install_tex_tooling() {
     dvisvgm \
     ghostscript \
     poppler-utils
+}
+
+install_lean_toolchain() {
+  local installer
+  local profile_script
+  local tool
+
+  export ELAN_HOME="${ELAN_HOME:-${HOME}/.elan}"
+  export PATH="${ELAN_HOME}/bin:${PATH}"
+
+  if ! command -v elan >/dev/null 2>&1; then
+    apt_install ca-certificates curl
+    installer="$(mktemp)"
+    curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+      -o "$installer"
+    sh "$installer" -y --default-toolchain "$lean_toolchain" --no-modify-path
+    rm -f "$installer"
+  fi
+
+  elan toolchain install "$lean_toolchain"
+  elan default "$lean_toolchain"
+
+  profile_script="$(mktemp)"
+  cat >"$profile_script" <<EOF
+export ELAN_HOME="${ELAN_HOME}"
+case ":\${PATH}:" in
+  *:"${ELAN_HOME}/bin":*) ;;
+  *) export PATH="${ELAN_HOME}/bin:\${PATH}" ;;
+esac
+EOF
+  run_as_root install -m 644 "$profile_script" /etc/profile.d/agent-canon-lean.sh
+  rm -f "$profile_script"
+
+  for tool in elan lean lake; do
+    if [ -x "${ELAN_HOME}/bin/${tool}" ]; then
+      run_as_root ln -sf "${ELAN_HOME}/bin/${tool}" "/usr/local/bin/${tool}"
+    fi
+  done
+
+  elan --version
+  lean --version
+  lake --version
 }
 
 linux_arch() {
@@ -372,6 +416,7 @@ install_github_cli
 install_codex_cli
 install_json_cli_tools
 install_tex_tooling
+install_lean_toolchain
 install_secret_scanners
 install_agent_canon_cli
 install_llama_cpp
@@ -382,5 +427,8 @@ pdflatex --version | sed -n '1p'
 xelatex --version | sed -n '1p'
 dvisvgm --version | sed -n '1p'
 pdfcrop --version | sed -n '1p'
+elan --version
+lean --version
+lake --version
 gh --version
 codex --version
