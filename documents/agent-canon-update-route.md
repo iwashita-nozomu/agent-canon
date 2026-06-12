@@ -20,15 +20,16 @@ make agent-canon-latest
 
 `latest` is the user-facing high-level route. It may update the parent pin,
 repair root views, rebuild shared tools, and report pending parent TODOs. It
-does not erase local AgentCanon source changes; local source commits route to an
-AgentCanon PR.
+does not erase local AgentCanon source changes. Safe dirty checkout state is
+preserved while AgentCanon `main` is merged, root views are repaired and
+checked, and local source commits route to an AgentCanon PR.
 
 ## Command Responsibilities
 
 | Command | Responsibility |
 | --- | --- |
 | `tools/update_agent_canon.sh plan` | observe/update route decision; read-only |
-| `tools/update_agent_canon.sh latest` | high-level parent pin/root-view update route |
+| `tools/update_agent_canon.sh latest` | high-level parent pin/root-view update route; uses preserve-dirty merge when safe |
 | `tools/update_agent_canon.sh apply` | compatibility low-level apply; not the canonical task-start route |
 | `tools/update_agent_canon.sh merge-main-into-current` | strict clean-worktree local AgentCanon source branch PR route |
 | `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | dirty-preserving local AgentCanon source branch PR route |
@@ -39,6 +40,9 @@ AgentCanon PR.
 ## Cases
 
 1. Parent repo uses an old AgentCanon main pin: run the parent pin update route.
+1. `vendor/agent-canon` has safe dirty checkout state: `latest` preserves the
+   dirt, merges GitHub main into the current named branch, restores the dirt,
+   repairs/checks root views, and reports the AgentCanon branch/PR next action.
 1. `vendor/agent-canon` has local source commits: merge GitHub main into that
    branch, push the branch, and open an AgentCanon PR.
 1. Root view drift only: run `link-root` and `check`.
