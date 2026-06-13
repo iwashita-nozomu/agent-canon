@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -18,6 +19,18 @@ from pathlib import Path
 from typing import TextIO, cast
 
 from agent_team import resolve_report_root, schedule_wave_row
+from mid_task_user_input_policy import (
+    MID_TASK_CLASSIFICATION_ACTIONS,
+    MID_TASK_CLASSIFICATION_SCOPE_STATUS,
+    MID_TASK_EVIDENCE_FIELDS,
+    MID_TASK_REQUIRED_KEYS,
+    MID_TASK_REUSE_MARKERS,
+    MID_TASK_SPAWN_AUTHORITY,
+    MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS,
+    MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS,
+    has_reuse_marker,
+    is_empty_policy_value,
+)
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -42,38 +55,6 @@ TOOL_WARNING_STATUS_VALUES = {
     "not_applicable",
 }
 TOOL_WARNING_LEDGER_STATUS_VALUES = {"pending", "open", "resolved", "none"}
-MID_TASK_CLASSIFICATION_ACTIONS = {
-    "same_active_task_delta": "send_input",
-    "scope_or_contract_change": "fresh_followup_wave",
-    "new_task": "fresh_run",
-}
-MID_TASK_CLASSIFICATION_SCOPE_STATUS = {
-    "same_active_task_delta": "unchanged",
-    "scope_or_contract_change": "changed",
-    "new_task": "new_task",
-}
-MID_TASK_SPAWN_AUTHORITY = {
-    "same_active_task_delta": "parent_checkpoint_then_send_input",
-    "scope_or_contract_change": "parent_checkpoint_then_spawn_fresh_wave",
-    "new_task": "fresh_run_required",
-}
-MID_TASK_REQUIRED_KEYS = (
-    "wave_id",
-    "input_classification",
-    "updated_packet",
-    "target_agents",
-    "scope_status",
-    "budget_before",
-    "budget_after",
-    "runtime_max_threads",
-    "runtime_max_depth",
-    "allowed_paths",
-    "do_not_read",
-    "write_scope",
-    "validation_route",
-    "review_gate",
-    "handoff_artifacts",
-)
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
     "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
@@ -274,8 +255,10 @@ def add_mid_task_user_input_argument(parser: argparse.ArgumentParser) -> None:
             "updated_packet, target_agents, scope_status, budget_before, "
             "budget_after, runtime_max_threads, runtime_max_depth, allowed_paths, "
             "do_not_read, write_scope, validation_route, review_gate, and "
-            "handoff_artifacts. The command appends matching schedule.md Agent Wave "
-            "Ledger and workflow_monitoring.md Actual Wave Events rows."
+            "handoff_artifacts. scope_or_contract_change also requires "
+            "spawned_roles and fresh_wave_evidence; new_task also requires "
+            "fresh_run_bundle. The command appends matching schedule.md Agent "
+            "Wave Ledger and workflow_monitoring.md Actual Wave Events rows."
         ),
     )
 
@@ -400,7 +383,7 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
     missing = [
         key
         for key in MID_TASK_REQUIRED_KEYS
-        if fields.get(key, "").strip() in {"", "missing"}
+        if fields.get(key, "").strip().lower() in {"", "missing"}
     ]
     if missing:
         raise ValueError(
@@ -412,7 +395,7 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
             "mid-task input_classification must be one of: "
             + ",".join(sorted(MID_TASK_CLASSIFICATION_ACTIONS))
         )
-    if fields["updated_packet"] == "none":
+    if is_empty_policy_value(fields["updated_packet"]):
         raise ValueError("mid-task user input updated_packet must not be none")
     expected_action = MID_TASK_CLASSIFICATION_ACTIONS[classification]
     action = fields.get("redispatch_action", expected_action)
@@ -425,28 +408,50 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
         raise ValueError(
             f"mid-task scope_status for {classification} must be {expected_scope_status}"
         )
-    if (
-        classification in {"same_active_task_delta", "scope_or_contract_change"}
-        and fields.get("target_agents", "") == "none"
+    expected_spawn_authority = MID_TASK_SPAWN_AUTHORITY[classification]
+    spawn_authority = fields.get("spawn_authority", expected_spawn_authority)
+    if spawn_authority != expected_spawn_authority:
+        raise ValueError(
+            f"mid-task spawn_authority for {classification} must be "
+            f"{expected_spawn_authority}"
+        )
+    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
+        fields.get("target_agents", "")
     ):
         raise ValueError(
             f"mid-task target_agents for {classification} must identify an agent or role"
         )
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(classification)
+    if evidence_field and is_empty_policy_value(fields.get(evidence_field, "")):
+        raise ValueError(
+            f"mid-task {evidence_field} for {classification} must identify evidence"
+        )
+    if classification in MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS and (
+        "spawned_roles" not in fields
+        or is_empty_policy_value(fields.get("spawned_roles", ""))
+    ):
+        raise ValueError(
+            f"mid-task spawned_roles for {classification} must identify fresh roles"
+        )
+    if classification in MID_TASK_EVIDENCE_FIELDS:
+        skipped_roles = fields.get("skipped_roles", "")
+        if has_reuse_marker(skipped_roles):
+            markers = ",".join(MID_TASK_REUSE_MARKERS)
+            raise ValueError(
+                f"mid-task {classification} must not include reused-agent marker: "
+                f"{markers}"
+            )
 
     normalized = dict(fields)
     normalized.setdefault("parent_or_delegate", "parent")
     normalized.setdefault("trigger", "mid_task_user_input")
-    normalized.setdefault("spawn_authority", MID_TASK_SPAWN_AUTHORITY[classification])
+    normalized.setdefault("spawn_authority", expected_spawn_authority)
     normalized.setdefault("redispatch_action", expected_action)
     normalized.setdefault("lifecycle_policy_ref", "team_manifest.yaml#run.subagent_lifecycle_policy")
     normalized.setdefault("delegated_policy_ref", "team_manifest.yaml#run.subagent_lifecycle_policy")
     normalized.setdefault("status", "checkpointed")
     if "spawned_roles" not in normalized:
-        normalized["spawned_roles"] = (
-            normalized["target_agents"]
-            if classification == "scope_or_contract_change"
-            else "none"
-        )
+        normalized["spawned_roles"] = "none"
     if "skipped_roles" not in normalized:
         normalized["skipped_roles"] = (
             f"{normalized['target_agents']}:reused_run_local_send_input"
@@ -458,7 +463,7 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
 
 def mid_task_actual_wave_event(row: dict[str, str]) -> str:
     """Return an Actual Wave Events token row for a mid-task checkpoint."""
-    fields = (
+    fields = [
         ("wave_event", "recorded"),
         ("wave_id", row["wave_id"]),
         ("event_kind", "mid_task_user_input"),
@@ -483,13 +488,16 @@ def mid_task_actual_wave_event(row: dict[str, str]) -> str:
         ("target_agents", row["target_agents"]),
         ("scope_status", row["scope_status"]),
         ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
-    )
+    ]
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(row["input_classification"])
+    if evidence_field:
+        fields.append((evidence_field, row[evidence_field]))
     return " ".join(f"{key}={value}" for key, value in fields)
 
 
 def mid_task_behavior_event(row: dict[str, str]) -> str:
     """Return a Behavior Events token row for a mid-task user checkpoint."""
-    fields = (
+    fields = [
         ("mid_task_user_input", "checkpointed"),
         ("wave_id", row["wave_id"]),
         ("input_classification", row["input_classification"]),
@@ -498,7 +506,10 @@ def mid_task_behavior_event(row: dict[str, str]) -> str:
         ("target_agents", row["target_agents"]),
         ("scope_status", row["scope_status"]),
         ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
-    )
+    ]
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(row["input_classification"])
+    if evidence_field:
+        fields.append((evidence_field, row[evidence_field]))
     return " ".join(f"{key}={value}" for key, value in fields)
 
 
