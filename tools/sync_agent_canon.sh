@@ -922,6 +922,11 @@ cmd_plan() {
       else
         route="local_contains_remote"
       fi
+    elif [ "$submodule_worktree_status" = "clean" ] \
+      && [ -n "$submodule_worktree_head" ] \
+      && [ "$submodule_worktree_head" != "$remote_sha" ] \
+      && [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$submodule_worktree_head^{tree}")" = "$remote_tree" ]; then
+      route="local_tree_matches_remote"
     elif [ "$local_tree" = "$remote_sha" ]; then
       route="already_current_submodule"
     elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
@@ -1066,6 +1071,7 @@ cmd_ensure_latest() {
     local submodule_branch=""
     local submodule_worktree_status=""
     local submodule_deferred_ref=""
+    local remote_tree=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     local_commit="$(submodule_commit)"
@@ -1087,6 +1093,7 @@ cmd_ensure_latest() {
     echo "agent_canon_latest_submodule_worktree_status=$submodule_worktree_status"
     git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
     remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+    remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
@@ -1111,12 +1118,33 @@ cmd_ensure_latest() {
         commit_sync_paths_if_needed "$remote_sha" "submodule_parent_pin"
         return
       fi
+      if [ -z "$submodule_status" ] \
+        && [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$worktree_commit^{tree}")" = "$remote_tree" ]; then
+        echo "agent_canon_latest=local_tree_matches_remote"
+        if [ "$worktree_commit" != "$remote_sha" ]; then
+          git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
+        fi
+        cmd_link_root
+        commit_sync_paths_if_needed "$remote_sha" "submodule_update"
+        return
+      fi
       echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
       die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin or route the AgentCanon branch through a PR before ensure-latest"
     fi
     if [ "$local_commit" = "$remote_sha" ]; then
       echo "agent_canon_latest=already_current_submodule"
       cmd_link_root
+      return
+    fi
+    if [ "$worktree_commit" = "$local_commit" ] \
+      && [ "$submodule_worktree_status" = "clean" ] \
+      && [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$local_commit^{tree}")" = "$remote_tree" ]; then
+      echo "agent_canon_latest=local_tree_matches_remote"
+      if [ "$worktree_commit" != "$remote_sha" ]; then
+        git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
+      fi
+      cmd_link_root
+      commit_sync_paths_if_needed "$remote_sha" "submodule_update"
       return
     fi
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
