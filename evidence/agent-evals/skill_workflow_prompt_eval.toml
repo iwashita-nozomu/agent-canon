@@ -974,7 +974,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
 description = "Routes skill selection through agent-orchestration first and keeps convention compliance as a tool gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff"]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-1"
@@ -992,7 +992,7 @@ description = "The discoverable agent-orchestration skill must enforce mandatory
 id = "CONVENTION-SKILL-1"
 critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]

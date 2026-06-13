@@ -216,6 +216,7 @@ SKILL_ROUTING_MARKERS = (
     "task-shape skill",
     "check_convention_compliance.py",
     "vertical dynamic wave",
+    "write-capable handoff",
 )
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"

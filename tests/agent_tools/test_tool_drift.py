@@ -280,6 +280,31 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_subagent_wave_routing_requires_write_capable_handoff(self) -> None:
+        """Subagent wave routing requires write-capable handoff marker as contract text."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_subagent_wave_routing_contract(root)
+            orchestrated = root / "agents" / "TASK_WORKFLOWS.md"
+            orchestrated.write_text(
+                orchestrated.read_text(encoding="utf-8").replace(
+                    "write-capable handoff",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "subagent_wave_routing")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:subagent_wave_routing:"
+                "agents/TASK_WORKFLOWS.md:"
+                "missing-workflow-write-capable-handoff-policy",
+                result.stdout,
+            )
+
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
         path = root / relative
@@ -384,6 +409,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "@dependency-end",
                         "-->",
                         "Initial Intake Wave",
+                        "write-capable handoff",
                         "dynamic expansion wave",
                         "run.delegated_spawn_policy",
                         "stage owner vertical dynamic wave",
@@ -394,7 +420,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(
             root,
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-            "VERTICAL-WAVE-POLICY vertical dynamic wave\n",
+            "VERTICAL-WAVE-POLICY vertical dynamic wave write-capable handoff\n",
         )
         self.write_file(
             root,

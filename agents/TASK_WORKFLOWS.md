@@ -92,9 +92,11 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します
 - 詳細設計では、新規または rename する identifier、path、CLI flag、config key、public API の naming plan を固定します
 - 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
+- ユーザーが「subagent coding」「実装」「patch」「編集」を明示的に要求した場合、read-only wave は setup 証跡に限定し、`要件整理`→`allowed_paths` 固定→`write scope` 固定→`validation route` 固定→`tool-rejection preflight` 固定の順を完了した後に write-capable handoff として `spark_worker` / `worker` を起動してから実装に進みます。read-only wave を完了経路にしてはいけません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙します。read-only diff-check agent は Shared canon / Large delivery / high-risk work で必須にします
+- write-capable subagent の spawn が runtime/tool gate で拒否された場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker（例: `WRITE_SUBAGENT_TOOL_BLOCKER=<理由>`）を記録し、条件整備後に parent-direct を代替ルートとして明示します
 - Shared canon / Large delivery / high-risk workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
 - skill selection は `agent-canon local-llm route-skill --prompt "<request>" --format json` の `ACTIVE_SKILLS` を current stage、`DEFERRED_SKILLS` を dynamic wave trigger として扱います。task-shape skill は `$agent-orchestration` を先頭に置き、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
 - parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
@@ -252,7 +254,8 @@ concurrent spawn budget:
 標準フロー:
 1. `manager` が request clause と lite 適用条件を固定する
 1. 必要なら `explorer` / `test_designer` で局所 cause と test case を確認する
-1. `spark_worker` または parent が parent-assigned write scope 内だけを編集する
+1. `spark_worker` / `worker` を起点に write-capable な edit を行う
+1. 明示的な coding / implementation / patch / editing 要求では、要件と write scope 固定後に `spark_worker` / `worker` 起動を優先し、read-only wave は setup のみで残す
 1. `python_reviewer` / `cpp_reviewer` / `diff_triage_reviewer` で cheap-first review を行う
 1. broad reviewer、document-flow、full design gate は、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ起動する
 1. lite 条件を外れた時点で `Scoped Change` へ昇格する
