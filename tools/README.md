@@ -23,6 +23,7 @@ downstream implementation agent_tools/evaluate_report_quality.py runs report qua
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
+downstream implementation agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream implementation agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
 downstream implementation agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 downstream implementation agent_tools/algorithm_flowchart.py renders proof-state flowcharts from Algorithm IR facts
@@ -107,6 +108,7 @@ python3 tools/agent_tools/render_dependency_manifest_graph.py
 python3 tools/agent_tools/classify_path_risk.py
 python3 tools/agent_tools/formal_proof.py --help
 python3 tools/agent_tools/lean_proof_env.py --help
+python3 tools/agent_tools/tool_proof_coverage.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
@@ -166,6 +168,11 @@ counterexample, and generated-stub surfaces. Use it as the AgentCanon-owned
 exploratory/fallback proof environment. For an active theorem package, pin
 these dependencies once in that package so routine retries use `lake build`
 instead of repeating environment setup.
+`tool_proof_coverage.py` reports behavior and performance proof-obligation
+coverage for every cataloged tool. Normal mode classifies proof frontiers
+without claiming Lean verification; `--require-lean-verified` fails until each
+behavior and performance claim points at a checked Lean artifact without
+`sorry`, `admit`, or unchecked `axiom`.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -271,6 +278,7 @@ findings for resilient test planning.
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `agent-canon local-llm route-skill --prompt "<user request>" --format json` で `$agent-orchestration` first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を確認します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `lean_proof_env.py` は Mathlib / Aesop / Plausible / LeanSearchClient を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke`、`agent-smoke`、`counterexample-smoke`、`all-smoke`、または `check-file` で proof-search、theorem-search、counterexample、generated proof stub を検査します。active theorem package では依存を一度 pin して `lake build` で再利用し、この tool は探索用・fallback 用の環境確認に使います。個別 proof package に ad hoc な Lean 依存を入れず、環境責務をこの tool に集約します。
+  - `tool_proof_coverage.py` は `tools/catalog.yaml` の全 tool に対して behavior / performance の Lean proof obligation を列挙します。通常 mode は coverage を生成し、`--require-lean-verified` は全 tool が checker 済み Lean artifact を持つまで fail します。
   - `agent-canon algorithm-ir-to-lean` は Algorithm Expansion IR の `expression_ast` と `control_facts` から Lean route artifact を生成し、構造体アクセスは IR 後段の projection として正規化します。
   - `ir_graph_correspondence.py` は Algorithm Expansion IR の `assignment_equation` / `return_equation` を lemma graph の code-fact node、consumption edge、target chain、任意の `proof_status.json` adoption に照合します。反復単位は `source_symbol` と `equation_tags` で group 化し、証明で使う中間計算式が IR 由来であることを確認します。
   - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。

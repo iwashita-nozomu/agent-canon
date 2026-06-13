@@ -6,7 +6,7 @@ upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design structure-planning.md reusable structure contract skill
 upstream design report-writing.md reader-facing report quality skill and Markdown default
-upstream design html-experiment-report.md experiment-specific HTML report workflow
+downstream design html-experiment-report.md experiment-specific HTML report workflow
 downstream implementation ../../.agents/skills/html-output/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->

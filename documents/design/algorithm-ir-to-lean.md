@@ -2,8 +2,8 @@
 @dependency-start
 responsibility Defines the generic Algorithm IR to Lean lowering architecture.
 upstream implementation ../tools/algorithm_expansion_ir.md documents Python AST extraction input.
-upstream design ../tools/algorithm_ir_to_lean.md documents operator-facing command usage.
 upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow consumption.
+downstream design ../tools/algorithm_ir_to_lean.md documents operator-facing command usage.
 downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR into Lean artifacts.
 downstream implementation ../../tools/agent_tools/algorithm_proof_theme_runner.py calls the Rust lowering command.
 @dependency-end

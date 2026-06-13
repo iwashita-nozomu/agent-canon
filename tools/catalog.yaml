@@ -281,6 +281,28 @@ entries:
     tests:
       - tests/agent_tools/test_lean_proof_env.py
 
+  - id: tool-proof-coverage
+    summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
+    path: tools/agent_tools/tool_proof_coverage.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: maintainer
+    placement: validation_checker
+    command: python3 tools/agent_tools/tool_proof_coverage.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/tool_proof_coverage.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_tool_proof_coverage.py
+
   - id: algorithm-expansion-ir
     summary: Builds AST-only Algorithm Expansion IR with instance interaction edges and first-class local proof obligations.
     path: tools/agent_tools/algorithm_expansion_ir.py
