@@ -2590,6 +2590,64 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
             self.assertIn("reports/dependency-review/ignored-run/workflow_monitoring.md", result.stdout)
 
+    def test_task_close_allows_ignored_old_agent_run_reports(self) -> None:
+        """Ignored agent run bundles are local log cache, not source-tree leakage."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".gitignore").write_text(
+                "reports/agents/\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "add", ".gitignore"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed ignored agent reports",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            old_run = workspace_root / "reports" / "agents" / "old-run"
+            old_run.mkdir(parents=True, exist_ok=True)
+            (old_run / "workflow_monitoring.md").write_text("# old run\n", encoding="utf-8")
+            run_id = "test-task-close-ignored-old-agent-run"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
+
     def test_task_close_allows_tracked_durable_reports(self) -> None:
         """Tracked durable reports are repository canon, not run-bundle leakage."""
         with tempfile.TemporaryDirectory() as tmp_dir:

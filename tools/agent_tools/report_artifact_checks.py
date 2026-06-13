@@ -298,6 +298,8 @@ def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> lis
             continue
         if candidate.resolve().is_relative_to(report_dir.resolve()):
             continue
+        if state == "ignored" and not is_mechanically_regenerated_report_path(path):
+            continue
         blockers.append(f"report_artifact_{state}_outside_current_run:{path}")
     return blockers
 
