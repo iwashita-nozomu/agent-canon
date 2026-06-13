@@ -339,7 +339,7 @@ route_requires_agent_workflow() {
   fi
   if [ "$dirty_update_surface" = "yes" ]; then
     case "$route" in
-      already_current_submodule|submodule_update)
+      already_current_submodule|local_tree_matches_remote|submodule_update)
         return 1
         ;;
       *)
