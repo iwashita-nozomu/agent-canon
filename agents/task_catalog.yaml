@@ -6,6 +6,44 @@
 # @dependency-end
 version: 2
 
+role_topology_defaults: &standard_role_topology
+  role_families:
+    intake:
+      - requirements_organizer
+      - explorer
+      - execution_planner
+    planning:
+      - execution_planner
+      - plan_reviewer
+    design:
+      - detailed_designer
+      - detailed_design_reviewer
+      - document_flow_reviewer
+      - test_designer
+    implementation:
+      - spark_worker
+      - worker
+    review:
+      - python_reviewer
+      - cpp_reviewer
+      - diff_triage_reviewer
+      - reviewer
+      - ship_reviewer
+    perspective_review:
+      - reproducibility_reviewer
+      - artifact_reviewer
+      - benchmark_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
+      - scientific_computing_reviewer
+  same_role_parallel_instances:
+    status: allowed_with_distinct_packets
+    identity_key: role_type+instance_id
+    read_only: allowed_when_input_packets_or_review_focus_are_distinct
+    write_capable: allowed_only_with_disjoint_write_scopes_and_parent_integration_order
+    collision_policy: serialize_current_checkout_waves
+    runtime_threads_are_cardinality_source: false
+
 workflow_families:
   - id: scoped_change_lite
     name: Scoped Change Lite
@@ -26,6 +64,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 4
       max_write_subagents: 2
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -63,6 +102,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 8
       max_write_subagents: 2
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -106,6 +146,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 12
       max_write_subagents: 3
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -165,6 +206,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 10
       max_write_subagents: 3
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -209,6 +251,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 10
       max_write_subagents: 2
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -256,6 +299,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 12
       max_write_subagents: 4
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -307,6 +351,7 @@ workflow_families:
     spawn_budget:
       active_subagents: 12
       max_write_subagents: 3
+    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager

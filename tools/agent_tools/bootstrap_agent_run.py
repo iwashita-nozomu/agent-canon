@@ -41,6 +41,7 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    same_role_subagent_policy_output_lines,
     select_roles,
     task_ids,
     workflow_spawn_budget,
@@ -355,6 +356,8 @@ def emit_bootstrap_output(
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
         print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        for line in same_role_subagent_policy_output_lines():
+            print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
         print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")

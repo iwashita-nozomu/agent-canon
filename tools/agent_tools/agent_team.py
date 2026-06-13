@@ -95,6 +95,24 @@ DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
     ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
     ("ship_reviewer",),
 )
+SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
+    "status": "allowed_with_distinct_packets",
+    "identity_key": "role_type+instance_id",
+    "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
+    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_parent_integration_order",
+    "collision_policy": "serialize_current_checkout_waves",
+}
+SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
+    "role_type",
+    "instance_id",
+    "input_packet",
+    "allowed_paths",
+    "do_not_read",
+    "expected_output",
+    "write_scope",
+    "validation_route",
+    "review_gate",
+)
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
     "$research-workflow",
@@ -376,6 +394,16 @@ def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
+
+
+def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for same-role subagent instances."""
+    return (
+        f"SAME_ROLE_SUBAGENT_INSTANCES={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}",
+        f"SAME_ROLE_SUBAGENT_INSTANCE_KEY={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']}",
+        "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
+        f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
+    )
 
 
 def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
@@ -1231,6 +1259,7 @@ def manifest_run_lines(
         else:
             lines.append("      - wave_id: none")
             lines.append("        agent_types: []")
+        lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.append("  delegated_spawn_policy:")
         lines.append("    dynamic_mid_task_spawn: allowed")
         lines.append("    delegated_child_spawn: allowed_with_bounded_packet")
@@ -1245,9 +1274,28 @@ def manifest_run_lines(
         lines.append("      - validation_failure_requires_parallel_triage")
         lines.append("      - disjoint_write_scope_available")
         lines.append("      - blocked_role_replacement")
+        lines.append("    same_role_instances:")
+        lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
+        lines.append(f"      identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}")
+        lines.append(
+            "      parallel_read_only: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_read_only']}"
+        )
+        lines.append(
+            "      parallel_write: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_write']}"
+        )
+        lines.append(
+            "      collision_policy: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['collision_policy']}"
+        )
+        lines.append("      required_fields:")
+        for field in SAME_ROLE_SUBAGENT_REQUIRED_FIELDS:
+            lines.append(f"        - {field}")
         lines.append("    handoff_required_fields:")
         lines.append("      - owner")
         lines.append("      - child_role")
+        lines.append("      - child_instance_id")
         lines.append("      - input_packet")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
@@ -1413,6 +1461,37 @@ def manifest_artifact_lines(config: TeamConfig, roles: tuple[Role, ...]) -> list
     lines = ["artifacts:"]
     for artifact in iter_artifacts(config, roles):
         lines.append(f"  - {artifact}")
+    return lines
+
+
+def render_role_topology(
+    workflow_family: dict[str, object],
+    indent: str,
+) -> list[str]:
+    """Render workflow role-family and same-role instance policy."""
+    topology = workflow_family.get("role_topology")
+    if not isinstance(topology, dict):
+        return []
+    lines = [f"{indent}role_topology:"]
+    role_families = topology.get("role_families")
+    if isinstance(role_families, dict):
+        lines.append(f"{indent}  role_families:")
+        for family_name, agent_types in role_families.items():
+            lines.append(f"{indent}    {family_name}:")
+            if isinstance(agent_types, list):
+                for agent_type in agent_types:
+                    lines.append(f"{indent}      - {str(agent_type)}")
+            else:
+                lines.append(f"{indent}      - {str(agent_types)}")
+    same_role_instances = topology.get("same_role_parallel_instances")
+    if isinstance(same_role_instances, dict):
+        lines.append(f"{indent}  same_role_parallel_instances:")
+        for key, value in same_role_instances.items():
+            if isinstance(value, bool):
+                rendered_value = "true" if value else "false"
+            else:
+                rendered_value = str(value)
+            lines.append(f"{indent}    {key}: {rendered_value}")
     return lines
 
 

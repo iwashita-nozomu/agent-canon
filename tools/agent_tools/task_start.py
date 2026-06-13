@@ -41,6 +41,7 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    same_role_subagent_policy_output_lines,
     select_roles,
     task_ids,
     workflow_spawn_budget,
@@ -355,6 +356,8 @@ def emit_task_start_output(
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
         print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        for line in same_role_subagent_policy_output_lines():
+            print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")

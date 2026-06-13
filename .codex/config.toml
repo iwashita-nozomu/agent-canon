@@ -211,6 +211,9 @@ enabled = true
 max_threads = 24
 max_depth = 2
 job_max_runtime_seconds = 3600
+same_role_instances = "allowed_with_distinct_packets"
+same_role_instance_key = "role_type+instance_id"
+same_role_write_collision_policy = "serialize_current_checkout_waves"
 
 [agents.artifact_reviewer]
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."

@@ -890,6 +890,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn(
+                "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
+                result.stdout,
+            )
+            self.assertIn(
+                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
+                result.stdout,
+            )
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
@@ -913,6 +921,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             spawn_budget = manifest["run"]["spawn_budget"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
+            role_topology = spawn_wave_recommendation["role_topology"]
+            same_role_instances = role_topology["same_role_parallel_instances"]
             self.assertEqual(spawn_budget["active_subagents"], 12)
             self.assertEqual(spawn_budget["max_write_subagents"], 4)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
@@ -924,6 +934,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "allowed",
             )
             self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
+            self.assertIn("implementation", role_topology["role_families"])
+            self.assertIn("review", role_topology["role_families"])
+            self.assertEqual(
+                same_role_instances["status"],
+                "allowed_with_distinct_packets",
+            )
+            self.assertEqual(
+                same_role_instances["identity_key"],
+                "role_type+instance_id",
+            )
+            self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assert_current_checkout_write_policy(write_scope_policy, 4)
             self.assert_initial_wave_execution_gate(report_root / "test-task-start")
@@ -1146,6 +1167,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("RECOMMENDED_INITIAL_SUBAGENT_WAVE=", result.stdout)
             self.assertIn("RECOMMENDED_DYNAMIC_EXPANSION_WAVES=", result.stdout)
+            self.assertIn(
+                "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
+                result.stdout,
+            )
+            self.assertIn(
+                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
+                result.stdout,
+            )
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
             self.assertIn("PLANNED_ACTIVE_ROLE_COUNT=", result.stdout)
             self.assertIn(
@@ -1172,6 +1201,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             spawn_budget = manifest["run"]["spawn_budget"]
             delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
+            role_topology = spawn_wave_recommendation["role_topology"]
+            same_role_instances = role_topology["same_role_parallel_instances"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             handoff_context_policy = manifest["run"]["handoff_context_policy"]
             implementation_gate_defaults = manifest["run"]["implementation_gate_defaults"]
@@ -1200,6 +1231,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 len(manifest["roles"]),
             )
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
+            self.assertEqual(
+                same_role_instances["status"],
+                "allowed_with_distinct_packets",
+            )
+            self.assertEqual(
+                same_role_instances["identity_key"],
+                "role_type+instance_id",
+            )
+            self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
+            self.assertIn("implementation", role_topology["role_families"])
+            self.assertIn("review", role_topology["role_families"])
             self.assertEqual(delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed")
             self.assertEqual(
                 delegated_spawn_policy["delegated_child_spawn"],
@@ -1280,6 +1322,31 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assert_initial_wave_execution_gate(
                 report_root / "test-bootstrap-spawn-budget"
             )
+
+    def test_task_catalog_workflow_families_define_role_topology(self) -> None:
+        """Every workflow family should define role topology separately from thread budget."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
+        )
+
+        for workflow_family in catalog["workflow_families"]:
+            with self.subTest(workflow_family=workflow_family["id"]):
+                role_topology = workflow_family["role_topology"]
+                same_role_instances = role_topology["same_role_parallel_instances"]
+                self.assertIn("role_families", role_topology)
+                self.assertIn("implementation", role_topology["role_families"])
+                self.assertIn("review", role_topology["role_families"])
+                self.assertEqual(
+                    same_role_instances["status"],
+                    "allowed_with_distinct_packets",
+                )
+                self.assertEqual(
+                    same_role_instances["identity_key"],
+                    "role_type+instance_id",
+                )
+                self.assertFalse(
+                    same_role_instances["runtime_threads_are_cardinality_source"]
+                )
 
     def test_bootstrap_warns_when_multi_agent_task_lacks_task_id(self) -> None:
         """A repo-wide bootstrap without --task-id should not silently lose fan-out evidence."""

@@ -61,12 +61,14 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - active な subagent 数は spawn budget で縛ります
 - spawn budget は同時 active 数の上限です。first wave を budget まで埋める target ではありません。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します。独立 workstream が複数ある場合は、flat な単一 wave に詰め込まず、workstream ごとの stage owner が vertical dynamic wave を起こします
 - multi-agent family で予定 stage wave を起こさない場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
+- `role` は subagent type / behavior contract であり、実行単位は `role_type+instance_id` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
+- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap であり、same-role cardinality の source ではありません。
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
 - 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
-- write-capable subagent は既定 1 体です。budget を増やしても、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を明示しない並列 write は許可しません。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract に触れない複数 writer だけを同一 wave で並列化できます
+- write-capable subagent instance は既定 1 体から始めます。budget を増やしても、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を明示しない並列 write は許可しません。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract に触れない複数 writer instance だけを同一 wave で並列化できます。同じ `spark_worker` や `worker` role を複数起動する場合も、instance ごとの `role_type+instance_id` と disjoint write scope を必須にします。
 - current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず、writer を後続 wave に直列化します
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
 - delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
@@ -97,7 +99,8 @@ role 分割が妥当でも input packet が広すぎる場合は routing defect 
 
 Every subagent wave must be recorded with the same compact contract across
 `team_manifest.yaml`, `schedule.md`, `workflow_monitoring.md`, and
-`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`,
+`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`, `role_type`,
+`instance_id`, `input_packet`,
 `spawn_budget.active_subagents`, `spawn_budget.max_write_subagents`,
 `runtime_max_threads`, `runtime_max_depth`, `allowed_paths`, `do_not_read`,
 `write_scope`, `validation_route`, `review_gate`, and `handoff_artifacts`.
@@ -344,11 +347,11 @@ Constraints:
 
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
 - 同一 path、同一 directory ownership、同一 public API surface を複数 writer に割り当てません
-- 同一 worktree の write-capable subagent は既定 1 人ですが、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合は複数 writer を同一 wave で使えます
+- 同一 worktree の write-capable subagent instance は既定 1 人から始めますが、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合は同じ role type を含む複数 writer instance を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は同一 wave に置きません
 - 衝突する target は禁止でも scope 縮小理由でもなく順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
 - 複数 worktree は選択肢にしません。current checkout 内の wave plan で安全に分離できない writer は後続 wave へ直列化します
-- review role は常に read-only とし、parent-managed write-scope discipline と single-writer-default の確認は `plan_reviewer` と `project_reviewer` の固定責務です
+- review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 ## Codex Model Settings
 
