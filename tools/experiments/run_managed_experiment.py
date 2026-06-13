@@ -19,17 +19,18 @@ import socket
 import subprocess
 import sys
 import time
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
-MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
+MANAGED_RUN_ARTIFACTS = frozenset(
+    {"run_manifest.json", "eval_manifest.json", "run.log"}
+)
 FILE_READ_CHUNK_BYTES = 1024 * 1024
 STREAM_TERMINATION_TIMEOUT_SECONDS = 10
 INTERRUPTED_EXIT_CODE = 130
 DURATION_ROUND_DIGITS = 3
-
-import tomllib
 
 
 def repo_root_from_script() -> Path:
@@ -143,7 +144,9 @@ def string_list(raw_value: object, key: str) -> list[str]:
     return [item.strip() for item in raw_value]
 
 
-def find_registry_topic(registry: dict[str, object], topic_name: str) -> dict[str, object] | None:
+def find_registry_topic(
+    registry: dict[str, object], topic_name: str
+) -> dict[str, object] | None:
     """Return one topic entry from the registry."""
     raw_topics = registry.get("topics", [])
     if not isinstance(raw_topics, list):
@@ -186,7 +189,9 @@ def command_version(name: str) -> str | None:
     )
     if result.returncode != 0:
         return None
-    output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
+    output = "\n".join(
+        part.strip() for part in (result.stdout, result.stderr) if part.strip()
+    )
     if not output:
         return None
     return output.splitlines()[0]
@@ -218,7 +223,9 @@ def parse_config_pairs(pairs: list[str]) -> dict[str, object]:
         try:
             config[key] = json.loads(raw_value)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"--config value for {key!r} is not valid JSON: {exc}") from exc
+            raise ValueError(
+                f"--config value for {key!r} is not valid JSON: {exc}"
+            ) from exc
     return config
 
 
@@ -239,12 +246,14 @@ def build_run_config(
     explicit_config: dict[str, object],
 ) -> dict[str, object]:
     """Build one JSON-serializable experiment run configuration dictionary."""
+    log_dir = result_dir / "logs"
     run_config: dict[str, object] = {
         "topic": topic,
         "run_name": run_name,
         "variant": variant,
         "paths": {
             "result_dir": str(result_dir),
+            "log_dir": str(log_dir),
             "report_path": str(report_path),
             "run_manifest": str(manifest_path),
             "eval_manifest": str(eval_manifest_path),
@@ -297,6 +306,7 @@ def render_report_stub(
     registry_path: Path | None,
 ) -> str:
     """Render one initial run report."""
+    log_dir = result_dir / "logs"
     command_text = shlex.join(command) if command else "(no command)"
     branch_text = branch or "(unknown)"
     commit_text = commit or "(unknown)"
@@ -306,6 +316,7 @@ def render_report_stub(
 - Topic: {topic}
 - Created At (UTC): {created_at}
 - Result Dir: {result_dir}
+- Log Dir: {log_dir}
 - Run Manifest: {manifest_path}
 - Eval Manifest: {eval_manifest_path}
 - Config: {config_path}
@@ -336,6 +347,7 @@ def render_report_stub(
 - `config.json`
 - `eval_manifest.json`
 - `run.log`
+- `logs/`
 - `summary.json`
 - `cases.jsonl`
 
@@ -363,6 +375,7 @@ def build_manifest(
     registered_command_match: str | None,
 ) -> dict[str, object]:
     """Build one manifest dictionary."""
+    log_dir = result_dir / "logs"
     branch = git_value(repo_root, "branch", "--show-current")
     commit = git_value(repo_root, "rev-parse", "HEAD")
     git_dirty = git_value(repo_root, "status", "--short")
@@ -374,6 +387,7 @@ def build_manifest(
         "repo_root": str(repo_root),
         "topic_dir": str(topic_dir),
         "result_dir": str(result_dir),
+        "log_dir": str(log_dir),
         "report_path": str(report_path),
         "manifest_path": str(manifest_path),
         "command": command,
@@ -406,7 +420,9 @@ def build_manifest(
 
 def write_json(path: Path, payload: dict[str, object]) -> None:
     """Write one JSON object with canonical formatting."""
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
 
 
 def write_manifest(path: Path, manifest: dict[str, object]) -> None:
@@ -424,7 +440,9 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
     for pattern in patterns:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
-            raise ValueError(f"{key} must stay relative to result/<run_name>: {pattern}")
+            raise ValueError(
+                f"{key} must stay relative to result/<run_name>: {pattern}"
+            )
         if ".." in pattern_path.parts:
             raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
     return patterns
@@ -444,11 +462,15 @@ def resolve_eval_artifact_patterns(
         "defaults.optional_eval_artifacts",
     )
     entry_required = string_list(
-        registry_entry.get("required_eval_artifacts") if registry_entry is not None else None,
+        registry_entry.get("required_eval_artifacts")
+        if registry_entry is not None
+        else None,
         "topics.required_eval_artifacts",
     )
     entry_optional = string_list(
-        registry_entry.get("optional_eval_artifacts") if registry_entry is not None else None,
+        registry_entry.get("optional_eval_artifacts")
+        if registry_entry is not None
+        else None,
         "topics.optional_eval_artifacts",
     )
     required = merge_unique_strings(
@@ -606,7 +628,9 @@ def matched_registered_command(
         return None
     for command_kind in ("smoke", "formal"):
         try:
-            registered_command = command_from_registry(registry_entry, command_kind, placeholders)
+            registered_command = command_from_registry(
+                registry_entry, command_kind, placeholders
+            )
         except ValueError:
             continue
         if registered_command == command:
@@ -614,7 +638,9 @@ def matched_registered_command(
     return None
 
 
-def stream_command(command: list[str], *, cwd: Path, env: dict[str, str], log_path: Path) -> int:
+def stream_command(
+    command: list[str], *, cwd: Path, env: dict[str, str], log_path: Path
+) -> int:
     """Run one command, teeing output to stdout and the log file."""
     with log_path.open("w", encoding="utf-8") as log_handle:
         log_handle.write("$ " + shlex.join(command) + "\n")
@@ -660,7 +686,10 @@ def main() -> int:
     if registry_entry is not None:
         topic_dir_raw = registry_entry.get("topic_dir")
         if not isinstance(topic_dir_raw, str):
-            print(f"registry entry for {args.topic!r} is missing topic_dir", file=sys.stderr)
+            print(
+                f"registry entry for {args.topic!r} is missing topic_dir",
+                file=sys.stderr,
+            )
             return 2
         topic_dir = repo_root / topic_dir_raw
     else:
@@ -674,19 +703,26 @@ def main() -> int:
     if args.report_path:
         report_path = Path(args.report_path).resolve()
     elif registry_entry is not None:
-        registry_report_root = registry_entry.get("report_root") or registry_defaults.get(
+        registry_report_root = registry_entry.get(
             "report_root"
-        )
+        ) or registry_defaults.get("report_root")
         if isinstance(registry_report_root, str):
-            report_path = (repo_root / registry_report_root / f"{run_name}.md").resolve()
+            report_path = (
+                repo_root / registry_report_root / f"{run_name}.md"
+            ).resolve()
         else:
-            report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
+            report_path = (
+                repo_root / "experiments" / "report" / f"{run_name}.md"
+            ).resolve()
     else:
-        report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
+        report_path = (
+            repo_root / "experiments" / "report" / f"{run_name}.md"
+        ).resolve()
     manifest_path = result_dir / "run_manifest.json"
     eval_manifest_path = result_dir / "eval_manifest.json"
     config_path = result_dir / "config.json"
     log_path = result_dir / "run.log"
+    log_dir = result_dir / "logs"
     try:
         required_eval_patterns, optional_eval_patterns = resolve_eval_artifact_patterns(
             registry_defaults,
@@ -702,6 +738,7 @@ def main() -> int:
         "topic_dir": str(topic_dir),
         "run_name": run_name,
         "run_dir": str(result_dir),
+        "log_dir": str(log_dir),
         "report_path": str(report_path),
         "manifest_path": str(manifest_path),
         "eval_manifest_path": str(eval_manifest_path),
@@ -719,11 +756,17 @@ def main() -> int:
         return 2
 
     if args.use_registered_command and args.command:
-        print("do not pass both a manual command and --use-registered-command", file=sys.stderr)
+        print(
+            "do not pass both a manual command and --use-registered-command",
+            file=sys.stderr,
+        )
         return 2
     if args.use_registered_command:
         if registry_entry is None:
-            print("--use-registered-command requires experiments/registry.toml", file=sys.stderr)
+            print(
+                "--use-registered-command requires experiments/registry.toml",
+                file=sys.stderr,
+            )
             return 2
         try:
             command = command_from_registry(
@@ -779,6 +822,7 @@ def main() -> int:
         return 2
 
     result_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(config_path, run_config)
     write_manifest(manifest_path, manifest)
@@ -798,8 +842,12 @@ def main() -> int:
                 config_path=config_path,
                 command=command,
                 created_at=created_at,
-                branch=git_info.get("branch") if isinstance(git_info.get("branch"), str) else None,
-                commit=git_info.get("commit") if isinstance(git_info.get("commit"), str) else None,
+                branch=git_info.get("branch")
+                if isinstance(git_info.get("branch"), str)
+                else None,
+                commit=git_info.get("commit")
+                if isinstance(git_info.get("commit"), str)
+                else None,
                 registry_path=registry_path,
             ),
             encoding="utf-8",
@@ -811,6 +859,7 @@ def main() -> int:
             "EXPERIMENT_RUN_NAME": run_name,
             "EXPERIMENT_TOPIC": args.topic,
             "EXPERIMENT_RUN_DIR": str(result_dir),
+            "EXPERIMENT_LOG_DIR": str(log_dir),
             "EXPERIMENT_REPORT_PATH": str(report_path),
             "EXPERIMENT_RUN_MANIFEST": str(manifest_path),
             "EXPERIMENT_CONFIG_PATH": str(config_path),
@@ -830,7 +879,9 @@ def main() -> int:
     )
     write_json(eval_manifest_path, eval_collection)
     manifest["finished_at_utc"] = finished_at
-    manifest["duration_seconds"] = round(time.monotonic() - start_monotonic, DURATION_ROUND_DIGITS)
+    manifest["duration_seconds"] = round(
+        time.monotonic() - start_monotonic, DURATION_ROUND_DIGITS
+    )
     manifest["exit_code"] = exit_code
     manifest["status"] = "completed" if exit_code == 0 else "failed"
     manifest["eval_artifacts"] = {
