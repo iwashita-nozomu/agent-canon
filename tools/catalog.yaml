@@ -574,6 +574,25 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: generated-artifact-guard
+    summary: Rejects mechanically regenerated report outputs left in the source tree.
+    path: tools/agent_tools/generated_artifact_guard.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/generated_artifact_guard.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+      - agents/templates/closeout_gate.md
+    tests:
+      - tests/agent_tools/test_generated_artifact_guard.py
+
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
     path: tools/agent_tools/run_accumulated_agent_evals.py

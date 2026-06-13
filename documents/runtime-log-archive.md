@@ -92,8 +92,10 @@ python3 tools/agent_tools/eval_accumulation_check.py
 ```
 
 That command runs each registered eval producer with `--accumulate` and
-captures producer stdout/stderr under `reports/agent-eval-runs/<run-id>/`.
-Agents do not hand-author accumulated eval reports.
+captures producer stdout/stderr under `reports/agent-eval-runs/<run-id>/` by
+default. PR / CI wrappers pass `--log-dir` under a temp directory and then run
+`generated_artifact_guard.py`; agents do not hand-author accumulated eval
+reports or leave regenerated stdout/stderr captures in the source tree.
 
 Immutable agent report archive snapshots use:
 

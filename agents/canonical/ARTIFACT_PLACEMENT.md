@@ -70,11 +70,17 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   helper の `push` command が担当します。
 - closeout 前に、`task_close.py` が report artifact placement を確認します。
   tracked durable report は repo canon として許可します。untracked または
-  ignored な generated report file は current run の
-  `reports/agents/<run-id>/` の下だけを許可し、古い run bundle や
-  generated report root に残った file は current run の
-  `recovered_orphan_reports/` などへ回収するか、恒久正本なら `documents/` /
-  `agents/` / `notes/` へ責務付きで昇格します。
+  ignored な report file は current run の `reports/agents/<run-id>/` の下だけを
+  許可します。古い run bundle は archive / closeout の対象であり、current run
+  へ手でコピーして残しません。
+- 機械的に再生成できる report root は残しません。
+  `reports/agent-eval-runs/`、`reports/dependency-review/`,
+  `reports/agent-runtime-dashboard/`, `reports/agent-improvement-guide/`,
+  `reports/hooks/`, `reports/.cache/`, `reports/*.json`, `reports/*.patch`,
+  `reports/*.txt` は `generated_artifact_guard.py` の対象です。必要なら
+  producer を再実行します。知見を残す場合は report file ではなく、
+  `documents/` / `agents/` / `notes/` へ責務と dependency manifest 付きで
+  昇格します。
 
 ### `documents/`
 

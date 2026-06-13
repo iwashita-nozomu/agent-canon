@@ -239,6 +239,27 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="generated_artifact_guard",
+        tool="tools/agent_tools/generated_artifact_guard.py",
+        links=(
+            LinkCheck("tools/agent_tools/report_artifact_checks.py"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("agents/canonical/ARTIFACT_PLACEMENT.md"),
+            LinkCheck("agents/templates/closeout_gate.md"),
+            LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
+            ),
+        ),
+    ),
+    ToolContract(
         name="agent_canon_pr_check",
         tool="tools/ci/check_agent_canon_pr.sh",
         links=(
@@ -247,6 +268,7 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
             LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
+            LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
@@ -268,6 +290,11 @@ CONTRACTS = (
                 "tools/ci/check_agent_canon_pr.sh",
                 "run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
                 "missing-accumulated-agent-eval-producer",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",

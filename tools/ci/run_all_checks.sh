@@ -248,7 +248,11 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py --run-id run-all-checks 2>&1; then
+accumulated_eval_args=(--run-id run-all-checks)
+if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
+  accumulated_eval_args+=(--log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR}")
+fi
+if "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"

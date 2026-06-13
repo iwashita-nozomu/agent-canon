@@ -10,6 +10,7 @@ downstream implementation ../../tools/agent_tools/responsibility_scope.py valida
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
+downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
@@ -72,7 +73,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/runtime_log_archive_git.py`
   - mounted log archive の ensure / status / import / agent report archive / push 操作を担当します。置き場確認は `status` の `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見ます。通常は `sync` が `reports/agents/` を `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>` へ同期します。`archive-agent-report --report-dir reports/agents/<run-id>` は特定 run bundle を `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` に immutable snapshot し、`index.jsonl` を機械的に追記します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
 - `tools/agent_tools/run_accumulated_agent_evals.py`
-  - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は `reports/agent-eval-runs/<run-id>/` に退避します。PR / CI gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
+  - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は既定で `reports/agent-eval-runs/<run-id>/`、PR / CI gate では一時 `--log-dir` に退避します。gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
+- `tools/agent_tools/generated_artifact_guard.py`
+  - `reports/agent-eval-runs/`、`reports/dependency-review/`、`reports/agent-runtime-dashboard/`、`reports/agent-improvement-guide/` など、機械的に再生成できる report root が tracked / untracked / ignored のまま残っていないか検査します。残す必要がある知見は report を保存せず、`documents/`、`agents/`、`notes/` の責務付き正本へ昇格します。
 - `tools/agent_tools/github_publish.py`
   - `gh` で GitHub repo を確認し、`origin` が同じ `owner/name` を指す場合だけ branch push、PR create/update、PR checks を実行します。`--user-task` は必須で、literal URL push、remote 推測、`.git/config` alternate route は使いません。GitHub publish / PR evidence はこの tool と PR gate の責務であり、非重大 hook finding では止めません。
 - `tools/agent_tools/repo_structure_contract.py`

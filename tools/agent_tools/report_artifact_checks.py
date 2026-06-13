@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import re
 import subprocess
-from pathlib import Path
+from collections.abc import Sequence
+from pathlib import Path, PurePosixPath
 
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
@@ -65,6 +66,17 @@ WAVE_COMPARISON_FIELDS = (
     ("Review Gate", "review_gate"),
     ("Handoff Artifacts", "handoff_artifacts"),
     ("Status", "status"),
+)
+MECHANICALLY_REGENERATED_REPORT_ROOTS = (
+    PurePosixPath("reports/agent-eval-runs"),
+    PurePosixPath("reports/agent-improvement-guide"),
+    PurePosixPath("reports/agent-runtime-dashboard"),
+    PurePosixPath("reports/dependency-review"),
+    PurePosixPath("reports/hooks"),
+    PurePosixPath("reports/.cache"),
+)
+MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS = (
+    re.compile(r"^reports/[^/]+\.(?:json|patch|txt)$"),
 )
 
 
@@ -194,6 +206,61 @@ def _git_report_paths(workspace: Path, args: tuple[str, ...]) -> list[str]:
         for raw_path in result.stdout.split(b"\0")
         if raw_path
     ]
+
+
+def _normalized_git_path(path: str) -> str:
+    """Return a POSIX-style Git path for classification."""
+    return path.replace("\\", "/").strip("/")
+
+
+def _is_relative_to(path: PurePosixPath, root: PurePosixPath) -> bool:
+    """Return whether a POSIX path is equal to or nested under root."""
+    return path == root or path.is_relative_to(root)
+
+
+def is_mechanically_regenerated_report_path(path: str) -> bool:
+    """Return whether one report path is a known mechanically regenerated output."""
+    normalized = _normalized_git_path(path)
+    candidate = PurePosixPath(normalized)
+    if any(
+        _is_relative_to(candidate, root)
+        for root in MECHANICALLY_REGENERATED_REPORT_ROOTS
+    ):
+        return True
+    return any(
+        pattern.match(normalized)
+        for pattern in MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS
+    )
+
+
+def generated_report_artifact_blockers(workspace: Path) -> list[str]:
+    """Return regenerated report outputs that should not remain in the tree."""
+    report_paths = {
+        path: "tracked"
+        for path in _git_report_paths(workspace, ())
+        if is_mechanically_regenerated_report_path(path)
+    }
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--exclude-standard"),
+    ):
+        if is_mechanically_regenerated_report_path(path):
+            report_paths.setdefault(path, "untracked")
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--ignored", "--exclude-standard"),
+    ):
+        if is_mechanically_regenerated_report_path(path):
+            report_paths.setdefault(path, "ignored")
+    return [
+        f"generated_report_artifact_{state}_left_in_tree:{path}"
+        for path, state in sorted(report_paths.items())
+    ]
+
+
+def join_artifact_blockers(blockers: Sequence[str]) -> str:
+    """Render blockers for compact shell output."""
+    return "|".join(blockers) if blockers else "none"
 
 
 def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> list[str]:

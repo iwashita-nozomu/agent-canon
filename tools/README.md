@@ -11,6 +11,7 @@ downstream implementation agent_tools/responsibility_scope.py validates responsi
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
+downstream implementation agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
@@ -112,6 +113,7 @@ python3 tools/agent_tools/tool_proof_coverage.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
+python3 tools/agent_tools/generated_artifact_guard.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
 agent-canon local-llm route-implementation-surface --request-file reports/task.txt
@@ -190,8 +192,16 @@ archive copies of their reports.
 `run_accumulated_agent_evals.py` is the mechanical producer entrypoint for
 required eval families. It runs role, skill/workflow prompt, local LLM,
 workflow-selection, and report-quality evals with `--accumulate`, captures
-their stdout/stderr under `reports/agent-eval-runs/<run-id>/`, then leaves
-`eval_accumulation_check.py` to validate the resulting archive structure.
+their stdout/stderr under `reports/agent-eval-runs/<run-id>/` unless `--log-dir`
+is supplied, then leaves `eval_accumulation_check.py` to validate the resulting
+archive structure. PR and CI wrappers pass a temp `--log-dir`; they must not
+leave regenerated stdout/stderr captures in the source tree.
+`generated_artifact_guard.py` fails when regenerated report roots such as
+`reports/agent-eval-runs/`, `reports/dependency-review/`,
+`reports/agent-runtime-dashboard/`, or `reports/agent-improvement-guide/`
+remain tracked, untracked, or ignored in the checkout. Delete those outputs and
+rerun the producer, or promote the underlying rule to `documents/`, `agents/`,
+or `notes/` with a dependency manifest.
 `agent-canon test-design check` scans test-like files for missing oracle,
 private-detail coupling, exact mock/output/prose assertions, wall-clock
 waiting, unseeded randomness, and property/metamorphic candidates. Use it
@@ -834,6 +844,11 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md \
   --compact-out reports/agent-runtime-dashboard/agent-runtime-compact.md
 ```
+
+These guide and dashboard outputs are regenerated views. Keep them only as
+current-run evidence when a task explicitly needs a report handoff; otherwise
+delete them before closeout or let `generated_artifact_guard.py` fail the PR
+gate.
 
 The dashboard also includes local LLM and workflow-selection eval families when
 their accumulated reports exist. `run_accumulated_agent_evals.py` is the normal

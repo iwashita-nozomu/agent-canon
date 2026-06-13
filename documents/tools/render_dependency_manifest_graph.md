@@ -37,11 +37,15 @@ checker or make generated HTML a policy truth surface.
 For PR gates with known graph-cycle debt, use the graph report together with:
 
 ```bash
+PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
+trap 'rm -rf "${PR_CHECK_TMP}"' EXIT
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --fail-missing \
   --cycle-report-only \
-  --report-dir reports/dependency-review/agent-canon-pr
+  --report-dir "${PR_CHECK_TMP}/dependency-review/agent-canon-pr"
 ```
 
 The wrapper still blocks missing or malformed manifests, but cycles remain a
-reported review artifact instead of hidden terminal output.
+reported review artifact instead of hidden terminal output. PR gates keep this
+artifact under the temp directory and run `generated_artifact_guard.py` before
+closeout so regenerated reports do not remain in `reports/`.
