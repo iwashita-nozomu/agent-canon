@@ -78,6 +78,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
+- ただし保守的な編集は「最小差分」ではなく、evidence-backed で責務を守ることを意味します。root cause が stale structure、obsolete surface、underspecified harness、または壊れた責務境界にある場合は、狭い wrapper や局所 guard で温存せず、削除・置換・rename・canonical surface 更新を含む cohesive edit を design trace に固定して実装します
 - 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
 - rate-limit pressure が強い場合は、Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
