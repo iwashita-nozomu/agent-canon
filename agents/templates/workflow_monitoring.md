@@ -25,7 +25,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 ## Actual Wave Events
 
-<!-- Mirror schedule.md Agent Wave Ledger events as concise `wave_event=...` token rows so dynamic expansion is searchable and checkable. Required tokens for each row: wave_id, event_kind, spawn_authority, trigger, budget_before, budget_after, runtime_max_threads, runtime_max_depth, spawned_roles, skipped_roles, allowed_paths, do_not_read, write_scope, validation_route, review_gate, handoff_artifacts, status. -->
+<!-- Mirror schedule.md Agent Wave Ledger events as concise `wave_event=...` token rows so dynamic expansion is searchable and checkable. Required tokens for each row: wave_id, event_kind, spawn_authority, trigger, budget_before, budget_after, runtime_max_threads, runtime_max_depth, spawned_roles, skipped_roles, allowed_paths, do_not_read, write_scope, validation_route, review_gate, handoff_artifacts, status. For `event_kind=mid_task_user_input`, also include input_classification, updated_packet, redispatch_action, target_agents, scope_status, and lifecycle_policy_ref; prefer `workflow_monitor.py --mid-task-user-input` instead of hand editing. -->
 
 ## Tool Warnings
 

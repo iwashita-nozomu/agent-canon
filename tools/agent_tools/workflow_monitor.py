@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO, cast
 
-from agent_team import resolve_report_root
+from agent_team import resolve_report_root, schedule_wave_row
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -42,6 +42,38 @@ TOOL_WARNING_STATUS_VALUES = {
     "not_applicable",
 }
 TOOL_WARNING_LEDGER_STATUS_VALUES = {"pending", "open", "resolved", "none"}
+MID_TASK_CLASSIFICATION_ACTIONS = {
+    "same_active_task_delta": "send_input",
+    "scope_or_contract_change": "fresh_followup_wave",
+    "new_task": "fresh_run",
+}
+MID_TASK_CLASSIFICATION_SCOPE_STATUS = {
+    "same_active_task_delta": "unchanged",
+    "scope_or_contract_change": "changed",
+    "new_task": "new_task",
+}
+MID_TASK_SPAWN_AUTHORITY = {
+    "same_active_task_delta": "parent_checkpoint_then_send_input",
+    "scope_or_contract_change": "parent_checkpoint_then_spawn_fresh_wave",
+    "new_task": "fresh_run_required",
+}
+MID_TASK_REQUIRED_KEYS = (
+    "wave_id",
+    "input_classification",
+    "updated_packet",
+    "target_agents",
+    "scope_status",
+    "budget_before",
+    "budget_after",
+    "runtime_max_threads",
+    "runtime_max_depth",
+    "allowed_paths",
+    "do_not_read",
+    "write_scope",
+    "validation_route",
+    "review_gate",
+    "handoff_artifacts",
+)
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
     "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
@@ -97,6 +129,7 @@ class MonitoringEntries:
     runtime_feedback: tuple[str, ...] = ()
     tool_warnings: tuple[str, ...] = ()
     tool_warning_status: str = ""
+    mid_task_user_inputs: tuple[str, ...] = ()
     interventions: tuple[str, ...] = ()
     decisions: Mapping[str, str] = field(default_factory=empty_decisions)
     timestamp: str = ""
@@ -109,6 +142,7 @@ MONITORING_LEGACY_KEYS = {
     "runtime_feedback",
     "tool_warnings",
     "tool_warning_status",
+    "mid_task_user_inputs",
     "interventions",
     "decisions",
     "timestamp",
@@ -120,6 +154,21 @@ def locked_monitoring_artifact(path: Path) -> Iterator[TextIO]:
     """Hold an exclusive lock while updating the monitoring artifact."""
     path.touch(exist_ok=True)
     with path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            yield handle
+        finally:
+            handle.flush()
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def locked_existing_artifact(path: Path) -> Iterator[TextIO]:
+    """Hold an exclusive lock while updating an existing artifact."""
+    if not path.is_file():
+        raise ValueError(f"missing required artifact: {path}")
+    with path.open("r+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
             handle.seek(0)
@@ -146,6 +195,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Workspace root used with --run-id and relative report roots.",
     )
+    add_monitoring_entry_arguments(parser)
+    add_tool_warning_arguments(parser)
+    add_mid_task_user_input_argument(parser)
+    add_closeout_decision_arguments(parser)
+    return parser
+
+
+def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common monitoring entry arguments."""
     parser.add_argument(
         "--signal",
         action="append",
@@ -176,6 +234,10 @@ def build_parser() -> argparse.ArgumentParser:
             "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
         ),
     )
+
+
+def add_tool_warning_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add tool warning ledger arguments."""
     parser.add_argument(
         "--tool-warning",
         action="append",
@@ -197,6 +259,29 @@ def build_parser() -> argparse.ArgumentParser:
             "and resolved only after all warning_ids are closed."
         ),
     )
+
+
+def add_mid_task_user_input_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the mid-task user input checkpoint argument."""
+    parser.add_argument(
+        "--mid-task-user-input",
+        action="append",
+        default=[],
+        help=(
+            "Checkpoint a user instruction added during an active multi-agent run. "
+            "Provide key=value tokens including wave_id, input_classification "
+            "(same_active_task_delta, scope_or_contract_change, new_task), "
+            "updated_packet, target_agents, scope_status, budget_before, "
+            "budget_after, runtime_max_threads, runtime_max_depth, allowed_paths, "
+            "do_not_read, write_scope, validation_route, review_gate, and "
+            "handoff_artifacts. The command appends matching schedule.md Agent Wave "
+            "Ledger and workflow_monitoring.md Actual Wave Events rows."
+        ),
+    )
+
+
+def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add closeout preset and improvement decision arguments."""
     parser.add_argument(
         "--closeout-token-preset",
         action="store_true",
@@ -221,7 +306,6 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Optional timestamp prefix. Defaults to current local time.",
     )
-    return parser
 
 
 def default_monitoring_text(report_dir: Path) -> str:
@@ -242,6 +326,8 @@ def default_monitoring_text(report_dir: Path) -> str:
             "## Signals",
             "",
             "## Behavior Events",
+            "",
+            "## Actual Wave Events",
             "",
             "## Tool Warnings",
             "",
@@ -303,6 +389,137 @@ def parse_token_fields(entry: str) -> dict[str, str]:
         key, value = token.split("=", 1)
         data[key.strip()] = value.strip()
     return data
+
+
+def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
+    """Normalize one mid-task user instruction checkpoint."""
+    stripped = entry.strip()
+    if not stripped:
+        raise ValueError("mid-task user input entries must not be empty")
+    fields = parse_token_fields(stripped)
+    missing = [
+        key
+        for key in MID_TASK_REQUIRED_KEYS
+        if fields.get(key, "").strip() in {"", "missing"}
+    ]
+    if missing:
+        raise ValueError(
+            "mid-task user input must include required keys: " + ",".join(missing)
+        )
+    classification = fields["input_classification"]
+    if classification not in MID_TASK_CLASSIFICATION_ACTIONS:
+        raise ValueError(
+            "mid-task input_classification must be one of: "
+            + ",".join(sorted(MID_TASK_CLASSIFICATION_ACTIONS))
+        )
+    if fields["updated_packet"] == "none":
+        raise ValueError("mid-task user input updated_packet must not be none")
+    expected_action = MID_TASK_CLASSIFICATION_ACTIONS[classification]
+    action = fields.get("redispatch_action", expected_action)
+    if action != expected_action:
+        raise ValueError(
+            f"mid-task redispatch_action for {classification} must be {expected_action}"
+        )
+    expected_scope_status = MID_TASK_CLASSIFICATION_SCOPE_STATUS[classification]
+    if fields["scope_status"] != expected_scope_status:
+        raise ValueError(
+            f"mid-task scope_status for {classification} must be {expected_scope_status}"
+        )
+    if (
+        classification in {"same_active_task_delta", "scope_or_contract_change"}
+        and fields.get("target_agents", "") == "none"
+    ):
+        raise ValueError(
+            f"mid-task target_agents for {classification} must identify an agent or role"
+        )
+
+    normalized = dict(fields)
+    normalized.setdefault("parent_or_delegate", "parent")
+    normalized.setdefault("trigger", "mid_task_user_input")
+    normalized.setdefault("spawn_authority", MID_TASK_SPAWN_AUTHORITY[classification])
+    normalized.setdefault("redispatch_action", expected_action)
+    normalized.setdefault("lifecycle_policy_ref", "team_manifest.yaml#run.subagent_lifecycle_policy")
+    normalized.setdefault("delegated_policy_ref", "team_manifest.yaml#run.subagent_lifecycle_policy")
+    normalized.setdefault("status", "checkpointed")
+    if "spawned_roles" not in normalized:
+        normalized["spawned_roles"] = (
+            normalized["target_agents"]
+            if classification == "scope_or_contract_change"
+            else "none"
+        )
+    if "skipped_roles" not in normalized:
+        normalized["skipped_roles"] = (
+            f"{normalized['target_agents']}:reused_run_local_send_input"
+            if classification == "same_active_task_delta"
+            else "none"
+        )
+    return normalized
+
+
+def mid_task_actual_wave_event(row: dict[str, str]) -> str:
+    """Return an Actual Wave Events token row for a mid-task checkpoint."""
+    fields = (
+        ("wave_event", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", "mid_task_user_input"),
+        ("spawn_authority", row["spawn_authority"]),
+        ("trigger", row["trigger"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("runtime_max_threads", row["runtime_max_threads"]),
+        ("runtime_max_depth", row["runtime_max_depth"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("allowed_paths", row["allowed_paths"]),
+        ("do_not_read", row["do_not_read"]),
+        ("write_scope", row["write_scope"]),
+        ("validation_route", row["validation_route"]),
+        ("review_gate", row["review_gate"]),
+        ("handoff_artifacts", row["handoff_artifacts"]),
+        ("status", row["status"]),
+        ("input_classification", row["input_classification"]),
+        ("updated_packet", row["updated_packet"]),
+        ("redispatch_action", row["redispatch_action"]),
+        ("target_agents", row["target_agents"]),
+        ("scope_status", row["scope_status"]),
+        ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
+    )
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def mid_task_behavior_event(row: dict[str, str]) -> str:
+    """Return a Behavior Events token row for a mid-task user checkpoint."""
+    fields = (
+        ("mid_task_user_input", "checkpointed"),
+        ("wave_id", row["wave_id"]),
+        ("input_classification", row["input_classification"]),
+        ("updated_packet", row["updated_packet"]),
+        ("redispatch_action", row["redispatch_action"]),
+        ("target_agents", row["target_agents"]),
+        ("scope_status", row["scope_status"]),
+        ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
+    )
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def append_mid_task_schedule_rows(
+    report_dir: Path,
+    rows: tuple[dict[str, str], ...],
+) -> None:
+    """Append mid-task user input rows to schedule.md."""
+    if not rows:
+        return
+    schedule_path = report_dir / "schedule.md"
+    with locked_existing_artifact(schedule_path) as handle:
+        lines = handle.read().splitlines()
+        insert_entries(
+            lines,
+            "## Agent Wave Ledger",
+            [schedule_wave_row(row) for row in rows],
+        )
+        handle.seek(0)
+        handle.truncate()
+        handle.write("\n".join(lines).rstrip() + "\n")
 
 
 def normalize_tool_warning(entry: str) -> str:
@@ -492,6 +709,7 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
         tool_warnings=string_entries(kwargs.get("tool_warnings")),
         tool_warning_status=str(kwargs.get("tool_warning_status", "")),
+        mid_task_user_inputs=string_entries(kwargs.get("mid_task_user_inputs")),
         interventions=string_entries(kwargs.get("interventions")),
         decisions=decision_entries(kwargs.get("decisions")),
         timestamp=str(kwargs.get("timestamp", "")),
@@ -506,6 +724,11 @@ def append_monitoring(
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
+    mid_task_rows = tuple(
+        normalize_mid_task_user_input(item)
+        for item in active_entries.mid_task_user_inputs
+    )
+    append_mid_task_schedule_rows(report_dir, mid_task_rows)
     path = report_dir / "workflow_monitoring.md"
     with locked_monitoring_artifact(path) as handle:
         text = handle.read()
@@ -524,6 +747,14 @@ def append_monitoring(
             normalize_entry(normalize_runtime_feedback(item), active_entries.timestamp)
             for item in active_entries.runtime_feedback
         )
+        behavior_entries.extend(
+            normalize_entry(mid_task_behavior_event(row), active_entries.timestamp)
+            for row in mid_task_rows
+        )
+        actual_wave_entries = [
+            normalize_entry(mid_task_actual_wave_event(row), active_entries.timestamp)
+            for row in mid_task_rows
+        ]
         tool_warning_entries = [
             normalize_entry(normalize_tool_warning(item), active_entries.timestamp)
             for item in active_entries.tool_warnings
@@ -534,6 +765,7 @@ def append_monitoring(
         ]
         insert_entries(lines, "## Signals", signal_entries)
         insert_entries(lines, "## Behavior Events", behavior_entries)
+        insert_entries(lines, "## Actual Wave Events", actual_wave_entries)
         insert_entries(lines, "## Tool Warnings", tool_warning_entries)
         inferred_tool_warning_status = (
             active_entries.tool_warning_status or infer_tool_warning_status(lines)
@@ -569,6 +801,7 @@ def main() -> int:
             runtime_feedback=tuple(args.runtime_feedback),
             tool_warnings=tuple(args.tool_warning),
             tool_warning_status=str(args.tool_warning_status),
+            mid_task_user_inputs=tuple(args.mid_task_user_input),
             interventions=tuple(args.intervention),
             decisions=decisions,
             timestamp=str(args.timestamp),

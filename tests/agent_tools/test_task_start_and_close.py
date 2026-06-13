@@ -241,6 +241,49 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
     )
 
 
+def append_mid_task_wave_checkpoint(
+    report_dir: Path,
+    *,
+    updated_packet: str = "reports/agents/run/user_delta_001.md",
+) -> None:
+    """Append a matching mid-task user input wave checkpoint fixture."""
+    schedule_path = report_dir / "schedule.md"
+    schedule_text = schedule_path.read_text(encoding="utf-8")
+    schedule_path.write_text(
+        schedule_text.rstrip()
+        + "\n"
+        + (
+            "| WAVE-2 | parent | parent_checkpoint_then_send_input | "
+            "mid_task_user_input | 3/12 | 3/12 | 24 | 2 | none | "
+            "explorer:reused_run_local_send_input | reports/agents/run | unrelated | "
+            "read-only | pytest | parent_review | reports/agents/run/user_delta_001.md | "
+            "team_manifest.yaml#run.subagent_lifecycle_policy | checkpointed |"
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monitoring_path = report_dir / "workflow_monitoring.md"
+    monitoring_text = monitoring_path.read_text(encoding="utf-8")
+    actual_event = (
+        "- wave_event=recorded wave_id=WAVE-2 event_kind=mid_task_user_input "
+        "spawn_authority=parent_checkpoint_then_send_input trigger=mid_task_user_input "
+        "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
+        "runtime_max_depth=2 spawned_roles=none "
+        "skipped_roles=explorer:reused_run_local_send_input "
+        "allowed_paths=reports/agents/run do_not_read=unrelated write_scope=read-only "
+        "validation_route=pytest review_gate=parent_review "
+        "handoff_artifacts=reports/agents/run/user_delta_001.md status=checkpointed "
+        "input_classification=same_active_task_delta "
+        f"updated_packet={updated_packet} redispatch_action=send_input "
+        "target_agents=explorer scope_status=unchanged "
+        "lifecycle_policy_ref=team_manifest.yaml#run.subagent_lifecycle_policy"
+    )
+    monitoring_path.write_text(
+        monitoring_text.replace("\n## Tool Warnings", f"\n{actual_event}\n\n## Tool Warnings"),
+        encoding="utf-8",
+    )
+
+
 def write_ready_agent_evaluation(report_dir: Path) -> None:
     """Write a passing agent-evaluation artifact."""
     (report_dir / "agent_evaluation.md").write_text(
@@ -2496,6 +2539,67 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
             self.assertIn("workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout)
+            self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
+
+    def test_task_close_accepts_mid_task_user_input_wave_checkpoint(self) -> None:
+        """A classified mid-task user input checkpoint should preserve closeout readiness."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-mid-task-user-input"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            append_mid_task_wave_checkpoint(report_dir)
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=\n", result.stdout)
+
+    def test_task_close_rejects_mid_task_user_input_without_packet(self) -> None:
+        """Mid-task user input rows should include a checkpoint packet path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-mid-task-user-input-missing-packet"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            append_mid_task_wave_checkpoint(report_dir, updated_packet="none")
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
+            self.assertIn(
+                "workflow_monitoring.md:mid_task_user_input_field_missing:"
+                "WAVE-2:updated_packet",
+                result.stdout,
+            )
             self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:

@@ -37,6 +37,24 @@ REQUIRED_ACTUAL_WAVE_FIELDS = (
     "handoff_artifacts",
     "status",
 )
+MID_TASK_CLASSIFICATION_ACTIONS = {
+    "same_active_task_delta": "send_input",
+    "scope_or_contract_change": "fresh_followup_wave",
+    "new_task": "fresh_run",
+}
+MID_TASK_CLASSIFICATION_SCOPE_STATUS = {
+    "same_active_task_delta": "unchanged",
+    "scope_or_contract_change": "changed",
+    "new_task": "new_task",
+}
+MID_TASK_REQUIRED_WAVE_FIELDS = (
+    "input_classification",
+    "updated_packet",
+    "redispatch_action",
+    "target_agents",
+    "scope_status",
+    "lifecycle_policy_ref",
+)
 WAVE_COMPARISON_FIELDS = (
     ("Spawn Authority", "spawn_authority"),
     ("Trigger", "trigger"),
@@ -260,11 +278,57 @@ def _actual_waves_by_id(
 
 
 def _actual_wave_field_blockers(wave_id: str, actual: dict[str, str]) -> list[str]:
-    return [
+    blockers = [
         f"workflow_monitoring.md:actual_wave_field_missing:{wave_id}:{field}"
         for field in REQUIRED_ACTUAL_WAVE_FIELDS
         if actual.get(field, "").strip() in {"", "missing"}
     ]
+    if actual.get("event_kind") == "mid_task_user_input":
+        blockers.extend(_mid_task_user_input_blockers(wave_id, actual))
+    return blockers
+
+
+def _mid_task_user_input_blockers(
+    wave_id: str,
+    actual: dict[str, str],
+) -> list[str]:
+    """Return blockers for mid-task user input wave checkpoints."""
+    blockers = [
+        f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:{field}"
+        for field in MID_TASK_REQUIRED_WAVE_FIELDS
+        if actual.get(field, "").strip() in {"", "missing"}
+    ]
+    if actual.get("updated_packet", "").strip() == "none":
+        blockers.append(
+            f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:updated_packet"
+        )
+    classification = actual.get("input_classification", "").strip()
+    if not classification:
+        return blockers
+    if classification not in MID_TASK_CLASSIFICATION_ACTIONS:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_classification:"
+            f"{wave_id}:{classification}"
+        )
+        return blockers
+    expected_action = MID_TASK_CLASSIFICATION_ACTIONS[classification]
+    if actual.get("redispatch_action", "").strip() != expected_action:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_redispatch_action:"
+            f"{wave_id}:expected={expected_action}"
+        )
+    expected_scope = MID_TASK_CLASSIFICATION_SCOPE_STATUS[classification]
+    if actual.get("scope_status", "").strip() != expected_scope:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_scope_status:"
+            f"{wave_id}:expected={expected_scope}"
+        )
+    target_agents = actual.get("target_agents", "").strip()
+    if classification != "new_task" and target_agents in {"", "missing", "none"}:
+        blockers.append(
+            f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:target_agents"
+        )
+    return blockers
 
 
 def _actual_wave_mismatch_blockers(

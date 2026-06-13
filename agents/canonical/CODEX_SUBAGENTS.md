@@ -74,7 +74,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
 - 新規 user request では前 task の subagent instance を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
-- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint を追記し、updated packet path と unchanged role scope がある場合だけ run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は existing agent へ継ぎ足さず fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
+- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint と updated packet path を追記し、unchanged role scope がある場合だけ run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は existing agent へ継ぎ足さず fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
 
