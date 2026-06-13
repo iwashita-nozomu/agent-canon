@@ -57,6 +57,10 @@ skill_families:
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
     shim: .agents/skills/agent-log-analysis/SKILL.md
+  - id: agent-eval-accumulation
+    purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
+    canonical_doc: agents/skills/agent-eval-accumulation.md
+    shim: .agents/skills/agent-eval-accumulation/SKILL.md
   - id: agent-canon-update
     purpose: Update AgentCanon source, parent submodule pins, root runtime views, and parent update TODO state through the canonical high-level route.
     canonical_doc: agents/skills/agent-canon-update.md

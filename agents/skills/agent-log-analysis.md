@@ -8,6 +8,7 @@ upstream design ../../documents/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
+downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
 @dependency-end
 -->
 
@@ -23,6 +24,8 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 - `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
+- accumulated eval family の missing / stale / fail を見つけ、producer / checker loop
+  に戻す必要がある
 
 ## Required Flow
 
@@ -50,11 +53,17 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
 1. 原則として `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` だけを読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
 1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止めます。AgentCanon 側で raw JSONL 広域検索に戻ってはいけません。
 1. compact summary で足りない観点がある場合は、raw JSONL を開く前に log archive repo の API / report profile を拡張します。
+1. eval family gap を見るときは、dashboard の推測ではなく
+   `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
+   があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
+   再 check、archive sync の順で閉じます。
 1. Raw JSONL は tool 実装、schema debugging、破損 audit の例外入力としてだけ読みます。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `rg -n` を使い、全ログ横断の一致行 dump を避けます。
 1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
 
 ## Boundaries
 
-- 実際の prompt / workflow / tool 修正は、分析結果に応じて `$agent-learning`、`$md-style-check`、`$codex-task-workflow`、または対象 skill を追加して行います。
+- 実際の prompt / workflow / tool 修正は、分析結果に応じて `$agent-learning`、
+  `$agent-eval-accumulation`、`$md-style-check`、`$codex-task-workflow`、または対象
+  skill を追加して行います。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
