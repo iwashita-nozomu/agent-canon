@@ -52,7 +52,12 @@ jobs:
           python-version: "3.11"
 
       - name: Prepare runtime log archive
-        run: mkdir -p .agent-canon/log-archive
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
+            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
+          fi
+          mkdir -p "${canon_root}/.agent-canon/log-archive"
 
       - name: Generate improvement guide
         id: guide
@@ -64,6 +69,7 @@ jobs:
           report_dir="${GITHUB_WORKSPACE}/reports/agent-improvement-guide"
           mkdir -p "${report_dir}"
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          export AGENT_CANON_HOOK_ARCHIVE_DIR="${canon_root}/.agent-canon/log-archive"
           python3 "${canon_root}/tools/agent_tools/generate_agent_improvement_guide.py" \
             --root "${canon_root}" \
             --out "${guide_path}"
