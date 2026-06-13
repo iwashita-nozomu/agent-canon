@@ -69,6 +69,13 @@ fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
 AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
 mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
+if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"
+else
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"
+  rm -rf "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
+  mkdir -p "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
+fi
 
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
@@ -251,11 +258,9 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-accumulated_eval_args=(--run-id run-all-checks)
-if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
-  accumulated_eval_args+=(--log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR}")
-fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}" 2>&1; then
+accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+  "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"
