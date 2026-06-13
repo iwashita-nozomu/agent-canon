@@ -7,6 +7,7 @@ description: Mandatory first skill for repository tasks. Use before selecting wo
 responsibility Documents Agent Orchestration for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/workflows/hypothesis-validation-workflow.md analysis-first overlay routing
+upstream design ../../../agents/COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 @dependency-end
 -->
 
@@ -22,6 +23,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
 1. For repo-changing execution where the implementation owner is not already fixed by an explicit path and source packet, run `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` before selecting edit paths. Use `PRIMARY_SURFACE`, `PRIMARY_PATHS`, `FORBIDDEN_PATHS`, and `REQUIRED_PRE_EDIT_CHECKS` as the source packet seed, and pass `PRIMARY_PATHS` into write-capable `allowed_paths` plus `FORBIDDEN_PATHS` into `do_not_read`. If LocalLLM is unavailable, use the deterministic fallback output or record a router-unavailable blocker; do not select implementation paths from chat impression.
 1. Before reading broad prose, scanning raw logs, or spawning a subagent, check whether a canonical tool already owns the needed judgment. If yes, call the tool first, trust its compact pass/finding output for the covered property, and read only the exact file slice needed to repair a finding.
+1. Before edit-path selection, parent-direct implementation, or write-capable subagent handoff, create or cite the `Pre-Edit Repository Investigation Packet` from `agents/COMMUNICATION_PROTOCOL.md`; require implementation surface route, responsibility search, reuse survey, stale surface scan, dependency scope, and validation route. Raw search hits, nearest editable files, or chat context alone do not satisfy pre-edit investigation.
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
    - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`

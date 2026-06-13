@@ -271,6 +271,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: 2026-06-13 user feedback: code edits are too conservative
 
+- 2026-06-13 | interaction-observation | Before editing, repo investigation must be fixed as a packet with implementation surface route, responsibility search, reuse survey, stale-surface scan, dependency scope, and validation route; fresh subagents need a compact context capsule because they do not retain context across launches.
+  - source: chat
+  - scope: shared-canon
+  - confidence: likely
+  - evidence: User feedback on 2026-06-13; updated COMMUNICATION_PROTOCOL, agent-orchestration, codex-task-workflow, subagent-bootstrap, TASK_WORKFLOWS, CODEX_SUBAGENTS, and prompt eval coverage.
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.

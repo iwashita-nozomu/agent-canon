@@ -37,6 +37,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 追加の `git worktree`、separate worktree、integration worktree は作成・使用しない。writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解く
 - subagent handoff の input packet は role ごとに bounded にし、`/workspace` や repo root 全体を読む scope として渡さない
 - reviewer には raw repo / raw log / full tree ではなく、対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡す
+- fresh subagent は launch 間で context を累積しないため、`agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を毎回渡す。capsule には objective、request clauses、state snapshot、exact read-before-work paths、compact artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を入れ、full transcript、raw log、full dashboard、repo root 全体を渡さない
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
 - 論文 draft では `citation_evidence_reviewer` も別の subagent で行う
@@ -341,6 +342,7 @@ Constraints:
 - この文書では route と inventory だけを決め、各 role の禁止事項を重複記述しません
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力をそのまま渡します
+- ただし fresh launch の prompt は過去 chat の要約に依存せず、`Fresh Subagent Context Capsule` の path と compact artifacts を正本にします。context が増えたら capsule artifact を更新して再配送し、old handoff prompt に長文追記し続けません
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
