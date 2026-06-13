@@ -99,11 +99,15 @@ role 分割が妥当でも input packet が広すぎる場合は routing defect 
 
 Every subagent wave must be recorded with the same compact contract across
 `team_manifest.yaml`, `schedule.md`, `workflow_monitoring.md`, and
-`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`, `role_type`,
-`instance_id`, `input_packet`,
+`closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`,
+`spawned_roles`, `role_instances`,
 `spawn_budget.active_subagents`, `spawn_budget.max_write_subagents`,
 `runtime_max_threads`, `runtime_max_depth`, `allowed_paths`, `do_not_read`,
 `write_scope`, `validation_route`, `review_gate`, and `handoff_artifacts`.
+`spawned_roles` is the legacy aggregate for dashboards. `role_instances`
+is the deterministic same-role identity ledger; each entry uses
+`role_type:instance_id:input_packet`, and repeated `role_type` entries must
+have distinct `instance_id` and bounded packet/scope evidence.
 Mid-task expansion uses the same contract; it is not an exception path.
 When work can be split into independent workstreams, record the dependency
 edge and stage owner for each vertical dynamic wave instead of flattening all

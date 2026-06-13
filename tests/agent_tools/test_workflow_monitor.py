@@ -148,7 +148,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
                             "Budget Before | Budget After | Runtime Max Threads | "
-                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
                             "Rationale | Allowed Paths | Do Not Read | Write Scope | "
                             "Validation Route | Review Gate | Handoff Artifacts | "
                             "Delegated Policy Ref | Status |"
@@ -156,7 +156,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| ------- | ------------------ | --------------- | ------- | "
                             "------------- | ------------ | ------------------- | "
-                            "----------------- | ------------- | ------------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
                             "------------- | ----------- | ----------- | ---------------- | "
                             "----------- | ----------------- | -------------------- | ------ |"
                         ),
@@ -255,6 +255,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "target_agents=worker scope_status=changed "
                         "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
                         "runtime_max_depth=2 spawned_roles=worker "
+                        "role_instances=worker:followup:reports/agents/run-1/user_delta_001.md "
                         "allowed_paths=tools/agent_tools "
                         "do_not_read=reports/agents/other write_scope=tools/agent_tools "
                         "validation_route=pytest review_gate=python_review "
@@ -284,7 +285,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
                             "Budget Before | Budget After | Runtime Max Threads | "
-                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
                             "Rationale | Allowed Paths | Do Not Read | Write Scope | "
                             "Validation Route | Review Gate | Handoff Artifacts | "
                             "Delegated Policy Ref | Status |"
@@ -292,7 +293,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| ------- | ------------------ | --------------- | ------- | "
                             "------------- | ------------ | ------------------- | "
-                            "----------------- | ------------- | ------------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
                             "------------- | ----------- | ----------- | ---------------- | "
                             "----------- | ----------------- | -------------------- | ------ |"
                         ),
@@ -315,6 +316,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "target_agents=worker scope_status=changed "
                         "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
                         "runtime_max_depth=2 spawned_roles=worker "
+                        "role_instances=worker:followup:reports/agents/run-1/user_delta_001.md "
                         "allowed_paths=tools/agent_tools "
                         "do_not_read=reports/agents/other write_scope=tools/agent_tools "
                         "validation_route=pytest review_gate=python_review "

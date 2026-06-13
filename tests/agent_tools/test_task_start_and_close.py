@@ -164,18 +164,21 @@ def write_ready_schedule(report_dir: Path) -> None:
                 (
                     "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | "
                     "Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | "
-                    "Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                    "Role Instances | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | "
                     "Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |"
                 ),
                 (
                     "| ------- | ------------------ | --------------- | ------- | ------------- | "
                     "------------ | ------------------- | ----------------- | ------------- | "
-                    "------------------------- | ------------- | ----------- | ----------- | "
+                    "-------------- | ------------------------- | ------------- | ----------- | ----------- | "
                     "---------------- | ----------- | ----------------- | -------------------- | ------ |"
                 ),
                 (
                     "| WAVE-1 | parent | parent | initial_intake | 0/12 | 3/12 | 24 | 2 | "
-                    "requirements_organizer,explorer,execution_planner | none | reports/agents/run | "
+                    "requirements_organizer,explorer,execution_planner | "
+                    "requirements_organizer:intake_requirements:team_manifest.yaml,"
+                    "explorer:intake_explorer:team_manifest.yaml,"
+                    "execution_planner:intake_plan:team_manifest.yaml | none | reports/agents/run | "
                     "unrelated | read-only | pytest | schedule_review | team_manifest.yaml | "
                     "team_manifest.yaml#run.delegated_spawn_policy | done |"
                 ),
@@ -226,6 +229,9 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
                     "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
                     "budget_after=3/12 runtime_max_threads=24 runtime_max_depth=2 "
                     "spawned_roles=requirements_organizer,explorer,execution_planner "
+                    "role_instances=requirements_organizer:intake_requirements:team_manifest.yaml,"
+                    "explorer:intake_explorer:team_manifest.yaml,"
+                    "execution_planner:intake_plan:team_manifest.yaml "
                     "skipped_roles=none allowed_paths=reports/agents/run "
                     "do_not_read=unrelated write_scope=read-only validation_route=pytest "
                     "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done"
@@ -251,6 +257,7 @@ def append_mid_task_wave_checkpoint(
     spawn_authority: str | None = None,
     target_agents: str | None = None,
     spawned_roles: str | None = None,
+    role_instances: str | None = None,
     skipped_roles: str | None = None,
     allowed_paths: str = "reports/agents/run",
     do_not_read: str = "unrelated",
@@ -269,6 +276,7 @@ def append_mid_task_wave_checkpoint(
         spawn_authority = spawn_authority or "parent_checkpoint_then_send_input"
         target_agents = target_agents or "explorer"
         spawned_roles = spawned_roles or "none"
+        role_instances = role_instances or "none"
         skipped_roles = skipped_roles or f"{target_agents}:reused_run_local_send_input"
     elif input_classification == "scope_or_contract_change":
         scope_status = scope_status or "changed"
@@ -276,6 +284,7 @@ def append_mid_task_wave_checkpoint(
         spawn_authority = spawn_authority or "parent_checkpoint_then_spawn_fresh_wave"
         target_agents = target_agents or "worker"
         spawned_roles = spawned_roles or target_agents
+        role_instances = role_instances or f"{spawned_roles}:followup:{updated_packet}"
         skipped_roles = skipped_roles or "none"
     elif input_classification == "new_task":
         scope_status = scope_status or "new_task"
@@ -283,6 +292,7 @@ def append_mid_task_wave_checkpoint(
         spawn_authority = spawn_authority or "fresh_run_required"
         target_agents = target_agents or "none"
         spawned_roles = spawned_roles or "none"
+        role_instances = role_instances or "none"
         skipped_roles = skipped_roles or "none"
     else:
         raise ValueError(f"unsupported test classification: {input_classification}")
@@ -298,7 +308,7 @@ def append_mid_task_wave_checkpoint(
         + "\n"
         + (
             f"| WAVE-2 | parent | {spawn_authority} | mid_task_user_input | "
-            f"3/12 | 3/12 | 24 | 2 | {spawned_roles} | {skipped_roles} | "
+            f"3/12 | 3/12 | 24 | 2 | {spawned_roles} | {role_instances} | {skipped_roles} | "
             f"{allowed_paths} | {do_not_read} | {write_scope} | "
             f"{validation_route} | {review_gate} | {handoff_artifacts} | "
             f"team_manifest.yaml#run.subagent_lifecycle_policy | {status} |"
@@ -313,6 +323,7 @@ def append_mid_task_wave_checkpoint(
         f"spawn_authority={spawn_authority} trigger=mid_task_user_input "
         "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
         f"runtime_max_depth=2 spawned_roles={spawned_roles} "
+        f"role_instances={role_instances} "
         f"skipped_roles={skipped_roles} allowed_paths={allowed_paths} "
         f"do_not_read={do_not_read} write_scope={write_scope} "
         f"validation_route={validation_route} review_gate={review_gate} "
@@ -499,6 +510,50 @@ class TaskStartAndCloseTest(unittest.TestCase):
         )
         self.assertNotIn("active_subagents", write_scope_policy)
 
+    def assert_same_role_runtime_policy(
+        self,
+        delegated_spawn_policy: dict[str, object],
+    ) -> None:
+        """Assert delegated spawn policy preserves same-role instance identity."""
+        raw_handoff_fields = cast(
+            "list[object]",
+            delegated_spawn_policy["handoff_required_fields"],
+        )
+        handoff_required_fields = {str(field) for field in raw_handoff_fields}
+        self.assertLessEqual(
+            {
+                "owner",
+                "child_role",
+                "child_instance_id",
+                "input_packet",
+                "allowed_paths",
+                "do_not_read",
+                "expected_output",
+                "write_scope",
+                "validation_route",
+                "review_gate",
+                "remaining_spawn_budget",
+            },
+            handoff_required_fields,
+        )
+        same_role_policy = cast(
+            "dict[str, object]",
+            delegated_spawn_policy["same_role_instances"],
+        )
+        self.assertEqual(
+            same_role_policy["status"],
+            "allowed_with_distinct_packets",
+        )
+        self.assertEqual(same_role_policy["identity_key"], "role_type+instance_id")
+        raw_same_role_fields = cast(
+            "list[object]",
+            same_role_policy["required_fields"],
+        )
+        self.assertLessEqual(
+            {"role_type", "instance_id", "input_packet", "allowed_paths", "do_not_read"},
+            {str(field) for field in raw_same_role_fields},
+        )
+
     def assert_initial_wave_execution_gate(self, report_dir: Path) -> None:
         """Assert generated run bundles expose the parent wave execution gate."""
         schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
@@ -509,6 +564,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
         )
         self.assertIn(expected_schedule, schedule_text)
         self.assertIn("requirements_organizer,explorer,execution_planner", schedule_text)
+        self.assertIn("Role Instances", schedule_text)
+        self.assertIn("role_instances=none", monitoring_text)
         self.assertIn("blocked_authority_required", schedule_text)
         self.assertIn("wave_event=recorded wave_id=WAVE-1", monitoring_text)
         self.assertIn("event_kind=authority_blocker", monitoring_text)
@@ -919,6 +976,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
+            delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             role_topology = spawn_wave_recommendation["role_topology"]
@@ -930,7 +988,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
             self.assertEqual(
-                manifest["run"]["delegated_spawn_policy"]["dynamic_mid_task_spawn"],
+                delegated_spawn_policy["dynamic_mid_task_spawn"],
                 "allowed",
             )
             self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
@@ -947,6 +1005,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assert_current_checkout_write_policy(write_scope_policy, 4)
+            self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assert_initial_wave_execution_gate(report_root / "test-task-start")
             self.assert_abstract_design_prompt_contracts(manifest)
 
@@ -1247,6 +1306,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["delegated_child_spawn"],
                 "allowed_with_bounded_packet",
             )
+            self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assertIn(
                 "validation_failure_requires_parallel_triage",
                 delegated_spawn_policy["expansion_triggers"],

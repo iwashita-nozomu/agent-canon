@@ -43,6 +43,7 @@ REQUIRED_ACTUAL_WAVE_FIELDS = (
     "runtime_max_threads",
     "runtime_max_depth",
     "spawned_roles",
+    "role_instances",
     "skipped_roles",
     "allowed_paths",
     "do_not_read",
@@ -59,6 +60,7 @@ WAVE_COMPARISON_FIELDS = (
     ("Budget After", "budget_after"),
     ("Runtime Max Threads", "runtime_max_threads"),
     ("Runtime Max Depth", "runtime_max_depth"),
+    ("Role Instances", "role_instances"),
     ("Allowed Paths", "allowed_paths"),
     ("Do Not Read", "do_not_read"),
     ("Write Scope", "write_scope"),
@@ -569,6 +571,10 @@ def _actual_wave_mismatch_blockers(
         actual.get("spawned_roles", "")
     ):
         blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles")
+    if _split_csv_field(planned.get("Role Instances", "")) != _split_csv_field(
+        actual.get("role_instances", "")
+    ):
+        blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances")
     return blockers
 
 

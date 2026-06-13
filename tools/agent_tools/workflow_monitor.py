@@ -256,7 +256,7 @@ def add_mid_task_user_input_argument(parser: argparse.ArgumentParser) -> None:
             "budget_after, runtime_max_threads, runtime_max_depth, allowed_paths, "
             "do_not_read, write_scope, validation_route, review_gate, and "
             "handoff_artifacts. scope_or_contract_change also requires "
-            "spawned_roles and fresh_wave_evidence; new_task also requires "
+            "spawned_roles, role_instances, and fresh_wave_evidence; new_task also requires "
             "fresh_run_bundle. The command appends matching schedule.md Agent "
             "Wave Ledger and workflow_monitoring.md Actual Wave Events rows."
         ),
@@ -433,6 +433,13 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
         raise ValueError(
             f"mid-task spawned_roles for {classification} must identify fresh roles"
         )
+    if classification in MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS and (
+        "role_instances" not in fields
+        or is_empty_policy_value(fields.get("role_instances", ""))
+    ):
+        raise ValueError(
+            f"mid-task role_instances for {classification} must identify role_type+instance_id"
+        )
     if classification in MID_TASK_EVIDENCE_FIELDS:
         skipped_roles = fields.get("skipped_roles", "")
         if has_reuse_marker(skipped_roles):
@@ -452,6 +459,8 @@ def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
     normalized.setdefault("status", "checkpointed")
     if "spawned_roles" not in normalized:
         normalized["spawned_roles"] = "none"
+    if "role_instances" not in normalized:
+        normalized["role_instances"] = "none"
     if "skipped_roles" not in normalized:
         normalized["skipped_roles"] = (
             f"{normalized['target_agents']}:reused_run_local_send_input"
@@ -474,6 +483,7 @@ def mid_task_actual_wave_event(row: dict[str, str]) -> str:
         ("runtime_max_threads", row["runtime_max_threads"]),
         ("runtime_max_depth", row["runtime_max_depth"]),
         ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
         ("skipped_roles", row["skipped_roles"]),
         ("allowed_paths", row["allowed_paths"]),
         ("do_not_read", row["do_not_read"]),

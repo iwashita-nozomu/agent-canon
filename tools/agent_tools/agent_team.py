@@ -1066,6 +1066,7 @@ def initial_wave_gate_fields(
         "runtime_max_threads": str(codex_runtime_max_threads()),
         "runtime_max_depth": str(codex_runtime_max_depth()),
         "spawned_roles": "none",
+        "role_instances": "none",
         "skipped_roles": skipped_roles,
         "allowed_paths": "team_manifest.yaml,schedule.md,workflow_monitoring.md,user_request_contract.md",
         "do_not_read": "broad_raw_logs,unrelated_reports",
@@ -1090,6 +1091,7 @@ def schedule_wave_row(row: dict[str, str]) -> str:
         row["runtime_max_threads"],
         row["runtime_max_depth"],
         row["spawned_roles"],
+        row["role_instances"],
         row["skipped_roles"],
         row["allowed_paths"],
         row["do_not_read"],
@@ -1116,6 +1118,7 @@ def workflow_wave_event_line(row: dict[str, str]) -> str:
         ("runtime_max_threads", row["runtime_max_threads"]),
         ("runtime_max_depth", row["runtime_max_depth"]),
         ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
         ("skipped_roles", row["skipped_roles"]),
         ("allowed_paths", row["allowed_paths"]),
         ("do_not_read", row["do_not_read"]),
@@ -1297,6 +1300,8 @@ def manifest_run_lines(
         lines.append("      - child_role")
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
+        lines.append("      - allowed_paths")
+        lines.append("      - do_not_read")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
         lines.append("      - validation_route")
