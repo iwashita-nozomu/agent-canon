@@ -974,7 +974,13 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
 description = "Routes skill selection through agent-orchestration first and keeps convention compliance as a tool gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave"]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-1"
+critical = true
+description = "Keeps independent workstreams as stage-owner vertical dynamic waves with delegated spawn policy."
+required_regex = ["Initial Intake Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
 
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
@@ -986,8 +992,14 @@ description = "The discoverable agent-orchestration skill must enforce mandatory
 id = "CONVENTION-SKILL-1"
 critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-2"
+critical = true
+description = "Keeps discoverable orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
+required_regex = ["Initial Intake Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-1"
@@ -1036,6 +1048,12 @@ id = "REPORT-ROUTING-CANONICAL-1"
 critical = true
 description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
 required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-3"
+critical = true
+description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
+required_regex = ["Initial Intake Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"

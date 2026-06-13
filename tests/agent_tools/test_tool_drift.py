@@ -256,6 +256,30 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_subagent_wave_routing_requires_policy_marker(self) -> None:
+        """Subagent wave routing drift is caught as a tool contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_subagent_wave_routing_contract(root)
+            workflow = root / "agents" / "TASK_WORKFLOWS.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "vertical dynamic wave",
+                    "flat wave",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "subagent_wave_routing")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:subagent_wave_routing:"
+                "agents/TASK_WORKFLOWS.md:"
+                "missing-workflow-vertical-wave-policy",
+                result.stdout,
+            )
+
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
         path = root / relative
@@ -292,6 +316,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# responsibility Checks convention compliance.",
                     "# upstream design ../../documents/conventions/README.md conventions",
                     "# upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow",
+                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
+                    "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
+                    "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
+                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
                     "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
                     "# upstream design ../../agents/templates/closeout_gate.md closeout",
                     "# upstream implementation ../ci/run_all_checks.sh ci",
@@ -304,12 +332,75 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "documents/conventions/README.md",
             "agents/canonical/CODEX_WORKFLOW.md",
+            "agents/canonical/CODEX_SUBAGENTS.md",
+            "agents/TASK_WORKFLOWS.md",
+            "agents/skills/agent-orchestration.md",
+            ".agents/skills/agent-orchestration/SKILL.md",
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "agents/templates/closeout_gate.md",
             "tools/ci/run_all_checks.sh",
             "tools/agent_tools/tool_drift.py",
         ]:
             self.write_plain_manifest(root, relative)
+
+    def write_subagent_wave_routing_contract(self, root: Path) -> None:
+        """Write fixtures for the subagent wave routing contract."""
+        self.write_file(root, "README.md", "# Fixture\n")
+        self.write_file(
+            root,
+            "tools/agent_tools/tool_drift.py",
+            "\n".join(
+                [
+                    "# @dependency-start",
+                    "# responsibility Detects fixture tool drift.",
+                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
+                    "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
+                    "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
+                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
+                    "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
+                    "# upstream implementation ./check_convention_compliance.py convention gate",
+                    "# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests",
+                    "# @dependency-end",
+                    "",
+                ]
+            ),
+        )
+        for relative in [
+            "agents/canonical/CODEX_SUBAGENTS.md",
+            "agents/TASK_WORKFLOWS.md",
+            "agents/skills/agent-orchestration.md",
+            ".agents/skills/agent-orchestration/SKILL.md",
+            "tools/agent_tools/check_convention_compliance.py",
+        ]:
+            self.write_file(
+                root,
+                relative,
+                "\n".join(
+                    [
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Provides subagent wave routing fixture.",
+                        "upstream design README.md fixture anchor",
+                        "@dependency-end",
+                        "-->",
+                        "Initial Intake Wave",
+                        "dynamic expansion wave",
+                        "run.delegated_spawn_policy",
+                        "stage owner vertical dynamic wave",
+                        "",
+                    ]
+                ),
+            )
+        self.write_file(
+            root,
+            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+            "VERTICAL-WAVE-POLICY vertical dynamic wave\n",
+        )
+        self.write_file(
+            root,
+            "tests/agent_tools/test_tool_drift.py",
+            "# fixture test vertical dynamic wave\n",
+        )
 
     def write_agent_canon_pr_contract(self, root: Path) -> None:
         """Write fixtures for the AgentCanon PR check contract."""

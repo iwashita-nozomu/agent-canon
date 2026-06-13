@@ -3,10 +3,16 @@
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
+# upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
+# upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
+# upstream implementation ./check_convention_compliance.py verifies skill-routing markers
 # downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
@@ -309,10 +315,59 @@ CONTRACTS = (
         links=(
             LinkCheck("documents/conventions/README.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
             LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tools/agent_tools/tool_drift.py"),
+        ),
+    ),
+    ToolContract(
+        name="subagent_wave_routing",
+        tool="tools/agent_tools/tool_drift.py",
+        links=(
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
+            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+            LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("tests/agent_tools/test_tool_drift.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "agents/canonical/CODEX_SUBAGENTS.md",
+                "vertical dynamic wave",
+                "missing-canonical-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/TASK_WORKFLOWS.md",
+                "vertical dynamic wave",
+                "missing-workflow-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/skills/agent-orchestration.md",
+                "vertical dynamic wave",
+                "missing-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "vertical dynamic wave",
+                "missing-runtime-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "VERTICAL-WAVE-POLICY",
+                "missing-vertical-wave-prompt-eval",
+            ),
+            TextCheck(
+                "tools/agent_tools/check_convention_compliance.py",
+                "vertical dynamic wave",
+                "missing-vertical-wave-convention-marker",
+            ),
         ),
     ),
     ToolContract(

@@ -61,7 +61,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
+- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。独立 workstream が複数ある場合は、workstream ごとに stage owner と vertical dynamic wave を切り、すべての role を flat な parent-owned first wave に詰め込みません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
 - Mid-task user additions are recorded first with `workflow_monitor.py --mid-task-user-input`; do not rely on prose-only routing or chat reuse decisions.
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
@@ -209,6 +209,7 @@ write-scope separation ルール:
 - parent は `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory / object を明示します
 - root/shared contract、同じ file、同じ canonical surface、同じ module boundary に触る writer は同一 wave では並列化しません
 - parent が dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合だけ、spawn budget 内で複数の write-capable subagent を並列化できます
+- 独立 workstream は同一階層に潰さず、各 workstream の stage owner が bounded child wave を持つ vertical dynamic wave として表現します
 - 複数 writer が必要な場合は、各 writer の編集対象を directory / file / object 単位で交差しないように割り、parent が結果を順番に統合します
 - 衝突リスクは作業禁止でも scope 縮小理由でもなく順序制約として扱います。交差する target は先行 wave と後続 wave に分け、先行 wave の validation と tool rerun 後に後続 writer へ渡します
 - current checkout 内の wave plan で安全に分離できない writer は、separate worktree へ逃がさず後続 wave へ直列化します
@@ -382,8 +383,8 @@ concurrent spawn budget:
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
 - `python_reviewer` と `cpp_reviewer` は言語差分に応じて implementation chunk review と final integration review に追加する
 - `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
-- 同一 worktree では `worker` だけが repo file を編集する
-- 同一 worktree では parallel write を許可しない
+- 同一 worktree では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した writer だけが repo file を編集する
+- 同一 worktree で scope が交差する parallel write は許可せず、current checkout 内の後続 wave に直列化する
 
 ### 7. Adaptive Improvement Loop
 
