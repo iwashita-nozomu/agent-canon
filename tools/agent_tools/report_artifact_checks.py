@@ -268,19 +268,24 @@ def join_artifact_blockers(blockers: Sequence[str]) -> str:
 def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> list[str]:
     """Return generated report artifacts outside the active run bundle.
 
-    Tracked durable reports are allowed. Untracked or ignored generated report files
-    are allowed only under the current run directory because runtime archive tooling
-    collects one active run bundle at closeout.
+    Tracked durable reports are allowed. Tracked generated report roots and tracked
+    agent run bundles outside the current run are blockers. Untracked generated
+    report files are allowed only under the current run directory because runtime
+    archive tooling collects one active run bundle at closeout. Ignored non-
+    generated report paths are local cache and do not block closeout.
     """
     if not report_dir.resolve().is_relative_to(workspace.resolve()):
         return []
-    report_paths = {
-        path: "untracked"
-        for path in _git_report_paths(
-            workspace,
-            ("--others", "--exclude-standard"),
-        )
-    }
+    report_paths = {}
+    for path in _git_report_paths(workspace, ()):
+        normalized = _normalized_git_path(path)
+        if normalized.startswith("reports/agents/") or is_mechanically_regenerated_report_path(path):
+            report_paths[path] = "tracked"
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--exclude-standard"),
+    ):
+        report_paths.setdefault(path, "untracked")
     for path in _git_report_paths(
         workspace,
         ("--others", "--ignored", "--exclude-standard"),
@@ -313,7 +318,7 @@ def actual_wave_event_fields(workflow_monitoring_text: str) -> list[dict[str, st
         if stripped.startswith("## "):
             in_section = stripped == "## Actual Wave Events"
             continue
-        if not in_section or "wave_event=" not in stripped:
+        if not in_section or not stripped.startswith("- wave_event="):
             continue
         rows.append(token_fields(stripped))
     return rows
