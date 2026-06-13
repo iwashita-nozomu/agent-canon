@@ -3,10 +3,16 @@
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
+# upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
+# upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
+# upstream implementation ./check_convention_compliance.py verifies skill-routing markers
 # downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
@@ -239,6 +245,27 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="generated_artifact_guard",
+        tool="tools/agent_tools/generated_artifact_guard.py",
+        links=(
+            LinkCheck("tools/agent_tools/report_artifact_checks.py"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("agents/canonical/ARTIFACT_PLACEMENT.md"),
+            LinkCheck("agents/templates/closeout_gate.md"),
+            LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
+            ),
+        ),
+    ),
+    ToolContract(
         name="agent_canon_pr_check",
         tool="tools/ci/check_agent_canon_pr.sh",
         links=(
@@ -247,6 +274,7 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
             LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
+            LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
@@ -271,6 +299,11 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
             ),
@@ -282,10 +315,89 @@ CONTRACTS = (
         links=(
             LinkCheck("documents/conventions/README.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
             LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tools/agent_tools/tool_drift.py"),
+        ),
+    ),
+    ToolContract(
+        name="subagent_wave_routing",
+        tool="tools/agent_tools/tool_drift.py",
+        links=(
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
+            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+            LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("tests/agent_tools/test_tool_drift.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "agents/canonical/CODEX_SUBAGENTS.md",
+                "vertical dynamic wave",
+                "missing-canonical-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/canonical/CODEX_SUBAGENTS.md",
+                "write-capable handoff",
+                "missing-canonical-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "agents/TASK_WORKFLOWS.md",
+                "vertical dynamic wave",
+                "missing-workflow-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/TASK_WORKFLOWS.md",
+                "write-capable handoff",
+                "missing-workflow-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "agents/skills/agent-orchestration.md",
+                "vertical dynamic wave",
+                "missing-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/skills/agent-orchestration.md",
+                "write-capable handoff",
+                "missing-orchestration-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "vertical dynamic wave",
+                "missing-runtime-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "write-capable handoff",
+                "missing-runtime-orchestration-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "VERTICAL-WAVE-POLICY",
+                "missing-vertical-wave-prompt-eval",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "write-capable handoff",
+                "missing-write-capable-handoff-prompt-eval",
+            ),
+            TextCheck(
+                "tools/agent_tools/check_convention_compliance.py",
+                "vertical dynamic wave",
+                "missing-vertical-wave-convention-marker",
+            ),
+            TextCheck(
+                "tools/agent_tools/check_convention_compliance.py",
+                "write-capable handoff",
+                "missing-write-capable-handoff-convention-marker",
+            ),
         ),
     ),
     ToolContract(

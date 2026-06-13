@@ -191,24 +191,29 @@ bash tools/sync_agent_canon.sh check
 standalone AgentCanon repo:
 
 ```bash
+PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
+trap 'rm -rf "${PR_CHECK_TMP}"' EXIT
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --fail-missing \
   --cycle-report-only \
-  --report-dir reports/dependency-review/agent-canon-pr
+  --report-dir "${PR_CHECK_TMP}/dependency-review/agent-canon-pr"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv \
-  --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md \
-  --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot
+  --graph-tsv "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_graph.tsv" \
+  --markdown-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.md" \
+  --dot-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"
 python3 tools/agent_tools/classify_path_risk.py --path agents/workflows/agent-canon-pr-workflow.md --format text
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
-python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
+python3 tools/agent_tools/run_accumulated_agent_evals.py \
+  --run-id agent-canon-pr-gate \
+  --log-dir "${PR_CHECK_TMP}/agent-eval-runs/agent-canon-pr-gate"
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/ci/check_github_workflows.py
 tools/bin/agent-canon docs check
 bash tools/ci/run_all_checks.sh --quick
+python3 tools/agent_tools/generated_artifact_guard.py
 ```
 
 template / derived repo:
@@ -229,11 +234,12 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - `python3 tools/agent_tools/tool_drift.py`
 - `python3 tools/agent_tools/responsibility_scope.py`
 - `python3 tools/agent_tools/issue_sync.py`
-- `python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate`
+- `python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir <tmp>/agent-eval-runs/agent-canon-pr-gate`
 - `python3 tools/agent_tools/eval_accumulation_check.py`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI
+- `python3 tools/agent_tools/generated_artifact_guard.py`
 
 5. commit を分ける
 

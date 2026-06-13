@@ -134,6 +134,244 @@ class WorkflowMonitorTest(unittest.TestCase):
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
             self.assertIn("- tool_warnings_status: none", text)
 
+    def test_monitor_appends_mid_task_user_input_to_wave_artifacts(self) -> None:
+        """Mid-task user additions should checkpoint schedule and monitoring rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Agent Wave Ledger",
+                        (
+                            "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
+                            "Budget Before | Budget After | Runtime Max Threads | "
+                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                            "Validation Route | Review Gate | Handoff Artifacts | "
+                            "Delegated Policy Ref | Status |"
+                        ),
+                        (
+                            "| ------- | ------------------ | --------------- | ------- | "
+                            "------------- | ------------ | ------------------- | "
+                            "----------------- | ------------- | ------------------------- | "
+                            "------------- | ----------- | ----------- | ---------------- | "
+                            "----------- | ----------------- | -------------------- | ------ |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--mid-task-user-input",
+                    (
+                        "wave_id=WAVE-2 input_classification=same_active_task_delta "
+                        "updated_packet=reports/agents/run-1/user_delta_001.md "
+                        "target_agents=explorer scope_status=unchanged "
+                        "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 allowed_paths=reports/agents/run-1 "
+                        "do_not_read=reports/agents/other write_scope=read-only "
+                        "validation_route=pytest review_gate=parent_review "
+                        "handoff_artifacts=reports/agents/run-1/user_delta_001.md"
+                    ),
+                    "--timestamp",
+                    "2026-04-30 12:00 JST",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("| WAVE-2 | parent | parent_checkpoint_then_send_input |", schedule_text)
+            self.assertIn("event_kind=mid_task_user_input", monitoring_text)
+            self.assertIn("input_classification=same_active_task_delta", monitoring_text)
+            self.assertIn("redispatch_action=send_input", monitoring_text)
+            self.assertIn("updated_packet=reports/agents/run-1/user_delta_001.md", monitoring_text)
+            self.assertIn("mid_task_user_input=checkpointed", monitoring_text)
+
+    def test_monitor_rejects_mid_task_user_input_with_wrong_action(self) -> None:
+        """Classification and redispatch action should be mechanically consistent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--mid-task-user-input",
+                    (
+                        "wave_id=WAVE-2 input_classification=same_active_task_delta "
+                        "redispatch_action=fresh_followup_wave "
+                        "updated_packet=reports/agents/run-1/user_delta_001.md "
+                        "target_agents=explorer scope_status=unchanged "
+                        "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 allowed_paths=reports/agents/run-1 "
+                        "do_not_read=reports/agents/other write_scope=read-only "
+                        "validation_route=pytest review_gate=parent_review "
+                        "handoff_artifacts=reports/agents/run-1/user_delta_001.md"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redispatch_action", result.stderr)
+
+    def test_monitor_requires_scope_change_fresh_wave_evidence(self) -> None:
+        """Scope-changing user additions should name fresh follow-up wave evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--mid-task-user-input",
+                    (
+                        "wave_id=WAVE-2 input_classification=scope_or_contract_change "
+                        "updated_packet=reports/agents/run-1/user_delta_001.md "
+                        "target_agents=worker scope_status=changed "
+                        "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 spawned_roles=worker "
+                        "allowed_paths=tools/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=tools/agent_tools "
+                        "validation_route=pytest review_gate=python_review "
+                        "handoff_artifacts=reports/agents/run-1/user_delta_001.md"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("fresh_wave_evidence", result.stderr)
+
+    def test_monitor_records_scope_change_fresh_wave_evidence(self) -> None:
+        """Fresh follow-up wave evidence should be emitted as machine-readable tokens."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Agent Wave Ledger",
+                        (
+                            "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
+                            "Budget Before | Budget After | Runtime Max Threads | "
+                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                            "Validation Route | Review Gate | Handoff Artifacts | "
+                            "Delegated Policy Ref | Status |"
+                        ),
+                        (
+                            "| ------- | ------------------ | --------------- | ------- | "
+                            "------------- | ------------ | ------------------- | "
+                            "----------------- | ------------- | ------------------------- | "
+                            "------------- | ----------- | ----------- | ---------------- | "
+                            "----------- | ----------------- | -------------------- | ------ |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--mid-task-user-input",
+                    (
+                        "wave_id=WAVE-2 input_classification=scope_or_contract_change "
+                        "updated_packet=reports/agents/run-1/user_delta_001.md "
+                        "target_agents=worker scope_status=changed "
+                        "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 spawned_roles=worker "
+                        "allowed_paths=tools/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=tools/agent_tools "
+                        "validation_route=pytest review_gate=python_review "
+                        "handoff_artifacts=reports/agents/run-1/user_delta_001.md "
+                        "fresh_wave_evidence=reports/agents/run-1/fresh_wave.md"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("redispatch_action=fresh_followup_wave", monitoring_text)
+            self.assertIn(
+                "fresh_wave_evidence=reports/agents/run-1/fresh_wave.md",
+                monitoring_text,
+            )
+
+    def test_monitor_rejects_mid_task_input_with_wrong_spawn_authority(self) -> None:
+        """Classification should own spawn authority, not caller-supplied overrides."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--mid-task-user-input",
+                    (
+                        "wave_id=WAVE-2 input_classification=new_task "
+                        "spawn_authority=parent_checkpoint_then_send_input "
+                        "updated_packet=reports/agents/run-1/user_delta_001.md "
+                        "target_agents=none scope_status=new_task "
+                        "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
+                        "runtime_max_depth=2 allowed_paths=reports/agents/run-2 "
+                        "do_not_read=reports/agents/run-1 write_scope=none "
+                        "validation_route=task_start review_gate=manager_review "
+                        "handoff_artifacts=reports/agents/run-1/user_delta_001.md "
+                        "fresh_run_bundle=reports/agents/run-2"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("spawn_authority", result.stderr)
+
     def test_monitor_preserves_parallel_tool_warning_updates(self) -> None:
         """Concurrent tool warning updates should not lose ledger rows."""
         with tempfile.TemporaryDirectory() as tmp_dir:

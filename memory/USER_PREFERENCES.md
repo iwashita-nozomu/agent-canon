@@ -162,6 +162,9 @@ upstream design README.md memory surface index
 - 2026-06-12 | When improving AgentCanon workflow policy, prioritize removing stale or obsolete conventions and hard-stop assumptions over adding new style-like rules.
   - source: chat
 
+- 2026-06-13 | コード編集では保守的すぎる最小差分に寄せず、問題の再発源が設計・構造・古い surface にある場合は、十分な大きさの cohesive edit と削除・置換まで踏み込んでほしい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

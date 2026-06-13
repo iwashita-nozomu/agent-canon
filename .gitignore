@@ -20,6 +20,7 @@ rust/agent-canon/target/
 reports/agents/
 reports/agent-eval-runs/
 reports/agent-improvement-guide/
+reports/agent-runtime-dashboard/
 reports/dependency-review/
 reports/hooks/
 reports/.cache/

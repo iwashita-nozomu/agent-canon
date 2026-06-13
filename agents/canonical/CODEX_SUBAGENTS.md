@@ -59,7 +59,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
 - active な subagent 数は spawn budget で縛ります
-- spawn budget は同時 active 数の上限です。first wave を budget まで埋める target ではありません。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します
+- spawn budget は同時 active 数の上限です。first wave を budget まで埋める target ではありません。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します。独立 workstream が複数ある場合は、flat な単一 wave に詰め込まず、workstream ごとの stage owner が vertical dynamic wave を起こします
 - multi-agent family で予定 stage wave を起こさない場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
@@ -74,7 +74,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
 - 新規 user request では前 task の subagent instance を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
-- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint を追記し、updated packet path と unchanged role scope がある場合だけ run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は existing agent へ継ぎ足さず fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
+- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint と updated packet path を追記し、unchanged role scope がある場合だけ run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は existing agent へ継ぎ足さず fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
 
@@ -102,6 +102,11 @@ Every subagent wave must be recorded with the same compact contract across
 `runtime_max_threads`, `runtime_max_depth`, `allowed_paths`, `do_not_read`,
 `write_scope`, `validation_route`, `review_gate`, and `handoff_artifacts`.
 Mid-task expansion uses the same contract; it is not an exception path.
+When work can be split into independent workstreams, record the dependency
+edge and stage owner for each vertical dynamic wave instead of flattening all
+roles into one parent-owned wave. Sibling workstreams may run in the same
+runtime budget only when their input packets, write scopes, validation routes,
+and review gates are disjoint; colliding workstreams become ordered waves.
 `task_start.py` and `bootstrap_agent_run.py` emit
 `RECOMMENDED_INITIAL_SUBAGENT_WAVE` and `RECOMMENDED_DYNAMIC_EXPANSION_WAVES`;
 these values are executable Codex `agent_type` lists for the parent to pass to
@@ -109,7 +114,7 @@ the runtime spawn tool.
 
 ## Initial Intake Wave
 
-Initial Intake Wave は repo-changing task の初期責務を要件、調査、実行計画に分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの初期 wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
+Initial Intake Wave は repo-changing task の初期責務を要件、調査、実行計画に分ける初期 wave です。これは総同時起動数の cap ではありません。独立 workstream が複数ある場合、Initial Intake Wave は各 workstream の最初の責務 wave として扱い、以後は stage owner が必要な child wave を vertical dynamic wave として追加します。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの初期 wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer

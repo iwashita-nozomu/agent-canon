@@ -39,7 +39,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Agent Wave Ledger
 
-<!-- This is the authoritative fanout ledger. Initial Intake Wave is not a total cap. Add one row for the first wave and one row for every mid-task expansion, skipped wave, or delegated child wave. Keep `Delegated Policy Ref` pointing at `team_manifest.yaml#run.delegated_spawn_policy`. -->
+<!-- This is the authoritative fanout ledger. Initial Intake Wave is not a total cap. Add one row for the first wave and one row for every mid-task expansion, skipped wave, or delegated child wave. On any mid-task user addition, classify it first as `same_active_task_delta`, `scope_or_contract_change`, or `new_task` and prefer `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` so this table and workflow_monitoring.md stay synchronized. Keep `Delegated Policy Ref` pointing at `team_manifest.yaml#run.delegated_spawn_policy` or `team_manifest.yaml#run.subagent_lifecycle_policy`. -->
 
 | Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |
 | ------- | ------------------ | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | -------------------- | ------ |

@@ -80,6 +80,7 @@ README、workflow、guide、migration、specification など file responsibility
 `Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
 また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 code を変える pass では、実装前に `test_designer` を独立に立て、static path と nasty case を test plan として固定します。
+この gate 順は implementation sequence です。独立 workstream が複数ある場合、parent は同じ sequence を workstream ごとの stage owner に割り当て、evidence と review gate に応じて vertical dynamic wave を追加します。
 
 ## 4A. 反復サイクル
 
@@ -177,6 +178,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
 - 包括的開発では、same directory / same public API surface の parallel write を許可しません
+- 独立 workstream が複数ある場合は、同じ parent wave に全 role を詰めず、stage owner ごとの vertical dynamic wave として schedule / workflow monitoring に記録します
 
 ### Gate 1. 要件整理
 

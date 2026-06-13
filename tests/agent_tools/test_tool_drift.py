@@ -159,7 +159,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate\n",
+                "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}\n",
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -171,6 +171,28 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-accumulated-agent-eval-producer",
+                result.stdout,
+            )
+
+    def test_pr_check_must_run_generated_artifact_guard(self) -> None:
+        """The AgentCanon PR check must reject regenerated report leftovers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            text = script.read_text(encoding="utf-8").replace(
+                "python3 tools/agent_tools/generated_artifact_guard.py\n",
+                "",
+            )
+            script.write_text(text, encoding="utf-8")
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-generated-artifact-pr-guard",
                 result.stdout,
             )
 
@@ -234,6 +256,55 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_subagent_wave_routing_requires_policy_marker(self) -> None:
+        """Subagent wave routing drift is caught as a tool contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_subagent_wave_routing_contract(root)
+            workflow = root / "agents" / "TASK_WORKFLOWS.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "vertical dynamic wave",
+                    "flat wave",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "subagent_wave_routing")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:subagent_wave_routing:"
+                "agents/TASK_WORKFLOWS.md:"
+                "missing-workflow-vertical-wave-policy",
+                result.stdout,
+            )
+
+    def test_subagent_wave_routing_requires_write_capable_handoff(self) -> None:
+        """Subagent wave routing requires write-capable handoff marker as contract text."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_subagent_wave_routing_contract(root)
+            orchestrated = root / "agents" / "TASK_WORKFLOWS.md"
+            orchestrated.write_text(
+                orchestrated.read_text(encoding="utf-8").replace(
+                    "write-capable handoff",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "subagent_wave_routing")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:subagent_wave_routing:"
+                "agents/TASK_WORKFLOWS.md:"
+                "missing-workflow-write-capable-handoff-policy",
+                result.stdout,
+            )
+
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
         path = root / relative
@@ -270,6 +341,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# responsibility Checks convention compliance.",
                     "# upstream design ../../documents/conventions/README.md conventions",
                     "# upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow",
+                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
+                    "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
+                    "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
+                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
                     "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
                     "# upstream design ../../agents/templates/closeout_gate.md closeout",
                     "# upstream implementation ../ci/run_all_checks.sh ci",
@@ -282,12 +357,76 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "documents/conventions/README.md",
             "agents/canonical/CODEX_WORKFLOW.md",
+            "agents/canonical/CODEX_SUBAGENTS.md",
+            "agents/TASK_WORKFLOWS.md",
+            "agents/skills/agent-orchestration.md",
+            ".agents/skills/agent-orchestration/SKILL.md",
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "agents/templates/closeout_gate.md",
             "tools/ci/run_all_checks.sh",
             "tools/agent_tools/tool_drift.py",
         ]:
             self.write_plain_manifest(root, relative)
+
+    def write_subagent_wave_routing_contract(self, root: Path) -> None:
+        """Write fixtures for the subagent wave routing contract."""
+        self.write_file(root, "README.md", "# Fixture\n")
+        self.write_file(
+            root,
+            "tools/agent_tools/tool_drift.py",
+            "\n".join(
+                [
+                    "# @dependency-start",
+                    "# responsibility Detects fixture tool drift.",
+                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
+                    "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
+                    "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
+                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
+                    "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
+                    "# upstream implementation ./check_convention_compliance.py convention gate",
+                    "# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests",
+                    "# @dependency-end",
+                    "",
+                ]
+            ),
+        )
+        for relative in [
+            "agents/canonical/CODEX_SUBAGENTS.md",
+            "agents/TASK_WORKFLOWS.md",
+            "agents/skills/agent-orchestration.md",
+            ".agents/skills/agent-orchestration/SKILL.md",
+            "tools/agent_tools/check_convention_compliance.py",
+        ]:
+            self.write_file(
+                root,
+                relative,
+                "\n".join(
+                    [
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Provides subagent wave routing fixture.",
+                        "upstream design README.md fixture anchor",
+                        "@dependency-end",
+                        "-->",
+                        "Initial Intake Wave",
+                        "write-capable handoff",
+                        "dynamic expansion wave",
+                        "run.delegated_spawn_policy",
+                        "stage owner vertical dynamic wave",
+                        "",
+                    ]
+                ),
+            )
+        self.write_file(
+            root,
+            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+            "VERTICAL-WAVE-POLICY vertical dynamic wave write-capable handoff\n",
+        )
+        self.write_file(
+            root,
+            "tests/agent_tools/test_tool_drift.py",
+            "# fixture test vertical dynamic wave\n",
+        )
 
     def write_agent_canon_pr_contract(self, root: Path) -> None:
         """Write fixtures for the AgentCanon PR check contract."""
@@ -304,6 +443,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template checklist",
                     "# upstream implementation ../agent_tools/run_repo_dependency_review.sh dependency review",
                     "# upstream implementation ../agent_tools/run_accumulated_agent_evals.py accumulated evals",
+                    "# upstream implementation ../agent_tools/generated_artifact_guard.py generated artifact guard",
                     "# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py prompt eval",
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
@@ -311,7 +451,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
                     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
-                    "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
+                    "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}",
+                    "python3 tools/agent_tools/generated_artifact_guard.py",
                     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
@@ -325,6 +466,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "tools/agent_tools/run_repo_dependency_review.sh",
             "tools/agent_tools/run_accumulated_agent_evals.py",
+            "tools/agent_tools/generated_artifact_guard.py",
             "tools/agent_tools/evaluate_skill_workflow_prompts.py",
             "tools/agent_tools/check_agent_runtime_alignment.py",
             "tools/agent_tools/check_convention_compliance.py",

@@ -61,7 +61,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
+- Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。独立 workstream が複数ある場合は、workstream ごとに stage owner と vertical dynamic wave を切り、すべての role を flat な parent-owned first wave に詰め込みません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
+- Mid-task user additions are recorded first with `workflow_monitor.py --mid-task-user-input`; do not rely on prose-only routing or chat reuse decisions.
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
@@ -77,6 +78,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
+- ただし保守的な編集は「最小差分」ではなく、evidence-backed で責務を守ることを意味します。root cause が stale structure、obsolete surface、underspecified harness、または壊れた責務境界にある場合は、狭い wrapper や局所 guard で温存せず、削除・置換・rename・canonical surface 更新を含む cohesive edit を design trace に固定して実装します
 - 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
 - rate-limit pressure が強い場合は、Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
@@ -90,9 +92,11 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します
 - 詳細設計では、新規または rename する identifier、path、CLI flag、config key、public API の naming plan を固定します
 - 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
+- ユーザーが「subagent coding」「実装」「patch」「編集」を明示的に要求した場合、read-only wave は setup 証跡に限定し、`要件整理`→`allowed_paths` 固定→`write scope` 固定→`validation route` 固定→`tool-rejection preflight` 固定の順を完了した後に write-capable handoff として `spark_worker` / `worker` を起動してから実装に進みます。read-only wave を完了経路にしてはいけません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙します。read-only diff-check agent は Shared canon / Large delivery / high-risk work で必須にします
+- write-capable subagent の spawn が runtime/tool gate で拒否された場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker（例: `WRITE_SUBAGENT_TOOL_BLOCKER=<理由>`）を記録し、条件整備後に parent-direct を代替ルートとして明示します
 - Shared canon / Large delivery / high-risk workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
 - skill selection は `agent-canon local-llm route-skill --prompt "<request>" --format json` の `ACTIVE_SKILLS` を current stage、`DEFERRED_SKILLS` を dynamic wave trigger として扱います。task-shape skill は `$agent-orchestration` を先頭に置き、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
 - parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
@@ -207,6 +211,7 @@ write-scope separation ルール:
 - parent は `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory / object を明示します
 - root/shared contract、同じ file、同じ canonical surface、同じ module boundary に触る writer は同一 wave では並列化しません
 - parent が dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合だけ、spawn budget 内で複数の write-capable subagent を並列化できます
+- 独立 workstream は同一階層に潰さず、各 workstream の stage owner が bounded child wave を持つ vertical dynamic wave として表現します
 - 複数 writer が必要な場合は、各 writer の編集対象を directory / file / object 単位で交差しないように割り、parent が結果を順番に統合します
 - 衝突リスクは作業禁止でも scope 縮小理由でもなく順序制約として扱います。交差する target は先行 wave と後続 wave に分け、先行 wave の validation と tool rerun 後に後続 writer へ渡します
 - current checkout 内の wave plan で安全に分離できない writer は、separate worktree へ逃がさず後続 wave へ直列化します
@@ -225,7 +230,7 @@ spawn budget ルール:
 - write-capable subagent の上限は family ごとの `max_write_subagents`、parent-managed write-scope ledger、integration order、review gate で縛ります
 - 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
-- active task の途中で user が追加指示を出した場合は、parent がまず `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類します。same-task delta は `schedule.md` Agent Wave Ledger と `workflow_monitoring.md` に checkpoint を足し、updated packet path を渡したうえで current run-local subagent へ再配送できます。scope、allowed paths、owner、review gate が変わる場合は既存 agent に継ぎ足さず、spawn budget 内の fresh follow-up wave にします。new task は fresh run bundle と fresh subagents に切り替えます。
+- active task の途中で user が追加指示を出した場合は、parent がまず `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類します。same-task delta は `schedule.md` Agent Wave Ledger と `workflow_monitoring.md` に checkpoint を足し、updated packet path を渡したうえで current run-local subagent へ再配送できます。scope、allowed paths、owner、review gate が変わる場合は既存 agent に継ぎ足さず、spawn budget 内の fresh follow-up wave にし、fresh wave evidence を closeout に残します。new task は fresh run bundle と fresh subagents に切り替え、current run には fresh run bundle evidence だけを残します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
 concurrent spawn budget:
@@ -249,7 +254,8 @@ concurrent spawn budget:
 標準フロー:
 1. `manager` が request clause と lite 適用条件を固定する
 1. 必要なら `explorer` / `test_designer` で局所 cause と test case を確認する
-1. `spark_worker` または parent が parent-assigned write scope 内だけを編集する
+1. `spark_worker` / `worker` を起点に write-capable な edit を行う
+1. 明示的な coding / implementation / patch / editing 要求では、要件と write scope 固定後に `spark_worker` / `worker` 起動を優先し、read-only wave は setup のみで残す
 1. `python_reviewer` / `cpp_reviewer` / `diff_triage_reviewer` で cheap-first review を行う
 1. broad reviewer、document-flow、full design gate は、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ起動する
 1. lite 条件を外れた時点で `Scoped Change` へ昇格する
@@ -380,8 +386,8 @@ concurrent spawn budget:
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
 - `python_reviewer` と `cpp_reviewer` は言語差分に応じて implementation chunk review と final integration review に追加する
 - `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
-- 同一 worktree では `worker` だけが repo file を編集する
-- 同一 worktree では parallel write を許可しない
+- 同一 worktree では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した writer だけが repo file を編集する
+- 同一 worktree で scope が交差する parallel write は許可せず、current checkout 内の後続 wave に直列化する
 
 ### 7. Adaptive Improvement Loop
 

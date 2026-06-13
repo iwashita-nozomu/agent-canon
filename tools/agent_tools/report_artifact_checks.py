@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Provides report artifact checks agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""
@@ -10,7 +11,21 @@ from __future__ import annotations
 
 import re
 import subprocess
-from pathlib import Path
+from collections.abc import Sequence
+from pathlib import Path, PurePosixPath
+
+from mid_task_user_input_policy import (
+    MID_TASK_CLASSIFICATION_ACTIONS,
+    MID_TASK_CLASSIFICATION_SCOPE_STATUS,
+    MID_TASK_EVIDENCE_FIELDS,
+    MID_TASK_REQUIRED_WAVE_FIELDS,
+    MID_TASK_REUSE_MARKERS,
+    MID_TASK_SPAWN_AUTHORITY,
+    MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS,
+    MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS,
+    has_reuse_marker,
+    is_empty_policy_value,
+)
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 APPROVE_DECISION_PATTERN = re.compile(
@@ -51,6 +66,17 @@ WAVE_COMPARISON_FIELDS = (
     ("Review Gate", "review_gate"),
     ("Handoff Artifacts", "handoff_artifacts"),
     ("Status", "status"),
+)
+MECHANICALLY_REGENERATED_REPORT_ROOTS = (
+    PurePosixPath("reports/agent-eval-runs"),
+    PurePosixPath("reports/agent-improvement-guide"),
+    PurePosixPath("reports/agent-runtime-dashboard"),
+    PurePosixPath("reports/dependency-review"),
+    PurePosixPath("reports/hooks"),
+    PurePosixPath("reports/.cache"),
+)
+MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS = (
+    re.compile(r"^reports/[^/]+\.(?:json|patch|txt)$"),
 )
 
 
@@ -182,6 +208,61 @@ def _git_report_paths(workspace: Path, args: tuple[str, ...]) -> list[str]:
     ]
 
 
+def _normalized_git_path(path: str) -> str:
+    """Return a POSIX-style Git path for classification."""
+    return path.replace("\\", "/").strip("/")
+
+
+def _is_relative_to(path: PurePosixPath, root: PurePosixPath) -> bool:
+    """Return whether a POSIX path is equal to or nested under root."""
+    return path == root or path.is_relative_to(root)
+
+
+def is_mechanically_regenerated_report_path(path: str) -> bool:
+    """Return whether one report path is a known mechanically regenerated output."""
+    normalized = _normalized_git_path(path)
+    candidate = PurePosixPath(normalized)
+    if any(
+        _is_relative_to(candidate, root)
+        for root in MECHANICALLY_REGENERATED_REPORT_ROOTS
+    ):
+        return True
+    return any(
+        pattern.match(normalized)
+        for pattern in MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS
+    )
+
+
+def generated_report_artifact_blockers(workspace: Path) -> list[str]:
+    """Return regenerated report outputs that should not remain in the tree."""
+    report_paths = {
+        path: "tracked"
+        for path in _git_report_paths(workspace, ())
+        if is_mechanically_regenerated_report_path(path)
+    }
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--exclude-standard"),
+    ):
+        if is_mechanically_regenerated_report_path(path):
+            report_paths.setdefault(path, "untracked")
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--ignored", "--exclude-standard"),
+    ):
+        if is_mechanically_regenerated_report_path(path):
+            report_paths.setdefault(path, "ignored")
+    return [
+        f"generated_report_artifact_{state}_left_in_tree:{path}"
+        for path, state in sorted(report_paths.items())
+    ]
+
+
+def join_artifact_blockers(blockers: Sequence[str]) -> str:
+    """Render blockers for compact shell output."""
+    return "|".join(blockers) if blockers else "none"
+
+
 def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> list[str]:
     """Return generated report artifacts outside the active run bundle.
 
@@ -242,6 +323,103 @@ def _split_csv_field(value: str) -> tuple[str, ...]:
     )
 
 
+def _candidate_evidence_paths(
+    value: str,
+    report_dir: Path | None,
+    workspace: Path | None,
+    evidence_field: str,
+) -> tuple[Path, ...]:
+    """Return policy-allowed filesystem paths for one evidence token."""
+    if is_empty_policy_value(value):
+        return ()
+    path = Path(value)
+    raw_candidates: list[Path] = []
+    if path.is_absolute():
+        raw_candidates.append(path)
+    else:
+        if workspace is not None:
+            raw_candidates.append(workspace / path)
+        if report_dir is not None:
+            raw_candidates.append(report_dir / path)
+            raw_candidates.append(report_dir.parent / path)
+            if len(path.parts) == 1:
+                raw_candidates.append(report_dir.parent / path.name)
+    if report_dir is None:
+        return ()
+    current_run_root = report_dir.resolve()
+    report_root = report_dir.parent.resolve()
+    candidates: list[Path] = []
+    for candidate in raw_candidates:
+        resolved = candidate.resolve()
+        if evidence_field == "fresh_wave_evidence":
+            if resolved.is_relative_to(current_run_root):
+                candidates.append(candidate)
+        elif (
+            evidence_field == "fresh_run_bundle"
+            and resolved.parent == report_root
+            and resolved != current_run_root
+        ):
+            candidates.append(candidate)
+    return tuple(dict.fromkeys(candidates))
+
+
+def _raw_evidence_paths(
+    value: str,
+    report_dir: Path | None,
+    workspace: Path | None,
+) -> tuple[Path, ...]:
+    """Return unfiltered path interpretations for diagnostics."""
+    if is_empty_policy_value(value):
+        return ()
+    path = Path(value)
+    candidates: list[Path] = []
+    if path.is_absolute():
+        candidates.append(path)
+    else:
+        if workspace is not None:
+            candidates.append(workspace / path)
+        if report_dir is not None:
+            candidates.append(report_dir / path)
+            candidates.append(report_dir.parent / path)
+    if report_dir is not None:
+        if len(path.parts) == 1:
+            candidates.append(report_dir.parent / path.name)
+    return tuple(dict.fromkeys(candidates))
+
+
+def _evidence_path_exists(
+    value: str,
+    report_dir: Path | None,
+    workspace: Path | None,
+    *,
+    require_dir: bool = False,
+    evidence_field: str,
+) -> bool:
+    """Return whether one evidence token points at an existing artifact."""
+    candidates = _candidate_evidence_paths(value, report_dir, workspace, evidence_field)
+    if not candidates:
+        return False
+    if require_dir:
+        return any(candidate.is_dir() for candidate in candidates)
+    return any(candidate.exists() for candidate in candidates)
+
+
+def _evidence_path_outside_scope(
+    value: str,
+    report_dir: Path | None,
+    workspace: Path | None,
+    evidence_field: str,
+) -> bool:
+    """Return whether evidence exists but outside the allowed run-artifact scope."""
+    raw_existing = any(
+        candidate.exists()
+        for candidate in _raw_evidence_paths(value, report_dir, workspace)
+    )
+    if not raw_existing:
+        return False
+    return not _candidate_evidence_paths(value, report_dir, workspace, evidence_field)
+
+
 def _actual_waves_by_id(
     actual_rows: list[dict[str, str]],
 ) -> tuple[dict[str, dict[str, str]], list[str]]:
@@ -259,12 +437,119 @@ def _actual_waves_by_id(
     return actual_by_id, blockers
 
 
-def _actual_wave_field_blockers(wave_id: str, actual: dict[str, str]) -> list[str]:
-    return [
+def _actual_wave_field_blockers(
+    wave_id: str,
+    actual: dict[str, str],
+    report_dir: Path | None = None,
+    workspace: Path | None = None,
+) -> list[str]:
+    blockers = [
         f"workflow_monitoring.md:actual_wave_field_missing:{wave_id}:{field}"
         for field in REQUIRED_ACTUAL_WAVE_FIELDS
         if actual.get(field, "").strip() in {"", "missing"}
     ]
+    if actual.get("event_kind") == "mid_task_user_input":
+        blockers.extend(
+            _mid_task_user_input_blockers(wave_id, actual, report_dir, workspace)
+        )
+    return blockers
+
+
+def _mid_task_user_input_blockers(
+    wave_id: str,
+    actual: dict[str, str],
+    report_dir: Path | None = None,
+    workspace: Path | None = None,
+) -> list[str]:
+    """Return blockers for mid-task user input wave checkpoints."""
+    blockers = [
+        f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:{field}"
+        for field in MID_TASK_REQUIRED_WAVE_FIELDS
+        if actual.get(field, "").strip().lower() in {"", "missing"}
+    ]
+    if is_empty_policy_value(actual.get("updated_packet", "")):
+        blockers.append(
+            f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:updated_packet"
+        )
+    classification = actual.get("input_classification", "").strip()
+    if not classification:
+        return blockers
+    if classification not in MID_TASK_CLASSIFICATION_ACTIONS:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_classification:"
+            f"{wave_id}:{classification}"
+        )
+        return blockers
+    expected_spawn_authority = MID_TASK_SPAWN_AUTHORITY[classification]
+    if actual.get("spawn_authority", "").strip() != expected_spawn_authority:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_spawn_authority:"
+            f"{wave_id}:expected={expected_spawn_authority}"
+        )
+    expected_action = MID_TASK_CLASSIFICATION_ACTIONS[classification]
+    if actual.get("redispatch_action", "").strip() != expected_action:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_redispatch_action:"
+            f"{wave_id}:expected={expected_action}"
+        )
+    expected_scope = MID_TASK_CLASSIFICATION_SCOPE_STATUS[classification]
+    if actual.get("scope_status", "").strip() != expected_scope:
+        blockers.append(
+            "workflow_monitoring.md:mid_task_user_input_invalid_scope_status:"
+            f"{wave_id}:expected={expected_scope}"
+        )
+    target_agents = actual.get("target_agents", "").strip()
+    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
+        target_agents
+    ):
+        blockers.append(
+            f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:target_agents"
+        )
+    spawned_roles = actual.get("spawned_roles", "").strip()
+    if classification in MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS:
+        if is_empty_policy_value(spawned_roles):
+            blockers.append(
+                "workflow_monitoring.md:mid_task_user_input_field_missing:"
+                f"{wave_id}:spawned_roles"
+            )
+    if classification in MID_TASK_EVIDENCE_FIELDS:
+        skipped_roles = actual.get("skipped_roles", "")
+        if has_reuse_marker(skipped_roles):
+            markers = ",".join(MID_TASK_REUSE_MARKERS)
+            blockers.append(
+                "workflow_monitoring.md:mid_task_user_input_reused_agent_forbidden:"
+                f"{wave_id}:{markers}"
+            )
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(classification)
+    if evidence_field:
+        evidence_value = actual.get(evidence_field, "").strip()
+        if is_empty_policy_value(evidence_value):
+            blockers.append(
+                "workflow_monitoring.md:mid_task_user_input_field_missing:"
+                f"{wave_id}:{evidence_field}"
+            )
+        elif _evidence_path_outside_scope(
+            evidence_value,
+            report_dir,
+            workspace,
+            evidence_field,
+        ):
+            blockers.append(
+                "workflow_monitoring.md:mid_task_user_input_evidence_outside_scope:"
+                f"{wave_id}:{evidence_field}:{evidence_value}"
+            )
+        elif not _evidence_path_exists(
+            evidence_value,
+            report_dir,
+            workspace,
+            require_dir=evidence_field == "fresh_run_bundle",
+            evidence_field=evidence_field,
+        ):
+            blockers.append(
+                "workflow_monitoring.md:mid_task_user_input_evidence_missing:"
+                f"{wave_id}:{evidence_field}:{evidence_value}"
+            )
+    return blockers
 
 
 def _actual_wave_mismatch_blockers(
@@ -291,6 +576,8 @@ def wave_reconciliation_blockers(
     schedule_text: str,
     workflow_monitoring_text: str,
     lifecycle_status: dict[str, str],
+    report_dir: Path | None = None,
+    workspace: Path | None = None,
 ) -> list[str]:
     """Return blockers when planned subagent waves do not match observed events."""
     planned_rows = markdown_table_dict_rows(schedule_text, "## Agent Wave Ledger")
@@ -317,7 +604,9 @@ def wave_reconciliation_blockers(
         if actual is None:
             blockers.append(f"workflow_monitoring.md:actual_wave_missing:{wave_id}")
             continue
-        blockers.extend(_actual_wave_field_blockers(wave_id, actual))
+        blockers.extend(
+            _actual_wave_field_blockers(wave_id, actual, report_dir, workspace)
+        )
         blockers.extend(_actual_wave_mismatch_blockers(wave_id, planned, actual))
     for wave_id in sorted(set(actual_by_id) - set(planned_by_id)):
         blockers.append(f"workflow_monitoring.md:actual_wave_without_plan:{wave_id}")

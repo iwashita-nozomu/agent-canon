@@ -167,10 +167,12 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Report Artifact Placement Evidence
 
-<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify generated report placement. Tracked durable reports are allowed. Untracked or ignored generated report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles or generated report roots outside the current run are blockers because runtime_log_archive_git.py sync/archive closes the current run bundle, not orphan outputs. -->
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify report placement. Also run generated_artifact_guard.py to reject mechanically regenerated roots left in the source tree. Tracked durable reports are allowed only when they are not regenerated tool output. Untracked or ignored report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles are archive/cleanup blockers, and regenerated roots such as `reports/dependency-review/` or `reports/agent-eval-runs/` must be deleted and rerun rather than recovered into another report. -->
 
 - report_artifact_placement_status:
 - report_artifact_outside_current_run_bundle:
+- generated_artifact_guard_status:
+- generated_artifact_guard_blockers:
 - report_artifact_recovery_evidence:
 
 ## Agent Evaluation Evidence

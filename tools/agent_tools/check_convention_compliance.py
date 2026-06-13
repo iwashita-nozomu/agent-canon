@@ -3,6 +3,10 @@
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
+# upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
+# upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
@@ -211,6 +215,8 @@ SKILL_ROUTING_MARKERS = (
     "$subagent-bootstrap",
     "task-shape skill",
     "check_convention_compliance.py",
+    "vertical dynamic wave",
+    "write-capable handoff",
 )
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"

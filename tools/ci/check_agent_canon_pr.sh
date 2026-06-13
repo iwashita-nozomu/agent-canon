@@ -8,6 +8,7 @@
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
+# upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
 # upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
@@ -25,6 +26,21 @@ else
 fi
 cd "${WORKSPACE_ROOT}"
 
+AGENT_CANON_PR_TEMP_ROOT_CREATED=0
+if [[ -z "${AGENT_CANON_PR_TEMP_ROOT:-}" ]]; then
+  AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
+  AGENT_CANON_PR_TEMP_ROOT_CREATED=1
+fi
+cleanup_agent_canon_pr_temp_root() {
+  if [[ "${AGENT_CANON_PR_TEMP_ROOT_CREATED}" -eq 1 ]]; then
+    rm -rf "${AGENT_CANON_PR_TEMP_ROOT}"
+  fi
+}
+trap cleanup_agent_canon_pr_temp_root EXIT
+PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
+PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
+PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
+
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"
 TEMPLATE_GITHUB_REPO="${TEMPLATE_GITHUB_REPO:-iwashita-nozomu/project_template}"
@@ -37,16 +53,6 @@ if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
 else
   AGENT_CANON_REPOSITORY_MODE="standalone_source"
 fi
-
-run_make_or_direct() {
-  local target="$1"
-  shift
-  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\b${target}\\b|^${target}:" Makefile; then
-    make "${target}"
-  else
-    "$@"
-  fi
-}
 
 run_direct_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
@@ -149,10 +155,14 @@ run_pr_quick_ci() {
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
     echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh --quick"
-    bash tools/ci/run_all_checks.sh --quick
+    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh --quick
     return
   fi
-  run_make_or_direct ci-quick bash tools/ci/run_all_checks.sh --quick
+  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bci-quick\\b|^ci-quick:" Makefile; then
+    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" make ci-quick
+  else
+    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh --quick
+  fi
 }
 
 run_standalone_static_gate_ci() {
@@ -167,7 +177,7 @@ run_standalone_static_gate_ci() {
   git fetch origin "${BASE_REF}" --depth=1 || true
   python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
   python3 tools/agent_tools/issue_sync.py
-  python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
+  python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
   python3 tools/agent_tools/eval_accumulation_check.py
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
@@ -219,6 +229,7 @@ echo "=========================================="
 echo "AGENT-CANON PR CHECK"
 echo "=========================================="
 echo "workspace_root=${WORKSPACE_ROOT}"
+echo "agent_canon_pr_temp_root=${AGENT_CANON_PR_TEMP_ROOT}"
 echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
 echo "agent_canon_remote=${REMOTE_URL}"
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
@@ -269,11 +280,11 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "reports/dependency-review/agent-canon-pr"
+bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv "reports/dependency-review/agent-canon-pr/dependency_graph.tsv" \
-  --markdown-out "reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md" \
-  --dot-out "reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"
+  --graph-tsv "${PR_DEPENDENCY_REVIEW_DIR}/dependency_graph.tsv" \
+  --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
+  --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
 echo ""
 
 echo "7️⃣  documentation checks"
@@ -282,6 +293,10 @@ echo ""
 
 echo "8️⃣  repository quick CI"
 run_pr_quick_ci
+echo ""
+
+echo "8b️⃣  generated artifact guard"
+python3 tools/agent_tools/generated_artifact_guard.py --root "${WORKSPACE_ROOT}"
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"

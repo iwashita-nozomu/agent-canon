@@ -265,6 +265,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User observed that multi-agent work tends to break when additional instructions arrive mid-task.
 
+- 2026-06-13 | interaction-observation | Conservative editing should mean evidence-backed and behavior-respecting, not smallest possible diff; when the root cause is stale structure or an underspecified harness, the agent should choose a cohesive structural repair instead of adding only a narrow wrapper.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: 2026-06-13 user feedback: code edits are too conservative
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
