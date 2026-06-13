@@ -29,13 +29,20 @@ class RunAllChecksScriptTest(unittest.TestCase):
             '${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"'
         )
         mkdir_marker = 'mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
+        eval_default_marker = 'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"'
+        state_default_marker = (
+            'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"'
+        )
         producer_marker = 'tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}"'
         checker_marker = "tools/agent_tools/eval_accumulation_check.py"
         command_env_marker = 'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
 
         self.assertIn(archive_marker, text)
         self.assertIn(mkdir_marker, text)
+        self.assertIn(eval_default_marker, text)
+        self.assertIn(state_default_marker, text)
         self.assertIn(command_env_marker, text)
+        self.assertIn('--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"', text)
         self.assertLess(text.index(archive_marker), text.index(producer_marker))
         self.assertLess(text.index(mkdir_marker), text.index(producer_marker))
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
