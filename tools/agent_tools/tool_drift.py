@@ -299,6 +299,11 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
+                'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}"',
+                "missing-agent-canon-pr-hook-archive-env",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
                 "python3 tools/agent_tools/generated_artifact_guard.py",
                 "missing-generated-artifact-pr-guard",
             ),
