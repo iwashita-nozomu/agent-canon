@@ -2516,7 +2516,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "directory_responsibility_graph",
-      "line": 261,
+      "line": 150,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "directory_responsibility_graph",
+      "line": 323,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2547,6 +2555,14 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "generated_artifact_boundary",
+      "line": 156,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "import_check",
       "line": 104,
       "path": "agents/skills/structure-refactor.md",
@@ -2564,7 +2580,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "moves_applied",
-      "line": 264,
+      "line": 328,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2588,7 +2604,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "path_mapping",
-      "line": 262,
+      "line": 152,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 324,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2635,6 +2659,38 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "reverse_edge_check",
+      "line": 154,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reverse_edge_check",
+      "line": 327,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewed_contract",
+      "line": 149,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewer_decision",
+      "line": 160,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "runtime_boundary",
       "line": 135,
       "path": "agents/skills/structure-refactor.md",
@@ -2660,7 +2716,31 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "scope_overlap_report",
-      "line": 263,
+      "line": 153,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 325,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
+      "line": 151,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
+      "line": 326,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2668,7 +2748,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "stale_path_sweep",
-      "line": 265,
+      "line": 329,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_surface_sweep",
+      "line": 155,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2676,7 +2764,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_refactor",
-      "line": 260,
+      "line": 321,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2693,6 +2781,30 @@
       "emitter": "markdown_key_value_example",
       "field": "structure_repair_root",
       "line": 97,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_decision",
+      "line": 322,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_root",
+      "line": 147,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_surface",
+      "line": 148,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2716,7 +2828,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "validation_docs",
-      "line": 268,
+      "line": 159,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 332,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2732,7 +2852,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "validation_imports",
-      "line": 267,
+      "line": 158,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 331,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2740,7 +2868,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "validation_scope",
-      "line": 266,
+      "line": 157,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_scope",
+      "line": 330,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2796,7 +2932,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "EVIDENCE",
-      "line": 1354,
+      "line": 1359,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2804,7 +2940,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM",
-      "line": 2679,
+      "line": 2684,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2836,7 +2972,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 2736,
+      "line": 2741,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2844,7 +2980,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_FILE",
-      "line": 2676,
+      "line": 2681,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2852,7 +2988,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_MODEL",
-      "line": 2677,
+      "line": 2682,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2860,7 +2996,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_PROMPT_SHA",
-      "line": 2678,
+      "line": 2683,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2868,7 +3004,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_SCOPE",
-      "line": 2675,
+      "line": 2680,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2876,7 +3012,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FORBIDDEN_PATHS",
-      "line": 1807,
+      "line": 1812,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2892,7 +3028,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1774,
+      "line": 1779,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2900,7 +3036,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1790,
+      "line": 1795,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2924,7 +3060,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1742,
+      "line": 1747,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2932,7 +3068,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1769,
+      "line": 1774,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2940,7 +3076,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1777,
+      "line": 1782,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2948,7 +3084,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE",
-      "line": 1776,
+      "line": 1781,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2964,7 +3100,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1779,
+      "line": 1784,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2972,7 +3108,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1798,
+      "line": 1803,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2988,7 +3124,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
-      "line": 1780,
+      "line": 1785,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2996,7 +3132,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION",
-      "line": 1778,
+      "line": 1783,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3004,7 +3140,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_SCHEMA",
-      "line": 1775,
+      "line": 1780,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3220,7 +3356,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "MODE",
-      "line": 1306,
+      "line": 1311,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3228,7 +3364,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_OWNER",
-      "line": 1804,
+      "line": 1809,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3236,7 +3372,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_PATHS",
-      "line": 1806,
+      "line": 1811,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3244,7 +3380,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SCORE",
-      "line": 1805,
+      "line": 1810,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3252,7 +3388,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SURFACE",
-      "line": 1803,
+      "line": 1808,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3260,7 +3396,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "ROUTE",
-      "line": 1304,
+      "line": 1309,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3268,7 +3404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SCHEMA",
-      "line": 1305,
+      "line": 1310,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -11140,7 +11276,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 779,
+      "line": 787,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11148,7 +11284,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 797,
+      "line": 805,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11156,7 +11292,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 817,
+      "line": 825,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11164,7 +11300,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 860,
+      "line": 868,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11172,7 +11308,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 531,
+      "line": 539,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11180,7 +11316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 926,
+      "line": 934,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -13932,7 +14068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 438,
+      "line": 491,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -13940,7 +14076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 438,
+      "line": 491,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -13948,7 +14084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 438,
+      "line": 491,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -13956,7 +14092,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATE",
-      "line": 430,
+      "line": 483,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -13964,7 +14100,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATES",
-      "line": 426,
+      "line": 479,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -13972,7 +14108,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREFLIGHT",
-      "line": 425,
+      "line": 478,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
