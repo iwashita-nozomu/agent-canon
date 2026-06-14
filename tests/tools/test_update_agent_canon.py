@@ -764,6 +764,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'owner = "agent-canon"',
                     'class = "runtime_surface"',
                     'paths = [',
+                    '  ".vscode",',
                     '  ".github/AGENTS.md",',
                     ']',
                     '',
@@ -809,6 +810,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / ".github" / "workflows").mkdir(parents=True)
         (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
+        (work_dir / ".vscode").mkdir()
+        (work_dir / ".vscode" / "settings.json").write_text(
+            '{"agentCanonTest": true}\n',
+            encoding="utf-8",
+        )
         (work_dir / "documents" / "README.md").write_text(
             "# Derived Documents Seed\n",
             encoding="utf-8",
@@ -854,6 +860,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "README.md",
                 "ROOT_AGENTS.md",
                 ".github",
+                ".vscode",
                 "documents",
                 "tools",
             ],
@@ -1133,6 +1140,59 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 ).read_text(encoding="utf-8"),
             )
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
+
+    def test_link_root_replaces_legacy_vscode_directory_with_shared_symlink(self) -> None:
+        """Link-root should migrate VS Code workspace defaults to AgentCanon ownership."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            vscode_dir = repo / ".vscode"
+            vscode_dir.mkdir()
+            (vscode_dir / "settings.json").write_text(
+                '{"legacyRepoLocalSetting": true}\n',
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", ".vscode/settings.json"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "add legacy vscode settings"],
+                cwd=repo,
+                check=True,
+            )
+
+            result = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            check = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "check"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(vscode_dir.is_symlink())
+            self.assertEqual(os.readlink(vscode_dir), "vendor/agent-canon/.vscode")
+            self.assertEqual(check.returncode, 0, check.stderr)
+            subprocess.run(["git", "add", "-A", ".vscode"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "sync vscode shared surface"],
+                cwd=repo,
+                check=True,
+            )
+            status = subprocess.run(
+                ["git", "status", "--short", "--", ".vscode"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(status.stdout.strip(), "")
 
     def test_link_root_materializes_missing_and_legacy_regular_active_contracts(self) -> None:
         """Link-root should seed active-contract docs without keeping legacy symlinks."""

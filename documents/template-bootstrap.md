@@ -83,8 +83,8 @@ bash scripts/start_repository.sh --validate-only
   - `docker/README.md`
 - VS Code devcontainer:
   - `.devcontainer/`
-- 推奨拡張:
-  - `.vscode/extensions.json`
+- VS Code workspace defaults and recommended extensions:
+  - `.vscode/` (AgentCanon-managed root view)
 
 ## 5. 作業開始
 
