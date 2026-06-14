@@ -92,6 +92,49 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
 
+    def test_full_repo_scan_skips_ignored_vendor_log_archive_python_files(self) -> None:
+        """Repository-wide scans should not inspect ignored AgentCanon log archives."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subprocess.run(["git", "-C", str(root), "init"], check=True, capture_output=True)
+            self.write_file(
+                root,
+                ".gitignore",
+                "vendor/agent-canon/.agent-canon/log-archive/\n",
+            )
+            self.write_file(
+                root,
+                "responsibility-scope.toml",
+                "\n".join(
+                    [
+                        'catalog_kind = "agent_canon_responsibility_scope"',
+                        "version = 1",
+                        "[[scope]]",
+                        'id = "app"',
+                        'paths = ["app/**"]',
+                        "",
+                        "[[import_rule]]",
+                        'source = "app"',
+                        'targets = ["app"]',
+                        "",
+                    ]
+                ),
+            )
+            self.write_file(root, "app/lib.py", "VALUE = 1\n")
+            self.write_file(root, "app/main.py", "import app.lib as lib\n\nVALUE = lib.VALUE\n")
+            self.write_file(
+                root,
+                "vendor/agent-canon/.agent-canon/log-archive/run/bad.py",
+                "def invalid syntax:\n",
+            )
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("IMPORT_RESPONSIBILITY_FILES=2", result.stdout)
+        self.assertNotIn("IMPORT_RESPONSIBILITY_FINDING=", result.stdout)
+        self.assertNotIn("bad.py", result.stdout + result.stderr)
+
     def test_exclude_paths_select_more_specific_responsibility_scope(self) -> None:
         """Excluded files should resolve to their owning scope for import rules."""
         with tempfile.TemporaryDirectory() as temp_dir:
