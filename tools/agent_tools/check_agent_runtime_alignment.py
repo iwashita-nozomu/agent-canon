@@ -50,6 +50,11 @@ EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+ALLOWED_AGENT_RUNTIME_KEYS = {
+    "max_threads",
+    "max_depth",
+    "job_max_runtime_seconds",
+}
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial intake wave role: own user-request clauses",
     "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
@@ -147,6 +152,17 @@ def validate_project_config() -> None:
     ensure(
         agents.get("job_max_runtime_seconds") == EXPECTED_JOB_MAX_RUNTIME_SECONDS,
         f"agents.job_max_runtime_seconds must remain {EXPECTED_JOB_MAX_RUNTIME_SECONDS}",
+    )
+    unsupported_agent_scalars = sorted(
+        key
+        for key, value in agents.items()
+        if key not in ALLOWED_AGENT_RUNTIME_KEYS and not isinstance(value, dict)
+    )
+    ensure(
+        not unsupported_agent_scalars,
+        "unsupported scalar keys under .codex/config.toml [agents]: "
+        + ", ".join(unsupported_agent_scalars)
+        + "; keep task policy in agents/task_catalog.yaml or generated team_manifest.yaml",
     )
     codex_agents = parse_codex_agents()
     registry = {
