@@ -13,60 +13,25 @@ upstream design ../README.md shared canon overview
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
 skill を user-facing に明示するときは `$skill-name` を使います。
 
-## Recommended Read Order
+## Reader Position
 
-1. `README.md`
-1. `documents/README.md`
-1. `agents/README.md`
-1. `agents/workflows/README.md`
+全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、
+agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
+`agents/canonical/README.md` は layout appendix であり、最初の hub ではありません。
 
-`agents/canonical/README.md` は layout appendix です。最初の人間向け hub として
-使わず、この file から必要になったときだけ参照します。
+## Hub Routes
 
-## 正本
+| 目的 | 入口 | 役割 |
+| --- | --- | --- |
+| workflow family を選ぶ | [TASK_WORKFLOWS.md](TASK_WORKFLOWS.md), [workflows/README.md](workflows/README.md) | task family、stage、review route を決める |
+| team shape と spawn budget を見る | [agents_config.json](agents_config.json), [task_catalog.yaml](task_catalog.yaml) | role、write policy、default specialist を固定する |
+| handoff / review の契約を見る | [COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md), [canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md) | subagent input packet、review separation、lifecycle を決める |
+| Codex task の実行順を見る | [canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md), [canonical/CLI_ENTRYPOINTS.md](canonical/CLI_ENTRYPOINTS.md) | bootstrap、plan、implementation、closeout の順序を確認する |
+| run artifact の置き場を確認する | [canonical/ARTIFACT_PLACEMENT.md](canonical/ARTIFACT_PLACEMENT.md) | reports、issues、notes、experiments の責務を分ける |
+| skill を選ぶ | [skills/README.md](skills/README.md), [skills/catalog.yaml](skills/catalog.yaml) | 個別 skill 文書へ進む前に family と trigger を決める |
 
-- [canonical/README.md](canonical/README.md)
-  - 共通レイアウトと正本の置き場を説明する appendix
-- [agents_config.json](agents_config.json)
-  - チーム定義と write policy
-- [TASK_WORKFLOWS.md](TASK_WORKFLOWS.md)
-  - workflow family と task 選択
-- [workflows/README.md](workflows/README.md)
-  - workflow catalog と routing guide の入口
-- [COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md)
-  - handoff / review / escalation の正本
-- [task_catalog.yaml](task_catalog.yaml)
-  - machine-readable catalog
-- [canonical/ARTIFACT_PLACEMENT.md](canonical/ARTIFACT_PLACEMENT.md)
-  - task 文書と run artifact の置き分け
-- [canonical/CLI_ENTRYPOINTS.md](canonical/CLI_ENTRYPOINTS.md)
-  - agent ごとの入口差分と bootstrap 入口
-- [canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md)
-  - Codex の標準 task 実行フロー
-- [canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md)
-  - Codex の subagent routing
-- [skills/README.md](skills/README.md)
-  - 人間向け skill 正本
-- [skills/catalog.yaml](skills/catalog.yaml)
-  - skill family の機械可読カタログ
-- [skills/literature-survey.md](skills/literature-survey.md)
-  - 文献調査と先行研究整理の入口
-- [skills/formal-proof-workflow.md](skills/formal-proof-workflow.md)
-  - 自然言語 claim から形式証明 scaffold と checker evidence へ進む入口
-- [skills/research-workflow.md](skills/research-workflow.md)
-  - 研究系変更の outer loop
-- [skills/adaptive-improvement-loop.md](skills/adaptive-improvement-loop.md)
-  - 実験、調査、チューニング、比較改良の outer loop
-- [skills/worktree-start.md](skills/worktree-start.md)
-  - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断
-- [skills/long-form-writing.md](skills/long-form-writing.md)
-  - README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter
-- [skills/academic-writing.md](skills/academic-writing.md)
-  - 論文、thesis chapter、scholarly note の作成フロー
-- [skills/comprehensive-development.md](skills/comprehensive-development.md)
-  - 包括的 repo-wide delivery の umbrella workflow
-- [skills/environment-maintenance.md](skills/environment-maintenance.md)
-  - Docker、CI、tool 導入方針の正本
+個別 skill のリンク一覧は `skills/README.md` と `skills/catalog.yaml` に集約します。
+この hub には常用 skill の抜粋を増やしません。
 
 ## Runtime Entry Points
 

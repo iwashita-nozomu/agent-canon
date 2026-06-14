@@ -97,38 +97,24 @@ The new directories are migration targets, not duplicate registries. Existing
 tool paths stay stable until the catalog entry, tests, docs, and workflow
 callers move together.
 
-Validation entrypoints:
+Common execution routes:
 
-```bash
-python3 tools/agent_tools/tool_catalog.py
-python3 tools/agent_tools/tool_drift.py
-python3 tools/agent_tools/responsibility_scope.py
-python3 tools/agent_tools/parent_repo_readiness.py
-python3 tools/agent_tools/repo_structure_contract.py
-python3 tools/agent_tools/render_dependency_manifest_graph.py
-python3 tools/agent_tools/classify_path_risk.py
-python3 tools/agent_tools/formal_proof.py --help
-python3 tools/agent_tools/lean_proof_env.py --help
-python3 tools/agent_tools/tool_proof_coverage.py
-python3 tools/agent_tools/issue_sync.py
-python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
-python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/generated_artifact_guard.py
-python3 tools/agent_tools/runtime_log_archive_git.py status
-agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
-agent-canon local-llm route-implementation-surface --request-file reports/task.txt
-agent-canon local-llm route-skill --prompt "fix skill routing" --format json
-agent-canon test-design check tests
-agent-canon local-llm build-index
-python3 tools/agent_tools/route.py --area search
-agent-canon local-llm eval
-python3 tools/agent_tools/evaluate_report_quality.py
-python3 tools/agent_tools/evaluate_codex_agent_roles.py
-python3 tools/agent_tools/github_publish.py --help
-python3 tools/agent_tools/prose_reasoning_graph.py --help
-agent-canon structured-analysis build --root . --profile manual
-agent-canon structured-analysis document-inventory --root .
-```
+| Need | Command |
+| --- | --- |
+| Catalog shape, docs wiring, and retired legacy paths | `python3 tools/agent_tools/tool_catalog.py` |
+| Tool / workflow / PR checklist drift | `python3 tools/agent_tools/tool_drift.py` |
+| Runtime profile and path-risk routing | `python3 tools/agent_tools/classify_path_risk.py` |
+| Markdown, links, math, Mermaid, and docs drift | `tools/bin/agent-canon docs check` |
+| Implementation-surface routing before edits | `agent-canon local-llm route-implementation-surface --request-file reports/task.txt` |
+| Bounded search route selection | `agent-canon local-llm search --purpose "<purpose>"` |
+| Document inventory and document-canon cleanup | `agent-canon structured-analysis document-inventory --root .` |
+| Runtime log archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
+| Generated report roots left in source tree | `python3 tools/agent_tools/generated_artifact_guard.py` |
+| Test-design resilience diagnostics | `agent-canon test-design check tests` |
+
+Use `documents/tools/README.md` for reader-facing tool-family guidance and
+`tools/catalog.yaml` for the complete structured registry. Do not expand this
+table into a second catalog.
 
 For agent-facing diagnostics, prefer compact artifact options over detailed
 stdout: `evaluate_skill_workflow_prompts.py --compact-out <path>.json`,
