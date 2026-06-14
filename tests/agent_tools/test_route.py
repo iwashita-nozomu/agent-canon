@@ -93,6 +93,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
+    def test_unknown_legacy_search_alias_fails(self) -> None:
+        """Unknown legacy-like search names must not silently resolve."""
+        result = self.run_route("--name", "search_legacy.py")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("STATUS=unknown", result.stdout)
+        self.assertIn("CANONICAL_AREA=", result.stdout)
+
     def test_prompt_routes_repo_changing_skill_set(self) -> None:
         """Prompt routing should expose concrete public skills, not only area aliases."""
         result = self.run_route(

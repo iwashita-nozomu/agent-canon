@@ -101,6 +101,26 @@ class SearchIndexTest(unittest.TestCase):
             self.assertEqual(tool_cards[0]["kind"], "tool")
             self.assertEqual(tool_cards[0]["related_tools"], ["dependency-graph"])
 
+    def test_build_prunes_legacy_token_tool_cards(self) -> None:
+        """Search cards must not preserve retired legacy-like implementation paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_tool_registry(root)
+            write_tool(root)
+            (root / "tools" / "search_legacy.py").write_text(
+                "def retired_search():\n    return 'legacyonlyneedle'\n",
+                encoding="utf-8",
+            )
+
+            result = run_index(root, "build", "--surface", "tools", "--format", "json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            card_file = root / ".agent-canon" / "search-index" / "llm-cards.jsonl"
+            cards = [json.loads(line) for line in card_file.read_text(encoding="utf-8").splitlines()]
+            paths = {card["path"] for card in cards}
+            self.assertIn("tools/dependency_graph.py", paths)
+            self.assertNotIn("tools/search_legacy.py", paths)
+
     def test_required_llm_missing_fails_before_index_write(self) -> None:
         """A required unavailable local LLM must fail explicitly."""
         with tempfile.TemporaryDirectory() as tmp_dir:

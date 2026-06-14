@@ -6,6 +6,7 @@
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream design ../../documents/repo-local-tool-imports.md legacy tool disposition policy
+# upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs catalog validation
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
 # @dependency-end
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from tool_path_policy import is_retired_legacy_tool_path
 
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
@@ -271,7 +273,7 @@ def check_entry(
     if not target.exists():
         findings.append(Finding("entry", path, "missing-path"))
 
-    if path.startswith("tools/legacy/") or status == "legacy_provenance":
+    if is_retired_legacy_tool_path(path) or status == "legacy_provenance":
         findings.append(Finding("legacy", path, "legacy-tools-are-retired"))
 
     docs = string_list(entry.get("docs"))

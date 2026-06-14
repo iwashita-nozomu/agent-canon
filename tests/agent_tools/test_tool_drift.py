@@ -278,6 +278,56 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_orphaned_legacy_token_tool_file_fails(self) -> None:
+        """Uncataloged legacy-like tool files must not survive drift checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+            self.write_file(root, "tools/search_legacy.py", "print('retired')\n")
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "retired-legacy-tool:tool_catalog:"
+                "tools/search_legacy.py:legacy-tools-are-retired",
+                result.stdout,
+            )
+
+    def test_cataloged_legacy_token_tool_file_is_not_double_reported(self) -> None:
+        """Cataloged retired tool files should produce one catalog finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+            self.write_file(root, "tools/legacysearch.py", "print('retired')\n")
+            catalog = root / "tools" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8")
+                + "\n".join(
+                    [
+                        "  - id: legacysearch",
+                        "    path: tools/legacysearch.py",
+                        "    status: canonical",
+                        "    callable_by_default: false",
+                        "    default_wiring:",
+                        "      ci: false",
+                        "      pr_check: false",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.count("tools/legacysearch.py"), 1)
+            self.assertIn(
+                "retired-legacy-tool:tool_catalog:"
+                "tools/legacysearch.py:legacy-tools-are-retired",
+                result.stdout,
+            )
+
     def test_subagent_wave_routing_requires_policy_marker(self) -> None:
         """Subagent wave routing drift is caught as a tool contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:

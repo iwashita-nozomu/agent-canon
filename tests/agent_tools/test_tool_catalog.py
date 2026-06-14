@@ -103,6 +103,94 @@ class CheckToolCatalogTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_legacy_token_entry_is_retired(self) -> None:
+        """Legacy-like tool names outside tools/legacy are also retired."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root)
+            self.write_file(
+                root,
+                "tools/search_legacy.py",
+                self.manifest("Retired search implementation."),
+            )
+            catalog = root / "tools" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8")
+                + "\n".join(
+                    [
+                        "  - id: search-legacy",
+                        "    summary: Retired fixture search implementation.",
+                        "    path: ./tools/search_legacy.py",
+                        "    family: agent_tools",
+                        "    role: catalog",
+                        "    status: canonical",
+                        "    command: python3 tools/search_legacy.py",
+                        "    writes: false",
+                        "    default_wiring:",
+                        "      ci: false",
+                        "      pr_check: false",
+                        "    docs:",
+                        "      - tools/README.md",
+                        "    tests:",
+                        "      - tests/agent_tools/test_tool_catalog.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "legacy:./tools/search_legacy.py:legacy-tools-are-retired",
+                result.stdout,
+            )
+
+    def test_joined_legacy_token_entry_is_retired(self) -> None:
+        """Legacy tool names are retired even when legacy is joined to another token."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root)
+            self.write_file(
+                root,
+                "tools/legacysearch.py",
+                self.manifest("Retired joined-name search implementation."),
+            )
+            catalog = root / "tools" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8")
+                + "\n".join(
+                    [
+                        "  - id: legacysearch",
+                        "    summary: Retired joined-name fixture search implementation.",
+                        "    path: tools/legacysearch.py",
+                        "    family: agent_tools",
+                        "    role: catalog",
+                        "    status: canonical",
+                        "    command: python3 tools/legacysearch.py",
+                        "    writes: false",
+                        "    default_wiring:",
+                        "      ci: false",
+                        "      pr_check: false",
+                        "    docs:",
+                        "      - tools/README.md",
+                        "    tests:",
+                        "      - tests/agent_tools/test_tool_catalog.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "legacy:tools/legacysearch.py:legacy-tools-are-retired",
+                result.stdout,
+            )
+
     def test_tool_doc_manifest_requires_same_named_doc(self) -> None:
         """Tool docs must map one tool to one same-basename Markdown file."""
         with tempfile.TemporaryDirectory() as tmp_dir:
