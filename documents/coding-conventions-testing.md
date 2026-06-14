@@ -77,6 +77,30 @@ unit test は「1 つの観測可能 behavior に対する concrete example」�
 - `Input Space`: concrete regression、boundary table、random/property generator、metamorphic follow-up input のどれか。
 - `Adequacy Evidence`: branch/edge coverage、mutation score、regression replay、manual review のどれで assertion の強さを確認するか。
 
+### 3.1 数値テスト採用ゲート
+
+数値テストは、変更の behavior contract が数値的な性質を持つ場合だけ追加します。
+solver、optimizer、floating-point approximation、residual、tolerance、random sampling、
+convergence、reference comparison、scientific experiment contract のどれにも関係しない
+docs、routing、metadata、string parsing、configuration、structure refactor では、
+数値 smoke、large random case、benchmark 風 test を追加しません。
+
+数値テストを提案する前に、test plan で次を固定します。
+
+- `Numerical Trigger`: 数値テストが必要な具体的契約、既知 regression、acceptance
+  criterion、または proof / experiment requirement。
+- `Non-Numerical Alternative`: static contract、parser example、diagnostic key、
+  property、metamorphic relation、snapshot で同じリスクをより小さく検証できない理由。
+- `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
+  flag など、production path と同じ bug を複製しない expected。
+- `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
+
+`Numerical Trigger` がない場合は、数値テストを省きます。その場合も test plan には
+「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
+数値 validation が必要でも、既定は最小の deterministic case です。GPU、long-running、
+broad benchmark、large random sweep は unit test ではなく experiment validation として
+profile、理由、ログ保存先を記録します。
+
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
 その対象が public contract である理由を test 名か test plan に残します。

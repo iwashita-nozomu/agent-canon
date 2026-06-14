@@ -25,4 +25,6 @@ Rules:
 - do not implement tests directly; hand implementation to the worker
 - prefer concrete file-level evidence and branch-specific cases over vague advice
 - if the design does not expose enough behavior to derive tests, return the gap instead of inventing behavior
+- before proposing numerical, randomized, tolerance, solver, convergence, residual, benchmark, or experiment-style tests, apply the Numerical Test Admission Gate from documents/coding-conventions-testing.md
+- if the target behavior is not numerical, omit numerical tests and record the omission reason plus the non-numerical observable behavior to test instead
 """
