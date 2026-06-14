@@ -76,6 +76,7 @@ goals = true
 
 [agents]
 max_threads = 24
+max_depth = 2
 job_max_runtime_seconds = 3600
 ```
 
@@ -212,7 +213,7 @@ workspace_owner_usage_nudge
 
 | Surface | Configured Here | Schema-Available But Absent Here |
 | ------- | --------------- | -------------------------------- |
-| `[agents]` | `max_threads`, `job_max_runtime_seconds` | `max_depth` and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` |
+| `[agents]` | `max_threads`, `max_depth`, `job_max_runtime_seconds`, and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` | task policy strings such as same-role instance rules; keep those in `agents/task_catalog.yaml` and generated `team_manifest.yaml` |
 | `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
 | `.agents/skills/` versus `[skills]` | skills are provided as files under `.agents/skills/` | `[skills] include_instructions`, `[skills.bundled]`, and `[[skills.config]]` name/path enablement entries |
 

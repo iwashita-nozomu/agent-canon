@@ -696,7 +696,7 @@ entries:
       - rust/agent-canon/src/local_llm.rs
 
   - id: test-design-check
-    summary: Runs Rust-native diagnostics for brittle or under-specified test design before code changes.
+    summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
     path: rust/agent-canon/src/test_design.rs
     family: root
     role: checker

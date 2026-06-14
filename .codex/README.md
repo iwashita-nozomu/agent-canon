@@ -105,7 +105,12 @@ or high-risk review. Profiles do not waive workflow gates.
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
 - `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
-- `[agents]` の `same_role_instances = "allowed_with_distinct_packets"` は role type と runtime instance を分ける registry metadata です。`role_type+instance_id` が instance key で、`max_threads` は runtime cap であり role cardinality の source ではありません。
+- same-role instance policy は `agents/task_catalog.yaml` と generated
+  `team_manifest.yaml` の `run.delegated_spawn_policy` が正本です。
+  `.codex/config.toml` の `[agents]` には Codex runtime が読む runtime
+  limit と `[agents.<role>]` registry だけを置き、policy 文字列を置きません。
+  `role_type+instance_id` が instance key で、`max_threads` は runtime cap であり
+  role cardinality の source ではありません。
 - write-capable subagent instance は既定 1 体から始めます。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、同じ role type を含む複数 writer instance を spawn budget 内で並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします

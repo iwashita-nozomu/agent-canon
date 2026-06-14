@@ -220,9 +220,9 @@ second command manual.
 - `tools/install_llama_cpp.sh`
   - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を公開します。
   - PostCreate では `--allow-fetch` で取得と build を行い、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
-  - CUDA build は `AGENT_CANON_LLAMA_CPP_CUDA=auto|1|0` で制御します。`auto` は `nvcc`、GPU device、linkable `libcuda` が揃う場合だけ `-DGGML_CUDA=ON` にし、それ以外は CPU build に戻します。
-  - `AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR` は WSL / devcontainer の `libcuda.so` 探索先を明示します。`AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。
-  - CUDA / CMake flag の組み合わせは build cache key として記録されます。source が新しくなくても設定が変わった場合は `already_current` にせず再ビルドします。
+  - Local LLM の llama.cpp build は CPU-only です。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は互換入力として受け付けますが、GPU build には切り替えません。
+  - `AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。GPU accelerator を有効化する CMake flags は CPU-only policy violation として失敗させます。
+  - CPU-only CMake flag の組み合わせは build cache key として記録されます。source が新しくなくても設定が変わった場合は `already_current` にせず再ビルドします。
   - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は lazy fetch で、repo にコミットしません。
 - `tools/agent_tools/route.py`
   - 長い候補 tool / skill 名を短い route area へ解決します。

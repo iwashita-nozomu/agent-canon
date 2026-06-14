@@ -31,7 +31,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import vector_search  # noqa: E402
-from file_responsibility_llm import DEFAULT_MODEL, find_llama_cli  # noqa: E402
+from file_responsibility_llm import DEFAULT_MODEL, find_llama_cli, local_llm_cpu_env  # noqa: E402
 
 DEFAULT_INDEX_DIR = ".agent-canon/search-index"
 DEFAULT_CARD_FILE = "llm-cards.jsonl"
@@ -456,6 +456,7 @@ def run_llm_card(invocation: LlmInvocation) -> LlmCardResult:
         check=False,
         capture_output=True,
         text=True,
+        env=local_llm_cpu_env(),
     )
     if result.returncode != 0:
         return LlmCardResult(card=invocation.base_card, used=False)
