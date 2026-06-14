@@ -292,6 +292,11 @@ kind = "any"
 category = "shared_runtime_view"
 
 [[profile.required]]
+path = ".vscode"
+kind = "any"
+category = "shared_runtime_view"
+
+[[profile.required]]
 path = "documents/README.md"
 kind = "file"
 category = "parent_active_contract"

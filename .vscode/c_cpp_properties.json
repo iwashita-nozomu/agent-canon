@@ -1,0 +1,25 @@
+{
+  "_dependency_manifest": [
+    "@dependency-start",
+    "responsibility Configures shared VS Code C and C++ language defaults without host-specific include paths.",
+    "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
+    "upstream design ../documents/cpp-build-layout.md C++ build layout guidance",
+    "@dependency-end"
+  ],
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Linux",
+      "compilerPath": "/usr/bin/c++",
+      "intelliSenseMode": "linux-gcc-x64",
+      "cppStandard": "c++20",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src",
+        "/usr/include",
+        "/usr/local/include"
+      ],
+      "forcedInclude": []
+    }
+  ]
+}
