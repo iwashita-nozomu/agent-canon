@@ -699,6 +699,42 @@ description = "Connects experiment planning/reporting to discourse-relations pro
 required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
 
 [[evals]]
+id = "test-design-numerical-admission-gate-shim"
+target = ".agents/skills/test-design/SKILL.md"
+kind = "skill"
+description = "The discoverable test-design skill must gate numerical, randomized, tolerance, solver, convergence, residual, benchmark, and experiment-style tests before proposing them."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-NUMERICAL-GATE-SHIM-1"
+critical = true
+description = "Requires numerical test admission before recommending numerical tests."
+required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-numerical alternative", "oracle", "budget", "omit"]
+
+[[evals]]
+id = "test-design-numerical-admission-gate-doc"
+target = "agents/skills/test-design.md"
+kind = "skill-doc"
+description = "The human test-design skill must require numerical trigger, alternative, oracle, and budget evidence."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
+critical = true
+description = "Documents when numerical tests may be proposed or omitted."
+required_regex = ["数値テスト採用ゲート", "Numerical Trigger", "Non-Numerical Alternative", "Oracle", "Budget", "省略理由"]
+
+[[evals]]
+id = "testing-conventions-numerical-admission-gate"
+target = "documents/coding-conventions-testing.md"
+kind = "document"
+description = "The common testing convention must forbid numerical tests without a numerical behavior contract."
+
+[[evals.checklist]]
+id = "TESTING-CONVENTIONS-NUMERICAL-GATE-1"
+critical = true
+description = "Defines triggers, alternatives, oracles, and budget for numerical tests."
+required_regex = ["数値テスト採用ゲート", "Numerical Trigger", "Non-Numerical Alternative", "Oracle", "Budget", "Numerical Trigger` がない場合"]
+
+[[evals]]
 id = "computational-optimization-shim"
 target = ".agents/skills/computational-optimization/SKILL.md"
 kind = "skill"

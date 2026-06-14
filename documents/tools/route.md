@@ -40,6 +40,11 @@ Prompt skill routing is owned by the Rust
 for dynamic wave triggers. The Python `route.py --prompt ...` path remains a
 compatibility mirror for older call sites.
 
+Japanese or English prompts about unnecessary numerical tests, heavy tests,
+test brittleness, tolerance-based tests, or test-design gaps route to
+`$test-design` so the numerical admission gate is applied before workers add
+tests.
+
 Repository-refactor and structure-review aliases such as
 `repo_refactor_skill.py`, `repo/refactor`, and `structure-review`, plus personal
 Codex runtime boundary prompts involving `~/.codex`, route to the `structure`

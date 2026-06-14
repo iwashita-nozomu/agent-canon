@@ -13,7 +13,7 @@ set -euo pipefail
 TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 LLAMA_CPP_REF="${AGENT_CANON_LLAMA_CPP_REF:-master}"
 FORCE_REBUILD="${AGENT_CANON_REBUILD_LLAMA_CPP:-0}"
-CUDA_MODE="${AGENT_CANON_LLAMA_CPP_CUDA:-auto}"
+CUDA_MODE="${AGENT_CANON_LLAMA_CPP_CUDA:-disabled}"
 CMAKE_EXTRA_ARGS="${AGENT_CANON_LLAMA_CPP_CMAKE_ARGS:-}"
 BUILD_JOBS="${AGENT_CANON_LLAMA_CPP_BUILD_JOBS:-}"
 ALLOW_FETCH=0
@@ -71,85 +71,18 @@ llama_build_config_matches() {
   [ "$(cat "$config_path")" = "$expected_config" ]
 }
 
-cuda_toolkit_available() {
-  command -v nvcc >/dev/null 2>&1 || [ -x /usr/local/cuda/bin/nvcc ]
-}
-
-cuda_device_visible() {
-  [ -e /dev/nvidia0 ] && return 0
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
-}
-
-cuda_driver_library_dir() {
-  if [ -n "${AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR:-}" ]; then
-    if [ -e "${AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR}/libcuda.so.1" ] \
-      || [ -e "${AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR}/libcuda.so" ]; then
-      printf '%s\n' "$AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR"
-      return 0
-    fi
-    return 1
-  fi
-  if command -v ldconfig >/dev/null 2>&1; then
-    local ldconfig_path
-    ldconfig_path="$(
-      ldconfig -p 2>/dev/null \
-        | awk '/libcuda\.so\.1/{print $NF; exit} /libcuda\.so[[:space:]]/{print $NF; exit}'
-    )"
-    if [ -n "$ldconfig_path" ]; then
-      dirname "$ldconfig_path"
-      return 0
-    fi
-  fi
-  local candidate
-  for candidate in \
-    /usr/local/cuda/compat/libcuda.so.1 \
-    /usr/local/cuda-*/compat/libcuda.so.1 \
-    /usr/lib/wsl/lib/libcuda.so.1 \
-    /usr/lib/x86_64-linux-gnu/libcuda.so.1; do
-    if [ -e "$candidate" ]; then
-      dirname "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
-cuda_driver_library_available() {
-  cuda_driver_library_dir >/dev/null 2>&1
-}
-
 resolve_cuda_backend() {
   case "$CUDA_MODE" in
     1 | true | TRUE | on | ON | yes | YES | cuda | CUDA)
-      if ! cuda_toolkit_available; then
-        echo "AGENT_CANON_LLAMA_CPP=fail"
-        echo "AGENT_CANON_LLAMA_CPP_ERROR=missing_cuda_toolkit"
-        exit 2
-      fi
-      if ! cuda_driver_library_available; then
-        echo "AGENT_CANON_LLAMA_CPP=fail"
-        echo "AGENT_CANON_LLAMA_CPP_ERROR=missing_cuda_driver_library"
-        exit 2
-      fi
-      printf '%s\n' enabled
+      printf '%s\n' disabled
       return
       ;;
-    0 | false | FALSE | off | OFF | no | NO | disabled)
+    0 | false | FALSE | off | OFF | no | NO | disabled | cpu | CPU)
       printf '%s\n' disabled
       return
       ;;
     auto | "")
-      if cuda_toolkit_available && cuda_device_visible && cuda_driver_library_available; then
-        printf '%s\n' enabled
-      elif cuda_device_visible; then
-        if cuda_toolkit_available; then
-          printf '%s\n' auto_disabled_missing_cuda_driver
-        else
-          printf '%s\n' auto_disabled_missing_nvcc
-        fi
-      else
-        printf '%s\n' auto_disabled_no_gpu
-      fi
+      printf '%s\n' disabled
       return
       ;;
     *)
@@ -177,6 +110,40 @@ resolve_build_jobs() {
   nproc 2>/dev/null || printf '%s\n' 2
 }
 
+reject_accelerator_cmake_arg() {
+  local arg="$1"
+  local key
+  local value
+  local normalized_key
+  local normalized_value
+  case "$arg" in
+    -D*=*)
+      key="${arg#-D}"
+      key="${key%%=*}"
+      value="${arg#*=}"
+      normalized_key="${key%%:*}"
+      normalized_value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+      ;;
+    *)
+      return
+      ;;
+  esac
+  case "$normalized_key" in
+    GGML_CUDA | GGML_CUBLAS | LLAMA_CUBLAS | LLAMA_CUDA | GGML_METAL | GGML_HIP | GGML_VULKAN | GGML_SYCL | GGML_CANN | GGML_OPENCL)
+      ;;
+    *)
+      return
+      ;;
+  esac
+  case "$normalized_value" in
+    1 | on | true | yes)
+      echo "AGENT_CANON_LLAMA_CPP=fail"
+      echo "AGENT_CANON_LLAMA_CPP_ERROR=cpu_only_policy_rejects_cmake_arg:$arg"
+      exit 2
+      ;;
+  esac
+}
+
 main() {
   local source_dir
   local build_dir
@@ -184,7 +151,6 @@ main() {
   local source_newer
   local jobs
   local cuda_backend
-  local cuda_driver_dir
   local build_config
   local build_config_path
   local -a cmake_args
@@ -215,30 +181,25 @@ main() {
 
   cmake_args=(-DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON)
   cuda_backend="$(resolve_cuda_backend)"
-  if [ "$cuda_backend" = "enabled" ]; then
-    cuda_driver_dir="$(cuda_driver_library_dir)"
-    export LIBRARY_PATH="${cuda_driver_dir}${LIBRARY_PATH:+:${LIBRARY_PATH}}"
-    export LD_LIBRARY_PATH="${cuda_driver_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-    cmake_args+=(-DGGML_CUDA=ON)
-    cmake_args+=("-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,${cuda_driver_dir} -Wl,-rpath,${cuda_driver_dir}")
-  else
-    cuda_driver_dir=""
-    cmake_args+=(-DGGML_CUDA=OFF)
-  fi
+  cmake_args+=(-DGGML_CUDA=OFF -DGGML_METAL=OFF -DGGML_HIP=OFF -DGGML_VULKAN=OFF -DGGML_SYCL=OFF)
   if [ -n "$CMAKE_EXTRA_ARGS" ]; then
     read -r -a extra_args <<<"$CMAKE_EXTRA_ARGS"
+    for arg in "${extra_args[@]}"; do
+      reject_accelerator_cmake_arg "$arg"
+    done
     cmake_args+=("${extra_args[@]}")
   fi
   jobs="$(resolve_build_jobs)"
   build_config_path="$build_dir/agent-canon-build-config.txt"
   build_config="$(
     printf 'cuda_backend=%s\n' "$cuda_backend"
-    printf 'cuda_driver_dir=%s\n' "$cuda_driver_dir"
     printf 'cmake_args=%s\n' "${cmake_args[*]}"
   )"
   echo "AGENT_CANON_LLAMA_CPP_CUDA=$cuda_backend"
-  if [ "$cuda_backend" = "enabled" ]; then
-    echo "AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR=$cuda_driver_dir"
+  echo "AGENT_CANON_LLAMA_CPP_ACCELERATOR_POLICY=cpu_only"
+  if [ "$CUDA_MODE" != "disabled" ] && [ "$CUDA_MODE" != "0" ] && [ "$CUDA_MODE" != "false" ] && [ "$CUDA_MODE" != "FALSE" ] && [ "$CUDA_MODE" != "off" ] && [ "$CUDA_MODE" != "OFF" ] && [ "$CUDA_MODE" != "no" ] && [ "$CUDA_MODE" != "NO" ] && [ "$CUDA_MODE" != "cpu" ] && [ "$CUDA_MODE" != "CPU" ]; then
+    echo "AGENT_CANON_LLAMA_CPP_CUDA_REQUESTED=$CUDA_MODE"
+    echo "AGENT_CANON_LLAMA_CPP_CUDA_REQUEST_POLICY=ignored_cpu_only"
   fi
   echo "AGENT_CANON_LLAMA_CPP_CMAKE_ARGS=${cmake_args[*]}"
   echo "AGENT_CANON_LLAMA_CPP_BUILD_JOBS=$jobs"

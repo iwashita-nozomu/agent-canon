@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -72,6 +73,56 @@ class FileResponsibilityLlmTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("single-file target is required", result.stderr)
+
+    def test_llama_invocation_hides_accelerator_devices(self) -> None:
+        """The local LLM subprocess should inherit normal env while hiding accelerators."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "tools" / "example.py"
+            fake_llama = root / "llama-cli"
+            target.parent.mkdir(parents=True)
+            target.write_text("# @dependency-start\n# responsibility Example.\n", encoding="utf-8")
+            fake_llama.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'CUDA_VISIBLE_DEVICES=%s\\n' \"${CUDA_VISIBLE_DEVICES-unset}\"\n"
+                "printf 'NVIDIA_VISIBLE_DEVICES=%s\\n' \"${NVIDIA_VISIBLE_DEVICES-unset}\"\n"
+                "printf 'HIP_VISIBLE_DEVICES=%s\\n' \"${HIP_VISIBLE_DEVICES-unset}\"\n"
+                "printf 'ROCR_VISIBLE_DEVICES=%s\\n' \"${ROCR_VISIBLE_DEVICES-unset}\"\n"
+                "printf 'AGENT_CANON_TEST_MARKER=%s\\n' \"${AGENT_CANON_TEST_MARKER-unset}\"\n",
+                encoding="utf-8",
+            )
+            fake_llama.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--llama-cli",
+                    str(fake_llama),
+                    "tools/example.py",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "CUDA_VISIBLE_DEVICES": "0",
+                    "NVIDIA_VISIBLE_DEVICES": "0",
+                    "HIP_VISIBLE_DEVICES": "0",
+                    "ROCR_VISIBLE_DEVICES": "0",
+                    "AGENT_CANON_TEST_MARKER": "kept",
+                },
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("FILE_RESP_LLM=pass", result.stdout)
+        self.assertIn("CUDA_VISIBLE_DEVICES=\n", result.stdout)
+        self.assertIn("NVIDIA_VISIBLE_DEVICES=void", result.stdout)
+        self.assertIn("HIP_VISIBLE_DEVICES=\n", result.stdout)
+        self.assertIn("ROCR_VISIBLE_DEVICES=\n", result.stdout)
+        self.assertIn("AGENT_CANON_TEST_MARKER=kept", result.stdout)
 
 
 if __name__ == "__main__":

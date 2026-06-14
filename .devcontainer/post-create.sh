@@ -54,6 +54,7 @@ publish_agent_tools_profile() {
 export AGENT_CANON_TOOLS_HOME="${tools_home}"
 export AGENT_CANON_LOCAL_LLM_MODEL="${local_llm_model}"
 export AGENT_CANON_LLAMA_CLI="${tools_home}/bin/llama-cli"
+export AGENT_CANON_LLAMA_CPP_CUDA="disabled"
 case ":\${PATH}:" in
   *:"${tools_home}/bin":*) ;;
   *) export PATH="${tools_home}/bin:\${PATH}" ;;
@@ -413,6 +414,7 @@ install_llama_cpp() {
   fi
   AGENT_CANON_TOOLS_HOME="$tools_home" \
     AGENT_CANON_LLAMA_CPP_REF="$llama_cpp_ref" \
+    AGENT_CANON_LLAMA_CPP_CUDA=disabled \
     bash "$installer" --allow-fetch
 }
 
