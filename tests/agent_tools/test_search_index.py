@@ -148,6 +148,61 @@ class SearchIndexTest(unittest.TestCase):
             self.assertIn("SEARCH_INDEX_ERROR=llama-cli-not-found", result.stderr)
             self.assertFalse((root / ".agent-canon" / "search-index" / "llm-cards.jsonl").exists())
 
+    def test_run_llm_hides_accelerator_devices(self) -> None:
+        """LLM-backed search cards should run llama-cli with CPU-only visibility."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            fake_llama = root / "llama-cli"
+            env_log = root / "llama-env.log"
+            write_tool_registry(root)
+            write_tool(root)
+            fake_llama.write_text(
+                "#!/usr/bin/env bash\n"
+                "{\n"
+                "  printf 'CUDA_VISIBLE_DEVICES=%s\\n' \"${CUDA_VISIBLE_DEVICES-unset}\"\n"
+                "  printf 'NVIDIA_VISIBLE_DEVICES=%s\\n' \"${NVIDIA_VISIBLE_DEVICES-unset}\"\n"
+                "  printf 'HIP_VISIBLE_DEVICES=%s\\n' \"${HIP_VISIBLE_DEVICES-unset}\"\n"
+                "  printf 'ROCR_VISIBLE_DEVICES=%s\\n' \"${ROCR_VISIBLE_DEVICES-unset}\"\n"
+                "  printf 'AGENT_CANON_TEST_MARKER=%s\\n' \"${AGENT_CANON_TEST_MARKER-unset}\"\n"
+                "} >\"$AGENT_CANON_TEST_ENV_LOG\"\n"
+                "printf '%s\\n' '{\"summary\":\"refined\",\"concepts\":[\"cpu\"],\"aliases\":[],\"responsibility\":\"CPU-only local LLM\",\"ambiguity_notes\":[]}'\n",
+                encoding="utf-8",
+            )
+            fake_llama.chmod(0o755)
+
+            result = run_index(
+                root,
+                "build",
+                "--surface",
+                "tools",
+                "--run-llm",
+                "--require-llm",
+                "--llama-cli",
+                str(fake_llama),
+                "--max-llm-files",
+                "1",
+                "--format",
+                "json",
+                env={
+                    "CUDA_VISIBLE_DEVICES": "0",
+                    "NVIDIA_VISIBLE_DEVICES": "0",
+                    "HIP_VISIBLE_DEVICES": "0",
+                    "ROCR_VISIBLE_DEVICES": "0",
+                    "AGENT_CANON_TEST_MARKER": "kept",
+                    "AGENT_CANON_TEST_ENV_LOG": str(env_log),
+                },
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["llm_used"], 1)
+            env_text = env_log.read_text(encoding="utf-8")
+            self.assertIn("CUDA_VISIBLE_DEVICES=\n", env_text)
+            self.assertIn("NVIDIA_VISIBLE_DEVICES=void", env_text)
+            self.assertIn("HIP_VISIBLE_DEVICES=\n", env_text)
+            self.assertIn("ROCR_VISIBLE_DEVICES=\n", env_text)
+            self.assertIn("AGENT_CANON_TEST_MARKER=kept", env_text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -73,8 +73,8 @@ class InstallLlamaCppTest(unittest.TestCase):
             self.assertTrue((tools_home / "bin" / "llama-cli").is_symlink())
             self.assertTrue((tools_home / "bin" / "llama-server").is_symlink())
 
-    def test_force_cuda_adds_current_ggml_cmake_option(self) -> None:
-        """Explicit CUDA mode should add the current llama.cpp GGML_CUDA option."""
+    def test_force_cuda_is_compatibility_input_and_builds_cpu_only(self) -> None:
+        """Explicit CUDA mode should be accepted only as a CPU-only compatibility input."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             fake_bin = root / "fake-bin"
@@ -110,19 +110,20 @@ class InstallLlamaCppTest(unittest.TestCase):
             log_text = cmake_log.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=enabled", result.stdout)
-        self.assertIn(f"AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR={cuda_driver}", result.stdout)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA_REQUESTED=1", result.stdout)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA_REQUEST_POLICY=ignored_cpu_only", result.stdout)
         self.assertIn("AGENT_CANON_LLAMA_CPP_BUILD_JOBS=7", result.stdout)
-        self.assertIn("-DGGML_CUDA=ON", log_text)
-        self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=", log_text)
-        self.assertIn("rpath-link", log_text)
-        self.assertIn(str(cuda_driver), log_text)
+        self.assertNotIn(f"AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR={cuda_driver}", result.stdout)
+        self.assert_cpu_only_build(result.stdout, log_text)
+        self.assertNotIn("-DCMAKE_EXE_LINKER_FLAGS=", log_text)
+        self.assertNotIn("rpath-link", log_text)
+        self.assertNotIn(str(cuda_driver), log_text)
         self.assertIn("-DGGML_NATIVE=OFF", log_text)
         self.assertIn("--build", log_text)
         self.assertIn(" -j 7 ", f" {log_text} ")
 
-    def test_auto_cuda_requires_driver_library(self) -> None:
-        """Auto CUDA should skip GPU build when the driver library is not linkable."""
+    def test_auto_cuda_is_compatibility_input_and_builds_cpu_only(self) -> None:
+        """Auto CUDA should not enable GPU build even when GPU runtime is visible."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             fake_bin = root / "fake-bin"
@@ -155,8 +156,9 @@ class InstallLlamaCppTest(unittest.TestCase):
             log_text = cmake_log.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=auto_disabled_missing_cuda_driver", result.stdout)
-        self.assertNotIn("-DGGML_CUDA=ON", log_text)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA_REQUESTED=auto", result.stdout)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA_REQUEST_POLICY=ignored_cpu_only", result.stdout)
+        self.assert_cpu_only_build(result.stdout, log_text)
 
     def test_cuda_disable_omits_gpu_cmake_option(self) -> None:
         """Explicit CUDA disable should win over any runtime GPU visibility."""
@@ -188,11 +190,10 @@ class InstallLlamaCppTest(unittest.TestCase):
             log_text = cmake_log.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=disabled", result.stdout)
-        self.assertNotIn("-DGGML_CUDA=ON", log_text)
+        self.assert_cpu_only_build(result.stdout, log_text)
 
-    def test_cuda_config_change_rebuilds_current_binary_without_force(self) -> None:
-        """CUDA mode changes should invalidate an otherwise current binary."""
+    def test_cpu_only_config_change_rebuilds_current_binary_without_force(self) -> None:
+        """CPU-only build flag changes should invalidate an otherwise current binary."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             fake_bin = root / "fake-bin"
@@ -212,7 +213,6 @@ class InstallLlamaCppTest(unittest.TestCase):
             (cuda_driver / "libcuda.so.1").write_text("", encoding="utf-8")
             (build_dir / "agent-canon-build-config.txt").write_text(
                 "cuda_backend=disabled\n"
-                "cuda_driver_dir=\n"
                 "cmake_args=-DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON -DGGML_CUDA=OFF\n",
                 encoding="utf-8",
             )
@@ -243,7 +243,68 @@ class InstallLlamaCppTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AGENT_CANON_LLAMA_CPP=rebuilt", result.stdout)
-        self.assertIn("-DGGML_CUDA=ON", log_text)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA_REQUESTED=1", result.stdout)
+        self.assert_cpu_only_build(result.stdout, log_text)
+
+    def test_cmake_extra_args_cannot_enable_accelerators(self) -> None:
+        """Extra CMake flags must not bypass the local LLM CPU-only policy."""
+        for rejected_arg in (
+            "-DGGML_CUDA=ON",
+            "-DGGML_CUDA=on",
+            "-DGGML_CUDA:BOOL=On",
+            "-DGGML_CUDA:STRING=YES",
+            "-DGGML_HIP=true",
+            "-DGGML_METAL=1",
+            "-DGGML_VULKAN:BOOL=yes",
+            "-DGGML_SYCL:STRING=TRUE",
+            "-DGGML_OPENCL=on",
+            "-DLLAMA_CUBLAS=True",
+        ):
+            with self.subTest(rejected_arg=rejected_arg):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    fake_bin = root / "fake-bin"
+                    tools_home = root / "tools-home"
+                    cmake_log = root / "cmake.log"
+                    source = tools_home / "src" / "llama.cpp"
+                    (source / ".git").mkdir(parents=True)
+                    (source / "CMakeLists.txt").write_text(
+                        "cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8"
+                    )
+                    self.write_fake_git_and_cmake(fake_bin)
+
+                    result = subprocess.run(
+                        ["bash", str(SCRIPT), "--skip-missing-source", "--force"],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        env={
+                            **os.environ,
+                            "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                            "AGENT_CANON_LLAMA_CPP_CMAKE_ARGS": rejected_arg,
+                            "AGENT_CANON_TEST_CMAKE_LOG": str(cmake_log),
+                            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                        },
+                    )
+
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("AGENT_CANON_LLAMA_CPP=fail", result.stdout)
+                self.assertIn(
+                    f"AGENT_CANON_LLAMA_CPP_ERROR=cpu_only_policy_rejects_cmake_arg:{rejected_arg}",
+                    result.stdout,
+                )
+                self.assertFalse(cmake_log.exists())
+
+    def assert_cpu_only_build(self, stdout: str, log_text: str) -> None:
+        """Assert common CPU-only installer evidence."""
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=disabled", stdout)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_ACCELERATOR_POLICY=cpu_only", stdout)
+        self.assertIn("-DGGML_CUDA=OFF", log_text)
+        self.assertIn("-DGGML_METAL=OFF", log_text)
+        self.assertIn("-DGGML_HIP=OFF", log_text)
+        self.assertIn("-DGGML_VULKAN=OFF", log_text)
+        self.assertIn("-DGGML_SYCL=OFF", log_text)
+        self.assertNotIn("-DGGML_CUDA=ON", log_text)
 
     def write_fake_git_and_cmake(self, fake_bin: Path) -> None:
         """Write fake git and cmake executables for installer tests."""
