@@ -189,6 +189,7 @@ remain tracked, untracked, or ignored in the checkout. Delete those outputs and
 rerun the producer, or promote the underlying rule to `documents/`, `agents/`,
 or `notes/` with a dependency manifest.
 `agent-canon test-design check` scans test-like files for missing oracle,
+static-analysis duplicate wrappers, generated execution-only placeholders,
 private-detail coupling, exact mock/output/prose assertions, wall-clock
 waiting, unseeded randomness, and property/metamorphic candidates. Use it
 before writing or rewriting tests; `fix-now` findings are repair targets, while
@@ -283,7 +284,7 @@ findings for resilient test planning.
   - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。
   - `algorithm_flowchart.py` は Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影し、実装されている反復法と proof-state overlay を Markdown / Mermaid / JSON artifact として出します。図は navigation evidence であり、証明済み判定は proof checker と `proof_path_analyzer.py` に戻します。`--view runtime|core` は proof-only node / label を runtime 図から外します。
   - `kkt_equation_section.py` は Algorithm Expansion IR の `code_facts` を検査し、reduced block-system / KKT / iterative-solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、solver-chain 式を proof note に手書きで足す経路を避けます。
-  - `agent-canon test-design check` は既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
+  - `agent-canon test-design check` は既存 test の oracle 不在、static analysis の重複 wrapper、generated execution-only placeholder、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。

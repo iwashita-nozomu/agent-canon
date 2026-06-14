@@ -34,11 +34,18 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - case が抽象論ではなく、target path、入力、期待結果まで具体化されている
 - brittle coupling finding がある場合、残す理由または修正方針が書かれている
 - 既存 test style、fixture、naming へどう寄せるかが書かれている
+- static analysis、checker、formatter、dependency review、type checker、lint、
+  docs check、CI gate が既に所有する性質は、新規 test ではなく validation
+  route と evidence に戻されている
 
 ## Mandatory Checklist
 
 - changed code path と関連 test path を固定している
 - `tools/bin/agent-canon test-design check <related-test-paths...>` を先に走らせ、`fix-now` / `review` / `design-hint` を test plan に反映している
+- `static-analysis-duplicate-test` と
+  `meaningless-generated-execution-test` の `fix-now` finding を、test 追加ではなく
+  deletion、behavior regression への置換、または canonical checker validation へ
+  ルーティングしている
 - behavior contract、observation level、oracle、input space、adequacy evidence を分けている
 - malformed input、boundary value、empty / null-ish input、error path、state transition を列挙している
 - 以前壊れたか、再発しやすい regression case を残している
@@ -51,7 +58,10 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 
 1. approved design と既存 code path を読み、target function / module / script を固定します。
 1. 関連 test path がある場合は `tools/bin/agent-canon test-design check <paths...>` を実行します。新規 test の場合は `documents/coding-conventions-testing.md` を読み、同種の既存 test style を確認します。
-1. `fix-now` finding は先に修正対象へ入れ、`review` / `design-hint` は behavior contract と照合して残すか直すかを決めます。
+1. `fix-now` finding は先に修正対象へ入れます。特に static-analysis duplicate や
+   generated execution-only placeholder は、pytest を増やさず canonical checker
+   validation へ戻すか、観測可能 behavior regression に置き換えます。
+   `review` / `design-hint` は behavior contract と照合して残すか直すかを決めます。
 1. branch、error path、parsing path、state mutation point を静的に洗います。
 1. 各 case の `Behavior Contract / Observation Level / Oracle / Input Space / Adequacy Evidence` を固定します。
 1. nasty case を `Target / Case / Why It Is Nasty / Expected Outcome / Oracle` で列挙します。
@@ -67,3 +77,5 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - coverage だけを adequacy とみなし、assertion が mutant や regressions を捕まえるかを見ない
 - 既存 test style を無視して別流儀の test を生やす
 - bug fix を一回限りの手動確認で済ませて durable test に変えない
+- static checker の成功を pytest で包んだだけの test を「coverage」として残す
+- generated smoke / runs / no-crash test を、behavior contract と oracle なしで残す

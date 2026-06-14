@@ -68,6 +68,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 unit test は「1 つの観測可能 behavior に対する concrete example」です。
 実装内部の call sequence や private helper の存在を固定するものではありません。
+単に script、CLI、checker、import、compile、type check、format check が
+exit code 0 で終わることだけを見る test は unit test ではありません。
+その性質を static analysis / checker / CI gate が所有している場合は、
+pytest wrapper を作らず、その checker を validation route に入れます。
 
 変更耐性のある test design は、次の 5 軸を先に固定します。
 
@@ -87,6 +91,10 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 必須方針:
 
+- 新規 test を作る前に、その test が検証する性質を既存の static analysis、
+  checker、formatter、dependency review、type checker、lint、docs check が
+  既に所有していないか確認します。所有している場合は、test を生成せず、
+  canonical command と evidence を validation に残します。
 - 1 test は 1 behavior / 1 failure reason を主語にします。
 - test 名は、対象 behavior と期待結果が読める名前にします。
 - Arrange / Act / Assert を読み分けられる構造にします。
@@ -168,6 +176,13 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 ## 8. 禁止事項
 
+- `test_runs`、`test_smoke`、`test_generated_*`、`test_can_run` などの名前で、
+  process success、import success、no-crash、exit code 0 だけを見る generated
+  placeholder test を追加しません。
+- `py_compile`、`compileall`、`ruff`、`pyright`、`mypy`、`cargo check`、
+  `cargo clippy`、`shellcheck`、AgentCanon checker、dependency/header check、
+  docs check の成功を pytest で包むだけの static-analysis duplicate test を
+  追加しません。必要な場合は該当 checker を validation route に直接入れます。
 - 本体モジュール内の `if __name__ == "__main__":` にテストを書きません。
 - 例外のみを根拠にせず、**既知解・残差・反復回数**で検証します。
 - repo 固有の directory 例を正本扱いせず、実在する `tests/` 配下だけを案内します。
