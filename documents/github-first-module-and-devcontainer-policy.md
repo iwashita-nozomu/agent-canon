@@ -109,6 +109,27 @@ parent repository. The generated Compose file must also set a top-level project
 It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
 allocate the project network automatically.
 
+## VS Code Workspace Boundary
+
+`.vscode/` is AgentCanon-owned workspace ergonomics. Template and derived repos
+expose it as a root symlink view into `vendor/agent-canon/.vscode`.
+
+The shared VS Code surface owns:
+
+- recommended extensions for AgentCanon, template, and derived repo operation;
+- editor defaults that are safe across repositories;
+- task entries for shared AgentCanon validation commands.
+
+It must not own:
+
+- personal editor state or machine-local settings;
+- host-specific include paths, interpreter paths, or absolute workspace paths;
+- project/product-specific build, experiment, or server commands.
+
+Project-specific VS Code guidance belongs in repo-local docs or project-owned
+scripts. If a derived repository needs local editor state, keep it outside the
+tracked shared `.vscode/` view.
+
 ## Validation
 
 Changes to this boundary must update and run:

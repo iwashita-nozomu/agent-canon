@@ -277,6 +277,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: User feedback on 2026-06-13; updated COMMUNICATION_PROTOCOL, agent-orchestration, codex-task-workflow, subagent-bootstrap, TASK_WORKFLOWS, CODEX_SUBAGENTS, and prompt eval coverage.
 
+- 2026-06-14 | interaction-observation | Test-design routing must treat complaints about unnecessary numerical tests as an active test-design task, not as a generic implementation request.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User said: 不要な数値テストを入れるのをやめさせてください
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.

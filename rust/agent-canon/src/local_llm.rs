@@ -35,6 +35,12 @@ const DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE: usize = 4;
 const DEFAULT_PROSE_IR_TERM_BATCH_SIZE: usize = 32;
 const DEFAULT_PROSE_IR_LLM_JOBS: usize = 4;
 const PROMPT_DIGEST_LENGTH: usize = 12;
+const LOCAL_LLM_CPU_ENV: [(&str, &str); 4] = [
+    ("CUDA_VISIBLE_DEVICES", ""),
+    ("NVIDIA_VISIBLE_DEVICES", "void"),
+    ("HIP_VISIBLE_DEVICES", ""),
+    ("ROCR_VISIBLE_DEVICES", ""),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum LocalLlmCommand {
@@ -1156,6 +1162,26 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
             ],
         ),
         (
+            "test-design",
+            "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+            vec![
+                vec!["test-design"],
+                vec!["test", "design"],
+                vec!["テスト", "設計"],
+                vec!["不要", "テスト"],
+                vec!["不要", "数値テスト"],
+                vec!["数値テスト"],
+                vec!["数値", "テスト"],
+                vec!["numerical", "test"],
+                vec!["numeric", "test"],
+                vec!["unnecessary", "test"],
+                vec!["heavy", "test"],
+                vec!["brittle", "test"],
+                vec!["tolerance", "test"],
+                vec!["seed", "test"],
+            ],
+        ),
+        (
             "md-style-check",
             "Markdown style, links, headings, or docs lint are in scope",
             vec![
@@ -1300,6 +1326,7 @@ fn is_current_stage_skill(skill: &str) -> bool {
             | "agent-log-analysis"
             | "structure-planning"
             | "structure-refactor"
+            | "test-design"
     )
 }
 
@@ -2894,9 +2921,9 @@ fn find_on_path(name: &str) -> String {
 }
 
 fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCommand) -> i32 {
-    let output = Command::new(&command.executable)
-        .args(command.args())
-        .output();
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process.args(command.args()).output();
     match output {
         Ok(result) => {
             let status = if result.status.success() {
@@ -2922,7 +2949,9 @@ fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCo
 }
 
 fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> {
-    let output = Command::new(&command.executable)
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process
         .args(command.args())
         .output()
         .map_err(|error| format!("llama-launch-failed:{error}"))?;
@@ -2936,6 +2965,12 @@ fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> 
             output.status.code().unwrap_or(1),
             stderr.trim()
         ))
+    }
+}
+
+fn apply_local_llm_cpu_env(command: &mut Command) {
+    for (key, value) in LOCAL_LLM_CPU_ENV {
+        command.env(key, value);
     }
 }
 
@@ -3115,6 +3150,30 @@ mod tests {
     }
 
     #[test]
+    fn local_llm_command_envelope_hides_accelerator_devices() {
+        let mut command = Command::new("llama-cli");
+        apply_local_llm_cpu_env(&mut command);
+
+        let envs = command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.map(|item| item.to_string_lossy().to_string()),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(envs.get("CUDA_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(
+            envs.get("NVIDIA_VISIBLE_DEVICES"),
+            Some(&Some("void".to_string()))
+        );
+        assert_eq!(envs.get("HIP_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(envs.get("ROCR_VISIBLE_DEVICES"), Some(&Some(String::new())));
+    }
+
+    #[test]
     fn parses_implementation_surface_route_request_file() {
         let args = vec![
             "route-implementation-surface".to_string(),
@@ -3211,6 +3270,15 @@ mod tests {
         assert!(decision
             .active_skills
             .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_unneeded_numerical_tests() {
+        let prompt = "不要な数値テストを入れるのをやめさせてください";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
     }
 
     #[test]

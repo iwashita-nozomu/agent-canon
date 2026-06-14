@@ -51,7 +51,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/REVIEW_PROCESS.md": "review\n",
     "documents/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
-        ".codex/hooks.json .codex/hooks .devcontainer/ documents/README.md "
+        ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
         "documents/template-bootstrap.md "
         "documents/github-first-module-and-devcontainer-policy.md "
         "memory/USER_PREFERENCES.md "
@@ -66,6 +66,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"documents/README.md"\n'
         '"documents/template-bootstrap.md"\n'
         '".devcontainer"\n'
+        '".vscode"\n'
         '"documents/github-first-module-and-devcontainer-policy.md"\n'
         '".codex/hooks.json"\n'
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
