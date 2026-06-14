@@ -113,6 +113,16 @@ SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
     "validation_route",
     "review_gate",
 )
+SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
+    "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
+    "--subagent-wave \"wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> "
+    "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
+    "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
+    "spawned_roles=<roles-or-none> role_instances=<role:instance:packet> "
+    "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
+    "write_scope=<scope> validation_route=<route> review_gate=<gate> "
+    "handoff_artifacts=<artifacts> status=<status>\""
+)
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
     "$research-workflow",
@@ -404,6 +414,11 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
         "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
         f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
     )
+
+
+def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") -> str:
+    """Return the canonical command for recording a spawned subagent wave."""
+    return SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
 
 
 def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
@@ -1271,6 +1286,9 @@ def manifest_run_lines(
         lines.append("    active_budget_source: 'run.spawn_budget.active_subagents'")
         lines.append("    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'")
         lines.append("    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'")
+        lines.append(
+            f"    wave_record_command: {subagent_wave_record_command(spec.report_dir)!r}"
+        )
         lines.append("    expansion_triggers:")
         lines.append("      - new_independent_stage")
         lines.append("      - review_finding_opens_independent_scope")
@@ -1308,6 +1326,11 @@ def manifest_run_lines(
         lines.append("      - review_gate")
         lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
+        lines.append(
+            "      - run delegated_spawn_policy.wave_record_command after any "
+            "actual parent or delegated child spawn; delegated child waves must "
+            "include remaining_spawn_budget"
+        )
         lines.append(
             "      - schedule.md Agent Wave Ledger row with spawn_authority, "
             "budget, runtime ceilings, paths, validation_route, review_gate, "

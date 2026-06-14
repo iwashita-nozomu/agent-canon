@@ -43,6 +43,7 @@ from agent_team import (
     resolve_workflow_family,
     same_role_subagent_policy_output_lines,
     select_roles,
+    subagent_wave_record_command,
     task_ids,
     workflow_spawn_budget,
 )
@@ -337,6 +338,7 @@ def emit_task_start_output(
         print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
         print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
         print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
+        print(f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}")
         active_budget = context.workflow_active_spawn_budget or 0
         initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
         if initial_wave:

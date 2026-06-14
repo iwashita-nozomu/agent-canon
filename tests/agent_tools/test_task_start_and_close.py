@@ -900,6 +900,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger",
                 result.stdout,
             )
+            self.assertIn("SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir", result.stdout)
+            self.assertIn("--subagent-wave", result.stdout)
             self.assertIn(
                 "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
                 result.stdout,
@@ -1216,6 +1218,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events",
                 result.stdout,
             )
+            self.assertIn("SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir", result.stdout)
+            self.assertIn("--subagent-wave", result.stdout)
             self.assertIn(
                 "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
                 result.stdout,
@@ -1306,6 +1310,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["delegated_child_spawn"],
                 "allowed_with_bounded_packet",
             )
+            self.assertIn(
+                "workflow_monitor.py",
+                delegated_spawn_policy["wave_record_command"],
+            )
+            self.assertIn(
+                "--subagent-wave",
+                delegated_spawn_policy["wave_record_command"],
+            )
             self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assertIn(
                 "validation_failure_requires_parallel_triage",
@@ -1313,6 +1325,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn(
                 "schedule.md Agent Wave Ledger row with spawn_authority, budget, runtime ceilings, paths, validation_route, review_gate, handoff_artifacts, and delegated policy ref",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                "run delegated_spawn_policy.wave_record_command after any actual parent or delegated child spawn; delegated child waves must include remaining_spawn_budget",
                 delegated_spawn_policy["required_before_spawn"],
             )
             first_wave = spawn_wave_recommendation["initial_wave_agent_types"]

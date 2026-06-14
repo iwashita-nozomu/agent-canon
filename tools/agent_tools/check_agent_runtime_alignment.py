@@ -669,6 +669,12 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         delegated_spawn_policy.get("delegated_child_spawn") == "allowed_with_bounded_packet",
         f"task {task_id} manifest delegated child spawn policy mismatch",
     )
+    wave_record_command = str(delegated_spawn_policy.get("wave_record_command", ""))
+    ensure(
+        "workflow_monitor.py" in wave_record_command
+        and "--subagent-wave" in wave_record_command,
+        f"task {task_id} manifest missing subagent wave record command",
+    )
     required_fields = delegated_spawn_policy.get("handoff_required_fields")
     expected_handoff_fields = {
         "owner",

@@ -118,7 +118,13 @@ and review gates are disjoint; colliding workstreams become ordered waves.
 `task_start.py` and `bootstrap_agent_run.py` emit
 `RECOMMENDED_INITIAL_SUBAGENT_WAVE` and `RECOMMENDED_DYNAMIC_EXPANSION_WAVES`;
 these values are executable Codex `agent_type` lists for the parent to pass to
-the runtime spawn tool.
+the runtime spawn tool. After a parent or delegated stage owner actually
+spawns, skips, or replaces a wave, record the actual result with
+`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...`; this
+updates `schedule.md` and `workflow_monitoring.md` by `wave_id` and replaces the
+bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
+`remaining_spawn_budget` so nested launch remains bounded by
+`run.delegated_spawn_policy`.
 
 ## Initial Intake Wave
 
