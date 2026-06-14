@@ -51,13 +51,16 @@ RECURSIVE_RUNNER_COMMAND = (
 )
 
 
-def build_repo(tmp_path: Path) -> Path:
-    """Create a minimal fake repo layout for the helper."""
-    repo_root = tmp_path / "repo"
+def create_fake_repo_dirs(repo_root: Path) -> None:
+    """Create the minimal fake repo directory layout."""
     (repo_root / "experiments" / "_template" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
+
+
+def write_template_topic(repo_root: Path) -> None:
+    """Write the fake template experiment topic."""
     (repo_root / "experiments" / "_template" / "README.md").write_text(
         "# Experiment Topic Template\n\n"
         "smoke: `python3 tools/experiments/run_managed_experiment.py "
@@ -80,6 +83,10 @@ def build_repo(tmp_path: Path) -> Path:
         "# Result Directory\n",
         encoding="utf-8",
     )
+
+
+def write_demo_topic_base(repo_root: Path) -> None:
+    """Write non-executable fake demo topic files."""
     (repo_root / "experiments" / "demo_topic" / "README.md").write_text(
         "# Demo Topic\n",
         encoding="utf-8",
@@ -92,7 +99,11 @@ def build_repo(tmp_path: Path) -> Path:
         "# placeholder\n",
         encoding="utf-8",
     )
-    (repo_root / "experiments" / "demo_topic" / "run.py").write_text(
+
+
+def demo_run_script_text() -> str:
+    """Return the fake demo topic runner source."""
+    return (
         "\n".join(
             [
                 "from __future__ import annotations",
@@ -127,9 +138,20 @@ def build_repo(tmp_path: Path) -> Path:
                 ")",
             ]
         )
-        + "\n",
+        + "\n"
+    )
+
+
+def write_demo_runner(repo_root: Path) -> None:
+    """Write the fake demo topic executable runner."""
+    (repo_root / "experiments" / "demo_topic" / "run.py").write_text(
+        demo_run_script_text(),
         encoding="utf-8",
     )
+
+
+def write_demo_registry(repo_root: Path) -> None:
+    """Write the fake experiment registry."""
     (repo_root / "experiments" / "registry.toml").write_text(
         "\n".join(
             [
@@ -158,9 +180,24 @@ def build_repo(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
+
+
+def init_fake_git_repo(repo_root: Path) -> None:
+    """Initialize git metadata for the fake repo."""
     subprocess.run(
         ["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True
     )
+
+
+def build_repo(tmp_path: Path) -> Path:
+    """Create a minimal fake repo layout for the helper."""
+    repo_root = tmp_path / "repo"
+    create_fake_repo_dirs(repo_root)
+    write_template_topic(repo_root)
+    write_demo_topic_base(repo_root)
+    write_demo_runner(repo_root)
+    write_demo_registry(repo_root)
+    init_fake_git_repo(repo_root)
     return repo_root
 
 
