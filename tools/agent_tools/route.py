@@ -424,6 +424,26 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
         ),
     ),
     (
+        "test-design",
+        "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+        (
+            ("test-design",),
+            ("test", "design"),
+            ("テスト", "設計"),
+            ("不要", "テスト"),
+            ("不要", "数値テスト"),
+            ("数値テスト",),
+            ("数値", "テスト"),
+            ("numerical", "test"),
+            ("numeric", "test"),
+            ("unnecessary", "test"),
+            ("heavy", "test"),
+            ("brittle", "test"),
+            ("tolerance", "test"),
+            ("seed", "test"),
+        ),
+    ),
+    (
         "md-style-check",
         "Markdown style, links, headings, or docs lint are in scope",
         (
@@ -733,6 +753,7 @@ def is_current_stage_skill(skill: str) -> bool:
         "agent-log-analysis",
         "structure-planning",
         "structure-refactor",
+        "test-design",
     }
 
 

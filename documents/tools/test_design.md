@@ -18,7 +18,9 @@ tests brittle or under-specified before an agent writes or rewrites tests.
 The command does not prove that a test is bad. It separates clear repair items
 from review prompts:
 
-- `fix-now`: missing path, missing oracle, unseeded randomness.
+- `fix-now`: missing path, missing oracle, unseeded randomness,
+  static-analysis duplicate tests, or generated execution-only placeholders
+  that observe only process success.
 - `review`: likely coupling to private state, exact mock call sequence, exact
   error/output prose, wall-clock waiting, or complex test-body control flow.
 - `design-hint`: parser, formatter, graph, router, or mapping tests that look
@@ -55,3 +57,14 @@ JSON output uses schema `agent_canon.test_design_check.v1` and includes
 Exit code is `1` only when at least one `fix-now` finding exists. `review` and
 `design-hint` findings return `0` so a skill can interpret them without turning
 every smell warning into a hard block.
+
+`static-analysis-duplicate-test` means the file is using a test runner to
+re-execute a property already owned by static analysis, formatting, dependency
+review, type checking, docs checking, or another canonical checker. The repair
+is to delete the wrapper and run the checker directly in the validation route,
+unless the test is rewritten around a concrete behavior regression.
+
+`meaningless-generated-execution-test` means a generated/smoke/runs-style test
+only checks import, no-crash, process success, or exit code 0. The repair is to
+remove it or add a behavior contract with explicit input, expected outcome, and
+oracle.

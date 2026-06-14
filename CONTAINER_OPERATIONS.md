@@ -140,7 +140,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   dependency.
 - llama.cpp and the default 3B-class local LLM model selector belong in
   `.devcontainer/post-create.sh` and `tools/install_llama_cpp.sh` when they are
-  used only for single-file AgentCanon responsibility analysis.
+  used only for AgentCanon local LLM analysis. This local LLM surface is
+  CPU-only even on GPU hosts; do not enable CUDA, HIP, Metal, Vulkan, or SYCL for
+  `agent-canon local-llm`, including through extra CMake flags.
 - Compiled agent convenience binaries belong under
   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}`. `/usr/local/bin` may contain
   symlinks for stable command discovery, but the compiled binary cache itself

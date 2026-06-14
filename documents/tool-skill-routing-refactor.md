@@ -31,6 +31,9 @@ evidence, not an AgentCanon product dependency.
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
   by a deterministic harness. `route.py --prompt <text>` is a compatibility
   mirror while area/name routing remains in `route.py`.
+- Japanese or English prompts about unnecessary numerical tests, heavy tests,
+  brittle tests, tolerance-based tests, or test-design gaps route to
+  `$test-design`; they are not handled by ad hoc worker judgment.
 - The public skill for this family is `$task-routing`.
 
 ## Canonical Short Surface

@@ -1,0 +1,35 @@
+{
+  "_dependency_manifest": [
+    "@dependency-start",
+    "responsibility Exposes shared VS Code task entrypoints for AgentCanon validation commands.",
+    "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
+    "upstream implementation ../tools/bin/agent-canon AgentCanon CLI wrapper",
+    "upstream implementation ../tools/agent_tools/check_convention_compliance.py convention compliance verifier",
+    "upstream implementation ../tools/agent_tools/check_dependency_headers.py dependency header verifier",
+    "@dependency-end"
+  ],
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AgentCanon: Docs Check",
+      "type": "shell",
+      "command": "tools/bin/agent-canon docs check",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentCanon: Convention Check",
+      "type": "shell",
+      "command": "python3 tools/agent_tools/check_convention_compliance.py",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AgentCanon: Dependency Headers",
+      "type": "shell",
+      "command": "python3 tools/agent_tools/check_dependency_headers.py --changed && bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing && bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

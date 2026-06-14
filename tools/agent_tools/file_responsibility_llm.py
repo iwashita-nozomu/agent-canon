@@ -25,6 +25,12 @@ DEFAULT_MODEL = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
 DEFAULT_MAX_BYTES = 24_000
 DEFAULT_PREDICT_TOKENS = 768
 PROMPT_DIGEST_LENGTH = 12
+LOCAL_LLM_CPU_ENV = {
+    "CUDA_VISIBLE_DEVICES": "",
+    "NVIDIA_VISIBLE_DEVICES": "void",
+    "HIP_VISIBLE_DEVICES": "",
+    "ROCR_VISIBLE_DEVICES": "",
+}
 
 
 @dataclass(frozen=True)
@@ -149,7 +155,13 @@ def run_llama(command: LlamaCommand) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env=local_llm_cpu_env(),
     )
+
+
+def local_llm_cpu_env() -> dict[str, str]:
+    """Return process environment with accelerator devices hidden."""
+    return {**os.environ, **LOCAL_LLM_CPU_ENV}
 
 
 def print_status(target: ReviewTarget, model: str, digest: str, status: str) -> None:

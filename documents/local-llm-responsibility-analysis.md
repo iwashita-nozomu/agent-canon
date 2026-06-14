@@ -23,6 +23,14 @@ Local LLM は advisory な抽出器です。repo policy、依存 closure、CI、
 PR readiness、citation approval、document acceptance を決める authority
 ではありません。
 
+Local LLM は CPU-only runtime です。AgentCanon の一般的な実験 / 数値計算
+profile は GPU を使えますが、`agent-canon local-llm` と互換 Python helper は
+llama.cpp を CPU-only build にし、subprocess 実行時にも CUDA / NVIDIA container /
+HIP / ROCr device を隠します。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は
+互換入力として受け付けますが、GPU build や GPU 実行を有効化しません。
+`AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` から GPU accelerator を有効化する CMake
+flags を渡した場合も、installer は失敗させます。
+
 ## 読者
 
 - 実装者:
