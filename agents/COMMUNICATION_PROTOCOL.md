@@ -111,9 +111,10 @@ The handoff or parent-direct work log includes the resulting
 `TOOL_REJECTION_PREDICTED_GATE` lines or an explicit
 `TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names OOP
 readability, helper inventory, dependency headers, GitHub workflow checks, hook
-runtime alignment, skill mirror sync, tool catalog, agent protocol convention,
-or log-surface inventory, the implementer receives the gate-specific command
-and a repair plan before editing. This prevents spending implementation tokens
+runtime alignment, skill mirror sync, AgentCanon tool source routing, tool
+catalog, agent protocol convention, or log-surface inventory, the implementer
+receives the gate-specific command and a repair plan before editing. This
+prevents spending implementation tokens
 on changes that the hook/tool layer can already predict will be rejected.
 
 ## Review Packet

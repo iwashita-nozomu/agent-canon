@@ -99,6 +99,7 @@ LIBRARY_SURFACE_PREFIXES = (
     ".venv/",
 )
 AGENT_CANON_SUBMODULE_PREFIX = "vendor/agent-canon"
+AGENT_CANON_TOOL_SOURCE_ROOT = f"{AGENT_CANON_SUBMODULE_PREFIX}/tools"
 
 
 @dataclass(frozen=True, order=True)
@@ -308,6 +309,46 @@ TOOL_CATALOG_GATE_TEMPLATES = (
         ),
     ),
 )
+AGENT_CANON_TOOL_SOURCE_ROUTE_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="agentcanon_tool_source_route",
+        command_template=(
+            "git -C vendor/agent-canon status --short --branch && "
+            "git submodule status vendor/agent-canon"
+        ),
+        handoff=(
+            "treat this planned path as AgentCanon-owned tool source: edit on "
+            "an AgentCanon branch/PR under vendor/agent-canon, then update the "
+            "parent submodule pin; do not create a parent-local tools implementation"
+        ),
+    ),
+)
+AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="log_surface_inventory_guard",
+        command_template=(
+            "cd vendor/agent-canon && "
+            "python3 tools/agent_tools/log_surface_inventory.py --root . "
+            "--check --baseline documents/log-surface-inventory.json"
+        ),
+        handoff=(
+            "validate AgentCanon source log-surface inventory from "
+            "vendor/agent-canon when a parent root tools/ view resolves there"
+        ),
+    ),
+)
+AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="tool_catalog",
+        command_template=(
+            "cd vendor/agent-canon && python3 tools/agent_tools/tool_catalog.py"
+        ),
+        handoff=(
+            "validate AgentCanon tool catalog from vendor/agent-canon for "
+            "shared tool source changes"
+        ),
+    ),
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -398,6 +439,9 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(HOOK_RUNTIME_GATE_TEMPLATES)
     if path.startswith(LOG_SURFACE_PREFIXES):
         templates.extend(LOG_SURFACE_GATE_TEMPLATES)
+    if agent_canon_tool_source_path(path):
+        templates.extend(AGENT_CANON_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
+        templates.extend(AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES)
     if path.startswith(SKILL_SURFACE_PREFIXES):
         templates.extend(SKILL_MIRROR_GATE_TEMPLATES)
     if path.startswith(GITHUB_SURFACE_PREFIXES):
@@ -406,9 +450,18 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(AGENT_PROTOCOL_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
+    if agent_canon_tool_source_path(path):
+        templates.extend(AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES)
     if library_surface_path(path):
         templates.extend(LIBRARY_GATE_TEMPLATES)
     return tuple(template.for_path(path) for template in templates)
+
+
+def agent_canon_tool_source_path(path: str) -> bool:
+    """Return whether a parent-root path resolves to AgentCanon tool source."""
+    return path == AGENT_CANON_TOOL_SOURCE_ROOT or path.startswith(
+        AGENT_CANON_TOOL_SOURCE_ROOT + "/"
+    )
 
 
 def library_surface_path(path: str) -> bool:
