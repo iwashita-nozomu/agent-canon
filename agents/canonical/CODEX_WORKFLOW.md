@@ -73,6 +73,15 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
+### Branch Reuse Default
+
+既存 branch / PR が現在の task、追加 user instruction、または小さな follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。新しい branch は「新規作業の儀式」ではありません。
+
+- 新しい branch を切ってよいのは、現在の branch が merged / closed / unpushable、別 ownership lane が必要、review isolation が明示的に必要、protected surface の衝突で同時に扱えない、dirty / divergent state が既存 branch 継続では安全に説明できない、または user が別 branch を明示した場合だけです。
+- 「fresh start」「dirty state 回避」「小さな追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」だけを理由に branch を増やしてはいけません。
+- 新しい branch が必要な場合は、branch 作成前に run bundle、work log、または PR body に `branch_creation_reason=<reason>` と、既存 branch / PR を継続できない理由を記録します。
+- AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
+
 ### Runtime Profile And Risk Selection
 
 Before broad context loading or validation, classify the task with
