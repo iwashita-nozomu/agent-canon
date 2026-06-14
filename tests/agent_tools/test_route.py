@@ -93,6 +93,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
+    def test_unknown_legacy_search_alias_fails(self) -> None:
+        """Unknown legacy-like search names must not silently resolve."""
+        result = self.run_route("--name", "search_legacy.py")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("STATUS=unknown", result.stdout)
+        self.assertIn("CANONICAL_AREA=", result.stdout)
+
     def test_prompt_routes_repo_changing_skill_set(self) -> None:
         """Prompt routing should expose concrete public skills, not only area aliases."""
         result = self.run_route(
@@ -193,6 +201,30 @@ class RouteToolTest(unittest.TestCase):
         slash_result = self.run_route("--name", "repo/refactor")
         self.assertEqual(slash_result.returncode, 0, slash_result.stdout + slash_result.stderr)
         self.assertIn("CANONICAL_AREA=structure", slash_result.stdout)
+
+    def test_structure_review_routes_to_structure_refactor(self) -> None:
+        """Structure review weakness should route to the structure refactor skill."""
+        result = self.run_route(
+            "--prompt",
+            "構造のレビュースキルが弱いので見直して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_structure_review_name_alias_routes_to_structure_area(self) -> None:
+        """Structure-review aliases should resolve to the structure area."""
+        for alias in ("structure-review", "structure-review-skill", "structural-review"):
+            with self.subTest(alias=alias):
+                result = self.run_route("--name", alias)
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("CANONICAL_AREA=structure", result.stdout)
+                self.assertIn("CANONICAL_TOOL=route.py --area structure", result.stdout)
 
     def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
         """Routing-context redesign prompts should activate the broader review stack."""

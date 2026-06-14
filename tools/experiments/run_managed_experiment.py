@@ -19,17 +19,91 @@ import socket
 import subprocess
 import sys
 import time
+import tomllib
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
-MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
+MANAGED_RUN_ARTIFACTS = frozenset(
+    {"run_manifest.json", "eval_manifest.json", "run.log"}
+)
 FILE_READ_CHUNK_BYTES = 1024 * 1024
 STREAM_TERMINATION_TIMEOUT_SECONDS = 10
 INTERRUPTED_EXIT_CODE = 130
 DURATION_ROUND_DIGITS = 3
 
-import tomllib
+
+@dataclass(frozen=True)
+class RegistryContext:
+    """Loaded experiment registry data for one topic."""
+
+    path: Path
+    entry: dict[str, object]
+    defaults: dict[str, object]
+    available: bool
+
+
+@dataclass(frozen=True)
+class RunIdentity:
+    """Stable identifiers for one managed experiment run."""
+
+    topic: str
+    run_name: str
+    variant: str
+
+
+@dataclass(frozen=True)
+class RunPaths:
+    """Filesystem paths owned by one managed run."""
+
+    result_dir: Path
+    log_dir: Path
+    report_path: Path
+    manifest_path: Path
+    eval_manifest_path: Path
+    config_path: Path
+    log_path: Path
+
+
+@dataclass(frozen=True)
+class CommandSelection:
+    """Selected inner command and its provenance."""
+
+    command: list[str]
+    source: str
+    registered_match: str | None
+
+
+@dataclass(frozen=True)
+class GitSnapshot:
+    """Git state captured for one run manifest."""
+
+    branch: str | None
+    commit: str | None
+    status_short: list[str]
+
+
+@dataclass(frozen=True)
+class EvalArtifactPatterns:
+    """Validated eval artifact patterns for one run."""
+
+    required: list[str]
+    optional: list[str]
+
+
+@dataclass(frozen=True)
+class RunContext:
+    """Complete immutable setup context for one managed run."""
+
+    repo_root: Path
+    identity: RunIdentity
+    topic_dir: Path
+    paths: RunPaths
+    registry: RegistryContext
+    command: CommandSelection
+    created_at: str
+    git: GitSnapshot
 
 
 def repo_root_from_script() -> Path:
@@ -143,7 +217,9 @@ def string_list(raw_value: object, key: str) -> list[str]:
     return [item.strip() for item in raw_value]
 
 
-def find_registry_topic(registry: dict[str, object], topic_name: str) -> dict[str, object] | None:
+def find_registry_topic(
+    registry: dict[str, object], topic_name: str
+) -> dict[str, object] | None:
     """Return one topic entry from the registry."""
     raw_topics = registry.get("topics", [])
     if not isinstance(raw_topics, list):
@@ -157,24 +233,38 @@ def find_registry_topic(registry: dict[str, object], topic_name: str) -> dict[st
     return None
 
 
-def load_registry_entry(
-    repo_root: Path, registry_path: Path | None, topic_name: str
-) -> tuple[Path | None, dict[str, object] | None, dict[str, object]]:
-    """Load one topic entry from the registry when available."""
-    resolved_registry = registry_path or (repo_root / "experiments" / "registry.toml")
-    if not resolved_registry.is_file():
-        return None, None, {}
-    registry = load_registry(resolved_registry)
+def resolve_registry_path(repo_root: Path, registry_arg: str) -> Path:
+    """Resolve the registry path requested by the CLI."""
+    if registry_arg:
+        return Path(registry_arg).resolve()
+    return repo_root / "experiments" / "registry.toml"
+
+
+def load_registry_context(registry_path: Path, topic_name: str) -> RegistryContext:
+    """Load one topic registry context when the registry exists."""
+    if not registry_path.is_file():
+        return RegistryContext(
+            path=registry_path,
+            entry={},
+            defaults={},
+            available=False,
+        )
+    registry = load_registry(registry_path)
     entry = find_registry_topic(registry, topic_name)
     if entry is None:
-        raise ValueError(f"topic {topic_name!r} is missing from {resolved_registry}")
+        raise ValueError(f"topic {topic_name!r} is missing from {registry_path}")
     defaults = registry.get("defaults", {})
     if not isinstance(defaults, dict):
         raise ValueError("experiment registry defaults must be a table")
-    return resolved_registry, entry, defaults
+    return RegistryContext(
+        path=registry_path,
+        entry=entry,
+        defaults=defaults,
+        available=True,
+    )
 
 
-def command_version(name: str) -> str | None:
+def load_command_version(name: str) -> str | None:
     """Return one-line version text for a command when available."""
     if shutil.which(name) is None:
         return None
@@ -186,7 +276,9 @@ def command_version(name: str) -> str | None:
     )
     if result.returncode != 0:
         return None
-    output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
+    output = "\n".join(
+        part.strip() for part in (result.stdout, result.stderr) if part.strip()
+    )
     if not output:
         return None
     return output.splitlines()[0]
@@ -218,51 +310,49 @@ def parse_config_pairs(pairs: list[str]) -> dict[str, object]:
         try:
             config[key] = json.loads(raw_value)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"--config value for {key!r} is not valid JSON: {exc}") from exc
+            raise ValueError(
+                f"--config value for {key!r} is not valid JSON: {exc}"
+            ) from exc
     return config
 
 
+def build_registry_config_snapshot(registry: RegistryContext) -> dict[str, object]:
+    """Build the registry fragment embedded in run config."""
+    if not registry.available:
+        return {}
+    return {
+        "name": registry.entry.get("name"),
+        "canonical_entrypoint": registry.entry.get("canonical_entrypoint"),
+        "default_variant": registry.entry.get("default_variant"),
+        "smoke_inner_command": registry.entry.get("smoke_inner_command"),
+        "formal_inner_command": registry.entry.get("formal_inner_command"),
+    }
+
+
 def build_run_config(
-    *,
-    topic: str,
-    run_name: str,
-    variant: str,
-    result_dir: Path,
-    report_path: Path,
-    manifest_path: Path,
-    eval_manifest_path: Path,
-    config_path: Path,
-    command: list[str],
-    command_source: str,
-    registered_command_match: str | None,
-    registry_entry: dict[str, object] | None,
-    explicit_config: dict[str, object],
+    context: RunContext, explicit_config: dict[str, object]
 ) -> dict[str, object]:
     """Build one JSON-serializable experiment run configuration dictionary."""
     run_config: dict[str, object] = {
-        "topic": topic,
-        "run_name": run_name,
-        "variant": variant,
+        "topic": context.identity.topic,
+        "run_name": context.identity.run_name,
+        "variant": context.identity.variant,
         "paths": {
-            "result_dir": str(result_dir),
-            "report_path": str(report_path),
-            "run_manifest": str(manifest_path),
-            "eval_manifest": str(eval_manifest_path),
-            "config": str(config_path),
+            "result_dir": str(context.paths.result_dir),
+            "log_dir": str(context.paths.log_dir),
+            "report_path": str(context.paths.report_path),
+            "run_manifest": str(context.paths.manifest_path),
+            "eval_manifest": str(context.paths.eval_manifest_path),
+            "config": str(context.paths.config_path),
         },
-        "command": command,
-        "command_source": command_source,
-        "registered_command_match": registered_command_match,
+        "command": context.command.command,
+        "command_source": context.command.source,
+        "registered_command_match": context.command.registered_match,
         "config": explicit_config,
     }
-    if registry_entry is not None:
-        run_config["registry"] = {
-            "name": registry_entry.get("name"),
-            "canonical_entrypoint": registry_entry.get("canonical_entrypoint"),
-            "default_variant": registry_entry.get("default_variant"),
-            "smoke_inner_command": registry_entry.get("smoke_inner_command"),
-            "formal_inner_command": registry_entry.get("formal_inner_command"),
-        }
+    registry_config = build_registry_config_snapshot(context.registry)
+    if registry_config:
+        run_config["registry"] = registry_config
     return run_config
 
 
@@ -281,35 +371,42 @@ def git_value(repo_root: Path, *args: str) -> str | None:
     return value or None
 
 
-def render_report_stub(
-    *,
-    topic: str,
-    run_name: str,
-    report_path: Path,
-    result_dir: Path,
-    manifest_path: Path,
-    eval_manifest_path: Path,
-    config_path: Path,
-    command: list[str],
-    created_at: str,
-    branch: str | None,
-    commit: str | None,
-    registry_path: Path | None,
-) -> str:
-    """Render one initial run report."""
-    command_text = shlex.join(command) if command else "(no command)"
-    branch_text = branch or "(unknown)"
-    commit_text = commit or "(unknown)"
-    registry_text = str(registry_path) if registry_path is not None else "(none)"
-    return f"""# {run_name}
+def load_git_snapshot(repo_root: Path) -> GitSnapshot:
+    """Load the git state recorded in run artifacts."""
+    git_dirty = git_value(repo_root, "status", "--short")
+    return GitSnapshot(
+        branch=git_value(repo_root, "branch", "--show-current"),
+        commit=git_value(repo_root, "rev-parse", "HEAD"),
+        status_short=git_dirty.splitlines() if git_dirty else [],
+    )
 
-- Topic: {topic}
-- Created At (UTC): {created_at}
-- Result Dir: {result_dir}
-- Run Manifest: {manifest_path}
-- Eval Manifest: {eval_manifest_path}
-- Config: {config_path}
-- Registry: {registry_text}
+
+def registry_path_text(registry: RegistryContext) -> str:
+    """Return the display registry path for reports."""
+    if registry.available:
+        return str(registry.path)
+    return "(none)"
+
+
+def render_report_stub(context: RunContext) -> str:
+    """Render one initial run report."""
+    command_text = (
+        shlex.join(context.command.command)
+        if context.command.command
+        else "(no command)"
+    )
+    branch_text = context.git.branch or "(unknown)"
+    commit_text = context.git.commit or "(unknown)"
+    return f"""# {context.identity.run_name}
+
+- Topic: {context.identity.topic}
+- Created At (UTC): {context.created_at}
+- Result Dir: {context.paths.result_dir}
+- Log Dir: {context.paths.log_dir}
+- Run Manifest: {context.paths.manifest_path}
+- Eval Manifest: {context.paths.eval_manifest_path}
+- Config: {context.paths.config_path}
+- Registry: {registry_path_text(context.registry)}
 - Branch: {branch_text}
 - Commit: {commit_text}
 
@@ -324,7 +421,7 @@ def render_report_stub(
 ## Protocol
 
 - Command: `{command_text}`
-- Report Path: `{report_path}`
+- Report Path: `{context.paths.report_path}`
 
 ## Results
 
@@ -336,6 +433,7 @@ def render_report_stub(
 - `config.json`
 - `eval_manifest.json`
 - `run.log`
+- `logs/`
 - `summary.json`
 - `cases.jsonl`
 
@@ -345,38 +443,20 @@ def render_report_stub(
 """
 
 
-def build_manifest(
-    *,
-    repo_root: Path,
-    topic: str,
-    run_name: str,
-    topic_dir: Path,
-    result_dir: Path,
-    report_path: Path,
-    manifest_path: Path,
-    command: list[str],
-    created_at: str,
-    status: str,
-    registry_path: Path | None,
-    registry_entry: dict[str, object] | None,
-    command_source: str,
-    registered_command_match: str | None,
-) -> dict[str, object]:
+def build_manifest(context: RunContext, status: str) -> dict[str, object]:
     """Build one manifest dictionary."""
-    branch = git_value(repo_root, "branch", "--show-current")
-    commit = git_value(repo_root, "rev-parse", "HEAD")
-    git_dirty = git_value(repo_root, "status", "--short")
     manifest: dict[str, object] = {
-        "topic": topic,
-        "run_name": run_name,
+        "topic": context.identity.topic,
+        "run_name": context.identity.run_name,
         "status": status,
-        "created_at_utc": created_at,
-        "repo_root": str(repo_root),
-        "topic_dir": str(topic_dir),
-        "result_dir": str(result_dir),
-        "report_path": str(report_path),
-        "manifest_path": str(manifest_path),
-        "command": command,
+        "created_at_utc": context.created_at,
+        "repo_root": str(context.repo_root),
+        "topic_dir": str(context.topic_dir),
+        "result_dir": str(context.paths.result_dir),
+        "log_dir": str(context.paths.log_dir),
+        "report_path": str(context.paths.report_path),
+        "manifest_path": str(context.paths.manifest_path),
+        "command": context.command.command,
         "server_context": {
             "hostname": socket.gethostname(),
             "platform": platform.platform(),
@@ -385,28 +465,30 @@ def build_manifest(
         },
         "tool_versions": {
             "python": platform.python_version(),
-            "codex": command_version("codex"),
-            "docker": command_version("docker"),
+            "codex": load_command_version("codex"),
+            "docker": load_command_version("docker"),
         },
-        "command_source": command_source,
-        "registered_command_match": registered_command_match,
+        "command_source": context.command.source,
+        "registered_command_match": context.command.registered_match,
         "git": {
-            "branch": branch,
-            "commit": commit,
-            "dirty": bool(git_dirty),
-            "status_short": git_dirty.splitlines() if git_dirty else [],
+            "branch": context.git.branch,
+            "commit": context.git.commit,
+            "dirty": bool(context.git.status_short),
+            "status_short": context.git.status_short,
         },
     }
-    if registry_path is not None and registry_entry is not None:
-        registry_snapshot = dict(registry_entry)
-        registry_snapshot["registry_path"] = str(registry_path)
+    if context.registry.available:
+        registry_snapshot = dict(context.registry.entry)
+        registry_snapshot["registry_path"] = str(context.registry.path)
         manifest["registry"] = registry_snapshot
     return manifest
 
 
 def write_json(path: Path, payload: dict[str, object]) -> None:
     """Write one JSON object with canonical formatting."""
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
 
 
 def write_manifest(path: Path, manifest: dict[str, object]) -> None:
@@ -424,7 +506,9 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
     for pattern in patterns:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
-            raise ValueError(f"{key} must stay relative to result/<run_name>: {pattern}")
+            raise ValueError(
+                f"{key} must stay relative to result/<run_name>: {pattern}"
+            )
         if ".." in pattern_path.parts:
             raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
     return patterns
@@ -432,8 +516,8 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
 
 def resolve_eval_artifact_patterns(
     registry_defaults: dict[str, object],
-    registry_entry: dict[str, object] | None,
-) -> tuple[list[str], list[str]]:
+    registry_entry: dict[str, object],
+) -> EvalArtifactPatterns:
     """Return required and optional eval artifact patterns for one run."""
     default_required = string_list(
         registry_defaults.get("required_eval_artifacts"),
@@ -444,11 +528,11 @@ def resolve_eval_artifact_patterns(
         "defaults.optional_eval_artifacts",
     )
     entry_required = string_list(
-        registry_entry.get("required_eval_artifacts") if registry_entry is not None else None,
+        registry_entry.get("required_eval_artifacts"),
         "topics.required_eval_artifacts",
     )
     entry_optional = string_list(
-        registry_entry.get("optional_eval_artifacts") if registry_entry is not None else None,
+        registry_entry.get("optional_eval_artifacts"),
         "topics.optional_eval_artifacts",
     )
     required = merge_unique_strings(
@@ -458,13 +542,13 @@ def resolve_eval_artifact_patterns(
     )
     optional = merge_unique_strings(default_optional, entry_optional)
     optional = [pattern for pattern in optional if pattern not in required]
-    return (
-        validate_eval_artifact_patterns(required, "required_eval_artifacts"),
-        validate_eval_artifact_patterns(optional, "optional_eval_artifacts"),
+    return EvalArtifactPatterns(
+        required=validate_eval_artifact_patterns(required, "required_eval_artifacts"),
+        optional=validate_eval_artifact_patterns(optional, "optional_eval_artifacts"),
     )
 
 
-def file_sha256(path: Path) -> str:
+def load_file_sha256(path: Path) -> str:
     """Return the sha256 digest for one file."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -492,7 +576,7 @@ def artifact_kind(path: Path) -> str:
     return "file"
 
 
-def line_count(path: Path) -> int:
+def load_line_count(path: Path) -> int:
     """Return the number of lines in one file without assuming UTF-8 text."""
     count = 0
     saw_bytes = False
@@ -515,19 +599,34 @@ def is_managed_run_artifact(path: Path, result_dir: Path) -> bool:
     return str(path.relative_to(result_dir)) in MANAGED_RUN_ARTIFACTS
 
 
-def collect_eval_artifacts(
+def load_eval_artifact(
+    path: Path, result_dir: Path, patterns: list[str]
+) -> dict[str, object]:
+    """Load eval artifact metadata for one collected file."""
+    artifact: dict[str, object] = {
+        "relative_path": str(path.relative_to(result_dir)),
+        "kind": artifact_kind(path),
+        "bytes": path.stat().st_size,
+        "sha256": load_file_sha256(path),
+        "matched_patterns": patterns,
+    }
+    if artifact["kind"] in {"jsonl", "text", "csv"}:
+        artifact["line_count"] = load_line_count(path)
+    return artifact
+
+
+def load_eval_artifacts(
     result_dir: Path,
     *,
     topic: str,
     run_name: str,
-    required_patterns: list[str],
-    optional_patterns: list[str],
+    patterns: EvalArtifactPatterns,
 ) -> dict[str, object]:
     """Collect eval artifact metadata from one result directory."""
     matched_patterns_by_path: dict[Path, list[str]] = {}
     missing_required_patterns: list[str] = []
 
-    for pattern in required_patterns:
+    for pattern in patterns.required:
         matches = sorted(
             path
             for path in result_dir.glob(pattern)
@@ -539,7 +638,7 @@ def collect_eval_artifacts(
         for match in matches:
             matched_patterns_by_path.setdefault(match, []).append(pattern)
 
-    for pattern in optional_patterns:
+    for pattern in patterns.optional:
         for match in sorted(
             path
             for path in result_dir.glob(pattern)
@@ -552,24 +651,17 @@ def collect_eval_artifacts(
         matched_patterns_by_path,
         key=lambda item: str(item.relative_to(result_dir)),
     ):
-        artifact: dict[str, object] = {
-            "relative_path": str(path.relative_to(result_dir)),
-            "kind": artifact_kind(path),
-            "bytes": path.stat().st_size,
-            "sha256": file_sha256(path),
-            "matched_patterns": matched_patterns_by_path[path],
-        }
-        if artifact["kind"] in {"jsonl", "text", "csv"}:
-            artifact["line_count"] = line_count(path)
-        artifacts.append(artifact)
+        artifacts.append(
+            load_eval_artifact(path, result_dir, matched_patterns_by_path[path])
+        )
 
     return {
         "topic": topic,
         "run_name": run_name,
         "result_dir": str(result_dir),
         "collected_at_utc": utc_now(),
-        "required_patterns": required_patterns,
-        "optional_patterns": optional_patterns,
+        "required_patterns": patterns.required,
+        "optional_patterns": patterns.optional,
         "missing_required_patterns": missing_required_patterns,
         "artifact_count": len(artifacts),
         "artifacts": artifacts,
@@ -596,17 +688,17 @@ def command_from_registry(
     return [token.format(**placeholders) for token in shlex.split(raw_command)]
 
 
-def matched_registered_command(
-    registry_entry: dict[str, object] | None,
-    command: list[str],
-    placeholders: dict[str, str],
+def resolve_registered_command_match(
+    registry: RegistryContext, command: list[str], placeholders: dict[str, str]
 ) -> str | None:
     """Return the matching registered command kind when one exists."""
-    if registry_entry is None:
+    if not registry.available:
         return None
     for command_kind in ("smoke", "formal"):
         try:
-            registered_command = command_from_registry(registry_entry, command_kind, placeholders)
+            registered_command = command_from_registry(
+                registry.entry, command_kind, placeholders
+            )
         except ValueError:
             continue
         if registered_command == command:
@@ -614,7 +706,9 @@ def matched_registered_command(
     return None
 
 
-def stream_command(command: list[str], *, cwd: Path, env: dict[str, str], log_path: Path) -> int:
+def run_streamed_command(
+    command: list[str], *, cwd: Path, env: dict[str, str], log_path: Path
+) -> int:
     """Run one command, teeing output to stdout and the log file."""
     with log_path.open("w", encoding="utf-8") as log_handle:
         log_handle.write("$ " + shlex.join(command) + "\n")
@@ -644,204 +738,262 @@ def stream_command(command: list[str], *, cwd: Path, env: dict[str, str], log_pa
                 return INTERRUPTED_EXIT_CODE
 
 
-def main() -> int:
-    """Run the CLI."""
-    args = parse_args()
-    repo_root = Path(args.repo_root).resolve()
-    registry_arg = Path(args.registry).resolve() if args.registry else None
-    try:
-        registry_path, registry_entry, registry_defaults = load_registry_entry(
-            repo_root, registry_arg, args.topic
-        )
-    except (OSError, ValueError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
-
-    if registry_entry is not None:
-        topic_dir_raw = registry_entry.get("topic_dir")
+def resolve_topic_dir(
+    repo_root: Path, identity: RunIdentity, registry: RegistryContext
+) -> Path:
+    """Resolve the experiment topic directory."""
+    if registry.available:
+        topic_dir_raw = registry.entry.get("topic_dir")
         if not isinstance(topic_dir_raw, str):
-            print(f"registry entry for {args.topic!r} is missing topic_dir", file=sys.stderr)
-            return 2
-        topic_dir = repo_root / topic_dir_raw
-    else:
-        topic_dir = repo_root / "experiments" / args.topic
-    if not topic_dir.is_dir():
-        print(f"topic directory does not exist: {topic_dir}", file=sys.stderr)
-        return 2
+            raise ValueError(
+                f"registry entry for {identity.topic!r} is missing topic_dir"
+            )
+        return repo_root / topic_dir_raw
+    return repo_root / "experiments" / identity.topic
 
-    run_name = args.run_name or f"{args.topic}_{args.variant}_{compact_timestamp()}"
-    result_dir = topic_dir / "result" / run_name
-    if args.report_path:
-        report_path = Path(args.report_path).resolve()
-    elif registry_entry is not None:
-        registry_report_root = registry_entry.get("report_root") or registry_defaults.get(
+
+def resolve_report_path(
+    repo_root: Path, registry: RegistryContext, run_name: str, report_arg: str
+) -> Path:
+    """Resolve the report path for one run."""
+    if report_arg:
+        return Path(report_arg).resolve()
+    if registry.available:
+        registry_report_root = registry.entry.get(
             "report_root"
-        )
+        ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
-            report_path = (repo_root / registry_report_root / f"{run_name}.md").resolve()
-        else:
-            report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
-    else:
-        report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
-    manifest_path = result_dir / "run_manifest.json"
-    eval_manifest_path = result_dir / "eval_manifest.json"
-    config_path = result_dir / "config.json"
-    log_path = result_dir / "run.log"
-    try:
-        required_eval_patterns, optional_eval_patterns = resolve_eval_artifact_patterns(
-            registry_defaults,
-            registry_entry,
-        )
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+            return (repo_root / registry_report_root / f"{run_name}.md").resolve()
+    return (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
 
-    created_at = utc_now()
-    placeholders = {
+
+def build_run_paths(topic_dir: Path, run_name: str, report_path: Path) -> RunPaths:
+    """Build filesystem paths owned by one run."""
+    result_dir = topic_dir / "result" / run_name
+    return RunPaths(
+        result_dir=result_dir,
+        log_dir=result_dir / "logs",
+        report_path=report_path,
+        manifest_path=result_dir / "run_manifest.json",
+        eval_manifest_path=result_dir / "eval_manifest.json",
+        config_path=result_dir / "config.json",
+        log_path=result_dir / "run.log",
+    )
+
+
+def build_placeholders(
+    repo_root: Path, identity: RunIdentity, topic_dir: Path, paths: RunPaths
+) -> dict[str, str]:
+    """Build command placeholder values for one run."""
+    return {
         "repo_root": str(repo_root),
         "topic_dir": str(topic_dir),
-        "run_name": run_name,
-        "run_dir": str(result_dir),
-        "report_path": str(report_path),
-        "manifest_path": str(manifest_path),
-        "eval_manifest_path": str(eval_manifest_path),
-        "config_path": str(config_path),
-        "log_path": str(log_path),
+        "run_name": identity.run_name,
+        "run_dir": str(paths.result_dir),
+        "log_dir": str(paths.log_dir),
+        "report_path": str(paths.report_path),
+        "manifest_path": str(paths.manifest_path),
+        "eval_manifest_path": str(paths.eval_manifest_path),
+        "config_path": str(paths.config_path),
+        "log_path": str(paths.log_path),
     }
 
-    try:
-        explicit_config: dict[str, object] = {}
-        if args.config_json:
-            explicit_config.update(load_config_json(Path(args.config_json).resolve()))
-        explicit_config.update(parse_config_pairs(args.config))
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
 
-    if args.use_registered_command and args.command:
-        print("do not pass both a manual command and --use-registered-command", file=sys.stderr)
-        return 2
-    if args.use_registered_command:
-        if registry_entry is None:
-            print("--use-registered-command requires experiments/registry.toml", file=sys.stderr)
-            return 2
-        try:
-            command = command_from_registry(
-                registry_entry,
-                args.use_registered_command,
-                placeholders,
+def load_explicit_config(
+    config_json_path: str, config_pairs: list[str]
+) -> dict[str, object]:
+    """Load explicit CLI config values."""
+    explicit_config: dict[str, object] = {}
+    if config_json_path:
+        explicit_config.update(load_config_json(Path(config_json_path).resolve()))
+    explicit_config.update(parse_config_pairs(config_pairs))
+    return explicit_config
+
+
+def select_command(
+    use_registered_command: str,
+    manual_command: list[str],
+    registry: RegistryContext,
+    placeholders: dict[str, str],
+) -> CommandSelection:
+    """Select the inner command for one managed run."""
+    if use_registered_command and manual_command:
+        raise ValueError(
+            "do not pass both a manual command and --use-registered-command"
+        )
+    if use_registered_command:
+        if not registry.available:
+            raise ValueError(
+                "--use-registered-command requires experiments/registry.toml"
             )
-        except ValueError as exc:
-            print(str(exc), file=sys.stderr)
-            return 2
-        command_source = f"registered:{args.use_registered_command}"
-    else:
-        command = format_command(args.command, placeholders)
-        command_source = "manual"
-    registered_match = matched_registered_command(registry_entry, command, placeholders)
-
-    manifest = build_manifest(
-        repo_root=repo_root,
-        topic=args.topic,
-        run_name=run_name,
-        topic_dir=topic_dir,
-        result_dir=result_dir,
-        report_path=report_path,
-        manifest_path=manifest_path,
-        command=command,
-        created_at=created_at,
-        status="running",
-        registry_path=registry_path,
-        registry_entry=registry_entry,
-        command_source=command_source,
-        registered_command_match=registered_match,
-    )
-    run_config = build_run_config(
-        topic=args.topic,
-        run_name=run_name,
-        variant=args.variant,
-        result_dir=result_dir,
-        report_path=report_path,
-        manifest_path=manifest_path,
-        eval_manifest_path=eval_manifest_path,
-        config_path=config_path,
-        command=command,
-        command_source=command_source,
-        registered_command_match=registered_match,
-        registry_entry=registry_entry,
-        explicit_config=explicit_config,
-    )
-    manifest["config_path"] = str(config_path)
-    manifest["config"] = run_config
-
-    if not command:
-        print("a command is required", file=sys.stderr)
-        return 2
-
-    result_dir.mkdir(parents=True, exist_ok=True)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    write_json(config_path, run_config)
-    write_manifest(manifest_path, manifest)
-
-    if not args.skip_report_init and not report_path.exists():
-        git_info = manifest["git"]
-        if not isinstance(git_info, dict):
-            raise TypeError("git manifest entry must be a dictionary")
-        report_path.write_text(
-            render_report_stub(
-                topic=args.topic,
-                run_name=run_name,
-                report_path=report_path,
-                result_dir=result_dir,
-                manifest_path=manifest_path,
-                eval_manifest_path=eval_manifest_path,
-                config_path=config_path,
-                command=command,
-                created_at=created_at,
-                branch=git_info.get("branch") if isinstance(git_info.get("branch"), str) else None,
-                commit=git_info.get("commit") if isinstance(git_info.get("commit"), str) else None,
-                registry_path=registry_path,
+        command = command_from_registry(
+            registry.entry, use_registered_command, placeholders
+        )
+        return CommandSelection(
+            command=command,
+            source=f"registered:{use_registered_command}",
+            registered_match=resolve_registered_command_match(
+                registry,
+                command,
+                placeholders,
             ),
+        )
+    command = format_command(manual_command, placeholders)
+    return CommandSelection(
+        command=command,
+        source="manual",
+        registered_match=resolve_registered_command_match(
+            registry, command, placeholders
+        ),
+    )
+
+
+def build_run_context(args: argparse.Namespace) -> RunContext:
+    """Build setup context for one managed run."""
+    repo_root = Path(args.repo_root).resolve()
+    identity = RunIdentity(
+        topic=args.topic,
+        run_name=args.run_name or f"{args.topic}_{args.variant}_{compact_timestamp()}",
+        variant=args.variant,
+    )
+    registry = load_registry_context(
+        resolve_registry_path(repo_root, args.registry or ""),
+        identity.topic,
+    )
+    topic_dir = resolve_topic_dir(repo_root, identity, registry)
+    if not topic_dir.is_dir():
+        raise ValueError(f"topic directory does not exist: {topic_dir}")
+    report_path = resolve_report_path(
+        repo_root,
+        registry,
+        identity.run_name,
+        args.report_path or "",
+    )
+    paths = build_run_paths(topic_dir, identity.run_name, report_path)
+    placeholders = build_placeholders(repo_root, identity, topic_dir, paths)
+    command = select_command(
+        args.use_registered_command or "",
+        args.command,
+        registry,
+        placeholders,
+    )
+    return RunContext(
+        repo_root=repo_root,
+        identity=identity,
+        topic_dir=topic_dir,
+        paths=paths,
+        registry=registry,
+        command=command,
+        created_at=utc_now(),
+        git=load_git_snapshot(repo_root),
+    )
+
+
+def write_initial_artifacts(
+    context: RunContext,
+    manifest: dict[str, object],
+    run_config: dict[str, object],
+    skip_report_init: bool,
+) -> None:
+    """Write run directories, initial JSON files, and optional report stub."""
+    context.paths.result_dir.mkdir(parents=True, exist_ok=True)
+    context.paths.log_dir.mkdir(parents=True, exist_ok=True)
+    context.paths.report_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(context.paths.config_path, run_config)
+    write_manifest(context.paths.manifest_path, manifest)
+
+    if not skip_report_init and not context.paths.report_path.exists():
+        context.paths.report_path.write_text(
+            render_report_stub(context),
             encoding="utf-8",
         )
 
+
+def build_run_environment(context: RunContext) -> dict[str, str]:
+    """Build the environment for the inner experiment command."""
     env = dict(os.environ)
     env.update(
         {
-            "EXPERIMENT_RUN_NAME": run_name,
-            "EXPERIMENT_TOPIC": args.topic,
-            "EXPERIMENT_RUN_DIR": str(result_dir),
-            "EXPERIMENT_REPORT_PATH": str(report_path),
-            "EXPERIMENT_RUN_MANIFEST": str(manifest_path),
-            "EXPERIMENT_CONFIG_PATH": str(config_path),
-            "EXPERIMENT_RUN_LOG": str(log_path),
+            "EXPERIMENT_RUN_NAME": context.identity.run_name,
+            "EXPERIMENT_TOPIC": context.identity.topic,
+            "EXPERIMENT_RUN_DIR": str(context.paths.result_dir),
+            "EXPERIMENT_LOG_DIR": str(context.paths.log_dir),
+            "EXPERIMENT_REPORT_PATH": str(context.paths.report_path),
+            "EXPERIMENT_RUN_MANIFEST": str(context.paths.manifest_path),
+            "EXPERIMENT_CONFIG_PATH": str(context.paths.config_path),
+            "EXPERIMENT_RUN_LOG": str(context.paths.log_path),
         }
     )
+    return env
 
-    start_monotonic = time.monotonic()
-    exit_code = stream_command(command, cwd=repo_root, env=env, log_path=log_path)
-    finished_at = utc_now()
-    eval_collection = collect_eval_artifacts(
-        result_dir,
-        topic=args.topic,
-        run_name=run_name,
-        required_patterns=required_eval_patterns,
-        optional_patterns=optional_eval_patterns,
+
+def finalize_run_manifest(
+    context: RunContext,
+    manifest: dict[str, object],
+    start_monotonic: float,
+    exit_code: int,
+    patterns: EvalArtifactPatterns,
+) -> None:
+    """Collect eval artifacts and write the final run manifest."""
+    eval_collection = load_eval_artifacts(
+        context.paths.result_dir,
+        topic=context.identity.topic,
+        run_name=context.identity.run_name,
+        patterns=patterns,
     )
-    write_json(eval_manifest_path, eval_collection)
-    manifest["finished_at_utc"] = finished_at
-    manifest["duration_seconds"] = round(time.monotonic() - start_monotonic, DURATION_ROUND_DIGITS)
+    write_json(context.paths.eval_manifest_path, eval_collection)
+    manifest["finished_at_utc"] = utc_now()
+    manifest["duration_seconds"] = round(
+        time.monotonic() - start_monotonic, DURATION_ROUND_DIGITS
+    )
     manifest["exit_code"] = exit_code
     manifest["status"] = "completed" if exit_code == 0 else "failed"
     manifest["eval_artifacts"] = {
-        "eval_manifest_path": str(eval_manifest_path),
-        "required_patterns": required_eval_patterns,
-        "optional_patterns": optional_eval_patterns,
+        "eval_manifest_path": str(context.paths.eval_manifest_path),
+        "required_patterns": patterns.required,
+        "optional_patterns": patterns.optional,
         "collected_artifact_count": eval_collection["artifact_count"],
         "missing_required_patterns": eval_collection["missing_required_patterns"],
     }
-    write_manifest(manifest_path, manifest)
+    write_manifest(context.paths.manifest_path, manifest)
+
+
+def run_cli(args: argparse.Namespace) -> int:
+    """Run one managed experiment from parsed CLI args."""
+    context = build_run_context(args)
+    patterns = resolve_eval_artifact_patterns(
+        context.registry.defaults,
+        context.registry.entry,
+    )
+    explicit_config = load_explicit_config(args.config_json or "", args.config)
+
+    if not context.command.command:
+        raise ValueError("a command is required")
+
+    manifest = build_manifest(context, "running")
+    run_config = build_run_config(context, explicit_config)
+    manifest["config_path"] = str(context.paths.config_path)
+    manifest["config"] = run_config
+    write_initial_artifacts(context, manifest, run_config, args.skip_report_init)
+
+    start_monotonic = time.monotonic()
+    exit_code = run_streamed_command(
+        context.command.command,
+        cwd=context.repo_root,
+        env=build_run_environment(context),
+        log_path=context.paths.log_path,
+    )
+    finalize_run_manifest(context, manifest, start_monotonic, exit_code, patterns)
     return exit_code
+
+
+def main() -> int:
+    """Run the CLI."""
+    try:
+        return run_cli(parse_args())
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

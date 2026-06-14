@@ -41,7 +41,9 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    same_role_subagent_policy_output_lines,
     select_roles,
+    subagent_wave_record_command,
     task_ids,
     workflow_spawn_budget,
 )
@@ -336,6 +338,7 @@ def emit_bootstrap_output(
         print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
         print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
         print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
+        print(f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}")
         active_budget = context.workflow_active_spawn_budget or 0
         initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
         if initial_wave:
@@ -355,6 +358,8 @@ def emit_bootstrap_output(
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
         print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        for line in same_role_subagent_policy_output_lines():
+            print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
         print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")

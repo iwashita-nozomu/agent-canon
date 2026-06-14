@@ -1,11 +1,12 @@
 ---
 name: agent-log-analysis
-description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, routing misses, weak skills, or selection gaps; first convert raw logs into a token-light compact summary with generate_agent_runtime_dashboard.py before reading or interpreting evidence.
+description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, routing misses, weak skills, or selection gaps; first convert raw logs into a token-light compact summary with the external runtime_log_dashboard.py API before reading or interpreting evidence.
 ---
 <!--
 @dependency-start
 responsibility Documents Agent Log Analysis for this repository.
 upstream design ../../../agents/skills/agent-log-analysis.md documents the human-facing skill
+upstream design ../../../agents/skills/agent-eval-accumulation.md repairs missing accumulated eval evidence
 upstream design ../../../documents/runtime-log-archive.md defines the external log archive mount
 upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 @dependency-end
@@ -39,6 +40,7 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
 1. Read the API JSON or compact Markdown as the default analysis input. The log archive repo owns aggregation, moving averages, and manuscript-structure evidence cells.
 1. If `<archive-root>/tools/runtime_log_dashboard.py` is missing, stop with `log_archive_api_missing`; do not use raw JSONL.
 1. If the compact report lacks enough context for a specific claim, extend the log archive repository API/report profile and rerun it instead of opening raw JSONL.
+1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
 1. Treat raw JSONL as tool-development or corruption-audit input only; record an explicit rationale before reading it.
 1. Do not answer token-use questions from lifetime totals alone; use the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
 1. Report observations separately from interpretation, repair target, and unknowns.

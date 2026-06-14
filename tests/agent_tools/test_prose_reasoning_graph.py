@@ -18,6 +18,7 @@ import textwrap
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest import mock
 
 import yaml
 
@@ -25,6 +26,7 @@ from tools.agent_tools import prose_reasoning_graph as prose_graph
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
+TEST_LOCAL_LLM_ENV = {"AGENT_CANON_LLAMA_CLI": str(PROJECT_ROOT / ".missing-test-llama-cli")}
 
 
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
@@ -35,6 +37,7 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, **TEST_LOCAL_LLM_ENV},
     )
 
 
@@ -46,7 +49,7 @@ def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedP
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, **env},
+        env={**os.environ, **TEST_LOCAL_LLM_ENV, **env},
     )
 
 
@@ -1400,6 +1403,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 "1",
                 "--local-llm-term-batch-size",
                 "1",
+                "--local-llm-jobs",
+                "2",
             )
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_INGEST_SET=pass", ingest.stdout)
@@ -1444,6 +1449,60 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(local_ir["document_count"], 2)
             self.assertEqual(local_ir["term_count"], 2)
             self.assertEqual(local_ir["part_count"], 4)
+            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
+            self.assertEqual(llm_execution["status"], "skipped_llama_cli_not_found")
+            self.assertEqual(llm_execution["jobs"], 2)
+
+    def test_local_llm_payload_passes_jobs_to_extract_command(self) -> None:
+        """The Python LocalLLM wrapper should keep part execution in the Rust CLI."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            first = root / "first.md"
+            second = root / "second.md"
+            db = root / "graph.sqlite"
+            ir_path = root / "local_llm_prose_ir.json"
+            first.write_text("# First\n\nAlpha evidence.", encoding="utf-8")
+            second.write_text("# Second\n\nBeta evidence.", encoding="utf-8")
+            args = type("Args", (), {})()
+            args.local_llm_ir_json = None
+            args.local_llm_root = root
+            args.local_llm_document_batch_size = 1
+            args.local_llm_term_batch_size = 1
+            args.local_llm_jobs = 2
+            args.term = ["evidence"]
+            args.terms_file = []
+            ir_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent_canon.local_llm.prose_ir.v1",
+                        "llm_execution": {"status": "completed", "jobs": 2},
+                        "parts": [
+                            {"part_id": "part:d1:t1", "llm_status": "pass"},
+                            {"part_id": "part:d2:t1", "llm_status": "pass"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(prose_graph.subprocess, "run") as run_mock:
+                run_mock.return_value = subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=f"{prose_graph.LOCAL_LLM_PROSE_IR_STDOUT_KEY}={ir_path}\n",
+                    stderr="",
+                )
+                local_ir = prose_graph.local_llm_prose_ir_payload(args, [first, second], "", db)
+
+            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
+            self.assertEqual(llm_execution["status"], "completed")
+            self.assertEqual(llm_execution["jobs"], 2)
+            parts = cast(list[dict[str, object]], local_ir["parts"])
+            self.assertEqual([part["part_id"] for part in parts], ["part:d1:t1", "part:d2:t1"])
+            self.assertTrue(all(part["llm_status"] == "pass" for part in parts))
+            command = run_mock.call_args.args[0]
+            self.assertIn("--llm-jobs", command)
+            self.assertEqual(command[command.index("--llm-jobs") + 1], "2")
 
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""

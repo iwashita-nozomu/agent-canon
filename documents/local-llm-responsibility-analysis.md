@@ -129,6 +129,7 @@ protecting tool / issue evidence の不足候補、deterministic follow-up check
 agent-canon local-llm extract-prose-ir \
   --root vendor/agent-canon \
   --json-out /tmp/local_llm_prose_ir.json \
+  --llm-jobs 4 \
   --term DSL \
   --term corpus \
   documents/tools/prose_reasoning_graph.md \
@@ -137,6 +138,10 @@ agent-canon local-llm extract-prose-ir \
 
 この command は複数 document と複数 term を受けます。単語 list ではなく、
 後続 tool が扱える intermediate representation を返します。
+document / term batch から作った part prompt は、`llama-cli` が見つかる場合に
+`--llm-jobs` 個まで bounded parallel に model invocation されます。
+`llama-cli` が見つからない場合は part ごとに
+`skipped_llama_cli_not_found` を記録し、deterministic IR artifact の生成を続けます。
 
 ### search / build-index / eval
 
@@ -203,8 +208,9 @@ prompt 生成、model invocation、または advisory parsing 自体の失敗は
 | `document_count` | Number of input documents. |
 | `term_count` | Number of input terms. |
 | `part_count` | Number of partitioned prompt parts. |
+| `llm_execution` | Per-part model invocation status, job count, and pass/fail/skip counts. |
 | `partition` | Document and term batch settings. |
-| `parts[]` | Per-part extraction summaries and unresolved items. |
+| `parts[]` | Per-part extraction summaries, prompt hash, model output, and unresolved items. |
 | `documents[]` | Per-document responsibility, section role, and coverage cues. |
 | `terms[]` | Term contexts grounded in document spans. |
 | `corpus_hints[]` | Domain calibration hints with evidence. |
@@ -221,12 +227,19 @@ confidence、basis を持ち、retrieval や writing norm の calibration に使
 ```bash
 --document-batch-size <N>
 --term-batch-size <N>
+--llm-jobs <N>
 ```
 
 各 part は `part:d<document-batch>:t<term-batch>` という id を持ちます。
 part prompt は、その part に入っていない document や term を推測してはいけません。
 未解決の関係は unresolved item として残し、merge stage が `parts[]` と
 `dsl_seed` を統合します。
+
+Local LLM 実行は part 単位です。tool は part prompt を元順に保持しながら
+bounded parallel に実行し、JSON artifact の `parts[]` は常に元の part order に戻します。
+`parts[].llm_output` は LLM stdout が JSON として parse できる場合は JSON value、
+parse できない場合は `{ "raw": "..." }` として保持します。model output は
+graph seed であり、source-truth record や reviewer decision ではありません。
 
 この分割は tool responsibility です。agent が chat 上で document chunk や
 term chunk を手作業で管理してはいけません。

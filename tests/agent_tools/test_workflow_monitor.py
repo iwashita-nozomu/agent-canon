@@ -148,7 +148,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
                             "Budget Before | Budget After | Runtime Max Threads | "
-                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
                             "Rationale | Allowed Paths | Do Not Read | Write Scope | "
                             "Validation Route | Review Gate | Handoff Artifacts | "
                             "Delegated Policy Ref | Status |"
@@ -156,7 +156,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| ------- | ------------------ | --------------- | ------- | "
                             "------------- | ------------ | ------------------- | "
-                            "----------------- | ------------- | ------------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
                             "------------- | ----------- | ----------- | ---------------- | "
                             "----------- | ----------------- | -------------------- | ------ |"
                         ),
@@ -203,6 +203,119 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("redispatch_action=send_input", monitoring_text)
             self.assertIn("updated_packet=reports/agents/run-1/user_delta_001.md", monitoring_text)
             self.assertIn("mid_task_user_input=checkpointed", monitoring_text)
+
+    def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
+        """A real parent wave should replace the bootstrap authority blocker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True)
+            bootstrap = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "nested wave monitor",
+                    "--task-id",
+                    "T1",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "run-1",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            report_dir = report_root / "run-1"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-1 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=initial_intake_spawn budget_before=4/4 "
+                        "budget_after=1/4 runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=requirements_organizer,explorer,execution_planner "
+                        "role_instances=requirements_organizer:intake:team_manifest.yaml#requirements,"
+                        "explorer:intake:team_manifest.yaml#explore,"
+                        "execution_planner:intake:team_manifest.yaml#plan "
+                        "skipped_roles=none allowed_paths=reports/agents/run-1,team_manifest.yaml "
+                        "do_not_read=.agent-canon/log-archive,reports/agents/other "
+                        "write_scope=read_only validation_route=parent_review "
+                        "review_gate=parent_integration "
+                        "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation "
+                        "status=completed"
+                    ),
+                    "--timestamp",
+                    "2026-04-30 12:00 JST",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertEqual(schedule_text.count("| WAVE-1 |"), 1)
+            self.assertIn("| WAVE-1 | parent | parent_runtime_authority |", schedule_text)
+            self.assertNotIn("blocked_authority_required", schedule_text)
+            self.assertIn("event_kind=spawned", monitoring_text)
+            self.assertIn("subagent_wave=recorded wave_id=WAVE-1", monitoring_text)
+            self.assertNotIn("event_kind=authority_blocker", monitoring_text)
+
+    def test_monitor_rejects_delegated_child_wave_without_budget(self) -> None:
+        """Delegated child waves must preserve bounded budget evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-2 parent_or_delegate=worker "
+                        "event_kind=delegated_child_spawn "
+                        "spawn_authority=delegated_stage_owner "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=1/4 budget_after=2/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=python_reviewer "
+                        "role_instances=python_reviewer:triage:test_plan.md "
+                        "skipped_roles=none allowed_paths=tests/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=read_only "
+                        "validation_route=pytest review_gate=parent_integration "
+                        "handoff_artifacts=reports/agents/run-1/triage_packet.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("remaining_spawn_budget", result.stderr)
 
     def test_monitor_rejects_mid_task_user_input_with_wrong_action(self) -> None:
         """Classification and redispatch action should be mechanically consistent."""
@@ -255,6 +368,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "target_agents=worker scope_status=changed "
                         "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
                         "runtime_max_depth=2 spawned_roles=worker "
+                        "role_instances=worker:followup:reports/agents/run-1/user_delta_001.md "
                         "allowed_paths=tools/agent_tools "
                         "do_not_read=reports/agents/other write_scope=tools/agent_tools "
                         "validation_route=pytest review_gate=python_review "
@@ -284,7 +398,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
                             "Budget Before | Budget After | Runtime Max Threads | "
-                            "Runtime Max Depth | Spawned Roles | Skipped Roles / "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
                             "Rationale | Allowed Paths | Do Not Read | Write Scope | "
                             "Validation Route | Review Gate | Handoff Artifacts | "
                             "Delegated Policy Ref | Status |"
@@ -292,7 +406,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         (
                             "| ------- | ------------------ | --------------- | ------- | "
                             "------------- | ------------ | ------------------- | "
-                            "----------------- | ------------- | ------------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
                             "------------- | ----------- | ----------- | ---------------- | "
                             "----------- | ----------------- | -------------------- | ------ |"
                         ),
@@ -315,6 +429,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "target_agents=worker scope_status=changed "
                         "budget_before=3/12 budget_after=4/12 runtime_max_threads=24 "
                         "runtime_max_depth=2 spawned_roles=worker "
+                        "role_instances=worker:followup:reports/agents/run-1/user_delta_001.md "
                         "allowed_paths=tools/agent_tools "
                         "do_not_read=reports/agents/other write_scope=tools/agent_tools "
                         "validation_route=pytest review_gate=python_review "

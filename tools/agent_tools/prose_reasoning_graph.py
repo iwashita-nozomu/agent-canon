@@ -155,6 +155,7 @@ DEFAULT_DB_NAME = "prose_graph.sqlite"
 DEFAULT_CACHE_HASH_LENGTH = 12
 DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE = 4
 DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE = 32
+DEFAULT_LOCAL_LLM_JOBS = 4
 VERIFICATION_RECURSION_MAX_DEPTH = 3
 FORM_NODE_LABEL_WORD_LIMIT = 8
 CONCEPT_CANDIDATE_LIMIT = 12
@@ -468,6 +469,12 @@ def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE,
         help="Maximum terms per LocalLLM prose IR part.",
+    )
+    parser.add_argument(
+        "--local-llm-jobs",
+        type=int,
+        default=DEFAULT_LOCAL_LLM_JOBS,
+        help="Maximum LocalLLM prose IR parts to run concurrently.",
     )
 
 
@@ -1209,6 +1216,8 @@ def local_llm_prose_ir_payload(
         str(getattr(args, "local_llm_document_batch_size", DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE)),
         "--term-batch-size",
         str(getattr(args, "local_llm_term_batch_size", DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE)),
+        "--llm-jobs",
+        str(getattr(args, "local_llm_jobs", DEFAULT_LOCAL_LLM_JOBS)),
     ]
     if prompt_text.strip():
         command.extend(["--prompt", prompt_text])

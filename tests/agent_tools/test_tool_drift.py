@@ -174,6 +174,28 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_pr_check_must_scope_agent_eval_archive_env(self) -> None:
+        """The AgentCanon PR check must pass a writable archive env to eval producers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            text = script.read_text(encoding="utf-8").replace(
+                'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\\n',
+                "",
+            )
+            script.write_text(text, encoding="utf-8")
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-agent-canon-pr-hook-archive-env",
+                result.stdout,
+            )
+
     def test_pr_check_must_run_generated_artifact_guard(self) -> None:
         """The AgentCanon PR check must reject regenerated report leftovers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -253,6 +275,56 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
             self.assertIn(
                 "retired-legacy-tool:tool_catalog:tools/legacy:legacy-directory-present",
+                result.stdout,
+            )
+
+    def test_orphaned_legacy_token_tool_file_fails(self) -> None:
+        """Uncataloged legacy-like tool files must not survive drift checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+            self.write_file(root, "tools/search_legacy.py", "print('retired')\n")
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "retired-legacy-tool:tool_catalog:"
+                "tools/search_legacy.py:legacy-tools-are-retired",
+                result.stdout,
+            )
+
+    def test_cataloged_legacy_token_tool_file_is_not_double_reported(self) -> None:
+        """Cataloged retired tool files should produce one catalog finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+            self.write_file(root, "tools/legacysearch.py", "print('retired')\n")
+            catalog = root / "tools" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8")
+                + "\n".join(
+                    [
+                        "  - id: legacysearch",
+                        "    path: tools/legacysearch.py",
+                        "    status: canonical",
+                        "    callable_by_default: false",
+                        "    default_wiring:",
+                        "      ci: false",
+                        "      pr_check: false",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.count("tools/legacysearch.py"), 1)
+            self.assertIn(
+                "retired-legacy-tool:tool_catalog:"
+                "tools/legacysearch.py:legacy-tools-are-retired",
                 result.stdout,
             )
 
@@ -451,6 +523,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
                     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+                    'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
                     "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}",
                     "python3 tools/agent_tools/generated_artifact_guard.py",
                     "python3 tools/agent_tools/check_agent_runtime_alignment.py",

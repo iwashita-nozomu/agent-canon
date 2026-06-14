@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 46
+expected_count = 47
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 66
+expected_count = 67
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -241,6 +241,12 @@ id = "SUBAGENT-TOOL-FIRST-1"
 critical = true
 description = "Requires canonical checker/router/dashboard before read-only exploration."
 required_regex = ["Before assigning read-only exploration", "canonical checker", "compact tool artifacts", "not to repeat deterministic tool checks"]
+
+[[evals.checklist]]
+id = "SUBAGENT-FRESH-CAPSULE-1"
+critical = true
+description = "Requires the fresh context capsule fields in handoff prompts."
+required_regex = ["Treat every spawned subagent as fresh", "Fresh Subagent Context Capsule", "exact read-before-work paths", "compact artifacts", "return contract"]
 
 [[evals]]
 id = "md-style-check-human-doc-unified-rust-docs"
@@ -982,6 +988,18 @@ critical = true
 description = "Keeps independent workstreams as stage-owner vertical dynamic waves with delegated spawn policy."
 required_regex = ["Initial Intake Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
 
+[[evals.checklist]]
+id = "TASK-WF-PRE-EDIT-PACKET-1"
+critical = true
+description = "Requires pre-edit repository investigation before parent edits or write-capable handoff."
+required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "responsibility search", "reuse survey", "stale surface scan", "dependency scope"]
+
+[[evals.checklist]]
+id = "TASK-WF-FRESH-CAPSULE-1"
+critical = true
+description = "Requires context capsule packing for fresh subagents."
+required_regex = ["Fresh Subagent Context Capsule", "launch 間で文脈を累積しない", "compact artifacts", "full transcript"]
+
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
 target = ".agents/skills/agent-orchestration/SKILL.md"
@@ -1012,6 +1030,12 @@ id = "ORCH-TOOL-FIRST-2"
 critical = true
 description = "Prevents subagents from repeating deterministic tool checks."
 required_regex = ["Do not use `explorer`", "re-check properties", "compact tool artifacts", "extend or repair the tool contract"]
+
+[[evals.checklist]]
+id = "ORCH-PRE-EDIT-PACKET-1"
+critical = true
+description = "Requires evidence-backed pre-edit investigation before edit path selection."
+required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "reuse survey", "stale surface scan", "dependency scope"]
 
 [[evals.checklist]]
 id = "REPORT-ROUTING-SKILL-1"
@@ -1084,6 +1108,18 @@ id = "CONVENTION-SKILL-2"
 critical = true
 description = "Requires convention compliance verifier during repo task closeout."
 required_regex = ["check_convention_compliance\\.py", "before closeout"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-PRE-EDIT-PACKET-1"
+critical = true
+description = "Requires the communication-protocol pre-edit packet before edits."
+required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "reuse survey", "stale surface scan", "dependency scope"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-FRESH-CAPSULE-1"
+critical = true
+description = "Requires compact fresh subagent context capsules instead of chat history."
+required_regex = ["Fresh Subagent Context Capsule", "exact paths and compact artifacts", "chat history", "repo-root scope"]
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"
@@ -1397,6 +1433,36 @@ id = "TOKEN-TOOL-FIRST-1"
 critical = true
 description = "Calls tools first and treats pass/finding output as authority for covered properties."
 required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand compact tool artifacts to subagents"]
+
+[[evals]]
+id = "communication-protocol-pre-edit-context"
+target = "agents/COMMUNICATION_PROTOCOL.md"
+kind = "workflow"
+description = "Agent communication must define pre-edit investigation packets and fresh subagent context capsules."
+
+[[evals.checklist]]
+id = "COMM-PRE-EDIT-PACKET-1"
+critical = true
+description = "Defines the minimum evidence packet for pre-edit repository investigation."
+required_regex = ["Pre-Edit Repository Investigation Packet", "implementation_surface_route", "responsibility_search", "reuse_survey", "stale_surface_scan", "dependency_scope"]
+
+[[evals.checklist]]
+id = "COMM-FRESH-CAPSULE-1"
+critical = true
+description = "Defines fresh subagent context capsules without chat-history or raw-log dependence."
+required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "compact_artifacts", "allowed_paths", "do_not_read", "return_contract"]
+
+[[evals]]
+id = "codex-subagents-fresh-context"
+target = "agents/canonical/CODEX_SUBAGENTS.md"
+kind = "workflow"
+description = "Codex subagent canon must require compact context capsules for fresh launches."
+
+[[evals.checklist]]
+id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
+critical = true
+description = "Requires exact bounded context fields and forbids full transcript/raw log handoff."
+required_regex = ["Fresh Subagent Context Capsule", "context を累積しない", "exact read-before-work paths", "full transcript", "raw log"]
 
 [[evals]]
 id = "slide-production-workflow"
@@ -1795,6 +1861,12 @@ critical = true
 description = "Forbids raw JSONL use when the archive API is missing."
 required_regex = ["log_archive_api_missing", "do not use raw JSONL"]
 
+[[evals.checklist]]
+id = "AGENT-LOG-EVAL-ACCUMULATION-SHIM-1"
+critical = true
+description = "Routes eval family gaps to the accumulated eval producer/checker skill instead of raw dashboard guessing."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "producer/checker/archive loop"]
+
 [[evals]]
 id = "agent-log-analysis-archive-api-doc"
 target = "agents/skills/agent-log-analysis.md"
@@ -1812,6 +1884,54 @@ id = "AGENT-LOG-API-DOC-2"
 critical = true
 description = "Keeps raw JSONL inspection exceptional."
 required_regex = ["log_archive_api_missing", "raw JSONL", "schema debugging", "破損 audit"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"
+critical = true
+description = "Routes missing or stale accumulated eval families to the dedicated producer/checker loop."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "run_accumulated_agent_evals\\.py"]
+
+[[evals]]
+id = "agent-eval-accumulation-skill"
+target = ".agents/skills/agent-eval-accumulation/SKILL.md"
+kind = "skill"
+description = "Accumulated eval repair must use registered producers, compact checker output, and archive sync instead of hand-generated reports."
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-1"
+critical = true
+description = "Starts with the compact accumulation checker."
+required_regex = ["eval_accumulation_check\\.py", "--compact-out", "eval-accumulation-before\\.json"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-2"
+critical = true
+description = "Runs the registered producer, records used skills, and treats captured stdout/stderr as transient."
+required_regex = ["run_accumulated_agent_evals\\.py", "--skill-used", "reports/agent-eval-runs/<run-id>", "transient"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-3"
+critical = true
+description = "Forbids hand-generated eval reports, requires archive persistence, and blocks regeneratable stdout/stderr leftovers."
+required_regex = ["Do not hand-generate eval reports", "runtime_log_archive_git\\.py", "sync", "generated_artifact_guard\\.py"]
+
+[[evals]]
+id = "agent-eval-accumulation-doc"
+target = "agents/skills/agent-eval-accumulation.md"
+kind = "skill-doc"
+description = "The human accumulated eval skill must define producer/checker/archive responsibilities and boundaries."
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-DOC-1"
+critical = true
+description = "Defines the compact checker and registered producer loop."
+required_regex = ["eval_accumulation_check\\.py", "run_accumulated_agent_evals\\.py", "registered producer"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-DOC-2"
+critical = true
+description = "Keeps generated evidence append-only in the archive and separates reader-facing reporting."
+required_regex = ["append-only", "runtime_log_archive_git\\.py", "\\$report-writing", "generated_artifact_guard\\.py"]
 
 [[evals]]
 id = "agent-canon-update-route-skill"

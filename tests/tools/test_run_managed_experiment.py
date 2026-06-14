@@ -13,11 +13,24 @@ import subprocess
 import sys
 from pathlib import Path
 
-CHECK_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "check_experiment_registry.py"
-CREATE_TOPIC_SCRIPT = (
-    Path(__file__).resolve().parents[2] / "tools" / "experiments" / "create_experiment_topic.py"
+CHECK_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "ci"
+    / "check_experiment_registry.py"
 )
-SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "run_managed_experiment.py"
+CREATE_TOPIC_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "experiments"
+    / "create_experiment_topic.py"
+)
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "experiments"
+    / "run_managed_experiment.py"
+)
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "tools"
@@ -33,16 +46,21 @@ FORMAL_INNER_COMMAND = (
     f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} "
     "--config {config_path} --mode formal"
 )
-RECURSIVE_RUNNER_COMMAND = "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
+RECURSIVE_RUNNER_COMMAND = (
+    "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
+)
 
 
-def build_repo(tmp_path: Path) -> Path:
-    """Create a minimal fake repo layout for the helper."""
-    repo_root = tmp_path / "repo"
+def create_fake_repo_dirs(repo_root: Path) -> None:
+    """Create the minimal fake repo directory layout."""
     (repo_root / "experiments" / "_template" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
+
+
+def write_template_topic(repo_root: Path) -> None:
+    """Write the fake template experiment topic."""
     (repo_root / "experiments" / "_template" / "README.md").write_text(
         "# Experiment Topic Template\n\n"
         "smoke: `python3 tools/experiments/run_managed_experiment.py "
@@ -65,6 +83,10 @@ def build_repo(tmp_path: Path) -> Path:
         "# Result Directory\n",
         encoding="utf-8",
     )
+
+
+def write_demo_topic_base(repo_root: Path) -> None:
+    """Write non-executable fake demo topic files."""
     (repo_root / "experiments" / "demo_topic" / "README.md").write_text(
         "# Demo Topic\n",
         encoding="utf-8",
@@ -77,7 +99,11 @@ def build_repo(tmp_path: Path) -> Path:
         "# placeholder\n",
         encoding="utf-8",
     )
-    (repo_root / "experiments" / "demo_topic" / "run.py").write_text(
+
+
+def demo_run_script_text() -> str:
+    """Return the fake demo topic runner source."""
+    return (
         "\n".join(
             [
                 "from __future__ import annotations",
@@ -112,9 +138,20 @@ def build_repo(tmp_path: Path) -> Path:
                 ")",
             ]
         )
-        + "\n",
+        + "\n"
+    )
+
+
+def write_demo_runner(repo_root: Path) -> None:
+    """Write the fake demo topic executable runner."""
+    (repo_root / "experiments" / "demo_topic" / "run.py").write_text(
+        demo_run_script_text(),
         encoding="utf-8",
     )
+
+
+def write_demo_registry(repo_root: Path) -> None:
+    """Write the fake experiment registry."""
     (repo_root / "experiments" / "registry.toml").write_text(
         "\n".join(
             [
@@ -143,11 +180,30 @@ def build_repo(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+
+
+def init_fake_git_repo(repo_root: Path) -> None:
+    """Initialize git metadata for the fake repo."""
+    subprocess.run(
+        ["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True
+    )
+
+
+def build_repo(tmp_path: Path) -> Path:
+    """Create a minimal fake repo layout for the helper."""
+    repo_root = tmp_path / "repo"
+    create_fake_repo_dirs(repo_root)
+    write_template_topic(repo_root)
+    write_demo_topic_base(repo_root)
+    write_demo_runner(repo_root)
+    write_demo_registry(repo_root)
+    init_fake_git_repo(repo_root)
     return repo_root
 
 
-def test_run_managed_experiment_uses_registered_command_and_writes_manifest(tmp_path: Path) -> None:
+def test_run_managed_experiment_uses_registered_command_and_writes_manifest(
+    tmp_path: Path,
+) -> None:
     """The helper should create canonical files for one successful registered run."""
     repo_root = build_repo(tmp_path)
     run_name = "demo_topic_smoke_20260406T000000Z"
@@ -172,22 +228,31 @@ def test_run_managed_experiment_uses_registered_command_and_writes_manifest(tmp_
 
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
-    manifest = json.loads((result_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (result_dir / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    eval_manifest = json.loads(
+        (result_dir / "eval_manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["status"] == "completed"
     assert manifest["exit_code"] == 0
     assert manifest["command_source"] == "registered:smoke"
     assert manifest["registered_command_match"] == "smoke"
     assert manifest["registry"]["canonical_entrypoint"] == CANONICAL_ENTRYPOINT
+    assert manifest["log_dir"] == str(result_dir / "logs")
     assert manifest["config_path"] == str(result_dir / "config.json")
+    assert manifest["config"]["paths"]["log_dir"] == str(result_dir / "logs")
     assert manifest["config"]["paths"]["config"] == str(result_dir / "config.json")
     assert manifest["eval_artifacts"]["collected_artifact_count"] == 3
     assert manifest["eval_artifacts"]["missing_required_patterns"] == []
     assert (result_dir / "config.json").is_file()
+    assert (result_dir / "logs").is_dir()
     assert (result_dir / "run.log").is_file()
     assert (result_dir / "marker.txt").read_text(encoding="utf-8") == "smoke"
     assert eval_manifest["missing_required_patterns"] == []
-    collected_paths = {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
+    collected_paths = {
+        artifact["relative_path"] for artifact in eval_manifest["artifacts"]
+    }
     assert collected_paths == {"summary.json", "cases.jsonl", "config.json"}
     report_path = repo_root / "experiments" / "report" / f"{run_name}.md"
     assert report_path.is_file()
@@ -221,12 +286,22 @@ def test_run_managed_experiment_propagates_failure(tmp_path: Path) -> None:
 
     assert result.returncode == 7
     manifest_path = (
-        repo_root / "experiments" / "demo_topic" / "result" / run_name / "run_manifest.json"
+        repo_root
+        / "experiments"
+        / "demo_topic"
+        / "result"
+        / run_name
+        / "run_manifest.json"
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     eval_manifest = json.loads(
         (
-            repo_root / "experiments" / "demo_topic" / "result" / run_name / "eval_manifest.json"
+            repo_root
+            / "experiments"
+            / "demo_topic"
+            / "result"
+            / run_name
+            / "eval_manifest.json"
         ).read_text(encoding="utf-8")
     )
     assert manifest["status"] == "failed"
@@ -237,9 +312,9 @@ def test_run_managed_experiment_propagates_failure(tmp_path: Path) -> None:
         "cases.jsonl",
     ]
     assert eval_manifest["artifact_count"] == 1
-    assert {
-        artifact["relative_path"] for artifact in eval_manifest["artifacts"]
-    } == {"config.json"}
+    assert {artifact["relative_path"] for artifact in eval_manifest["artifacts"]} == {
+        "config.json"
+    }
 
 
 def test_run_managed_experiment_collects_topic_specific_optional_eval_artifacts(
@@ -278,8 +353,12 @@ def test_run_managed_experiment_collects_topic_specific_optional_eval_artifacts(
 
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
-    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
-    artifacts = {artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]}
+    eval_manifest = json.loads(
+        (result_dir / "eval_manifest.json").read_text(encoding="utf-8")
+    )
+    artifacts = {
+        artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]
+    }
     assert "marker.txt" in artifacts
     assert artifacts["marker.txt"]["matched_patterns"] == ["marker.txt"]
     assert artifacts["marker.txt"]["line_count"] == 1
@@ -327,10 +406,16 @@ def test_run_managed_experiment_collects_binary_named_optional_artifact_without_
 
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
-    manifest = json.loads((result_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (result_dir / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    eval_manifest = json.loads(
+        (result_dir / "eval_manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["status"] == "completed"
-    artifacts = {artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]}
+    artifacts = {
+        artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]
+    }
     assert "binary.txt" in artifacts
     assert artifacts["binary.txt"]["line_count"] == 1
 
@@ -368,8 +453,12 @@ def test_run_managed_experiment_excludes_managed_files_from_optional_wildcards(
 
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
-    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
-    collected_paths = {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
+    eval_manifest = json.loads(
+        (result_dir / "eval_manifest.json").read_text(encoding="utf-8")
+    )
+    collected_paths = {
+        artifact["relative_path"] for artifact in eval_manifest["artifacts"]
+    }
     assert "summary.json" in collected_paths
     assert "run_manifest.json" not in collected_paths
     assert "eval_manifest.json" not in collected_paths
@@ -392,8 +481,7 @@ def test_run_managed_experiment_keeps_nested_run_log_artifacts_collectable(
     experiment_path = repo_root / "experiments" / "demo_topic" / "run.py"
     experiment_path.write_text(
         experiment_path.read_text(encoding="utf-8")
-        + "\n(run_dir / 'logs').mkdir(parents=True, exist_ok=True)\n"
-        + "(run_dir / 'logs' / 'run.log').write_text('nested\\nlog', encoding='utf-8')\n",
+        + "\n(run_dir / 'logs' / 'run.log').write_text('nested\\nlog', encoding='utf-8')\n",
         encoding="utf-8",
     )
     run_name = "demo_topic_formal_nestedlog_20260406T000000Z"
@@ -418,8 +506,12 @@ def test_run_managed_experiment_keeps_nested_run_log_artifacts_collectable(
 
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
-    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
-    assert "logs/run.log" in {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
+    eval_manifest = json.loads(
+        (result_dir / "eval_manifest.json").read_text(encoding="utf-8")
+    )
+    assert "logs/run.log" in {
+        artifact["relative_path"] for artifact in eval_manifest["artifacts"]
+    }
 
 
 def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> None:
@@ -573,7 +665,9 @@ def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
     assert "OK: experiment registry is valid" in result.stdout
 
 
-def test_check_experiment_registry_rejects_recursive_runner_command(tmp_path: Path) -> None:
+def test_check_experiment_registry_rejects_recursive_runner_command(
+    tmp_path: Path,
+) -> None:
     """The checker should fail when an inner command recursively calls the wrapper."""
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
@@ -599,7 +693,9 @@ def test_check_experiment_registry_rejects_recursive_runner_command(tmp_path: Pa
     assert "must not call the managed runner recursively" in result.stdout
 
 
-def test_check_experiment_registry_rejects_command_without_config_path(tmp_path: Path) -> None:
+def test_check_experiment_registry_rejects_command_without_config_path(
+    tmp_path: Path,
+) -> None:
     """The registry checker should require registered commands to consume config_path."""
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
@@ -625,7 +721,9 @@ def test_check_experiment_registry_rejects_command_without_config_path(tmp_path:
     assert "must contain {config_path}" in result.stdout
 
 
-def test_check_experiment_registry_rejects_non_topic_local_entrypoint(tmp_path: Path) -> None:
+def test_check_experiment_registry_rejects_non_topic_local_entrypoint(
+    tmp_path: Path,
+) -> None:
     """The registry checker should require experiments/<topic>/run.py entrypoints."""
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
@@ -633,7 +731,9 @@ def test_check_experiment_registry_rejects_non_topic_local_entrypoint(tmp_path: 
         f'canonical_entrypoint = "{CANONICAL_ENTRYPOINT}"',
         'canonical_entrypoint = "python/package/experiment.py"',
     )
-    registry_text = registry_text.replace(CANONICAL_ENTRYPOINT, "python/package/experiment.py")
+    registry_text = registry_text.replace(
+        CANONICAL_ENTRYPOINT, "python/package/experiment.py"
+    )
     registry_path.write_text(registry_text, encoding="utf-8")
 
     result = subprocess.run(
@@ -652,7 +752,9 @@ def test_check_experiment_registry_rejects_non_topic_local_entrypoint(tmp_path: 
     assert "canonical_entrypoint must be the topic-local run.py" in result.stdout
 
 
-def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(tmp_path: Path) -> None:
+def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
+    tmp_path: Path,
+) -> None:
     """The registry checker should reject reserved top-level managed artifact patterns."""
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
@@ -678,7 +780,9 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(tmp_pa
     assert "reserved top-level managed artifacts" in result.stdout
 
 
-def test_create_experiment_topic_scaffolds_directory_and_registry(tmp_path: Path) -> None:
+def test_create_experiment_topic_scaffolds_directory_and_registry(
+    tmp_path: Path,
+) -> None:
     """The scaffold script should copy the template and append a registry entry."""
     repo_root = build_repo(tmp_path)
 
@@ -703,12 +807,16 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(tmp_path: Path
     readme_text = (topic_dir / "README.md").read_text(encoding="utf-8")
     assert "# new_topic" in readme_text
     assert "<topic>" not in readme_text
-    registry_text = (repo_root / "experiments" / "registry.toml").read_text(encoding="utf-8")
+    registry_text = (repo_root / "experiments" / "registry.toml").read_text(
+        encoding="utf-8"
+    )
     assert 'name = "new_topic"' in registry_text
     assert 'active_branch = "work/new-topic-20260406"' in registry_text
 
 
-def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(tmp_path: Path) -> None:
+def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
+    tmp_path: Path,
+) -> None:
     """The sync script should update branch and worktree metadata for one topic."""
     repo_root = build_repo(tmp_path)
     workspace_root = repo_root / ".worktrees" / "demo-topic"
@@ -736,7 +844,9 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(tmp_
     )
 
     assert result.returncode == 0
-    registry_text = (repo_root / "experiments" / "registry.toml").read_text(encoding="utf-8")
+    registry_text = (repo_root / "experiments" / "registry.toml").read_text(
+        encoding="utf-8"
+    )
     assert 'active_branch = "work/demo-topic-20260406"' in registry_text
     assert 'active_worktree = ".worktrees/demo-topic"' in registry_text
     assert 'scope_file = ".worktrees/demo-topic/WORKTREE_SCOPE.md"' in registry_text

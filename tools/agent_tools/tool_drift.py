@@ -13,6 +13,7 @@
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
 # upstream implementation ./check_convention_compliance.py verifies skill-routing markers
+# upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
@@ -29,6 +30,11 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from tool_path_policy import (
+    is_retired_legacy_tool_path,
+    iter_retired_legacy_tool_paths,
+    retired_legacy_tool_detail,
+)
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
@@ -296,6 +302,11 @@ CONTRACTS = (
                 "tools/ci/check_agent_canon_pr.sh",
                 "run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
                 "missing-accumulated-agent-eval-producer",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}"',
+                "missing-agent-canon-pr-hook-archive-env",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
@@ -674,64 +685,38 @@ def check_catalog_entries(root: Path) -> list[Finding]:
     """Check catalog entries for stale paths and legacy/default confusion."""
     catalog_path = resolve_repo_path(root, "tools/catalog.yaml")
     if not catalog_path.is_file():
-        return [
-            Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")
-        ]
+        return [Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")]
     if not has_dependency_manifest(catalog_path):
-        return [
-            Finding(
-                "missing-dependency-header",
-                "tool_catalog",
-                "tools/catalog.yaml",
-                "catalog",
-            )
-        ]
+        return [Finding("missing-dependency-header", "tool_catalog", "tools/catalog.yaml", "catalog")]
     raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     catalog = as_mapping(raw)
     if catalog is None:
-        return [
-            Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping")
-        ]
+        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping")]
     entries = as_sequence(catalog.get("entries"))
     if entries is None:
-        return [
-            Finding(
-                "invalid-catalog",
-                "tool_catalog",
-                "tools/catalog.yaml",
-                "entries-not-list",
-            )
-        ]
+        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "entries-not-list")]
     findings: list[Finding] = []
+    catalog_retired_paths: set[str] = set()
     for index, raw_entry in enumerate(entries, start=1):
         entry = as_mapping(raw_entry)
         if entry is None:
             findings.append(
-                Finding(
-                    "invalid-catalog-entry",
-                    "tool_catalog",
-                    "tools/catalog.yaml",
-                    f"entry-{index}-not-mapping",
-                )
+                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-not-mapping")
             )
             continue
         entry_path = entry.get("path")
         status = entry.get("status")
         if not isinstance(entry_path, str):
             findings.append(
-                Finding(
-                    "invalid-catalog-entry",
-                    "tool_catalog",
-                    "tools/catalog.yaml",
-                    f"entry-{index}-missing-path",
-                )
+                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-missing-path")
             )
             continue
         if not resolve_repo_path(root, entry_path).exists():
             findings.append(
                 Finding("stale-catalog-entry", "tool_catalog", entry_path, "missing-path")
             )
-        if entry_path.startswith("tools/legacy/") or status == "legacy_provenance":
+        if is_retired_legacy_tool_path(entry_path) or status == "legacy_provenance":
+            catalog_retired_paths.add(entry_path.replace("\\", "/").removeprefix("./"))
             findings.append(
                 Finding(
                     "retired-legacy-tool",
@@ -740,13 +725,15 @@ def check_catalog_entries(root: Path) -> list[Finding]:
                     "legacy-tools-are-retired",
                 )
             )
-    if (root / "tools" / "legacy").exists():
+    for retired_path in iter_retired_legacy_tool_paths(root):
+        if retired_path in catalog_retired_paths:
+            continue
         findings.append(
             Finding(
                 "retired-legacy-tool",
                 "tool_catalog",
-                "tools/legacy",
-                "legacy-directory-present",
+                retired_path,
+                retired_legacy_tool_detail(retired_path),
             )
         )
     return findings

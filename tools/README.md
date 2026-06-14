@@ -97,38 +97,24 @@ The new directories are migration targets, not duplicate registries. Existing
 tool paths stay stable until the catalog entry, tests, docs, and workflow
 callers move together.
 
-Validation entrypoints:
+Common execution routes:
 
-```bash
-python3 tools/agent_tools/tool_catalog.py
-python3 tools/agent_tools/tool_drift.py
-python3 tools/agent_tools/responsibility_scope.py
-python3 tools/agent_tools/parent_repo_readiness.py
-python3 tools/agent_tools/repo_structure_contract.py
-python3 tools/agent_tools/render_dependency_manifest_graph.py
-python3 tools/agent_tools/classify_path_risk.py
-python3 tools/agent_tools/formal_proof.py --help
-python3 tools/agent_tools/lean_proof_env.py --help
-python3 tools/agent_tools/tool_proof_coverage.py
-python3 tools/agent_tools/issue_sync.py
-python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
-python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/generated_artifact_guard.py
-python3 tools/agent_tools/runtime_log_archive_git.py status
-agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
-agent-canon local-llm route-implementation-surface --request-file reports/task.txt
-agent-canon local-llm route-skill --prompt "fix skill routing" --format json
-agent-canon test-design check tests
-agent-canon local-llm build-index
-python3 tools/agent_tools/route.py --area search
-agent-canon local-llm eval
-python3 tools/agent_tools/evaluate_report_quality.py
-python3 tools/agent_tools/evaluate_codex_agent_roles.py
-python3 tools/agent_tools/github_publish.py --help
-python3 tools/agent_tools/prose_reasoning_graph.py --help
-agent-canon structured-analysis build --root . --profile manual
-agent-canon structured-analysis document-inventory --root .
-```
+| Need | Command |
+| --- | --- |
+| Catalog shape, docs wiring, and retired legacy paths | `python3 tools/agent_tools/tool_catalog.py` |
+| Tool / workflow / PR checklist drift | `python3 tools/agent_tools/tool_drift.py` |
+| Runtime profile and path-risk routing | `python3 tools/agent_tools/classify_path_risk.py` |
+| Markdown, links, math, Mermaid, and docs drift | `tools/bin/agent-canon docs check` |
+| Implementation-surface routing before edits | `agent-canon local-llm route-implementation-surface --request-file reports/task.txt` |
+| Bounded search route selection | `agent-canon local-llm search --purpose "<purpose>"` |
+| Document inventory and document-canon cleanup | `agent-canon structured-analysis document-inventory --root .` |
+| Runtime log archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
+| Generated report roots left in source tree | `python3 tools/agent_tools/generated_artifact_guard.py` |
+| Test-design resilience diagnostics | `agent-canon test-design check tests` |
+
+Use `documents/tools/README.md` for reader-facing tool-family guidance and
+`tools/catalog.yaml` for the complete structured registry. Do not expand this
+table into a second catalog.
 
 For agent-facing diagnostics, prefer compact artifact options over detailed
 stdout: `evaluate_skill_workflow_prompts.py --compact-out <path>.json`,
@@ -218,6 +204,9 @@ an environment error when llama.cpp is unavailable.
 `agent-canon local-llm route-skill` is the deterministic prompt-to-skill
 router. It returns compatibility `SKILLS`, current-stage `ACTIVE_SKILLS`, and
 later-stage `DEFERRED_SKILLS` so agents do not predeclare every skill family.
+`agent-canon local-llm extract-prose-ir` partitions documents and terms into
+part prompts and, when `llama-cli` is available, runs those parts with bounded
+parallelism controlled by `--llm-jobs` before writing deterministic prose IR.
 `agent-canon local-llm build-index` builds the repo-local ignored semantic-card
 index consumed by the LLM provider under `.agent-canon/search-index/`.
 `agent-canon local-llm eval` validates the configured single-file local LLM
@@ -300,7 +289,7 @@ findings for resilient test planning.
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
   - `parent_repo_readiness.py` は template / derived parent repo に AgentCanon が期待する submodule shape、root view、parent-owned document contract、update state、MCP launcher、Docker/devcontainer environment surface が揃っているかをまとめて検査します。
   - `repo_structure_contract.py` は top-level から `tree -a -J` で取得した構成を `documents/repo-structure-contract.toml` の profile と比較し、想定 repo 構成、ignore、unexpected top-level を source-code hardcode なしで検査します。
-  - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。
+  - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。repo 全体 scan では Git の `--exclude-standard` view を優先し、`.agent-canon/`、`reports/`、`target/` などの runtime / cache state は検査対象から外します。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
   - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の `logs/<repo-key>` branch にまとめて commit / push する通常経路です。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
@@ -314,7 +303,7 @@ findings for resilient test planning.
   - `noncanonical_document_inventory.py` は Markdown / text 文書棚卸しの legacy migration shim です。operator は `agent-canon structured-analysis document-inventory --root .` を使います。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
   - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
-  - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。
+  - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、AgentCanon tool source route、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。親 repo の `tools/` symlink view が `vendor/agent-canon/tools/` に解決される場合も、AgentCanon branch / PR と source-root validation へ誘導します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans、semantic-index review artifacts、任意の provider-comparison artifact を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
 - `ci/`
@@ -896,7 +885,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, retired legacy entries, and broken tool-doc mappings.
 - `tool_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, skill/workflow prompt eval wiring, runtime alignment wiring, skill mirror parity, and the tool catalog.
 - `responsibility_scope.py` keeps checker/tool ownership tied to a scope so new gates do not become orphaned entrypoints.
-- `import_responsibility.py` ties Python imports back to `responsibility-scope.toml`, catches unused aliases before later style checks, and rejects local imports whose source scope is not allowed to depend on the target scope.
+- `import_responsibility.py` ties Python imports back to `responsibility-scope.toml`, catches unused aliases before later style checks, and rejects local imports whose source scope is not allowed to depend on the target scope. Repository-wide scans prefer Git's `--exclude-standard` view and skip runtime/cache state such as `.agent-canon/`, `reports/`, and `target/`.
 - `issue_sync.py` keeps folder issues structurally valid and gives GitHub Issue sync a repeatable command plan.
 - `eval_accumulation_check.py` keeps hook and skill eval evidence usable by improvement-guide and feedback-loop tools.
 - `agent-canon local-llm eval` keeps Local LLM single-file responsibility analysis covered by configurable eval cases without making model output a repo-wide gate.

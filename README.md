@@ -134,37 +134,24 @@ python3 tools/agent_tools/responsibility_scope.py --root . --format json \
   > reports/agentcanon-structure/responsibility_scope.json
 ```
 
-## 主な入口
+## 目的別ルート
 
-- `documents/README.md`
-  - root `documents/` の索引
-- `PHILOSOPHY.md`
-  - 設計時哲学と安定原則の正本
-- `agents/README.md`
-  - workflow / skill / runtime hub
-- `agents/workflows/README.md`
-  - workflow catalog と routing guide の入口
-- `ROOT_AGENTS.md`
-- `agents/`
-- `.agents/skills/`
-- `.codex/agents/`
-- `tools/`
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `CONTAINER_OPERATIONS.md`
-- `documents/github-first-module-and-devcontainer-policy.md`
-- `documents/agent-canon-github-remote.md`
-- `documents/agent-canon-update-route.md`
-- `documents/agent-canon-submodule-rollback.md`
-- `documents/derived-repo-bootstrap-runbook.md`
-- `documents/mcp-preflight-and-alternate route-policy.md`
-- `documents/issue-label-taxonomy.md`
-- `documents/prompt-skill-evaluation-checklist.md`
-- `documents/template-github-remote.md`
-- `documents/runtime-profiles-and-check-matrix.md`
-- `documents/template-agent-canon-audit-resolution.md`
-- `agents/workflows/agent-canon-pr-workflow.md`
-- `documents/agent-canon-subtree-migration.md`
-  - legacy vendoring compatibility appendix
+この README は最初の読者ラダーだけを持ちます。詳細な catalog や
+tool / skill の個別一覧は、それぞれの hub と machine-readable source に戻します。
+
+| 目的 | 次に読む入口 | そこで決めること |
+| --- | --- | --- |
+| 設計思想を確認する | `PHILOSOPHY.md` | AgentCanon が守る抽象責務と安定原則 |
+| 文書の所在を探す | `documents/README.md` | policy、runtime、tool docs、template contract の責務 owner |
+| agent workflow を選ぶ | `agents/README.md` | workflow、skill、subagent、runtime entrypoint の入口 |
+| workflow family を選ぶ | `agents/workflows/README.md` | task family、stage、review route |
+| shared surface を修復する | `documents/SHARED_RUNTIME_SURFACES.md` | root view、symlink/copy、submodule source の扱い |
+| AgentCanon 更新を進める | `documents/agent-canon-update-route.md` | parent pin、AgentCanon branch / PR、rollback への分岐 |
+| runtime profile と validation を選ぶ | `documents/runtime-profiles-and-check-matrix.md` | changed path と risk class から実行 gate を選ぶ |
+| shared tool を使う | `tools/README.md` | root `tools/` view から呼ぶ実行入口 |
+
+読み進めるときは、この表から 1 行だけ選びます。複数行を横断する必要が出た場合は、
+その理由を run bundle、issue、または PR body に残します。
 
 ## OpenAI / Codex Source Route
 

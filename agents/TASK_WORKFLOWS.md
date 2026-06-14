@@ -62,6 +62,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - Initial Intake Wave は初期 wave の責務分割であり、同時起動数の cap ではありません。独立 workstream が複数ある場合は、workstream ごとに stage owner と vertical dynamic wave を切り、すべての role を flat な parent-owned first wave に詰め込みません。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
+- role family と同一 role 複数 instance の source schema は `agents/task_catalog.yaml` の `workflow_families[].role_topology` です。`role` は behavior contract、実行単位は `role_type+instance_id` とし、same-role read-only instance は input packet / review focus が異なる場合、same-role write-capable instance は disjoint write scope と parent integration order がある場合だけ同一 wave に置けます。`runtime_max_threads` は cap であり role cardinality の source ではありません。
 - Mid-task user additions are recorded first with `workflow_monitor.py --mid-task-user-input`; do not rely on prose-only routing or chat reuse decisions.
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
@@ -75,6 +76,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 原因考察、コード改善、修正箇所選定、複数候補比較が必要な task では `agents/workflows/hypothesis-validation-workflow.md` を overlay とし、code dependency scan と header dependency graph を別々に取得してから仮説、expected mechanism、candidate comparison、反証条件、support evidence、fix surface 妥当性を固定します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 詳細設計には `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` を必ず含め、worker が確認する抽象責務と、読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
+- 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` として残します。implementation surface route、responsibility search、reuse survey、stale surface scan、dependency scope、validation route が揃うまで、parent 直編集や write-capable subagent handoff へ進みません
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
@@ -230,6 +232,7 @@ spawn budget ルール:
 - write-capable subagent の上限は family ごとの `max_write_subagents`、parent-managed write-scope ledger、integration order、review gate で縛ります
 - 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
+- fresh subagent には `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を渡します。subagent が launch 間で文脈を累積しないことを前提に、objective、request clauses、state snapshot、read-before-work paths、compact artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を capsule に詰め、full transcript や repo root 全体を context として渡しません
 - active task の途中で user が追加指示を出した場合は、parent がまず `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類します。same-task delta は `schedule.md` Agent Wave Ledger と `workflow_monitoring.md` に checkpoint を足し、updated packet path を渡したうえで current run-local subagent へ再配送できます。scope、allowed paths、owner、review gate が変わる場合は既存 agent に継ぎ足さず、spawn budget 内の fresh follow-up wave にし、fresh wave evidence を closeout に残します。new task は fresh run bundle と fresh subagents に切り替え、current run には fresh run bundle evidence だけを残します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 

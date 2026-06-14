@@ -40,6 +40,13 @@ trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
 PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
+if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
+  PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+else
+  PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
+fi
+PR_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${PR_AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
+mkdir -p "${PR_HOOK_ARCHIVE_DIR}"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"
@@ -61,9 +68,11 @@ run_direct_agent_checks() {
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
   python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+    python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+    python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
 }
 
@@ -177,8 +186,10 @@ run_standalone_static_gate_ci() {
   git fetch origin "${BASE_REF}" --depth=1 || true
   python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
   python3 tools/agent_tools/issue_sync.py
-  python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
-  python3 tools/agent_tools/eval_accumulation_check.py
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+    python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+    python3 tools/agent_tools/eval_accumulation_check.py
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
   python3 tools/agent_tools/check_convention_compliance.py

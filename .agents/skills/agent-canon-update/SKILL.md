@@ -40,6 +40,11 @@ bash tools/update_agent_canon.sh merge-main-into-current
 git -C vendor/agent-canon push origin HEAD
 ```
 
+   Reuse the current AgentCanon source branch / PR when it already owns the
+   shared-canon work. Do not create a fresh branch for a small follow-up,
+   mid-task user instruction, dirty-state avoidance, or checklist addendum.
+   Record a reason before creating any new branch.
+
 1. After a safe update or PR merge, repair and verify root views:
 
 ```bash
@@ -55,7 +60,8 @@ python3 tools/agent_tools/agent_canon_update_todos.py plan --write
 ```
 
 1. Use `$agent-update-branch` only for parent-repo `canon-pin` update branches.
-   AgentCanon source edits use a standalone AgentCanon branch and PR.
+   AgentCanon source edits use a standalone AgentCanon branch and PR. Reuse the
+   current parent branch if it already owns the same pin/update lane.
 1. Close out with update route, dirty-surface classification, submodule pin or
    AgentCanon commit, PR URL if any, root-view check, TODO status, and selected
    validation evidence.

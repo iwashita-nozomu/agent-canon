@@ -3,6 +3,7 @@
 # responsibility Searches AgentCanon text surfaces and expands dependency-aware context.
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md operator guide for shared tools
+# upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tests/agent_tools/test_vector_search.py regression tests
 # @dependency-end
 """Search repo text surfaces with a lightweight TF-IDF vector model."""
@@ -20,6 +21,8 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+from tool_path_policy import is_retired_legacy_tool_path
 
 DEFAULT_SURFACES = (
     "tools",
@@ -428,6 +431,8 @@ def is_indexable(
     relative = relative_path(root, path)
     parts = set(Path(relative).parts)
     if parts & excluded_parts:
+        return False
+    if is_retired_legacy_tool_path(relative):
         return False
     return not matches_exclude(relative, excludes)
 

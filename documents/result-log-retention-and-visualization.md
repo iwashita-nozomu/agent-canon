@@ -33,6 +33,10 @@ JSONL and accumulated eval archive branch policy belong to
   `documents/runtime-log-archive.md`.
 - `experiments/<topic>/result/<run-id>/` stores raw experiment outputs, JSONL,
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
+- `experiments/<topic>/result/<run-id>/logs/` stores per-run stdout/stderr,
+  tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
+- `experiments/<topic>/notebooks/` stores Jupyter notebooks used to visualize
+  run artifacts and regenerate figures/tables from `result/<run-id>/`.
 - `experiments/report/<run-id>.md` stores the human-readable experiment report.
 - `tests/logs/[YYYYMMDD]-[HHMMSS]/` stores test-run raw logs, JSONL extracts,
   and exit-code records.
@@ -59,6 +63,9 @@ point to a `summary.json`, `*.jsonl`, or reader-facing Markdown summary.
 
 - Prefer text-first summaries for closeout gates, then link plots or HTML.
 - Store graph/plot outputs beside the data that generated them.
+- For experiment visualization, keep the Jupyter notebook under
+  `experiments/<topic>/notebooks/` and read data from `result/<run-id>/`.
+  Do not use notebooks as the formal run launcher or config source of truth.
 - Use deterministic formats (`svg`, `png`, `html`, `json`) and record the
   generation command in the manifest.
 - For dependency and structural graphs, keep the source edges or DOT input with

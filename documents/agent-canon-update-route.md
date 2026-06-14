@@ -24,6 +24,13 @@ does not erase local AgentCanon source changes. Safe dirty checkout state is
 preserved while AgentCanon `main` is merged, root views are repaired and
 checked, and local source commits route to an AgentCanon PR.
 
+The update route reuses existing branch / PR ownership by default. If the
+current AgentCanon source branch or parent update branch already owns the same
+surface, continue it. Do not create a branch just to start fresh, avoid dirty
+state, split a small addendum, or handle an additional user instruction. A new
+branch requires `branch_creation_reason=<reason>` in run evidence or the PR body
+before it is created.
+
 ## Command Responsibilities
 
 | Command | Responsibility |
@@ -44,7 +51,9 @@ checked, and local source commits route to an AgentCanon PR.
    dirt, merges GitHub main into the current named branch, restores the dirt,
    repairs/checks root views, and reports the AgentCanon branch/PR next action.
 1. `vendor/agent-canon` has local source commits: merge GitHub main into that
-   branch, push the branch, and open an AgentCanon PR.
+   branch, push the existing branch, and open or update the AgentCanon PR. Use a
+   new branch only when the existing branch / PR cannot safely continue, and
+   record the reason first.
 1. Root view drift only: run `link-root` and `check`.
 1. AgentCanon update TODO pending: treat it as first work, then rerun latest.
 1. Legacy subtree/snapshot repos: compatibility appendix only.

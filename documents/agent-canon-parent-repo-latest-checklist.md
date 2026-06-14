@@ -47,6 +47,12 @@ git status --short --branch --untracked-files=all
 git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/null || true
 ```
 
+1. Reuse the current branch / PR when it already owns the same update lane or
+   shared-canon follow-up. Do not create a new branch for a fresh start,
+   dirty-state avoidance, small addendum, or mid-task user instruction. If a new
+   branch is required, record `branch_creation_reason=<reason>` and why the
+   existing branch cannot continue before creating it.
+
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
 
 - safe dirty `vendor/agent-canon/` checkout state is preserved, AgentCanon `main` is merged into the current named branch, the dirty state is restored, root views are repaired, and shared-surface drift is checked.

@@ -132,6 +132,10 @@ flowchart TB
 `local_llm_prose_ir` metadata です。corpus hint と既存文書からの DSL seed は
 固定 keyword 辞書ではなく、この LocalLLM task から入ります。LocalLLM output は seed であり、
 graph DB の source-truth record ではありません。
+`extract-prose-ir` は document / term fragment ごとの part prompt を持ち、
+`llama-cli` が使える場合は part を `--local-llm-jobs` 由来の bounded parallelism で実行します。
+graph tool は part order を変更せず、LocalLLM IR の `parts[]` と `llm_execution` を
+metadata として保存します。
 
 この LocalLLM output と graph DB の境界に加えて、同じ LocalLLM IR の `analysis_intents[]` は、本文が実験計画を述べているのか、
 profile 語彙を説明しているだけなのかを区別します。graph 側はこの intent status を読み、
@@ -167,6 +171,7 @@ python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-c
 ```bash
 python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md \
   --prompt-file reports/agents/<run-id>/user_request_contract.md \
+  --local-llm-jobs 4 \
   --stats-out reports/agents/<run-id>/prose_ingest.stats.json
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
 python3 tools/agent_tools/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile all \
