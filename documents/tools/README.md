@@ -143,6 +143,9 @@ second command manual.
     入口です。`route-implementation-surface` は実装前に primary owner と
     required pre-edit checks を返します。`search`、`build-index`、`eval`
     もこの CLI surface から呼び、Python 実装は互換 engine として残します。
+    `extract-prose-ir` は document / term part prompt を作り、`llama-cli` が
+    利用可能な場合は `--llm-jobs` で bounded parallel に実行してから
+    deterministic prose IR を出します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`

@@ -204,6 +204,9 @@ an environment error when llama.cpp is unavailable.
 `agent-canon local-llm route-skill` is the deterministic prompt-to-skill
 router. It returns compatibility `SKILLS`, current-stage `ACTIVE_SKILLS`, and
 later-stage `DEFERRED_SKILLS` so agents do not predeclare every skill family.
+`agent-canon local-llm extract-prose-ir` partitions documents and terms into
+part prompts and, when `llama-cli` is available, runs those parts with bounded
+parallelism controlled by `--llm-jobs` before writing deterministic prose IR.
 `agent-canon local-llm build-index` builds the repo-local ignored semantic-card
 index consumed by the LLM provider under `.agent-canon/search-index/`.
 `agent-canon local-llm eval` validates the configured single-file local LLM

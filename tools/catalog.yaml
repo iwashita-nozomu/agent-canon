@@ -675,7 +675,7 @@ entries:
       - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: agent-canon-local-llm
-    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, deterministic skill routing, prose IR extraction, local LLM search, index, and eval routing.
+    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, deterministic skill routing, bounded-parallel prose IR extraction, local LLM search, index, and eval routing.
     path: rust/agent-canon/src/local_llm.rs
     family: root
     role: runner

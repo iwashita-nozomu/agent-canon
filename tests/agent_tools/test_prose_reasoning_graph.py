@@ -25,6 +25,7 @@ from tools.agent_tools import prose_reasoning_graph as prose_graph
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
+TEST_LOCAL_LLM_ENV = {"AGENT_CANON_LLAMA_CLI": str(PROJECT_ROOT / ".missing-test-llama-cli")}
 
 
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
@@ -35,6 +36,7 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, **TEST_LOCAL_LLM_ENV},
     )
 
 
@@ -46,7 +48,7 @@ def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedP
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, **env},
+        env={**os.environ, **TEST_LOCAL_LLM_ENV, **env},
     )
 
 
@@ -1400,6 +1402,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 "1",
                 "--local-llm-term-batch-size",
                 "1",
+                "--local-llm-jobs",
+                "2",
             )
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_INGEST_SET=pass", ingest.stdout)
@@ -1444,6 +1448,59 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(local_ir["document_count"], 2)
             self.assertEqual(local_ir["term_count"], 2)
             self.assertEqual(local_ir["part_count"], 4)
+            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
+            self.assertEqual(llm_execution["status"], "skipped_llama_cli_not_found")
+            self.assertEqual(llm_execution["jobs"], 2)
+
+    def test_ingest_set_runs_fake_llama_for_local_llm_parts(self) -> None:
+        """Graph ingestion should pass LocalLLM parts through a runnable llama CLI."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            fake_llama = root / "llama-cli"
+            fake_llama.write_text(
+                "#!/bin/sh\n"
+                "printf '{\"schema\":\"agent_canon.local_llm.prose_ir.v1\",\"ok\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            fake_llama.chmod(0o755)
+            first = root / "first.md"
+            second = root / "second.md"
+            db = root / "graph.sqlite"
+            first.write_text("# First\n\nAlpha evidence.", encoding="utf-8")
+            second.write_text("# Second\n\nBeta evidence.", encoding="utf-8")
+
+            ingest = run_graph_with_env(
+                {"AGENT_CANON_LLAMA_CLI": str(fake_llama)},
+                "ingest-set",
+                str(root),
+                "--db",
+                str(db),
+                "--term",
+                "evidence",
+                "--local-llm-document-batch-size",
+                "1",
+                "--local-llm-term-batch-size",
+                "1",
+                "--local-llm-jobs",
+                "2",
+            )
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+
+            with sqlite3.connect(db) as connection:
+                row = connection.execute(
+                    "SELECT value FROM metadata WHERE key = ?",
+                    ("local_llm_prose_ir",),
+                ).fetchone()
+
+            self.assertIsNotNone(row)
+            local_ir = cast(dict[str, object], json.loads(str(row[0])))
+            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
+            self.assertEqual(llm_execution["status"], "completed")
+            self.assertEqual(llm_execution["jobs"], 2)
+            parts = cast(list[dict[str, object]], local_ir["parts"])
+            self.assertEqual([part["part_id"] for part in parts], ["part:d1:t1", "part:d2:t1"])
+            self.assertTrue(all(part["llm_status"] == "pass" for part in parts))
+            self.assertTrue(all(cast(dict[str, object], part["llm_output"])["ok"] is True for part in parts))
 
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""
