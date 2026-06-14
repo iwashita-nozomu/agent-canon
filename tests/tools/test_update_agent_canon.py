@@ -1755,7 +1755,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=True,
             )
             subprocess.run(
-                ["git", "add", "AGENTS.md", ".github", "documents/README.md", "goal.md"],
+                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md", "goal.md"],
                 cwd=repo,
                 check=True,
             )
@@ -1873,7 +1873,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=True,
             )
             subprocess.run(
-                ["git", "add", "AGENTS.md", ".github", "documents/README.md", "goal.md"],
+                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md", "goal.md"],
                 cwd=repo,
                 check=True,
             )
