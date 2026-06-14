@@ -1047,6 +1047,11 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
                 vec!["path", "layout"],
                 vec!["path", "responsibility"],
                 vec!["source", "ownership"],
+                vec!["構造", "レビュー"],
+                vec!["構造", "review"],
+                vec!["structure", "review"],
+                vec!["structural", "review"],
+                vec!["構造", "スキル", "弱"],
                 vec!["構成", "考え直"],
                 vec!["~/.codex"],
                 vec![".codex", "config"],
@@ -2999,6 +3004,19 @@ mod tests {
     #[test]
     fn skill_route_matches_repo_refactor_and_personal_codex_boundary() {
         let prompt = "レポのリファクタスキルを定義して ~/.codex も見て修正して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_structure_review_weakness() {
+        let prompt = "構造のレビュースキルが弱いので見直して";
         let decision = decide_skill_route(prompt, "repo-changing");
 
         assert!(decision
