@@ -1162,6 +1162,26 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
             ],
         ),
         (
+            "test-design",
+            "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+            vec![
+                vec!["test-design"],
+                vec!["test", "design"],
+                vec!["テスト", "設計"],
+                vec!["不要", "テスト"],
+                vec!["不要", "数値テスト"],
+                vec!["数値テスト"],
+                vec!["数値", "テスト"],
+                vec!["numerical", "test"],
+                vec!["numeric", "test"],
+                vec!["unnecessary", "test"],
+                vec!["heavy", "test"],
+                vec!["brittle", "test"],
+                vec!["tolerance", "test"],
+                vec!["seed", "test"],
+            ],
+        ),
+        (
             "md-style-check",
             "Markdown style, links, headings, or docs lint are in scope",
             vec![
@@ -1306,6 +1326,7 @@ fn is_current_stage_skill(skill: &str) -> bool {
             | "agent-log-analysis"
             | "structure-planning"
             | "structure-refactor"
+            | "test-design"
     )
 }
 
@@ -3249,6 +3270,15 @@ mod tests {
         assert!(decision
             .active_skills
             .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_unneeded_numerical_tests() {
+        let prompt = "不要な数値テストを入れるのをやめさせてください";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
     }
 
     #[test]

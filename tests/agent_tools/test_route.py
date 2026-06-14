@@ -333,6 +333,54 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("pr-processing", decision["skills"])
         self.assertIn("pr-processing", decision["matched_skills"])
 
+    def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
+        """Unneeded numerical-test complaints should activate test-design routing."""
+        prompt = "不要な数値テストを入れるのをやめさせてください"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        self.assertIn("test-design", python_decision["matched_skills"])
+        self.assertIn("test-design", python_decision["active_skills"])
+        self.assertEqual(python_decision["skills"], rust_decision["skills"])
+        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
+
+    def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(self) -> None:
+        """English unneeded numerical-test prompts should match the Rust router."""
+        prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        self.assertIn("test-design", python_decision["matched_skills"])
+        self.assertIn("test-design", python_decision["active_skills"])
+        self.assertEqual(python_decision["skills"], rust_decision["skills"])
+        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
+
     def test_prompt_skill_route_matches_rust_harness(self) -> None:
         """Python compatibility prompt routing should match the Rust skill router."""
         prompt = (

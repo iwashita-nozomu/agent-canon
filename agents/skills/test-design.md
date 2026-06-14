@@ -34,12 +34,17 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - case が抽象論ではなく、target path、入力、期待結果まで具体化されている
 - brittle coupling finding がある場合、残す理由または修正方針が書かれている
 - 既存 test style、fixture、naming へどう寄せるかが書かれている
+- 数値テストを提案する場合は numerical trigger、non-numerical alternative、oracle、
+  budget があり、提案しない場合は省略理由と代替 observable behavior が書かれている
 
 ## Mandatory Checklist
 
 - changed code path と関連 test path を固定している
 - `tools/bin/agent-canon test-design check <related-test-paths...>` を先に走らせ、`fix-now` / `review` / `design-hint` を test plan に反映している
 - behavior contract、observation level、oracle、input space、adequacy evidence を分けている
+- 数値、randomized、tolerance、solver、convergence、residual、benchmark、
+  experiment-style test を提案する前に `documents/coding-conventions-testing.md` の
+  数値テスト採用ゲートを適用している
 - malformed input、boundary value、empty / null-ish input、error path、state transition を列挙している
 - 以前壊れたか、再発しやすい regression case を残している
 - expected exception、error message、return shape、state mutation を曖昧にしていない
@@ -54,6 +59,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 1. `fix-now` finding は先に修正対象へ入れ、`review` / `design-hint` は behavior contract と照合して残すか直すかを決めます。
 1. branch、error path、parsing path、state mutation point を静的に洗います。
 1. 各 case の `Behavior Contract / Observation Level / Oracle / Input Space / Adequacy Evidence` を固定します。
+1. 数値テスト候補は `Numerical Trigger / Non-Numerical Alternative / Oracle / Budget` を固定し、trigger がない場合は省略理由と非数値の代替 test を書きます。
 1. nasty case を `Target / Case / Why It Is Nasty / Expected Outcome / Oracle` で列挙します。
 1. regression として残すべき case を分けます。
 1. worker がどこへ test を実装すべきかを `Implementation Notes` に書きます。
@@ -67,3 +73,5 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - coverage だけを adequacy とみなし、assertion が mutant や regressions を捕まえるかを見ない
 - 既存 test style を無視して別流儀の test を生やす
 - bug fix を一回限りの手動確認で済ませて durable test に変えない
+- docs、routing、metadata、string parsing、configuration、structure refactor など
+  数値契約を持たない変更に、数値 smoke、large random case、benchmark 風 test を生やす
