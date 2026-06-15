@@ -174,6 +174,9 @@ upstream design README.md memory surface index
 - 2026-06-15 | Reader-facing repository documents should use positive responsibility and contract phrasing.
   - source: chat
 
+- 2026-06-15 | Temporary code should be explicitly marked as temporary when created, and removed before closeout once it has served its purpose.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
