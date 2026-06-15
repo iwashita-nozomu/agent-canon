@@ -162,15 +162,15 @@ skill_families:
     canonical_doc: agents/skills/literature-survey.md
     shim: .agents/skills/literature-survey/SKILL.md
   - id: formal-proof-workflow
-    purpose: Convert natural-language mathematical claims or Python AST-derived implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
+    purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .agents/skills/formal-proof-workflow/SKILL.md
   - id: algorithm-proof-exploration
-    purpose: Explore algorithm choices under proof obligations by building Algorithm Expansion IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
+    purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
     shim: .agents/skills/algorithm-proof-exploration/SKILL.md
   - id: algorithm-flowchart
-    purpose: Render AST-derived Algorithm Expansion IR, LemmaGraph, and proof_status overlays into Mermaid block charts for algorithm/proof-state review.
+    purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
     shim: .agents/skills/algorithm-flowchart/SKILL.md
   - id: research-workflow

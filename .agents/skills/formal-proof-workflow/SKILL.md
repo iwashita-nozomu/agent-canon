@@ -1,6 +1,6 @@
 ---
 name: formal-proof-workflow
-description: Use when natural-language mathematical claims, Python AST-derived implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
+description: Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
 ---
 
 <!--
@@ -11,11 +11,8 @@ upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guid
 upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
-upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
-upstream implementation ../../../tools/agent_tools/algorithm_flowchart.py renders implementation/proof-state Mermaid diagrams
-upstream implementation ../../../tools/agent_tools/ir_graph_correspondence.py checks IR equation facts against lemma graphs
-upstream implementation ../../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers IR facts into Lean route artifacts
-upstream implementation ../../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts
+upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
+upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
 -->
@@ -27,33 +24,58 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. For algorithm-derived claims that require proof-path search, algorithm
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
-1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations; for implementation-derived claims, use `--python-symbol path.py::qualname` to extract side-effect-free AST provenance first.
+1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, use the JIT-canonical public root consumed by the theorem.
+1. For implementation-derived algorithm proofs, always start from the whole
+   target theorem over the JIT-canonical public entrypoint, normally the
+   `main(problem, InitializeConfig, ...)` or equivalent run function and its
+   returned `Answer` / `State` / `Info` specification. Do not begin from a
+   helper lemma, inner solver claim, loop-control fact, residual component, or
+   hand-selected local theorem unless it is selected by recursively decomposing
+   that top-level main theorem.
+1. Build the theorem statement from the public root's static argument schema
+   and return schema. The target theorem must talk about `let out := main
+   problem config` and its returned `Answer` / `State` / `Info` fields, or
+   generated high-level projections of those fields. Do not make low-level
+   operation ids, bindings, regions, frames, trace rows, or the internal state
+   of `generatedMainFuel` the theorem surface. Low-level generated evidence is
+   used only to prove that those public projections follow the implementation
+   path.
+1. Keep proof-relevant public inputs in the JIT root signature. A proof root may
+   take real runtime inputs such as `Problem`, `InitializeConfig`, and an
+   actual runtime solve config when the API has one, but it must not add
+   proof-only arguments, trace handles, op ids, binding ids, or proof-only
+   state/config. If a theorem needs a value, expose it through the public return
+   schema or reconstruct it in the theorem graph from the implementation path.
 1. Treat the terminal goal as either proving the target claim or proving that
    the target cannot be established from the current assumptions and
    implementation path. `blocked`, `not_run`, and `unverified` are intermediate
    states, not completion.
 1. For algorithm-derived claims, consume the
    `$algorithm-proof-exploration` artifact when available. If it does not
-   exist yet, mechanically and recursively expand the root algorithm into an
-   Algorithm Expansion IR before selecting local proof obligations. The IR is
-   not a proof; it is the intermediate representation used to choose only the
-   local theorems needed by the final target.
-1. Build that IR with `python3 tools/agent_tools/algorithm_expansion_ir.py --python-symbol <path.py::qualname> --target-theorem <target> --format json|markdown`, and retain `proof_algorithm_ir`, `proof_goal_directed_slice`, and `proof_selected_local_obligations` in the proof artifact.
-   Do not add a caller-chosen recursion-depth knob to ordinary proof runs; the
-   IR expands to saturation over AST-resolved calls and stops by already-seen
-   `path.py::qualname` keys.
-1. For implementation algebra, use IR `code_facts` before writing prose-only
-   claims. Reduced-KKT equations, step updates, floor-preserving formulas,
-   initialization-path facts, and solver defaults should be represented as
-   code-derived facts and connected to lemma graph nodes before they are cited
-   in a proof status table.
-   For checker-facing implementation path models, generate Lean route artifacts
-   from the current Algorithm Expansion IR with
-   `tools/bin/agent-canon algorithm-ir-to-lean`. Do not introduce a
-   hand-written algorithm-specific operation record as the proof entrypoint
-   when IR `expression_ast` and `control_facts` can supply the evaluation order.
-   Structure access must be handled by the post-IR Rust projection pass, while
-   theorem-specific typed interpretations stay in proof theme files.
+   exist yet, lower the public root into JIT-canonical IR before selecting
+   local proof obligations. The IR is not a proof; it records what the JIT root
+   computes.
+1. Build that IR with
+   `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`.
+   Retain the StableHLO hash, thin operational ops, backend phase trace, and
+   coverage status in the proof artifact. Do not add recursion-depth knobs or
+   hand-written operation records.
+1. Generate checker-facing Lean evidence definitions from the current
+   JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`. Keep this
+   generated evidence layer separate from the theorem graph. The
+   generated layer owns root identity, StableHLO hash, operational op kinds,
+   dtype coverage, and backend trace coverage. Mathematical propositions such
+   as residual decrease, KKT regularity, direction quality, and finite
+   termination belong only in the theorem graph.
+   Require the generated layer or theorem-graph projection layer to expose the
+   public root argument tree, return tree, return leaf indexes, and high-level
+   projection functions for theorem-visible return fields. If these projections
+   are absent, fix extraction or the `main` return shape before proving local
+   low-level facts.
+1. Backend arithmetic is generated trace evidence, not an external backend
+   axiom. If backend lowering stops before LLVM or executable code, record the
+   last successful backend phase as a coverage gap and decide whether to fix
+   the algorithm, the lowering path, or the backend configuration.
    For target-critical code shape, do not leave implementation-local functions
    as arbitrary proof axioms merely because the first trace generator is shallow.
    Residual bundles, next-state construction, step-length formulas, KKT
@@ -75,29 +97,46 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    implementation uses finite precision, prove arithmetic claims over the
    rounded value model and `decode` relation consumed by the theorem, not over a
    field abstraction that the runtime values do not satisfy.
-   For target-critical assignment and return equations, run
-   `python3 tools/agent_tools/ir_graph_correspondence.py` on the current
-   Algorithm Expansion IR and LemmaGraph before writing or adopting a proof
-   fragment. The checker must show that the equation fact has a code-fact node,
-   a `lemma_consumes_code_fact` edge, and target-chain coverage; use
-   `--require-proof-status-adoption` when the theorem claims to consume that
-   intermediate formula.
-   For reduced KKT / block-system / iterative-solver-chain equation prose, run
-   `python3 tools/agent_tools/kkt_equation_section.py` or the relevant equation
-   section generator against the current Algorithm Expansion IR files. If required evidence is
-   missing, fix IR extraction or implementation shape before writing prose.
-   The generated section must substitute displayed implementation equations
-   from matched IR `code_facts[*].expression` entries. Do not mirror those
-   runtime formulas by hand in the proof note; link to or regenerate the
-   generated section instead.
-   After extraction, hand-translate theorem-critical equations into candidate
-   typed Lean propositions and bridge theorems. IR facts identify the code
-   equations; Lean propositions state possible mathematical meanings. Generate
-   multiple bridge candidates at the abstraction level required by the target
-   theorem, check or refute them when possible, and classify each candidate
-   before choosing the route used by the final theorem. Do not leave
-   theorem-critical returned values unconstrained when the current IR contains
-   equations that determine or bound them.
+   For iterative numerical convergence claims, keep the whole-root public
+   return theorem as the top-level target. The implemented recurrence and
+   stopping scalar, such as `z_next = Step_impl(Problem, Config, z)` and
+   `R_impl(Problem, Config, z)`, are local lemmas selected by decomposing that
+   public-return theorem. Prove contraction, ranking, finite reachability, or
+   stopping soundness for that implemented map only after the target theorem has
+   been projected from `main`'s static return schema. Do not add runtime proof
+   checks, proof-only `Info` fields, diagnostic gates, or proof-only
+   config/state to make a theorem true. If the current map is checker-refuted or
+   insufficient, return to `$algorithm-proof-exploration` to replace the
+   initializer, update rule, line search, inner-solver policy, regularization,
+   Phase I, or globalization route with a provable numerical mechanism, then
+   regenerate IR and retry the theorem.
+   For target-critical equations, start from the theorem proposition and trace
+   to the generated JIT-canonical Lean evidence definitions and StableHLO/backend trace
+   records it actually consumes. Do not hand-maintain parallel runtime
+   equations in proof notes. If the theorem needs a formula not present in the
+   generated implementation layer, improve the extractor or change the
+   implementation shape before adopting the theorem.
+   After extraction, propositionize theorem-critical equations from the target
+   proposition, not from a flat op list. First select the target theorem/profile
+   in the theorem graph to bound the search surface. The proposition must be
+   stated over public return projections, then the substitution tree follows
+   `Answer` / `State` / `Info` field paths to static return leaf indexes before
+   it descends into local assignments and callee return equations. Generate
+   bridge candidates only from facts in that projection-rooted tree.
+   Runtime observation, diagnostic, or logging paths are not globally excluded:
+   if `P` is about their validity, they are the tree root; if `P` is about a
+   returned solver value and those paths are not assigned into that value, they
+   remain execution evidence outside the substitution tree. Facts outside the
+   selected theorem/profile, outside the proposition tree, or marked
+   `substitution_eligible=false` are not first-class substitution
+   propositions for `P`. Hand-translate target-tree equations into typed Lean
+   propositions and bridge theorems. IR facts identify code equations; Lean
+   propositions state possible mathematical meanings. Generate multiple bridge
+   candidates at the abstraction level required by the target theorem, check or
+   refute them when possible, and classify each candidate before choosing the
+   route used by the final theorem. Do not leave theorem-critical returned
+   values unconstrained when the current IR contains equations that determine
+   or bound them.
    Candidate selection is recursive and target-driven: state the final
    proposition `P`, run the appropriate proof search (`aesop?`, `aesop`,
    `simp?`, `exact?`, or the Lean capability route), inspect the unsolved goals
@@ -105,11 +144,22 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    prove/refute them from generated Lean functions and IR facts, then rerun the
    proof of `P`. A flat candidate inventory is only input to this loop, not the
    proof workflow outcome.
+   Treat the theorem graph as a directed proposition graph:
+   proposition nodes point to the propositions they consume.  For
+   implementation-derived proofs, every terminal leaf on the target chain must
+   be rooted in exactly one allowed origin class: a code function/code fact, an
+   analyzed top-level function argument such as `Problem`, `InitializeConfig`, or
+   `SolveConfig`, a backend/environment profile, or an explicit external library
+   axiom. Run the theorem graph checker in leaf-origin mode before claiming a
+   code-aligned proof. If a leaf is free prose, an unrooted helper theorem, or a
+   proof-only assumption, remove that path or reconnect it to code/argument/
+   backend evidence.
 1. After any algorithm update that changes initialization, cold-start,
-   Phase-I, basin-entry, or selected-scope-entry logic, regenerate the Algorithm
-   Expansion IR, lemma graphs, and proof-status overlay before reporting back.
+   Phase-I, basin-entry, or selected-scope-entry logic, regenerate the
+   JIT-canonical IR, generated Lean operational-program evidence, theorem
+   graphs, and proof-status overlay before reporting back.
    Discharge every initialization fact that the code now exposes as
-   `code_facts` first: selected base point, epigraph point, slack/multiplier
+   `generated implementation leaves` first: selected base point, epigraph point, slack/multiplier
    floors, initial residuals, and initial child-solver state. Do not return
    those as user-owned blockers when they can be extracted from the current
    implementation.
@@ -125,14 +175,22 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    reachability, and certificate soundness are derived lemmas, not assumptions.
    Record this premise under `operational_assumptions`, separate from
    `open_frontier` and `external_assumptions`.
-1. Keep backend / dtype / IREE / finite-precision semantics as Algorithm Expansion IR `backend_assumptions` and Lemma Dependency Graph overlay variables. Do not add proof-only backend fields to production `InitializeConfig` or algorithm state.
+1. Keep backend / dtype / IREE / finite-precision semantics as JIT-canonical IR `backend_trace` and theorem graph overlay variables. Do not add proof-only backend fields to production `InitializeConfig` or algorithm state.
    If the compiler/runtime semantics are outside the current proof theme, use an
-   explicit external backend axiom in `lean/lib` or the proof-theme Lean files
+   explicit generated backend trace coverage in `lean/lib` or the proof-theme Lean files
    instead of making IREE lowering, fast-math, denormal, or min/max semantics a
    blocker for the algorithm proof.
+   Bridge, connection, profile binding, and witness instantiation rows are
+   recursive proof frontier, not user-facing stopping points. If such a row
+   blocks a caller-side lemma or target theorem edge, continue by expanding the
+   code fact, generated Lean function, theorem graph, `lean/lib` profile, or
+   backend/source packet that could bind it. Return only after the remaining
+   gap is checked as a production code / algorithm issue, a top-level
+   `Problem` / config / solve-input issue, or a backend/runtime architecture
+   boundary that the current repository and tools cannot advance.
 1. Keep runtime `Info` for runtime diagnostics, convergence checks, and logs
    only. Do not add proof-only witness fields to `Info`. Values needed by a
-   proof should be reconstructed by the proof extractor or lemma graph from
+   proof should be reconstructed by the proof extractor or theorem graph from
    `Problem + InitializeConfig + State_k` and consumed through upper-bound
    lemmas such as `runtime_value <= upper_bound <= requested_budget`.
    Per-iteration KKT conditioning measurement is only one validation route;
@@ -162,35 +220,45 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    For optimization problems, "differentiable" refers to the target `Problem`
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
-1. Store checker-facing IR, lemma graphs, profile libraries, and Lean stubs under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `algorithm_expansion_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
-1. Convert Algorithm Expansion IR into a Lemma Dependency Graph with
-   `python3 tools/agent_tools/algorithm_lemma_graph.py --target-profile <profile> --format json|markdown`.
-   Retain `proof_lemma_graph`, `proof_target_chains`, and graph validation
-   evidence before writing proof text. After algorithm changes, regenerate IR,
-   lemma graphs, and proof-status overlays from the current root; do not carry
+1. Store checker-facing IR, theorem graphs, profile libraries, and Lean stubs under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
+1. Build the implementation layer with
+   `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
+   and then
+   `tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean>`.
+   Convert the generated implementation layer into theorem graph overlays with
+   the current theorem-graph tool, not by passing theorem-profile options to
+   `jit_canonical_ir.py`. Retain `proof_lemma_graph`,
+   `proof_target_chains`, and graph validation evidence before writing proof
+   text. After algorithm changes, regenerate IR, generated Lean evidence,
+   theorem graphs, and proof-status overlays from the current root; do not carry
    old IR-backed generated lemma groups forward by fingerprint or prose edits.
 1. If the task asks what iterative algorithm is implemented or where proof
    holes sit on the implementation path, use `$algorithm-flowchart` after IR,
-   LemmaGraph, and proof-status generation. The chart is navigation evidence,
+   theorem graph, and proof-status generation. The chart is navigation evidence,
    not proof completion.
-1. After a proof-status overlay exists, run
-   `python3 tools/agent_tools/ir_graph_correspondence.py --algorithm-ir <ir.json> --lemma-graph <graph.json> --proof-status <proof_status.json>`
-   for the theorem-critical equation slice, especially `step_update`,
-   `reduced_kkt`, `minres_defaults`, and initialization tags. This validates
-   variable-assignment and return-equation correspondence; it is distinct from
-   mathematical proof completion.
+1. After a proof-status overlay exists, run the theorem-graph correspondence
+   checker for the theorem-critical equation slice, especially `step_update`,
+   `reduced_kkt`, `minres_defaults`, and initialization tags. This checker
+   consumes the generated JIT-canonical IR / Lean operational-program evidence
+   and validates variable-assignment and return-equation correspondence; it is
+   distinct from mathematical proof completion. Do not call
+   `jit_canonical_ir.py` with non-existent graph-checking options.
 1. After equation correspondence is valid, run
-   `python3 tools/agent_tools/proof_path_analyzer.py --lemma-graph <graph.json> --proof-status <proof_status.json> --proof-frontier <frontier.md> --adoption-text <proof-note.md>`
+   the theorem graph checker
    before claiming proof-path progress. Treat `validation.valid=true` as
    evidence that the proof path is structurally connected and the remaining
    holes are named; treat `proof_complete=false` as the normal state while open
    witnesses or unprovable-under-assumption rows remain.
-1. Treat the Lemma Dependency Graph as an editable proof-search surface.
+1. Treat the theorem graph as an editable proof-search surface.
    Keep IR-backed obligation nodes synchronized only by regenerating IR after
    source-program changes; add agent/human auxiliary lemmas, bridge edges,
    proof attempts, adoption decisions, and missing frontier as graph overlay.
    A reader-facing `verified` claim requires a checker-backed certified
    subgraph, not merely a candidate proof path.
+   The certified subgraph must also pass the leaf-origin check.  A proof path
+   whose terminal leaves do not resolve to code, target arguments, backend
+   environment, or external-library axioms is not a code verification path, even
+   if the intermediate Lean theorem typechecks.
 1. Propositionize the full target-facing algorithm route before returning an
    algorithmic blocker. For an iterative solver this means, at minimum, the
    stopping scalar, state update, step-length or acceptance selection,
@@ -212,17 +280,20 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    Bare `unverified` may describe a raw generated node or stub, but it is not a
    completed frontier outcome.
 1. For every unverified frontier node, try these routes in order:
-   (a) prove the exact implementation algebra or certificate projection;
+   (a) prove the exact implementation algebra or existing algorithm-output
+   projection;
    (b) prove a conditional bridge theorem with explicit theorem variables;
    (c) refute an over-strong route with a concrete counterexample/model; or
    (d) prove that the current assumptions do not entail the target and name the
    missing witness. Do not leave a node as merely "hard" when a weaker terminal
    result can be checked.
 1. When a node remains open, record the algorithm change that would make it
-   provable: expose a runtime certificate, strengthen an acceptance contract,
-   add a problem-class witness, narrow the theorem, or add a globalization /
-   Phase-I route. Keep this as proof guidance, not as a proof-only production
-   field.
+   provable: replace the current recurrence, initializer, line search,
+   inner-solver policy, regularization, Phase I / globalization route, strengthen
+   an acceptance rule as part of the algorithm, add a top-level problem-class
+   witness, or narrow the theorem. Keep this as proof guidance, not as a reason
+   to add proof-only fields, diagnostic gates, or runtime proof checks to
+   production code.
 1. Before returning a blocker to the user, show that it is frontier-minimal for
    the selected theorem/profile: all earlier target-chain nodes are terminal or
    adopted external assumptions, and the returned row has no smaller open
@@ -260,7 +331,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    smaller named frontier witness that is immediately re-entered into the same
    loop.
 1. "No proof path works" means no path under the current Algorithm Expansion
-   IR, assumption ledger, and adopted external axioms. Support that claim with
+   IR, assumption ledger, and adopted generated backend trace coverage gaps. Support that claim with
    a checker-backed countermodel, independence result, or obligation-gap model;
    failed attempts and "hard" are not outcomes.
 1. If a named witness can be derived from repository code, existing proof
@@ -270,6 +341,12 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    external runs, unavailable tools/authority, or a deliberate external
    semantics axiom; classify that boundary explicitly as `external_assumption`
    or with a strictly smaller `next_witness`.
+1. If the next lemma, bridge, connection, or witness needed by the target chain
+   is already known, do not report it as future work. Generate it, propositionize
+   it, run the checker, and update the proof-status artifact in the same turn.
+   Only return when that witness is verified, refuted, proved unprovable under
+   the current top-level inputs, or reduced to a strictly smaller checked
+   frontier that cannot be derived from local code/tool/library evidence.
 1. Before returning user-facing progress, finish every currently selected
    component proof attempt to a terminal or smaller-frontier state. Each
    component must be `verified`, `refuted`, `unprovable_under_assumptions`, or
@@ -299,6 +376,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    falsifying the target conclusion; use `unprovable_under_assumptions` only
    with a checked independence result or a model / witness showing that the
    assumptions do not entail the target claim.
+1. For implementation-derived claims, a helper-level, component-level,
+   residual-slice, or otherwise partial counterexample is not a user-facing
+   `refuted` result until it is embedded into the top-level public theorem
+   trace.  Before returning or adopting that counterexample, prove a
+   reachability/instantiation theorem showing that the current top-level
+   `Problem` / config / backend assumptions and JIT-canonical `main` or run
+   path can produce the local state, input, model, or trace used by the
+   counterexample, and prove the propagation edge from the local falsified
+   property to the target theorem conclusion.  If either edge is missing,
+   classify the artifact as `local_counterexample_candidate` or
+   `route_rejected_not_top_level_reachable`, keep it in the failed-route
+   overlay, and continue the target-rooted frontier search.  Do not report it
+   as terminal refutation or unprovability.
 1. For a function-level guarantee, separate "not yet derived" from
    "cannot be guaranteed".  If the proof packet says a function cannot
    guarantee a property, formalize the property over that function's
@@ -322,20 +412,26 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Normalize top-level implementation-derived theorem statements to
    `ImplementedTrace -> ProblemWitnesses -> BackendWitnesses -> Convergence`.
    `ImplementedTrace` is an assumption; `Convergence` is the lemma to prove.
-1. For implementation-derived proof traces, run `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims, and fix stale source paths, AST anchors, retained theorem names, and required/forbidden source-token drift first.
+1. Treat connection-level witnesses like function-level witnesses. A missing
+   bridge from solver return to caller units, code fact to theorem variable, or
+   backend profile to finite-precision theorem variable must be recursively
+   expanded before returning. It may be reported only when a checker-backed
+   minimal frontier shows that the remaining item is a code/algorithm change,
+   a target input/config condition, or an generated backend coverage boundary.
+1. For implementation-derived proof traces, run `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims, and fix stale source paths, StableHLO anchors, retained theorem names, and required/forbidden source-token drift first.
 1. If the checker cannot be run, record `proof_status=not_run`, the exact command, and the missing environment or dependency.
 
-## Algorithm Expansion IR
+## JIT-canonical IR
 
 Use this pattern before proving implementation-derived algorithm claims.
 
 1. Select the root from the public algorithm entrypoint consumed by the target theorem: `initialize`, `solve`, `step`, or a certificate-returning function.
-1. Expand AST source, `InitializeConfig` ownership, nested solver selection, state updates, certificate projection, and diagnostic construction into nodes and edges without importing or executing the target module.
-   Expansion is saturated over AST-resolved calls; do not tune a proof result
+1. Expand JIT root, `InitializeConfig` ownership, nested solver selection, state updates, certificate projection, and diagnostic construction into nodes and edges without importing or executing the target module.
+   Expansion is saturated over JIT-lowered calls; do not tune a proof result
    by changing a recursion-depth parameter.
 1. Classify nodes as mathematical state transition, linear/nonlinear solve, certificate, stopping predicate, diagnostic, performance-only helper, or implementation bookkeeping.
-1. Preserve AST-derived assignment, return, module-constant, and class-default
-   facts as `code_facts`. Use these facts to cite exact equations and defaults;
+1. Preserve JIT-derived assignment, return, module-constant, and class-default
+   facts as `generated implementation leaves`. Use these facts to cite exact equations and defaults;
    do not downgrade such facts to prose or broad `code_symbol` anchors.
 1. Backward-slice the IR from the final theorem. Keep selected local obligations and assumptions that are necessary for the final claim; exclude helper structure, type facts, and convenience fields that do not affect that claim.
    Discharge instance method dispatch and constructor binding as `static_checks`
@@ -345,21 +441,21 @@ Use this pattern before proving implementation-derived algorithm claims.
    Expand visible function-pointer variants such as `self.update(...)` into
    same-module variant functions before proof selection; keep variant selection
    as a static dispatch check and the variant math as ordinary nodes.
-1. For initialization and selected-scope-entry blockers, consume IR `code_facts` before
+1. For initialization and selected-scope-entry blockers, consume IR `generated implementation leaves` before
    returning. Code-derived selected-initializer equations belong in the graph
    and proof-status overlay; only the remaining non-code problem facts, such as
    selected-scope membership, regularity, differentiability, or compactness witnesses,
    may remain as mathematical assumptions.
-1. Put backend arithmetic, IREE FP32, fast-math, denormal, and lowered-IR assumptions in IR `backend_assumptions`; treat them as theorem variables or witness obligations.
+1. Put backend arithmetic, IREE FP32, fast-math, denormal, and lowered-IR assumptions in IR `backend_trace`; treat them as theorem variables or witness obligations.
 1. Assign each selected obligation to a formal theorem, existing-proof search, literature evidence, or explicit problem-class/backend assumption.
 
-## Lemma Dependency Graph
+## theorem graph
 
-Use this after Algorithm Expansion IR and before writing proof text.
+Use this after JIT-canonical IR and before writing proof text.
 
 1. Store auxiliary lemmas, assumptions, and target theorem/profile nodes as a graph.
 1. Use IR `node_id`, not implementation symbol alone, as the lemma identity.
-1. Connect `code_facts` as graph nodes when they are consumed by the proof
+1. Connect `generated implementation leaves` as graph nodes when they are consumed by the proof
    path. Connect backend profile records from `lean/lib/` as graph nodes under
    backend assumptions; production algorithms must not read those proof
    profiles.
@@ -375,7 +471,7 @@ Use this after Algorithm Expansion IR and before writing proof text.
    `local_convergence`, `fp32_floor`, and `solver_chain`.
 1. Require graph validation for edge endpoints, acyclicity, and target-chain
    reachability before making reader-facing proof claims.
-1. Run `proof_path_analyzer.py` on the lemma graph, `proof_status.json`, and
+1. Run the theorem graph checker on the theorem graph, `proof_status.json`, and
    proof frontier/note before every reader-facing progress claim. It should
    fail on missing graph endpoints, disconnected target chains, unadopted
    checked fragments, stale implementation tokens, bare `unverified` frontier
@@ -393,7 +489,7 @@ Use this loop after graph generation and before claiming progress on an
 algorithm theorem.
 
 1. Pick a target theorem/profile and compute its uncertified frontier from the
-   lemma graph. Prefer nodes whose proof would unlock multiple downstream
+   theorem graph. Prefer nodes whose proof would unlock multiple downstream
    edges, but do not skip a refutable over-strong claim.
 1. Normalize each selected node into one of four proposition shapes:
    exact implementation identity, conditional bridge, reachability/existence
@@ -404,7 +500,8 @@ algorithm theorem.
    - `unprovable_under_assumptions`: a checker-backed witness shows the current
      assumptions do not entail the proposition.
    - `unverified_with_next_witness`: the exact missing theorem variable,
-     runtime certificate, backend evidence, or problem-class witness is named.
+     existing algorithm-output projection, backend evidence, or problem-class
+     witness is named.
      Immediately re-enter this same loop on that witness or next frontier.
 1. A failed single-lemma route does not by itself falsify the downstream
    theorem. Keep the failed route as overlay evidence and search for a weaker
@@ -418,13 +515,13 @@ algorithm theorem.
    refutation and replace the route with a narrowed theorem or algorithm change.
 1. Update the proof status table and proof note in the same pass. Every open
    row must state whether the next step is mathematical proof, implementation
-   certificate plumbing, backend evidence binding, or theorem narrowing.
+   return-value projection, backend evidence binding, or theorem narrowing.
    Do not close out while a frontier row still has bare `unverified` as its
    only outcome.
 
 ## Initialize-Rooted Proof Expansion
 
-Use this as one edge family inside the Algorithm Expansion IR when a runtime
+Use this as one edge family inside the JIT-canonical IR when a runtime
 module recursively initializes lower solvers, stopping predicates, or
 preconditioners.
 

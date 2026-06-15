@@ -1588,7 +1588,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_algorithm_ir",
-      "line": 489,
+      "line": 572,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1596,7 +1596,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_certified_subgraph",
-      "line": 497,
+      "line": 580,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1604,7 +1604,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_command",
-      "line": 482,
+      "line": 565,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1612,7 +1612,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_log",
-      "line": 483,
+      "line": 566,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1620,7 +1620,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_claim",
-      "line": 475,
+      "line": 558,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1628,7 +1628,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_existing_queries",
-      "line": 478,
+      "line": 561,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1636,7 +1636,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_goal_directed_slice",
-      "line": 490,
+      "line": 573,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1644,7 +1644,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_impossibility_certificate",
-      "line": 486,
+      "line": 569,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1652,7 +1652,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_initialize_expansion_graph",
-      "line": 501,
+      "line": 584,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1660,7 +1660,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_initialize_root",
-      "line": 500,
+      "line": 583,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1668,7 +1668,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph",
-      "line": 492,
+      "line": 575,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1676,7 +1676,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph_overlay",
-      "line": 495,
+      "line": 578,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1684,7 +1684,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph_validation",
-      "line": 494,
+      "line": 577,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1692,7 +1692,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_library_trace_module",
-      "line": 481,
+      "line": 564,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1700,7 +1700,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_literature_queries",
-      "line": 479,
+      "line": 562,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1708,7 +1708,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_missing_frontier",
-      "line": 498,
+      "line": 581,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1716,7 +1716,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_nonterminal_return",
-      "line": 503,
+      "line": 586,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1724,7 +1724,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_path_attempts",
-      "line": 496,
+      "line": 579,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1732,7 +1732,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_plan_json",
-      "line": 476,
+      "line": 559,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1740,7 +1740,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_plan_md",
-      "line": 477,
+      "line": 560,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1748,7 +1748,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_selected_local_obligations",
-      "line": 491,
+      "line": 574,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1756,7 +1756,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_kind",
-      "line": 488,
+      "line": 571,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1764,7 +1764,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_packet",
-      "line": 487,
+      "line": 570,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1772,7 +1772,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_status",
-      "line": 484,
+      "line": 567,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1780,7 +1780,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_status_table",
-      "line": 499,
+      "line": 582,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1788,7 +1788,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_stub",
-      "line": 480,
+      "line": 563,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1796,7 +1796,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_target_chains",
-      "line": 493,
+      "line": 576,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1804,7 +1804,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_terminal_outcome",
-      "line": 485,
+      "line": 568,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1812,7 +1812,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_trace_alignment_check",
-      "line": 502,
+      "line": 585,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -2932,7 +2932,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "EVIDENCE",
-      "line": 1394,
+      "line": 1415,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2940,7 +2940,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM",
-      "line": 2867,
+      "line": 2888,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2972,7 +2972,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 2924,
+      "line": 2945,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2980,7 +2980,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_FILE",
-      "line": 2864,
+      "line": 2885,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2988,7 +2988,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_MODEL",
-      "line": 2865,
+      "line": 2886,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2996,7 +2996,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_PROMPT_SHA",
-      "line": 2866,
+      "line": 2887,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3004,7 +3004,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_SCOPE",
-      "line": 2863,
+      "line": 2884,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3012,7 +3012,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FORBIDDEN_PATHS",
-      "line": 1847,
+      "line": 1868,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3028,7 +3028,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1814,
+      "line": 1835,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3036,7 +3036,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1830,
+      "line": 1851,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3060,7 +3060,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1782,
+      "line": 1803,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3068,7 +3068,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1809,
+      "line": 1830,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3076,7 +3076,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1817,
+      "line": 1838,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3084,7 +3084,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE",
-      "line": 1816,
+      "line": 1837,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3100,7 +3100,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1819,
+      "line": 1840,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3108,7 +3108,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1838,
+      "line": 1859,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3124,7 +3124,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
-      "line": 1820,
+      "line": 1841,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3132,7 +3132,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION",
-      "line": 1818,
+      "line": 1839,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3140,7 +3140,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_SCHEMA",
-      "line": 1815,
+      "line": 1836,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3356,7 +3356,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "MODE",
-      "line": 1346,
+      "line": 1367,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3364,7 +3364,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_OWNER",
-      "line": 1844,
+      "line": 1865,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3372,7 +3372,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_PATHS",
-      "line": 1846,
+      "line": 1867,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3380,7 +3380,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SCORE",
-      "line": 1845,
+      "line": 1866,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3388,7 +3388,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SURFACE",
-      "line": 1843,
+      "line": 1864,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3396,7 +3396,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "ROUTE",
-      "line": 1344,
+      "line": 1365,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3404,7 +3404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SCHEMA",
-      "line": 1345,
+      "line": 1366,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -4332,7 +4332,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "TEST_DESIGN_CHECK",
-      "line": 693,
+      "line": 830,
       "path": "rust/agent-canon/src/test_design.rs",
       "surface": "tool"
     },
@@ -4897,390 +4897,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 417,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 2711,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 1749,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR",
-      "line": 2423,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_BACKEND_ASSUMPTION",
-      "line": 2465,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_BACKEND_PROFILE_LIBRARY",
-      "line": 2426,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_CODE_FACT",
-      "line": 2448,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_CODE_FACTS",
-      "line": 2429,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_CONTROL_FACT",
-      "line": 2454,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_CONTROL_FACTS",
-      "line": 2430,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_EDGE",
-      "line": 2442,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_EDGES",
-      "line": 2428,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_NODE",
-      "line": 2437,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_NODES",
-      "line": 2427,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_OBLIGATION",
-      "line": 2472,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_OBLIGATIONS",
-      "line": 2432,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_ROOT",
-      "line": 2424,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_SELECTED_OBLIGATIONS",
-      "line": 2433,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_STATIC_CHECK",
-      "line": 2460,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_STATIC_CHECKS",
-      "line": 2431,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_EXPANSION_IR_TARGET_THEOREM",
-      "line": 2425,
-      "path": "tools/agent_tools/algorithm_expansion_ir.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 676,
-      "path": "tools/agent_tools/algorithm_flowchart.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 945,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 954,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 960,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 968,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "backend_assumptions",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "code_facts",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "edges",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "goal_directed_slice",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "nodes",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "obligations",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "root_path",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "root_symbol",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "selected_local_obligations",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "static_checks",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "target_theorem",
-      "line": 159,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH",
-      "line": 824,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_EDGE",
-      "line": 840,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_EDGES",
-      "line": 828,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_NODE",
-      "line": 834,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_NODES",
-      "line": 827,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_ROOT",
-      "line": 825,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_TARGETS",
-      "line": 829,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_TARGET_CHAIN",
-      "line": 846,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_THEOREM",
-      "line": 826,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "LEMMA_GRAPH_VALID",
-      "line": 830,
-      "path": "tools/agent_tools/algorithm_lemma_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 109,
-      "path": "tools/agent_tools/algorithm_proof_theme_runner.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "VIOLATION",
@@ -5820,7 +5436,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 990,
+      "line": 1006,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -9612,86 +9228,6 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 660,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_CONSUMPTION_EDGE_COVERED",
-      "line": 529,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_CORRESPONDENCE",
-      "line": 525,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_CORRESPONDENCE_VALID",
-      "line": 526,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_FACTS",
-      "line": 527,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_FINDING",
-      "line": 536,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_FINDINGS",
-      "line": 532,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_GRAPH_NODE_COVERED",
-      "line": 528,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_PROOF_STATUS_ADOPTED",
-      "line": 531,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IR_GRAPH_TARGET_CHAIN_COVERED",
-      "line": 530,
-      "path": "tools/agent_tools/ir_graph_correspondence.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
       "line": 342,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
@@ -9876,16 +9412,56 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 452,
-      "path": "tools/agent_tools/kkt_equation_section.py",
+      "line": 1834,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
     {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 319,
-      "path": "tools/agent_tools/kkt_equation_section.py",
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "operational_ir",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "public_interface",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "root",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "source_root",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "stablehlo",
+      "line": 1825,
+      "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
     {
@@ -10697,158 +10273,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "candidate_count",
-      "line": 312,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "candidates",
-      "line": 312,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 312,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "target_theorem",
-      "line": 312,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 106,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_BRIDGE_CANDIDATE",
-      "line": 299,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_BRIDGE_CANDIDATES",
-      "line": 296,
-      "path": "tools/agent_tools/proof_bridge_candidate_extractor.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 1141,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH",
-      "line": 870,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_CODE_FACTS",
-      "line": 878,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_COMPLETE",
-      "line": 873,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_CONNECTED",
-      "line": 872,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_EXTERNAL_ASSUMPTIONS",
-      "line": 877,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_FINDING",
-      "line": 883,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_FINDINGS",
-      "line": 879,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_FRONTIER_MINIMAL",
-      "line": 874,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_OPEN_WITNESSES",
-      "line": 875,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_OPERATIONAL_ASSUMPTIONS",
-      "line": 876,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PROOF_PATH_VALID",
-      "line": 871,
-      "path": "tools/agent_tools/proof_path_analyzer.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
@@ -11276,7 +10700,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 787,
+      "line": 808,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11284,7 +10708,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 805,
+      "line": 826,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11292,7 +10716,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 825,
+      "line": 846,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11300,7 +10724,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 868,
+      "line": 889,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11308,7 +10732,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 539,
+      "line": 559,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11316,7 +10740,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 934,
+      "line": 955,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -16428,7 +15852,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 126,
+      "line": 140,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16436,7 +15860,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 158,
+      "line": 172,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16444,7 +15868,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 200,
+      "line": 214,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16452,7 +15876,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 210,
+      "line": 224,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16460,7 +15884,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_ACCELERATOR_POLICY",
-      "line": 185,
+      "line": 199,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16468,7 +15892,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_BUILD_JOBS",
-      "line": 191,
+      "line": 205,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16476,7 +15900,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_CMAKE_ARGS",
-      "line": 190,
+      "line": 204,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16484,7 +15908,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_CUDA",
-      "line": 184,
+      "line": 198,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16492,7 +15916,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_CUDA_REQUESTED",
-      "line": 187,
+      "line": 201,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16500,7 +15924,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_CUDA_REQUEST_POLICY",
-      "line": 188,
+      "line": 202,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16532,7 +15956,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_ERROR",
-      "line": 127,
+      "line": 141,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16548,7 +15972,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_NEXT",
-      "line": 159,
+      "line": 173,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16556,7 +15980,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_REF",
-      "line": 146,
+      "line": 160,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16564,7 +15988,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_TOOLS_HOME",
-      "line": 145,
+      "line": 159,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16572,7 +15996,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "cmake_args",
-      "line": 182,
+      "line": 196,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -16580,7 +16004,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "cuda_backend",
-      "line": 181,
+      "line": 195,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -18892,8 +18316,8 @@
     "agents/skills/user-preference-sync.md",
     "agents/skills/worktree-health.md",
     "agents/skills/worktree-start.md",
-    "rust/agent-canon/src/algorithm_ir_to_lean.rs",
     "rust/agent-canon/src/docs.rs",
+    "rust/agent-canon/src/jit_ir_to_lean.rs",
     "rust/agent-canon/src/local_llm.rs",
     "rust/agent-canon/src/main.rs",
     "rust/agent-canon/src/migration_audit.rs",
@@ -18912,10 +18336,6 @@
     "tools/agent_tools/agent_canon_update_todos.py",
     "tools/agent_tools/agent_team.py",
     "tools/agent_tools/agent_update_branch.sh",
-    "tools/agent_tools/algorithm_expansion_ir.py",
-    "tools/agent_tools/algorithm_flowchart.py",
-    "tools/agent_tools/algorithm_lemma_graph.py",
-    "tools/agent_tools/algorithm_proof_theme_runner.py",
     "tools/agent_tools/analyze_refactor_surface.py",
     "tools/agent_tools/bootstrap_agent_run.py",
     "tools/agent_tools/bootstrap_worktree_notes.py",
@@ -18956,9 +18376,8 @@
     "tools/agent_tools/goal_loop.py",
     "tools/agent_tools/helper_function_inventory.py",
     "tools/agent_tools/import_responsibility.py",
-    "tools/agent_tools/ir_graph_correspondence.py",
     "tools/agent_tools/issue_sync.py",
-    "tools/agent_tools/kkt_equation_section.py",
+    "tools/agent_tools/jit_canonical_ir.py",
     "tools/agent_tools/lean_proof_env.py",
     "tools/agent_tools/lean_recursive_proof_search.py",
     "tools/agent_tools/local_llm_eval.py",
@@ -18969,8 +18388,6 @@
     "tools/agent_tools/noncanonical_document_inventory.py",
     "tools/agent_tools/parent_repo_readiness.py",
     "tools/agent_tools/persist_agent_memory.py",
-    "tools/agent_tools/proof_bridge_candidate_extractor.py",
-    "tools/agent_tools/proof_path_analyzer.py",
     "tools/agent_tools/prose_reasoning_graph.py",
     "tools/agent_tools/reference_materializer.py",
     "tools/agent_tools/render_dependency_manifest_graph.py",

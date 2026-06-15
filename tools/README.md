@@ -25,10 +25,8 @@ downstream implementation agent_tools/prose_reasoning_graph.py builds prose grap
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 downstream implementation agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
-downstream implementation agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
-downstream implementation agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
-downstream implementation agent_tools/algorithm_flowchart.py renders proof-state flowcharts from Algorithm IR facts
-downstream implementation agent_tools/kkt_equation_section.py renders KKT equation sections from Algorithm IR facts
+downstream implementation agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation ../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream implementation ../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 @dependency-end
 -->
@@ -279,11 +277,8 @@ findings for resilient test planning.
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `lean_proof_env.py` は Mathlib / Aesop / Plausible / LeanSearchClient を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke`、`agent-smoke`、`counterexample-smoke`、`all-smoke`、または `check-file` で proof-search、theorem-search、counterexample、generated proof stub を検査します。active theorem package では依存を一度 pin して `lake build` で再利用し、この tool は探索用・fallback 用の環境確認に使います。個別 proof package に ad hoc な Lean 依存を入れず、環境責務をこの tool に集約します。
   - `tool_proof_coverage.py` は `tools/catalog.yaml` の全 tool に対して behavior / performance の Lean proof obligation を列挙します。通常 mode は coverage を生成し、`--require-lean-verified` は全 tool が checker 済み Lean artifact を持つまで fail します。
-  - `agent-canon algorithm-ir-to-lean` は Algorithm Expansion IR の `expression_ast` と `control_facts` から Lean route artifact を生成し、構造体アクセスは IR 後段の projection として正規化します。
-  - `ir_graph_correspondence.py` は Algorithm Expansion IR の `assignment_equation` / `return_equation` を lemma graph の code-fact node、consumption edge、target chain、任意の `proof_status.json` adoption に照合します。反復単位は `source_symbol` と `equation_tags` で group 化し、証明で使う中間計算式が IR 由来であることを確認します。
-  - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。
-  - `algorithm_flowchart.py` は Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影し、実装されている反復法と proof-state overlay を Markdown / Mermaid / JSON artifact として出します。図は navigation evidence であり、証明済み判定は proof checker と `proof_path_analyzer.py` に戻します。`--view runtime|core` は proof-only node / label を runtime 図から外します。
-  - `kkt_equation_section.py` は Algorithm Expansion IR の `code_facts` を検査し、reduced block-system / KKT / iterative-solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、solver-chain 式を proof note に手書きで足す経路を避けます。
+  - `jit_canonical_ir.py` は JIT 可能な正本関数を lower し、StableHLO 由来の薄い operational IR、StableHLO text、backend phase trace を生成します。
+  - `agent-canon jit-ir-to-lean` は JIT-canonical IR record から Lean の generated evidence definitions と fuel 付き operational evaluator を生成します。
   - `agent-canon test-design check` は既存 test の oracle 不在、static analysis の重複 wrapper、generated execution-only placeholder、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。

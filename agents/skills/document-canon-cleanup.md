@@ -13,7 +13,7 @@ downstream implementation ../../tools/agent_tools/noncanonical_document_inventor
 
 ## Purpose
 
-正本でない文書、generated evidence、root view、重複見出し、stale 名称の文書を機械的に棚卸しし、どの正本を編集すべきかを先に固定します。
+補助文書、generated evidence、root view、重複見出し、stale 名称の文書を機械的に棚卸しし、どの文書を編集すべきかを先に固定します。
 
 ## Use When
 
