@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design result-artifact-writeout.md raw result and summary artifact policy
 upstream design report-writing.md reader-facing evidence report policy
 downstream design refactor-loop.md consumes finding packets for repair slices
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings
 downstream implementation ../../.agents/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -93,6 +94,7 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    - Module groups: `python-module-groups-check`
    - OOP readability: `tools/oop/<language>/readability.py --format json`
    - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
+   - Design evidence drift: `check_design_doc_claims.py`
 1. 全 finding に deterministic priority を付けます。tool が priority を持たない
    場合も、少なくとも severity、public API / algorithm contract 影響、dependency
    fan-in / fan-out、single-caller / duplicate / thin-structure signal、test /
@@ -111,6 +113,7 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
 1. finding を分類します。
    - `implementation_bug`: 実装を直す
    - `missing_test_or_design_evidence`: test / design artifact を直す
+   - `missing_design_claim_evidence`: design claim を code、dependency header、parent-doc evidence に接続する
    - `handoff_prompt_gap`: 次の subagent handoff prompt を直す
    - `shared_skill_or_workflow_gap`: skill / workflow / task catalog prompt を直す
    - `tool_gap`: tool rule、false positive、structured output を直す

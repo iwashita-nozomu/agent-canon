@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents Detailed Design Brief for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../../documents/dependency-manifest-design.md dependency evidence contract
 @dependency-end
 -->
 
@@ -25,6 +26,15 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Future extension layers:
 - Evaluation axes:
 - Canonical-surface relationships:
+
+## Evidence And Assumption Ledger
+
+<!-- Tie design claims to current code, dependency headers, existing docs, and parent documents. Record first-use DSL terms, problem standard forms, normalization rules, and governing parent-doc differences before file-by-file implementation design. For design-doc claim checking, cite code paths, tool paths, dependency-header evidence, or parent documents with stable paths. -->
+
+- Evidence sources:
+- Assumptions:
+- Parent-doc alignment:
+- Refactor handoff:
 
 ## Existing Code And Docs To Reuse
 

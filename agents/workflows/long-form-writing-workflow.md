@@ -28,6 +28,10 @@ upstream design README.md workflow catalog
 - 先に `何を言う文書か` を固定してから書く
 - 見出し列を、あとで本文が従う roadmap として扱う
 - section ごとに `focus`、`purpose`、`support` を先に固定する
+- substantive な文書変更では `$structure-planning` の structure contract と
+  `$prose-reasoning-graph` の reader path / claim support / source map を先に固定する
+- typo / link / format-only route では `$md-style-check` を使い、
+  `structure_contract=skipped:<reason>` を closeout evidence に残す
 - 一般説明 prose では、scan できる構造と linear に読んだときの意味の両方を満たす
 - line edit より先に、focus、purpose、order、gap を直す
 - 一般説明 prose の構造変更では subagent review を必須にする

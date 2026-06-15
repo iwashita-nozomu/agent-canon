@@ -73,11 +73,42 @@ def current_diff_ref(workspace: Path = PROJECT_ROOT) -> str:
     return f"{head}-dirty-{hashlib.sha256(diff_bytes).hexdigest()}"
 
 
+def current_changed_markdown_paths(workspace: Path = PROJECT_ROOT) -> tuple[str, ...]:
+    """Return source Markdown paths changed in the workspace."""
+    paths: set[str] = set()
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if path.endswith(".md") and not path.startswith(
+                ("reports/", ".agent-canon/log-archive/")
+            ):
+                paths.add(path)
+    return tuple(sorted(paths))
+
+
 def ready_closeout_evidence_lines(
     diff_ref: str | None = None, workspace: Path = PROJECT_ROOT
 ) -> list[str]:
     """Return structured closeout evidence lines for a ready bundle."""
     latest_diff_ref = diff_ref or current_diff_ref(workspace)
+    changed_markdown = current_changed_markdown_paths(workspace)
+    document_structure_paths = (
+        ",".join(changed_markdown) if changed_markdown else "fixture-format-only.md"
+    )
     return [
         "",
         "## AgentCanon Latest And CI Gate Evidence",
@@ -104,6 +135,15 @@ def ready_closeout_evidence_lines(
         "- tool_warning_monitoring_status: none",
         "- tool_warning_open_items: none",
         "- tool_warning_resolution_evidence: workflow_monitoring.md no warnings observed",
+        "",
+        "## Document Structure Evidence",
+        f"- document_structure_paths: {document_structure_paths}",
+        "- document_structure_status: skipped",
+        "- structure_planning: not_applicable",
+        "- prose_graph: not_applicable",
+        "- structure_contract: skipped: fixture format-only route",
+        "- md_style_check: pass",
+        "- format_only_reason: fixture closeout bundle",
         "",
         "## Subagent Lifecycle Evidence",
         "- fresh_subagents_required: yes",
@@ -2305,6 +2345,191 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("mechanical_loop_validation_status", result.stdout)
+
+    def test_task_close_rejects_markdown_change_without_structure_evidence(self) -> None:
+        """Changed source Markdown paths require document structure evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n",
+                encoding="utf-8",
+            )
+            run_id = "test-task-close-doc-structure"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- structure_contract: skipped: fixture format-only route",
+                    "- structure_contract: missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DOCUMENT_STRUCTURE_REQUIRED=yes", result.stdout)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
+            self.assertIn("document_structure_evidence", result.stdout)
+
+    def test_task_close_rejects_markdown_change_with_mismatched_structure_paths(self) -> None:
+        """Document structure evidence must cover the changed Markdown paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n",
+                encoding="utf-8",
+            )
+            run_id = "test-task-close-doc-structure-paths"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- document_structure_paths: README.md",
+                    "- document_structure_paths: docs/other.md",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DOCUMENT_STRUCTURE_CHANGED_MARKDOWN=README.md", result.stdout)
+            self.assertIn("document_structure_paths_recorded", result.stdout)
+
+    def test_task_close_rejects_complete_structure_route_with_skip_contract(self) -> None:
+        """A complete document structure route requires a real structure contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n",
+                encoding="utf-8",
+            )
+            run_id = "test-task-close-doc-structure-contract"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            text = closeout_path.read_text(encoding="utf-8")
+            text = text.replace(
+                "- document_structure_status: skipped",
+                "- document_structure_status: complete",
+            )
+            text = text.replace(
+                "- structure_planning: not_applicable",
+                "- structure_planning: complete",
+            )
+            text = text.replace(
+                "- prose_graph: not_applicable",
+                "- prose_graph: complete",
+            )
+            closeout_path.write_text(text, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
 
     def test_task_close_rejects_non_git_workspace(self) -> None:
         """task_close should fail closed when it cannot resolve the current diff ref."""

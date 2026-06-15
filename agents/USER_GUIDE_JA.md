@@ -33,6 +33,8 @@ upstream design README.md agent canon overview
 - C / C++ 差分では `cpp-review` を既定で使います。
 - 局所 diff を findings-first で見るときは `change-review` を使います。
 - Markdown 差分では `md-style-check` を使います。
+- 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
+- typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。

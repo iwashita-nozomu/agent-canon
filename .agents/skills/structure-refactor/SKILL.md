@@ -13,6 +13,7 @@ upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md documents Codex run
 upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime views
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 upstream implementation ../../../tools/agent_tools/import_responsibility.py validates import boundaries
+upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
 @dependency-end
 -->
 
@@ -36,6 +37,7 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
    - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json`
    - run or update a scope-overlap report that applies `exclude_paths`
    - run `python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path> --out-dir <run>/prose/<readme-id> --profile all --stats-out <run>/prose/<readme-id>.stats.json` on changed directory README files
+   - run `python3 tools/agent_tools/check_design_doc_claims.py --root <root> <design-doc>` when a design document justifies the structure change
 1. Treat directory structure as a product contract. Fix `Behavior Contract`, `Allowed Structural Delta`, `Forbidden Semantic Delta`, `Path Mapping`, `Directory Responsibility Map`, and `Reader Impact` before moving files.
 1. Derive target layout from responsibilities, not from path aesthetics:
    - split a directory when one README must describe unrelated primary responsibilities

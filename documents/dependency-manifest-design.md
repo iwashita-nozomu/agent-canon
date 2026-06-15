@@ -9,6 +9,7 @@ downstream implementation ../tools/agent_tools/check_dependency_header_format.sh
 downstream implementation ../tools/agent_tools/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
+downstream implementation ../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream design ./structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
@@ -30,6 +31,7 @@ downstream design ./structured-analysis/dependency-header-analysis.md maps manif
 - graph-level の孤立 manifest を tool で検証できる
 - dependency header check から repo-wide の machine-readable graph artifact を自動生成できる
 - responsibility-based search と bounded text search の hit file から、依存 graph を辿った edit-scope candidate を自動生成できる
+- design document の implementation-backed claim、implicit DSL / standard-form assumption、parent-doc alignment を dependency graph から検証できる
 - code、docs、workflow、test、environment file を同じ内部 DSL で扱う
 
 ## Non-Goals
@@ -38,6 +40,30 @@ downstream design ./structured-analysis/dependency-header-analysis.md maps manif
 - 推移依存を各 file に手書きしない
 - すべての generated / binary artifact を同じ manifest で管理しない
 - write-capable subagent の並列数を増やすための設計ではない
+
+## Design Claim Evidence Contract
+
+Design documents state implementation-facing claims within the evidence exposed
+by current code, dependency headers, existing docs, and parent design
+documents. The design artifact records that evidence in an `Evidence And
+Assumption Ledger` before file-by-file implementation planning.
+
+The ledger carries four fields:
+
+- `Evidence sources`: code paths, tool paths, dependency-header graph artifacts,
+  or existing documents that support the claim.
+- `Assumptions`: first-use DSL terms, problem standard forms, normalization
+  rules, and governing definitions.
+- `Parent-doc alignment`: parent documents that agree with the claim, plus the
+  governing source when a child design chooses a narrower interpretation.
+- `Refactor handoff`: structure, ownership, or route changes passed to
+  `dependency-analysis` and `structure-refactor`.
+
+`check_design_doc_claims.py` implements the deterministic gate. It expands
+`design` and `implementation` dependency edges recursively, checks backticked
+code/path/command tokens against repo paths or evidence text, tracks implicit
+DSL / standard-form terms through the ledger, and reports modal contradictions
+between a design document and its upstream parent documents.
 
 ## Manifest Block
 

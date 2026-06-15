@@ -9,6 +9,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable refactor structure contracts
 upstream design ../../../agents/skills/dependency-analysis.md defines change-impact and repair-planning packets
 upstream design ../../../agents/skills/tool-finding-report.md tool-based finding packet workflow
+upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 @dependency-end
 -->
 
@@ -26,6 +27,9 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
    repair-planning input; raw findings, raw search hits, and single filenames
    are not enough. Full dependency artifacts stay on disk and are read only for
    the current repair batch or disputed edges.
+   Include `check_design_doc_claims.py` output when a design document provides
+   the refactor rationale, so implementation-backed claims and parent-doc
+   alignment enter the same repair packet.
 1. Before launching implementation subagents, the parent must write a refactor
    orchestration plan from that dependency graph. Separate sequential root
    slices that must be fixed first from independent downstream slices that can

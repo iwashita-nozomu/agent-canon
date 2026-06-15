@@ -17,7 +17,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
-AGENT_CANON_DEBUG = PROJECT_ROOT / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class RouteToolTest(unittest.TestCase):
@@ -35,10 +35,10 @@ class RouteToolTest(unittest.TestCase):
 
     def run_rust_skill_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the Rust-backed skill router."""
-        if not AGENT_CANON_DEBUG.is_file():
-            self.skipTest("Rust agent-canon debug binary is not built")
+        if not AGENT_CANON_CLI.is_file():
+            self.skipTest("Rust agent-canon CLI wrapper is not available")
         return subprocess.run(
-            [str(AGENT_CANON_DEBUG), "local-llm", "route-skill", *args],
+            [str(AGENT_CANON_CLI), "local-llm", "route-skill", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,

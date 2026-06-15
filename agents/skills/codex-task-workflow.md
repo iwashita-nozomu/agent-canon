@@ -41,9 +41,9 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 ## Required Output
 
-- 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
+- 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
-- `Scoped Change Lite` では cheap-first local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
+- `Scoped Change Lite` では cheap local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では parent-direct を許可し、必要な targeted validation を通す
 - ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理・allowed_paths 固定・write scope 固定・validation route 固定・`tool_rejection_preflight` 固定後に `spark_worker` / `worker` を起動してから実装へ進む
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
@@ -64,6 +64,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - runtime/tool gate が write-capable spawn を阻害する場合は `WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker を記録し、条件が満たされた場合に parent-direct 代替を明示する
 - tool / checker / hook / reviewer / subagent feedback から実装へ入る場合は `tool-finding-report` で finding packet を作り、write-capable subagent handoff に artifact path、structured findings、prompt feedback decision を渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` が出た場合は、次の write-capable subagent を起動する前に handoff prompt、skill、workflow、または task catalog prompt を修正する
 - prompt/config drift が shared canon surface をまたぐ場合は、親がその場で prose を増やす前に `prompt_config_reviewer` で audit し、この workflow はその監査結果を消費して最小差分だけ適用する
+- nontrivial document creation / revision では `prose-reasoning-graph` と `structure-planning` を構造先行 gate として通し、その後に `long-form-writing` / `paper-writing` / `academic-writing` へ渡す。typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残す
 - closeout 前に `check_dependency_headers.py --changed`、`scan_dependency_headers.sh --changed --fail-missing`、`check_dependency_header_format.sh --changed --require-header` を通す
 - dependency edge を変更した場合は `check_dependency_graph.sh --print-edges` の結果、または移行中 baseline と今回差分で新規 graph error を増やしていない evidence を残す
 - Shared canon / Large delivery / high-risk / workflow-tooling change では closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を tool で検出する

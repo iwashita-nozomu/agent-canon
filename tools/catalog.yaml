@@ -4,6 +4,7 @@
 # upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
 # downstream implementation agent_tools/tool_catalog.py validates this catalog
 # downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
+# downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # @dependency-end
 
@@ -199,7 +200,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML graph reports.
+    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML projection reports under the shared graph visualization DSL contract.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker
@@ -214,6 +215,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/render_dependency_manifest_graph.md
       - documents/dependency-manifest-design.md
+      - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_render_dependency_manifest_graph.py
 
@@ -705,7 +707,7 @@ entries:
       - rust/agent-canon/src/semantic_index.rs
 
   - id: semantic-provider-html-report
-    summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
+    summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
     path: tools/agent_tools/semantic_provider_html_report.py
     family: agent_tools
     role: docs
@@ -721,11 +723,12 @@ entries:
       - documents/tools/semantic_provider_html_report.md
       - agents/skills/html-experiment-report.md
       - documents/semantic_index.md
+      - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
+    summary: Builds SQLite-backed prose structure graphs, shared graph visualization projection contracts, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -739,6 +742,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/prose_reasoning_graph.md
+      - documents/prose-reasoning-graph/dsl-spec.md
       - agents/skills/prose-reasoning-graph.md
       - agents/skills/structure-planning.md
     tests:
@@ -796,6 +800,27 @@ entries:
       - documents/tools/README.md
       - documents/dependency-manifest-design.md
     tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-design-doc-claims
+    summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
+    path: tools/agent_tools/check_design_doc_claims.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_design_doc_claims.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/check_design_doc_claims.md
+      - documents/design/README.md
+      - documents/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_check_design_doc_claims.py
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: scan-dependency-headers

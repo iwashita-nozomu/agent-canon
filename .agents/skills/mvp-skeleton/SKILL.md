@@ -1,6 +1,6 @@
 ---
 name: mvp-skeleton
-description: Use when creating, scaffolding, planning, or implementing an MVP, prototype, first working version, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, 最小実装, first pass, first runnable path, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests.
+description: Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, 最小実装, thin vertical slice, core runnable path, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests.
 ---
 <!--
 @dependency-start
@@ -14,7 +14,7 @@ downstream design ../../../agents/skills/catalog.yaml catalogs this public skill
 
 1. Read `agents/skills/mvp-skeleton.md`.
 1. Before editing, write a compact MVP contract in working notes, a run bundle, or the user-facing plan:
-   - `core_user`: who needs the first version
+   - `core_user`: who uses the skeletal slice
    - `core_loop`: one input-to-useful-output path
    - `success_signal`: smallest observable result that proves the loop
    - `runtime_floor`: cheapest local run or inspection path
@@ -23,11 +23,11 @@ downstream design ../../../agents/skills/catalog.yaml catalogs this public skill
 1. Keep only the `required` items that are necessary for one end-to-end path.
 1. Prefer one vertical slice over reusable infrastructure, extra workflows, broad abstractions, and generalized services.
 1. Stub auth, external services, payments, imports, analytics, admin tools, notifications, search, exports, persistence, and deployment unless the core loop specifically depends on them.
-1. For frontend work, make the first screen the usable product surface rather than a landing page unless the user explicitly asked for a landing page.
+1. For frontend work, make the entry screen the usable product surface rather than a landing page unless the user explicitly asked for a landing page.
 1. Add only the smallest smoke check that proves the MVP path runs.
-1. Stop after the first runnable path and report:
+1. Stop when the core runnable path is available and report:
    - core loop implemented
    - run or inspection path
    - smoke check performed
    - deferred list capped at five items
-1. Treat the deferred list as success evidence, not as missing quality.
+1. Treat the deferred list as success evidence and scope control.
