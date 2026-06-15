@@ -401,6 +401,26 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
         ),
     ),
     (
+        "adaptive-improvement-loop",
+        "backlog-driven iterative experiment, tuning, or code improvement loop is in scope",
+        (
+            ("反復実行",),
+            ("継続反復",),
+            ("改善ループ",),
+            ("改善", "backlog"),
+            ("実験", "改善", "反復"),
+            ("実験", "チューニング", "継続"),
+            ("調査", "チューニング", "反復"),
+            ("code change", "run", "継続反復"),
+            ("iterative", "code improvement"),
+            ("iterative", "tuning"),
+            ("backlog-driven", "outer loop"),
+            ("adaptive", "improvement", "loop"),
+            ("experiment", "tuning", "loop"),
+            ("research", "tuning", "improvement"),
+        ),
+    ),
+    (
         "agent-canon-update",
         "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
         (
@@ -754,6 +774,7 @@ def is_current_stage_skill(skill: str) -> bool:
         "structure-planning",
         "structure-refactor",
         "test-design",
+        "adaptive-improvement-loop",
     }
 
 

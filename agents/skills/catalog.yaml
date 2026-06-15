@@ -6,7 +6,7 @@ version: 1
 
 skill_families:
   - id: agent-orchestration
-    purpose: Mandatory first routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
+    purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
     shim: .agents/skills/agent-orchestration/SKILL.md
   - id: repo-onboarding
@@ -90,7 +90,7 @@ skill_families:
     canonical_doc: agents/skills/html-output.md
     shim: .agents/skills/html-output/SKILL.md
   - id: html-experiment-report
-    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the first figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
+    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the primary figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
     canonical_doc: agents/skills/html-experiment-report.md
     shim: .agents/skills/html-experiment-report/SKILL.md
   - id: test-design
@@ -122,11 +122,11 @@ skill_families:
     canonical_doc: agents/skills/paper-writing.md
     shim: .agents/skills/paper-writing/SKILL.md
   - id: md-style-check
-    purpose: Check Markdown formatting, heading structure, and link hygiene.
+    purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
   - id: mvp-skeleton
-    purpose: Keep first-pass MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
+    purpose: Keep MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
     canonical_doc: agents/skills/mvp-skeleton.md
     shim: .agents/skills/mvp-skeleton/SKILL.md
   - id: document-canon-cleanup
@@ -162,15 +162,15 @@ skill_families:
     canonical_doc: agents/skills/literature-survey.md
     shim: .agents/skills/literature-survey/SKILL.md
   - id: formal-proof-workflow
-    purpose: Convert natural-language mathematical claims or Python AST-derived implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
+    purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .agents/skills/formal-proof-workflow/SKILL.md
   - id: algorithm-proof-exploration
-    purpose: Explore algorithm choices under proof obligations by building Algorithm Expansion IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
+    purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
     shim: .agents/skills/algorithm-proof-exploration/SKILL.md
   - id: algorithm-flowchart
-    purpose: Render AST-derived Algorithm Expansion IR, LemmaGraph, and proof_status overlays into Mermaid block charts for algorithm/proof-state review.
+    purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
     shim: .agents/skills/algorithm-flowchart/SKILL.md
   - id: research-workflow

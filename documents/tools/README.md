@@ -11,6 +11,7 @@ downstream implementation ../../tools/agent_tools/issue_sync.py validates local 
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
+downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
@@ -28,10 +29,9 @@ downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
 downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
-downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
-downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
-downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
-downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
+downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
+downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end
 -->
 
@@ -58,7 +58,9 @@ first and then return here only for reader-facing context.
 | Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
 | Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
+| Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
 | Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
+| Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
 
 ## AgentCanon Tool Catalog
 
@@ -94,9 +96,14 @@ to choose a route:
   `agent-canon semantic-index ...`, `prose_reasoning_graph.py`, and
   `tools/agent_tools/route.py --area search`.
 - Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
-  `tool_proof_coverage.py`, `proof_path_analyzer.py`,
-  `ir_graph_correspondence.py`, `algorithm_flowchart.py`,
-  `kkt_equation_section.py`, and `agent-canon test-design check`.
+  `tool_proof_coverage.py`, `jit_canonical_ir.py`,
+  `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
+
+Graph visualization follows the Prose Reasoning Graph DSL projection contract.
+`render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
+runtime dashboard diagrams are adapters or projections; their domain producers
+keep validation authority. Proof and JIT-canonical IR tools provide source facts
+that future graph viewers map through the same DSL contract.
 
 When a reader needs exact options, run the command with `--help` or open the
 same-named file under `documents/tools/`. Do not expand this README into a
@@ -118,6 +125,8 @@ second command manual.
   - review 前の基礎 gate をまとめて実行します。
 - `tools/bin/agent-canon docs check`
   - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
+- `tools/agent_tools/check_design_doc_claims.py`
+  - design document の claim line を dependency header closure、implementation evidence、parent documents と比較し、Evidence And Assumption Ledger、DSL / standard-form terms、parent-doc alignment を機械的に確認します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`

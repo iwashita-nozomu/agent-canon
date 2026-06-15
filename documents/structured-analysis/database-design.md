@@ -16,8 +16,8 @@ downstream design document-canon-analysis.md maps duplicate and non-canonical do
 # Structured Analysis Database Design
 
 この文書は、文章解析 DSL、dependency header graph、report 構造 contract を接続する
-SQLite 設計を固定する。DB は run 中の中間表現であり、正本ではない。正本は source
-document、dependency manifest、DSL spec、exported evidence artifact に残す。
+SQLite 設計を固定する。DB は source document、dependency manifest、DSL spec、
+exported evidence artifact から導出される run 中の中間表現です。
 
 ## Design Goal
 

@@ -121,6 +121,13 @@ language = "python"
 summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]
+id = "check-design-doc-claims"
+tool = "tools/agent_tools/check_design_doc_claims.py"
+doc = "documents/tools/check_design_doc_claims.md"
+language = "python"
+summary = "Design-document claim evidence checker documentation."
+
+[[tool]]
 id = "classify-path-risk"
 tool = "tools/agent_tools/classify_path_risk.py"
 doc = "documents/tools/classify_path_risk.md"
@@ -149,53 +156,18 @@ language = "python"
 summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
 
 [[tool]]
-id = "algorithm-expansion-ir"
-tool = "tools/agent_tools/algorithm_expansion_ir.py"
-doc = "documents/tools/algorithm_expansion_ir.md"
+id = "jit-canonical-ir"
+tool = "tools/agent_tools/jit_canonical_ir.py"
+doc = "documents/tools/jit_canonical_ir.md"
 language = "python"
-summary = "Algorithm Expansion IR extractor documentation, including AST-only recursion, instance interactions, and local proof-obligation grain."
+summary = "JIT root to StableHLO-derived operational IR and backend trace documentation."
 
 [[tool]]
-id = "algorithm-ir-to-lean"
-tool = "rust/agent-canon/src/algorithm_ir_to_lean.rs"
-doc = "documents/tools/algorithm_ir_to_lean.md"
+id = "jit-ir-to-lean"
+tool = "rust/agent-canon/src/jit_ir_to_lean.rs"
+doc = "documents/tools/jit_ir_to_lean.md"
 language = "rust"
-summary = "Algorithm IR to Lean lowering documentation, including expression_ast, control facts, and post-IR projection normalization."
-
-[[tool]]
-id = "algorithm-lemma-graph"
-tool = "tools/agent_tools/algorithm_lemma_graph.py"
-doc = "documents/tools/algorithm_lemma_graph.md"
-language = "python"
-summary = "Lemma dependency graph builder documentation, including theorem profiles, graph validation, and Algorithm IR traceability."
-
-[[tool]]
-id = "algorithm-flowchart"
-tool = "tools/agent_tools/algorithm_flowchart.py"
-doc = "documents/tools/algorithm_flowchart.md"
-language = "python"
-summary = "Algorithm flowchart renderer documentation, including AST/IR Mermaid diagrams and proof-status overlays."
-
-[[tool]]
-id = "ir-graph-correspondence"
-tool = "tools/agent_tools/ir_graph_correspondence.py"
-doc = "documents/tools/ir_graph_correspondence.md"
-language = "python"
-summary = "IR equation fact to lemma graph correspondence checker documentation, including assignment coverage and proof-status adoption."
-
-[[tool]]
-id = "kkt-equation-section"
-tool = "tools/agent_tools/kkt_equation_section.py"
-doc = "documents/tools/kkt_equation_section.md"
-language = "python"
-summary = "KKT solver-chain equation-section generator documentation, including fail-closed IR code-fact evidence checks."
-
-[[tool]]
-id = "proof-path-analyzer"
-tool = "tools/agent_tools/proof_path_analyzer.py"
-doc = "documents/tools/proof_path_analyzer.md"
-language = "python"
-summary = "Proof path analyzer documentation, including proof-status adoption and connected proof-hole checks."
+summary = "JIT-canonical IR to Lean evidence-catalog documentation."
 
 [[tool]]
 id = "check-proof-trace-alignment"

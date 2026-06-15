@@ -11,6 +11,11 @@ upstream design ../canonical/skills.md skill canon registry
 
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。
 formatter を実行した場合は、体裁修正だけで完了にせず、同じ入口で周辺チェックまで閉じます。
+この skill 単独で扱うのは typo / link / format-only の文書変更です。
+section order、reader path、claim support、source map、canonical route、
+document responsibility が変わる substantive な文書変更では、
+`prose-reasoning-graph` と `structure-planning` を先に通し、
+format-only route では `structure_contract=skipped` と理由を evidence に残します。
 
 ## Use When
 
@@ -20,6 +25,7 @@ formatter を実行した場合は、体裁修正だけで完了にせず、同�
 - docs lint、link check、heading hierarchy、markdown math、docs-check failure、Markdown style drift を直す
 - `format_markdown.py`、docs formatter、Mermaid formatter、math fixer、または `agent-canon docs` が scope にある
 - formatter 後の lint、link、math、Mermaid、heading の確認が抜けている
+- substantive な文書変更は `prose-reasoning-graph` と `structure-planning` の構造解析後に、この skill で Markdown checks を閉じる
 
 ## Required Checks
 
@@ -81,3 +87,5 @@ formatter を実行した場合は、体裁修正だけで完了にせず、同�
   inline code を確認します。table cell の中に raw `|` を含む数式や code を置くと
   Markdown の列として解釈されるため、式を display math へ出す、短い名前へ置換する、
   または table 外の本文へ移してから、`tools/bin/agent-canon docs check <paths...>` を再実行します。
+- format-only として閉じる場合は、`structure_contract=skipped` と理由が
+  run bundle、work log、PR body、または closeout evidence に残っていることを確認します。

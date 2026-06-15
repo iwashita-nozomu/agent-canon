@@ -17,7 +17,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
-AGENT_CANON_DEBUG = PROJECT_ROOT / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class RouteToolTest(unittest.TestCase):
@@ -35,10 +35,10 @@ class RouteToolTest(unittest.TestCase):
 
     def run_rust_skill_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the Rust-backed skill router."""
-        if not AGENT_CANON_DEBUG.is_file():
-            self.skipTest("Rust agent-canon debug binary is not built")
+        if not AGENT_CANON_CLI.is_file():
+            self.skipTest("Rust agent-canon CLI wrapper is not available")
         return subprocess.run(
-            [str(AGENT_CANON_DEBUG), "local-llm", "route-skill", *args],
+            [str(AGENT_CANON_CLI), "local-llm", "route-skill", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -157,6 +157,49 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("agent-log-analysis", decision["skills"])
         self.assertIn("agent-log-analysis", decision["matched_skills"])
+
+    def test_prompt_routes_adaptive_improvement_loop_from_iterative_work(self) -> None:
+        """Iterative execution and tuning prompts should activate adaptive loop routing."""
+        prompts = (
+            "反復実行系のスキルがうまく作動してない。原因を探して",
+            (
+                "experiments research tuning iterative code improvement "
+                "managed as one backlog-driven agile outer loop"
+            ),
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                python_result = self.run_route("--prompt", prompt, "--format", "json")
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    prompt_path = Path(tmp_dir) / "prompt.txt"
+                    prompt_path.write_text(prompt, encoding="utf-8")
+                    rust_result = self.run_rust_skill_route(
+                        "--prompt-file",
+                        str(prompt_path),
+                        "--format",
+                        "json",
+                    )
+
+                self.assertEqual(
+                    python_result.returncode,
+                    0,
+                    python_result.stdout + python_result.stderr,
+                )
+                self.assertEqual(
+                    rust_result.returncode,
+                    0,
+                    rust_result.stdout + rust_result.stderr,
+                )
+                python_decision = json.loads(python_result.stdout)
+                rust_decision = json.loads(rust_result.stdout)
+                self.assertIn("adaptive-improvement-loop", python_decision["skills"])
+                self.assertIn("adaptive-improvement-loop", python_decision["matched_skills"])
+                self.assertIn("adaptive-improvement-loop", python_decision["active_skills"])
+                self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+                self.assertEqual(python_decision["skills"], rust_decision["skills"])
+                self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+                self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_routes_root_design_followup_to_task_routing(self) -> None:
         """Broad follow-up redesign prompts should not fall through to matched=none."""

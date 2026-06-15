@@ -2,6 +2,8 @@
 @dependency-start
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../dependency-manifest-design.md dependency evidence contract
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
 -->
 
@@ -19,9 +21,6 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
   - Python structural duplicate analysis and module-group dependency priority
-- [algorithm-ir-to-lean.md](algorithm-ir-to-lean.md)
-  - Generic Python AST Algorithm IR to Lean lowering architecture
-  - Python / Rust responsibility boundary and structure projection policy
 - [../remote-execution-repo-contract.md](../remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 
@@ -29,7 +28,8 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 - 実コードに対応する詳細設計が必要になった時点で、`documents/design/<topic>/` を追加します。
 - 詳細設計は、実装者がそのまま従える粒度の責務分割、公開境界、検証計画を含めます。
-- 実体のない package 名や将来案だけで空ディレクトリを増やしません。
+- 詳細設計は、current code、dependency header evidence、parent documents に支えられた `Evidence And Assumption Ledger` を持ち、初出の DSL 用語や problem standard form をそこで明示します。
+- 新しい設計入口は、対応する実装 path、dependency header edge、または親文書上の governing source と一緒に追加します。
 
 ## 更新ルール
 
@@ -37,8 +37,8 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 - `experiment_runner` の契約を変えた場合は [experiment_runner.md](../experiment_runner.md) を更新します。
 - 特定 topic の設計書を新設したら、この index にも入口を追加します。
 
-## 禁止事項
+## 正本維持ルール
 
-- `documents/design/base_components.md` のような存在しない旧パスを正本として参照することを禁止します。
-- `documents/design/apis/` のような削除済み階層を案内することを禁止します。
-- 設計の正本を `notes/` や `reports/` に置くことを禁止します。
+- 現在存在する design path だけを index から参照します。
+- 削除済み階層の案内は、現在の canonical path へ更新します。
+- 設計の正本は `documents/design/` と、この index が示す AgentCanon-owned design surface に集約します。
