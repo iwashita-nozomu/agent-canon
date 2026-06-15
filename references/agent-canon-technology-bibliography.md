@@ -42,6 +42,8 @@ record.
   SHA-256, Rust crates used by the Rust CLI.
 - Formal proof support: Lean 4, mathlib theorem search, LeanSearch,
   Isabelle/Sledgehammer, CoqHammer, and informal-to-formal proof sketching.
+- Compiler and proof graph tooling: LLVM Kaleidoscope, MLIR, CompCert,
+  CakeML, Lean metaprogramming, and code property graphs.
 - Static/dependency analysis: Python AST, Pyright, Ruff, pytest, program
   dependence graphs, code property graphs.
 - Runtime and operations: Rust/Cargo, Dev Containers, GitHub Actions, Git
@@ -125,6 +127,20 @@ Access date for this section: 2026-06-01.
 | Hammering Away: A User's Guide to Sledgehammer for Isabelle/HOL | <https://isabelle.in.tum.de/dist/Isabelle2025-2/doc/sledgehammer.pdf> | Isabelle target route and automation boundary | Sledgehammer applies ATPs, SMT solvers, and Isabelle proof methods to current goals and can return Isabelle proof text that reconstructs in Isabelle. | Works on loaded context and selected facts; generated proof text may need reconstruction/minimization and can fail. | Use as source for assistant-backed search/reconstruction, with checker log as authority. |
 | CoqHammer | <https://coqhammer.github.io/> | Coq/Rocq target route and automation caveats | CoqHammer integrates external automated theorem provers and reconstruction tactics for Coq/Rocq. | It is limited on some fragments and does not try induction by design; SMT-heavy goals may need SMTCoq instead. | Include Coq/Rocq route when project context selects it, not as universal default. |
 | Draft, sketch, and prove: Guiding formal theorem provers with informal proofs | <https://doi.org/10.17863/CAM.94959> | Natural-language proof sketch to formal obligation workflow | Informal proofs can guide formal proof sketches and automated prover search, but success is measured by checked formal proof. | Research setting does not guarantee arbitrary natural-language formalization. | Shape workflow as sketch -> obligations -> checker, never direct proof assertion. |
+
+## Compiler, IR, And Proof-Graph Tooling
+
+Access date for this section: 2026-06-12.
+
+| Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
+| --- | --- | --- | --- | --- | --- |
+| LLVM Kaleidoscope: Code generation to LLVM IR | <https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl03.html> | `jit_canonical_ir.py` backend trace design | A compiler pipeline can lower a source-root representation toward backend IR and preserve inspectable intermediate artifacts. | Tutorial language and not a verified compiler. | Keep the proof entrypoint on the JIT root and record StableHLO/backend artifacts. |
+| MLIR Toy Tutorial | <https://mlir.llvm.org/docs/Tutorials/Toy/> | `jit_canonical_ir.py` thin operational IR | MLIR uses dialects to preserve operation structure while enabling analysis, verification, transforms, and later lowering. | MLIR is an SSA compiler framework; AgentCanon should not import MLIR machinery or TableGen complexity. | Treat StableHLO-derived records as thin operational evidence and keep mathematical labels in the theorem graph. |
+| CompCert verified compiler documentation | <https://compcert.org/doc/> | Future compiler-correctness validation for JIT-canonical lowering | CompCert's correctness claim is semantic equivalence between source and generated assembly, proved in Coq. | AgentCanon's current lowering emits evidence catalogs only; it is not yet a verified compiler theorem. | Do not claim semantic preservation for `jit-ir-to-lean` until a pass-correctness proof or validator exists. |
+| CakeML publications | <https://cakeml.org/publications.html> | Future multi-pass proof layering for JIT-canonical IR | CakeML records verified compiler work through multiple intermediate languages and proof stages. | Source counts and pass structure are version-sensitive; project and paper versions can differ. | Leave room for multiple JIT/IR/backend evidence layers and per-layer invariants instead of one permanent graph schema. |
+| The verified CakeML compiler backend | <https://www.cambridge.org/core/journals/journal-of-functional-programming/article/verified-cakeml-compiler-backend/E43ED3EA740D2DF970067F4E2BB9EF7D> | Future compiler-correctness and backend proof design | The CakeML backend explains how intermediate languages, semantics, and proofs fit across compiler phases. | HOL4/CakeML organization is not a Lean template. | Keep generated code graph files separate from theorem/proof graph modules, with stable references between them. |
+| Lean Language Reference: Syntax, macros, elaborators, and terms | <https://lean-lang.org/doc/reference/latest/> | Generated Lean artifact design | Lean parses syntax, expands macros, elaborates terms, and checks core terms in the kernel. | Metaprogramming APIs and generated syntax are Lean-version-sensitive. | Emit ordinary exposed Lean definitions/records before adding custom syntax or elaborators. |
+| Modeling and Discovering Vulnerabilities with Code Property Graphs | <https://www.ieee-security.org/TC/SP2014/papers/ModelingandDiscoveringVulnerabilitieswithCodePropertyGraphs.pdf> | Theorem graph traversal validation | Code property graphs unify AST, control flow, and dependence information into a graph that can be traversed. | CPG is analysis evidence, not a theorem or semantic-preservation proof. | Keep operational evidence and theorem dependency edges distinct; reachability evidence is not a mathematical equation by itself. |
 
 ## Static Analysis, Dependency, And Code Intelligence
 

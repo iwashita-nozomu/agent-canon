@@ -95,7 +95,7 @@ Projection view は次を推奨できる。
 | repair or validation steps | ordered list |
 | few local edges with short reason | prose |
 
-Format recommendation は report rendering hint であり、dependency graph の正本ではない。
+Format recommendation は report rendering hint であり、dependency graph の入力仕様には使いません。
 
 ## Extraction Notes
 

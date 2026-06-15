@@ -10,8 +10,8 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 downstream design ../tools/prose_reasoning_graph.md documents CLI usage
 downstream design ../tools/README.md documents graph visualization tool routing from the documentation hub
 downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph visualization adapter
-downstream design ../tools/algorithm_flowchart.md documents algorithm/proof graph visualization adapter
 downstream design ../tools/semantic_provider_html_report.md documents semantic provider visualization adapter
+downstream design ../tools/jit_canonical_ir.md documents JIT-canonical source facts available to future graph visualization adapters
 downstream design ../../tools/README.md documents graph visualization tool routing from the execution hub
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
@@ -599,11 +599,11 @@ adapter metadata, and `payload_json` provenance.
 Reusable graph renderers should consume a DSL projection payload or an adapter
 payload that can be losslessly mapped into DSL nodes and edges. Domain tools may
 still own source-specific extraction. For example, dependency-manifest graph
-TSV, Algorithm Expansion IR / LemmaGraph, semantic-provider comparison JSON,
-and runtime-dashboard decision flows are adapter inputs. Their visual reports
-are review projections over source facts, while the source checker, proof
-checker, semantic-index command, or dashboard producer keeps domain validation
-authority.
+TSV, semantic-provider comparison JSON, runtime-dashboard decision flows, and
+JIT-canonical IR / Lean evidence records are adapter inputs. Their visual
+reports are review projections over source facts, while the source checker,
+proof checker, semantic-index command, or dashboard producer keeps domain
+validation authority.
 
 Every graph visualization adapter records this boundary:
 
@@ -770,12 +770,12 @@ C++, Rust, or other structured sources. Adapters must map their source facts
 into the same object model before adding new durable vocabulary.
 
 Visualization adapters follow the same rule. A dependency graph renderer maps
-manifest edges into `artifact` nodes and dependency edges; an algorithm
-flowchart renderer maps IR blocks, lemma nodes, and proof-status overlays into
-adapter nodes, proof/status payloads, and projection edges; a semantic-provider
-HTML report maps provider deltas into artifact or projection nodes with
-comparison payloads. Each adapter may keep its source-specific CLI while the
-shared projection contract remains this DSL.
+manifest edges into `artifact` nodes and dependency edges; a proof or JIT
+viewer maps JIT-canonical records, Lean evidence definitions, and proof-status
+payloads into adapter nodes and projection edges; a semantic-provider HTML
+report maps provider deltas into artifact or projection nodes with comparison
+payloads. Each adapter may keep its source-specific CLI while the shared
+projection contract remains this DSL.
 
 An adapter must provide:
 

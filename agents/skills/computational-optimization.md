@@ -53,6 +53,15 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 1. Failure Semantics
    - infeasible、singular、non-finite、max-iter、not-converged を success と分ける
 
+For iterative solvers, convergence evidence is a theorem about the implemented
+iteration map and stopping scalar, not a runtime proof check. State the map as
+`z_next = Step_impl(Problem, Config, z)` and the stopping quantity as
+`R_impl(Problem, Config, z)` before changing code. If the map cannot be proved
+to satisfy the target theorem under the accepted problem/config/backend
+assumptions, change the algorithmic mechanism itself; do not add proof-only
+`Info` fields, diagnostic gates, or extra runtime checks merely to satisfy the
+proof.
+
 ## Workflow
 
 1. Classify the algorithm surface: unconstrained optimization, constrained optimization, least squares, root finding, linear solve, preconditioning, or benchmark-only.
@@ -68,6 +77,9 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 
 - 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route をしません。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
+- runtime proof-only fields or diagnostic gates are not convergence evidence;
+  use them only when they are genuine execution outputs needed by the user-facing
+  algorithm contract.
 - Final value だけでなく、first bad iteration、finite state、residual components、reference norm、tolerance、status flag を確認します。
 - Constraint つき問題では objective だけでなく feasibility と KKT / complementarity を分けます。
 - Linear solver / preconditioner では residual norm、reference norm、preconditioner summary、breakdown status を分けます。

@@ -39,22 +39,22 @@ The output directory contains:
 - an importable Python trace module such as
   `spd_quadratic_form_positive_proof_trace.py`
 
-For implementation-derived proof planning, pass a Python AST source reference:
+For implementation-derived proof planning, pass a Python source reference:
 
 ```bash
 python3 tools/agent_tools/formal_proof.py \
-  --python-symbol python/jax_util/optimizers/pdipm.py::_pdipm_accept_candidate \
+  --python-symbol path/to/algorithm.py::<implementation_symbol> \
   --target lean \
-  --domain "interior point method" \
-  --out-dir reports/formal-proof/pdipm-acceptance \
+  --domain "<mathematical domain>" \
+  --out-dir reports/formal-proof/<topic> \
   --format markdown
 ```
 
-The AST route reads the file as UTF-8 and parses it with `ast.parse`; it does
-not import or execute the module. The plan records `source_kind=python_ast`,
-`source_path`, `source_symbol`, a signature summary, and additional obligations
-for extracted branch and return-expression structure. These fields are
-provenance and planning evidence only, not proof evidence.
+With `--python-symbol`, the tool reads the file as UTF-8 and does not import or
+execute the module. The plan records source path, source symbol, a signature
+summary, and additional obligations for extracted branch and return-expression
+structure. These fields are provenance and planning evidence only, not proof
+evidence.
 
 To keep the trace when a project is distributed as a Python library, write the
 output directory inside the package tree or copy the generated

@@ -263,7 +263,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
 - shared canon PR では `agents/workflows/agent-canon-pr-workflow.md` を使い、`make agent-canon-pr-check` を merge 前の固定 gate にします。
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a repo-local override is intentional.
-- closeout 前に、正本でない設計文書、実装 copy、dated mirror、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
+- closeout 前に、補助設計文書、実装 copy、dated mirror、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
 
 ## Close-Out Readiness Checklist
 
