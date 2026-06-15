@@ -274,7 +274,7 @@ def validate_codex_agent_settings() -> None:
 
     for role_id, marker in INITIAL_INTAKE_MARKERS.items():
         instructions = str(configs[role_id].get("developer_instructions", ""))
-        ensure(marker in instructions, f"{role_id} missing initial intake marker")
+        ensure(marker in instructions, f"{role_id} missing intake responsibility marker")
 
 
 def validate_team_config_references() -> None:
@@ -464,11 +464,11 @@ def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
-        ensure("Initial Intake Wave" in text, f"{path} missing initial intake contract")
+        ensure("Intake Responsibility Wave" in text, f"{path} missing intake responsibility contract")
         ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
         ensure("Agent Wave Ledger" in text, f"{path} missing Agent Wave Ledger contract")
         for role_id in INITIAL_INTAKE_MARKERS:
-            ensure(role_id in text, f"{path} missing initial intake role {role_id}")
+            ensure(role_id in text, f"{path} missing intake responsibility role {role_id}")
         ensure(
             "max_depth = 2" in text and "delegated_spawn_policy" in text,
             f"{path} must state bounded nested spawn and delegated_spawn_policy",
@@ -662,7 +662,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     ensure(
         spawn_budget.get("initial_three_agent_intake_is_total_cap") is False,
-        f"task {task_id} manifest must state initial intake is not a total cap",
+        f"task {task_id} manifest must state intake responsibility wave is not a total cap",
     )
     ensure(
         "workflow_families[].spawn_budget" in str(spawn_budget.get("source", "")),
@@ -782,7 +782,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
                         dynamic_agent_candidates.append(agent_type)
         ensure(
             initial_wave == ["requirements_organizer", "explorer", "execution_planner"],
-            f"task {task_id} manifest must use the stage-ready Initial Intake Wave",
+            f"task {task_id} manifest must use the stage-ready Intake Responsibility Wave",
         )
         ensure(
             len(dynamic_agent_candidates) >= 1,
@@ -790,7 +790,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         )
         ensure(
             len(set(initial_wave + dynamic_agent_candidates)) > 3,
-            f"task {task_id} manifest must not collapse multi-agent work to initial intake",
+            f"task {task_id} manifest must not collapse multi-agent work to intake responsibility",
         )
     ensure(
         len(initial_wave) <= expected_active,
