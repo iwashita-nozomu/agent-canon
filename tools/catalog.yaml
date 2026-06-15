@@ -303,15 +303,15 @@ entries:
     tests:
       - tests/agent_tools/test_tool_proof_coverage.py
 
-  - id: algorithm-expansion-ir
-    summary: Builds AST-only Algorithm Expansion IR with instance interaction edges and first-class local proof obligations.
-    path: tools/agent_tools/algorithm_expansion_ir.py
+  - id: jit-canonical-ir
+    summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
+    path: tools/agent_tools/jit_canonical_ir.py
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/agent_tools/algorithm_expansion_ir.py
+    command: python3 tools/agent_tools/jit_canonical_ir.py
     writes: true
     default_wiring:
       ci: false
@@ -319,20 +319,20 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/algorithm_expansion_ir.md
+      - documents/tools/jit_canonical_ir.md
       - agents/skills/formal-proof-workflow.md
     tests:
-      - tests/agent_tools/test_algorithm_expansion_ir.py
+      - tests/agent_tools/test_jit_canonical_ir.py
 
-  - id: algorithm-ir-to-lean
-    summary: Lowers Algorithm Expansion IR expression_ast and control facts into generic Lean route artifacts.
-    path: rust/agent-canon/src/algorithm_ir_to_lean.rs
+  - id: jit-ir-to-lean
+    summary: Lowers JIT-canonical IR records into generated Lean evidence definitions.
+    path: rust/agent-canon/src/jit_ir_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: tools/bin/agent-canon algorithm-ir-to-lean
+    command: tools/bin/agent-canon jit-ir-to-lean
     writes: true
     default_wiring:
       ci: false
@@ -340,120 +340,10 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/algorithm_ir_to_lean.md
-      - documents/design/algorithm-ir-to-lean.md
+      - documents/tools/jit_ir_to_lean.md
       - agents/skills/formal-proof-workflow.md
     tests:
-      - rust/agent-canon/src/algorithm_ir_to_lean.rs
-
-  - id: algorithm-lemma-graph
-    summary: Converts Algorithm Expansion IR JSON into theorem-profiled lemma dependency graphs.
-    path: tools/agent_tools/algorithm_lemma_graph.py
-    family: agent_tools
-    role: helper
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/agent_tools/algorithm_lemma_graph.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/algorithm_lemma_graph.md
-      - agents/skills/formal-proof-workflow.md
-    tests:
-      - tests/agent_tools/test_algorithm_lemma_graph.py
-
-  - id: algorithm-flowchart
-    summary: Renders Algorithm Expansion IR, LemmaGraph, and proof_status overlays as Mermaid block charts.
-    path: tools/agent_tools/algorithm_flowchart.py
-    family: agent_tools
-    role: helper
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/agent_tools/algorithm_flowchart.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/algorithm_flowchart.md
-      - agents/skills/algorithm-flowchart.md
-      - agents/skills/algorithm-proof-exploration.md
-      - agents/skills/formal-proof-workflow.md
-    tests:
-      - tests/agent_tools/test_algorithm_flowchart.py
-
-  - id: ir-graph-correspondence
-    summary: Checks Algorithm Expansion IR equation facts against lemma graph code-fact nodes and proof-status adoption.
-    path: tools/agent_tools/ir_graph_correspondence.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/agent_tools/ir_graph_correspondence.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/ir_graph_correspondence.md
-      - agents/skills/algorithm-proof-exploration.md
-      - agents/skills/formal-proof-workflow.md
-    tests:
-      - tests/agent_tools/test_ir_graph_correspondence.py
-
-  - id: kkt-equation-section
-    summary: Emits reproducible KKT solver-chain equation sections from Algorithm Expansion IR code facts.
-    path: tools/agent_tools/kkt_equation_section.py
-    family: agent_tools
-    role: helper
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/agent_tools/kkt_equation_section.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/kkt_equation_section.md
-      - agents/skills/algorithm-proof-exploration.md
-      - agents/skills/formal-proof-workflow.md
-    tests:
-      - tests/agent_tools/test_kkt_equation_section.py
-
-  - id: proof-path-analyzer
-    summary: Checks proof-status overlays against lemma graphs and reports connected proof holes.
-    path: tools/agent_tools/proof_path_analyzer.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/agent_tools/proof_path_analyzer.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/proof_path_analyzer.md
-      - agents/skills/formal-proof-workflow.md
-    tests:
-      - tests/agent_tools/test_proof_path_analyzer.py
+      - rust/agent-canon/src/jit_ir_to_lean.rs
 
   - id: check-proof-trace-alignment
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.

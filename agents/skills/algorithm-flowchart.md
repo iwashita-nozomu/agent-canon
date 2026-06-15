@@ -1,12 +1,10 @@
 <!--
 @dependency-start
-responsibility Documents AST/IR-derived algorithm Mermaid flowcharts for proof review.
-upstream design algorithm-proof-exploration.md algorithm IR and lemma graph workflow.
+responsibility Documents JIT-canonical algorithm Mermaid flowcharts for proof review.
+upstream design algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
 upstream design formal-proof-workflow.md checker-backed proof workflow.
-upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders Mermaid diagrams.
-upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm Expansion IR.
-upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds Lemma Dependency Graphs.
-upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections.
+upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
+upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
@@ -15,9 +13,9 @@ downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md expo
 
 ## Purpose
 
-`algorithm-flowchart` は、Python AST から作った Algorithm Expansion IR、
-Lemma Dependency Graph、`proof_status.json` を重ね、実装されている反復法と
-証明状態を Mermaid の block chart として機械生成する skill です。
+`algorithm-flowchart` は、JIT-canonical IR、生成済み Lean evidence module、theorem
+graph overlay を重ね、実装されている反復法と証明状態を Mermaid の block chart
+として機械生成する skill です。
 
 この skill は証明そのものを与えません。証明探索の前後で、今の実装 path、
 solver chain、code fact、証明済み fragment、open / external / operational
@@ -26,54 +24,41 @@ assumption の位置を一目で確認するための visualization layer です
 ## Use When
 
 - 反復法、solver chain、initialization path、certificate path を
-  AST / IR から図示したい
+  StableHLO 由来の JIT-canonical IR から図示したい
 - 「今どんなアルゴリズムになっているか」と「どこが証明済みか」を同時に見たい
-- Algorithm Expansion IR や LemmaGraph の graph artifact を人間が読みやすい
+- JIT-canonical record と theorem graph artifact を人間が読みやすい
   Mermaid diagram に射影したい
 - 証明 note へ入れる前に、proof frontier が実装 path のどこに載っているか確認したい
 
 ## Canonical Flow
 
-1. Target theorem と root symbol を固定します。
-   例: `python/jax_util/optimizers/pdipm.py::_solve` と
-   `PDIPM local convergence`。
+1. Target theorem と JIT-canonical public root を固定します。
+   例: `lean/<topic>/main.py::main` と `<target theorem>`。
 
-1. まだ IR がない場合は AST から生成します。
-
-   ```bash
-   python3 tools/agent_tools/algorithm_expansion_ir.py \
-     --python-symbol python/jax_util/optimizers/pdipm.py::_solve \
-     --target-theorem "PDIPM local convergence" \
-     --format json \
-     --out lean/pdipm_convergence/pdipm_solve_ir.json
-   ```
-
-1. 必要な theorem profile の LemmaGraph を生成します。
+1. まだ IR がない場合は StableHLO lowering から生成します。
 
    ```bash
-   python3 tools/agent_tools/algorithm_lemma_graph.py \
-     --ir-json lean/pdipm_convergence/pdipm_solve_ir.json \
-     --target-profile local_convergence \
-     --target-profile solver_chain \
-     --format json \
-     --out lean/pdipm_convergence/pdipm_solver_chain_lemma_graph.json
+   python3 tools/agent_tools/jit_canonical_ir.py \
+     --python-symbol lean/<topic>/main.py::main \
+     --input-factory lean/<topic>/main.py::example_inputs \
+     --out lean/<topic>/<root>_jit_canonical_ir.json \
+     --stablehlo-out lean/<topic>/<root>.stablehlo.mlir \
+     --backend-trace-dir lean/<topic>/backend_trace \
+     --backend-trace-out lean/<topic>/<root>_backend_trace.json
    ```
 
-1. `algorithm_flowchart.py` で Mermaid diagram を生成します。
+1. Lean evidence module を生成します。
 
    ```bash
-   python3 tools/agent_tools/algorithm_flowchart.py \
-     --ir-json lean/pdipm_convergence/pdipm_solve_ir.json \
-     --lemma-graph lean/pdipm_convergence/pdipm_solver_chain_lemma_graph.json \
-     --proof-status lean/pdipm_convergence/proof_status.json \
-     --include-code-facts \
-     --format markdown \
-     --out lean/pdipm_convergence/pdipm_recursive_minimal_flowchart.md
+   tools/bin/agent-canon jit-ir-to-lean \
+     --jit-ir lean/<topic>/<root>_jit_canonical_ir.json \
+     --namespace <LeanNamespace> \
+     --module-name Generated<Root>JitCanonical \
+     --out lean/<topic>/<LeanNamespace>/Generated<Root>JitCanonical.lean
    ```
 
-   実装経路だけを見せる図では `--view runtime`、数理・solver 中核だけを
-   見せる図では `--view core --include-code-facts` を使います。`proof`
-   view 以外では proof status label を出しません。
+1. Renderer は現在の JIT-canonical record と theorem graph overlay を入力にします。
+   旧 record だけを読む renderer しかない場合は、renderer を先に更新します。
 
 1. 図を reader-facing proof note へ貼る場合は、生成済み Markdown から
    fenced `mermaid` block を引用します。手書きで Mermaid を更新せず、
@@ -81,9 +66,9 @@ assumption の位置を一目で確認するための visualization layer です
 
 ## Interpretation
 
-- 通常の矩形 block は IR の algorithm node です。
-- 波括弧 block は IR の `code_facts` です。
-- 点線 edge は static dispatch / static check 系の edge です。
+- 通常の矩形 block は JIT-canonical operational op です。
+- backend / dtype block は生成された backend trace coverage です。
+- theorem overlay edge は proof graph の依存です。
 - 色は proof overlay から来ます。
   - `verified`: checker-backed fragment がある、または graph/overlay が verified
   - `assumption`: mathematical assumption node
@@ -103,5 +88,5 @@ assumption の位置を一目で確認するための visualization layer です
 - 大きな graph では `--include-code-facts` を必要な review だけに使い、
   proof note には対象 theorem に関係する diagram を載せます。
 - runtime diagram に proof-only boundary、proof obligation、手書きの分岐を
-  足しません。KKT solver-chain の数式 section は
-  `tools/agent_tools/kkt_equation_section.py` で IR code fact から生成します。
+  足しません。定理に必要な equation section は JIT-canonical record、
+  theorem graph overlay、または対象 domain の projection tool から生成します。

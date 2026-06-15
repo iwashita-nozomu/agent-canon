@@ -263,7 +263,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
 - shared canon PR では `agents/workflows/agent-canon-pr-workflow.md` を使い、`make agent-canon-pr-check` を merge 前の固定 gate にします。
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a repo-local override is intentional.
-- closeout 前に、正本でない設計文書、実装 copy、dated mirror、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
+- closeout 前に、補助設計文書、実装 copy、dated mirror、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
 
 ## Close-Out Prohibitions
 
@@ -295,7 +295,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - read-only diff-check agent が最新 diff を approve していない状態で user-facing completion を返してはいけません。
 - 作成・編集した text file の冒頭に依存 file header が無い状態で user-facing completion を返してはいけません。
 - active profile と risk class に応じた依存解析、header scan / format / graph check、静的解析を通さないまま user-facing completion を返してはいけません。Shared canon、Large delivery、高 risk 変更では全 repo 対象の evidence が必要です。
-- 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
+- 補助設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
 - 大規模改修や構成変更のあとに、削除済み・置換済みの implementation / document surface への参照を README、guide、workflow、規約文書、script help、validation 出力へ残したまま closeout してはいけません。
 - current tree head 以外を durable な product state として扱ってはいけません。履歴保持は `git` と run bundle artifact に限ります。
 - `verification.txt` が `status=pass` でない、または `closeout_gate.md` が `user_completion_report=unlocked` でない状態で user-facing 完了報告を出してはいけません。

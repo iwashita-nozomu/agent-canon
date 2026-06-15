@@ -28,9 +28,8 @@ downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
 downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
-downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
-downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
-downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
+downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
 @dependency-end
 -->
@@ -94,9 +93,8 @@ to choose a route:
   `agent-canon semantic-index ...`, `prose_reasoning_graph.py`, and
   `tools/agent_tools/route.py --area search`.
 - Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
-  `tool_proof_coverage.py`, `proof_path_analyzer.py`,
-  `ir_graph_correspondence.py`, `algorithm_flowchart.py`,
-  `kkt_equation_section.py`, and `agent-canon test-design check`.
+  `tool_proof_coverage.py`, `jit_canonical_ir.py`,
+  `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
 
 When a reader needs exact options, run the command with `--help` or open the
 same-named file under `documents/tools/`. Do not expand this README into a
