@@ -472,6 +472,8 @@ def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--local-llm-jobs",
+        "--llm-jobs",
+        dest="local_llm_jobs",
         type=int,
         default=DEFAULT_LOCAL_LLM_JOBS,
         help="Maximum LocalLLM prose IR parts to run concurrently.",

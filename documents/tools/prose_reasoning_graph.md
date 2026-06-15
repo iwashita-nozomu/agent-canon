@@ -162,8 +162,12 @@ DB 作成 command は、`--db` が省略された場合に
 python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-canon/documents/tools/prose_reasoning_graph.md \
   --out-dir reports/agents/<run-id>/prose_tool_doc_check \
   --profile all \
+  --llm-jobs 4 \
   --stats-out reports/agents/<run-id>/prose_tool_doc_check.stats.json
 ```
+
+`check-document` と `ingest` / `ingest-set` は `--local-llm-jobs` と
+Rust LocalLLM と同じ `--llm-jobs` を同じ bounded parallelism option として扱います。
 
 通常の分割実行では、`ingest` 後に stats JSON の
 `.fields.PROSE_REASONING_GRAPH_DB` を後続 command へ渡します。
