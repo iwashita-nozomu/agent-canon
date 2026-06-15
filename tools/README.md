@@ -13,6 +13,7 @@ downstream implementation agent_tools/issue_sync.py validates local issue sync s
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
+downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
@@ -109,6 +110,7 @@ Common execution routes:
 | Document inventory and document-canon cleanup | `agent-canon structured-analysis document-inventory --root .` |
 | Runtime log archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
 | Generated report roots left in source tree | `python3 tools/agent_tools/generated_artifact_guard.py` |
+| Design-doc claim evidence against code and dependency headers | `python3 tools/agent_tools/check_design_doc_claims.py <design-doc>` |
 | Test-design resilience diagnostics | `agent-canon test-design check tests` |
 
 Use `documents/tools/README.md` for reader-facing tool-family guidance and
@@ -145,6 +147,10 @@ unexpected top-level severity.
 projection artifacts. It is the dependency-manifest adapter for the shared
 graph visualization DSL; `check_dependency_graph.sh` keeps dependency
 validation authority.
+`check_design_doc_claims.py` compares design-document claim tokens with
+dependency-header closure, implementation text, and upstream parent design
+documents. Use it before accepting implementation-backed design prose or route
+it through `run_repo_dependency_review.sh --check-design-doc-claims`.
 `classify_path_risk.py` maps changed paths to runtime profiles and targeted
 validation checks; the manual GitHub smoke workflow uses the same classifier.
 `formal_proof.py` converts natural-language mathematical claims into

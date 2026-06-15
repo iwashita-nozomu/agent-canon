@@ -6,6 +6,7 @@ responsibility Documents dependency-analysis for this repository.
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest format and tools
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
 
@@ -22,6 +23,7 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - closeout 前に dependency manifest evidence を揃えたい
 - 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
 - repo-wide search の responsibility-based candidate と bounded `rg` hit から、どの file を編集・確認すべきか dependency graph で展開したい
+- design document の implementation-backed claim、DSL / standard-form assumption、parent-doc alignment を dependency header evidence と比較したい
 - requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
 - refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
 
@@ -75,6 +77,32 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
   --search-hits-file reports/search_hits.txt
 ```
 
+Design-document claim evidence gate:
+
+```bash
+python3 tools/agent_tools/check_design_doc_claims.py \
+  --root . \
+  --recursive-depth 3 \
+  documents/design/<topic>.md
+```
+
+or through the dependency review wrapper:
+
+```bash
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --check-design-doc-claims
+```
+
+For an explicit design document:
+
+```bash
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --check-design-doc-claims \
+  --design-doc-claim-path documents/design/<topic>.md
+```
+
 ## Interpretation
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。
@@ -85,6 +113,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
 - search result を編集対象に変換するときは、responsibility-based context、bounded `rg` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw `rg` hit だけで編集対象を決めません。
+- design document を修正または作成するときは、major claim の code / path token、初出 DSL / standard-form terms、parent-doc alignment を `Evidence And Assumption Ledger` に接続し、`check_design_doc_claims.py` の finding を design evidence gap として扱います。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。

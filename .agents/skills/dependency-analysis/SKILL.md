@@ -10,6 +10,7 @@ upstream design ../../../documents/dependency-manifest-design.md defines manifes
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ../../../agents/skills/dependency-analysis.md documents the human-facing skill
 upstream design ../../../agents/workflows/hypothesis-validation-workflow.md separates code and header dependency evidence
+upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
 
@@ -26,6 +27,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
    - repo-wide search triage: run responsibility-based search first, then use bounded `rg -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
+   - design-document evidence: run `check_design_doc_claims.py` on changed or newly authored design docs
    - repair planning or subagent handoff: build a token-light `Change Impact
      Packet` manifest before selecting implementation targets
 1. For code dependency evidence, run:
@@ -65,6 +67,18 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ```
 
 1. Use `dependency_graph.tsv` and `dependency_edit_scope.txt` to list files that need edits or review. Do not close an issue or PR with only raw search hits when dependency-expanded edit scope is available.
+1. When a design document introduces implementation-backed claims, DSL or problem-standard-form terms, normalization rules, or parent-document differences, run:
+
+```bash
+python3 tools/agent_tools/check_design_doc_claims.py \
+  --root . \
+  --recursive-depth 3 \
+  <design-doc>
+```
+
+   Treat `DESIGN_DOC_CLAIMS=fail` as a design evidence gap. Route structural
+   claim gaps to `$structure-refactor` after dependency-expanded scope is
+   available.
 
 1. When a task changes one requested object/file/finding, or when a parent will
    hand work to a write-capable subagent, produce a token-light

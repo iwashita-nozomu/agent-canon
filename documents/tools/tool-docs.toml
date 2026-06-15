@@ -121,6 +121,13 @@ language = "python"
 summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]
+id = "check-design-doc-claims"
+tool = "tools/agent_tools/check_design_doc_claims.py"
+doc = "documents/tools/check_design_doc_claims.md"
+language = "python"
+summary = "Design-document claim evidence checker documentation."
+
+[[tool]]
 id = "classify-path-risk"
 tool = "tools/agent_tools/classify_path_risk.py"
 doc = "documents/tools/classify_path_risk.md"

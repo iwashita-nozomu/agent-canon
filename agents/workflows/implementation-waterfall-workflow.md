@@ -4,6 +4,7 @@ responsibility Documents 実装ウォーターフォールワークフロー for
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates
 downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
+downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 @dependency-end
 -->
 
@@ -128,6 +129,9 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - 完了条件:
 - 実装者が文書だけ読んで着手できる
 - `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` が揃っている
+- `Evidence And Assumption Ledger` が current code、dependency header evidence、parent documents、初出 DSL / standard-form terms を設計 claim に接続している
+- 新規または変更された design document は、詳細設計レビュー前に次の gate を通している
+  `python3 tools/agent_tools/check_design_doc_claims.py --root . <design-doc>`
 - `Canonical Tree-Head Plan` が、正本として残す設計文書 path / 実装 path と削除対象の non-canonical path を明示している
 - reuse-first、style-following、reader path が blocker なしで揃っている
 
