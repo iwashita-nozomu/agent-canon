@@ -118,7 +118,7 @@ Issue / edit-scope evidence:
 - [ ] `tools/bin/agent-canon local-llm eval`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] Path/risk smoke, when relevant: `python3 tools/agent_tools/classify_path_risk.py --paths-file <changed-paths>`
-- [ ] `bash tools/ci/run_docs_checks.sh`
+- [ ] `tools/bin/agent-canon docs check`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`
 - [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots, or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source, instead of automatic `actions/checkout` submodules.
 - [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or an equivalent documented GitHub App token covers private AgentCanon reads.
