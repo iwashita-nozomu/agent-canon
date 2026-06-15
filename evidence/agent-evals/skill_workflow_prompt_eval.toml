@@ -1034,7 +1034,7 @@ required_regex = ["Pre-Edit Repository Investigation Packet", "implementation su
 id = "TASK-WF-FRESH-CAPSULE-1"
 critical = true
 description = "Requires context capsule packing for fresh subagents."
-required_regex = ["Fresh Subagent Context Capsule", "launch 間で文脈を累積しない", "compact artifacts", "full transcript"]
+required_regex = ["Fresh Subagent Context Capsule", "objective", "compact artifacts", "return contract"]
 
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
@@ -1064,8 +1064,8 @@ required_regex = ["canonical tool", "call the tool first", "trust its compact pa
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-2"
 critical = true
-description = "Prevents subagents from repeating deterministic tool checks."
-required_regex = ["Do not use `explorer`", "re-check properties", "compact tool artifacts", "extend or repair the tool contract"]
+description = "Routes deterministic tool coverage through compact artifacts and repairs the tool contract when abstraction is missing."
+required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "compact tool artifacts", "extend or repair the tool contract"]
 
 [[evals.checklist]]
 id = "ORCH-PRE-EDIT-PACKET-1"
@@ -1497,8 +1497,8 @@ description = "Codex subagent canon must require compact context capsules for fr
 [[evals.checklist]]
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
-description = "Requires exact bounded context fields and forbids full transcript/raw log handoff."
-required_regex = ["Fresh Subagent Context Capsule", "context を累積しない", "exact read-before-work paths", "full transcript", "raw log"]
+description = "Requires exact bounded context fields for fresh subagent launches."
+required_regex = ["Fresh Subagent Context Capsule", "launch 間の context", "exact read-before-work paths", "compact artifacts", "return contract"]
 
 [[evals]]
 id = "slide-production-workflow"

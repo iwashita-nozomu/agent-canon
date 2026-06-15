@@ -83,12 +83,13 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_runtime_profile_inventory.py\n"
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
-        "Close-Out Prohibitions\n"
+        "Completion Readiness\n"
         "user-facing completion\n"
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
     ),
+    "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
@@ -98,6 +99,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff\n"
     ),
+    ".agents/skills/codex-task-workflow/SKILL.md": "codex task workflow\n",
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -161,7 +163,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "ROOT_AGENTS.md": (
         "## Mechanical Guardrail Policy\n"
-        "原則 block しません hook 設定の退避や無効化ではなく strict block mode\n"
+        "高確信で公開事故になるものだけを block 対象 "
+        "hook 設定を維持したまま strict block mode\n"
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
@@ -391,21 +394,23 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("normative-lines-without-verification-route", result.stdout)
 
-    def test_prohibition_without_prohibition_section_fails(self) -> None:
-        """A convention source with prohibitions needs a prohibition section."""
+    def test_runtime_wording_rejects_legacy_completion_blocker(self) -> None:
+        """Runtime docs keep completion wording in readiness form."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "coding-conventions-python.md").write_text(
-                "# Python\n\n- 型なし公開関数を禁止します。\n\n"
-                "## 検証\n\n- `python3 -m pyright`\n",
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8")
+                + "\n- completion report を出さない\n",
                 encoding="utf-8",
             )
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("prohibition-lines-without-prohibition-section", result.stdout)
+            self.assertIn("positive_runtime_wording", result.stdout)
+            self.assertIn("legacy-negative-runtime-wording", result.stdout)
 
     def test_legacy_forwarder_requires_caller_action_warning(self) -> None:
         """Legacy forwarders must identify callers and migration action."""
