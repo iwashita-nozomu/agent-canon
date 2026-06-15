@@ -218,6 +218,99 @@ SKILL_ROUTING_MARKERS = (
     "vertical dynamic wave",
     "write-capable handoff",
 )
+DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/md-style-check/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/md-style-check.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/README.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/catalog.yaml": (
+        "format-only docs work",
+        "prose-reasoning-graph",
+        "structure-planning",
+    ),
+    "agents/TASK_WORKFLOWS.md": (
+        "$structure-planning",
+        "$prose-reasoning-graph",
+        "$md-style-check",
+        "Document Structure Evidence",
+        "structure_contract=skipped",
+    ),
+    "agents/workflows/long-form-writing-workflow.md": (
+        "$structure-planning",
+        "$prose-reasoning-graph",
+        "$md-style-check",
+        "structure_contract=skipped",
+    ),
+    "documents/REVIEW_PROCESS.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/USER_GUIDE_JA.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "Document Structure Evidence",
+        "structure_contract=skipped",
+    ),
+    "agents/templates/closeout_gate.md": (
+        "Document Structure Evidence",
+        "document_structure_status",
+        "structure_planning",
+        "prose_graph",
+        "md_style_check",
+        "format_only_reason",
+    ),
+    "tools/agent_tools/task_close.py": (
+        "changed_markdown_paths",
+        "Document Structure Evidence",
+        "document_structure_evidence",
+        "DOCUMENT_STRUCTURE_REQUIRED",
+    ),
+}
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -501,6 +594,27 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_document_structure_routing(root: Path) -> list[Finding]:
+    """Verify docs edit routing keeps structure analysis mechanically visible."""
+    paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "document_structure_routing")
+    for path, markers in DOCUMENT_STRUCTURE_ROUTING_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "document_structure_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_closeout_readiness(root: Path) -> list[Finding]:
     """Verify workflow completion readiness remains wired into the workflow."""
     path = "agents/canonical/CODEX_WORKFLOW.md"
@@ -706,6 +820,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
+    findings.extend(check_document_structure_routing(root))
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_agentcanon_push_remote_guard(root))

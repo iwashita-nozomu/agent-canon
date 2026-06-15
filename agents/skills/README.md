@@ -58,7 +58,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `long-form-writing` | README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
-| `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
+| `md-style-check` | format-only な Markdown の体裁とリンク確認。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `document-canon-cleanup` | 非正本の文書候補を棚卸しし、generated evidence / closed issue / duplicate heading を正本へ振り分ける | `agents/skills/document-canon-cleanup.md` | `.agents/skills/document-canon-cleanup/SKILL.md` |
 | `dependency-analysis` | 依存 manifest / 実コード依存を確認し、変更影響範囲と repair-planning packet を作る | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
 | `worktree-start` | stale worktree / `WORKTREE_SCOPE.md` / action log を legacy cleanup evidence として診断し、new worktree kickoff には使わない | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
@@ -133,6 +133,7 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは `report-writing` を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
 - 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは `prose-reasoning-graph` を使います。
 - report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、primary artifact、source map、metric / delta contract、invalid interpretation を固定します。
+- substantive な文書変更では `prose-reasoning-graph` と `structure-planning` を先に通し、typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残します。
 - docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、primary figure、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。

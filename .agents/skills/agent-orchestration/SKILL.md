@@ -42,7 +42,7 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md pre-edit investigation
    - add `$subagent-bootstrap` only when an explicit handoff/wave is ready or the task shape requires subagent bootstrap evidence
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
-     - nontrivial or substantive document creation/addition/revision where section order, reader path, claim support, source map, canonical route, or document responsibility changes -> `$prose-reasoning-graph` as the common structure graph/DSL gate; for typo/link/format-only edits, use `$md-style-check` and record that structure analysis is unnecessary.
+     - nontrivial or substantive document creation/addition/revision where section order, reader path, claim support, source map, canonical route, or document responsibility changes -> `$prose-reasoning-graph` as the common structure graph/DSL gate and `$structure-planning` as the structure contract gate; for typo/link/format-only edits, use `$md-style-check` and record `structure_contract=skipped` with the reason.
      - README, workflow, guide, migration, or other general explanatory reader-facing docs -> `$long-form-writing` as the DSL-to-prose projection adapter; select by document responsibility and reader contract, with length as a secondary signal.
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing outside paper-draft ownership -> `$academic-writing`
@@ -60,7 +60,7 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md pre-edit investigation
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
      - optimizer, solver, preconditioner, gradient, Jacobian, Hessian, KKT, convergence, tolerance, numerical benchmark, or numerical-test diagnosis -> `$computational-optimization`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, multi-candidate comparison, change-impact packet creation, or repair-planning/subagent handoff context -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay when a cause hypothesis is involved
-     - Markdown file edits, docs lint/link/heading repair, Mermaid/math drift, formatter adjacent checks, `agent-canon docs`, docs-check failures, or Markdown style drift -> `$md-style-check`
+     - Markdown file edits, docs lint/link/heading repair, Mermaid/math drift, formatter adjacent checks, `agent-canon docs`, docs-check failures, or Markdown style drift -> `$md-style-check`; pair substantive document edits with `$prose-reasoning-graph` and `$structure-planning`.
      - accumulated skill/tool/workflow/hook/eval log analysis, routing misses, selection gaps, or weak-skill diagnosis -> `$agent-log-analysis`
      - AgentCanon source update, `vendor/agent-canon` submodule latest/pin update, root runtime view repair, parent AgentCanon update TODOs, or `make agent-canon-ensure-latest` / `tools/update_agent_canon.sh` routing -> `$agent-canon-update`; add `$agent-update-branch` only when a parent-repo `canon-pin` branch lane is needed
      - user/reviewer feedback about agent behavior, repeated routing misses, recurrence prevention, task retrospectives, or agent-side memory updates -> `$agent-learning`

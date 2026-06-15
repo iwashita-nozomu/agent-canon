@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import re
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from agent_team import resolve_report_root
@@ -214,6 +215,75 @@ def current_diff_ref(workspace: Path) -> str:
     return f"{head}-dirty-{diff_hash}"
 
 
+def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
+    """Return source-tree Markdown paths changed in the current checkout."""
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if not path.endswith(".md"):
+                continue
+            if path.startswith(("reports/", ".agent-canon/log-archive/")):
+                continue
+            paths.add(path)
+    return tuple(sorted(paths))
+
+
+def parse_document_structure_paths(value: str) -> set[str]:
+    """Parse a closeout document-structure path list."""
+    if value in {"", "missing", "none"}:
+        return set()
+    return {
+        Path(item.strip()).as_posix()
+        for item in re.split(r"[,\s]+", value)
+        if item.strip() and item.strip() not in {"missing", "none"}
+    }
+
+
+def document_structure_evidence_ready(
+    changed_markdown: Sequence[str], evidence: dict[str, str]
+) -> tuple[bool, bool]:
+    """Return path-record and route evidence readiness for Markdown changes."""
+    if not changed_markdown:
+        return True, True
+    recorded_paths = parse_document_structure_paths(
+        evidence.get("document_structure_paths", "")
+    )
+    normalized_changed = {Path(path).as_posix() for path in changed_markdown}
+    paths_recorded = normalized_changed.issubset(recorded_paths)
+    status = evidence.get("document_structure_status", "")
+    structure_contract = evidence.get("structure_contract", "")
+    complete_route = (
+        status == "complete"
+        and evidence.get("structure_planning") == "complete"
+        and evidence.get("prose_graph") == "complete"
+        and structure_contract
+        not in {"", "missing", "none", "not_applicable"}
+        and "skipped" not in structure_contract
+    )
+    skipped_route = (
+        status == "skipped"
+        and evidence.get("md_style_check") == "pass"
+        and "skipped" in evidence.get("structure_contract", "")
+        and evidence.get("format_only_reason", "") not in {"", "missing", "none"}
+    )
+    return paths_recorded, complete_route or skipped_route
+
+
 def active_run_name(report_dir: Path) -> str | None:
     """Return the active run marker for a report root, or None when absent."""
     active_run_path = report_dir.parent / ".active_run"
@@ -271,6 +341,9 @@ def main() -> int:
     tool_warning_evidence = parse_markdown_status_section(
         closeout_path, "Tool Warning Evidence"
     )
+    document_structure = parse_markdown_status_section(
+        closeout_path, "Document Structure Evidence"
+    )
     subagent_lifecycle = parse_markdown_status_section(
         closeout_path, "Subagent Lifecycle Evidence"
     )
@@ -290,6 +363,10 @@ def main() -> int:
         else {}
     )
     active_diff_ref = current_diff_ref(workspace)
+    changed_markdown = changed_markdown_paths(workspace)
+    document_structure_paths_ready, document_structure_route_ready = (
+        document_structure_evidence_ready(changed_markdown, document_structure)
+    )
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
     workflow_tool_warning_blockers = workflow_tool_warning_problems(
         workflow_monitoring_path
@@ -365,6 +442,8 @@ def main() -> int:
         )
         not in {"", "missing", "none"},
         "workflow_tool_warnings_closed": not workflow_tool_warning_blockers,
+        "document_structure_paths_recorded": document_structure_paths_ready,
+        "document_structure_evidence": document_structure_route_ready,
         "mechanical_completion_loop_complete": closeout.get(
             "mechanical_completion_loop_complete"
         )
@@ -581,6 +660,26 @@ def main() -> int:
     print(
         "WORKFLOW_TOOL_WARNING_BLOCKERS="
         f"{join_blockers(list(workflow_tool_warning_blockers))}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_REQUIRED="
+        f"{'yes' if changed_markdown else 'no'}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN="
+        f"{','.join(changed_markdown) if changed_markdown else 'none'}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_STATUS="
+        f"{document_structure.get('document_structure_status', '')}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_PATHS="
+        f"{document_structure.get('document_structure_paths', '')}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_EVIDENCE="
+        f"{'yes' if document_structure_route_ready else 'no'}"
     )
     print(
         "MECHANICAL_COMPLETION_LOOP_COMPLETE="

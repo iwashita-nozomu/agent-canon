@@ -17,6 +17,7 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
 )
 
@@ -49,7 +50,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
     "documents/algorithm-implementation-boundary.md": "algorithm\n",
     "documents/object-oriented-design.md": "readability.py\n",
-    "documents/REVIEW_PROCESS.md": "review\n",
+    "documents/REVIEW_PROCESS.md": (
+        "review structure-planning prose-reasoning-graph md-style-check "
+        "structure_contract=skipped\n"
+    ),
     "documents/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
         ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
@@ -95,24 +99,55 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
+    "agents/workflows/long-form-writing-workflow.md": (
+        "$structure-planning $prose-reasoning-graph $md-style-check "
+        "structure_contract=skipped\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
     ".agents/skills/agent-orchestration/SKILL.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
-        "write-capable handoff\n"
+        "write-capable handoff $prose-reasoning-graph $structure-planning "
+        "$md-style-check format-only structure_contract=skipped\n"
     ),
-    ".agents/skills/codex-task-workflow/SKILL.md": "codex task workflow\n",
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "codex task workflow prose-reasoning-graph $structure-planning "
+        "$md-style-check format-only structure_contract=skipped\n"
+    ),
+    ".agents/skills/md-style-check/SKILL.md": (
+        "$prose-reasoning-graph $structure-planning format-only "
+        "structure_contract=skipped\n"
+    ),
     ".agents/skills/mvp-skeleton/SKILL.md": "mvp core loop vertical slice\n",
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
-        "write-capable handoff\n"
+        "write-capable handoff prose-reasoning-graph structure-planning "
+        "md-style-check format-only structure_contract=skipped\n"
     ),
-    "agents/skills/catalog.yaml": "skill catalog routing entry skill\n",
+    "agents/skills/codex-task-workflow.md": (
+        "codex task workflow prose-reasoning-graph structure-planning "
+        "md-style-check format-only structure_contract=skipped\n"
+    ),
+    "agents/skills/md-style-check.md": (
+        "prose-reasoning-graph structure-planning format-only "
+        "structure_contract=skipped\n"
+    ),
+    "agents/skills/README.md": (
+        "prose-reasoning-graph structure-planning md-style-check "
+        "structure_contract=skipped\n"
+    ),
+    "agents/skills/catalog.yaml": (
+        "skill catalog routing entry skill format-only docs work "
+        "prose-reasoning-graph structure-planning\n"
+    ),
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
-        "write-capable handoff\n"
+        "write-capable handoff $structure-planning $prose-reasoning-graph "
+        "$md-style-check Document Structure Evidence structure_contract=skipped\n"
     ),
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
@@ -120,7 +155,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "evaluate_skill_workflow_prompts.py\n"
     ),
     "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
-    "agents/templates/closeout_gate.md": "evaluate_agent_run.py run_repo_dependency_review.sh\n",
+    "agents/USER_GUIDE_JA.md": (
+        "structure-planning prose-reasoning-graph md-style-check "
+        "Document Structure Evidence structure_contract=skipped\n"
+    ),
+    "agents/templates/closeout_gate.md": (
+        "evaluate_agent_run.py run_repo_dependency_review.sh\n"
+        "Document Structure Evidence document_structure_status structure_planning "
+        "prose_graph md_style_check format_only_reason\n"
+    ),
     "agents/workflows/hypothesis-validation-workflow.md": (
         "scan_code_dependencies.sh\n"
         "Before closeout, run "
@@ -164,6 +207,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".codex/hooks/direct_rg_context_guard.py": (
         "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
         "reports *.jsonl\n"
+    ),
+    "tools/agent_tools/task_close.py": (
+        "changed_markdown_paths Document Structure Evidence "
+        "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED\n"
     ),
     "ROOT_AGENTS.md": (
         "## Mechanical Guardrail Policy\n"
@@ -514,6 +561,56 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("skill_routing", result.stdout)
             self.assertIn("missing-marker:write-capable handoff", result.stdout)
+
+    def test_document_structure_routing_requires_structure_planning(self) -> None:
+        """Document edit routing must keep structure analysis markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "$structure-planning",
+                    "structure-route-missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_structure_routing", result.stdout)
+            self.assertIn("missing-marker:$structure-planning", result.stdout)
+
+    def test_document_structure_routing_requires_format_skip_evidence(self) -> None:
+        """Format-only Markdown routes must keep the skip evidence marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "md-style-check.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8").replace(
+                    "structure_contract=skipped",
+                    "structure-contract-record",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_structure_routing", result.stdout)
+            self.assertIn("missing-marker:structure_contract=skipped", result.stdout)
+
+    def test_minimal_fixture_covers_document_structure_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every docs structure routing surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def copy_minimal_repo(self, root: Path) -> None:
         """Create the minimum tree needed by the checker."""

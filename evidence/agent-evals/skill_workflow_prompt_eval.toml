@@ -230,6 +230,12 @@ critical = true
 description = "Requires adjacent checks after formatter or fixer execution."
 required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
 
+[[evals.checklist]]
+id = "MD-STYLE-STRUCTURE-GATE-1"
+critical = true
+description = "Routes substantive Markdown document edits through prose graph and structure planning, with format-only skip evidence."
+required_regex = ["\\$prose-reasoning-graph", "\\$structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+
 [[evals]]
 id = "subagent-bootstrap-tool-first-gate"
 target = ".agents/skills/subagent-bootstrap/SKILL.md"
@@ -265,6 +271,12 @@ id = "MD-STYLE-DOC-RUST-2"
 critical = true
 description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
 required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
+critical = true
+description = "Separates format-only Markdown checks from substantive document structure changes."
+required_regex = ["prose-reasoning-graph", "structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
 
 [[evals]]
 id = "html-output-shim"
@@ -1088,8 +1100,8 @@ required_regex = ["\\$html-output", "\\$html-experiment-report", "defaults to Ma
 [[evals.checklist]]
 id = "STRUCTURE-ROUTING-SKILL-1"
 critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
-required_regex = ["\\$structure-planning", "experiment plan/report", "document", "paper", "refactor", "source map"]
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["\\$structure-planning", "\\$prose-reasoning-graph", "experiment plan/report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
 
 [[evals.checklist]]
 id = "TOOL-FINDING-ROUTING-SKILL-1"
@@ -1124,8 +1136,8 @@ required_regex = ["html-output", "html-experiment-report", "Markdown", "HTML", "
 [[evals.checklist]]
 id = "STRUCTURE-ROUTING-CANONICAL-1"
 critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
-required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map"]
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
 
 [[evals.checklist]]
 id = "TOOL-FINDING-ROUTING-CANONICAL-1"

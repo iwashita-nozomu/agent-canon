@@ -89,6 +89,7 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
 - token 節約は context loading と fan-out の制御であり、active profile が要求する review、dependency analysis、validation、closeout gate は維持します
 - canonical tool が正本判定を持つ question では、prose 読み込みや subagent 起動の前に tool を呼び、pass / finding の compact output を信頼します。tool-covered property は tool output を正本にし、必要な場合は tool contract の不足を修正対象にします
 - workflow が user に実行させる command を引用する場合は、`tools/catalog.yaml` の `audience` / `placement` を確認し、user-facing entrypoint の catalog surface から案内します
+- substantive な文書変更では、本文編集の前に `$structure-planning` で structure contract を固定し、`$prose-reasoning-graph` で reader path / claim support / source map を確認します。typo / link / format-only route では `$md-style-check` を使い、closeout の `Document Structure Evidence` に `structure_contract=skipped:<reason>`、`md_style_check=pass`、`format_only_reason` を残します
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
 - 要件整理では、ユーザーへ戻す前に notes、guardrails、documents、prior logs、local code / tests で解決できる unknown を解決し、根拠を `Resolved From Accumulated Context` に残します
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します

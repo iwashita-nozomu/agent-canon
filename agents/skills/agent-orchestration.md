@@ -101,7 +101,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - `$agent-orchestration` は routing skill として常に先頭に置きます
 - `repo-changing execution` が始まる stage では `$codex-task-workflow` を足します
 - `$subagent-bootstrap` は explicit handoff / wave が ready になった stage、または Shared canon / Large delivery / high-risk / multi-step / explicit subagent work で bootstrap evidence が必要な stage だけ足します
-- 非自明または substantive な文書作成・追記・改稿で section order、reader path、claim support、source map、canonical route、または document responsibility が変わる場合は、共通の構造先行 gate として `prose-reasoning-graph` を足します。typo / link / format-only では `md-style-check` を使い、構造解析を省略した理由を残します
+- 非自明または substantive な文書作成・追記・改稿で section order、reader path、claim support、source map、canonical route、または document responsibility が変わる場合は、共通の構造先行 gate として `prose-reasoning-graph` と `structure-planning` を足します。typo / link / format-only では `md-style-check` を使い、`structure_contract=skipped` と理由を残します
 - file / document responsibility の判定結果から DSL->文章 adapter を選びます。README、workflow、guide、migration、specification などの一般説明 prose では `long-form-writing` を足します。これは長さではなく責務による選択です
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
@@ -118,7 +118,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - task 開始前に expected AgentCanon repo structure、root view、`vendor/agent-canon/`、`.gitmodules`、または canonical path の欠落 / 移動 / stale state が疑われる場合は、通常 task の前に `structure-refactor` の pre-task structure repair route を使います。AgentCanon-owned root view / submodule drift なら `agent-canon-update` も併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
-- Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します
+- Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
 - skill / tool / workflow / hook / eval の蓄積ログ分析、routing miss、selection gap、弱い skill の調査が scope にある場合は `agent-log-analysis` を足します
 - AgentCanon source update、`vendor/agent-canon` submodule latest / pin update、root runtime view repair、parent AgentCanon update TODO、または `make agent-canon-ensure-latest` / `tools/update_agent_canon.sh` routing が scope にある場合は `agent-canon-update` を足します。parent repo の `canon-pin` branch lane が必要な場合だけ `agent-update-branch` も併用します
 - user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、agent-side memory update を要求する場合は `agent-learning` を足します
