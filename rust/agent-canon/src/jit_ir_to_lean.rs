@@ -635,8 +635,8 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
             "  {{ coverage := {}, targetBackend := {}, ireeCompileAvailable := {}, ireeRunModuleAvailable := {}, lastSuccessfulPhase := {}, phaseTraceCount := {}, compileAttemptCount := {}, llvmModuleCount := llvmModules.length, llvmBitcodeCount := {}, executableSourceCount := {}, llvmModules := llvmModules }}",
             lean_string(string_field(backend, "coverage")),
             lean_string(string_field(backend, "target_backend")),
-            executables.get("iree-compile").map_or(false, |v| !v.is_null()),
-            executables.get("iree-run-module").map_or(false, |v| !v.is_null()),
+            executables.get("iree-compile").is_some_and(|v| !v.is_null()),
+            executables.get("iree-run-module").is_some_and(|v| !v.is_null()),
             lean_string(string_field(backend, "last_successful_phase")),
             phase_trace_count,
             compile_attempt_count,
@@ -1165,7 +1165,7 @@ fn render_string_list(values: &[Value], indent: &str) -> String {
     let items: Vec<String> = values
         .iter()
         .filter_map(Value::as_str)
-        .map(|value| lean_string(value.to_string()))
+        .map(lean_string)
         .collect();
     format!("{indent}[{}]", items.join(", "))
 }
@@ -1177,7 +1177,7 @@ fn render_inline_string_list(values: Option<&Vec<Value>>) -> String {
     let items: Vec<String> = values
         .iter()
         .filter_map(Value::as_str)
-        .map(|value| lean_string(value.to_string()))
+        .map(lean_string)
         .collect();
     format!("[{}]", items.join(", "))
 }
