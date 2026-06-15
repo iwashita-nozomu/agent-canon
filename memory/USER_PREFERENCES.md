@@ -177,6 +177,9 @@ upstream design README.md memory surface index
 - 2026-06-15 | Temporary code should be explicitly marked as temporary when created, and removed before closeout once it has served its purpose.
   - source: chat
 
+- 2026-06-15 | Use GitHub Issues as durable work tracking when appropriate, and include issue cleanup or explicit issue status confirmation in closeout.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
