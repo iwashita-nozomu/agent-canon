@@ -199,7 +199,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML graph reports.
+    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML projection reports under the shared graph visualization DSL contract.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker
@@ -214,6 +214,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/render_dependency_manifest_graph.md
       - documents/dependency-manifest-design.md
+      - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_render_dependency_manifest_graph.py
 
@@ -368,7 +369,7 @@ entries:
       - tests/agent_tools/test_algorithm_lemma_graph.py
 
   - id: algorithm-flowchart
-    summary: Renders Algorithm Expansion IR, LemmaGraph, and proof_status overlays as Mermaid block charts.
+    summary: Renders Algorithm Expansion IR, LemmaGraph, and proof_status overlays as Mermaid projection charts under the shared graph visualization DSL contract.
     path: tools/agent_tools/algorithm_flowchart.py
     family: agent_tools
     role: helper
@@ -387,6 +388,7 @@ entries:
       - agents/skills/algorithm-flowchart.md
       - agents/skills/algorithm-proof-exploration.md
       - agents/skills/formal-proof-workflow.md
+      - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_algorithm_flowchart.py
 
@@ -815,7 +817,7 @@ entries:
       - rust/agent-canon/src/semantic_index.rs
 
   - id: semantic-provider-html-report
-    summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
+    summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
     path: tools/agent_tools/semantic_provider_html_report.py
     family: agent_tools
     role: docs
@@ -831,11 +833,12 @@ entries:
       - documents/tools/semantic_provider_html_report.md
       - agents/skills/html-experiment-report.md
       - documents/semantic_index.md
+      - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
+    summary: Builds SQLite-backed prose structure graphs, shared graph visualization projection contracts, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -849,6 +852,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/prose_reasoning_graph.md
+      - documents/prose-reasoning-graph/dsl-spec.md
       - agents/skills/prose-reasoning-graph.md
       - agents/skills/structure-planning.md
     tests:

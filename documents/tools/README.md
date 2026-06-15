@@ -31,7 +31,7 @@ downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature r
 downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
 downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
 downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
-downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
+downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end
 -->
 
@@ -59,6 +59,7 @@ first and then return here only for reader-facing context.
 | Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
 | Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
+| Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
 
 ## AgentCanon Tool Catalog
 
@@ -97,6 +98,11 @@ to choose a route:
   `tool_proof_coverage.py`, `proof_path_analyzer.py`,
   `ir_graph_correspondence.py`, `algorithm_flowchart.py`,
   `kkt_equation_section.py`, and `agent-canon test-design check`.
+
+Graph visualization follows the Prose Reasoning Graph DSL projection contract.
+`render_dependency_manifest_graph.py`, `algorithm_flowchart.py`,
+`semantic_provider_html_report.py`, and runtime dashboard diagrams are adapters
+or projections; their domain producers keep validation authority.
 
 When a reader needs exact options, run the command with `--help` or open the
 same-named file under `documents/tools/`. Do not expand this README into a

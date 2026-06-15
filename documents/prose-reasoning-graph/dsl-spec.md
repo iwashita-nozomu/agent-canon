@@ -8,6 +8,11 @@ coverage graph_format_trace requires node record|nodes table; edge record|edges 
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current MVP implementation
 downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py validates current graph behavior
 downstream design ../tools/prose_reasoning_graph.md documents CLI usage
+downstream design ../tools/README.md documents graph visualization tool routing from the documentation hub
+downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph visualization adapter
+downstream design ../tools/algorithm_flowchart.md documents algorithm/proof graph visualization adapter
+downstream design ../tools/semantic_provider_html_report.md documents semantic provider visualization adapter
+downstream design ../../tools/README.md documents graph visualization tool routing from the execution hub
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
 @dependency-end
@@ -39,6 +44,7 @@ view, not one prose layer versus another.
 This specification is binding for:
 
 - graph layers and allowed MVP layer names;
+- graph visualization adapters and projection artifacts;
 - document responsibility contracts and responsibility-derived coverage checks;
 - directory responsibility projections derived from README and child artifact
   responsibility evidence;
@@ -582,6 +588,42 @@ edges, diagnostics, and edit operations. Full internal analysis nodes are
 available through debug-oriented projection exports for receiving skills and
 reviewers that need complete graph evidence.
 
+## Graph Visualization Contract
+
+Graph visualization is a projection surface over this DSL object model. A
+visual artifact may be Markdown, Mermaid, DOT, SVG, or self-contained HTML, but
+its authority comes from the graph objects it projects: document records, node
+records, edge records, diagnostics, projection views, presentation features,
+adapter metadata, and `payload_json` provenance.
+
+Reusable graph renderers should consume a DSL projection payload or an adapter
+payload that can be losslessly mapped into DSL nodes and edges. Domain tools may
+still own source-specific extraction. For example, dependency-manifest graph
+TSV, Algorithm Expansion IR / LemmaGraph, semantic-provider comparison JSON,
+and runtime-dashboard decision flows are adapter inputs. Their visual reports
+are review projections over source facts, while the source checker, proof
+checker, semantic-index command, or dashboard producer keeps domain validation
+authority.
+
+Every graph visualization adapter records this boundary:
+
+- `adapter_name` and `adapter_version` identify the source extractor or legacy
+  renderer.
+- source nodes preserve path, symbol, document, provider, run, or other native
+  locators in `payload_json`.
+- edge kinds reuse registered relation vocabulary when available and otherwise
+  use an adapter extension namespace.
+- projection output preserves member node ids, source locators, edge basis,
+  diagnostic ids, and renderer decisions.
+- HTML or SVG viewers are inspection artifacts generated from projection data;
+  they are reproducible outputs with projected provenance and renderer
+  decisions.
+
+The canonical implementation direction is a shared `prose_reasoning_graph.py`
+projection / visualization entrypoint fed by adapters. Existing domain-specific
+renderers remain valid while they document their adapter mapping and route
+future reusable graph UI behavior through this contract.
+
 ## Profiles And Skill Handoff
 
 Profiles choose the receiving skill set and diagnostic emphasis.
@@ -726,6 +768,14 @@ replacement for projection, diagnostics, or rewrite packets.
 Future independent-tool work may ingest code, design documents, shell scripts,
 C++, Rust, or other structured sources. Adapters must map their source facts
 into the same object model before adding new durable vocabulary.
+
+Visualization adapters follow the same rule. A dependency graph renderer maps
+manifest edges into `artifact` nodes and dependency edges; an algorithm
+flowchart renderer maps IR blocks, lemma nodes, and proof-status overlays into
+adapter nodes, proof/status payloads, and projection edges; a semantic-provider
+HTML report maps provider deltas into artifact or projection nodes with
+comparison payloads. Each adapter may keep its source-specific CLI while the
+shared projection contract remains this DSL.
 
 An adapter must provide:
 

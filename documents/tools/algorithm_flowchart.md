@@ -5,7 +5,10 @@ upstream implementation ../../tools/agent_tools/algorithm_flowchart.py renders M
 upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py builds Algorithm Expansion IR.
 upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds Lemma Dependency Graphs.
 upstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays.
+upstream implementation ../../tools/agent_tools/kkt_equation_section.py emits KKT solver-chain equation sections from IR facts.
 upstream design ../../agents/skills/algorithm-flowchart.md defines the skill workflow.
+upstream design ../prose-reasoning-graph/dsl-spec.md defines shared graph visualization projection and adapter contract.
+upstream design kkt_equation_section.md documents KKT equation prose generation from Algorithm IR facts.
 downstream implementation ../../tests/agent_tools/test_algorithm_flowchart.py tests CLI behavior.
 @dependency-end
 -->
@@ -20,6 +23,25 @@ assumptions, operational assumptions, or terminal negative results.
 The tool does not prove mathematics. It is a navigation view over artifacts
 produced by `algorithm_expansion_ir.py`, `algorithm_lemma_graph.py`, and
 `proof_path_analyzer.py`.
+
+Within AgentCanon's shared graph visualization model, this tool is the
+Algorithm Expansion IR / LemmaGraph adapter. Algorithm extraction, lemma-graph
+construction, and proof-status checks keep domain authority. The Mermaid,
+Markdown, and JSON outputs are DSL-style projection artifacts over source
+locators, IR node ids, lemma graph ids, proof-status payloads, and projection
+edges. Future shared visual UI behavior should be implemented through the graph
+projection contract in `documents/prose-reasoning-graph/dsl-spec.md`, while
+this tool keeps the algorithm/proof adapter responsibilities.
+
+Adapter mapping uses each Algorithm Expansion IR block, lemma node, and
+proof-status entry as a source-truth anchor with source span metadata when the
+producer provides it. Blocks, lemmas, proof obligations, and status overlays
+become node record entries; control-flow, lemma-dependency, proof-support, and
+status-overlay links become typed relation edge record entries. `payload_json`
+carries native ids, path or symbol locators, proof status, theorem names, and
+checker provenance. Mermaid, Markdown, and JSON outputs are projection view
+products over this lower graph, with reader-state and macro-claim context
+provided by the proof or algorithm review packet.
 
 ## Typical Use
 
@@ -100,12 +122,11 @@ Color classes:
 
 ## Limits
 
-The chart is intentionally a visualization layer. It does not replace
-`proof_path_analyzer.py`, and it does not infer missing proof obligations from
-prose. Regenerate the chart after changing implementation code, Algorithm
-Expansion IR, LemmaGraph, or `proof_status.json`.
+The chart is a visualization layer over `proof_path_analyzer.py`,
+Algorithm Expansion IR, LemmaGraph, and `proof_status.json`. Regenerate the
+chart after changing implementation code or any upstream graph artifact.
 
-When a proof note needs an implementation-only diagram, use `--view runtime` or
-`--view core`; do not hand-draw proof boundaries or mix proof obligations into
-the runtime diagram. Use `kkt_equation_section.py` for KKT equation prose that
-must be backed by IR code facts.
+The `--view runtime` and `--view core` inputs above are the implementation-only
+diagram routes. Keep proof-boundary material in the `proof` view and proof
+artifacts, and use `kkt_equation_section.py` for KKT equation prose backed by IR
+code facts.

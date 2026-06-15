@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
+upstream design ../documents/prose-reasoning-graph/dsl-spec.md shared graph visualization projection and adapter contract
 downstream design catalog.yaml structured AgentCanon tool catalog
 downstream design ../documents/tools/tool-docs.toml same-named tool documentation map
 downstream implementation agent_tools/tool_catalog.py validates catalog/docs consistency
@@ -142,7 +143,10 @@ directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
 `render_dependency_manifest_graph.py` turns a dependency graph TSV from
-`check_dependency_graph.sh --graph-tsv` into Markdown and DOT review artifacts.
+`check_dependency_graph.sh --graph-tsv` into Markdown, DOT, and HTML review
+projection artifacts. It is the dependency-manifest adapter for the shared
+graph visualization DSL; `check_dependency_graph.sh` keeps dependency
+validation authority.
 `classify_path_risk.py` maps changed paths to runtime profiles and targeted
 validation checks; the manual GitHub smoke workflow uses the same classifier.
 `formal_proof.py` converts natural-language mathematical claims into
@@ -221,6 +225,10 @@ prose structure graph, exports diagnostics and natural-language explanations,
 and writes handoff packets for writing, review, literature, experiment, and
 artifact skills. DB creation defaults to the user-home prose graph cache and
 accepts an explicit `--db` path when a workflow needs one.
+The Prose Reasoning Graph DSL also owns the shared graph visualization contract:
+dependency graph HTML/DOT, algorithm Mermaid flowcharts, semantic-provider HTML,
+and runtime decision-flow diagrams are adapter projections over DSL graph
+objects rather than independent graph schemas.
 `agent-canon structured-analysis build --root . --profile manual` rebuilds the
 SQLite intermediate representation from git-visible files into the user-home
 structured-analysis cache. It materializes an `artifact` layer and imports
@@ -282,7 +290,7 @@ findings for resilient test planning.
   - `agent-canon algorithm-ir-to-lean` は Algorithm Expansion IR の `expression_ast` と `control_facts` から Lean route artifact を生成し、構造体アクセスは IR 後段の projection として正規化します。
   - `ir_graph_correspondence.py` は Algorithm Expansion IR の `assignment_equation` / `return_equation` を lemma graph の code-fact node、consumption edge、target chain、任意の `proof_status.json` adoption に照合します。反復単位は `source_symbol` と `equation_tags` で group 化し、証明で使う中間計算式が IR 由来であることを確認します。
   - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。
-  - `algorithm_flowchart.py` は Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影し、実装されている反復法と proof-state overlay を Markdown / Mermaid / JSON artifact として出します。図は navigation evidence であり、証明済み判定は proof checker と `proof_path_analyzer.py` に戻します。`--view runtime|core` は proof-only node / label を runtime 図から外します。
+  - `algorithm_flowchart.py` は Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影し、実装されている反復法と proof-state overlay を Markdown / Mermaid / JSON artifact として出します。図は shared graph visualization DSL の algorithm/proof adapter projection であり、証明済み判定は proof checker と `proof_path_analyzer.py` に戻します。`--view runtime|core` は proof-only node / label を runtime 図から外します。
   - `kkt_equation_section.py` は Algorithm Expansion IR の `code_facts` を検査し、reduced block-system / KKT / iterative-solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、solver-chain 式を proof note に手書きで足す経路を避けます。
   - `agent-canon test-design check` は既存 test の oracle 不在、static analysis の重複 wrapper、generated execution-only placeholder、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
@@ -659,7 +667,8 @@ creating labels or ownership decisions.
 `semantic_provider_html_report.py` renders that provider-delta JSON as a
 self-contained HTML report whose first figure is
 `Provider Delta To Shared Candidate Logic`; the HTML remains review evidence and
-does not replace candidate logic, `eval-output`, or responsibility checks.
+projects provider deltas over the shared graph visualization DSL. Candidate
+logic, `eval-output`, and responsibility checks keep their validation authority.
 `eval-output` validates generated JSONL artifacts before reviewers consume
 them, including result counts, responsibility metadata, thin-doc actions, and no
 full long-query echo in search summaries.

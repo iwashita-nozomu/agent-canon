@@ -47,6 +47,21 @@ explanation、integration plan、skill handoff、rewrite packet を export し�
 repository policy change を判断しません。finding の解釈、verification route の展開、
 rewrite の採否は skill、reviewer、workflow の責務です。
 
+## Graph Visualization Owner
+
+AgentCanon の graph visualization contract は
+[Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)
+が持ちます。`prose_reasoning_graph.py` は source-anchored graph、projection
+payload、presentation feature、adapter metadata、diagnostic / verification route
+を保持する共通入口です。
+
+Dependency manifest graph、Algorithm Expansion IR / LemmaGraph flowchart、
+semantic-provider comparison HTML、runtime dashboard evidence flow は、source
+extractor または domain checker を持つ adapter surface です。これらの viewer は
+DSL projection を読む、または DSL object model に lossless mapping できる adapter
+payload を読む形へ寄せます。domain checker の pass / fail authority は元 tool に残し、
+HTML、DOT、Mermaid、SVG は review projection artifact として扱います。
+
 ## Graph Contract
 
 この tool の graph は source-anchored です。source span、form、concept、phase、
