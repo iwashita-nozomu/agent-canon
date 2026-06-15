@@ -1537,6 +1537,51 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
         ),
         surface_candidate(
             &lower,
+            "numerical_iterative_algorithm_contract",
+            "Computational optimization and iterative algorithm contract",
+            &[
+                "agents/skills/computational-optimization.md",
+                ".agents/skills/computational-optimization/SKILL.md",
+                "documents/algorithm-implementation-boundary.md",
+                "documents/conventions/python/15_jax_rules.md",
+                "documents/coding-conventions-testing.md",
+            ],
+            &[
+                "new solver helper before objective/residual, Step_impl, R_impl, state, and stopping policy are fixed",
+                "proof-only Info fields, diagnostic gates, or runtime checks without iteration-map effect",
+                "large numerical tests before static contract and smallest deterministic cases are defined",
+            ],
+            &[
+                "tools/bin/agent-canon python-algorithm-contract-check --root . <paths>",
+                "tools/bin/agent-canon test-design check <test-plan-or-doc>",
+                "python3 tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                ("iterative method", 9),
+                ("iteration map", 9),
+                ("fixed point", 7),
+                ("solver", 8),
+                ("convergence", 8),
+                ("stopping", 7),
+                ("residual", 7),
+                ("preconditioner", 7),
+                ("kkt", 7),
+                ("newton", 6),
+                ("mehrotra", 6),
+                ("optimizer", 5),
+                ("optimization", 5),
+                ("lax.while_loop", 6),
+                ("while_loop", 5),
+                ("反復法", 9),
+                ("反復", 6),
+                ("収束", 8),
+                ("停止条件", 7),
+                ("残差", 7),
+                ("数値", 5),
+            ],
+        ),
+        surface_candidate(
+            &lower,
             "directory_repository_responsibility",
             "Repository and directory responsibility contract",
             &[
@@ -3370,6 +3415,30 @@ mod tests {
             .forbidden_paths
             .iter()
             .any(|path| path.contains("auth")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_iterative_algorithm_contract() {
+        let request =
+            "反復法の solver 実装で convergence と residual の stopping policy を直したい";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(
+            candidates[0].surface,
+            "numerical_iterative_algorithm_contract"
+        );
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("computational-optimization")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("algorithm-implementation-boundary")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("python-algorithm-contract-check")));
     }
 
     #[test]

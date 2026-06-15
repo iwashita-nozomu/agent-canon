@@ -26,6 +26,12 @@ upstream design ../../../agents/skills/test-design.md adversarial test design bo
    under the accepted problem/config/backend assumptions, change the algorithmic
    mechanism itself. Do not add proof-only `Info` fields, diagnostic gates, or
    extra runtime checks merely to satisfy the proof.
+1. When tool-side routing returns `numerical_iterative_algorithm_contract`, build
+   an explicit route packet before code changes: `iteration_map`,
+   `stopping_scalar`, `state_tuple`, `reuse_surface`, `failure_semantics`, and
+   `validation_surface`. Prefer existing solver/library/framework primitives or
+   repo helpers as the first implementation surface, and keep correctness
+   validation separate from experiment or benchmark evidence.
 1. For JAX/XLA/IREE iterative solvers, keep lowering-friendly loop structure in
    the implementation: do not feed residual / convergence / breakdown status
    produced inside `lax.while_loop` back into the next `cond`, and normalize
