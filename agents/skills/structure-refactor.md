@@ -42,6 +42,13 @@ separated before routing or subagent work, or when mechanical evidence shows a
 responsibility conflict that documentation edits alone cannot repair; the next
 section defines that mechanical evidence packet.
 
+When this skill is reached from `$agent-log-analysis`, require the log-analysis
+`Finding Route Packet` with `finding_class=structure_boundary`. Treat the
+compact evidence cell as the trigger and then switch to this skill's structure
+contract, responsibility graph, path mapping, and validation gates. Launch
+mechanics stay with `$subagent-bootstrap`; log interpretation stays with
+`$agent-log-analysis`.
+
 ## Evidence Sources
 
 The trigger, move rules, and handoff requirements below are checked against this

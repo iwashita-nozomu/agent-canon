@@ -130,6 +130,24 @@ bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 
 Intake Responsibility Wave は、repo-changing task の責務分割を要件、調査、実行計画に分ける intake wave です。独立 workstream が複数ある場合、Intake Responsibility Wave は各 workstream の責務分担 wave として扱い、以後は stage owner が必要な child wave を vertical dynamic wave として追加します。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの intake wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
 
+## Skill-Level Responsibility Boundaries
+
+Subagent role は先に evidence surface で分けます。dashboard や run
+bundle が `missing_actual_waves`、大量の skipped intake roles、または同一
+role の scope 混線を示す場合、parent は skill boundary を先に決め、その
+boundary に沿って subagent packet を作ります。
+
+| Evidence Surface | Owning Skill | Subagent Responsibility Split |
+| --- | --- | --- |
+| log archive API、compact dashboard、routing miss、selection gap、wave execution reconciliation | `agent-log-analysis` | parent が compact artifact を生成し、`prompt_config_reviewer` は prompt / config drift、`docs_workflow_steward` は workflow / skill wording、`project_reviewer` は repo-wide operational risk を別 packet で見る |
+| repository layout、root shared view、responsibility scope、directory README、import boundary、project `.codex` / `.agents` view と personal `~/.codex` の境界 | `structure-refactor` | `explorer` は responsibility graph と stale surface、`execution_planner` は move / validation order、write-capable agent は disjoint path mapping、document-flow reviewer は reader route を見る |
+| run bundle、spawn authorization、wave ledger、handoff capsule、fresh lifecycle、same-role instance identity | `subagent-bootstrap` | parent は launch mechanics を所有し、stage owner は `role_type+instance_id`、input packet、remaining budget、validation route、review gate を持つ child wave だけを起こす |
+
+Skill を連鎖させる場合は、前 skill が作った compact artifact、handoff
+packet、または structure contract を次 skill の input にします。境界は
+`allowed_paths`、`do_not_read`、`expected_output`、`validation_route`、
+`review_gate` を含む artifact path で渡します。
+
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer
 - reader-facing narrative interpretation -> report_reviewer
