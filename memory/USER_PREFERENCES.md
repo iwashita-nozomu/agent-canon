@@ -171,6 +171,9 @@ upstream design README.md memory surface index
 - 2026-06-14 | Do not add numerical tests unless the changed behavior, known regression, acceptance criterion, proof obligation, or experiment contract has a concrete numerical trigger; otherwise prefer static or lightweight deterministic non-numerical tests and record the omission reason.
   - source: chat
 
+- 2026-06-15 | Reader-facing repository documents should use positive responsibility and contract phrasing.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
