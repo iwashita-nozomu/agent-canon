@@ -3,6 +3,9 @@
 @dependency-start
 responsibility Documents Agent Communication Protocol for this repository.
 upstream design README.md agent canon overview
+downstream design skills/agent-orchestration.md routes pre-edit investigation before path selection
+downstream design skills/codex-task-workflow.md consumes pre-edit investigation and context capsules
+downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
 downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
@@ -33,6 +36,8 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `request_clause_ids`
 - `summary`
 - `requested_action`
+- `pre_edit_repository_investigation`
+- `fresh_subagent_context_capsule`
 - `artifacts`
 - `repo_changes`
 - `pre_edit_rejection_prediction`
@@ -41,6 +46,59 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `gate_specific_repair_plan`
 - `open_questions`
 - `status`
+
+## Pre-Edit Repository Investigation Packet
+
+Before selecting edit paths, direct parent edits, or write-capable subagent
+handoff, the parent records a bounded pre-edit investigation packet. This is
+the minimum evidence that repo investigation happened before implementation.
+
+- `request_clause_ids`: user clauses covered by the edit
+- `workflow_and_skills`: selected workflow, active skills, deferred dynamic
+  wave triggers
+- `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
+  `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
+  blocker
+- `responsibility_search`: compact semantic-index / local-LLM / tool-catalog
+  result paths, not broad raw `rg` dumps
+- `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
+  why reuse / extension / deletion / new implementation was selected
+- `stale_surface_scan`: obsolete mirror, generated artifact, legacy wrapper,
+  old convention, or source-canon drift checked before edits
+- `dependency_scope`: `dependency_edit_scope.txt`, `dependency_graph.tsv`, or
+  reason dependency expansion is not applicable
+- `validation_route`: targeted checks and closeout gates derived from the
+  packet
+- `open_questions`: only items that cannot be resolved from repo evidence
+
+Raw search hits, chat memory, and a list of nearest files are not sufficient.
+If the packet is missing, implementation returns to investigation instead of
+guessing an edit path.
+
+## Fresh Subagent Context Capsule
+
+Subagents are fresh per launch and do not inherit accumulated context. Each
+handoff therefore includes a compact context capsule that is self-contained
+enough to execute the role, but bounded enough to avoid broad repo reading.
+
+- `objective`: one sentence with active non-goals
+- `request_clause_ids`: clauses the subagent owns
+- `state_snapshot`: branch, relevant commit or run-id, current stage, and
+  parent integration owner
+- `read_before_work`: exact files or sections to read, capped to role-owned
+  surfaces
+- `compact_artifacts`: router output, dashboard summary, checker finding
+  packet, dependency scope, design trace, or report summary paths
+- `allowed_paths` / `do_not_read`: role-specific path boundaries
+- `expected_output_schema`: artifact name, findings format, or patch summary
+- `validation_route`: commands or review gate the parent will use
+- `return_contract`: what changed, what evidence supports it, unresolved
+  blockers, and whether more context is needed
+
+Do not paste full run transcripts, full dashboards, raw accumulated logs, or
+entire repo docs into the prompt. If a subagent needs more context, it asks for
+an expanded packet path; parent updates the capsule and records the change in
+the Agent Wave Ledger.
 
 Before the parent edits directly or a write-capable subagent starts repository
 edits, the parent runs or cites:
@@ -53,9 +111,10 @@ The handoff or parent-direct work log includes the resulting
 `TOOL_REJECTION_PREDICTED_GATE` lines or an explicit
 `TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names OOP
 readability, helper inventory, dependency headers, GitHub workflow checks, hook
-runtime alignment, skill mirror sync, tool catalog, agent protocol convention,
-or log-surface inventory, the implementer receives the gate-specific command
-and a repair plan before editing. This prevents spending implementation tokens
+runtime alignment, skill mirror sync, AgentCanon tool source routing, tool
+catalog, agent protocol convention, or log-surface inventory, the implementer
+receives the gate-specific command and a repair plan before editing. This
+prevents spending implementation tokens
 on changes that the hook/tool layer can already predict will be rejected.
 
 ## Review Packet

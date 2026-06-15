@@ -18,10 +18,12 @@
 // downstream implementation ../../../.github/workflows/agent-canon-static-gates.yml runs this CLI in GitHub static gates
 // @dependency-end
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -31,7 +33,14 @@ const DEFAULT_MAX_BYTES: usize = 24_000;
 const DEFAULT_PREDICT_TOKENS: usize = 768;
 const DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE: usize = 4;
 const DEFAULT_PROSE_IR_TERM_BATCH_SIZE: usize = 32;
+const DEFAULT_PROSE_IR_LLM_JOBS: usize = 4;
 const PROMPT_DIGEST_LENGTH: usize = 12;
+const LOCAL_LLM_CPU_ENV: [(&str, &str); 4] = [
+    ("CUDA_VISIBLE_DEVICES", ""),
+    ("NVIDIA_VISIBLE_DEVICES", "void"),
+    ("HIP_VISIBLE_DEVICES", ""),
+    ("ROCR_VISIBLE_DEVICES", ""),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum LocalLlmCommand {
@@ -187,9 +196,12 @@ struct ProseIrArgs {
     prompt: String,
     prompt_files: Vec<PathBuf>,
     model: String,
+    llama_cli: String,
     max_bytes: usize,
+    predict_tokens: usize,
     document_batch_size: usize,
     term_batch_size: usize,
+    llm_jobs: usize,
     json_out: Option<PathBuf>,
     print_prompt: bool,
 }
@@ -342,9 +354,12 @@ impl ProseIrArgs {
             prompt_files: Vec::new(),
             model: env::var("AGENT_CANON_LOCAL_LLM_MODEL")
                 .unwrap_or_else(|_| DEFAULT_MODEL.to_string()),
+            llama_cli: env::var("AGENT_CANON_LLAMA_CLI").unwrap_or_default(),
             max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: DEFAULT_PREDICT_TOKENS,
             document_batch_size: DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE,
             term_batch_size: DEFAULT_PROSE_IR_TERM_BATCH_SIZE,
+            llm_jobs: default_prose_ir_llm_jobs(),
             json_out: None,
             print_prompt: false,
         };
@@ -359,8 +374,16 @@ impl ProseIrArgs {
                     parsed.model = value_string(args, index, "--model")?;
                     index += 2;
                 }
+                "--llama-cli" => {
+                    parsed.llama_cli = value_string(args, index, "--llama-cli")?;
+                    index += 2;
+                }
                 "--max-bytes" => {
                     parsed.max_bytes = parse_usize(args, index, "--max-bytes")?;
+                    index += 2;
+                }
+                "--predict-tokens" => {
+                    parsed.predict_tokens = parse_usize(args, index, "--predict-tokens")?;
                     index += 2;
                 }
                 "--document-batch-size" => {
@@ -369,6 +392,10 @@ impl ProseIrArgs {
                 }
                 "--term-batch-size" => {
                     parsed.term_batch_size = parse_usize(args, index, "--term-batch-size")?;
+                    index += 2;
+                }
+                "--llm-jobs" | "--jobs" => {
+                    parsed.llm_jobs = parse_usize(args, index, args[index].as_str())?;
                     index += 2;
                 }
                 "--prompt" => {
@@ -764,7 +791,15 @@ fn run_extract_prose_ir(args: &LocalLlmArgs) -> i32 {
         return 0;
     }
 
-    let payload = prose_ir_payload(&parsed, &documents, &terms, &prompt_context, &digest);
+    let part_llm_results = prose_ir_part_llm_results(&part_prompts, &parsed);
+    let payload = prose_ir_payload(
+        &parsed,
+        &documents,
+        &terms,
+        &prompt_context,
+        &digest,
+        &part_llm_results,
+    );
     let rendered = match serde_json::to_string_pretty(&payload) {
         Ok(rendered) => rendered + "\n",
         Err(error) => {
@@ -1047,6 +1082,11 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
                 vec!["path", "layout"],
                 vec!["path", "responsibility"],
                 vec!["source", "ownership"],
+                vec!["構造", "レビュー"],
+                vec!["構造", "review"],
+                vec!["structure", "review"],
+                vec!["structural", "review"],
+                vec!["構造", "スキル", "弱"],
                 vec!["構成", "考え直"],
                 vec!["~/.codex"],
                 vec![".codex", "config"],
@@ -1119,6 +1159,26 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
                 vec!["diff", "review"],
                 vec!["コード", "レビュー"],
                 vec!["根本", "設計", "レビュー"],
+            ],
+        ),
+        (
+            "test-design",
+            "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+            vec![
+                vec!["test-design"],
+                vec!["test", "design"],
+                vec!["テスト", "設計"],
+                vec!["不要", "テスト"],
+                vec!["不要", "数値テスト"],
+                vec!["数値テスト"],
+                vec!["数値", "テスト"],
+                vec!["numerical", "test"],
+                vec!["numeric", "test"],
+                vec!["unnecessary", "test"],
+                vec!["heavy", "test"],
+                vec!["brittle", "test"],
+                vec!["tolerance", "test"],
+                vec!["seed", "test"],
             ],
         ),
         (
@@ -1266,6 +1326,7 @@ fn is_current_stage_skill(skill: &str) -> bool {
             | "agent-log-analysis"
             | "structure-planning"
             | "structure-refactor"
+            | "test-design"
     )
 }
 
@@ -1896,9 +1957,19 @@ fn rooted_path(root: &Path, path: &Path) -> PathBuf {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ProseIrPromptPart {
     part_id: String,
     prompt: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProseIrPartLlmResult {
+    part_id: String,
+    prompt_sha: String,
+    status: String,
+    stdout: String,
+    stderr: String,
 }
 
 fn prompt_parts_for_prose_ir(
@@ -1998,12 +2069,81 @@ fn prompt_for_prose_ir_part(
     lines.join("\n")
 }
 
+fn prose_ir_part_llm_results(
+    part_prompts: &[ProseIrPromptPart],
+    args: &ProseIrArgs,
+) -> Vec<ProseIrPartLlmResult> {
+    if part_prompts.is_empty() {
+        return Vec::new();
+    }
+    let executable = find_llama_cli(&args.llama_cli);
+    if executable.is_empty() {
+        return part_prompts
+            .iter()
+            .map(|part| ProseIrPartLlmResult {
+                part_id: part.part_id.clone(),
+                prompt_sha: prompt_digest(&part.prompt),
+                status: "skipped_llama_cli_not_found".to_string(),
+                stdout: String::new(),
+                stderr: String::new(),
+            })
+            .collect();
+    }
+
+    let jobs = args.llm_jobs.max(1).min(part_prompts.len());
+    let mut results = Vec::with_capacity(part_prompts.len());
+    for chunk in part_prompts.chunks(jobs) {
+        let mut handles = Vec::with_capacity(chunk.len());
+        for part in chunk {
+            let part_id = part.part_id.clone();
+            let prompt_sha = prompt_digest(&part.prompt);
+            let command = LlamaCommand {
+                executable: executable.clone(),
+                model: args.model.clone(),
+                prompt: part.prompt.clone(),
+                predict_tokens: args.predict_tokens,
+            };
+            let handle = thread::spawn(move || match run_llama_prompt(&command) {
+                Ok((stdout, stderr)) => ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "pass".to_string(),
+                    stdout,
+                    stderr,
+                },
+                Err(error) => ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "fail".to_string(),
+                    stdout: String::new(),
+                    stderr: error,
+                },
+            });
+            handles.push((part.part_id.clone(), prompt_digest(&part.prompt), handle));
+        }
+        for (part_id, prompt_sha, handle) in handles {
+            match handle.join() {
+                Ok(result) => results.push(result),
+                Err(_) => results.push(ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "panic".to_string(),
+                    stdout: String::new(),
+                    stderr: "llama-thread-panicked".to_string(),
+                }),
+            }
+        }
+    }
+    results
+}
+
 fn prose_ir_payload(
     args: &ProseIrArgs,
     documents: &[ProseIrDocument],
     terms: &[String],
     prompt_context: &str,
     prompt_digest: &str,
+    part_llm_results: &[ProseIrPartLlmResult],
 ) -> Value {
     let derived_terms = if terms.is_empty() {
         extract_salient_terms(documents)
@@ -2046,7 +2186,7 @@ fn prose_ir_payload(
         })
         .collect();
     let corpus_hints = corpus_hints_for_ir(documents, &derived_terms, prompt_context);
-    let parts = prose_ir_part_records(documents, &derived_terms, args);
+    let parts = prose_ir_part_records(documents, &derived_terms, args, part_llm_results);
     let analysis_intents = analysis_intents_for_ir(documents);
     json!({
         "schema": "agent_canon.local_llm.prose_ir.v1",
@@ -2058,6 +2198,7 @@ fn prose_ir_payload(
         "document_count": documents.len(),
         "term_count": derived_terms.len(),
         "part_count": parts.len(),
+        "llm_execution": prose_ir_llm_execution_summary(args, part_llm_results),
         "partition": {
             "document_batch_size": args.document_batch_size.max(1),
             "term_batch_size": args.term_batch_size.max(1),
@@ -2075,9 +2216,14 @@ fn prose_ir_part_records(
     documents: &[ProseIrDocument],
     terms: &[String],
     args: &ProseIrArgs,
+    part_llm_results: &[ProseIrPartLlmResult],
 ) -> Vec<Value> {
     let document_batch_size = args.document_batch_size.max(1);
     let term_batch_size = args.term_batch_size.max(1);
+    let llm_by_part = part_llm_results
+        .iter()
+        .map(|result| (result.part_id.as_str(), result))
+        .collect::<BTreeMap<_, _>>();
     let term_chunks: Vec<&[String]> = if terms.is_empty() {
         vec![&[]]
     } else {
@@ -2091,15 +2237,78 @@ fn prose_ir_part_records(
                 .iter()
                 .map(|document| document.relative_path.clone())
                 .collect::<Vec<_>>();
-            parts.push(json!({
-                "part_id": format!("part:d{}:t{}", document_batch_index + 1, term_batch_index + 1),
+            let part_id = format!(
+                "part:d{}:t{}",
+                document_batch_index + 1,
+                term_batch_index + 1
+            );
+            let mut record = json!({
+                "part_id": part_id.clone(),
                 "document_paths": document_paths,
                 "terms": term_batch.to_vec(),
                 "status": "extracted_and_merged",
-            }));
+            });
+            if let Some(result) = llm_by_part.get(part_id.as_str()) {
+                if let Some(object) = record.as_object_mut() {
+                    object.insert("llm_status".to_string(), json!(result.status));
+                    object.insert("llm_prompt_sha".to_string(), json!(result.prompt_sha));
+                    if let Some(output) = prose_ir_part_llm_output(result) {
+                        object.insert("llm_output".to_string(), output);
+                    }
+                    if !result.stderr.trim().is_empty() {
+                        object.insert("llm_stderr".to_string(), json!(result.stderr.trim()));
+                    }
+                }
+            }
+            parts.push(record);
         }
     }
     parts
+}
+
+fn prose_ir_part_llm_output(result: &ProseIrPartLlmResult) -> Option<Value> {
+    let trimmed = result.stdout.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    serde_json::from_str::<Value>(trimmed)
+        .map(Some)
+        .unwrap_or_else(|_| Some(json!({ "raw": trimmed })))
+}
+
+fn prose_ir_llm_execution_summary(args: &ProseIrArgs, results: &[ProseIrPartLlmResult]) -> Value {
+    let pass_count = results
+        .iter()
+        .filter(|result| result.status == "pass")
+        .count();
+    let skipped_count = results
+        .iter()
+        .filter(|result| result.status == "skipped_llama_cli_not_found")
+        .count();
+    let failed_count = results.len().saturating_sub(pass_count + skipped_count);
+    let status = if results.is_empty() {
+        "not_applicable"
+    } else if skipped_count == results.len() {
+        "skipped_llama_cli_not_found"
+    } else if pass_count == results.len() {
+        "completed"
+    } else if pass_count > 0 {
+        "partial_failure"
+    } else {
+        "failed"
+    };
+    json!({
+        "status": status,
+        "strategy": "per_part_bounded_parallel",
+        "jobs": args.llm_jobs.max(1).min(results.len().max(1)),
+        "configured_jobs": args.llm_jobs.max(1),
+        "predict_tokens": args.predict_tokens,
+        "part_count": results.len(),
+        "attempted": pass_count + failed_count > 0,
+        "passed": pass_count,
+        "failed": failed_count,
+        "skipped": skipped_count,
+    })
 }
 
 fn infer_markdown_title(text: &str, path: &Path) -> String {
@@ -2712,9 +2921,9 @@ fn find_on_path(name: &str) -> String {
 }
 
 fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCommand) -> i32 {
-    let output = Command::new(&command.executable)
-        .args(command.args())
-        .output();
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process.args(command.args()).output();
     match output {
         Ok(result) => {
             let status = if result.status.success() {
@@ -2740,7 +2949,9 @@ fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCo
 }
 
 fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> {
-    let output = Command::new(&command.executable)
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process
         .args(command.args())
         .output()
         .map_err(|error| format!("llama-launch-failed:{error}"))?;
@@ -2754,6 +2965,12 @@ fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> 
             output.status.code().unwrap_or(1),
             stderr.trim()
         ))
+    }
+}
+
+fn apply_local_llm_cpu_env(command: &mut Command) {
+    for (key, value) in LOCAL_LLM_CPU_ENV {
+        command.env(key, value);
     }
 }
 
@@ -2779,6 +2996,15 @@ fn parse_usize(args: &[String], index: usize, name: &str) -> Result<usize, Strin
     value
         .parse::<usize>()
         .map_err(|_| format!("{name} must be a positive integer, got {value}"))
+}
+
+fn default_prose_ir_llm_jobs() -> usize {
+    env::var("AGENT_CANON_LOCAL_LLM_PROSE_IR_JOBS")
+        .or_else(|_| env::var("AGENT_CANON_LOCAL_LLM_JOBS"))
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_PROSE_IR_LLM_JOBS)
 }
 
 fn build_invocation(args: &LocalLlmArgs) -> Result<PythonInvocation, String> {
@@ -2924,6 +3150,30 @@ mod tests {
     }
 
     #[test]
+    fn local_llm_command_envelope_hides_accelerator_devices() {
+        let mut command = Command::new("llama-cli");
+        apply_local_llm_cpu_env(&mut command);
+
+        let envs = command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.map(|item| item.to_string_lossy().to_string()),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(envs.get("CUDA_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(
+            envs.get("NVIDIA_VISIBLE_DEVICES"),
+            Some(&Some("void".to_string()))
+        );
+        assert_eq!(envs.get("HIP_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(envs.get("ROCR_VISIBLE_DEVICES"), Some(&Some(String::new())));
+    }
+
+    #[test]
     fn parses_implementation_surface_route_request_file() {
         let args = vec![
             "route-implementation-surface".to_string(),
@@ -3007,6 +3257,28 @@ mod tests {
         assert!(decision
             .active_skills
             .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_structure_review_weakness() {
+        let prompt = "構造のレビュースキルが弱いので見直して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_unneeded_numerical_tests() {
+        let prompt = "不要な数値テストを入れるのをやめさせてください";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
     }
 
     #[test]
@@ -3124,6 +3396,12 @@ mod tests {
             "fixture".to_string(),
             "--term".to_string(),
             "DSL".to_string(),
+            "--llama-cli".to_string(),
+            "fake-llama-cli".to_string(),
+            "--predict-tokens".to_string(),
+            "64".to_string(),
+            "--llm-jobs".to_string(),
+            "3".to_string(),
             "--json-out".to_string(),
             "out.json".to_string(),
             "docs/one.md".to_string(),
@@ -3138,6 +3416,9 @@ mod tests {
             ProseIrArgs::parse(parsed.root, &parsed.passthrough).expect("parse prose ir args");
         assert_eq!(prose_args.files, vec!["docs/one.md", "docs/two.md"]);
         assert_eq!(prose_args.terms, vec!["DSL"]);
+        assert_eq!(prose_args.llama_cli, "fake-llama-cli");
+        assert_eq!(prose_args.predict_tokens, 64);
+        assert_eq!(prose_args.llm_jobs, 3);
         assert_eq!(prose_args.json_out, Some(PathBuf::from("out.json")));
     }
 
@@ -3161,9 +3442,12 @@ mod tests {
             prompt: "academic Python/Rust paper".to_string(),
             prompt_files: Vec::new(),
             model: DEFAULT_MODEL.to_string(),
+            llama_cli: String::new(),
             max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: DEFAULT_PREDICT_TOKENS,
             document_batch_size: 1,
             term_batch_size: 1,
+            llm_jobs: 2,
             json_out: None,
             print_prompt: false,
         };
@@ -3172,12 +3456,45 @@ mod tests {
             .iter()
             .map(|file| read_prose_ir_document(&args.root, file, args.max_bytes).expect("read doc"))
             .collect::<Vec<_>>();
-        let payload = prose_ir_payload(&args, &documents, &args.terms, &args.prompt, "abc123");
+        let prompt_parts = prompt_parts_for_prose_ir(&documents, &args.terms, &args.prompt, &args);
+        let part_llm_results = vec![
+            ProseIrPartLlmResult {
+                part_id: "part:d2:t1".to_string(),
+                prompt_sha: "second".to_string(),
+                status: "pass".to_string(),
+                stdout: "{\"part\":\"second\"}".to_string(),
+                stderr: String::new(),
+            },
+            ProseIrPartLlmResult {
+                part_id: "part:d1:t1".to_string(),
+                prompt_sha: "first".to_string(),
+                status: "pass".to_string(),
+                stdout: "{\"part\":\"first\"}".to_string(),
+                stderr: String::new(),
+            },
+        ];
+        assert_eq!(prompt_parts.len(), 2);
+        let payload = prose_ir_payload(
+            &args,
+            &documents,
+            &args.terms,
+            &args.prompt,
+            "abc123",
+            &part_llm_results,
+        );
 
         assert_eq!(payload["schema"], "agent_canon.local_llm.prose_ir.v1");
         assert_eq!(payload["document_count"], 2);
         assert_eq!(payload["term_count"], 1);
         assert_eq!(payload["part_count"], 2);
+        assert_eq!(payload["llm_execution"]["status"], "completed");
+        assert_eq!(payload["llm_execution"]["jobs"], 2);
+        let parts = payload["parts"].as_array().expect("parts");
+        assert_eq!(parts[0]["part_id"], "part:d1:t1");
+        assert_eq!(parts[0]["llm_prompt_sha"], "first");
+        assert_eq!(parts[0]["llm_output"]["part"], "first");
+        assert_eq!(parts[1]["part_id"], "part:d2:t1");
+        assert_eq!(parts[1]["llm_prompt_sha"], "second");
         assert!(payload["documents"].as_array().expect("documents").len() == 2);
         assert!(
             payload["dsl_seed"]["nodes"]
@@ -3200,6 +3517,110 @@ mod tests {
         assert!(analysis_intents
             .iter()
             .all(|item| item["intent"].as_str() == Some("experiment_plan")));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prose_ir_part_llm_results_skip_when_llama_cli_is_missing() {
+        let root = make_fixture_root();
+        let args = ProseIrArgs {
+            root: root.clone(),
+            files: vec!["docs/one.md".to_string()],
+            terms: Vec::new(),
+            terms_files: Vec::new(),
+            prompt: String::new(),
+            prompt_files: Vec::new(),
+            model: DEFAULT_MODEL.to_string(),
+            llama_cli: root.join("missing-llama-cli").to_string_lossy().to_string(),
+            max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: 16,
+            document_batch_size: 1,
+            term_batch_size: 1,
+            llm_jobs: 2,
+            json_out: None,
+            print_prompt: false,
+        };
+        let parts = vec![
+            ProseIrPromptPart {
+                part_id: "part:d1:t1".to_string(),
+                prompt: "first".to_string(),
+            },
+            ProseIrPromptPart {
+                part_id: "part:d2:t1".to_string(),
+                prompt: "second".to_string(),
+            },
+        ];
+
+        let results = prose_ir_part_llm_results(&parts, &args);
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].part_id, "part:d1:t1");
+        assert_eq!(results[1].part_id, "part:d2:t1");
+        assert!(results
+            .iter()
+            .all(|result| result.status == "skipped_llama_cli_not_found"));
+        assert!(results.iter().all(|result| !result.prompt_sha.is_empty()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prose_ir_part_llm_results_run_fake_llama_per_part_in_input_order() {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_fixture_root();
+        fs::create_dir_all(&root).expect("mkdir root");
+        let fake_llama = root.join("llama-cli");
+        fs::write(
+            &fake_llama,
+            "#!/bin/sh\nprintf '{\"schema\":\"agent_canon.local_llm.prose_ir.v1\",\"ok\":true}\\n'\n",
+        )
+        .expect("write fake llama");
+        #[cfg(unix)]
+        {
+            let mut permissions = fs::metadata(&fake_llama)
+                .expect("fake llama metadata")
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&fake_llama, permissions).expect("chmod fake llama");
+        }
+        let args = ProseIrArgs {
+            root: root.clone(),
+            files: vec!["docs/one.md".to_string()],
+            terms: Vec::new(),
+            terms_files: Vec::new(),
+            prompt: String::new(),
+            prompt_files: Vec::new(),
+            model: DEFAULT_MODEL.to_string(),
+            llama_cli: fake_llama.to_string_lossy().to_string(),
+            max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: 16,
+            document_batch_size: 1,
+            term_batch_size: 1,
+            llm_jobs: 2,
+            json_out: None,
+            print_prompt: false,
+        };
+        let parts = vec![
+            ProseIrPromptPart {
+                part_id: "part:d1:t1".to_string(),
+                prompt: "first".to_string(),
+            },
+            ProseIrPromptPart {
+                part_id: "part:d2:t1".to_string(),
+                prompt: "second".to_string(),
+            },
+        ];
+
+        let results = prose_ir_part_llm_results(&parts, &args);
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].part_id, "part:d1:t1");
+        assert_eq!(results[1].part_id, "part:d2:t1");
+        assert!(results.iter().all(|result| result.status == "pass"));
+        assert!(results
+            .iter()
+            .all(|result| result.stdout.contains("\"ok\":true")));
         let _ = fs::remove_dir_all(root);
     }
 

@@ -37,6 +37,10 @@ from generate_agent_improvement_guide import (  # noqa: E402
     counter_lines,
     known_skill_ids,
 )
+from report_artifact_checks import (  # noqa: E402
+    actual_wave_event_fields,
+    markdown_table_dict_rows,
+)
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
@@ -103,6 +107,7 @@ REFERENCE_CAPTURE_EVIDENCE_TARGET = "compact report Reference Capture Drilldown"
 WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET = "compact report Workflow Attribution Drilldown"
 TOKEN_USAGE_EVIDENCE_TARGET = "compact report Token Consumption Drilldown"
 SKILL_EVAL_EVIDENCE_TARGET = "compact report Skill Eval Failure Drilldown"
+WAVE_EXECUTION_EVIDENCE_TARGET = "compact report Wave And Subagent Execution Drilldown"
 SELECTION_RESPONSIBILITIES = ("skill", "workflow", "tool")
 SELECTED_WORKFLOW_FIELDS = (
     "workflows",
@@ -193,6 +198,25 @@ class TokenUsageBreakdown:
     average_tokens_per_event: float
     timed_candidate_token_counts: tuple[TimedIntMetric, ...]
     timed_token_ratios: tuple[TimedFloatMetric, ...]
+
+
+@dataclass(frozen=True)
+class WaveExecutionBreakdown:
+    """Wave and subagent execution evidence inferred from run-bundle reports."""
+
+    report_files: tuple[Path, ...]
+    planned_wave_count: int
+    actual_wave_event_count: int
+    spawned_event_count: int
+    blocked_event_count: int
+    skipped_event_count: int
+    completed_event_count: int
+    missing_actual_wave_count: int
+    unplanned_actual_wave_count: int
+    events_by_status: Counter[str]
+    events_by_spawn_authority: Counter[str]
+    spawned_roles: Counter[str]
+    skipped_roles: Counter[str]
 
 
 @dataclass(frozen=True)
@@ -313,6 +337,7 @@ class RuntimeDashboardSummary:
     skill_eval_breakdown: SkillEvalBreakdown
     hook_workflow_breakdown: HookWorkflowBreakdown
     token_usage_breakdown: TokenUsageBreakdown
+    wave_execution_breakdown: WaveExecutionBreakdown
     prompt_tool_breakdown: PromptToolBreakdown
     markdown_docs_breakdown: MarkdownDocsBreakdown
     reference_capture_breakdown: ReferenceCaptureBreakdown
@@ -329,7 +354,12 @@ class ResultFamilyReader:
 
     def read_family(self, family: str) -> ResultFamilySummary:
         """Read one accumulated Markdown report directory."""
-        directories = eval_result_search_dirs(self.root, family)
+        try:
+            directories = eval_result_search_dirs(self.root, family)
+        except RuntimeError as error:
+            if not missing_log_archive_error(error):
+                raise
+            directories = (self.root / "agents" / "evals" / "results" / family,)
         reports = tuple(
             sorted(
                 {
@@ -670,6 +700,108 @@ class TokenUsageBreakdownReader:
         return parse_compact_utc_timestamp(path_match.group(0))
 
 
+class WaveExecutionBreakdownReader:
+    """Reads wave execution evidence from run-bundle monitor files."""
+
+    @classmethod
+    def read(
+        cls,
+        root: Path,
+        recent_cutoff_epoch: int | None = None,
+    ) -> WaveExecutionBreakdown:
+        """Return accumulated wave and subagent execution stats."""
+        report_files: set[Path] = set()
+        planned_wave_count = 0
+        actual_wave_event_count = 0
+        spawned_event_count = 0
+        blocked_event_count = 0
+        skipped_event_count = 0
+        completed_event_count = 0
+        missing_actual_wave_count = 0
+        unplanned_actual_wave_count = 0
+        events_by_status: Counter[str] = Counter()
+        events_by_spawn_authority: Counter[str] = Counter()
+        spawned_roles: Counter[str] = Counter()
+        skipped_roles: Counter[str] = Counter()
+        for workflow_path in cls.candidate_paths(root):
+            text = workflow_path.read_text(encoding="utf-8")
+            epoch = TokenUsageBreakdownReader.evidence_epoch(workflow_path, text)
+            if not evidence_inside_recent_window(workflow_path, epoch, recent_cutoff_epoch):
+                continue
+            actual_rows = actual_wave_event_fields(text)
+            planned_ids = cls.planned_wave_ids(workflow_path)
+            if not actual_rows and not planned_ids:
+                continue
+            report_files.add(workflow_path)
+            actual_wave_event_count += len(actual_rows)
+            actual_by_id = {
+                row.get("wave_id", "").strip(): row
+                for row in actual_rows
+                if row.get("wave_id", "").strip()
+            }
+            planned_wave_count += len(planned_ids)
+            missing_actual_wave_count += len(planned_ids - set(actual_by_id))
+            unplanned_actual_wave_count += len(set(actual_by_id) - planned_ids)
+            for row in actual_rows:
+                status = row.get("status", "missing").strip() or "missing"
+                authority = row.get("spawn_authority", "missing").strip() or "missing"
+                events_by_status[status] += 1
+                events_by_spawn_authority[authority] += 1
+                spawned = split_counter_field(row.get("spawned_roles", ""))
+                skipped = split_counter_field(row.get("skipped_roles", ""))
+                spawned_roles.update(spawned)
+                skipped_roles.update(skipped)
+                spawned_event_count += int(bool(spawned))
+                skipped_event_count += int(bool(skipped))
+                blocked_event_count += int(
+                    "blocked" in status or "required" in authority
+                )
+                completed_event_count += int(status in {"done", "complete", "completed"})
+        return WaveExecutionBreakdown(
+            report_files=tuple(sorted(report_files)),
+            planned_wave_count=planned_wave_count,
+            actual_wave_event_count=actual_wave_event_count,
+            spawned_event_count=spawned_event_count,
+            blocked_event_count=blocked_event_count,
+            skipped_event_count=skipped_event_count,
+            completed_event_count=completed_event_count,
+            missing_actual_wave_count=missing_actual_wave_count,
+            unplanned_actual_wave_count=unplanned_actual_wave_count,
+            events_by_status=events_by_status,
+            events_by_spawn_authority=events_by_spawn_authority,
+            spawned_roles=spawned_roles,
+            skipped_roles=skipped_roles,
+        )
+
+    @staticmethod
+    def candidate_paths(root: Path) -> tuple[Path, ...]:
+        """Return workflow monitor reports that may carry wave-event rows."""
+        patterns = (
+            "reports/agents/**/workflow_monitoring.md",
+            ".agent-canon/log-archive/agent-reports/**/workflow_monitoring.md",
+        )
+        paths: set[Path] = set()
+        for pattern in patterns:
+            paths.update(path for path in root.glob(pattern) if path.is_file())
+        return tuple(sorted(paths))
+
+    @staticmethod
+    def planned_wave_ids(workflow_path: Path) -> set[str]:
+        """Return planned wave ids from sibling schedule.md when present."""
+        schedule_path = workflow_path.with_name("schedule.md")
+        if not schedule_path.is_file():
+            return set()
+        rows = markdown_table_dict_rows(
+            schedule_path.read_text(encoding="utf-8"),
+            "## Agent Wave Ledger",
+        )
+        return {
+            row.get("Wave ID", "").strip()
+            for row in rows
+            if row.get("Wave ID", "").strip()
+        }
+
+
 @dataclass
 class SelectionMetricAccumulator:
     """Mutable accumulator for one selection metric."""
@@ -894,6 +1026,7 @@ class RuntimeDashboardVisuals:
             f"  SkillFailures[\"Skill failure attribution<br/>active failed skills: {len(summary.skill_eval_breakdown.active_failed)}\"]",
             f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
             f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}<br/>summaries: {summary.token_usage_breakdown.summary_count}\"]",
+            f"  Waves[\"Wave execution<br/>events: {summary.wave_execution_breakdown.actual_wave_event_count}<br/>blocked: {summary.wave_execution_breakdown.blocked_event_count}\"]",
             f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
             f"  Selection[\"Selection accuracy<br/>items: {len(summary.selection_metrics_breakdown.metrics)}<br/>misses: {selection_missed_total(summary)}\"]",
             f"  MarkdownDocs[\"Markdown/docs signals<br/>eval fails: {summary.markdown_docs_breakdown.failed_eval_reports}<br/>hook signals: {markdown_hook_signal_count(summary)}\"]",
@@ -913,6 +1046,7 @@ class RuntimeDashboardVisuals:
             "  Hooks --> WorkflowHooks",
             "  WorkflowHooks --> Dashboard",
             "  Tokens --> Dashboard",
+            "  Waves --> Dashboard",
             "  PromptTools --> Dashboard",
             "  Hooks --> Selection",
             "  PromptTools --> Selection",
@@ -942,6 +1076,7 @@ class RuntimeDashboardVisuals:
             self.skill_failure_row(),
             self.workflow_hook_row(),
             self.token_usage_row(),
+            self.wave_execution_row(),
             self.prompt_tool_row(),
             self.selection_metrics_row(),
             self.markdown_docs_row(),
@@ -1027,6 +1162,18 @@ class RuntimeDashboardVisuals:
             breakdown.comparison_count == 0 and breakdown.summary_count == 0,
         )
 
+    def wave_execution_row(self) -> str:
+        """Return the wave execution action-map row."""
+        breakdown = self.summary.wave_execution_breakdown
+        return action_map_row(
+            "wave and subagent execution",
+            "record spawned, skipped, or authority-blocked wave rows before closeout",
+            breakdown.actual_wave_event_count,
+            breakdown.actual_wave_event_count == 0
+            or breakdown.blocked_event_count > 0
+            or breakdown.missing_actual_wave_count > 0,
+        )
+
     def prompt_tool_row(self) -> str:
         """Return the prompt/tool selection evidence action-map row."""
         breakdown = self.summary.prompt_tool_breakdown
@@ -1097,11 +1244,7 @@ class AgentRuntimeDashboard:
 
     def collect(self) -> RuntimeDashboardSummary:
         """Collect dashboard evidence without mutating repository state."""
-        evidence = self.guide.collect()
-        hook_files = filter_hook_paths(
-            self.guide.hook_result_paths(),
-            self.recent_cutoff_epoch,
-        )
+        evidence, hook_files = self.collect_evidence()
         reader = ResultFamilyReader(self.root, self.recent_cutoff_epoch)
         result_families = (
             reader.read_family("skill-workflow-prompt"),
@@ -1144,6 +1287,10 @@ class AgentRuntimeDashboard:
                 self.root,
                 self.recent_cutoff_epoch,
             ),
+            wave_execution_breakdown=WaveExecutionBreakdownReader.read(
+                self.root,
+                self.recent_cutoff_epoch,
+            ),
             prompt_tool_breakdown=read_prompt_tool_breakdown(
                 hook_files,
                 self.recent_cutoff_epoch,
@@ -1160,6 +1307,35 @@ class AgentRuntimeDashboard:
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
+        )
+
+    def collect_evidence(self) -> tuple[EvidenceSummary, tuple[Path, ...]]:
+        """Collect guide evidence, tolerating a missing read-only log archive."""
+        try:
+            evidence = self.guide.collect()
+            hook_files = filter_hook_paths(
+                self.guide.hook_result_paths(),
+                self.recent_cutoff_epoch,
+            )
+            return evidence, hook_files
+        except RuntimeError as error:
+            if not missing_log_archive_error(error):
+                raise
+        hook_files: tuple[Path, ...] = ()
+        return (
+            EvidenceSummary(
+                open_issues=self.guide.paths("issues/open/AC-*.md"),
+                closed_issues=self.guide.paths("issues/closed/AC-*.md"),
+                memory_entries=self.guide.memory_entry_counts(),
+                skill_eval_reports=(),
+                failed_skill_eval_reports=(),
+                hook_counts=read_hook_evidence_counts(
+                    self.root,
+                    hook_files,
+                    self.recent_cutoff_epoch,
+                ),
+            ),
+            hook_files,
         )
 
 
@@ -1354,6 +1530,10 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "",
         *compact_token_consumption_drilldown_lines(summary),
         "",
+        "### Wave And Subagent Execution Drilldown",
+        "",
+        *compact_wave_execution_drilldown_lines(summary),
+        "",
         "### Reference Capture Drilldown",
         "",
         *compact_reference_capture_drilldown_lines(summary),
@@ -1538,6 +1718,28 @@ def compact_reference_capture_drilldown_lines(summary: RuntimeDashboardSummary) 
         f"| `source_fields` | `{compact_counter_summary(breakdown.source_fields)}` |",
         f"| `missing_urls` | `{compact_counter_summary(breakdown.missing_urls)}` |",
         f"| `registered_urls` | `{compact_counter_summary(breakdown.registered_urls)}` |",
+    ]
+
+
+def compact_wave_execution_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return compact wave and subagent execution details."""
+    breakdown = summary.wave_execution_breakdown
+    return [
+        "| metric | value |",
+        "| --- | --- |",
+        f"| `report_files` | `{len(breakdown.report_files)}` |",
+        f"| `planned_waves` | `{breakdown.planned_wave_count}` |",
+        f"| `actual_wave_events` | `{breakdown.actual_wave_event_count}` |",
+        f"| `spawned_events` | `{breakdown.spawned_event_count}` |",
+        f"| `blocked_events` | `{breakdown.blocked_event_count}` |",
+        f"| `skipped_events` | `{breakdown.skipped_event_count}` |",
+        f"| `completed_events` | `{breakdown.completed_event_count}` |",
+        f"| `missing_actual_waves` | `{breakdown.missing_actual_wave_count}` |",
+        f"| `unplanned_actual_waves` | `{breakdown.unplanned_actual_wave_count}` |",
+        f"| `status_counts` | `{compact_counter_summary(breakdown.events_by_status)}` |",
+        f"| `authority_counts` | `{compact_counter_summary(breakdown.events_by_spawn_authority)}` |",
+        f"| `spawned_roles` | `{compact_counter_summary(breakdown.spawned_roles)}` |",
+        f"| `skipped_roles` | `{compact_counter_summary(breakdown.skipped_roles)}` |",
     ]
 
 
@@ -1806,6 +2008,10 @@ def dashboard_analysis_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "",
         *token_usage_lines(summary),
         "",
+        "## Wave And Subagent Execution",
+        "",
+        *wave_execution_lines(summary),
+        "",
         "## Selection Accuracy By Responsibility",
         "",
         "This section compares candidate skills, workflows, and tools against the same-entry selections recorded in hook JSONL.",
@@ -1922,6 +2128,11 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
         "- github_actions_dashboard: AgentCanon repository Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
     ]
+
+
+def missing_log_archive_error(error: RuntimeError) -> bool:
+    """Return whether a RuntimeError only means the read-only log archive is absent."""
+    return "AgentCanon log archive root is required" in str(error)
 
 
 def result_family_lines(summary: RuntimeDashboardSummary) -> list[str]:
@@ -2041,6 +2252,36 @@ def token_usage_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "| evidence file |",
         "| --- |",
         *token_file_rows(summary),
+    ]
+
+
+def wave_execution_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return wave and subagent execution evidence lines."""
+    breakdown = summary.wave_execution_breakdown
+    if breakdown.actual_wave_event_count == 0 and breakdown.planned_wave_count == 0:
+        return [
+            "- wave_execution_status: `missing`",
+            "- wave_execution_reason: `no Agent Wave Ledger or Actual Wave Events evidence found`",
+            "- expected_sources: `reports/agents/**/schedule.md` and `reports/agents/**/workflow_monitoring.md`",
+        ]
+    return [
+        "- wave_execution_status: `present`",
+        f"- wave_report_files: `{len(breakdown.report_files)}`",
+        f"- planned_waves: `{breakdown.planned_wave_count}`",
+        f"- actual_wave_events: `{breakdown.actual_wave_event_count}`",
+        f"- spawned_events: `{breakdown.spawned_event_count}`",
+        f"- blocked_events: `{breakdown.blocked_event_count}`",
+        f"- skipped_events: `{breakdown.skipped_event_count}`",
+        f"- completed_events: `{breakdown.completed_event_count}`",
+        f"- missing_actual_waves: `{breakdown.missing_actual_wave_count}`",
+        f"- unplanned_actual_waves: `{breakdown.unplanned_actual_wave_count}`",
+        "",
+        "| counter | values |",
+        "| --- | --- |",
+        f"| `status_counts` | `{compact_counter_summary(breakdown.events_by_status)}` |",
+        f"| `authority_counts` | `{compact_counter_summary(breakdown.events_by_spawn_authority)}` |",
+        f"| `spawned_roles` | `{compact_counter_summary(breakdown.spawned_roles)}` |",
+        f"| `skipped_roles` | `{compact_counter_summary(breakdown.skipped_roles)}` |",
     ]
 
 
@@ -2216,7 +2457,7 @@ def issue_routing_lines(summary: RuntimeDashboardSummary) -> list[str]:
                 summary,
                 "eval evidence gaps",
                 "eval-accumulation-gaps",
-                "repair missing workflow attribution, prompt capture, or token comparison evidence",
+                "repair missing workflow attribution, Wave execution, prompt capture, or token comparison evidence",
             )
         )
     rows.append(
@@ -2238,6 +2479,9 @@ def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
     """Return whether the dashboard found missing runtime evidence."""
     return (
         summary.hook_workflow_breakdown.entries_without_workflow > 0
+        or summary.wave_execution_breakdown.missing_actual_wave_count > 0
+        or summary.wave_execution_breakdown.blocked_event_count > 0
+        or summary.wave_execution_breakdown.actual_wave_event_count == 0
         or (
             summary.token_usage_breakdown.comparison_count == 0
             and summary.token_usage_breakdown.summary_count == 0
@@ -2300,6 +2544,7 @@ def dashboard_problem_components(summary: RuntimeDashboardSummary) -> tuple[Prob
         hook_problem_components,
         skill_problem_components,
         workflow_problem_components,
+        wave_problem_components,
         evidence_problem_components,
     )
     components = [component for builder in builders for component in builder(summary)]
@@ -2379,6 +2624,46 @@ def workflow_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
             )
         )
     components.extend(selection_problem_components(summary, "workflow"))
+    return tuple(components)
+
+
+def wave_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+    """Return wave execution components that need attention."""
+    breakdown = summary.wave_execution_breakdown
+    components: list[ProblemComponent] = []
+    if breakdown.missing_actual_wave_count > 0:
+        components.append(
+            ProblemComponent(
+                component_type="workflow",
+                name="wave_execution_reconciliation",
+                status="fail",
+                problem=f"{breakdown.missing_actual_wave_count} planned wave(s) lack actual events",
+                evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+                next_action="record actual spawned/skipped/blocked wave rows",
+            )
+        )
+    if breakdown.actual_wave_event_count == 0:
+        components.append(
+            ProblemComponent(
+                component_type="workflow",
+                name="wave_execution_evidence",
+                status="missing",
+                problem="no wave execution events are present",
+                evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+                next_action="bootstrap a run with an explicit wave execution gate",
+            )
+        )
+    elif breakdown.blocked_event_count > 0:
+        components.append(
+            ProblemComponent(
+                component_type="workflow",
+                name="wave_execution_authority",
+                status="attention",
+                problem=f"{breakdown.blocked_event_count} wave event(s) are authority blocked",
+                evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+                next_action="parent runtime must spawn or explicitly skip the wave",
+            )
+        )
     return tuple(components)
 
 
@@ -2481,6 +2766,7 @@ def dashboard_next_actions(summary: RuntimeDashboardSummary) -> tuple[DashboardN
         hook_failure_next_action,
         reference_capture_next_action,
         workflow_attribution_next_action,
+        wave_execution_next_action,
         selection_metrics_next_action,
         skill_eval_next_action,
         markdown_docs_next_action,
@@ -2571,6 +2857,48 @@ def workflow_attribution_next_action(summary: RuntimeDashboardSummary) -> tuple[
         command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
         done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+        automation="agent-fix",
+    ),)
+
+
+def wave_execution_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+    """Return the next action for wave execution evidence gaps."""
+    breakdown = summary.wave_execution_breakdown
+    if breakdown.missing_actual_wave_count > 0:
+        return (DashboardNextAction(
+            priority="P1",
+            action="record missing actual wave execution rows",
+            reason=f"{breakdown.missing_actual_wave_count} planned waves lack actual events",
+            evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+            owner_surface="schedule.md and workflow_monitoring.md",
+            command="python3 tools/agent_tools/task_close.py --run-id <run-id>",
+            done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL=0",
+            issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
+            automation="agent-fix",
+        ),)
+    if breakdown.blocked_event_count > 0:
+        return (DashboardNextAction(
+            priority="P1",
+            action="resolve wave execution authority blockers",
+            reason=f"{breakdown.blocked_event_count} wave events are authority blocked",
+            evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+            owner_surface="parent Codex runtime subagent wave and run bundle ledger",
+            command="spawn/skip the listed roles, then update schedule.md and workflow_monitoring.md",
+            done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=0 or explicit skipped wave rows remain",
+            issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
+            automation="parent-runtime",
+        ),)
+    if breakdown.actual_wave_event_count > 0:
+        return ()
+    return (DashboardNextAction(
+        priority="P2",
+        action="add wave execution evidence to run bundles",
+        reason="no Actual Wave Events rows were found",
+        evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+        owner_surface="tools/agent_tools/agent_team.py",
+        command="python3 tools/agent_tools/bootstrap_agent_run.py --task-id <id>",
+        done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS>0",
+        issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
         automation="agent-fix",
     ),)
 
@@ -2779,6 +3107,15 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES={summary.token_usage_breakdown.summary_count}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_SESSIONS={summary.token_usage_breakdown.session_count}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_EVENTS={summary.token_usage_breakdown.token_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_REPORTS={len(summary.wave_execution_breakdown.report_files)}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_PLANNED={summary.wave_execution_breakdown.planned_wave_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS={summary.wave_execution_breakdown.actual_wave_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_SPAWNED={summary.wave_execution_breakdown.spawned_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED={summary.wave_execution_breakdown.blocked_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_SKIPPED={summary.wave_execution_breakdown.skipped_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_COMPLETED={summary.wave_execution_breakdown.completed_event_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL={summary.wave_execution_breakdown.missing_actual_wave_count}",
+        f"AGENT_RUNTIME_DASHBOARD_WAVE_UNPLANNED_ACTUAL={summary.wave_execution_breakdown.unplanned_actual_wave_count}",
         f"AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES={summary.prompt_tool_breakdown.prompt_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES={summary.prompt_tool_breakdown.tool_selection_entries}",
         f"AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS={len(summary.selection_metrics_breakdown.metrics)}",
@@ -2910,6 +3247,17 @@ def normalized_text_values(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(item for item in cast(list[object], value) if isinstance(item, str) and item)
+
+
+def split_counter_field(value: str) -> tuple[str, ...]:
+    """Return comma-separated role names from one wave-event counter field."""
+    roles: list[str] = []
+    for item in value.split(","):
+        role = item.strip()
+        if not role or role.lower() == "none":
+            continue
+        roles.append(role.split(":", 1)[0])
+    return tuple(roles)
 
 
 def integer_field(entry: dict[str, object], key: str) -> int:

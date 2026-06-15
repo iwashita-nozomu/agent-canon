@@ -1123,7 +1123,7 @@ def workflow_monitor_report_dir(root: Path | None = None) -> str:
     if root is None:
         return ""
     pointer = os.environ.get(ACTIVE_RUN_POINTER_ENV, "").strip()
-    pointer_path = Path(pointer) if pointer else root / "reports" / "agents" / ".active_run"
+    pointer_path = Path(pointer) if pointer else default_active_run_pointer(root)
     try:
         value = pointer_path.read_text(encoding="utf-8").strip()
     except OSError:
@@ -1136,6 +1136,23 @@ def workflow_monitor_report_dir(root: Path | None = None) -> str:
     if (report_dir / "workflow_monitoring.md").is_file():
         return str(report_dir)
     return ""
+
+
+def default_active_run_pointer(root: Path) -> Path:
+    """Return the run pointer that should own hook workflow evidence."""
+    parent_pointer = vendored_agent_canon_parent_pointer(root)
+    if parent_pointer is not None:
+        return parent_pointer
+    return root / "reports" / "agents" / ".active_run"
+
+
+def vendored_agent_canon_parent_pointer(root: Path) -> Path | None:
+    """Return the parent repo active-run pointer for vendored AgentCanon checkouts."""
+    resolved = root.resolve()
+    if resolved.name != "agent-canon" or resolved.parent.name != "vendor":
+        return None
+    pointer = resolved.parent.parent / "reports" / "agents" / ".active_run"
+    return pointer if pointer.is_file() else None
 
 
 def workflow_monitor_behavior_event(root: Path, report_dir: str, event: str) -> bool:

@@ -594,9 +594,10 @@ fn collect_documents(root: &Path) -> Result<Vec<DocumentRecord>, String> {
             .or_else(|_| fs::read(&path).map(|bytes| String::from_utf8_lossy(&bytes).to_string()))
             .map_err(|error| format!("read {}: {error}", path.display()))?;
         let lines: Vec<&str> = text.lines().collect();
+        let title = markdown_title_for_path(Path::new(&relative_path), &lines);
         records.push(DocumentRecord {
             path: relative_path,
-            title: markdown_title(&lines),
+            title,
             responsibility: dependency_responsibility(&lines),
             upstream_design_targets: dependency_manifest_values(&lines, "upstream design "),
             coverage_rules: dependency_coverage_rules(&lines),
@@ -643,7 +644,7 @@ fn collect_files(root: &Path) -> Result<Vec<FileRecord>, String> {
             extension,
             byte_len: bytes.len() as u64,
             content_sha256: sha256_hex(&bytes),
-            title: markdown_title(&lines),
+            title: markdown_title_for_path(&path, &lines),
             responsibility: dependency_responsibility(&lines),
             has_dependency_manifest: has_dependency_manifest(&lines),
             is_document: is_document_path(&path),
@@ -782,6 +783,13 @@ fn is_document_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn is_markdown_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("md"))
+        .unwrap_or(false)
+}
+
 fn has_dependency_manifest(lines: &[&str]) -> bool {
     let header = &lines[..lines.len().min(HEADER_SCAN_LINES)];
     header.iter().any(|line| line.contains("@dependency-start"))
@@ -861,6 +869,14 @@ fn markdown_title(lines: &[&str]) -> String {
         }
     }
     String::new()
+}
+
+fn markdown_title_for_path(path: &Path, lines: &[&str]) -> String {
+    if is_markdown_path(path) {
+        markdown_title(lines)
+    } else {
+        String::new()
+    }
 }
 
 fn strip_comment_prefix(line: &str) -> &str {

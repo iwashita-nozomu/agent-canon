@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import subprocess
 from pathlib import Path
 
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
@@ -28,10 +29,12 @@ LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
-CODEX_RUNTIME_SUMMARY_FILE = "summary.jsonl"
 CODEX_RUNTIME_INDEX_FILE = "index.jsonl"
 NAMESPACE_HASH_LENGTH = 8
 MAX_KEY_LENGTH = 80
+GIT_COMMIT_KEY_LENGTH = 12
+CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
+GIT_HEAD_TIMEOUT_SECONDS = 5
 AGENT_CANON_ROOT_MARKERS = (
     (Path("tools") / "agent_tools" / "runtime_log_paths.py", 2),
     (Path("tools") / "agent_tools" / "evaluate_skill_workflow_prompts.py", 2),
@@ -74,6 +77,59 @@ def _log_environment_key(root: Path) -> str:
 def log_environment_key(root: Path) -> str:
     """Return the public local environment key used in archive context output."""
     return _log_environment_key(root)
+
+
+def codex_trace_key() -> str:
+    """Return the current Codex chat/session trace key when the runtime exposes one."""
+    for env_name in CODEX_TRACE_ENV_NAMES:
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def log_chat_key(source_root: Path) -> str:
+    """Return the chat key segment used by runtime log archive branches."""
+    trace_key = codex_trace_key()
+    if trace_key:
+        return safe_slug(trace_key)
+    return f"no-chat-{repo_log_key(source_root)}"
+
+
+def log_branch_key(source_root: Path, canon_root: Path) -> str:
+    """Return the environment-plus-chat key used for runtime log archive branches."""
+    return f"{log_environment_key(canon_root)}-{log_chat_key(source_root)}"
+
+
+def source_git_head(source_root: Path) -> str:
+    """Return the source repository HEAD SHA when it is available."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_HEAD_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def agent_canon_git_commit_key(canon_root: Path) -> str:
+    """Return the AgentCanon Git commit key used in runtime log filenames."""
+    head = source_git_head(canon_root)
+    return safe_slug(head[:GIT_COMMIT_KEY_LENGTH]) if head else "no-git-head"
+
+
+def hook_log_file_name(hook_name: str, canon_root: Path) -> str:
+    """Return the commit-keyed hook JSONL filename."""
+    return f"{safe_slug(hook_name)}-{agent_canon_git_commit_key(canon_root)}.jsonl"
+
+
+def codex_runtime_summary_file(canon_root: Path) -> str:
+    """Return the commit-keyed Codex runtime summary filename."""
+    return f"summary-{agent_canon_git_commit_key(canon_root)}.jsonl"
 
 
 def mounted_log_archive_root(canon_root: Path) -> Path:
@@ -140,7 +196,7 @@ def codex_runtime_chat_dir(active_root: Path, canon_root: Path, conversation_id:
 
 def codex_runtime_summary_path(active_root: Path, canon_root: Path, conversation_id: str) -> Path:
     """Return the per-chat Codex runtime summary JSONL path."""
-    return codex_runtime_chat_dir(active_root, canon_root, conversation_id) / CODEX_RUNTIME_SUMMARY_FILE
+    return codex_runtime_chat_dir(active_root, canon_root, conversation_id) / codex_runtime_summary_file(canon_root)
 
 
 def codex_runtime_index_path(active_root: Path, canon_root: Path) -> Path:

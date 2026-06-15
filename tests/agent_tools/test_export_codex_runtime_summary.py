@@ -24,6 +24,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from runtime_log_paths import (  # noqa: E402
     codex_runtime_index_path,
     codex_runtime_summary_path,
+    mounted_log_archive_root,
     repo_log_key,
 )
 
@@ -39,6 +40,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             canon = root / "agent-canon"
             source.mkdir()
             canon.mkdir()
+            mounted_log_archive_root(canon).mkdir(parents=True)
             thread_id = "019e64a8-041d-7080-a5d6-09fa11cc0435"
             history = root / "history.jsonl"
             sqlite_log = root / "logs_2.sqlite"
@@ -86,6 +88,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
         self.assertEqual(record["session_id"], thread_id)
         self.assertEqual(record["thread_id"], thread_id)
         self.assertEqual(record["source_repo_key"], repo_log_key(source))
+        self.assertEqual(record["agent_canon_git_head"], "")
         self.assertEqual(record["history"]["entry_count"], 1)
         self.assertEqual(record["sqlite"]["row_count"], 3)
         self.assertEqual(record["tokens"]["live_turn_count"], 1)
@@ -96,7 +99,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
         self.assertEqual(index[0]["schema"], "codex-runtime-summary-index.v1")
         self.assertEqual(index[0]["conversation_id"], thread_id)
         self.assertEqual(index[0]["session_id"], thread_id)
-        self.assertEqual(index[0]["summary_path"], f"chats/{thread_id}/summary.jsonl")
+        self.assertEqual(index[0]["summary_path"], f"chats/{thread_id}/summary-no-git-head.jsonl")
 
     def test_all_threads_exports_discovered_history_and_sqlite_threads(self) -> None:
         """Bulk rescue should export every bounded thread discovered in runtime logs."""
@@ -106,6 +109,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             canon = root / "agent-canon"
             source.mkdir()
             canon.mkdir()
+            mounted_log_archive_root(canon).mkdir(parents=True)
             history_thread = "019e64a8-041d-7080-a5d6-09fa11cc0001"
             sqlite_thread = "019e64a8-041d-7080-a5d6-09fa11cc0002"
             history = root / "history.jsonl"

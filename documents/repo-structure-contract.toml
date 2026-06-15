@@ -150,6 +150,16 @@ kind = "dir"
 category = "tooling"
 
 [[profile.required]]
+path = "tools/user"
+kind = "dir"
+category = "tooling"
+
+[[profile.required]]
+path = "tools/internal"
+kind = "dir"
+category = "tooling"
+
+[[profile.required]]
 path = "tools/ci"
 kind = "dir"
 category = "tooling"
@@ -278,6 +288,11 @@ category = "shared_runtime_view"
 
 [[profile.required]]
 path = ".devcontainer"
+kind = "any"
+category = "shared_runtime_view"
+
+[[profile.required]]
+path = ".vscode"
 kind = "any"
 category = "shared_runtime_view"
 

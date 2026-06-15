@@ -15,7 +15,7 @@ server 上でどの実験コードを正式に実行するかを、topic ごと�
 
 - experiment topic の正本 entrypoint を固定する
 - smoke / formal run の canonical inner command を固定する
-- `result/` と `report/` の正本 path を固定する
+- `README.md`、`result/`、`report/` を固定し、topic README を通じて可視化 notebook の入口を固定する
 - branch / worktree と実験 topic の対応を補助 metadata として残す
 
 branch 名は補助情報です。主キーにはしません。
@@ -39,6 +39,11 @@ durable な正本は常に topic 名です。
 - `formal_inner_command`
 - 必要なら `required_eval_artifacts`
 - 必要なら `optional_eval_artifacts`
+
+`topic_readme` は、実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、
+出力 schema、run_name 規則を辿る入口です。`result_root` は
+`result/<run_name>/` だけでなく、各 run の `result/<run_name>/logs/` も含む
+runtime artifact surface として扱います。
 
 `smoke_inner_command` と `formal_inner_command` は `{run_dir}` に加えて `{config_path}` を含めます。
 checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は run 開始前に
@@ -102,6 +107,8 @@ python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
 - 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
 - checked-in 設定正本は topic の `config.yaml` に置きます。`config.json` または `config.yaml` snapshot には run 開始前に固定した設定 dictionary を残し、`run_manifest.json` からも `config_path` と snapshot を辿れるようにします。
+- 各 managed run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は runner が管理する互換ログで、追加の stdout / stderr、tool log、diagnostic log は `logs/` 配下へ置きます。
+- 可視化は `experiments/<topic>/notebooks/` の Jupyter notebook を入口にします。notebook は `summary.json`、`cases.jsonl`、必要な `logs/` artifact を読んで図表化するためのもので、formal run の起動や設定正本にはしません。
 - `required_eval_artifacts` と `optional_eval_artifacts` は `result/<run_name>/` から自動収集したい eval artifact pattern を表します。`summary.json` と `cases.jsonl` は managed runner の既定 required eval とし、topic 固有の追加 artifact だけを registry に書き足します。top-level managed file (`run_manifest.json`、`eval_manifest.json`、`run.log`) は reserved で、pattern に指定してはいけません。
 
 ## validation

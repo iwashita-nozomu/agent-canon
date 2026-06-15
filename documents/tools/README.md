@@ -10,7 +10,10 @@ downstream implementation ../../tools/agent_tools/responsibility_scope.py valida
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
+downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
+downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
+downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
@@ -23,6 +26,7 @@ downstream implementation ../../tools/agent_tools/search_index.py builds repo-lo
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
+downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
 downstream implementation ../../rust/agent-canon/src/algorithm_ir_to_lean.rs lowers Algorithm IR expression_ast and control facts into Lean route artifacts
 downstream implementation ../../tools/agent_tools/ir_graph_correspondence.py checks IR equation fact coverage in lemma graphs
@@ -41,122 +45,62 @@ agent/worktree helper、review / validation runner、docs-check helper、contain
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
 実行する tool は [Runtime Profiles And Check Matrix](../runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
 
+## Where To Start
+
+This file explains the tool documentation surface. It is not a duplicate
+registry. When a task needs the exact command list, read the structured source
+first and then return here only for reader-facing context.
+
+| Need | Start Here | Notes |
+| --- | --- | --- |
+| Decide whether a tool exists, who may call it, or whether it is retired | `tools/catalog.yaml` | Canonical registry for status, audience, placement, docs, tests, and wiring. |
+| Find one reader-facing document for a tool | `documents/tools/tool-docs.toml` | One-to-one map validated by `tool_catalog.py`; do not mirror it as prose. |
+| Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
+| Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
+| Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
+| Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
+
 ## AgentCanon Tool Catalog
 
-- `tools/catalog.yaml`
-  - canonical、compatibility wrapper、optional、maintainer-only、retired tool の構造化カタログです。
-- [Dependency Tools And Licenses](dependency-tools-and-licenses.md)
-  - dependency manifest tools、shared runtime tools、外部 toolchain、default local LLM model の用途と license evidence をまとめた人間向け一覧です。
-- `tools/agent_tools/tool_catalog.py`
-  - catalog の schema、path、説明、docs/tests、default wiring、retired legacy 混入を検査し、`--format markdown` で対応表を出します。
-- `tools/agent_tools/tool_drift.py`
-  - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
-- `tools/agent_tools/responsibility_scope.py`
-  - top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub、vendor の責務範囲と protecting tool を固定します。
-- `tools/agent_tools/import_responsibility.py`
-  - Python import の未使用 alias、wildcard import、local import の responsibility-scope 越境を検査します。
-  - 越境許可は repo top-level `responsibility-scope.toml` の `[[import_rule]]` に書き、reviewer の推測にしません。
-- `tools/agent_tools/issue_sync.py`
-  - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
-- `tools/agent_tools/eval_accumulation_check.py`
-  - mounted runtime log archive の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。source tree の `agents/evals/results/` は正規の読み書き場所ではありません。
-- `tools/agent_tools/runtime_log_archive_git.py`
-  - mounted log archive の ensure / status / import / agent report archive / push 操作を担当します。置き場確認は `status` の `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見ます。通常は `sync` が `reports/agents/` を `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>` へ同期します。`archive-agent-report --report-dir reports/agents/<run-id>` は特定 run bundle を `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` に immutable snapshot し、`index.jsonl` を機械的に追記します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
-- `tools/agent_tools/run_accumulated_agent_evals.py`
-  - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は `reports/agent-eval-runs/<run-id>/` に退避します。PR / CI gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
-- `tools/agent_tools/github_publish.py`
-  - `gh` で GitHub repo を確認し、`origin` が同じ `owner/name` を指す場合だけ branch push、PR create/update、PR checks を実行します。`--user-task` は必須で、literal URL push、remote 推測、`.git/config` alternate route は使いません。GitHub publish / PR evidence はこの tool と PR gate の責務であり、非重大 hook finding では止めません。
-- `tools/agent_tools/repo_structure_contract.py`
-  - `documents/repo-structure-contract.toml` を正本にして、top-level から `tree -a -J` で取得した directory / file 構成を AgentCanon-supported profile と比較します。保存済み `tree -J` JSON も `--tree-json` で読めます。期待 path、ignore、profile detection、unexpected top-level severity は tool code ではなく TOML contract から解決します。
-- `tools/agent_tools/render_dependency_manifest_graph.py`
-  - `check_dependency_graph.sh --graph-tsv` の edge artifact から Markdown summary と Graphviz DOT を生成します。大規模 review では raw edge listing の前にこの report を読みます。
-- `tools/agent_tools/classify_path_risk.py`
-  - changed path list から docs / Python / Docker / GitHub / shared-canon / full-confidence 候補を分類し、targeted validation command を出します。`.github/workflows/path-risk-check-matrix-smoke.yml` もこの classifier を使います。
-- `tools/agent_tools/formal_proof.py`
-  - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
-- `tools/agent_tools/lean_proof_env.py`
-  - Mathlib / Aesop を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke` または `check-file` で generated proof stub を検査します。探索・fallback はこの tool、durable theorem surface は topic-local Lake package の依存として固定します。
-- `documents/tools/lean_capability_matrix.md`
-  - Lean core、Mathlib、Aesop、theorem search、Lake 環境の使い分けを記録する proof-task 向け能力表です。特定アルゴリズム名に寄せず、方程式、反復、順序、線形/多項式不等式、構造分解、既存定理探索をどう Lean に渡すかを決めます。
-- `tools/agent_tools/proof_path_analyzer.py`
-  - `algorithm_lemma_graph.py` の lemma graph と topic-local `proof_status.json` を読み、checked fragment の採用漏れ、裸の `unverified` frontier、stale implementation token、重複 B-label、target-chain 切断を検査します。数学的 witness が未接続な箇所は open witness として残し、artifact integrity と proof completion を分けて報告します。
-- `tools/agent_tools/ir_graph_correspondence.py`
-  - Algorithm Expansion IR の `assignment_equation` / `return_equation` が lemma graph の code-fact node、`lemma_consumes_code_fact` edge、target chain、必要なら `proof_status.json` の `code_derived_facts` に対応しているかを検査します。反復法は `source_symbol` と `equation_tags` で grouped iteration unit として報告します。
-- `agent-canon algorithm-ir-to-lean`
-  - Algorithm Expansion IR の `expression_ast`、`control_facts`、構造体 projection を Rust で Lean route artifact へ変換し、手書き抽象ではなく実装由来の evaluation order を証明テーマへ渡します。
-- `tools/agent_tools/algorithm_flowchart.py`
-  - Algorithm Expansion IR、LemmaGraph、`proof_status.json` を Mermaid block chart に射影します。実装されている反復法、solver chain、code fact、verified/open/external/operational state を図で確認するための visualization tool で、proof authority は checker artifact に残します。`--view runtime|core` は proof-only node / label を runtime 図から外し、実装経路の確認に使います。
-- `tools/agent_tools/kkt_equation_section.py`
-  - Algorithm Expansion IR の `code_facts` を検査し、reduced block-system / KKT / iterative-solver-chain の数式 section を再現可能に生成します。必須 fact が欠けたら fail closed し、solver-chain 式を proof note に手書きで足す経路を避けます。
-- `agent-canon test-design check`
-  - Rust CLI の test design 診断入口です。既存 test の oracle 不在、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。説明文書は [test_design.md](test_design.md) です。
-- `agent-canon local-llm classify-responsibility`
-  - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
-- `agent-canon local-llm route-implementation-surface`
-  - 実装前の置き場所 router です。`--request-file`、`--request-stdin`、または
-    `--request` で依頼文を渡し、repo / directory / tool / skill / workflow /
-    root instruction / document / report surface の primary owner、candidate
-    paths、forbidden paths、required pre-edit checks を compact text または
-    JSON で返します。
-  - llama.cpp が使えない場合は環境構築ミスとして
-    `IMPLEMENTATION_SURFACE_ROUTER=error` と修復 action を返し、implementation
-    path の選択へ進ませません。
-- `agent-canon local-llm extract-prose-ir`
-  - 複数 document と複数 term を受け取り、LocalLLM 向け part に分割して prose intermediate representation JSON を作ります。
-  - 返す単位は単語 list ではなく、document responsibility、section role、term context、corpus hints、`dsl_seed`、`parts[]` です。
-  - `--document-batch-size` と `--term-batch-size` で分割幅を指定し、merge 済み JSON は `--json-out` に保存します。
-- `agent-canon local-llm eval`
-  - `evidence/agent-evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
-- `tools/agent_tools/evaluate_report_quality.py`
-  - `evidence/agent-evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
-- `tools/agent_tools/evaluate_codex_agent_roles.py`
-  - `.codex/agents/*.toml` の期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を role 単位で eval します。
-- `tools/agent_tools/prose_reasoning_graph.py`
-  - Markdown/plain text を SQLite-backed prose graph に取り込み、projection、
-    diagnostics、natural-language explanation、split/merge/bridge/reorder
-    operation、既存 writing/review skill への handoff packet を出します。
-  - list / table / figure / equation の候補は keyword や閾値ではなく、`presentation`
-    layer の feature subgraph として materialize してから
-    `presentation_format_candidate` diagnostic に接続します。
-  - DB 作成の既定は
-    `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`。
-    run-local DB などが必要な場合だけ `--db` で明示します。
-  - DSL vocabulary and validation are defined in
-    [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md).
-- `agent-canon local-llm search`
-  - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
-- `agent-canon local-llm build-index`
-  - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
-- `agent-canon semantic-index`
-  - text-like file を安定 node に分け、provider-scoped dense vector を SQLite に保存します。
-  - `build`、`embed-provider`、`search`、`context-pack`、`responsibility-tree`、`similar`、`merge-candidates`、`natural-relations`、`discourse-relations`、`thin-docs`、`compare-providers`、`eval`、`eval-output` を持つ候補生成 tool です。
-  - `embed-provider` は既存 node に LLM embedding provider の vector を追加し、`compare-providers` は deterministic baseline と LLM provider の候補 ranking delta を診断します。LLM label や ownership authority は生成しません。
-  - `search` は `--query`、`--query-file`、`--query-stdin` を受けます。長い user request は file / stdin で渡し、agent が JSON 全体や長い query echo を読む必要がないように `--top-k` と `--format text` または `--format jsonl` を使います。
-  - `context-pack` は agent handoff 用に、上位候補を path、line range、score、responsibility bucket、短い excerpt の bounded evidence cell へ圧縮します。
-  - `responsibility-tree` は SQLite 内の node vector を directory vector に集約し、現在の indexable repo tree と DB file tree の directory 差分を JSON report と exit code で検査します。
-  - `similar` は横断 alignment evidence を許可し、`merge-candidates` は full repo 入力のまま同じ responsibility scope / surface kind / document topic / node kind 内だけを候補化します。runtime mirror と eval/report log は統合候補にしません。
-  - `natural-relations` は pair の両方向で "A is a kind of B" の自然さを score 化し、`equivalent`、`unrelated`、片方向包含を SQLite に保存します。
-  - `discourse-relations` は profile 別に近傍 paragraph/block のつながりを score 化し、`therefore` / `because` のような surface phrase の違いと `reason_to_result` のような relation primitive を分けて SQLite に保存します。構造計画の evidence であり、文章・policy・統合判断の authority ではありません。
-  - `thin-docs` は低内容量、高い単一 target 類似度、参照密度、wrapper 語彙から薄い文書候補を出し、root entrypoint は `keep_entrypoint` として削除候補から分けます。
-  - `eval-output` は review JSONL artifact 自体を検査し、result count、responsibility metadata、thin-doc action、long-query echo の欠落を検出します。
-  - `tools/agent_tools/semantic_provider_html_report.py` は `compare-providers` JSON を self-contained HTML に描画します。先頭図は `Provider Delta To Shared Candidate Logic` で、provider 差分は診断 evidence、責務 bucket / candidate logic が authority であることを明示します。
-  - 生成 DB の既定は `~/.cache/agent-canon/semantic-index/<repo-key>/` です。repo-local cache が必要な場合だけ `--db` で明示し、commit しません。削除・統合の authority にはしません。
-- `agent-canon structured-analysis build --root . --profile manual`
-  - git-visible file tree を `artifact` layer、directory responsibility projection を
-    README と child artifact responsibility からの derived graph、document-canon
-    cleanup finding を `document-canon` layer として user-home cache の SQLite DB に
-    materialize し、解析 warning を別の `diagnostics.sqlite` に保存します。DevContainer
-    post-create でも warning-only で走り、repo tree は書き換えません。
-  - `directory_responsibility_low_child_coverage` は README responsibility が child artifact
-    responsibilities を十分に代表していない候補です。自動 rewrite ではなく
-    `directory_responsibility_verification` route に渡します。
-- `agent-canon structured-analysis document-inventory --root .`
-  - document-canon cleanup の canonical Rust entrypoint です。runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出し、stale document name を棚卸しします。
-  - `agent-canon structured-analysis import-document-inventory --db <graph.sqlite> --json <inventory.json>` で同じ結果を SQLite の `document-canon` layer に取り込み、レポ root から一文までの graph trace と接続します。
-- `tools/agent_tools/route.py --area search`
-  - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
-- `documents/tools/tool-docs.toml`
-  - tool 実装と説明文書を一対一で対応させる機械可読 map です。`tool` と `doc` は同じ basename にし、`tool_catalog.py` が path、dependency header、catalog docs wiring を検査します。
+`tools/catalog.yaml` owns the structured catalog. Each effective entry has:
+
+- `audience`: who should call the tool directly: `user`, `agent`, `skill`,
+  `workflow`, `maintainer`, or `internal`.
+- `placement`: where the implementation or wrapper belongs after migration,
+  such as `user_entrypoint`, `skill_helper`, `workflow_helper`,
+  `validation_checker`, `ci_gate`, `compatibility_wrapper`, or
+  `support_library`.
+- docs and test wiring, validated by `tools/agent_tools/tool_catalog.py`.
+
+`tools/user/` and `tools/internal/` are migration targets, not second catalogs.
+Existing command paths remain stable until catalog entries, tests, docs, and
+callers move together.
+
+## Tool Detail Notes
+
+Detailed tool behavior belongs in the same-named tool document or in
+`tools/catalog.yaml`. This hub keeps only the families a reader usually needs
+to choose a route:
+
+- Catalog and drift checks: `tool_catalog.py`, `tool_drift.py`,
+  `responsibility_scope.py`, and `import_responsibility.py`.
+- Runtime evidence and generated output guards: `runtime_log_archive_git.py`,
+  `eval_accumulation_check.py`, `run_accumulated_agent_evals.py`, and
+  `generated_artifact_guard.py`.
+- Repo structure, issue, and PR support: `repo_structure_contract.py`,
+  `issue_sync.py`, `github_publish.py`, `classify_path_risk.py`, and
+  `render_dependency_manifest_graph.py`.
+- Search and prose structure: `agent-canon local-llm ...`,
+  `agent-canon semantic-index ...`, `prose_reasoning_graph.py`, and
+  `tools/agent_tools/route.py --area search`.
+- Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
+  `tool_proof_coverage.py`, `proof_path_analyzer.py`,
+  `ir_graph_correspondence.py`, `algorithm_flowchart.py`,
+  `kkt_equation_section.py`, and `agent-canon test-design check`.
+
+When a reader needs exact options, run the command with `--help` or open the
+same-named file under `documents/tools/`. Do not expand this README into a
+second command manual.
 
 ## 置き場所の固定ルール
 
@@ -199,6 +143,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     入口です。`route-implementation-surface` は実装前に primary owner と
     required pre-edit checks を返します。`search`、`build-index`、`eval`
     もこの CLI surface から呼び、Python 実装は互換 engine として残します。
+    `extract-prose-ir` は document / term part prompt を作り、`llama-cli` が
+    利用可能な場合は `--llm-jobs` で bounded parallel に実行してから
+    deterministic prose IR を出します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -273,9 +220,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/install_llama_cpp.sh`
   - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を公開します。
   - PostCreate では `--allow-fetch` で取得と build を行い、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
-  - CUDA build は `AGENT_CANON_LLAMA_CPP_CUDA=auto|1|0` で制御します。`auto` は `nvcc`、GPU device、linkable `libcuda` が揃う場合だけ `-DGGML_CUDA=ON` にし、それ以外は CPU build に戻します。
-  - `AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR` は WSL / devcontainer の `libcuda.so` 探索先を明示します。`AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。
-  - CUDA / CMake flag の組み合わせは build cache key として記録されます。source が新しくなくても設定が変わった場合は `already_current` にせず再ビルドします。
+  - Local LLM の llama.cpp build は CPU-only です。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は互換入力として受け付けますが、GPU build には切り替えません。
+  - `AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。GPU accelerator を有効化する CMake flags は CPU-only policy violation として失敗させます。
+  - CPU-only CMake flag の組み合わせは build cache key として記録されます。source が新しくなくても設定が変わった場合は `already_current` にせず再ビルドします。
   - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は lazy fetch で、repo にコミットしません。
 - `tools/agent_tools/route.py`
   - 長い候補 tool / skill 名を短い route area へ解決します。

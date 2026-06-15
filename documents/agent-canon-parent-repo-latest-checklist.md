@@ -47,16 +47,21 @@ git status --short --branch --untracked-files=all
 git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/null || true
 ```
 
-1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. The update may proceed when the AgentCanon update surface is clean:
+1. Reuse the current branch / PR when it already owns the same update lane or
+   shared-canon follow-up. Do not create a new branch for a fresh start,
+   dirty-state avoidance, small addendum, or mid-task user instruction. If a new
+   branch is required, record `branch_creation_reason=<reason>` and why the
+   existing branch cannot continue before creating it.
 
-- `vendor/agent-canon/` submodule worktree is clean.
-- parent gitlink at `vendor/agent-canon` is not already an unresolved local pin change.
-- `.gitmodules` is clean.
-- AgentCanon-owned symlink and GitHub copy root views are clean.
+1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
+
+- safe dirty `vendor/agent-canon/` checkout state is preserved, AgentCanon `main` is merged into the current named branch, the dirty state is restored, root views are repaired, and shared-surface drift is checked.
+- local AgentCanon source commits stay on the AgentCanon branch/PR route.
+- detached heads, merge conflicts, restore conflicts, unresolved local pin changes, `.gitmodules` edits, and AgentCanon-owned root-view edits that `link-root` would overwrite still report a recovery action instead of being hidden.
 
 Template-owned active contracts such as `documents/README.md`, bootstrap docs, host/server contracts, project notes, experiments, and reports do not block the submodule update just because they are dirty.
 
-1. If the AgentCanon update surface is clean, update AgentCanon before planning or implementation.
+1. Update AgentCanon before planning or implementation.
 
 ```bash
 make agent-canon-ensure-latest
@@ -73,7 +78,7 @@ binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If the dirty state is inside AgentCanon source, `.gitmodules`, the parent gitlink, or an AgentCanon-owned root view that `link-root` may overwrite, route the change through a normal AgentCanon GitHub branch and PR first.
+1. If latest preserves dirty AgentCanon checkout state, continue the AgentCanon branch/PR flow with the restored state. If latest reports a detached head, merge conflict, restore conflict, `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk, fix that recovery target before rerunning latest.
 
 ```bash
 bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty

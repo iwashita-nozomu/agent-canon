@@ -44,40 +44,79 @@ role_values:
   - sync
   - workflow
 
+audience_values:
+  - user
+  - agent
+  - skill
+  - workflow
+  - maintainer
+  - internal
+
+placement_values:
+  - user_entrypoint
+  - skill_helper
+  - workflow_helper
+  - validation_checker
+  - ci_gate
+  - compatibility_wrapper
+  - support_library
+
 families:
   agent_tools:
     root: tools/agent_tools
     summary: Agent workflow, dependency, convention, review, and runtime helpers.
+    audience: agent
+    placement: workflow_helper
   ci:
     root: tools/ci
     summary: CI, GitHub workflow, container, and repository readiness entrypoints.
+    audience: user
+    placement: ci_gate
   docs:
     root: tools/docs
     summary: Markdown, link, design-document, and skill-shim maintenance helpers.
+    audience: skill
+    placement: skill_helper
   oop_python:
     root: tools/oop/python
     summary: Python-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
   oop_cpp:
     root: tools/oop/cpp
     summary: C++-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
   data:
     root: tools/data
     summary: Portable result-data transformations.
+    audience: agent
+    placement: support_library
   hlo:
     root: tools/hlo
     summary: HLO result summarization helpers.
+    audience: agent
+    placement: support_library
   audit:
     root: tools/audit
     summary: Portable audit log schema and writer helpers.
+    audience: internal
+    placement: support_library
   experiments:
     root: tools/experiments
     summary: Shared experiment scaffold, registry, and managed-run helpers.
+    audience: user
+    placement: user_entrypoint
   validation:
     root: tools/validation
     summary: Generic validation helpers used by compatibility wrappers.
+    audience: agent
+    placement: validation_checker
   root:
     root: tools
     summary: Top-level shared automation entrypoints and compatibility wrappers.
+    audience: user
+    placement: user_entrypoint
 
 default_wiring_docs:
   - tools/README.md
@@ -160,7 +199,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown and DOT reports.
+    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML graph reports.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker
@@ -203,6 +242,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/formal_proof.py
     writes: true
     default_wiring:
@@ -224,6 +265,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/lean_proof_env.py
     writes: true
     default_wiring:
@@ -238,12 +281,36 @@ entries:
     tests:
       - tests/agent_tools/test_lean_proof_env.py
 
+  - id: tool-proof-coverage
+    summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
+    path: tools/agent_tools/tool_proof_coverage.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: maintainer
+    placement: validation_checker
+    command: python3 tools/agent_tools/tool_proof_coverage.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/tool_proof_coverage.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_tool_proof_coverage.py
+
   - id: algorithm-expansion-ir
     summary: Builds AST-only Algorithm Expansion IR with instance interaction edges and first-class local proof obligations.
     path: tools/agent_tools/algorithm_expansion_ir.py
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_expansion_ir.py
     writes: true
     default_wiring:
@@ -263,6 +330,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: tools/bin/agent-canon algorithm-ir-to-lean
     writes: true
     default_wiring:
@@ -283,6 +352,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_lemma_graph.py
     writes: true
     default_wiring:
@@ -302,6 +373,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/algorithm_flowchart.py
     writes: true
     default_wiring:
@@ -323,6 +396,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/ir_graph_correspondence.py
     writes: true
     default_wiring:
@@ -343,6 +418,8 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/kkt_equation_section.py
     writes: true
     default_wiring:
@@ -363,6 +440,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/proof_path_analyzer.py
     writes: true
     default_wiring:
@@ -382,6 +461,8 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
+    audience: skill
+    placement: skill_helper
     command: python3 tools/agent_tools/check_proof_trace_alignment.py
     writes: false
     default_wiring:
@@ -493,6 +574,25 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: generated-artifact-guard
+    summary: Rejects mechanically regenerated report outputs left in the source tree.
+    path: tools/agent_tools/generated_artifact_guard.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/generated_artifact_guard.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+      - agents/templates/closeout_gate.md
+    tests:
+      - tests/agent_tools/test_generated_artifact_guard.py
+
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
     path: tools/agent_tools/run_accumulated_agent_evals.py
@@ -575,7 +675,7 @@ entries:
       - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: agent-canon-local-llm
-    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, deterministic skill routing, prose IR extraction, local LLM search, index, and eval routing.
+    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, deterministic skill routing, bounded-parallel prose IR extraction, local LLM search, index, and eval routing.
     path: rust/agent-canon/src/local_llm.rs
     family: root
     role: runner
@@ -596,7 +696,7 @@ entries:
       - rust/agent-canon/src/local_llm.rs
 
   - id: test-design-check
-    summary: Runs Rust-native diagnostics for brittle or under-specified test design before code changes.
+    summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
     path: rust/agent-canon/src/test_design.rs
     family: root
     role: checker
@@ -622,6 +722,8 @@ entries:
     family: agent_tools
     role: checker
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/agent_tools/file_responsibility_llm.py --print-prompt <file>
     writes: false
     default_wiring:
@@ -1239,6 +1341,8 @@ entries:
     family: docs
     role: helper
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-math <files...>
     writes: true
     callable_by_default: false
@@ -1259,6 +1363,8 @@ entries:
     family: docs
     role: helper
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs fix-mermaid <files...>
     writes: true
     callable_by_default: false
@@ -1279,6 +1385,8 @@ entries:
     family: ci
     role: runner
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: tools/bin/agent-canon docs check
     writes: false
     default_wiring:
@@ -1575,6 +1683,8 @@ entries:
     family: agent_tools
     role: inventory
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/agent_tools/noncanonical_document_inventory.py
     writes: true
     default_wiring:
@@ -1967,6 +2077,8 @@ entries:
     family: root
     role: compatibility
     status: compatibility_wrapper
+    audience: internal
+    placement: compatibility_wrapper
     command: python3 tools/check_doc_test_triplet.py
     writes: false
     replacement: tools/validation/triplet_validator.py

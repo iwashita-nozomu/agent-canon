@@ -54,7 +54,9 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - `Fairness Notes:`
   - 同じ case set、同じ timeout、同じ hardware、同じ seed policy、同じ allocator 方針をどこまで維持するか。
 - `Artifact Plan:`
-  - 実験ディレクトリ、`result/<run_name>/` の出力先、`experiments/report/<run_name>.md` の置き場を先に固定します。
+  - 実験ディレクトリ、`result/<run_name>/` の出力先、`result/<run_name>/logs/` のログ置き場、`experiments/report/<run_name>.md` の置き場を先に固定します。
+- `Visualization Plan:`
+  - 可視化 notebook を `experiments/<topic>/notebooks/` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
 - `Naming Plan:`
   - topic 名、run_name、result ディレクトリ名、report 名の規則を先に決め、topic README か対応する正本文書へ残します。
 - `Registry Plan:`
@@ -81,6 +83,10 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
   - `experiments/<topic>/`
 - runtime 生成物
   - `experiments/<topic>/result/<run_name>/`
+- run-local log
+  - `experiments/<topic>/result/<run_name>/logs/`
+- 可視化 notebook
+  - `experiments/<topic>/notebooks/`
 - 1 回の実験 report
   - `experiments/report/<run_name>.md`
 - 複数 run をまたぐ要約や知見
@@ -100,7 +106,10 @@ top-level の `reports/` は project-wide な review、automation、management r
   - `result/<run_name>/config.json`
   - `result/<run_name>/run_manifest.json`
   - `result/<run_name>/run.log`
+  - `result/<run_name>/logs/`
   - 図を出力する場合は `result/<run_name>/figures/`
+- 可視化 notebook
+  - `notebooks/<run_name>.ipynb` または topic README で固定した notebook 名
 - report 名
   - `experiments/report/<run_name>.md`
 
@@ -112,6 +121,7 @@ top-level の `reports/` は project-wide な review、automation、management r
 - `summary.json` / `cases.jsonl` の schema
 - `git status --short`
 - 既定の出力先と命名が topic README に書かれているか
+- 可視化 notebook の入口と `logs/` の扱いが topic README に書かれているか
 
 `Interpretation:`
 準備段階の目的は、今回の run が debug なのか、verified なのか、正式比較なのかを曖昧にしないことです。
@@ -124,13 +134,15 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 推奨構成は次です。
 
 - `README.md`
-  - 実験目的、コード配置、Make target、YAML config、出力先、report の入口、命名規則を書く。
+  - 実験目的、コード配置、Make target、YAML config、出力先、可視化 notebook、report の入口、命名規則を書く。
 - `cases.py`
   - case 定義、difficulty range、resource estimate を置く。
 - `experimentcode.py`
   - orchestration と CLI に集中させる。
+- `notebooks/`
+  - run artifact を読む可視化 notebook を置く。Notebook は説明と図表化を担い、正式 run の起動や test を担いません。
 - `result/`
-  - `result/<run_name>/` ごとに JSON、JSONL、ログ、図を置く。
+  - `result/<run_name>/` ごとに JSON、JSONL、`logs/`、図を置く。
 
 `experiment_runner` を使う実験で、実験側が実装する対象は次の 5 点に絞ります。
 
@@ -151,6 +163,8 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 
 - 実験コードの topic パス
 - `result/<run_name>/` の canonical 出力先
+- `result/<run_name>/logs/` のログ置き場
+- `notebooks/` の可視化入口
 - `experiments/report/<run_name>.md` の置き場
 - 関連する `notes/` を使う場合はその入口
 - run_name の形式
@@ -210,6 +224,7 @@ pickle 可否、JAX import 後の env 汚染、GPU visibility の実際の反映
 それらは次の実行段階で smoke / verified として確認します。
 
 server 実行の formal run では、少なくとも `run_manifest.json`、`run.log`、exact command、host 情報、commit 情報が残ることを確認します。
+追加ログがある場合は、正式 run 前に `result/<run_name>/logs/` に出ることも確認します。
 
 ### 4. 実験実行
 
@@ -259,6 +274,7 @@ make experiment-formal TOPIC=<topic>
 
 この Make target は内側で `tools/experiments/run_managed_experiment.py` を呼びます。
 wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
+各 run では `result/<run_name>/logs/` も初期化されます。
 
 #### 4.4 long run のルール
 
@@ -287,6 +303,8 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 - `config.json`
 - `run_manifest.json`
 - `run.log`
+- `logs/`
+- `notebooks/<run_name>.ipynb` または topic README で指定した可視化 notebook
 - report へのリンク
 - `Result Summary:`
 - `Quantitative Summary:`
@@ -318,6 +336,8 @@ report 本文は次の構成を基本にします。
 carry-over のルールは次です。
 
 - 実行ごとの生成物は `experiments/<topic>/result/<run_name>/` に残す
+- 実行ごとの追加ログは `experiments/<topic>/result/<run_name>/logs/` に残す
+- 可視化 notebook は `experiments/<topic>/notebooks/` に残し、run artifact を読む形にする
 - 1 回の実験 report は `experiments/report/<run_name>.md` に残す
 - 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
@@ -404,6 +424,8 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - 静的チェック結果
 - 実行コマンド
 - `result/<run_name>/` の所在
+- `result/<run_name>/logs/` の所在
+- 可視化 notebook の所在
 - `config.json` の所在と主要 key
 - report の所在
 - 置き場と命名規則の変更有無
@@ -429,7 +451,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - この文書
   - 実験全般の標準手順
 - topic README
-  - その実験固有の目的、入力、CLI、`result/<run_name>/` の置き場、`experiments/report/<run_name>.md` の置き場、run_name 規則、既知の注意点
+  - その実験固有の目的、入力、CLI、可視化 notebook、`result/<run_name>/` と `logs/` の置き場、`experiments/report/<run_name>.md` の置き場、run_name 規則、既知の注意点
 
 個別 README は「そのモジュールや実験をどう使うか」を書き、
 この文書は「repo で実験をどう進めるか」を書く、という分担にします。

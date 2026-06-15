@@ -64,7 +64,8 @@ bash tools/sync_agent_canon.sh link-root
 
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
-`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `.vscode/`, and
+`tools/`.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 
@@ -104,6 +105,14 @@ scripts, `devcontainer.json`, post-create setup, and attach status reporting are
 edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
 does not make `docker/` AgentCanon-owned.
+
+`.vscode/` is also a shared AgentCanon runtime ergonomics surface. It owns
+workspace settings, recommended extensions, and VS Code task entrypoints that
+should behave the same in AgentCanon, template, and derived repository roots.
+Do not store personal editor state, host-specific include paths, workspace-local
+secrets, or product-specific commands in the shared `.vscode/` view. Put
+project-specific editor guidance in repo-local docs or project-owned scripts
+instead.
 
 ## Template-Owned Active Contracts
 

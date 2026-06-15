@@ -93,6 +93,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
+    def test_unknown_legacy_search_alias_fails(self) -> None:
+        """Unknown legacy-like search names must not silently resolve."""
+        result = self.run_route("--name", "search_legacy.py")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("STATUS=unknown", result.stdout)
+        self.assertIn("CANONICAL_AREA=", result.stdout)
+
     def test_prompt_routes_repo_changing_skill_set(self) -> None:
         """Prompt routing should expose concrete public skills, not only area aliases."""
         result = self.run_route(
@@ -193,6 +201,30 @@ class RouteToolTest(unittest.TestCase):
         slash_result = self.run_route("--name", "repo/refactor")
         self.assertEqual(slash_result.returncode, 0, slash_result.stdout + slash_result.stderr)
         self.assertIn("CANONICAL_AREA=structure", slash_result.stdout)
+
+    def test_structure_review_routes_to_structure_refactor(self) -> None:
+        """Structure review weakness should route to the structure refactor skill."""
+        result = self.run_route(
+            "--prompt",
+            "構造のレビュースキルが弱いので見直して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_structure_review_name_alias_routes_to_structure_area(self) -> None:
+        """Structure-review aliases should resolve to the structure area."""
+        for alias in ("structure-review", "structure-review-skill", "structural-review"):
+            with self.subTest(alias=alias):
+                result = self.run_route("--name", alias)
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("CANONICAL_AREA=structure", result.stdout)
+                self.assertIn("CANONICAL_TOOL=route.py --area structure", result.stdout)
 
     def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
         """Routing-context redesign prompts should activate the broader review stack."""
@@ -300,6 +332,54 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("pr-processing", decision["skills"])
         self.assertIn("pr-processing", decision["matched_skills"])
+
+    def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
+        """Unneeded numerical-test complaints should activate test-design routing."""
+        prompt = "不要な数値テストを入れるのをやめさせてください"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        self.assertIn("test-design", python_decision["matched_skills"])
+        self.assertIn("test-design", python_decision["active_skills"])
+        self.assertEqual(python_decision["skills"], rust_decision["skills"])
+        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
+
+    def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(self) -> None:
+        """English unneeded numerical-test prompts should match the Rust router."""
+        prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        self.assertIn("test-design", python_decision["matched_skills"])
+        self.assertIn("test-design", python_decision["active_skills"])
+        self.assertEqual(python_decision["skills"], rust_decision["skills"])
+        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_skill_route_matches_rust_harness(self) -> None:
         """Python compatibility prompt routing should match the Rust skill router."""

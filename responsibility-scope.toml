@@ -34,6 +34,7 @@ required_coverage = [
   ".agents",
   ".codex",
   ".devcontainer",
+  ".vscode",
   ".github",
   "agents",
   "evidence",
@@ -126,6 +127,7 @@ paths = [
   ".agents/**",
   ".codex/**",
   ".devcontainer/**",
+  ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
 ]

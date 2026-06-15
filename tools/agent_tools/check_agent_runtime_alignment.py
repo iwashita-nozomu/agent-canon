@@ -50,6 +50,11 @@ EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+ALLOWED_AGENT_RUNTIME_KEYS = {
+    "max_threads",
+    "max_depth",
+    "job_max_runtime_seconds",
+}
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial intake wave role: own user-request clauses",
     "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
@@ -147,6 +152,17 @@ def validate_project_config() -> None:
     ensure(
         agents.get("job_max_runtime_seconds") == EXPECTED_JOB_MAX_RUNTIME_SECONDS,
         f"agents.job_max_runtime_seconds must remain {EXPECTED_JOB_MAX_RUNTIME_SECONDS}",
+    )
+    unsupported_agent_scalars = sorted(
+        key
+        for key, value in agents.items()
+        if key not in ALLOWED_AGENT_RUNTIME_KEYS and not isinstance(value, dict)
+    )
+    ensure(
+        not unsupported_agent_scalars,
+        "unsupported scalar keys under .codex/config.toml [agents]: "
+        + ", ".join(unsupported_agent_scalars)
+        + "; keep task policy in agents/task_catalog.yaml or generated team_manifest.yaml",
     )
     codex_agents = parse_codex_agents()
     registry = {
@@ -669,11 +685,20 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         delegated_spawn_policy.get("delegated_child_spawn") == "allowed_with_bounded_packet",
         f"task {task_id} manifest delegated child spawn policy mismatch",
     )
+    wave_record_command = str(delegated_spawn_policy.get("wave_record_command", ""))
+    ensure(
+        "workflow_monitor.py" in wave_record_command
+        and "--subagent-wave" in wave_record_command,
+        f"task {task_id} manifest missing subagent wave record command",
+    )
     required_fields = delegated_spawn_policy.get("handoff_required_fields")
     expected_handoff_fields = {
         "owner",
         "child_role",
+        "child_instance_id",
         "input_packet",
+        "allowed_paths",
+        "do_not_read",
         "expected_output",
         "write_scope",
         "validation_route",
@@ -684,6 +709,38 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         isinstance(required_fields, list)
         and expected_handoff_fields.issubset({str(item) for item in required_fields}),
         f"task {task_id} manifest delegated spawn handoff fields incomplete",
+    )
+    same_role_policy = delegated_spawn_policy.get("same_role_instances")
+    ensure(
+        isinstance(same_role_policy, dict),
+        f"task {task_id} manifest missing delegated same-role instance policy",
+    )
+    ensure(
+        same_role_policy.get("status") == "allowed_with_distinct_packets",
+        f"task {task_id} manifest same-role instance policy status mismatch",
+    )
+    ensure(
+        same_role_policy.get("identity_key") == "role_type+instance_id",
+        f"task {task_id} manifest same-role identity key mismatch",
+    )
+    same_role_required_fields = same_role_policy.get("required_fields")
+    expected_same_role_fields = {
+        "role_type",
+        "instance_id",
+        "input_packet",
+        "allowed_paths",
+        "do_not_read",
+        "expected_output",
+        "write_scope",
+        "validation_route",
+        "review_gate",
+    }
+    ensure(
+        isinstance(same_role_required_fields, list)
+        and expected_same_role_fields.issubset(
+            {str(item) for item in same_role_required_fields}
+        ),
+        f"task {task_id} manifest same-role required fields incomplete",
     )
     spawn_wave_recommendation = run.get("spawn_wave_recommendation")
     ensure(

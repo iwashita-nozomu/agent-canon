@@ -40,10 +40,16 @@ Prompt skill routing is owned by the Rust
 for dynamic wave triggers. The Python `route.py --prompt ...` path remains a
 compatibility mirror for older call sites.
 
-Repository-refactor aliases such as `repo_refactor_skill.py`,
-`repo/refactor`, and personal Codex runtime boundary prompts involving
-`~/.codex` route to the `structure` area and `$structure-refactor`. Do not add a
-parallel public repo-refactor skill unless `route.py --name <candidate>` returns
+Japanese or English prompts about unnecessary numerical tests, heavy tests,
+test brittleness, tolerance-based tests, or test-design gaps route to
+`$test-design` so the numerical admission gate is applied before workers add
+tests.
+
+Repository-refactor and structure-review aliases such as
+`repo_refactor_skill.py`, `repo/refactor`, and `structure-review`, plus personal
+Codex runtime boundary prompts involving `~/.codex`, route to the `structure`
+area and `$structure-refactor`. Do not add a parallel public repo-refactor or
+structure-review skill unless `route.py --name <candidate>` returns
 `STATUS=unknown` after the structure route has been considered.
 
 Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are

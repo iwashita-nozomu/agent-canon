@@ -40,6 +40,10 @@ path = "../.agents/skills/agent-canon-update/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/agent-eval-accumulation/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/agent-log-analysis/SKILL.md"
 enabled = true
 

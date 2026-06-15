@@ -136,6 +136,61 @@ runtime_boundary=<project .codex/.agents views vs personal ~/.codex state>
 validation_gate=<scope/import/docs/tests/build commands>
 ```
 
+## Structure Review Gate
+
+Use this gate whenever the task asks for structure review, a structure review
+skill, a repo-layout review, or final approval of a structure refactor. The
+review is findings-first and must decide whether the structure contract is
+actionable before edits or acceptable before closeout.
+
+```text
+structure_review_root=<repo-or-subtree>
+structure_review_surface=<repo-source|agentcanon-shared|project-runtime-view|personal-runtime|mixed>
+reviewed_contract=<artifact path>
+directory_responsibility_graph=<artifact path>
+source_view_boundary_check=<artifact path>
+path_mapping=<artifact path>
+scope_overlap_report=<artifact path>
+reverse_edge_check=<artifact path>
+stale_surface_sweep=<artifact path>
+generated_artifact_boundary=<artifact path>
+validation_scope=<pass|fail|not_run>
+validation_imports=<pass|fail|not_run>
+validation_docs=<pass|fail|not_run>
+reviewer_decision=<approve|revise|block>
+```
+
+Reject the packet with `reviewer_decision=revise` or
+`reviewer_decision=block` when any of these findings is present:
+
+- The review reads only nearby files or top-level prose and does not include a
+  recursive directory responsibility graph.
+- The target path is chosen from naming aesthetics, proximity, or chat
+  impression instead of responsibility, source ownership, and dependency
+  evidence.
+- AgentCanon source files, template root views, project `.codex` / `.agents`
+  views, and personal `~/.codex` state are not classified before a shared
+  surface is edited.
+- `path_mapping` omits unchanged legacy paths, reverse edges, import fallout,
+  public entrypoints, document links, generated output locations, or caller
+  chains affected by the move.
+- `scope_overlap_report` ignores `exclude_paths` or leaves a tracked file under
+  multiple primary responsibilities.
+- A responsibility conflict is papered over by docs text while source layout,
+  route alias, dependency header, checker, or workflow ownership stays wrong.
+- Generated reports, log archives, notebooks, or eval outputs are treated as
+  structure sources instead of evidence artifacts.
+- The packet leaves `_old`, `_copy`, backup docs, stale root views, duplicate
+  READMEs, compatibility wrappers, or old route names without a fix-now owner
+  and removal plan.
+- The reviewer accepts tool success as reader-flow approval without a separate
+  structure judgement.
+
+Approve only when every changed or intentionally unchanged path is covered by
+the contract, old and new routes are both accounted for, the source/view
+boundary is explicit, and the validation commands above are either passing or
+recorded as task-appropriate `not_run` evidence with a reason.
+
 ## Default Sequence
 
 1. Identify the requested root and non-goals.
@@ -209,6 +264,11 @@ python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path> 
    directories into one evidence folder.
 
 1. Propose the smallest responsibility-preserving path mapping.
+1. Before the first edit and again before closeout, run the Structure Review
+   Gate. Do not approve a structure refactor whose packet is missing recursive
+   responsibility evidence, source/view boundary classification, path mapping,
+   scope overlap review, reverse-edge review, stale-surface sweep, or explicit
+   structure judgement.
 
 1. Hand wave planning to `refactor-loop`. This skill owns the validated
    structure surface classification, root/scope contract, path mapping, runtime
@@ -242,6 +302,7 @@ Use separate agents for:
 
 - recursive responsibility inventory
 - path mapping / structural design review
+- structure review gate and reject/approve judgement
 - write-capable move/update wave
 - document-flow review of READMEs and indexes
 - language-specific import/build review
@@ -258,9 +319,12 @@ waves without relying on chat memory.
 
 ```text
 structure_refactor=complete
+structure_review_decision=<approve|revise|block>
 directory_responsibility_graph=<path>
 path_mapping=<path>
 scope_overlap_report=<path>
+source_view_boundary_check=<path>
+reverse_edge_check=<path>
 moves_applied=<count>
 stale_path_sweep=<path>
 validation_scope=<pass|fail>

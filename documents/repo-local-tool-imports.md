@@ -31,8 +31,11 @@ machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
 `tool_catalog.py` and cross-checked by `tool_drift.py`.
 When a tool is promoted, left in the source repository, deleted, or converted
 into a compatibility wrapper, update both this ledger and the corresponding
-catalog entry. AgentCanon no longer keeps `tools/legacy/` provenance paths;
-update-route legacy subtree wording is unrelated to tool import disposition.
+catalog entry. The catalog entry must also classify the imported tool with
+`audience` and `placement` so a promoted user entrypoint is not mixed with a
+skill-only helper, workflow gate, support library, or compatibility wrapper.
+AgentCanon no longer keeps `tools/legacy/` provenance paths; update-route
+legacy subtree wording is unrelated to tool import disposition.
 
 ## Promoted To Canonical Tool Families
 

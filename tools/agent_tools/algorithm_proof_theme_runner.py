@@ -19,7 +19,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -44,6 +44,20 @@ def _stringify(value: str | Path) -> str:
     return str(value)
 
 
+def _dict_list(value: object) -> list[dict[str, object]]:
+    """Return JSON object rows from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, object], item) for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def _string_list(value: object) -> list[str]:
+    """Return string values from a JSON list."""
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in cast(list[object], value)]
+
+
 def _pascal(value: str) -> str:
     return "".join(part.capitalize() for part in value.replace("-", "_").split("_") if part)
 
@@ -57,7 +71,10 @@ class ThemeRunner:
         local_tools = self.repo_root / "tools" / "agent_tools"
         self.tools_dir = vendor_tools if vendor_tools.is_dir() else local_tools
         self.dry_run = dry_run
-        self.config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        payload = json.loads(self.config_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("theme config must be a JSON object")
+        self.config = cast(dict[str, object], payload)
 
     def run_command(self, cmd: list[str | Path], *, cwd: Path | None = None) -> None:
         rendered = [_stringify(part) for part in cmd]
@@ -75,33 +92,33 @@ class ThemeRunner:
             return vendor_cli
         return self.repo_root / "tools" / "bin" / "agent-canon"
 
-    def root_stem(self, root: dict[str, Any]) -> str:
+    def root_stem(self, root: dict[str, object]) -> str:
         return str(root.get("artifact_stem") or root["name"]).replace("-", "_")
 
-    def ir_json(self, root: dict[str, Any]) -> Path:
+    def ir_json(self, root: dict[str, object]) -> Path:
         return self.theme_dir / f"{self.root_stem(root)}_ir.json"
 
-    def ir_markdown(self, root: dict[str, Any]) -> Path:
+    def ir_markdown(self, root: dict[str, object]) -> Path:
         return self.theme_dir / f"{self.root_stem(root)}_ir.md"
 
-    def graph_path(self, root: dict[str, Any], profile: str, suffix: str) -> Path:
+    def graph_path(self, root: dict[str, object], profile: str, suffix: str) -> Path:
         stem = self.root_stem(root)
         return self.theme_dir / f"{stem}_{profile}_lemma_graph{suffix}"
 
-    def lean_namespace(self, root: dict[str, Any]) -> str:
+    def lean_namespace(self, root: dict[str, object]) -> str:
         return f"{self.config['lean_namespace']}.Generated{_pascal(self.root_stem(root))}"
 
-    def lean_output(self, root: dict[str, Any]) -> Path:
+    def lean_output(self, root: dict[str, object]) -> Path:
         name = f"Generated{_pascal(self.root_stem(root))}.lean"
-        return self.theme_dir / self.config.get("lean_dir", "PDIPMConvergence") / name
+        return self.theme_dir / str(self.config.get("lean_dir", "PDIPMConvergence")) / name
 
-    def profiles(self, root: dict[str, Any]) -> list[str]:
-        return list(root.get("profiles", ["solver_chain"]))
+    def profiles(self, root: dict[str, object]) -> list[str]:
+        return _string_list(root.get("profiles")) or ["solver_chain"]
 
-    def selected_roots(self, names: list[str]) -> list[dict[str, Any]]:
-        roots = list(self.config.get("roots", []))
+    def selected_roots(self, names: list[str]) -> list[dict[str, object]]:
+        roots = _dict_list(self.config.get("roots"))
         requested = set(names)
-        known = {root["name"] for root in roots}
+        known = {str(root["name"]) for root in roots}
         unknown = requested.difference(known)
         if unknown:
             raise SystemExit(
@@ -110,9 +127,9 @@ class ThemeRunner:
             )
         if not requested:
             return roots
-        return [root for root in roots if root["name"] in requested]
+        return [root for root in roots if str(root["name"]) in requested]
 
-    def generate_ir(self, root: dict[str, Any]) -> None:
+    def generate_ir(self, root: dict[str, object]) -> None:
         for fmt, out in (("json", self.ir_json(root)), ("markdown", self.ir_markdown(root))):
             self.run_command(
                 self.python_tool(
@@ -120,9 +137,9 @@ class ThemeRunner:
                     "--root",
                     self.repo_root,
                     "--python-symbol",
-                    root["python_symbol"],
+                    str(root["python_symbol"]),
                     "--target-theorem",
-                    root["target_theorem"],
+                    str(root["target_theorem"]),
                     "--format",
                     fmt,
                     "--out",
@@ -130,7 +147,7 @@ class ThemeRunner:
                 )
             )
 
-    def generate_graphs(self, root: dict[str, Any]) -> None:
+    def generate_graphs(self, root: dict[str, object]) -> None:
         ir_json = self.ir_json(root)
         for profile in self.profiles(root):
             for fmt, suffix in (("json", ".json"), ("markdown", ".md")):
@@ -148,7 +165,7 @@ class ThemeRunner:
                     )
                 )
 
-    def generate_lean(self, root: dict[str, Any]) -> None:
+    def generate_lean(self, root: dict[str, object]) -> None:
         if root.get("extra_shapes"):
             raise SystemExit(
                 f"root {root['name']} requests extra_shapes, but generic IR-to-Lean lowering "
@@ -171,49 +188,66 @@ class ThemeRunner:
         )
 
     def generate_equation_sections(self) -> None:
-        for section in self.config.get("equation_sections", []):
+        sections = _dict_list(self.config.get("equation_sections"))
+        roots = _dict_list(self.config.get("roots"))
+        for section in sections:
             for fmt, key in (("json", "json"), ("markdown", "markdown")):
                 cmd = self.python_tool("kkt_equation_section.py")
-                for root in self.config.get("roots", []):
+                for root in roots:
                     cmd.extend(["--ir-json", self.ir_json(root)])
+                out_path = _resolve(self.theme_dir, str(section[key]))
+                if out_path is None:
+                    raise ValueError("equation section output path is required")
                 cmd.extend(
                     [
                         "--title",
-                        section["title"],
+                        str(section["title"]),
                         "--format",
                         fmt,
                         "--out",
-                        _resolve(self.theme_dir, section[key]),
+                        out_path,
                     ]
                 )
                 self.run_command(cmd)
 
     def generate_proof_path_analyses(self) -> None:
-        for analysis in self.config.get("proof_path_analyses", []):
+        analyses = _dict_list(self.config.get("proof_path_analyses"))
+        roots = _dict_list(self.config.get("roots"))
+        for analysis in analyses:
+            proof_status = _resolve(self.theme_dir, str(analysis["proof_status"]))
+            if proof_status is None:
+                raise ValueError("proof status path is required")
             base = self.python_tool(
                 "proof_path_analyzer.py",
                 "--proof-status",
-                _resolve(self.theme_dir, analysis["proof_status"]),
+                proof_status,
             )
             algorithm_root = analysis.get("algorithm_root")
             if algorithm_root:
-                for root in self.config.get("roots", []):
-                    if root["name"] == algorithm_root:
+                for root in roots:
+                    if str(root["name"]) == str(algorithm_root):
                         base.extend(["--algorithm-ir", self.ir_json(root)])
                         break
-            for root in self.config.get("roots", []):
+            for root in roots:
                 for profile in self.profiles(root):
                     base.extend(["--lemma-graph", self.graph_path(root, profile, ".json")])
-            for frontier in analysis.get("proof_frontier", []):
-                base.extend(["--proof-frontier", _resolve(self.theme_dir, frontier)])
-            for adoption_text in analysis.get("adoption_text", []):
-                base.extend(["--adoption-text", _resolve(self.theme_dir, adoption_text)])
+            for frontier in _string_list(analysis.get("proof_frontier")):
+                frontier_path = _resolve(self.theme_dir, frontier)
+                if frontier_path is not None:
+                    base.extend(["--proof-frontier", frontier_path])
+            for adoption_text in _string_list(analysis.get("adoption_text")):
+                adoption_path = _resolve(self.theme_dir, adoption_text)
+                if adoption_path is not None:
+                    base.extend(["--adoption-text", adoption_path])
 
             for fmt, key in (("json", "json"), ("markdown", "markdown")):
-                self.run_command([*base, "--format", fmt, "--out", _resolve(self.theme_dir, analysis[key])])
+                out_path = _resolve(self.theme_dir, str(analysis[key]))
+                if out_path is None:
+                    raise ValueError("proof path analysis output path is required")
+                self.run_command([*base, "--format", fmt, "--out", out_path])
 
     def lake_build(self) -> None:
-        lake_dir = _resolve(self.theme_dir, self.config.get("lake_build_dir", "."))
+        lake_dir = _resolve(self.theme_dir, str(self.config.get("lake_build_dir", ".")))
         assert lake_dir is not None
         self.run_command(["lake", "build"], cwd=lake_dir)
 

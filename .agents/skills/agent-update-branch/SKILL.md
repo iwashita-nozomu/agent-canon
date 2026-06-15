@@ -21,6 +21,11 @@ upstream implementation ../../../tools/agent_tools/agent_update_branch.sh valida
    merging AgentCanon main into a local `vendor/agent-canon` branch, opening an
    AgentCanon PR, or deciding the parent latest route. This skill only owns the
    parent-repo update branch lane after that route is known.
+1. Reuse the current parent branch / PR when it already owns the same update
+   lane. Do not create `agent-updates/*` just to start fresh, split a small
+   follow-up, avoid dirty state, or respond to a mid-task user instruction. A new
+   branch requires `branch_creation_reason=<reason>` in the run bundle, work
+   log, or PR body.
 1. Use a template-derived branch name:
    - `agent-updates/memory-eval/<slug>`
    - `agent-updates/canon-pin/<slug>`

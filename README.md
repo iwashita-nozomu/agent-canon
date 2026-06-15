@@ -62,7 +62,7 @@ control-plane file を差し引く。2026-06-06 の再解析では、`exclude_pa
 
 | Scope | 種別 | 主な path | 役割 |
 | --- | --- | --- | --- |
-| `runtime-entrypoints` | primary | `AGENTS.md`, `ROOT_AGENTS.md`, `.agents/**`, `.codex/**`, `.devcontainer/**`, `agents/**`, `mcp/**` | agent runtime の入口、workflow canon、skill、hook、MCP、runtime config。 |
+| `runtime-entrypoints` | primary | `AGENTS.md`, `ROOT_AGENTS.md`, `.agents/**`, `.codex/**`, `.devcontainer/**`, `.vscode/**`, `agents/**`, `mcp/**` | agent runtime の入口、workflow canon、skill、hook、MCP、runtime / editor config。 |
 | `shared-tooling` | primary | `tools/**`, `rust/**`, `helper_inventory_guard_policy.json` | shared automation、static gate、OOP checker、Rust CLI、tool catalog。 |
 | `shared-policy-documents` | primary | `README.md`, `CONTAINER_OPERATIONS.md`, `responsibility-scope.toml`, `documents/**`, `notes/**`, `memory/**`, `references/**` | policy、convention、container、bootstrap、tool documentation、記憶と参照資料。 |
 | `test-surfaces` | primary | `tests/**` | shared tools、workflow、責務 policy を検証する test surface。 |
@@ -88,6 +88,7 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | `.agents/` | 42 | 42 | Codex skill discovery 用の runtime skill entrypoint。 |
 | `.codex/` | 61 | 61 | Codex config、role TOML、hook runtime surface。 |
 | `.devcontainer/` | 4 | 4 | shared devcontainer profile。 |
+| `.vscode/` | 4 | 4 | shared VS Code workspace defaults and validation tasks。 |
 | `.github/` | 12 | 12 | GitHub workflow、Issue / PR template、GitHub agent entrypoint。 |
 | `agents/` | 143 | 143 | workflow、skill canon、template、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |
 | `evidence/` | 8 | 8 | tracked eval manifest source と evidence contract。run output は `.agent-canon/log-archive/` に置き、legacy `agents/evals/results/` は migration input としてだけ扱う。 |
@@ -134,37 +135,24 @@ python3 tools/agent_tools/responsibility_scope.py --root . --format json \
   > reports/agentcanon-structure/responsibility_scope.json
 ```
 
-## 主な入口
+## 目的別ルート
 
-- `documents/README.md`
-  - root `documents/` の索引
-- `PHILOSOPHY.md`
-  - 設計時哲学と安定原則の正本
-- `agents/README.md`
-  - workflow / skill / runtime hub
-- `agents/workflows/README.md`
-  - workflow catalog と routing guide の入口
-- `ROOT_AGENTS.md`
-- `agents/`
-- `.agents/skills/`
-- `.codex/agents/`
-- `tools/`
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `CONTAINER_OPERATIONS.md`
-- `documents/github-first-module-and-devcontainer-policy.md`
-- `documents/agent-canon-github-remote.md`
-- `documents/agent-canon-update-route.md`
-- `documents/agent-canon-submodule-rollback.md`
-- `documents/derived-repo-bootstrap-runbook.md`
-- `documents/mcp-preflight-and-alternate route-policy.md`
-- `documents/issue-label-taxonomy.md`
-- `documents/prompt-skill-evaluation-checklist.md`
-- `documents/template-github-remote.md`
-- `documents/runtime-profiles-and-check-matrix.md`
-- `documents/template-agent-canon-audit-resolution.md`
-- `agents/workflows/agent-canon-pr-workflow.md`
-- `documents/agent-canon-subtree-migration.md`
-  - legacy vendoring compatibility appendix
+この README は最初の読者ラダーだけを持ちます。詳細な catalog や
+tool / skill の個別一覧は、それぞれの hub と machine-readable source に戻します。
+
+| 目的 | 次に読む入口 | そこで決めること |
+| --- | --- | --- |
+| 設計思想を確認する | `PHILOSOPHY.md` | AgentCanon が守る抽象責務と安定原則 |
+| 文書の所在を探す | `documents/README.md` | policy、runtime、tool docs、template contract の責務 owner |
+| agent workflow を選ぶ | `agents/README.md` | workflow、skill、subagent、runtime entrypoint の入口 |
+| workflow family を選ぶ | `agents/workflows/README.md` | task family、stage、review route |
+| shared surface を修復する | `documents/SHARED_RUNTIME_SURFACES.md` | root view、symlink/copy、submodule source の扱い |
+| AgentCanon 更新を進める | `documents/agent-canon-update-route.md` | parent pin、AgentCanon branch / PR、rollback への分岐 |
+| runtime profile と validation を選ぶ | `documents/runtime-profiles-and-check-matrix.md` | changed path と risk class から実行 gate を選ぶ |
+| shared tool を使う | `tools/README.md` | root `tools/` view から呼ぶ実行入口 |
+
+読み進めるときは、この表から 1 行だけ選びます。複数行を横断する必要が出た場合は、
+その理由を run bundle、issue、または PR body に残します。
 
 ## OpenAI / Codex Source Route
 
@@ -217,6 +205,7 @@ derived repo に露出する root view は次です。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
 - `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
+- `.vscode -> vendor/agent-canon/.vscode`: VS Code workspace defaults と validation tasks の共有 view。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
 - `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。

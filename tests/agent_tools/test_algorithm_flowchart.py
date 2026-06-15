@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py emits source IR.
 # upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py emits lemma graphs.
 # upstream design ../../agents/skills/algorithm-flowchart.md documents workflow.
-# downstream design ../../documents/tools/algorithm_flowchart.md documents CLI usage.
+# upstream design ../../documents/tools/algorithm_flowchart.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations

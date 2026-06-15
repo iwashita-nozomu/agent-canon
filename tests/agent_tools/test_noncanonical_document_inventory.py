@@ -85,6 +85,65 @@ class NoncanonicalDocumentInventoryTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("NONCANONICAL_DOCUMENT_FINDINGS=1", result.stdout)
 
+    def test_heading_prefix_is_ignored_for_non_markdown_duplicate_detection(self) -> None:
+        """Only Markdown H1 syntax should feed duplicate-heading findings."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = self.manifest("Documents a shared heading fixture.")
+            self.write_file(root, "documents/alpha.md", manifest + "# Shared Heading\n")
+            self.write_file(root, "documents/beta.md", manifest + "# Shared Heading\n")
+            self.write_file(root, "documents/noise.txt", manifest + "# Shared Heading\n")
+            self.write_file(root, "documents/noise.rst", manifest + "# Shared Heading\n")
+            json_out = root / "reports" / "noncanonical-docs.json"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--json-out",
+                    str(json_out),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(json_out.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            {
+                "action": "merge, retitle, or document why both headings are active",
+                "canonical_path": "documents/alpha.md",
+                "kind": "duplicate_heading_candidate",
+                "path": "documents/beta.md",
+                "reason": "shares H1 title with documents/alpha.md",
+            },
+            payload["findings"],
+        )
+        self.assertNotIn(
+            {
+                "action": "merge, retitle, or document why both headings are active",
+                "canonical_path": "documents/alpha.md",
+                "kind": "duplicate_heading_candidate",
+                "path": "documents/noise.txt",
+                "reason": "shares H1 title with documents/alpha.md",
+            },
+            payload["findings"],
+        )
+        self.assertNotIn(
+            {
+                "action": "merge, retitle, or document why both headings are active",
+                "canonical_path": "documents/alpha.md",
+                "kind": "duplicate_heading_candidate",
+                "path": "documents/noise.rst",
+                "reason": "shares H1 title with documents/alpha.md",
+            },
+            payload["findings"],
+        )
+
     def test_git_untracked_documents_are_included(self) -> None:
         """New documents must be visible before their first commit."""
         with tempfile.TemporaryDirectory() as temp_dir:

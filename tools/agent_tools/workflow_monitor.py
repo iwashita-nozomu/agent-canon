@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -17,7 +18,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO, cast
 
-from agent_team import resolve_report_root
+from agent_team import resolve_report_root, schedule_wave_row
+from mid_task_user_input_policy import (
+    MID_TASK_CLASSIFICATION_ACTIONS,
+    MID_TASK_CLASSIFICATION_SCOPE_STATUS,
+    MID_TASK_EVIDENCE_FIELDS,
+    MID_TASK_REQUIRED_KEYS,
+    MID_TASK_REUSE_MARKERS,
+    MID_TASK_SPAWN_AUTHORITY,
+    MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS,
+    MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS,
+    has_reuse_marker,
+    is_empty_policy_value,
+)
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -42,6 +55,39 @@ TOOL_WARNING_STATUS_VALUES = {
     "not_applicable",
 }
 TOOL_WARNING_LEDGER_STATUS_VALUES = {"pending", "open", "resolved", "none"}
+SUBAGENT_WAVE_REQUIRED_KEYS = (
+    "wave_id",
+    "parent_or_delegate",
+    "spawn_authority",
+    "trigger",
+    "budget_before",
+    "budget_after",
+    "runtime_max_threads",
+    "runtime_max_depth",
+    "spawned_roles",
+    "role_instances",
+    "skipped_roles",
+    "allowed_paths",
+    "do_not_read",
+    "write_scope",
+    "validation_route",
+    "review_gate",
+    "handoff_artifacts",
+    "status",
+)
+SUBAGENT_WAVE_EVENT_KINDS = {
+    "spawned",
+    "delegated_child_spawn",
+    "skipped",
+    "authority_blocker",
+}
+SUBAGENT_WAVE_EMPTY_OK_STATUSES = {
+    "blocked",
+    "blocked_authority_required",
+    "skipped",
+    "not_applicable",
+}
+SUBAGENT_WAVE_DELEGATED_EVENTS = {"delegated_child_spawn"}
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
     "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
@@ -97,6 +143,8 @@ class MonitoringEntries:
     runtime_feedback: tuple[str, ...] = ()
     tool_warnings: tuple[str, ...] = ()
     tool_warning_status: str = ""
+    mid_task_user_inputs: tuple[str, ...] = ()
+    subagent_waves: tuple[str, ...] = ()
     interventions: tuple[str, ...] = ()
     decisions: Mapping[str, str] = field(default_factory=empty_decisions)
     timestamp: str = ""
@@ -109,6 +157,8 @@ MONITORING_LEGACY_KEYS = {
     "runtime_feedback",
     "tool_warnings",
     "tool_warning_status",
+    "mid_task_user_inputs",
+    "subagent_waves",
     "interventions",
     "decisions",
     "timestamp",
@@ -120,6 +170,21 @@ def locked_monitoring_artifact(path: Path) -> Iterator[TextIO]:
     """Hold an exclusive lock while updating the monitoring artifact."""
     path.touch(exist_ok=True)
     with path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            yield handle
+        finally:
+            handle.flush()
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def locked_existing_artifact(path: Path) -> Iterator[TextIO]:
+    """Hold an exclusive lock while updating an existing artifact."""
+    if not path.is_file():
+        raise ValueError(f"missing required artifact: {path}")
+    with path.open("r+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
             handle.seek(0)
@@ -146,6 +211,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Workspace root used with --run-id and relative report roots.",
     )
+    add_monitoring_entry_arguments(parser)
+    add_tool_warning_arguments(parser)
+    add_mid_task_user_input_argument(parser)
+    add_subagent_wave_argument(parser)
+    add_closeout_decision_arguments(parser)
+    return parser
+
+
+def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common monitoring entry arguments."""
     parser.add_argument(
         "--signal",
         action="append",
@@ -176,6 +251,10 @@ def build_parser() -> argparse.ArgumentParser:
             "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
         ),
     )
+
+
+def add_tool_warning_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add tool warning ledger arguments."""
     parser.add_argument(
         "--tool-warning",
         action="append",
@@ -197,6 +276,49 @@ def build_parser() -> argparse.ArgumentParser:
             "and resolved only after all warning_ids are closed."
         ),
     )
+
+
+def add_mid_task_user_input_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the mid-task user input checkpoint argument."""
+    parser.add_argument(
+        "--mid-task-user-input",
+        action="append",
+        default=[],
+        help=(
+            "Checkpoint a user instruction added during an active multi-agent run. "
+            "Provide key=value tokens including wave_id, input_classification "
+            "(same_active_task_delta, scope_or_contract_change, new_task), "
+            "updated_packet, target_agents, scope_status, budget_before, "
+            "budget_after, runtime_max_threads, runtime_max_depth, allowed_paths, "
+            "do_not_read, write_scope, validation_route, review_gate, and "
+            "handoff_artifacts. scope_or_contract_change also requires "
+            "spawned_roles, role_instances, and fresh_wave_evidence; new_task also requires "
+            "fresh_run_bundle. The command appends matching schedule.md Agent "
+            "Wave Ledger and workflow_monitoring.md Actual Wave Events rows."
+        ),
+    )
+
+
+def add_subagent_wave_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the structured subagent wave recorder argument."""
+    parser.add_argument(
+        "--subagent-wave",
+        action="append",
+        default=[],
+        help=(
+            "Record an actual parent or delegated subagent wave as key=value tokens. "
+            "Required keys: wave_id, parent_or_delegate, spawn_authority, trigger, "
+            "budget_before, budget_after, runtime_max_threads, runtime_max_depth, "
+            "spawned_roles, role_instances, skipped_roles, allowed_paths, do_not_read, "
+            "write_scope, validation_route, review_gate, handoff_artifacts, and status. "
+            "Optional event_kind defaults to spawned; delegated child waves must include "
+            "remaining_spawn_budget."
+        ),
+    )
+
+
+def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add closeout preset and improvement decision arguments."""
     parser.add_argument(
         "--closeout-token-preset",
         action="store_true",
@@ -221,7 +343,6 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Optional timestamp prefix. Defaults to current local time.",
     )
-    return parser
 
 
 def default_monitoring_text(report_dir: Path) -> str:
@@ -242,6 +363,8 @@ def default_monitoring_text(report_dir: Path) -> str:
             "## Signals",
             "",
             "## Behavior Events",
+            "",
+            "## Actual Wave Events",
             "",
             "## Tool Warnings",
             "",
@@ -303,6 +426,368 @@ def parse_token_fields(entry: str) -> dict[str, str]:
         key, value = token.split("=", 1)
         data[key.strip()] = value.strip()
     return data
+
+
+def normalize_subagent_wave(entry: str) -> dict[str, str]:
+    """Normalize one actual parent or delegated subagent wave."""
+    stripped = entry.strip()
+    if not stripped:
+        raise ValueError("subagent wave entries must not be empty")
+    fields = parse_token_fields(stripped)
+    missing = [
+        key
+        for key in SUBAGENT_WAVE_REQUIRED_KEYS
+        if fields.get(key, "").strip().lower() in {"", "missing"}
+    ]
+    if missing:
+        raise ValueError("subagent wave must include required keys: " + ",".join(missing))
+    normalized = dict(fields)
+    normalized.setdefault("event_kind", "spawned")
+    normalized.setdefault("delegated_policy_ref", "team_manifest.yaml#run.delegated_spawn_policy")
+    event_kind = normalized["event_kind"]
+    if event_kind not in SUBAGENT_WAVE_EVENT_KINDS:
+        raise ValueError(
+            "subagent wave event_kind must be one of: "
+            + ",".join(sorted(SUBAGENT_WAVE_EVENT_KINDS))
+        )
+    runtime_max_depth = normalized["runtime_max_depth"]
+    if not runtime_max_depth.isdigit() or int(runtime_max_depth) < 1:
+        raise ValueError("subagent wave runtime_max_depth must be an integer >= 1")
+    status = normalized["status"]
+    if status not in SUBAGENT_WAVE_EMPTY_OK_STATUSES:
+        for key in ("spawned_roles", "role_instances"):
+            if is_empty_policy_value(normalized[key]):
+                raise ValueError(f"subagent wave {key} must identify actual roles")
+    is_delegated = normalized["parent_or_delegate"] != "parent" or (
+        event_kind in SUBAGENT_WAVE_DELEGATED_EVENTS
+    )
+    if is_delegated and is_empty_policy_value(
+        normalized.get("remaining_spawn_budget", "")
+    ):
+        raise ValueError(
+            "delegated subagent wave must include remaining_spawn_budget"
+        )
+    return normalized
+
+
+def subagent_wave_actual_event(row: dict[str, str]) -> str:
+    """Return an Actual Wave Events token row for a subagent wave."""
+    fields = [
+        ("wave_event", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", row["event_kind"]),
+        ("spawn_authority", row["spawn_authority"]),
+        ("trigger", row["trigger"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("runtime_max_threads", row["runtime_max_threads"]),
+        ("runtime_max_depth", row["runtime_max_depth"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("allowed_paths", row["allowed_paths"]),
+        ("do_not_read", row["do_not_read"]),
+        ("write_scope", row["write_scope"]),
+        ("validation_route", row["validation_route"]),
+        ("review_gate", row["review_gate"]),
+        ("handoff_artifacts", row["handoff_artifacts"]),
+        ("status", row["status"]),
+        ("delegated_policy_ref", row["delegated_policy_ref"]),
+    ]
+    if "remaining_spawn_budget" in row:
+        fields.append(("remaining_spawn_budget", row["remaining_spawn_budget"]))
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def subagent_wave_behavior_event(row: dict[str, str]) -> str:
+    """Return a Behavior Events token row for a subagent wave."""
+    fields = [
+        ("subagent_wave", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", row["event_kind"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("status", row["status"]),
+    ]
+    if "remaining_spawn_budget" in row:
+        fields.append(("remaining_spawn_budget", row["remaining_spawn_budget"]))
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def parse_mid_task_fields(entry: str) -> dict[str, str]:
+    """Parse one mid-task user instruction checkpoint."""
+    if not entry.strip():
+        raise ValueError("mid-task user input entries must not be empty")
+    fields = parse_token_fields(entry.strip())
+    missing = [
+        key
+        for key in MID_TASK_REQUIRED_KEYS
+        if fields.get(key, "").strip().lower() in {"", "missing"}
+    ]
+    if missing:
+        raise ValueError(
+            "mid-task user input must include required keys: " + ",".join(missing)
+        )
+    return fields
+
+
+def mid_task_classification(fields: Mapping[str, str]) -> str:
+    """Return and validate one mid-task input classification."""
+    classification = fields["input_classification"]
+    if classification not in MID_TASK_CLASSIFICATION_ACTIONS:
+        raise ValueError(
+            "mid-task input_classification must be one of: "
+            + ",".join(sorted(MID_TASK_CLASSIFICATION_ACTIONS))
+        )
+    if is_empty_policy_value(fields["updated_packet"]):
+        raise ValueError("mid-task user input updated_packet must not be none")
+    return classification
+
+
+def validate_mid_task_route_fields(
+    fields: Mapping[str, str],
+    classification: str,
+) -> tuple[str, str]:
+    """Validate route fields that are derived from the classification."""
+    expected_action = MID_TASK_CLASSIFICATION_ACTIONS[classification]
+    action = fields.get("redispatch_action", expected_action)
+    if action != expected_action:
+        raise ValueError(
+            f"mid-task redispatch_action for {classification} must be {expected_action}"
+        )
+    expected_scope_status = MID_TASK_CLASSIFICATION_SCOPE_STATUS[classification]
+    if fields["scope_status"] != expected_scope_status:
+        raise ValueError(
+            f"mid-task scope_status for {classification} must be {expected_scope_status}"
+        )
+    expected_spawn_authority = MID_TASK_SPAWN_AUTHORITY[classification]
+    spawn_authority = fields.get("spawn_authority", expected_spawn_authority)
+    if spawn_authority != expected_spawn_authority:
+        raise ValueError(
+            f"mid-task spawn_authority for {classification} must be "
+            f"{expected_spawn_authority}"
+        )
+    return expected_action, expected_spawn_authority
+
+
+def validate_mid_task_target_and_evidence(
+    fields: Mapping[str, str],
+    classification: str,
+) -> None:
+    """Validate classification-specific target and evidence fields."""
+    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
+        fields.get("target_agents", "")
+    ):
+        raise ValueError(
+            f"mid-task target_agents for {classification} must identify an agent or role"
+        )
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(classification)
+    if evidence_field and is_empty_policy_value(fields.get(evidence_field, "")):
+        raise ValueError(
+            f"mid-task {evidence_field} for {classification} must identify evidence"
+        )
+    if classification in MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS and (
+        "spawned_roles" not in fields
+        or is_empty_policy_value(fields.get("spawned_roles", ""))
+    ):
+        raise ValueError(
+            f"mid-task spawned_roles for {classification} must identify fresh roles"
+        )
+    if classification in MID_TASK_SPAWNED_ROLES_REQUIRED_CLASSIFICATIONS and (
+        "role_instances" not in fields
+        or is_empty_policy_value(fields.get("role_instances", ""))
+    ):
+        raise ValueError(
+            f"mid-task role_instances for {classification} must identify role_type+instance_id"
+        )
+    if classification in MID_TASK_EVIDENCE_FIELDS:
+        skipped_roles = fields.get("skipped_roles", "")
+        if has_reuse_marker(skipped_roles):
+            markers = ",".join(MID_TASK_REUSE_MARKERS)
+            raise ValueError(
+                f"mid-task {classification} must not include reused-agent marker: "
+                f"{markers}"
+            )
+
+
+def mid_task_defaults(
+    fields: Mapping[str, str],
+    classification: str,
+    expected_action: str,
+    expected_spawn_authority: str,
+) -> dict[str, str]:
+    """Return normalized mid-task fields with defaulted ledger values."""
+    normalized = dict(fields)
+    normalized.setdefault("parent_or_delegate", "parent")
+    normalized.setdefault("trigger", "mid_task_user_input")
+    normalized.setdefault("spawn_authority", expected_spawn_authority)
+    normalized.setdefault("redispatch_action", expected_action)
+    normalized.setdefault(
+        "lifecycle_policy_ref",
+        "team_manifest.yaml#run.subagent_lifecycle_policy",
+    )
+    normalized.setdefault(
+        "delegated_policy_ref",
+        "team_manifest.yaml#run.subagent_lifecycle_policy",
+    )
+    normalized.setdefault("status", "checkpointed")
+    if "spawned_roles" not in normalized:
+        normalized["spawned_roles"] = "none"
+    if "role_instances" not in normalized:
+        normalized["role_instances"] = "none"
+    if "skipped_roles" not in normalized:
+        normalized["skipped_roles"] = (
+            f"{normalized['target_agents']}:reused_run_local_send_input"
+            if classification == "same_active_task_delta"
+            else "none"
+        )
+    return normalized
+
+
+def normalize_mid_task_user_input(entry: str) -> dict[str, str]:
+    """Normalize one mid-task user instruction checkpoint."""
+    fields = parse_mid_task_fields(entry)
+    classification = mid_task_classification(fields)
+    expected_action, expected_spawn_authority = validate_mid_task_route_fields(
+        fields,
+        classification,
+    )
+    validate_mid_task_target_and_evidence(fields, classification)
+    return mid_task_defaults(
+        fields,
+        classification,
+        expected_action,
+        expected_spawn_authority,
+    )
+
+
+def mid_task_actual_wave_event(row: dict[str, str]) -> str:
+    """Return an Actual Wave Events token row for a mid-task checkpoint."""
+    fields = [
+        ("wave_event", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", "mid_task_user_input"),
+        ("spawn_authority", row["spawn_authority"]),
+        ("trigger", row["trigger"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("runtime_max_threads", row["runtime_max_threads"]),
+        ("runtime_max_depth", row["runtime_max_depth"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("allowed_paths", row["allowed_paths"]),
+        ("do_not_read", row["do_not_read"]),
+        ("write_scope", row["write_scope"]),
+        ("validation_route", row["validation_route"]),
+        ("review_gate", row["review_gate"]),
+        ("handoff_artifacts", row["handoff_artifacts"]),
+        ("status", row["status"]),
+        ("input_classification", row["input_classification"]),
+        ("updated_packet", row["updated_packet"]),
+        ("redispatch_action", row["redispatch_action"]),
+        ("target_agents", row["target_agents"]),
+        ("scope_status", row["scope_status"]),
+        ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
+    ]
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(row["input_classification"])
+    if evidence_field:
+        fields.append((evidence_field, row[evidence_field]))
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def mid_task_behavior_event(row: dict[str, str]) -> str:
+    """Return a Behavior Events token row for a mid-task user checkpoint."""
+    fields = [
+        ("mid_task_user_input", "checkpointed"),
+        ("wave_id", row["wave_id"]),
+        ("input_classification", row["input_classification"]),
+        ("updated_packet", row["updated_packet"]),
+        ("redispatch_action", row["redispatch_action"]),
+        ("target_agents", row["target_agents"]),
+        ("scope_status", row["scope_status"]),
+        ("lifecycle_policy_ref", row["lifecycle_policy_ref"]),
+    ]
+    evidence_field = MID_TASK_EVIDENCE_FIELDS.get(row["input_classification"])
+    if evidence_field:
+        fields.append((evidence_field, row[evidence_field]))
+    return " ".join(f"{key}={value}" for key, value in fields)
+
+
+def append_mid_task_schedule_rows(
+    report_dir: Path,
+    rows: tuple[dict[str, str], ...],
+) -> None:
+    """Append mid-task user input rows to schedule.md."""
+    if not rows:
+        return
+    schedule_path = report_dir / "schedule.md"
+    with locked_existing_artifact(schedule_path) as handle:
+        lines = handle.read().splitlines()
+        insert_entries(
+            lines,
+            "## Agent Wave Ledger",
+            [schedule_wave_row(row) for row in rows],
+        )
+        handle.seek(0)
+        handle.truncate()
+        handle.write("\n".join(lines).rstrip() + "\n")
+
+
+def markdown_wave_id(line: str) -> str:
+    """Return the wave id from one Agent Wave Ledger row, or an empty string."""
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        return ""
+    cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+    if not cells:
+        return ""
+    wave_id = cells[0]
+    if wave_id == "Wave ID" or set(wave_id) <= {"-", " "}:
+        return ""
+    return wave_id
+
+
+def upsert_subagent_wave_schedule_rows(
+    report_dir: Path,
+    rows: tuple[dict[str, str], ...],
+) -> None:
+    """Insert or replace actual subagent wave rows in schedule.md."""
+    if not rows:
+        return
+    schedule_path = report_dir / "schedule.md"
+    desired = {row["wave_id"]: schedule_wave_row(row) for row in rows}
+    replaced: set[str] = set()
+    with locked_existing_artifact(schedule_path) as handle:
+        lines = handle.read().splitlines()
+        ensure_section(lines, "## Agent Wave Ledger")
+        start, end = section_bounds(lines, "## Agent Wave Ledger")
+        index = start + 1
+        while index < end:
+            wave_id = markdown_wave_id(lines[index])
+            if wave_id not in desired:
+                index += 1
+                continue
+            if wave_id in replaced:
+                del lines[index]
+                end -= 1
+                continue
+            lines[index] = desired[wave_id]
+            replaced.add(wave_id)
+            index += 1
+        missing_rows = [
+            desired[wave_id]
+            for wave_id in desired
+            if wave_id not in replaced
+        ]
+        if missing_rows:
+            insert_entries(lines, "## Agent Wave Ledger", missing_rows)
+        handle.seek(0)
+        handle.truncate()
+        handle.write("\n".join(lines).rstrip() + "\n")
 
 
 def normalize_tool_warning(entry: str) -> str:
@@ -424,6 +909,46 @@ def insert_entries(lines: list[str], heading: str, entries: list[str]) -> None:
         insert_at += 1
 
 
+def wave_event_id(line: str) -> str:
+    """Return the wave id from one workflow monitoring event row."""
+    if "wave_event=recorded" not in line:
+        return ""
+    return parse_token_fields(line).get("wave_id", "")
+
+
+def upsert_wave_event_entries(
+    lines: list[str],
+    heading: str,
+    entries: list[str],
+) -> None:
+    """Insert or replace workflow monitoring wave-event rows by wave id."""
+    if not entries:
+        return
+    ensure_section(lines, heading)
+    desired = {wave_event_id(entry): entry for entry in entries}
+    desired.pop("", None)
+    replaced: set[str] = set()
+    start, end = section_bounds(lines, heading)
+    index = start + 1
+    while index < end:
+        wave_id = wave_event_id(lines[index])
+        if wave_id not in desired:
+            index += 1
+            continue
+        if wave_id in replaced:
+            del lines[index]
+            end -= 1
+            continue
+        lines[index] = desired[wave_id]
+        replaced.add(wave_id)
+        index += 1
+    insert_entries(
+        lines,
+        heading,
+        [entry for wave_id, entry in desired.items() if wave_id not in replaced],
+    )
+
+
 def parse_decision(raw: str) -> tuple[str, str]:
     """Parse and validate one decision key=value pair."""
     if "=" not in raw:
@@ -492,10 +1017,99 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
         tool_warnings=string_entries(kwargs.get("tool_warnings")),
         tool_warning_status=str(kwargs.get("tool_warning_status", "")),
+        mid_task_user_inputs=string_entries(kwargs.get("mid_task_user_inputs")),
+        subagent_waves=string_entries(kwargs.get("subagent_waves")),
         interventions=string_entries(kwargs.get("interventions")),
         decisions=decision_entries(kwargs.get("decisions")),
         timestamp=str(kwargs.get("timestamp", "")),
     )
+
+
+def normalized_wave_rows(
+    entries: MonitoringEntries,
+) -> tuple[tuple[dict[str, str], ...], tuple[dict[str, str], ...]]:
+    """Return normalized mid-task and subagent wave rows."""
+    return (
+        tuple(
+            normalize_mid_task_user_input(item)
+            for item in entries.mid_task_user_inputs
+        ),
+        tuple(
+            normalize_subagent_wave(item)
+            for item in entries.subagent_waves
+        ),
+    )
+
+
+def append_wave_schedule_rows(
+    report_dir: Path,
+    mid_task_rows: tuple[dict[str, str], ...],
+    subagent_wave_rows: tuple[dict[str, str], ...],
+) -> None:
+    """Update schedule.md with every monitor-owned wave row."""
+    append_mid_task_schedule_rows(report_dir, mid_task_rows)
+    upsert_subagent_wave_schedule_rows(report_dir, subagent_wave_rows)
+
+
+def append_monitoring_sections(
+    lines: list[str],
+    entries: MonitoringEntries,
+    mid_task_rows: tuple[dict[str, str], ...],
+    subagent_wave_rows: tuple[dict[str, str], ...],
+) -> None:
+    """Apply normalized monitoring rows to workflow_monitoring.md sections."""
+    signal_entries = [
+        normalize_entry(item, entries.timestamp)
+        for item in entries.signals
+    ]
+    behavior_entries = [
+        normalize_entry(item, entries.timestamp)
+        for item in entries.behavior_events
+    ]
+    behavior_entries.extend(
+        normalize_entry(normalize_runtime_feedback(item), entries.timestamp)
+        for item in entries.runtime_feedback
+    )
+    behavior_entries.extend(
+        normalize_entry(mid_task_behavior_event(row), entries.timestamp)
+        for row in mid_task_rows
+    )
+    behavior_entries.extend(
+        normalize_entry(subagent_wave_behavior_event(row), entries.timestamp)
+        for row in subagent_wave_rows
+    )
+    actual_wave_entries = [
+        normalize_entry(mid_task_actual_wave_event(row), entries.timestamp)
+        for row in mid_task_rows
+    ]
+    subagent_wave_entries = [
+        normalize_entry(subagent_wave_actual_event(row), entries.timestamp)
+        for row in subagent_wave_rows
+    ]
+    tool_warning_entries = [
+        normalize_entry(normalize_tool_warning(item), entries.timestamp)
+        for item in entries.tool_warnings
+    ]
+    intervention_entries = [
+        normalize_entry(item, entries.timestamp)
+        for item in entries.interventions
+    ]
+    insert_entries(lines, "## Signals", signal_entries)
+    insert_entries(lines, "## Behavior Events", behavior_entries)
+    insert_entries(lines, "## Actual Wave Events", actual_wave_entries)
+    upsert_wave_event_entries(lines, "## Actual Wave Events", subagent_wave_entries)
+    insert_entries(lines, "## Tool Warnings", tool_warning_entries)
+    inferred_tool_warning_status = (
+        entries.tool_warning_status or infer_tool_warning_status(lines)
+    )
+    set_section_status(
+        lines,
+        "## Tool Warnings",
+        "tool_warnings_status",
+        inferred_tool_warning_status,
+    )
+    insert_entries(lines, "## Interventions", intervention_entries)
+    apply_decisions(lines, dict(entries.decisions))
 
 
 def append_monitoring(
@@ -506,46 +1120,20 @@ def append_monitoring(
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
+    mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
+    append_wave_schedule_rows(report_dir, mid_task_rows, subagent_wave_rows)
     path = report_dir / "workflow_monitoring.md"
     with locked_monitoring_artifact(path) as handle:
         text = handle.read()
         if not text.strip():
             text = default_monitoring_text(report_dir)
         lines = text.splitlines()
-        signal_entries = [
-            normalize_entry(item, active_entries.timestamp)
-            for item in active_entries.signals
-        ]
-        behavior_entries = [
-            normalize_entry(item, active_entries.timestamp)
-            for item in active_entries.behavior_events
-        ]
-        behavior_entries.extend(
-            normalize_entry(normalize_runtime_feedback(item), active_entries.timestamp)
-            for item in active_entries.runtime_feedback
-        )
-        tool_warning_entries = [
-            normalize_entry(normalize_tool_warning(item), active_entries.timestamp)
-            for item in active_entries.tool_warnings
-        ]
-        intervention_entries = [
-            normalize_entry(item, active_entries.timestamp)
-            for item in active_entries.interventions
-        ]
-        insert_entries(lines, "## Signals", signal_entries)
-        insert_entries(lines, "## Behavior Events", behavior_entries)
-        insert_entries(lines, "## Tool Warnings", tool_warning_entries)
-        inferred_tool_warning_status = (
-            active_entries.tool_warning_status or infer_tool_warning_status(lines)
-        )
-        set_section_status(
+        append_monitoring_sections(
             lines,
-            "## Tool Warnings",
-            "tool_warnings_status",
-            inferred_tool_warning_status,
+            active_entries,
+            mid_task_rows,
+            subagent_wave_rows,
         )
-        insert_entries(lines, "## Interventions", intervention_entries)
-        apply_decisions(lines, dict(active_entries.decisions))
         handle.seek(0)
         handle.truncate()
         handle.write("\n".join(lines).rstrip() + "\n")
@@ -569,6 +1157,8 @@ def main() -> int:
             runtime_feedback=tuple(args.runtime_feedback),
             tool_warnings=tuple(args.tool_warning),
             tool_warning_status=str(args.tool_warning_status),
+            mid_task_user_inputs=tuple(args.mid_task_user_input),
+            subagent_waves=tuple(args.subagent_wave),
             interventions=tuple(args.intervention),
             decisions=decisions,
             timestamp=str(args.timestamp),

@@ -3,10 +3,17 @@
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
+# upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
+# upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
+# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
+# upstream implementation ./check_convention_compliance.py verifies skill-routing markers
+# upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
@@ -23,6 +30,11 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from tool_path_policy import (
+    is_retired_legacy_tool_path,
+    iter_retired_legacy_tool_paths,
+    retired_legacy_tool_detail,
+)
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
@@ -239,6 +251,27 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="generated_artifact_guard",
+        tool="tools/agent_tools/generated_artifact_guard.py",
+        links=(
+            LinkCheck("tools/agent_tools/report_artifact_checks.py"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("agents/canonical/ARTIFACT_PLACEMENT.md"),
+            LinkCheck("agents/templates/closeout_gate.md"),
+            LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
+            ),
+        ),
+    ),
+    ToolContract(
         name="agent_canon_pr_check",
         tool="tools/ci/check_agent_canon_pr.sh",
         links=(
@@ -247,6 +280,7 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
             LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
+            LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
@@ -271,6 +305,16 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
+                'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}"',
+                "missing-agent-canon-pr-hook-archive-env",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "python3 tools/agent_tools/generated_artifact_guard.py",
+                "missing-generated-artifact-pr-guard",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
             ),
@@ -282,10 +326,89 @@ CONTRACTS = (
         links=(
             LinkCheck("documents/conventions/README.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
             LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tools/agent_tools/tool_drift.py"),
+        ),
+    ),
+    ToolContract(
+        name="subagent_wave_routing",
+        tool="tools/agent_tools/tool_drift.py",
+        links=(
+            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
+            LinkCheck("agents/TASK_WORKFLOWS.md"),
+            LinkCheck("agents/skills/agent-orchestration.md"),
+            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
+            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+            LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("tests/agent_tools/test_tool_drift.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "agents/canonical/CODEX_SUBAGENTS.md",
+                "vertical dynamic wave",
+                "missing-canonical-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/canonical/CODEX_SUBAGENTS.md",
+                "write-capable handoff",
+                "missing-canonical-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "agents/TASK_WORKFLOWS.md",
+                "vertical dynamic wave",
+                "missing-workflow-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/TASK_WORKFLOWS.md",
+                "write-capable handoff",
+                "missing-workflow-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "agents/skills/agent-orchestration.md",
+                "vertical dynamic wave",
+                "missing-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                "agents/skills/agent-orchestration.md",
+                "write-capable handoff",
+                "missing-orchestration-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "vertical dynamic wave",
+                "missing-runtime-orchestration-vertical-wave-policy",
+            ),
+            TextCheck(
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "write-capable handoff",
+                "missing-runtime-orchestration-write-capable-handoff-policy",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "VERTICAL-WAVE-POLICY",
+                "missing-vertical-wave-prompt-eval",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "write-capable handoff",
+                "missing-write-capable-handoff-prompt-eval",
+            ),
+            TextCheck(
+                "tools/agent_tools/check_convention_compliance.py",
+                "vertical dynamic wave",
+                "missing-vertical-wave-convention-marker",
+            ),
+            TextCheck(
+                "tools/agent_tools/check_convention_compliance.py",
+                "write-capable handoff",
+                "missing-write-capable-handoff-convention-marker",
+            ),
         ),
     ),
     ToolContract(
@@ -562,64 +685,38 @@ def check_catalog_entries(root: Path) -> list[Finding]:
     """Check catalog entries for stale paths and legacy/default confusion."""
     catalog_path = resolve_repo_path(root, "tools/catalog.yaml")
     if not catalog_path.is_file():
-        return [
-            Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")
-        ]
+        return [Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")]
     if not has_dependency_manifest(catalog_path):
-        return [
-            Finding(
-                "missing-dependency-header",
-                "tool_catalog",
-                "tools/catalog.yaml",
-                "catalog",
-            )
-        ]
+        return [Finding("missing-dependency-header", "tool_catalog", "tools/catalog.yaml", "catalog")]
     raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     catalog = as_mapping(raw)
     if catalog is None:
-        return [
-            Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping")
-        ]
+        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping")]
     entries = as_sequence(catalog.get("entries"))
     if entries is None:
-        return [
-            Finding(
-                "invalid-catalog",
-                "tool_catalog",
-                "tools/catalog.yaml",
-                "entries-not-list",
-            )
-        ]
+        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "entries-not-list")]
     findings: list[Finding] = []
+    catalog_retired_paths: set[str] = set()
     for index, raw_entry in enumerate(entries, start=1):
         entry = as_mapping(raw_entry)
         if entry is None:
             findings.append(
-                Finding(
-                    "invalid-catalog-entry",
-                    "tool_catalog",
-                    "tools/catalog.yaml",
-                    f"entry-{index}-not-mapping",
-                )
+                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-not-mapping")
             )
             continue
         entry_path = entry.get("path")
         status = entry.get("status")
         if not isinstance(entry_path, str):
             findings.append(
-                Finding(
-                    "invalid-catalog-entry",
-                    "tool_catalog",
-                    "tools/catalog.yaml",
-                    f"entry-{index}-missing-path",
-                )
+                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-missing-path")
             )
             continue
         if not resolve_repo_path(root, entry_path).exists():
             findings.append(
                 Finding("stale-catalog-entry", "tool_catalog", entry_path, "missing-path")
             )
-        if entry_path.startswith("tools/legacy/") or status == "legacy_provenance":
+        if is_retired_legacy_tool_path(entry_path) or status == "legacy_provenance":
+            catalog_retired_paths.add(entry_path.replace("\\", "/").removeprefix("./"))
             findings.append(
                 Finding(
                     "retired-legacy-tool",
@@ -628,13 +725,15 @@ def check_catalog_entries(root: Path) -> list[Finding]:
                     "legacy-tools-are-retired",
                 )
             )
-    if (root / "tools" / "legacy").exists():
+    for retired_path in iter_retired_legacy_tool_paths(root):
+        if retired_path in catalog_retired_paths:
+            continue
         findings.append(
             Finding(
                 "retired-legacy-tool",
                 "tool_catalog",
-                "tools/legacy",
-                "legacy-directory-present",
+                retired_path,
+                retired_legacy_tool_detail(retired_path),
             )
         )
     return findings

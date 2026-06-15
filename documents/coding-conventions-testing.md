@@ -68,6 +68,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 unit test は「1 つの観測可能 behavior に対する concrete example」です。
 実装内部の call sequence や private helper の存在を固定するものではありません。
+単に script、CLI、checker、import、compile、type check、format check が
+exit code 0 で終わることだけを見る test は unit test ではありません。
+その性質を static analysis / checker / CI gate が所有している場合は、
+pytest wrapper を作らず、その checker を validation route に入れます。
 
 変更耐性のある test design は、次の 5 軸を先に固定します。
 
@@ -76,6 +80,30 @@ unit test は「1 つの観測可能 behavior に対する concrete example」�
 - `Oracle`: literal expected、known reference、exception type、state change、property、metamorphic relation のどれか。
 - `Input Space`: concrete regression、boundary table、random/property generator、metamorphic follow-up input のどれか。
 - `Adequacy Evidence`: branch/edge coverage、mutation score、regression replay、manual review のどれで assertion の強さを確認するか。
+
+### 3.1 数値テスト採用ゲート
+
+数値テストは、変更の behavior contract が数値的な性質を持つ場合だけ追加します。
+solver、optimizer、floating-point approximation、residual、tolerance、random sampling、
+convergence、reference comparison、scientific experiment contract のどれにも関係しない
+docs、routing、metadata、string parsing、configuration、structure refactor では、
+数値 smoke、large random case、benchmark 風 test を追加しません。
+
+数値テストを提案する前に、test plan で次を固定します。
+
+- `Numerical Trigger`: 数値テストが必要な具体的契約、既知 regression、acceptance
+  criterion、または proof / experiment requirement。
+- `Non-Numerical Alternative`: static contract、parser example、diagnostic key、
+  property、metamorphic relation、snapshot で同じリスクをより小さく検証できない理由。
+- `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
+  flag など、production path と同じ bug を複製しない expected。
+- `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
+
+`Numerical Trigger` がない場合は、数値テストを省きます。その場合も test plan には
+「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
+数値 validation が必要でも、既定は最小の deterministic case です。GPU、long-running、
+broad benchmark、large random sweep は unit test ではなく experiment validation として
+profile、理由、ログ保存先を記録します。
 
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
@@ -87,6 +115,10 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 必須方針:
 
+- 新規 test を作る前に、その test が検証する性質を既存の static analysis、
+  checker、formatter、dependency review、type checker、lint、docs check が
+  既に所有していないか確認します。所有している場合は、test を生成せず、
+  canonical command と evidence を validation に残します。
 - 1 test は 1 behavior / 1 failure reason を主語にします。
 - test 名は、対象 behavior と期待結果が読める名前にします。
 - Arrange / Act / Assert を読み分けられる構造にします。
@@ -168,6 +200,13 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 ## 8. 禁止事項
 
+- `test_runs`、`test_smoke`、`test_generated_*`、`test_can_run` などの名前で、
+  process success、import success、no-crash、exit code 0 だけを見る generated
+  placeholder test を追加しません。
+- `py_compile`、`compileall`、`ruff`、`pyright`、`mypy`、`cargo check`、
+  `cargo clippy`、`shellcheck`、AgentCanon checker、dependency/header check、
+  docs check の成功を pytest で包むだけの static-analysis duplicate test を
+  追加しません。必要な場合は該当 checker を validation route に直接入れます。
 - 本体モジュール内の `if __name__ == "__main__":` にテストを書きません。
 - 例外のみを根拠にせず、**既知解・残差・反復回数**で検証します。
 - repo 固有の directory 例を正本扱いせず、実在する `tests/` 配下だけを案内します。

@@ -118,7 +118,7 @@ id = "render-dependency-manifest-graph"
 tool = "tools/agent_tools/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"
 language = "python"
-summary = "Dependency manifest graph Markdown and DOT renderer documentation."
+summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]
 id = "classify-path-risk"
@@ -140,6 +140,13 @@ tool = "tools/agent_tools/lean_proof_env.py"
 doc = "documents/tools/lean_proof_env.md"
 language = "python"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
+
+[[tool]]
+id = "tool-proof-coverage"
+tool = "tools/agent_tools/tool_proof_coverage.py"
+doc = "documents/tools/tool_proof_coverage.md"
+language = "python"
+summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
 
 [[tool]]
 id = "algorithm-expansion-ir"

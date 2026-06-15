@@ -4,6 +4,7 @@
 responsibility Documents agent-orchestration for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/hypothesis-validation-workflow.md analysis-first overlay routing
+upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 @dependency-end
 -->
 
@@ -37,8 +38,9 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
 1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流す。LocalLLM が無い場合は deterministic fallback output を使うか、router unavailable blocker として記録し、chat 印象で implementation path を選ばない
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の compact output を信頼し、修正に必要な path / line / bounded slice だけを読む
+1. 編集 path、parent-direct 実装、または write-capable subagent handoff の前に、`agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` を作るか引用する。packet には implementation surface route、responsibility search、reuse survey、stale surface scan、dependency scope、validation route を含める。raw search hits、nearest editable file、または chat context だけで調査完了扱いにしない
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
-1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget ceiling、stage wave は parent が current stage の evidence と dependency order から切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Intake Wave は初期責務 wave であり、family budget を埋める target ではありません。後続 role / skill は dynamic expansion wave として evidence gate で追加します
+1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget ceiling、stage wave は parent が current stage の evidence と dependency order から切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Initial Intake Wave は初期責務 wave であり、family budget を埋める target ではありません。後続 role / skill は dynamic expansion wave として evidence gate で追加します。独立 workstream は同一階層の flat wave ではなく、stage owner ごとの vertical dynamic wave chain として扱います
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. prompt-derived skill routing が必要なら `agent-canon local-llm route-skill --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`python3 tools/agent_tools/route.py --prompt ...` は互換 mirror です
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。初期 update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
@@ -69,6 +71,7 @@ mode の意味:
 - request mode (`repo-changing execution` or `routing-only/advisory`)
 - 必要な role / specialist
 - review と handoff の最小構成
+- `Pre-Edit Repository Investigation Packet` の path または parent-direct rationale
 - repo-editing task なら、workflow family ごとの順序。`Scoped Change Lite` は cheap-first local route、full staged route は requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation
 - 最初の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
 - PR を作る task では、同じ routing 宣言と `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す

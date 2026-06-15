@@ -20,19 +20,23 @@ import ast
 import fnmatch
 import json
 import subprocess
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
 
 MANIFEST_PATH = "responsibility-scope.toml"
 PYTHON_SUFFIX = ".py"
 IGNORED_DIRS = {
+    ".agent-canon",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "node_modules",
     "reports",
     "target",
 }
@@ -296,7 +300,39 @@ def add_changed_python_paths(paths: set[str], command: list[str]) -> None:
     """Add changed Python paths from one git command into paths."""
     result = subprocess.run(command, check=False, capture_output=True, text=True)
     if result.returncode == 0:
-        paths.update(line for line in result.stdout.splitlines() if line.endswith(PYTHON_SUFFIX))
+        paths.update(
+            line
+            for line in result.stdout.splitlines()
+            if line.endswith(PYTHON_SUFFIX) and not should_skip(line)
+        )
+
+
+def git_visible_python_paths(root: Path) -> tuple[str, ...] | None:
+    """Return Python paths visible to git, respecting standard ignore rules."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return tuple(
+        sorted(
+            path
+            for path in result.stdout.split("\0")
+            if path.endswith(PYTHON_SUFFIX) and not should_skip(path)
+        )
+    )
 
 
 def checked_python_paths(
@@ -317,6 +353,9 @@ def checked_python_paths(
         )
     if changed:
         return changed_python_paths(root, baseline_ref)
+    git_paths = git_visible_python_paths(root)
+    if git_paths is not None:
+        return git_paths
     paths: list[str] = []
     for path in sorted(root.rglob(f"*{PYTHON_SUFFIX}")):
         relative = path.relative_to(root).as_posix()

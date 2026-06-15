@@ -48,6 +48,64 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
 
+    def test_parent_tools_symlink_routes_to_agentcanon_source_gates(self) -> None:
+        """Parent tools/ views should route shared tool edits to AgentCanon source."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_tools = root / "vendor" / "agent-canon" / "tools"
+            (source_tools / "agent_tools").mkdir(parents=True)
+            (root / "tools").symlink_to(
+                Path("vendor") / "agent-canon" / "tools",
+                target_is_directory=True,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                    "tools/agent_tools/new_shared_checker.py",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        commands_by_gate: dict[str, list[str]] = {}
+        for gate in payload["predicted_gates"]:
+            commands_by_gate.setdefault(gate["gate"], []).append(gate["command"])
+        paths = {gate["path"] for gate in payload["predicted_gates"]}
+
+        self.assertIn(
+            "vendor/agent-canon/tools/agent_tools/new_shared_checker.py", paths
+        )
+        self.assertIn("agentcanon_tool_source_route", gates)
+        self.assertIn("tool_catalog", gates)
+        self.assertIn("log_surface_inventory_guard", gates)
+        self.assertTrue(
+            any(
+                "git -C vendor/agent-canon status" in command
+                for command in commands_by_gate["agentcanon_tool_source_route"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "cd vendor/agent-canon" in command
+                for command in commands_by_gate["log_surface_inventory_guard"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "cd vendor/agent-canon" in command
+                for command in commands_by_gate["tool_catalog"]
+            )
+        )
+
     def test_vendor_library_path_predicts_library_guard(self) -> None:
         """Vendored dependency implementation edits should route to library guard."""
         result = subprocess.run(

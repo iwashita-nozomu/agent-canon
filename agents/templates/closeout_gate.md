@@ -167,10 +167,12 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Report Artifact Placement Evidence
 
-<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify generated report placement. Tracked durable reports are allowed. Untracked or ignored generated report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles or generated report roots outside the current run are blockers because runtime_log_archive_git.py sync/archive closes the current run bundle, not orphan outputs. -->
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify report placement. Also run generated_artifact_guard.py to reject mechanically regenerated roots left in the source tree. Tracked durable reports are allowed only when they are not regenerated tool output. Untracked or ignored report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles are archive/cleanup blockers, and regenerated roots such as `reports/dependency-review/` or `reports/agent-eval-runs/` must be deleted and rerun rather than recovered into another report. -->
 
 - report_artifact_placement_status:
 - report_artifact_outside_current_run_bundle:
+- generated_artifact_guard_status:
+- generated_artifact_guard_blockers:
 - report_artifact_recovery_evidence:
 
 ## Agent Evaluation Evidence
@@ -179,7 +181,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Runtime Log Archive Evidence
 
-<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+<!-- Archive the active run with `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`, then `python3 tools/agent_tools/runtime_log_archive_git.py push`, and run `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Use broad `sync` only when intentionally collecting accumulated runtime families. Do not unlock closeout while the archive is dirty, on the wrong `logs/<environment-key>-<chat-key>` branch, or contains foreign repo-key dirty paths or committed foreign repo-key trees. Record whether archive/push committed or was a no-op, and include the archive branch and repo key. -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:
@@ -190,6 +192,9 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - runtime_log_archive_branch_match:
 - runtime_log_archive_dirty:
 - runtime_log_archive_foreign_dirty:
+- runtime_log_archive_foreign_dirty_keys:
+- runtime_log_archive_foreign_tree:
+- runtime_log_archive_foreign_tree_keys:
 - runtime_log_archive_commit:
 - runtime_log_archive_push:
 

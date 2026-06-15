@@ -95,6 +95,34 @@ DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
     ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
     ("ship_reviewer",),
 )
+SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
+    "status": "allowed_with_distinct_packets",
+    "identity_key": "role_type+instance_id",
+    "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
+    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_parent_integration_order",
+    "collision_policy": "serialize_current_checkout_waves",
+}
+SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
+    "role_type",
+    "instance_id",
+    "input_packet",
+    "allowed_paths",
+    "do_not_read",
+    "expected_output",
+    "write_scope",
+    "validation_route",
+    "review_gate",
+)
+SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
+    "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
+    "--subagent-wave \"wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> "
+    "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
+    "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
+    "spawned_roles=<roles-or-none> role_instances=<role:instance:packet> "
+    "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
+    "write_scope=<scope> validation_route=<route> review_gate=<gate> "
+    "handoff_artifacts=<artifacts> status=<status>\""
+)
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
     "$research-workflow",
@@ -376,6 +404,21 @@ def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
+
+
+def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for same-role subagent instances."""
+    return (
+        f"SAME_ROLE_SUBAGENT_INSTANCES={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}",
+        f"SAME_ROLE_SUBAGENT_INSTANCE_KEY={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']}",
+        "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
+        f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
+    )
+
+
+def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") -> str:
+    """Return the canonical command for recording a spawned subagent wave."""
+    return SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
 
 
 def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
@@ -985,11 +1028,149 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         encoding="utf-8",
     )
     created_files.append(AUTHORITY_FILE_NAME)
+    write_initial_wave_execution_gate(spec)
     unique_created_files: list[str] = []
     for artifact in created_files:
         if artifact not in unique_created_files:
             unique_created_files.append(artifact)
     return tuple(unique_created_files)
+
+
+def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
+    """Record the parent runtime gate for the first recommended subagent wave."""
+    if not spec.workflow_family_id:
+        return
+    active_subagents, _max_write_subagents = workflow_spawn_budget(
+        load_task_catalog(spec.config),
+        spec.workflow_family_id,
+    )
+    initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
+    if not initial_wave:
+        return
+    row = initial_wave_gate_fields(
+        initial_wave=initial_wave,
+        active_subagents=active_subagents,
+    )
+    append_markdown_section_line(
+        spec.report_dir / "schedule.md",
+        "## Agent Wave Ledger",
+        schedule_wave_row(row),
+    )
+    append_markdown_section_line(
+        spec.report_dir / "workflow_monitoring.md",
+        "## Actual Wave Events",
+        workflow_wave_event_line(row),
+    )
+
+
+def initial_wave_gate_fields(
+    *,
+    initial_wave: tuple[str, ...],
+    active_subagents: int,
+) -> dict[str, str]:
+    """Return one schedule/monitor row for a parent-executed WAVE-1 gate."""
+    skipped_roles = ",".join(initial_wave) + ":pending_explicit_runtime_spawn_authority"
+    active_budget = f"{active_subagents}/{active_subagents}"
+    return {
+        "wave_id": "WAVE-1",
+        "parent_or_delegate": "parent",
+        "spawn_authority": "parent_runtime_authority_required",
+        "trigger": "bootstrap_initial_intake_wave",
+        "budget_before": active_budget,
+        "budget_after": active_budget,
+        "runtime_max_threads": str(codex_runtime_max_threads()),
+        "runtime_max_depth": str(codex_runtime_max_depth()),
+        "spawned_roles": "none",
+        "role_instances": "none",
+        "skipped_roles": skipped_roles,
+        "allowed_paths": "team_manifest.yaml,schedule.md,workflow_monitoring.md,user_request_contract.md",
+        "do_not_read": "broad_raw_logs,unrelated_reports",
+        "write_scope": "read_only_intake_until_parent_updates_wave_row",
+        "validation_route": "parent_spawn_or_skip_update_required",
+        "review_gate": "parent_execution_gate",
+        "handoff_artifacts": "team_manifest.yaml#run.spawn_wave_recommendation",
+        "delegated_policy_ref": "team_manifest.yaml#run.delegated_spawn_policy",
+        "status": "blocked_authority_required",
+    }
+
+
+def schedule_wave_row(row: dict[str, str]) -> str:
+    """Return a schedule.md Agent Wave Ledger row."""
+    cells = (
+        row["wave_id"],
+        row["parent_or_delegate"],
+        row["spawn_authority"],
+        row["trigger"],
+        row["budget_before"],
+        row["budget_after"],
+        row["runtime_max_threads"],
+        row["runtime_max_depth"],
+        row["spawned_roles"],
+        row["role_instances"],
+        row["skipped_roles"],
+        row["allowed_paths"],
+        row["do_not_read"],
+        row["write_scope"],
+        row["validation_route"],
+        row["review_gate"],
+        row["handoff_artifacts"],
+        row["delegated_policy_ref"],
+        row["status"],
+    )
+    return "| " + " | ".join(cells) + " |"
+
+
+def workflow_wave_event_line(row: dict[str, str]) -> str:
+    """Return a workflow_monitoring.md Actual Wave Events token row."""
+    fields = (
+        ("wave_event", "recorded"),
+        ("wave_id", row["wave_id"]),
+        ("event_kind", "authority_blocker"),
+        ("spawn_authority", row["spawn_authority"]),
+        ("trigger", row["trigger"]),
+        ("budget_before", row["budget_before"]),
+        ("budget_after", row["budget_after"]),
+        ("runtime_max_threads", row["runtime_max_threads"]),
+        ("runtime_max_depth", row["runtime_max_depth"]),
+        ("spawned_roles", row["spawned_roles"]),
+        ("role_instances", row["role_instances"]),
+        ("skipped_roles", row["skipped_roles"]),
+        ("allowed_paths", row["allowed_paths"]),
+        ("do_not_read", row["do_not_read"]),
+        ("write_scope", row["write_scope"]),
+        ("validation_route", row["validation_route"]),
+        ("review_gate", row["review_gate"]),
+        ("handoff_artifacts", row["handoff_artifacts"]),
+        ("status", row["status"]),
+    )
+    return "- " + " ".join(f"{key}={value}" for key, value in fields)
+
+
+def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
+    """Append one line to a level-2 Markdown section if it is not already present."""
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if line in text:
+        return
+    lines = text.splitlines()
+    in_section = False
+    insert_at = len(lines)
+    for index, existing_line in enumerate(lines):
+        stripped = existing_line.strip()
+        if not stripped.startswith("## "):
+            continue
+        if in_section:
+            insert_at = index
+            break
+        in_section = stripped == heading
+    if not in_section:
+        lines.extend(("", heading, "", line))
+    else:
+        while insert_at > 0 and not lines[insert_at - 1].strip():
+            insert_at -= 1
+        lines.insert(insert_at, line)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def build_manifest(spec: RunBundleSpec) -> str:
@@ -1096,6 +1277,7 @@ def manifest_run_lines(
         else:
             lines.append("      - wave_id: none")
             lines.append("        agent_types: []")
+        lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.append("  delegated_spawn_policy:")
         lines.append("    dynamic_mid_task_spawn: allowed")
         lines.append("    delegated_child_spawn: allowed_with_bounded_packet")
@@ -1104,22 +1286,51 @@ def manifest_run_lines(
         lines.append("    active_budget_source: 'run.spawn_budget.active_subagents'")
         lines.append("    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'")
         lines.append("    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'")
+        lines.append(
+            f"    wave_record_command: {subagent_wave_record_command(spec.report_dir)!r}"
+        )
         lines.append("    expansion_triggers:")
         lines.append("      - new_independent_stage")
         lines.append("      - review_finding_opens_independent_scope")
         lines.append("      - validation_failure_requires_parallel_triage")
         lines.append("      - disjoint_write_scope_available")
         lines.append("      - blocked_role_replacement")
+        lines.append("    same_role_instances:")
+        lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
+        lines.append(f"      identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}")
+        lines.append(
+            "      parallel_read_only: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_read_only']}"
+        )
+        lines.append(
+            "      parallel_write: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_write']}"
+        )
+        lines.append(
+            "      collision_policy: "
+            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['collision_policy']}"
+        )
+        lines.append("      required_fields:")
+        for field in SAME_ROLE_SUBAGENT_REQUIRED_FIELDS:
+            lines.append(f"        - {field}")
         lines.append("    handoff_required_fields:")
         lines.append("      - owner")
         lines.append("      - child_role")
+        lines.append("      - child_instance_id")
         lines.append("      - input_packet")
+        lines.append("      - allowed_paths")
+        lines.append("      - do_not_read")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
         lines.append("      - validation_route")
         lines.append("      - review_gate")
         lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
+        lines.append(
+            "      - run delegated_spawn_policy.wave_record_command after any "
+            "actual parent or delegated child spawn; delegated child waves must "
+            "include remaining_spawn_budget"
+        )
         lines.append(
             "      - schedule.md Agent Wave Ledger row with spawn_authority, "
             "budget, runtime ceilings, paths, validation_route, review_gate, "
@@ -1278,6 +1489,37 @@ def manifest_artifact_lines(config: TeamConfig, roles: tuple[Role, ...]) -> list
     lines = ["artifacts:"]
     for artifact in iter_artifacts(config, roles):
         lines.append(f"  - {artifact}")
+    return lines
+
+
+def render_role_topology(
+    workflow_family: dict[str, object],
+    indent: str,
+) -> list[str]:
+    """Render workflow role-family and same-role instance policy."""
+    topology = workflow_family.get("role_topology")
+    if not isinstance(topology, dict):
+        return []
+    lines = [f"{indent}role_topology:"]
+    role_families = topology.get("role_families")
+    if isinstance(role_families, dict):
+        lines.append(f"{indent}  role_families:")
+        for family_name, agent_types in role_families.items():
+            lines.append(f"{indent}    {family_name}:")
+            if isinstance(agent_types, list):
+                for agent_type in agent_types:
+                    lines.append(f"{indent}      - {str(agent_type)}")
+            else:
+                lines.append(f"{indent}      - {str(agent_types)}")
+    same_role_instances = topology.get("same_role_parallel_instances")
+    if isinstance(same_role_instances, dict):
+        lines.append(f"{indent}  same_role_parallel_instances:")
+        for key, value in same_role_instances.items():
+            if isinstance(value, bool):
+                rendered_value = "true" if value else "false"
+            else:
+                rendered_value = str(value)
+            lines.append(f"{indent}    {key}: {rendered_value}")
     return lines
 
 

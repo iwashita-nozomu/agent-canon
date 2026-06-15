@@ -22,6 +22,14 @@ branch/PR first. After that PR lands, the parent repo uses
 `make agent-canon-ensure-latest` and root-view sync to advance the pin. See
 `documents/agent-canon-update-route.md`.
 
+This skill does not authorize a new branch when the current parent branch
+already owns the same lane. Continue the existing branch / PR for added user
+instructions, small follow-ups, and checklist or evidence updates. Create a new
+`agent-updates/*` branch only when the current branch is merged, closed,
+unpushable, has an unrelated ownership lane, needs explicit review isolation, or
+would mix incompatible pin / memory / eval ownership. Record
+`branch_creation_reason=<reason>` before creating it.
+
 ## Required Gates
 
 - Validate the lane with `bash tools/agent_tools/agent_update_branch.sh validate <lane>`.

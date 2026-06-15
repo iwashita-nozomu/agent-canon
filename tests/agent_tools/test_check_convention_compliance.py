@@ -51,7 +51,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/REVIEW_PROCESS.md": "review\n",
     "documents/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
-        ".codex/hooks.json .codex/hooks .devcontainer/ documents/README.md "
+        ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
         "documents/template-bootstrap.md "
         "documents/github-first-module-and-devcontainer-policy.md "
         "memory/USER_PREFERENCES.md "
@@ -66,6 +66,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"documents/README.md"\n'
         '"documents/template-bootstrap.md"\n'
         '".devcontainer"\n'
+        '".vscode"\n'
         '"documents/github-first-module-and-devcontainer-policy.md"\n'
         '".codex/hooks.json"\n'
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
@@ -94,18 +95,22 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/agent-orchestration/SKILL.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "task-shape skill check_convention_compliance.py\n"
+        "task-shape skill check_convention_compliance.py vertical dynamic wave "
+        "write-capable handoff\n"
     ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "task-shape skill check_convention_compliance.py\n"
+        "task-shape skill check_convention_compliance.py vertical dynamic wave "
+        "write-capable handoff\n"
     ),
     "agents/TASK_WORKFLOWS.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "task-shape skill check_convention_compliance.py\n"
+        "task-shape skill check_convention_compliance.py vertical dynamic wave "
+        "write-capable handoff\n"
     ),
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
-        "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL\n"
+        "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
+        "write-capable handoff\n"
         "evaluate_skill_workflow_prompts.py\n"
     ),
     "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
@@ -419,6 +424,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("legacy_forwarder_warning", result.stdout)
             self.assertIn("missing-marker:FORWARDER_CALLER", result.stdout)
             self.assertIn("missing-marker:FORWARDER_ACTION", result.stdout)
+
+    def test_skill_routing_requires_vertical_wave_policy(self) -> None:
+        """Skill routing prompts must keep the vertical wave policy marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "TASK_WORKFLOWS.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    " vertical dynamic wave",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_routing", result.stdout)
+            self.assertIn("missing-marker:vertical dynamic wave", result.stdout)
+
+    def test_skill_routing_requires_write_capable_handoff(self) -> None:
+        """Skill routing prompts must include the write-capable handoff marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "TASK_WORKFLOWS.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "write-capable handoff",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_routing", result.stdout)
+            self.assertIn("missing-marker:write-capable handoff", result.stdout)
 
     def copy_minimal_repo(self, root: Path) -> None:
         """Create the minimum tree needed by the checker."""

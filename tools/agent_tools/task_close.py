@@ -313,6 +313,8 @@ def main() -> int:
         schedule_text,
         workflow_monitoring_text,
         subagent_lifecycle,
+        report_dir,
+        workspace,
     )
 
     checks = {
