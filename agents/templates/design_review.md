@@ -55,6 +55,10 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 <!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
 
+## Design Side-Effect Map Review
+
+<!-- Check whether the design maps each major design decision to affected implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces. Confirm every side-effect item is tied to the Abstract Design Frame, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. Return revise if implementation would need to discover secondary surfaces after design approval. -->
+
 ## Canonical Tree-Head Review
 
 <!-- Check whether the design fixes the canonical design-document paths and implementation paths that may remain in the tracked tree, and whether it explicitly deletes or forbids non-canonical drafts, snapshots, mirrored directories, backup files, or copied implementations. Return revise if the task would preserve multiple truths beyond the current tree head. -->

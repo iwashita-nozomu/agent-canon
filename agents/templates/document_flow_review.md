@@ -25,6 +25,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Check whether section order supports the intended reader path and whether key decisions appear before implementation detail. -->
 
+## Reader-Visible Side Effects
+
+<!-- Check whether side-effect items that change reader-facing docs, workflows, prompts, CLI/help text, reports, or validation output appear in the reader path at the point where a first reader needs them. -->
+
 ## Rewrite Targets
 
 <!-- Record concrete rewrite points needed to make the document readable in order. -->
