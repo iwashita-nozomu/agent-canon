@@ -45,8 +45,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
-- Abstract Design Frame と approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、既定の説明を write-capable handoff first にする。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
+- Abstract Design Frame と approved packet で完全に切れる低リスク slice は Spark role TOML を preferred implementation candidate とする
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、write-capable handoff を既定 route として説明する。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence です。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、`spark_worker` / `worker` を起動または schedule します。
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に該当 role TOML の model / reasoning で fresh default subagent を再試行する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier role TOML に残す
@@ -60,7 +60,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、subagent spawn 許可は上位 runtime / developer instruction に従います
 - active runtime が explicit user request を spawn 条件にする場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、authorization が揃った時点で spawn します
 - active な subagent 数は spawn budget で縛ります
-- spawn budget は同時 active 数の上限です。parent は Initial Intake Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します。独立 workstream が複数ある場合は、workstream ごとの stage owner が vertical dynamic wave を起こします
+- spawn budget は同時 active 数の上限です。parent は Intake Responsibility Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します。独立 workstream が複数ある場合は、workstream ごとの stage owner が vertical dynamic wave を起こします
 - multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は subagent type / behavior contract であり、実行単位は `role_type+instance_id` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
 - role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。
@@ -126,9 +126,9 @@ bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 `remaining_spawn_budget` so nested launch remains bounded by
 `run.delegated_spawn_policy`.
 
-## Initial Intake Wave
+## Intake Responsibility Wave
 
-Initial Intake Wave は repo-changing task の初期責務を要件、調査、実行計画に分ける初期 wave です。独立 workstream が複数ある場合、Initial Intake Wave は各 workstream の最初の責務 wave として扱い、以後は stage owner が必要な child wave を vertical dynamic wave として追加します。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの初期 wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
+Intake Responsibility Wave は、repo-changing task の責務分割を要件、調査、実行計画に分ける intake wave です。独立 workstream が複数ある場合、Intake Responsibility Wave は各 workstream の責務分担 wave として扱い、以後は stage owner が必要な child wave を vertical dynamic wave として追加します。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの intake wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer
@@ -158,7 +158,7 @@ protocol_feedback_reason=<short-reason>
 ## Pre-Goal Activation
 
 Goal-driven repo-changing tasks prepare subagent fan-out before the final
-`/goal` command when the goal intent is clear. The parent may draft the initial
+`/goal` command when the goal intent is clear. The parent may draft the candidate
 goal, and read-only roles check the draft before implementation. If the active
 runtime requires explicit spawn authorization, persist the handoff packets and
 spawn the roles after authorization.
@@ -169,10 +169,10 @@ Candidate pre-goal roles:
   constraints, and Exit Criteria from the user request and durable repo notes.
 - `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
   tools, and reuse candidates that affect the goal.
-- `execution_planner`: group open `GW*` rows into the first cohesive slice after
+- `execution_planner`: group open `GW*` rows into the next cohesive slice after
   `goal_loop.py plan` exists.
 - `plan_reviewer`: verify that the candidate goal is checkable and that the
-  first slice has evidence gates and rollback boundaries.
+  selected slice has evidence gates and rollback boundaries.
 
 Start with the roles needed for the current stage, keep unused roles as dynamic
 wave triggers, and add them when goal evidence, dependency state, or review
@@ -217,7 +217,7 @@ Activation Conditions:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `spark_worker` first for narrow slices derived from the Abstract Design Frame and design trace; `worker` alternate route for broad or ambiguous implementation |
+| `implementer` | `spark_worker` preferred for narrow slices derived from the Abstract Design Frame and design trace; `worker` alternate route for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
@@ -257,7 +257,7 @@ Activation Conditions:
 - `plan_reviewer`
   - 実行計画の順序、review 分離、rollback readiness を確認する
 - `detailed_designer`
-  - reuse-first の detailed design 文書と identifier naming plan を起こす
+  - reuse-prioritized の detailed design 文書と identifier naming plan を起こす
 - `detailed_design_reviewer`
   - 実装前の最重要 gate として設計文書と identifier naming plan を独立に確認する
 - `document_flow_reviewer`
@@ -269,17 +269,17 @@ Activation Conditions:
 - `logic_gap_reviewer`
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
-  - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-first で prose projection する
+  - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-led で prose projection する
 - `test_designer`
   - approved design と既存 code path を静的解析し、nasty case と regression case の test plan を起こす
 - `diff_triage_reviewer`
-  - 狭い diff の first-pass review を安価に行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
+  - 狭い diff の triage review を安価に行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
 - `ship_reviewer`
   - user request clause、Abstract Design Frame、approved packet、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
 - `explorer`
   - 読み取り専用で codebase / docs / workflow の調査を行う
 - `reviewer`
-  - 読み取り専用で diff と risk を findings-first で洗う
+  - 読み取り専用で diff と risk を findings-led で洗う
 - `python_reviewer`
   - Python diff を型、pytest、ruff 前提で洗う
 - `cpp_reviewer`
@@ -339,7 +339,7 @@ Activation Conditions:
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report を事実として扱い、OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
-| 低リスク実装slice | Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice だけを `spark_worker` first |
+| 低リスク実装slice | Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice だけを `spark_worker` preferred |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
 | 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、prompt/config surface がある場合は `prompt_config_reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
@@ -383,7 +383,7 @@ workflow docs、task catalog は agent TOML を参照します。
 - この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と Abstract Design Frame から導かれた設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
-- 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします
+- 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を preferred candidate とします
 - mini review role TOML は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断は frontier role TOML に残します
 - Spark role TOML は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review は frontier / reviewer role TOML に残します
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
@@ -392,7 +392,7 @@ workflow docs、task catalog は agent TOML を参照します。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます
-- `reviewer` は broad diff / cross-surface / clause coverage に上げる role とし、Python-only / C++-only / narrow diff では `python_reviewer`、`cpp_reviewer`、`diff_triage_reviewer` を first reviewer にします
+- `reviewer` は broad diff / cross-surface / clause coverage に上げる role とし、Python-only / C++-only / narrow diff では `python_reviewer`、`cpp_reviewer`、`diff_triage_reviewer` を entry reviewer にします
 
 ## Research Perspective Review Pack
 

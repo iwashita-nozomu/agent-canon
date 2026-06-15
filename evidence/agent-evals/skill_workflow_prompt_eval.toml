@@ -1022,7 +1022,7 @@ required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subage
 id = "VERTICAL-WAVE-POLICY-1"
 critical = true
 description = "Keeps independent workstreams as stage-owner vertical dynamic waves with delegated spawn policy."
-required_regex = ["Initial Intake Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
+required_regex = ["Intake Responsibility Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
 
 [[evals.checklist]]
 id = "TASK-WF-PRE-EDIT-PACKET-1"
@@ -1053,13 +1053,13 @@ forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 id = "VERTICAL-WAVE-POLICY-2"
 critical = true
 description = "Keeps discoverable orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Initial Intake Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+required_regex = ["Intake Responsibility Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-1"
 critical = true
 description = "Uses tool pass/finding output as the authority before broad reading or subagents."
-required_regex = ["canonical tool", "call the tool first", "trust its compact pass/finding output", "read only the exact file slice"]
+required_regex = ["canonical tool", "call the tool before prose review", "trust its compact pass/finding output", "read only the exact file slice"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-2"
@@ -1113,7 +1113,7 @@ required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / J
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
 description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Initial Intake Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+required_regex = ["Intake Responsibility Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"

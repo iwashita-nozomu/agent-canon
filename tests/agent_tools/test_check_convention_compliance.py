@@ -17,6 +17,7 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    POSITIVE_RUNTIME_WORDING_SURFACES,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -100,11 +101,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "write-capable handoff\n"
     ),
     ".agents/skills/codex-task-workflow/SKILL.md": "codex task workflow\n",
+    ".agents/skills/mvp-skeleton/SKILL.md": "mvp core loop vertical slice\n",
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff\n"
     ),
+    "agents/skills/catalog.yaml": "skill catalog routing entry skill\n",
+    "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -411,6 +415,46 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("positive_runtime_wording", result.stdout)
             self.assertIn("legacy-negative-runtime-wording", result.stdout)
+
+    def test_runtime_wording_rejects_sequence_design_labels(self) -> None:
+        """Runtime docs keep MVP and design routing free of sequence labels."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            cases = {
+                ".agents/skills/mvp-skeleton/SKILL.md": (
+                    "# MVP\nStop after the first runnable path.\n"
+                ),
+                "ROOT_AGENTS.md": "- first-wave target\n",
+                "agents/TASK_WORKFLOWS.md": "- 最初の作業 update\n",
+                "agents/skills/mvp-skeleton.md": (
+                    "# MVP\nThis is a first-pass MVP scope.\n"
+                ),
+            }
+            for rel_path, content in cases.items():
+                with self.subTest(rel_path=rel_path):
+                    self.copy_minimal_repo(root)
+                    (root / rel_path).write_text(content, encoding="utf-8")
+
+                    result = self.run_checker(root)
+
+                    self.assertEqual(
+                        result.returncode,
+                        1,
+                        result.stdout + result.stderr,
+                    )
+                    self.assertIn("positive_runtime_wording", result.stdout)
+                    self.assertIn("legacy-sequence-design-wording", result.stdout)
+
+    def test_minimal_fixture_covers_positive_runtime_wording_surfaces(self) -> None:
+        """The minimal test fixture includes every positive wording surface."""
+        missing = sorted(
+            path
+            for path in POSITIVE_RUNTIME_WORDING_SURFACES
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def test_legacy_forwarder_requires_caller_action_warning(self) -> None:
         """Legacy forwarders must identify callers and migration action."""

@@ -26,7 +26,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - 各 `.md` ファイルは、タイトル、短い導入、`##` 見出しごとの本文という流れを基本にします。
 - workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
 - Mermaid 図は Markdown 内の fenced `mermaid` code block として保持し、本文の責務説明と併記して正本化します。
-- Mermaid 図は本文と併用します。図の直前または直後に、図が答える問い、読者が最初に見るべき node / edge、本文で扱う制約を短く書きます。
+- Mermaid 図は本文と併用します。図の直前または直後に、図が答える問い、読者が入口として見る node / edge、本文で扱う制約を短く書きます。
 - リポジトリ root の `.markdownlint.json` を Markdown 体裁チェックの既定設定として扱います。
 - Markdown は `markdownlint` に準拠させ、例外が必要な場合は設定ファイルと規約文書を同時に更新します。
 - まとまった Markdown 変更の前後では、少なくとも変更したファイルに対して `markdownlint` を実行して体裁崩れを確認します。

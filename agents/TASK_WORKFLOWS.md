@@ -61,9 +61,9 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Intake Wave は初期 wave の責務分割です。独立 workstream が複数ある場合は、workstream ごとに stage owner と vertical dynamic wave を切ります。`requirements_organizer`、`explorer`、`execution_planner` の初期責務から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
+- Intake Responsibility Wave は、repo-changing task の責務分割を要件、調査、実行計画に分ける intake wave です。独立 workstream が複数ある場合は、workstream ごとに stage owner と vertical dynamic wave を切ります。`requirements_organizer`、`explorer`、`execution_planner` の責務分担から始め、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing / Agent Wave Ledger を持ちます。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy`、`CODEX_SUBAGENTS.md` の Wave Plan Contract、bounded handoff packet を渡します
 - role family と同一 role 複数 instance の source schema は `agents/task_catalog.yaml` の `workflow_families[].role_topology` です。`role` は behavior contract、実行単位は `role_type+instance_id` とし、same-role read-only instance は input packet / review focus が異なる場合、same-role write-capable instance は disjoint write scope と parent integration order がある場合に同一 wave に置けます。role cardinality は role topology から決めます。
-- Mid-task user additions are recorded first with `workflow_monitor.py --mid-task-user-input`; routing uses the monitor artifact, updated packet path, and run-local lifecycle evidence.
+- Mid-task user additions are recorded before rerouting with `workflow_monitor.py --mid-task-user-input`; routing uses the monitor artifact, updated packet path, and run-local lifecycle evidence.
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
@@ -238,7 +238,7 @@ spawn budget ルール:
 
 concurrent spawn budget:
 - global runtime cap は `.codex/config.toml` の `max_threads = 24`
-- `Scoped Change Lite`: parent を除いて最大 4 agent を同時起動できます。cheap-first survey / test / language review / narrow implementation のうち 3 体程度で足りる wave は通常例です
+- `Scoped Change Lite`: parent を除いて最大 4 agent を同時起動できます。cheap local survey / test / language review / narrow implementation のうち 3 体程度で足りる wave は通常例です
 - `Scoped Change`: parent を除いて同時 6-8 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 5-7 まで
 - `Research-Driven Change`: parent を除いて同時 9-12 agent を目安にします。perspective reviewer は batch で回します
 - `Platform And Environment` と `Large Delivery`: parent を除いて同時 8-10 agent を目安にします。planning / design / review を wave に分けます
@@ -259,7 +259,7 @@ concurrent spawn budget:
 1. 必要なら `explorer` / `test_designer` で局所 cause と test case を確認する
 1. `spark_worker` / `worker` を起点に write-capable な edit を行う
 1. 明示的な coding / implementation / patch / editing 要求では、要件と write scope 固定後に `spark_worker` / `worker` 起動を優先し、read-only wave は setup のみで残す
-1. `python_reviewer` / `cpp_reviewer` / `diff_triage_reviewer` で cheap-first review を行う
+1. `python_reviewer` / `cpp_reviewer` / `diff_triage_reviewer` で cheap local review を行う
 1. broad reviewer、document-flow、full design gate は、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ起動する
 1. lite 条件を外れた時点で `Scoped Change` へ昇格する
 1. active な subagent は同時 4 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる

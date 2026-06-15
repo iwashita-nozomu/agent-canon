@@ -24,7 +24,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 
 CLI に出す公開 skill は、user が直接選ぶ価値が高いものだけに絞ります。
 review の細粒度 checklist、CLI adapter、artifact placement、validation helper は public skill ではなく canonical docs と subagent routing に寄せます。
-workflow selection は task 開始時に使い忘れると実害が出るため、`agent-orchestration` を常に最初の routing skill として public surface の先頭に置きます。
+workflow selection は task 開始時に使い忘れると実害が出るため、`agent-orchestration` を routing entry skill として public surface の先頭に置きます。
 subagent bootstrap は repo-changing task の stage 分離に必要なため public skill として出します。
 
 | Family | Purpose | Canonical Doc | Discovery Shim |
@@ -48,9 +48,9 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `agent-update-branch` | memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する | `agents/skills/agent-update-branch.md` | `.agents/skills/agent-update-branch/SKILL.md` |
 | `report-writing` | evidence から reader-facing report / presentation narrative / PPT storyboard を構成し、source packet、visual asset plan、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
 | `prose-reasoning-graph` | 既存 prose を SQLite-backed graph に変換し、構造診断、自然言語説明、rewrite packet、既存 skill handoff を出す | `agents/skills/prose-reasoning-graph.md` | `.agents/skills/prose-reasoning-graph/SKILL.md` |
-| `structure-planning` | report / experiment / Eval / presentation / document / refactor の構造 contract、first artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
+| `structure-planning` | report / experiment / Eval / presentation / document / refactor の構造 contract、primary artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
 | `html-output` | HTML が明示された出力だけを browser-readable artifact にし、layout、ImageGen、既存 server reuse / external URL 公開を固定する | `agents/skills/html-output.md` | `.agents/skills/html-output/SKILL.md` |
-| `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
+| `html-experiment-report` | experiment / Eval artifact を HTML report にし、primary figure、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
 | `test-design` | brittle test 診断、behavior contract、oracle、property/metamorphic 候補、nasty/regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
 | `structure-refactor` | directory README と dependency manifest を再帰展開し、責務に基づいて directory 構造、path mapping、scope map を refactor する | `agents/skills/structure-refactor.md` | `.agents/skills/structure-refactor/SKILL.md` |
@@ -132,10 +132,10 @@ Internal / compatibility review docs that remain routable by workflow, but are n
 - agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは `agent-update-branch` を使います。
 - reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは `report-writing` を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
 - 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは `prose-reasoning-graph` を使います。
-- report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、first artifact、source map、metric / delta contract、invalid interpretation を固定します。
-- docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の first visual 候補にします。
+- report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、primary artifact、source map、metric / delta contract、invalid interpretation を固定します。
+- docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
-- HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
+- HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、primary figure、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
 - AST 由来の Algorithm Expansion IR、LemmaGraph、proof status から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。

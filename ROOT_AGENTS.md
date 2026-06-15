@@ -35,7 +35,7 @@ contract listed in `documents/README.md`.
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - 同時 spawn は `.codex/config.toml` の `max_threads` 内に収めます。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
-- active な subagent 数は固定 depth ではなく spawn budget で縛ります。spawn budget は上限であると同時に workflow family の既定 first-wave target です。既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合、または multi-agent family で既定より少ない wave から始める場合は `schedule.md` と `work_log.md` に理由を書きます。
+- active な subagent 数は固定 depth ではなく spawn budget で縛ります。spawn budget は上限であると同時に workflow family の既定 intake-wave target です。既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合、または multi-agent family で既定より少ない wave から始める場合は `schedule.md` と `work_log.md` に理由を書きます。
 - write-capable subagent は既定 1 体ですが、parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、allowed / out-of-scope files、integration order、review gate を明示した場合は spawn budget 内で複数体を並列化できます。同一 path、同一 ownership surface、同じ file / canonical surface / shared root contract に触る作業は順序制約として先行 / 後続 wave に分けます。安全に分離できる writer は並列化し、分離が難しい writer は current checkout 内の後続 wave へ直列化します。
 - 新規 user request では run bundle ごとに fresh subagent を起動します。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
@@ -105,13 +105,13 @@ contract listed in `documents/README.md`.
 
 ## Default Search And Routing
 
-- 検索語や調査 surface を選ぶ前に、今回の topic を 1 文で固定し、最初の作業 update で `topic=...` としてチャットに出します。固定する内容は、user request が問う対象、現在追跡する code / proof / document path、明示的に外す非対象です。隣接する backend、tool、export、runtime surface は、この topic 文から必要性が導ける場合だけ検索対象に入れます。
+- 検索語や調査 surface を選ぶ前に、今回の topic を 1 文で固定し、着手時の作業 update で `topic=...` としてチャットに出します。固定する内容は、user request が問う対象、現在追跡する code / proof / document path、明示的に外す非対象です。隣接する backend、tool、export、runtime surface は、この topic 文から必要性が導ける場合だけ検索対象に入れます。
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - checker、router、semantic index、dashboard、compact report が対象判断を所有している場合は、manual prose reading より先にその tool を呼びます。tool が返す compact output で足りる場合は、その output を source packet にします。不足する場合は tool contract の gap として修正または記録します。
 - 実装前に置き場所が明示 path と source packet で固定されている場合はその packet を使います。未固定の場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text` を走らせます。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed とし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流します。LocalLLM が使える場合はその route を使い、使えない場合は deterministic fallback output または router-unavailable blocker を記録します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。skill、tool、workflow は chat 上の印象ではなく、route evidence から選びます。
 - exact path、symbol、literal error message、短い一意 token 以外の検索では、`rg` より先に responsibility-based route を走らせます。まず task / question を `reports/.../query.txt` に書き、`agent-canon semantic-index context-pack --query-file <file> --max-cells <N> --format text`、`agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、または `agent-canon local-llm search --purpose "<purpose>" --providers llm,tool,header-deps,code-deps,vector --format json` で responsibility bucket、dependency-header provider、tool/workflow/document surface を絞ります。directory ownership や責務 coverage が問題なら `agent-canon semantic-index responsibility-tree --root . --check-directory-coverage --report <path>` も先に使います。
-- 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、責務ベースの bounded 結果を source packet の第一候補にします。長い文章は `--query-file` または `--query-stdin` で渡します。
+- 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、責務ベースの bounded 結果を source packet の primary candidate にします。長い文章は `--query-file` または `--query-stdin` で渡します。
 - semantic-index が `unable to open database file`、missing DB、または stale cache で失敗した場合は、その場で `agent-canon semantic-index build --root .` を実行してから同じ bounded semantic-index command を再試行します。build 自体が toolchain / permission / model endpoint 理由で失敗した場合だけ、失敗理由を run bundle に残して bounded `rg -l` 比較へ降ります。
 - semantic-index の JSON が必要な場合は、`--top-k` を必ず小さくし、全体 JSON を agent が読むのではなく `--format jsonl` または `jq -r '.results[] | ...'` で必要 field だけ取り出します。JSONL / compact text で足りない場合だけ、tool 実装や schema debugging の根拠を残して full JSON を開きます。
 - 当面は検索 Eval 収集のため、責務ベースの bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
@@ -133,9 +133,9 @@ contract listed in `documents/README.md`.
 
 ## Experiment And Log Diagnostics
 
-- 数値実験、収束、optimizer、KKT / linear solver、preconditioner の失敗を診断するときは、最初に悪化した iteration / step と直前の finite state を原因推定の起点にします。
-- run log は時系列で追い、最初に悪化した iteration / step、直前の finite state、RHS / reference norm、tolerance、residual、preconditioner summary、converged flag を分けて確認します。
-- user-facing diagnosis では、観測された最終状態、最初の破綻点、推定原因、未確認仮説を明確に分離します。
+- 数値実験、収束、optimizer、KKT / linear solver、preconditioner の失敗を診断するときは、悪化開始 iteration / step と直前の finite state を原因推定の起点にします。
+- run log は時系列で追い、悪化開始 iteration / step、直前の finite state、RHS / reference norm、tolerance、residual、preconditioner summary、converged flag を分けて確認します。
+- user-facing diagnosis では、観測された最終状態、破綻開始点、推定原因、未確認仮説を明確に分離します。
 
 ## AgentCanon Submodule Update Flow
 
@@ -167,7 +167,7 @@ contract listed in `documents/README.md`.
 - task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn は conversation-only、GitHub-only read inspection は GitHub-only read route として扱います。
 - repository task 開始時、`make agent-canon-ensure-latest` を high-level latest route として実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path は別 evidence として扱います。
 - `vendor/agent-canon/` の dirty state が古い checkout 由来の AgentCanon-owned eval / hook result under `agents/evals/results/` だけなら、latest route は互換処理として `agent-logs/<parent-repo>` branch へ退避してから続行できます。新規蓄積は `.agent-canon/log-archive/` に置き、runtime source、workflow、skill、tool、document、test の dirty state は AgentCanon branch / PR workflow に送ります。
-- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できる状態にない場合は、`bash tools/update_agent_canon.sh latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。clean な pushed branch checkout と stale parent gitlink の mismatch は `deferred_branch_pr` evidence として扱い、dirty / detached / unpushed / divergent source state は AgentCanon workflow の修復対象にします。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
+- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できる状態にない場合は、`bash tools/update_agent_canon.sh latest` の未実行理由を着手時の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。clean な pushed branch checkout と stale parent gitlink の mismatch は `deferred_branch_pr` evidence として扱い、dirty / detached / unpushed / divergent source state は AgentCanon workflow の修復対象にします。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`issues/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 広い概念や修正 surface 探索では、先に responsibility-based search / context-pack で source dirs と候補責務を絞ります。必要な場合だけ bounded `rg -l "<topic>" <responsibility-scoped dirs> > reports/search_hits.txt` を併走し、そのあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。
@@ -177,7 +177,7 @@ contract listed in `documents/README.md`.
 - ファイル横断の実装では、修正対象 file だけでなく call site、import/export surface、既存 helper、既存 test fixture、既存 workflow/tool を先に読み、既存の責務境界へ寄せます。
 - 既存実装の拡張、既存 API の薄い adapter、既存 tool の option 追加、既存 test fixture の再利用で達成できる場合は、それを優先します。新しい helper、module、script、workflow branch、設定 surface は、既存 surface では足りない理由を固定してから選びます。
 - 新規実装を選ぶ場合は、run bundle または作業 artifact に `Reuse Survey` として、見た path、再利用した path、採用対象から外した候補、既存では足りない具体理由を残してから編集します。
-- 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
+- 着手時の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
 - durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `memory/USER_PREFERENCES.md` へ追記し、closeout 前に `python3 tools/agent_tools/persist_agent_memory.py --commit --push` で AgentCanon 側へ永続化します。
 - agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `memory/AGENT_PHILOSOPHY.md` へ追記し、closeout 前に `python3 tools/agent_tools/persist_agent_memory.py --commit --push` で AgentCanon 側へ永続化します。
@@ -186,7 +186,7 @@ contract listed in `documents/README.md`.
 - tool / hook / review / CI の finding は、まず severity と修正先を決めます。S0/S1 または `fix-now` finding は新規機能や追加整理より先に直し、直せない場合は `issues/open/AC-YYYYMMDD-*.md`、PR body、run bundle のすべてに blocker として残します。
 - PreToolUse / PostToolUse / Stop hook が guardrail finding を返した場合は、指示された正本 file、baseline、ログ、依存 header、style/OOP finding、または issue evidence を修正対象にします。非重大 finding は作業を続けながら closeout 前の修復 / 記録対象とし、prompt secret など実 runtime が block を維持した場合は同じ hook / 対応 checker の pass evidence を得てから元操作へ戻ります。false positive と判断する場合も、issue または run artifact に根拠と再発防止を記録してから進めます。
 - workflow defect、ログ欠落、hook 誤判定、PR gate 欠陥、検索/依存展開の欠落を見つけた場合は、同じ task 内で durable finding を作るか、既存 issue に追記します。closeout evidence には durable finding または issue link を含めます。
-- Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
+- Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を作業開始時に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を記録します。
 - Shared canon、Large delivery、goal task、long-running multi-step work では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
 - 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree は canonical design doc と canonical implementation にそろえます。
@@ -198,7 +198,7 @@ contract listed in `documents/README.md`.
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon.
 - role behavior, stage execution conditions, and review separation rules は `.codex/agents/*.toml` を正本にします。この file は薄い entrypoint のまま保ちます
-- Repo-changing tasks follow the workflow family selected from `agents/task_catalog.yaml`. `Scoped Change Lite` uses cheap-first local routing; full staged routes follow `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
+- Repo-changing tasks follow the workflow family selected from `agents/task_catalog.yaml`. `Scoped Change Lite` uses cheap local routing; full staged routes follow `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
 - code-changing tasks add `test_designer` before implementation and fix nasty cases into tests in the same pass.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。

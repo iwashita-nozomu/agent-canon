@@ -239,9 +239,12 @@ POSITIVE_RUNTIME_WORDING_SURFACES = (
     "ROOT_AGENTS.md",
     ".agents/skills/agent-orchestration/SKILL.md",
     ".agents/skills/codex-task-workflow/SKILL.md",
+    ".agents/skills/mvp-skeleton/SKILL.md",
     "agents/TASK_WORKFLOWS.md",
     "agents/canonical/CODEX_SUBAGENTS.md",
     "agents/canonical/CODEX_WORKFLOW.md",
+    "agents/skills/catalog.yaml",
+    "agents/skills/mvp-skeleton.md",
     "documents/conventions/common/05_docs.md",
     "documents/coding-conventions-project.md",
 )
@@ -335,6 +338,14 @@ LEGACY_NEGATIVE_RUNTIME_RE = re.compile(
     r"Prohibitions|Close-Out Prohibitions|しなければ|must\s+not|"
     r"do\s+not|don't|never|cannot|can't|せず|ではありません|"
     r"しません|しない|置かず|戻さず)"
+)
+LEGACY_SEQUENCE_DESIGN_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"最初の|最初に|初期\s*(?:wave|責務)|Initial Intake Wave|"
+    r"mandatory first skill|first-wave|first-pass|first working version|needs the first version|"
+    r"first runnable path|first screen|first responsibilities wave|"
+    r"first implementation candidate|first cohesive slice|first slice|"
+    r"first candidate|first reviewer|first figure|first routing declaration)"
 )
 VERIFICATION_RE = re.compile(
     r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
@@ -515,15 +526,19 @@ def check_positive_runtime_wording(root: Path) -> list[Finding]:
         if full_path is None:
             continue
         text = full_path.read_text(encoding="utf-8")
-        for match in LEGACY_NEGATIVE_RUNTIME_RE.finditer(text):
-            line_no = text.count("\n", 0, match.start()) + 1
-            findings.append(
-                Finding(
-                    "positive_runtime_wording",
-                    path,
-                    f"legacy-negative-runtime-wording:{line_no}",
+        for label, pattern in (
+            ("legacy-negative-runtime-wording", LEGACY_NEGATIVE_RUNTIME_RE),
+            ("legacy-sequence-design-wording", LEGACY_SEQUENCE_DESIGN_RE),
+        ):
+            for match in pattern.finditer(text):
+                line_no = text.count("\n", 0, match.start()) + 1
+                findings.append(
+                    Finding(
+                        "positive_runtime_wording",
+                        path,
+                        f"{label}:{line_no}",
+                    )
                 )
-            )
     return findings
 
 

@@ -265,7 +265,7 @@ dependency surface は task に応じて次を見ます。
 編集 workflow:
 
 1. 変更対象 file の manifest を先に読み、upstream edge の target を編集前 context として読む
-1. manifest が無い checkable file を編集する場合は、同じ差分の最初に `@dependency-start` block を追加する
+1. manifest が無い checkable file を編集する場合は、同じ差分で `@dependency-start` block を追加する
 1. downstream edge を持つ file を編集した場合は、差分後に downstream target を確認する
 1. 新しい dependency edge を足す場合は、同じ変更で reverse edge も足すか、migration 中で足せない理由を review artifact に記録する
 1. subagent handoff には `dependency_manifest_plan` と dependency header graph の再帰展開結果を含め、編集対象ごとの upstream / downstream edge、`dependency_edit_scope.txt` / `dependency_graph.tsv`、読む順序を固定する
@@ -318,7 +318,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success だけでなく implementation alignment evidence が review artifact に残っている
-- required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最初からやり直している
+- required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最新 diff 全体に対して再実行している
 - deferred findings は今回の completion readiness への影響、理由、escalation を artifact に記録している
 
 `closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
@@ -341,12 +341,12 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から必要最小限の skill だけ選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
-repo-changing task では `agent-canon local-llm route-skill --prompt "<request>" --format json` の `ACTIVE_SKILLS` を最初に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。
+repo-changing task では `agent-canon local-llm route-skill --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。
 
 Before a capability gap claim about an existing API, dependency, config,
 or extension point, the implementation plan includes the
 `documents/api-surface-traversal-policy.md` evidence trail. Helper wrappers,
-first-party reusable API patches, and vendor/library edit proposals follow
+native reusable API patches, and vendor/library edit proposals follow
 after the public import/export/signature/nested-config/example path has been
 checked and cited.
 
@@ -405,7 +405,7 @@ checked and cited.
 - 不明点は notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
-- 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
+- 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
 - durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/USER_PREFERENCES.md` へ追記する
 - agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `memory/AGENT_PHILOSOPHY.md` へ追記する
@@ -572,7 +572,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
 - high-risk code 変更、新規 behavior、または regression-prone な修正では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
 - 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
-- JAX export / native runtime の task では、最初の implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
+- JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
 - cross-process export worker には serializable manifest と reconstruction recipe を渡す
 - `LoadedProgram` のような runtime materialization は runtime vertex / lifetime scope として扱う
 - まず導入済みライブラリ、既存 code path、既存 helper、既存 style を調べ、再利用と拡張を優先する
@@ -580,7 +580,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は approved design または明白な局所 precedent に由来する variable、function、class、file、CLI flag、config key、public API identifier を使う
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice と execution-only experiment/log work の first candidate は Spark role TOML とする
+- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice と execution-only experiment/log work の preferred candidate は Spark role TOML とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ
@@ -644,7 +644,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ## Codex-Specific Rules
 
-- `AGENTS.md` は Codex の最初の入口として保つ
+- `AGENTS.md` は Codex のruntime 入口として保つ
 - `.agents/skills/` を正規 skill path とする
 - repo-changing task では、stage ごとの subagent / specialist を明示する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は別 instance にする
