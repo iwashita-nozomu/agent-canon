@@ -1139,6 +1139,26 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
             ],
         ),
         (
+            "adaptive-improvement-loop",
+            "backlog-driven iterative experiment, tuning, or code improvement loop is in scope",
+            vec![
+                vec!["反復実行"],
+                vec!["継続反復"],
+                vec!["改善ループ"],
+                vec!["改善", "backlog"],
+                vec!["実験", "改善", "反復"],
+                vec!["実験", "チューニング", "継続"],
+                vec!["調査", "チューニング", "反復"],
+                vec!["code change", "run", "継続反復"],
+                vec!["iterative", "code improvement"],
+                vec!["iterative", "tuning"],
+                vec!["backlog-driven", "outer loop"],
+                vec!["adaptive", "improvement", "loop"],
+                vec!["experiment", "tuning", "loop"],
+                vec!["research", "tuning", "improvement"],
+            ],
+        ),
+        (
             "agent-canon-update",
             "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
             vec![
@@ -1327,6 +1347,7 @@ fn is_current_stage_skill(skill: &str) -> bool {
             | "structure-planning"
             | "structure-refactor"
             | "test-design"
+            | "adaptive-improvement-loop"
     )
 }
 
@@ -3279,6 +3300,26 @@ mod tests {
 
         assert!(decision.matched_skills.contains(&"test-design".to_string()));
         assert!(decision.active_skills.contains(&"test-design".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_adaptive_improvement_loop() {
+        let prompts = [
+            "反復実行系のスキルがうまく作動してない。原因を探して",
+            "experiments research tuning iterative code improvement managed as one backlog-driven agile outer loop",
+        ];
+
+        for prompt in prompts {
+            let decision = decide_skill_route(prompt, "repo-changing");
+
+            assert!(decision
+                .matched_skills
+                .contains(&"adaptive-improvement-loop".to_string()));
+            assert!(decision
+                .active_skills
+                .contains(&"adaptive-improvement-loop".to_string()));
+            assert!(!decision.evidence.contains("matched=none"));
+        }
     }
 
     #[test]
