@@ -62,6 +62,29 @@ assumptions, change the algorithmic mechanism itself; do not add proof-only
 `Info` fields, diagnostic gates, or extra runtime checks merely to satisfy the
 proof.
 
+### Tool-Side Iterative Method Handoff
+
+When a tool or subagent is asked to implement an iterative method, treat the
+tool output as a route packet that selects an existing primitive or an explicit
+local loop contract. The packet must contain:
+
+- `iteration_map`: the concrete `Step_impl(Problem, Config, z)`.
+- `stopping_scalar`: the concrete `R_impl(Problem, Config, z)`.
+- `state_tuple`: all loop-carried state, with owner and dtype / device boundary.
+- `reuse_surface`: existing solver, library, framework primitive, or repo helper
+  selected as the first implementation surface.
+- `failure_semantics`: max-iteration, breakdown, singular, non-finite,
+  infeasible, and nonconvergence statuses.
+- `validation_surface`: static checker, smallest deterministic numerical case,
+  and any experiment or benchmark path kept separate from correctness evidence.
+
+If `agent-canon local-llm route-implementation-surface` returns
+`numerical_iterative_algorithm_contract`, use this skill, the algorithm boundary
+document, and the JAX loop rules as the implementation source packet before
+writing code. The preferred fix is an algorithm or contract correction.
+Diagnostic fields, proof `Info`, and broader numerical tests become follow-on
+surfaces when the route packet makes them part of the product contract.
+
 ## Workflow
 
 1. Classify the algorithm surface: unconstrained optimization, constrained optimization, least squares, root finding, linear solve, preconditioning, or benchmark-only.

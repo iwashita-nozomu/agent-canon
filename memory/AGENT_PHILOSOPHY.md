@@ -283,6 +283,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User said: 不要な数値テストを入れるのをやめさせてください
 
+- 2026-06-15 | interaction-observation | Tool-side requests to implement iterative methods should be routed through an explicit iteration-map contract and existing solver/library reuse survey before adding local loop code.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: 20260615 iterative-method routing repair: route-implementation-surface now returns numerical_iterative_algorithm_contract
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
