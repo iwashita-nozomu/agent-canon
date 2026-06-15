@@ -62,8 +62,38 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
 
 ## Boundaries
 
-- 実際の prompt / workflow / tool 修正は、分析結果に応じて `$agent-learning`、
-  `$agent-eval-accumulation`、`$md-style-check`、`$codex-task-workflow`、または対象
-  skill を追加して行います。
+- この skill は log archive API、compact summary、routing miss、selection gap、
+  wave execution reconciliation の観測と解釈を所有します。
+- 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
+  skill / role へ渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
+
+## Finding Route Packet
+
+Log analysis から修復 wave へ進むときは、次の deterministic packet を run
+bundle に残します。
+
+```text
+finding_class=<wave_execution|skill_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
+evidence_cells=<compact dashboard section or API field paths>
+route_target=<skill-or-role>
+instance_partition=<repo_key|hook_family|skill_name|workflow_name|issue_id|path_scope>
+required_packet=<artifact path>
+closeout_gate=<command or evidence field>
+```
+
+| finding_class | route_target | required_packet | closeout_gate |
+| --- | --- | --- | --- |
+| `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, affected run bundle paths, planned-vs-actual wave ids | `workflow_monitoring.md` actual wave rows reconciled or issue updated |
+| `skill_selection` | affected skill + `prompt_config_reviewer` | Selection Evidence drilldown row, skill source path, reset basis | skill prompt eval or dashboard miss rate after reset window |
+| `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
+| `eval_gap` | `agent-eval-accumulation` | eval accumulation compact output, missing / stale / fail families | `eval_accumulation_check.py` pass or issue updated |
+| `token_coverage` | `agent-learning` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
+| `archive_hygiene` | `result-artifact-writeout` or log archive owner | `runtime_log_archive_git.py status/check-clean` output | `RUNTIME_LOG_ARCHIVE_CLEAN=yes` |
+| `prompt_or_config_drift` | `prompt_config_reviewer` | affected prompt/config path and compact evidence cell | reviewed patch or routing issue updated |
+| `structure_boundary` | `structure-refactor` | evidence cell plus candidate path / view boundary | structure repair contract or structure issue updated |
+
+When one compact summary contains several independent findings, split follow-up
+subagents by `instance_partition`. Suggested same-role instance id:
+`<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.

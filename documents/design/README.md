@@ -3,7 +3,7 @@
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../dependency-manifest-design.md dependency evidence contract
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
+downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
 -->
 

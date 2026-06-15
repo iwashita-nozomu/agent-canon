@@ -100,6 +100,15 @@ write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 write-capable coding subagent を authorization または tool gate で起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、その slice について read-only 分析を増やし続けません。
 独立 workstream が複数ある場合は、workstream ごとに stage owner を置き、`run.delegated_spawn_policy` の下で vertical dynamic wave を起こします。同じ parent wave へ全 role を flat に詰め込むのは避け、入力 packet、write scope、validation route、review gate が交差しない sibling wave だけを同時に走らせます。
+log-analysis 由来の wave は `agent-log-analysis` の `Finding Route Packet` を
+input にします。`finding_class` が `wave_execution`、`skill_selection`、
+`workflow_attribution`、`eval_gap`、`archive_hygiene`、`prompt_or_config_drift`、
+または `structure_boundary` のときは、その route target を stage owner とし、
+parent は launch mechanics、budget、fresh lifecycle、wave ledger の整合だけを持ちます。
+同じ role を複数起動する場合は、`instance_partition` を
+`repo_key`、`hook_family`、`skill_name`、`workflow_name`、`issue_id`、
+または path scope で分けます。instance id は
+`<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` を推奨形にします。
 parent または delegated stage owner が実際に spawn / skip / replacement を行ったら、`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...` で `schedule.md` と `workflow_monitoring.md` を同じ `wave_id` で更新します。delegated child wave は `remaining_spawn_budget` を必ず含めます。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。

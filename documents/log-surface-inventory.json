@@ -1587,6 +1587,54 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "closeout_gate",
+      "line": 83,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "evidence_cells",
+      "line": 79,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "finding_class",
+      "line": 78,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "instance_partition",
+      "line": 81,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "required_packet",
+      "line": 82,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "route_target",
+      "line": 80,
+      "path": "agents/skills/agent-log-analysis.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "proof_algorithm_ir",
       "line": 572,
       "path": "agents/skills/formal-proof-workflow.md",
@@ -2476,7 +2524,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "allowed_structural_delta",
-      "line": 137,
+      "line": 144,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -2484,238 +2532,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "behavior_contract",
-      "line": 133,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "contract_check",
-      "line": 109,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "design_claim_evidence",
-      "line": 162,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "detected_repo_profile",
-      "line": 106,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 134,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 157,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 331,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "drift_symptom",
-      "line": 107,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "expected_owner",
-      "line": 108,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "forbidden_semantic_delta",
-      "line": 138,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "generated_artifact_boundary",
-      "line": 164,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "import_check",
-      "line": 111,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "missing_path_triage",
-      "line": 113,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "moves_applied",
-      "line": 336,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordinary_task_status",
-      "line": 115,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
-      "line": 139,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
-      "line": 159,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
-      "line": 332,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "personal_runtime_check",
-      "line": 112,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "primary_responsibility_map",
-      "line": 135,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reader_delta",
-      "line": 141,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "recursive_readme_sources",
-      "line": 136,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "repair_action",
-      "line": 114,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reverse_edge_check",
-      "line": 161,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reverse_edge_check",
-      "line": 335,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reviewed_contract",
-      "line": 156,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reviewer_decision",
-      "line": 168,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "runtime_boundary",
-      "line": 142,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_check",
-      "line": 110,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_delta",
       "line": 140,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -2723,143 +2539,127 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "scope_overlap_report",
-      "line": 160,
+      "field": "contract_check",
+      "line": 116,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "scope_overlap_report",
-      "line": 333,
+      "field": "design_claim_evidence",
+      "line": 169,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "source_view_boundary_check",
-      "line": 158,
+      "field": "detected_repo_profile",
+      "line": 113,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "source_view_boundary_check",
-      "line": 334,
+      "field": "directory_responsibility_graph",
+      "line": 141,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "stale_path_sweep",
-      "line": 337,
+      "field": "directory_responsibility_graph",
+      "line": 164,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "stale_surface_sweep",
-      "line": 163,
+      "field": "directory_responsibility_graph",
+      "line": 338,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_refactor",
-      "line": 329,
+      "field": "drift_symptom",
+      "line": 114,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_refactor_root",
-      "line": 131,
+      "field": "expected_owner",
+      "line": 115,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_repair_root",
-      "line": 104,
+      "field": "forbidden_semantic_delta",
+      "line": 145,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_review_decision",
-      "line": 330,
+      "field": "generated_artifact_boundary",
+      "line": 171,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_review_root",
-      "line": 154,
+      "field": "import_check",
+      "line": 118,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_review_surface",
-      "line": 155,
+      "field": "missing_path_triage",
+      "line": 120,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_surface",
-      "line": 105,
+      "field": "moves_applied",
+      "line": 343,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_surface",
-      "line": 132,
+      "field": "ordinary_task_status",
+      "line": 122,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_docs",
-      "line": 167,
+      "field": "path_mapping",
+      "line": 146,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_docs",
-      "line": 340,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_gate",
-      "line": 143,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_imports",
+      "field": "path_mapping",
       "line": 166,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -2867,7 +2667,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_imports",
+      "field": "path_mapping",
       "line": 339,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -2875,7 +2675,119 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_scope",
+      "field": "personal_runtime_check",
+      "line": 119,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "primary_responsibility_map",
+      "line": 142,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reader_delta",
+      "line": 148,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "recursive_readme_sources",
+      "line": 143,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "repair_action",
+      "line": 121,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reverse_edge_check",
+      "line": 168,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reverse_edge_check",
+      "line": 342,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewed_contract",
+      "line": 163,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewer_decision",
+      "line": 175,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "runtime_boundary",
+      "line": 149,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_check",
+      "line": 117,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_delta",
+      "line": 147,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 167,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 340,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
       "line": 165,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -2883,8 +2795,144 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
+      "line": 341,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_path_sweep",
+      "line": 344,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_surface_sweep",
+      "line": 170,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor",
+      "line": 336,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor_root",
+      "line": 138,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_repair_root",
+      "line": 111,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_decision",
+      "line": 337,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_root",
+      "line": 161,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_surface",
+      "line": 162,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_surface",
+      "line": 112,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_surface",
+      "line": 139,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 174,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 347,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 150,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 173,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 346,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "validation_scope",
-      "line": 338,
+      "line": 172,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_scope",
+      "line": 345,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -9500,7 +9548,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1834,
+      "line": 1833,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9508,7 +9556,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "operational_ir",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9516,7 +9564,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "public_interface",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9524,7 +9572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9532,7 +9580,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9540,7 +9588,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_root",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9548,7 +9596,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "stablehlo",
-      "line": 1825,
+      "line": 1824,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },

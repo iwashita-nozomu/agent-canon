@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents agent-canon jit-ir-to-lean usage and current Lean output boundary.
-upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR JSON into Lean evidence definitions.
+downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR JSON into Lean evidence definitions.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py produces the consumed JIT-canonical IR JSON.
 @dependency-end
 -->
