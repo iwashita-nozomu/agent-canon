@@ -275,11 +275,11 @@ Activation Conditions:
 - `plan_reviewer`
   - 実行計画の順序、review 分離、rollback readiness を確認する
 - `detailed_designer`
-  - reuse-prioritized の detailed design 文書と identifier naming plan を起こす
+  - reuse-prioritized の detailed design 文書、Design Side-Effect Map、identifier naming plan を起こす
 - `detailed_design_reviewer`
-  - 実装前の最重要 gate として設計文書と identifier naming plan を独立に確認する
+  - 実装前の最重要 gate として設計文書、Design Side-Effect Map、identifier naming plan を独立に確認する
 - `document_flow_reviewer`
-  - 文書を上から順に読み、用語導入、section 順序、reader path が自然かを確認する
+  - 文書を上から順に読み、用語導入、section 順序、reader-facing side effect、reader path が自然かを確認する
 - `citation_evidence_reviewer`
   - 論文主張が citation、figure、table、derivation、appendix、result に辿れるかを確認する
 - `notation_definition_reviewer`
@@ -293,7 +293,7 @@ Activation Conditions:
 - `diff_triage_reviewer`
   - 狭い diff の triage review を安価に行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
 - `ship_reviewer`
-  - user request clause、Abstract Design Frame、approved packet、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
+  - user request clause、Abstract Design Frame、Design Side-Effect Map、approved packet、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
 - `explorer`
   - 読み取り専用で codebase / docs / workflow の調査を行う
 - `reviewer`
@@ -344,12 +344,12 @@ Activation Conditions:
 | 調査 | 外部文献は `literature_researcher`、local precedent は `explorer` |
 | 実行計画立案 | `execution_planner` |
 | 計画レビュー | 専用の `plan_reviewer` instance |
-| 詳細設計 | `detailed_designer`。既存 code path 調査が要るなら `explorer` を補助に使う |
-| 詳細設計レビュー | 専用の `detailed_design_reviewer` instance |
+| 詳細設計 | `detailed_designer`。既存 code path 調査が要るなら `explorer` を補助に使う。主要設計判断の downstream surface は Design Side-Effect Map に落とす |
+| 詳細設計レビュー | 専用の `detailed_design_reviewer` instance。Design Side-Effect Map が実装者へ渡せる粒度か確認する |
 | 一般説明 prose projection | `long_form_writer`。README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として使う |
 | 学術文章起草 | `long_form_writer`。論文、thesis chapter、scholarly note では `academic-writing` を前提に draft する |
 | 論文 draft 起草 | `long_form_writer`。投稿論文や thesis chapter では `paper-writing` を前提に draft する |
-| 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見る |
+| 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見て、reader-facing side effect が reader path に現れているか確認する |
 | citation / evidence trace review | 専用の `citation_evidence_reviewer` instance。paper claim が citation、figure、table、appendix、result に辿れるかを見る |
 | テストケース設計 | 専用の `test_designer` instance。approved design と既存 code path を静的解析し、最も意地の悪い edge case と regression case を test plan に落とす |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
@@ -358,7 +358,7 @@ Activation Conditions:
 | OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report を事実として扱い、OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
 | 低リスク実装slice | Abstract Design Frame から導かれ、design trace、naming、validation が固定済みの slice だけを `spark_worker` preferred |
-| 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
+| 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer`。Design Side-Effect Map から外れた side effect は設計差分として扱う |
 | 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、prompt/config surface がある場合は `prompt_config_reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
 運用ルール:

@@ -52,6 +52,10 @@ upstream design ../../documents/dependency-manifest-design.md dependency evidenc
 
 <!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
 
+## Design Side-Effect Map
+
+<!-- For each major design decision, list downstream implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces it affects. Connect each item to the Abstract Design Frame responsibility, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. -->
+
 ## Canonical Tree-Head Plan
 
 <!-- Name the only canonical design-document paths and implementation paths that may remain tracked after this task. List every non-canonical draft, snapshot, backup file, copied implementation, mirrored directory, or parallel design doc that must be deleted or must not be created. State that the durable product state is the current tree head only. -->

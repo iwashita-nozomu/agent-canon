@@ -75,7 +75,8 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - 原因考察、コード改善、修正箇所選定、複数候補比較が必要な task では `agents/workflows/hypothesis-validation-workflow.md` を overlay とし、code dependency scan と header dependency graph を別々に取得してから仮説、expected mechanism、candidate comparison、反証条件、support evidence、fix surface 妥当性を固定します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
-- 詳細設計には `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` を必ず含め、worker が確認する抽象責務と、読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
+- 詳細設計には `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を必ず含め、worker が確認する抽象責務と、読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
+- `Design Side-Effect Map` では、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、owner stage、review gate、validation / test-plan item へ接続します
 - 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` として残します。implementation surface route、responsibility search、reuse survey、stale surface scan、dependency scope、validation route が揃った時点で、parent 直編集または write-capable subagent handoff へ進みます
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できる変更を実装対象にし、trace が切れた変更は Gate 5-6 の設計更新へ戻します

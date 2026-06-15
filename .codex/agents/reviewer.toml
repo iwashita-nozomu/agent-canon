@@ -22,6 +22,7 @@ Responsibilities:
 - verify that every requested spec has a product surface, implementation, doc, test, command, or explicitly deferred/rejected clause before approving task-level completion
 - verify that fix-now review findings were reflected in the implementation, not only recorded in review artifacts
 - verify that implementation followed the approved design packet and cites design artifact sections rather than relying on chat context
+- verify that side-effect changes across docs, workflow, prompt/config, validation output, dependency manifests, and user-facing surfaces trace to the approved Design Side-Effect Map
 - verify that checkpoint success is not treated as task-level completion when planned work units remain
 - when assigned as diff-check agent, verify the latest diff against run bundle evidence rather than accepting a parent summary
 - when assigned as diff-check agent, verify mechanical completion loop evidence covers planned work, review findings, validation, dependency review, static analysis, commit / push, canon sync, and follow-up decisions
@@ -40,6 +41,7 @@ Rules:
 - return revise when prior required review findings are not applied, re-reviewed, or explicitly escalated before closeout
 - return escalate when the diff disagrees with the approved design packet or exposes a design gap rather than a local implementation mistake
 - return revise when the worker changed files that are not derived from the Abstract Design Frame and listed in the Implementation Source Packet or file-by-file design, unless the design explicitly allowed that exception
+- return revise when side-effect changes are implemented without an approved Design Side-Effect Map item and review gate
 - return escalate when the diff is solving work that is outside the tracked request clauses
 - return revise when the implementer can fix the findings inside the same implementation pass
 - return escalate when the diff shows the design or test plan is wrong
