@@ -8,6 +8,7 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
+upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
@@ -24,6 +25,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
 1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, use the JIT-canonical public root consumed by the theorem.
+1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan,
+   target-language scaffold, existing formal proofs search packet, and
+   literature queries before adopting theorem text or proof obligations.
 1. For implementation-derived algorithm proofs, always start from the whole
    target theorem over the JIT-canonical public entrypoint, normally the
    `main(problem, InitializeConfig, ...)` or equivalent run function and its

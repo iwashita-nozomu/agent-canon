@@ -48,7 +48,8 @@ upstream design ../../../agents/skills/test-design.md adversarial test design bo
 1. If code changes are needed, use `$test-design` before implementation and include exact small cases, ill-conditioned cases, constraint-boundary cases, derivative checks, non-finite guards, and not-converged status handling when relevant.
 1. Do not green numerical tests by relaxing tolerances, deleting assertions,
    skipping cases, changing expected values to match current output, or running
-   computational tests on CPU. Solver, optimizer, JAX/XLA/IREE lowering,
+   computational tests on CPU; using CPU as substitute evidence is a validation
+   blocker, not pass evidence. Solver, optimizer, JAX/XLA/IREE lowering,
    convergence, residual, benchmark, and experiment validation must run on the
    GPU target or be recorded as `gpu_validation_blocker=<reason>`.
 1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.

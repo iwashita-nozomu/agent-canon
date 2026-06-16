@@ -20,8 +20,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. For each test case, fix `Behavior Contract`, `Observation Level`, `Oracle`, `Input Space`, and `Adequacy Evidence`.
 1. Reject generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` when they observe only process success, import success, no-crash, or exit code 0.
 1. Before proposing numerical, randomized, tolerance, solver, convergence,
-   residual, benchmark, or experiment-style tests, apply the Numerical Test
-   Admission Gate from `documents/coding-conventions-testing.md`: record the
+   residual, benchmark, or experiment-style tests, apply the Numerical Test Admission Gate from `documents/coding-conventions-testing.md`: record the
    numerical trigger, non-numerical alternative, oracle, GPU target, and budget.
    If the target behavior is not numerical, omit the numerical test and record
    the omission reason instead. Do not propose CPU computational tests as a
