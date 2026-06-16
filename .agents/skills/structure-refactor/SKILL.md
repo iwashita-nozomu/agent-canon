@@ -13,6 +13,7 @@ upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md documents Codex run
 upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime views
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 upstream implementation ../../../tools/agent_tools/import_responsibility.py validates import boundaries
+upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
 @dependency-end
 -->
 
@@ -20,6 +21,7 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
 
 1. Read `agents/skills/structure-refactor.md`.
 1. Use this for structure review requests, repo-refactor requests, directory layout refactors, pre-task repair of AgentCanon expected repository-structure drift, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, project `.codex` / `.agents` view changes, personal `~/.codex` boundary triage, and responsibility-scope map changes.
+1. When reached from `$agent-log-analysis`, require a `Finding Route Packet` with `finding_class=structure_boundary`, then use this skill's structure contract and validation gates. Keep log interpretation with `$agent-log-analysis` and launch mechanics with `$subagent-bootstrap`.
 1. Route before reading broad prose. Use `agent-canon local-llm route-skill --prompt "<request>" --format json` for prompt-derived skill routing and `python3 tools/agent_tools/route.py --name <candidate>` for proposed route names. If repo-refactor, structure-review, or `~/.codex` boundary prompts do not route here, fix the deterministic router instead of adding prose-only workarounds.
 1. Pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup` when the evidence shows a real source-layout refactor, directory README/prose ownership change, or stale document-canon cleanup. For pre-task expected-layout drift, start with the compact structure repair checks below and add those paired skills only after the repair action requires them.
 1. For pre-task structure repair, classify the checkout before reading broad packets or recreating missing paths:
@@ -36,6 +38,7 @@ upstream implementation ../../../tools/agent_tools/import_responsibility.py vali
    - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json`
    - run or update a scope-overlap report that applies `exclude_paths`
    - run `python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path> --out-dir <run>/prose/<readme-id> --profile all --stats-out <run>/prose/<readme-id>.stats.json` on changed directory README files
+   - run `python3 tools/agent_tools/check_design_doc_claims.py --root <root> <design-doc>` when a design document justifies the structure change
 1. Treat directory structure as a product contract. Fix `Behavior Contract`, `Allowed Structural Delta`, `Forbidden Semantic Delta`, `Path Mapping`, `Directory Responsibility Map`, and `Reader Impact` before moving files.
 1. Derive target layout from responsibilities, not from path aesthetics:
    - split a directory when one README must describe unrelated primary responsibilities

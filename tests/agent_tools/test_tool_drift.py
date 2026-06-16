@@ -480,7 +480,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "upstream design README.md fixture anchor",
                         "@dependency-end",
                         "-->",
-                        "Initial Intake Wave",
+                        "Intake Responsibility Wave",
                         "write-capable handoff",
                         "dynamic expansion wave",
                         "run.delegated_spawn_policy",

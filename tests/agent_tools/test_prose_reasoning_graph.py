@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sqlite3
@@ -1463,14 +1464,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
             ir_path = root / "local_llm_prose_ir.json"
             first.write_text("# First\n\nAlpha evidence.", encoding="utf-8")
             second.write_text("# Second\n\nBeta evidence.", encoding="utf-8")
-            args = type("Args", (), {})()
-            args.local_llm_ir_json = None
-            args.local_llm_root = root
-            args.local_llm_document_batch_size = 1
-            args.local_llm_term_batch_size = 1
-            args.local_llm_jobs = 2
-            args.term = ["evidence"]
-            args.terms_file = []
+            args = argparse.Namespace(
+                local_llm_ir_json=None,
+                local_llm_root=root,
+                local_llm_document_batch_size=1,
+                local_llm_term_batch_size=1,
+                local_llm_jobs=2,
+                term=["evidence"],
+                terms_file=[],
+            )
             ir_path.write_text(
                 json.dumps(
                     {
@@ -1503,6 +1505,23 @@ class ProseReasoningGraphTest(unittest.TestCase):
             command = run_mock.call_args.args[0]
             self.assertIn("--llm-jobs", command)
             self.assertEqual(command[command.index("--llm-jobs") + 1], "2")
+
+    def test_check_document_accepts_llm_jobs_alias(self) -> None:
+        """check-document should accept the Rust-facing llm jobs option name."""
+        parser = prose_graph.build_parser()
+
+        args = parser.parse_args(
+            [
+                "check-document",
+                "agents/skills/md-style-check.md",
+                "--out-dir",
+                "reports/agents/test/prose",
+                "--llm-jobs",
+                "3",
+            ]
+        )
+
+        self.assertEqual(args.local_llm_jobs, 3)
 
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""

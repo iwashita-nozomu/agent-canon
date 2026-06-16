@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
@@ -218,6 +218,99 @@ SKILL_ROUTING_MARKERS = (
     "vertical dynamic wave",
     "write-capable handoff",
 )
+DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/md-style-check/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/md-style-check.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/README.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/catalog.yaml": (
+        "format-only docs work",
+        "prose-reasoning-graph",
+        "structure-planning",
+    ),
+    "agents/TASK_WORKFLOWS.md": (
+        "$structure-planning",
+        "$prose-reasoning-graph",
+        "$md-style-check",
+        "Document Structure Evidence",
+        "structure_contract=skipped",
+    ),
+    "agents/workflows/long-form-writing-workflow.md": (
+        "$structure-planning",
+        "$prose-reasoning-graph",
+        "$md-style-check",
+        "structure_contract=skipped",
+    ),
+    "documents/REVIEW_PROCESS.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/USER_GUIDE_JA.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "Document Structure Evidence",
+        "structure_contract=skipped",
+    ),
+    "agents/templates/closeout_gate.md": (
+        "Document Structure Evidence",
+        "document_structure_status",
+        "structure_planning",
+        "prose_graph",
+        "md_style_check",
+        "format_only_reason",
+    ),
+    "tools/agent_tools/task_close.py": (
+        "changed_markdown_paths",
+        "Document Structure Evidence",
+        "document_structure_evidence",
+        "DOCUMENT_STRUCTURE_REQUIRED",
+    ),
+}
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -229,11 +322,24 @@ WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"check_convention_compliance\.py|check_convention_compliance\.py"
     r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
 )
-CLOSEOUT_PROHIBITION_MARKERS = (
-    "Close-Out Prohibitions",
+CLOSEOUT_READINESS_MARKERS = (
+    "Completion Readiness",
     "user-facing completion",
     "repo_wide_static_analysis_complete",
     "repo_wide_dependency_tools_complete",
+)
+POSITIVE_RUNTIME_WORDING_SURFACES = (
+    "ROOT_AGENTS.md",
+    ".agents/skills/agent-orchestration/SKILL.md",
+    ".agents/skills/codex-task-workflow/SKILL.md",
+    ".agents/skills/mvp-skeleton/SKILL.md",
+    "agents/TASK_WORKFLOWS.md",
+    "agents/canonical/CODEX_SUBAGENTS.md",
+    "agents/canonical/CODEX_WORKFLOW.md",
+    "agents/skills/catalog.yaml",
+    "agents/skills/mvp-skeleton.md",
+    "documents/conventions/common/05_docs.md",
+    "documents/coding-conventions-project.md",
 )
 PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
@@ -309,8 +415,8 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
     ),
     "ROOT_AGENTS.md": (
         "Mechanical Guardrail Policy",
-        "原則 block しません",
-        "hook 設定の退避や無効化ではなく",
+        "高確信で公開事故になるものだけを block 対象",
+        "hook 設定を維持したまま",
         "strict block mode",
     ),
 }
@@ -319,15 +425,25 @@ NORMATIVE_RE = re.compile(
     r"must|must not|required|forbidden)",
     flags=re.IGNORECASE,
 )
-PROHIBITION_RE = re.compile(
-    r"(?m)^\s*[-*]\s+.*(?:を禁止|禁止します|してはいけません|must not|forbidden)",
-    flags=re.IGNORECASE,
+LEGACY_NEGATIVE_RUNTIME_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"禁止|してはいけ|出さない|返さない|完了扱いにしない|"
+    r"Prohibitions|Close-Out Prohibitions|しなければ|must\s+not|"
+    r"do\s+not|don't|never|cannot|can't|せず|ではありません|"
+    r"しません|しない|置かず|戻さず)"
+)
+LEGACY_SEQUENCE_DESIGN_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"最初の|最初に|初期\s*(?:wave|責務)|Initial Intake Wave|"
+    r"mandatory first skill|first-wave|first-pass|first working version|needs the first version|"
+    r"first runnable path|first screen|first responsibilities wave|"
+    r"first implementation candidate|first cohesive slice|first slice|"
+    r"first candidate|first reviewer|first figure|first routing declaration)"
 )
 VERIFICATION_RE = re.compile(
     r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
     r"CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)"
 )
-PROHIBITION_SECTION_RE = re.compile(r"(?m)^#{2,6}\s+(?:.*禁止事項|Close-Out Prohibitions)")
 FORWARDER_WARNING_REQUIRED_MARKER = "LEGACY_FORWARDER_WARNING_REQUIRED"
 FORWARDER_WARNING_MARKERS = (
     "FORWARDER_CALLER",
@@ -478,18 +594,65 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def check_closeout_prohibitions(root: Path) -> list[Finding]:
-    """Verify workflow prohibition sources remain wired into the canonical workflow."""
+def check_document_structure_routing(root: Path) -> list[Finding]:
+    """Verify docs edit routing keeps structure analysis mechanically visible."""
+    paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "document_structure_routing")
+    for path, markers in DOCUMENT_STRUCTURE_ROUTING_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "document_structure_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_closeout_readiness(root: Path) -> list[Finding]:
+    """Verify workflow completion readiness remains wired into the workflow."""
     path = "agents/canonical/CODEX_WORKFLOW.md"
-    findings = check_required_files(root, (path,), "workflow_prohibitions")
+    findings = check_required_files(root, (path,), "workflow_readiness")
     if findings:
         return findings
     text = read_text(root, path)
-    for marker in CLOSEOUT_PROHIBITION_MARKERS:
+    for marker in CLOSEOUT_READINESS_MARKERS:
         if marker not in text:
             findings.append(
-                Finding("workflow_prohibitions", path, f"missing-marker:{marker}")
+                Finding("workflow_readiness", path, f"missing-marker:{marker}")
             )
+    return findings
+
+
+def check_positive_runtime_wording(root: Path) -> list[Finding]:
+    """Verify central runtime docs use positive operational wording."""
+    findings = check_required_files(
+        root, POSITIVE_RUNTIME_WORDING_SURFACES, "positive_runtime_wording"
+    )
+    for path in POSITIVE_RUNTIME_WORDING_SURFACES:
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for label, pattern in (
+            ("legacy-negative-runtime-wording", LEGACY_NEGATIVE_RUNTIME_RE),
+            ("legacy-sequence-design-wording", LEGACY_SEQUENCE_DESIGN_RE),
+        ):
+            for match in pattern.finditer(text):
+                line_no = text.count("\n", 0, match.start()) + 1
+                findings.append(
+                    Finding(
+                        "positive_runtime_wording",
+                        path,
+                        f"{label}:{line_no}",
+                    )
+                )
     return findings
 
 
@@ -602,14 +765,6 @@ def check_convention_assertions(root: Path) -> list[Finding]:
                     "normative-lines-without-verification-route",
                 )
             )
-        if PROHIBITION_RE.search(text) and not PROHIBITION_SECTION_RE.search(text):
-            findings.append(
-                Finding(
-                    "convention_assertions",
-                    path,
-                    "prohibition-lines-without-prohibition-section",
-                )
-            )
     return findings
 
 
@@ -665,7 +820,9 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
-    findings.extend(check_closeout_prohibitions(root))
+    findings.extend(check_document_structure_routing(root))
+    findings.extend(check_closeout_readiness(root))
+    findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

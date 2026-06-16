@@ -110,6 +110,18 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
 
+## Document Structure Evidence
+
+<!-- For changed Markdown source files, classify the document route before closeout and list every changed Markdown source path in `document_structure_paths`. For substantive document edits, record `document_structure_status: complete`, `structure_planning: complete`, `prose_graph: complete`, and the structure contract artifact. For typo / link / format-only edits, record `document_structure_status: skipped`, `structure_contract: skipped:<reason>`, `md_style_check: pass`, and `format_only_reason`. Generated run-bundle Markdown under reports/ is outside this source-document gate. -->
+
+- document_structure_paths:
+- document_structure_status:
+- structure_planning:
+- prose_graph:
+- structure_contract:
+- md_style_check:
+- format_only_reason:
+
 ## Tool Warning Evidence
 
 <!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->

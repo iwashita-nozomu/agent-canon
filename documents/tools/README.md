@@ -11,6 +11,7 @@ downstream implementation ../../tools/agent_tools/issue_sync.py validates local 
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
+downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
@@ -30,7 +31,7 @@ downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
 downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
 downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
-downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
+downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end
 -->
 
@@ -57,7 +58,9 @@ first and then return here only for reader-facing context.
 | Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
 | Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
+| Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
 | Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
+| Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
 
 ## AgentCanon Tool Catalog
 
@@ -96,6 +99,12 @@ to choose a route:
   `tool_proof_coverage.py`, `jit_canonical_ir.py`,
   `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
 
+Graph visualization follows the Prose Reasoning Graph DSL projection contract.
+`render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
+runtime dashboard diagrams are adapters or projections; their domain producers
+keep validation authority. Proof and JIT-canonical IR tools provide source facts
+that future graph viewers map through the same DSL contract.
+
 When a reader needs exact options, run the command with `--help` or open the
 same-named file under `documents/tools/`. Do not expand this README into a
 second command manual.
@@ -116,6 +125,8 @@ second command manual.
   - review 前の基礎 gate をまとめて実行します。
 - `tools/bin/agent-canon docs check`
   - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
+- `tools/agent_tools/check_design_doc_claims.py`
+  - design document の claim line を dependency header closure、implementation evidence、parent documents と比較し、Evidence And Assumption Ledger、DSL / standard-form terms、parent-doc alignment を機械的に確認します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
@@ -272,6 +283,7 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
 - `tools/agent_tools/helper_function_inventory.py`
   - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。
   - `redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
+  - `searchable_name`、`name_search_rule`、`matched_role_name_tokens` は、AST から推定した role と identifier 内の role/action token の対応を出します。`--only-name-gaps` は、責務検索で見つけやすい名前へ寄せる review 対象だけを抽出します。
   - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
   - `helper_first_guard.py` は `helper_function_inventory.py --changed --baseline-ref HEAD --format json` の record を読み、test / docs / issue / responsibility-scope などの ownership evidence がない helper-like function 追加を block します。log には accepted / blocked の両方を分析できる `helper_candidate_records` と、blocking subset の `helper_first_records` を残し、prompt / skill eval の改善材料にします。
   - `library_implementation_guard.py` は `vendor/**`、`site-packages`、`node_modules`、`responsibility-scope.toml` の `external_dependency` scope を protected library implementation として扱い、既存 file の直接 rewrite を block します。外部実装は wrapper / adapter、fork / upstream patch、または manifest-backed vendor import で扱います。

@@ -25,7 +25,6 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 _OP_RE = re.compile(r"\b(?:stablehlo|mhlo|chlo|func|scf|arith)\.[A-Za-z0-9_]+|\breturn\b|\bcall\b")
 _TENSOR_RE = re.compile(r"tensor<([^>]+)>")
@@ -85,7 +84,7 @@ def _symbol_path_and_qualname(symbol: str) -> tuple[Path, str]:
     return path, qualname
 
 
-def _load_symbol(symbol: str) -> Callable[..., Any]:
+def _load_symbol(symbol: str) -> Callable[..., object]:
     path, qualname = _symbol_path_and_qualname(symbol)
     module_name = f"_agent_canon_jit_root_{_sha256_text(str(path))[:12]}"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -94,7 +93,7 @@ def _load_symbol(symbol: str) -> Callable[..., Any]:
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
-    value: Any = module
+    value: object = module
     for part in qualname.split("."):
         value = getattr(value, part)
     if not callable(value):
@@ -177,9 +176,9 @@ def _keyword_map(source_text: str, call: ast.Call) -> dict[str, str | int]:
 def _detect_source_main_pattern(
     source_text: str,
     function: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> dict[str, Any] | None:
-    initialize_assign: dict[str, Any] | None = None
-    algorithm_call_assign: dict[str, Any] | None = None
+) -> dict[str, object] | None:
+    initialize_assign: dict[str, object] | None = None
+    algorithm_call_assign: dict[str, object] | None = None
     returned: list[str] | None = None
     for statement in function.body:
         if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
@@ -192,7 +191,7 @@ def _detect_source_main_pattern(
                     "args": [_expr_to_source(source_text, arg) for arg in value.args],
                 }
             if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
-                solve_config: dict[str, Any] = {}
+                solve_config: dict[str, object] = {}
                 for arg in value.args:
                     if isinstance(arg, ast.Call) and _call_name(arg.func).endswith(".SolveConfig"):
                         solve_config = {
@@ -224,7 +223,7 @@ def _detect_source_main_pattern(
     }
 
 
-def _extract_source_root(symbol: str) -> dict[str, Any]:
+def _extract_source_root(symbol: str) -> dict[str, object]:
     path, qualname = _symbol_path_and_qualname(symbol)
     source_text = path.read_text(encoding="utf-8")
     tree = ast.parse(source_text)
@@ -253,7 +252,7 @@ def _extract_source_root(symbol: str) -> dict[str, Any]:
     }
 
 
-def _hlo_only_source_root(symbol: str) -> dict[str, Any]:
+def _hlo_only_source_root(symbol: str) -> dict[str, object]:
     path, qualname = _symbol_path_and_qualname(symbol)
     return {
         "schema": "agent-canon.source-root.v1",
@@ -270,7 +269,7 @@ def _hlo_only_source_root(symbol: str) -> dict[str, Any]:
     }
 
 
-def _extract_public_source_signature(symbol: str) -> dict[str, Any]:
+def _extract_public_source_signature(symbol: str) -> dict[str, object]:
     path, qualname = _symbol_path_and_qualname(symbol)
     source_text = path.read_text(encoding="utf-8")
     tree = ast.parse(source_text)
@@ -327,7 +326,7 @@ def _split_top_level_csv(text: str) -> list[str]:
     return items
 
 
-def _return_roots_from_annotation(return_annotation: str) -> list[dict[str, Any]]:
+def _return_roots_from_annotation(return_annotation: str) -> list[dict[str, object]]:
     annotation = return_annotation.strip()
     if annotation.startswith("tuple[") and annotation.endswith("]"):
         parts = _split_top_level_csv(annotation[len("tuple[") : -1])
@@ -335,7 +334,7 @@ def _return_roots_from_annotation(return_annotation: str) -> list[dict[str, Any]
         parts = _split_top_level_csv(annotation[len("Tuple[") : -1])
     else:
         parts = [annotation] if annotation else []
-    roots: list[dict[str, Any]] = []
+    roots: list[dict[str, object]] = []
     for index, part in enumerate(parts):
         class_name = part.rsplit(".", maxsplit=1)[-1].strip()
         label = class_name[:1].lower() + class_name[1:] if class_name else f"return_{index}"
@@ -350,28 +349,28 @@ def _return_roots_from_annotation(return_annotation: str) -> list[dict[str, Any]
     return roots
 
 
-def _shape_text(value: Any) -> str:
+def _shape_text(value: object) -> str:
     shape = getattr(value, "shape", None)
     if shape is None:
         return ""
     return str(tuple(int(dim) for dim in shape))
 
 
-def _dtype_text(value: Any) -> str:
+def _dtype_text(value: object) -> str:
     dtype = getattr(value, "dtype", None)
     return "" if dtype is None else str(dtype)
 
 
-def _tree_key_text(path: Any) -> str:
+def _tree_key_text(path: object) -> str:
     import jax
 
     return jax.tree_util.keystr(path)
 
 
-def _collect_tree_leaves(root_name: str, root_index: int, value: Any) -> list[dict[str, Any]]:
+def _collect_tree_leaves(root_name: str, root_index: int, value: object) -> list[dict[str, object]]:
     import jax
 
-    leaves: list[dict[str, Any]] = []
+    leaves: list[dict[str, object]] = []
     for leaf_index, (path, leaf) in enumerate(jax.tree_util.tree_flatten_with_path(value)[0]):
         local_path = _tree_key_text(path)
         public_path = f"{root_name}{local_path}" if local_path else root_name
@@ -390,7 +389,7 @@ def _collect_tree_leaves(root_name: str, root_index: int, value: Any) -> list[di
     return leaves
 
 
-def _eval_shape(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> Any:
+def _eval_shape(func: Callable[..., object], args: tuple[object, ...], kwargs: Mapping[str, object]) -> object:
     try:
         import equinox as eqx
 
@@ -401,7 +400,7 @@ def _eval_shape(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping
         return jax.eval_shape(func, *args, **kwargs)
 
 
-def _entry_signature(operational_ir: Mapping[str, Any], root_name: str) -> str:
+def _entry_signature(operational_ir: Mapping[str, object], root_name: str) -> str:
     signatures = operational_ir.get("function_signatures", [])
     if not isinstance(signatures, list):
         return ""
@@ -413,7 +412,7 @@ def _entry_signature(operational_ir: Mapping[str, Any], root_name: str) -> str:
     return public_candidates[0] if public_candidates else (str(signatures[0]) if signatures else "")
 
 
-def _parse_stablehlo_entry_signature(signature: str) -> dict[str, Any]:
+def _parse_stablehlo_entry_signature(signature: str) -> dict[str, object]:
     arguments = [
         {
             "index": int(match.group("index")),
@@ -422,7 +421,7 @@ def _parse_stablehlo_entry_signature(signature: str) -> dict[str, Any]:
         }
         for match in _STABLEHLO_ARG_RE.finditer(signature)
     ]
-    returns: list[dict[str, Any]] = []
+    returns: list[dict[str, object]] = []
     for leaf_index, match in enumerate(_STABLEHLO_RESULT_INFO_RE.finditer(signature)):
         result_info = match.group("result_info")
         indexes = [int(item.group("index")) for item in _RESULT_INDEX_RE.finditer(result_info)]
@@ -444,11 +443,11 @@ def _parse_stablehlo_entry_signature(signature: str) -> dict[str, Any]:
 def _collect_public_interface(
     *,
     python_symbol: str,
-    func: Callable[..., Any],
-    args: tuple[Any, ...],
-    kwargs: Mapping[str, Any],
-    operational_ir: Mapping[str, Any],
-) -> dict[str, Any]:
+    func: Callable[..., object],
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+    operational_ir: Mapping[str, object],
+) -> dict[str, object]:
     signature = _extract_public_source_signature(python_symbol)
     parameters = signature.get("parameters", [])
     parameter_names = [
@@ -456,7 +455,7 @@ def _collect_public_interface(
         for index, parameter in enumerate(parameters)
         if isinstance(parameter, Mapping)
     ]
-    argument_leaves: list[dict[str, Any]] = []
+    argument_leaves: list[dict[str, object]] = []
     for index, arg in enumerate(args):
         name = parameter_names[index] if index < len(parameter_names) else f"arg{index}"
         argument_leaves.extend(_collect_tree_leaves(name, index, arg))
@@ -476,7 +475,7 @@ def _collect_public_interface(
             }
             for index, _root in enumerate(output_roots)
         ]
-    return_leaves: list[dict[str, Any]] = []
+    return_leaves: list[dict[str, object]] = []
     for root_index, root in enumerate(output_roots):
         root_label = (
             str(return_roots[root_index]["label"])
@@ -542,7 +541,7 @@ def _configure_jax_platform(
 
 
 @contextlib.contextmanager
-def _jax_default_device(device_kind: str | None) -> Any:
+def _jax_default_device(device_kind: str | None) -> object:
     if not device_kind:
         yield
         return
@@ -555,7 +554,7 @@ def _jax_default_device(device_kind: str | None) -> Any:
         yield
 
 
-def _normalize_inputs(value: Any) -> tuple[tuple[Any, ...], Mapping[str, Any]]:
+def _normalize_inputs(value: object) -> tuple[tuple[object, ...], Mapping[str, object]]:
     if isinstance(value, Mapping):
         args_value = value.get("args", ())
         kwargs_value = value.get("kwargs", {})
@@ -569,23 +568,23 @@ def _normalize_inputs(value: Any) -> tuple[tuple[Any, ...], Mapping[str, Any]]:
     return (value,), {}
 
 
-def _lower(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any], jit_kind: str) -> Any:
+def _lower(func: Callable[..., object], args: tuple[object, ...], kwargs: Mapping[str, object], jit_kind: str) -> object:
     if jit_kind in {"auto", "filter_jit"}:
         try:
             import equinox as eqx
 
-            filter_jitted: Any = eqx.filter_jit(func)
+            filter_jitted: object = eqx.filter_jit(func)
             return filter_jitted.lower(*args, **kwargs)
         except Exception:
             if jit_kind == "filter_jit":
                 raise
     import jax
 
-    jitted: Any = jax.jit(func)
+    jitted: object = jax.jit(func)
     return jitted.lower(*args, **kwargs)
 
 
-def _compiler_ir_text(lowered: Any) -> tuple[str, str, list[str]]:
+def _compiler_ir_text(lowered: object) -> tuple[str, str, list[str]]:
     errors: list[str] = []
     compiler_ir = getattr(lowered, "compiler_ir", None)
     if compiler_ir is not None:
@@ -625,10 +624,10 @@ def _classify_opcode(opcode: str) -> str:
 
 def _open_region(
     *,
-    regions: list[dict[str, Any]],
-    expansion_edges: list[dict[str, Any]],
+    regions: list[dict[str, object]],
+    expansion_edges: list[dict[str, object]],
     region_stack: list[str],
-    region_by_id: dict[str, dict[str, Any]],
+    region_by_id: dict[str, dict[str, object]],
     kind: str,
     parent_function: str,
     parent_op_id: str,
@@ -665,12 +664,12 @@ def _close_region(
     *,
     line_no: int,
     region_stack: list[str],
-    region_by_id: dict[str, dict[str, Any]],
+    region_by_id: dict[str, dict[str, object]],
     function_stack: list[str],
-    function_by_name: dict[str, dict[str, Any]],
+    function_by_name: dict[str, dict[str, object]],
     while_owner_stack: list[str],
-    case_owner_stack: list[dict[str, Any]],
-) -> dict[str, Any] | None:
+    case_owner_stack: list[dict[str, object]],
+) -> dict[str, object] | None:
     if len(region_stack) <= 1:
         module_region = region_by_id.get(region_stack[0]) if region_stack else None
         if module_region is not None:
@@ -695,22 +694,22 @@ def _close_region(
 def _current_region(
     *,
     region_stack: Sequence[str],
-    region_by_id: Mapping[str, dict[str, Any]],
-) -> dict[str, Any]:
+    region_by_id: Mapping[str, dict[str, object]],
+) -> dict[str, object]:
     return region_by_id[region_stack[-1]]
 
 
-def _extract_operational_ir(stablehlo_text: str) -> dict[str, Any]:
-    ops: list[dict[str, Any]] = []
-    functions: list[dict[str, Any]] = []
-    regions: list[dict[str, Any]] = []
-    expansion_edges: list[dict[str, Any]] = []
-    function_by_name: dict[str, dict[str, Any]] = {}
-    region_by_id: dict[str, dict[str, Any]] = {}
+def _extract_operational_ir(stablehlo_text: str) -> dict[str, object]:
+    ops: list[dict[str, object]] = []
+    functions: list[dict[str, object]] = []
+    regions: list[dict[str, object]] = []
+    expansion_edges: list[dict[str, object]] = []
+    function_by_name: dict[str, dict[str, object]] = {}
+    region_by_id: dict[str, dict[str, object]] = {}
     region_stack: list[str] = []
     function_stack: list[str] = []
     while_owner_stack: list[str] = []
-    case_owner_stack: list[dict[str, Any]] = []
+    case_owner_stack: list[dict[str, object]] = []
     function_signatures: list[str] = []
     _open_region(
         regions=regions,
@@ -1000,9 +999,9 @@ def _count_mlir_ops(text: str) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def _parse_llvm_functions(text: str) -> list[dict[str, Any]]:
-    functions: list[dict[str, Any]] = []
-    current: dict[str, Any] | None = None
+def _parse_llvm_functions(text: str) -> list[dict[str, object]]:
+    functions: list[dict[str, object]] = []
+    current: dict[str, object] | None = None
     current_block = "entry"
     for line_no, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
@@ -1094,7 +1093,7 @@ def _parse_llvm_functions(text: str) -> list[dict[str, Any]]:
     return functions
 
 
-def _copy_text_artifact(source: Path, output_dir: Path, *, relative_prefix: str) -> dict[str, Any]:
+def _copy_text_artifact(source: Path, output_dir: Path, *, relative_prefix: str) -> dict[str, object]:
     text = source.read_text(encoding="utf-8", errors="replace")
     destination = output_dir / relative_prefix / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1133,7 +1132,7 @@ def _copy_text_artifact(source: Path, output_dir: Path, *, relative_prefix: str)
     }
 
 
-def _copy_binary_artifact(source: Path, output_dir: Path, *, relative_prefix: str, kind: str) -> dict[str, Any]:
+def _copy_binary_artifact(source: Path, output_dir: Path, *, relative_prefix: str, kind: str) -> dict[str, object]:
     data = source.read_bytes()
     destination = output_dir / relative_prefix / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1169,7 +1168,7 @@ def _copy_llvm_bitcode_as_text(
     output_dir: Path,
     *,
     relative_prefix: str,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     llvm_dis = shutil.which("llvm-dis")
     if llvm_dis is None:
         return None
@@ -1193,8 +1192,8 @@ def _collect_dump_artifacts(
     output_dir: Path,
     *,
     relative_prefix: str,
-) -> dict[str, list[dict[str, Any]]]:
-    artifacts: dict[str, list[dict[str, Any]]] = {
+) -> dict[str, list[dict[str, object]]]:
+    artifacts: dict[str, list[dict[str, object]]] = {
         "executable_sources": [],
         "llvm_ir": [],
         "llvm_bitcode": [],
@@ -1239,8 +1238,8 @@ def _collect_dump_artifacts(
 
 
 def _merge_artifacts(
-    target: dict[str, list[dict[str, Any]]],
-    source: dict[str, list[dict[str, Any]]],
+    target: dict[str, list[dict[str, object]]],
+    source: dict[str, list[dict[str, object]]],
 ) -> None:
     seen = {
         key: {item.get("sha256") for item in target.get(key, [])}
@@ -1263,7 +1262,7 @@ def _run_iree_compile_attempt(
     dump_dir: Path,
     output_path: Path,
     output_dir: Path,
-) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
+) -> tuple[dict[str, object], dict[str, list[dict[str, object]]]]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dump_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(command, text=True, capture_output=True, check=False)
@@ -1272,7 +1271,7 @@ def _run_iree_compile_attempt(
         output_dir,
         relative_prefix=f"compile_attempts/{name}",
     )
-    record: dict[str, Any] = {
+    record: dict[str, object] = {
         "name": name,
         "compile_command": command,
         "returncode": result.returncode,
@@ -1308,12 +1307,12 @@ def _run_executable_configuration_translation_attempt(
     compiler: str,
     source_dir: Path,
     output_dir: Path,
-) -> tuple[dict[str, Any] | None, dict[str, list[dict[str, Any]]]]:
+) -> tuple[dict[str, object] | None, dict[str, list[dict[str, object]]]]:
     configured_sources = sorted(
         path for path in source_dir.rglob("configured_*.mlir")
         if path.is_file()
     )
-    artifacts: dict[str, list[dict[str, Any]]] = {
+    artifacts: dict[str, list[dict[str, object]]] = {
         "executable_sources": [],
         "llvm_ir": [],
         "llvm_bitcode": [],
@@ -1324,7 +1323,7 @@ def _run_executable_configuration_translation_attempt(
     if not configured_sources:
         return None, artifacts
 
-    child_records: list[dict[str, Any]] = []
+    child_records: list[dict[str, object]] = []
     with tempfile.TemporaryDirectory(prefix="agent-canon-iree-executable-config-") as tmp_text:
         tmp = Path(tmp_text)
         for source in configured_sources:
@@ -1385,7 +1384,7 @@ def _collect_mlir_failure_reproducer(
     output_dir: Path,
     *,
     relative_prefix: str,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     compiler = command[0]
     with tempfile.TemporaryDirectory(prefix="agent-canon-iree-repro-") as tmp_text:
         tmp = Path(tmp_text)
@@ -1406,7 +1405,7 @@ def _collect_mlir_failure_reproducer(
         ]
         result = subprocess.run(rerun_command, text=True, capture_output=True, check=False)
         match = _MLIR_FAILURE_PASS_RE.search(result.stderr)
-        record: dict[str, Any] = {
+        record: dict[str, object] = {
             "command": rerun_command,
             "returncode": result.returncode,
             "stdout": result.stdout,
@@ -1448,12 +1447,12 @@ def _collect_backend_trace(
     target_backend: str,
     iree_cuda_target: str | None,
     compiler_errors: Sequence[str],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     executables = {
         "iree-compile": shutil.which("iree-compile"),
         "iree-run-module": shutil.which("iree-run-module"),
     }
-    base: dict[str, Any] = {
+    base: dict[str, object] = {
         "schema": "agent-canon.typed-backend-trace.v1",
         "target_backend": target_backend,
         "target_options": {
@@ -1500,7 +1499,7 @@ def _collect_backend_trace(
                 str(phase_out),
             ]
             phase_result = subprocess.run(phase_cmd, text=True, capture_output=True, check=False)
-            phase_record: dict[str, Any] = {
+            phase_record: dict[str, object] = {
                 "phase": phase,
                 "compile_command": phase_cmd,
                 "returncode": phase_result.returncode,
@@ -1548,7 +1547,7 @@ def _collect_backend_trace(
         base["phase_traces"] = phase_records
         base["last_successful_phase"] = last_phase
 
-        collected: dict[str, list[dict[str, Any]]] = {
+        collected: dict[str, list[dict[str, object]]] = {
             "executable_sources": [],
             "llvm_ir": [],
             "llvm_bitcode": [],
@@ -1661,7 +1660,7 @@ def _collect_backend_trace(
         return base
 
 
-def _backend_environment(dialect: str, compiler_errors: Sequence[str]) -> dict[str, Any]:
+def _backend_environment(dialect: str, compiler_errors: Sequence[str]) -> dict[str, object]:
     import jax
 
     executables = {
@@ -1709,7 +1708,7 @@ def build_jit_canonical_ir(
     iree_cuda_target: str | None,
     include_source_root: bool,
     include_backend_trace: bool,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     repo_root = Path.cwd().resolve()
     with _jax_default_device(input_device):
         func = _load_symbol(python_symbol)
@@ -1731,7 +1730,7 @@ def build_jit_canonical_ir(
         if include_source_root
         else _hlo_only_source_root(python_symbol)
     )
-    record: dict[str, Any] = {
+    record: dict[str, object] = {
         "schema": "agent-canon.jit-canonical-ir.v1",
         "root": {
             "python_symbol": python_symbol,

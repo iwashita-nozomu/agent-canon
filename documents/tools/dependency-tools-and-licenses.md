@@ -98,6 +98,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | `check-dependency-headers` | `python3 tools/agent_tools/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/agent_tools/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
 | `scan-code-dependencies` | `bash tools/agent_tools/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
+| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim、dependency header evidence、implementation text、parent document alignment を検査します。 | no | local: Apache-2.0 |
 | `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | dependency graph TSV から Markdown / DOT review artifact を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools

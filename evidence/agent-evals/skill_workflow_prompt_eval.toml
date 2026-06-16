@@ -230,6 +230,12 @@ critical = true
 description = "Requires adjacent checks after formatter or fixer execution."
 required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
 
+[[evals.checklist]]
+id = "MD-STYLE-STRUCTURE-GATE-1"
+critical = true
+description = "Routes substantive Markdown document edits through prose graph and structure planning, with format-only skip evidence."
+required_regex = ["\\$prose-reasoning-graph", "\\$structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+
 [[evals]]
 id = "subagent-bootstrap-tool-first-gate"
 target = ".agents/skills/subagent-bootstrap/SKILL.md"
@@ -265,6 +271,12 @@ id = "MD-STYLE-DOC-RUST-2"
 critical = true
 description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
 required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
+critical = true
+description = "Separates format-only Markdown checks from substantive document structure changes."
+required_regex = ["prose-reasoning-graph", "structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
 
 [[evals]]
 id = "html-output-shim"
@@ -1022,7 +1034,7 @@ required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subage
 id = "VERTICAL-WAVE-POLICY-1"
 critical = true
 description = "Keeps independent workstreams as stage-owner vertical dynamic waves with delegated spawn policy."
-required_regex = ["Initial Intake Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
+required_regex = ["Intake Responsibility Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
 
 [[evals.checklist]]
 id = "TASK-WF-PRE-EDIT-PACKET-1"
@@ -1034,7 +1046,7 @@ required_regex = ["Pre-Edit Repository Investigation Packet", "implementation su
 id = "TASK-WF-FRESH-CAPSULE-1"
 critical = true
 description = "Requires context capsule packing for fresh subagents."
-required_regex = ["Fresh Subagent Context Capsule", "launch 間で文脈を累積しない", "compact artifacts", "full transcript"]
+required_regex = ["Fresh Subagent Context Capsule", "objective", "compact artifacts", "return contract"]
 
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
@@ -1053,19 +1065,19 @@ forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 id = "VERTICAL-WAVE-POLICY-2"
 critical = true
 description = "Keeps discoverable orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Initial Intake Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+required_regex = ["Intake Responsibility Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-1"
 critical = true
 description = "Uses tool pass/finding output as the authority before broad reading or subagents."
-required_regex = ["canonical tool", "call the tool first", "trust its compact pass/finding output", "read only the exact file slice"]
+required_regex = ["canonical tool", "call the tool before prose review", "trust its compact pass/finding output", "read only the exact file slice"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-2"
 critical = true
-description = "Prevents subagents from repeating deterministic tool checks."
-required_regex = ["Do not use `explorer`", "re-check properties", "compact tool artifacts", "extend or repair the tool contract"]
+description = "Routes deterministic tool coverage through compact artifacts and repairs the tool contract when abstraction is missing."
+required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "compact tool artifacts", "extend or repair the tool contract"]
 
 [[evals.checklist]]
 id = "ORCH-PRE-EDIT-PACKET-1"
@@ -1088,8 +1100,8 @@ required_regex = ["\\$html-output", "\\$html-experiment-report", "defaults to Ma
 [[evals.checklist]]
 id = "STRUCTURE-ROUTING-SKILL-1"
 critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
-required_regex = ["\\$structure-planning", "experiment plan/report", "document", "paper", "refactor", "source map"]
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["\\$structure-planning", "\\$prose-reasoning-graph", "experiment plan/report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
 
 [[evals.checklist]]
 id = "TOOL-FINDING-ROUTING-SKILL-1"
@@ -1113,7 +1125,7 @@ required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / J
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
 description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Initial Intake Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+required_regex = ["Intake Responsibility Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
@@ -1124,8 +1136,8 @@ required_regex = ["html-output", "html-experiment-report", "Markdown", "HTML", "
 [[evals.checklist]]
 id = "STRUCTURE-ROUTING-CANONICAL-1"
 critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
-required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map"]
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
 
 [[evals.checklist]]
 id = "TOOL-FINDING-ROUTING-CANONICAL-1"
@@ -1497,8 +1509,8 @@ description = "Codex subagent canon must require compact context capsules for fr
 [[evals.checklist]]
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
-description = "Requires exact bounded context fields and forbids full transcript/raw log handoff."
-required_regex = ["Fresh Subagent Context Capsule", "context を累積しない", "exact read-before-work paths", "full transcript", "raw log"]
+description = "Requires exact bounded context fields for fresh subagent launches."
+required_regex = ["Fresh Subagent Context Capsule", "launch 間の context", "exact read-before-work paths", "compact artifacts", "return contract"]
 
 [[evals]]
 id = "slide-production-workflow"

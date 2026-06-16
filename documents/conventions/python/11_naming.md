@@ -30,6 +30,8 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 
 - `snake_case` を使ってください。
 - **動詞で始める**ことを推奨します（例: `load_*`, `build_*`, `run_*`, `update_*`, `check_*`）。
+- helper / local function では、推定 role に対応する action token を名前へ含めます。例: parser / loader は `parse_*` / `load_*`、collector は `collect_*` / `list_*`、validator は `check_*` / `validate_*`、writer は `write_*` / `persist_*`。
+- role/action token alignment は `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps` で確認します。
 
 ## クラス名・Protocol名
 

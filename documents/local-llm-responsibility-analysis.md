@@ -201,6 +201,28 @@ REQUIRED_PRE_EDIT_CHECKS=...
 prompt 生成、model invocation、または advisory parsing 自体の失敗は error surface
 のままです。
 
+#### Numerical iterative algorithm route
+
+`route-implementation-surface` は、反復法、solver、optimizer、収束、残差、
+停止条件、KKT、preconditioner、`lax.while_loop` などを含む実装 request を
+`numerical_iterative_algorithm_contract` へ寄せます。この surface の責務は、
+実装候補を選ぶ段階で、`$computational-optimization` の optimization contract と
+`documents/algorithm-implementation-boundary.md` の Boundary Map を source packet
+にすることです。
+
+この route の `PRIMARY_PATHS` は、少なくとも次を含みます。
+
+- `agents/skills/computational-optimization.md`
+- `.agents/skills/computational-optimization/SKILL.md`
+- `documents/algorithm-implementation-boundary.md`
+- `documents/conventions/python/15_jax_rules.md`
+- `documents/coding-conventions-testing.md`
+
+`REQUIRED_PRE_EDIT_CHECKS` は、algorithm contract checker、test-design
+checker、convention compliance を候補にします。これにより、tool-side の
+反復法実装は、`Step_impl`、`R_impl`、state、stopping policy、failure semantics、
+既存 solver / library reuse を固定してから実装へ進みます。
+
 ## Prose IR Contract
 
 `extract-prose-ir` の JSON artifact は

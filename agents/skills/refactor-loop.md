@@ -6,6 +6,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 @dependency-end
 -->
 
@@ -62,6 +63,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 1. old path と new path の対応を `Path Mapping:` として残します。
 1. 大規模 repo では `Current Responsibility Map:` と `Target Responsibility Map:` を先に作り、OOP 的に責務、状態、契約、adapter を最小境界へ分けます。
 1. full tool finding、mechanical priority order、baseline packet、任意の impact、repair packet は `tool-finding-report` を使って固定し、その後 `dependency-analysis` の `Change Impact Packet` に統合します。
+   design document が refactor rationale を持つ場合は、`check_design_doc_claims.py` の finding も同じ packet に入れ、implementation-backed claim、parent-doc alignment、assumption ledger の evidence gap を repair slice の入力にします。
 1. implementation subagent を起動する前に、親 agent が dependency graph から
    `Refactor Orchestration Plan:` を作ります。依存の根本に近い sequential root
    slice と、root 修正後に並列化できる independent downstream slice を分け、

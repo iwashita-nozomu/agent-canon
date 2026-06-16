@@ -13,6 +13,7 @@ upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root runtime s
 upstream design refactor-loop.md behavior-preserving refactor loop
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md graph-backed prose and README analysis
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
 downstream implementation ../../.agents/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -41,6 +42,13 @@ separated before routing or subagent work, or when mechanical evidence shows a
 responsibility conflict that documentation edits alone cannot repair; the next
 section defines that mechanical evidence packet.
 
+When this skill is reached from `$agent-log-analysis`, require the log-analysis
+`Finding Route Packet` with `finding_class=structure_boundary`. Treat the
+compact evidence cell as the trigger and then switch to this skill's structure
+contract, responsibility graph, path mapping, and validation gates. Launch
+mechanics stay with `$subagent-bootstrap`; log interpretation stays with
+`$agent-log-analysis`.
+
 ## Evidence Sources
 
 The trigger, move rules, and handoff requirements below are checked against this
@@ -68,6 +76,9 @@ source packet:
   fields, bounded handoff rules, and packet requirements that structure
   refactors must freeze before implementation.
 - `refactor-loop.md` defines behavior-preserving refactor safety contracts.
+- `check_design_doc_claims.py` shows whether a design document's structural
+  claim is backed by code, dependency-header closure, and parent-document
+  alignment before the refactor packet is accepted.
 
 ## Use When
 
@@ -87,6 +98,9 @@ source packet:
   source/owned directories are missing, stale, moved, or unexpectedly local.
 - An agent is tempted to recreate a missing file or implement in a nearby
   directory because the expected canonical path is absent.
+- A design doc justifies a structure change, route shift, directory ownership
+  change, or root-view change and needs code/dependency-backed evidence before
+  the refactor slice is selected.
 
 ## Pre-Task Structure Repair Contract
 
@@ -152,6 +166,7 @@ source_view_boundary_check=<artifact path>
 path_mapping=<artifact path>
 scope_overlap_report=<artifact path>
 reverse_edge_check=<artifact path>
+design_claim_evidence=<check_design_doc_claims artifact path|not_applicable>
 stale_surface_sweep=<artifact path>
 generated_artifact_boundary=<artifact path>
 validation_scope=<pass|fail|not_run>
