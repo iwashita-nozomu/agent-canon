@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
@@ -46,22 +46,27 @@ DEFAULT_DOMAIN_LIMITS = {
     "main": {
         "max_needs_user_judgment": 0,
         "max_tool_rule_gap": 0,
+        "max_name_gap": 0,
     },
     "test": {
         "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
         "max_tool_rule_gap": 0,
+        "max_name_gap": 0,
     },
     "experiment": {
         "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
         "max_tool_rule_gap": 0,
+        "max_name_gap": 0,
     },
     "tooling": {
         "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
         "max_tool_rule_gap": 0,
+        "max_name_gap": 0,
     },
     "*": {
         "max_needs_user_judgment": 0,
         "max_tool_rule_gap": 0,
+        "max_name_gap": 0,
     },
 }
 
@@ -170,7 +175,7 @@ def _merge_domain_limits(raw_limits: object) -> dict[str, dict[str, int]]:
         if not isinstance(domain, str) or not isinstance(raw_domain_limits, dict):
             continue
         domain_limits = dict(merged.get(domain, {}))
-        for key in ("max_needs_user_judgment", "max_tool_rule_gap"):
+        for key in ("max_needs_user_judgment", "max_tool_rule_gap", "max_name_gap"):
             value = raw_domain_limits.get(key)
             if isinstance(value, int):
                 domain_limits[key] = value
@@ -286,6 +291,14 @@ def _is_tool_rule_gap(record: dict[str, object]) -> bool:
     return any(token in haystack for token in gap_tokens)
 
 
+def _is_name_gap(record: dict[str, object]) -> bool:
+    """Return whether helper inventory selected a symbol for naming review."""
+    return (
+        record.get("searchable_name") is False
+        or str(record.get("name_search_rule") or "").startswith("role-token-review:")
+    )
+
+
 def _domain_limit(policy: dict[str, object], domain: str, key: str) -> int:
     raw_limits = policy.get("domain_limits")
     if not isinstance(raw_limits, dict):
@@ -307,11 +320,16 @@ def _violating_records(
     counts: dict[str, dict[str, int]] = {}
     for record in records:
         domain = str(record.get("domain") or "unknown")
-        bucket = counts.setdefault(domain, {"needs_user_judgment": 0, "tool_rule_gap": 0})
+        bucket = counts.setdefault(
+            domain,
+            {"needs_user_judgment": 0, "tool_rule_gap": 0, "name_gap": 0},
+        )
         if bool(record.get("needs_user_judgment")):
             bucket["needs_user_judgment"] += 1
         if _is_tool_rule_gap(record):
             bucket["tool_rule_gap"] += 1
+        if _is_name_gap(record):
+            bucket["name_gap"] += 1
 
     if mode == "report":
         return [], counts
@@ -319,7 +337,9 @@ def _violating_records(
         return [
             record
             for record in records
-            if bool(record.get("needs_user_judgment")) or _is_tool_rule_gap(record)
+            if bool(record.get("needs_user_judgment"))
+            or _is_tool_rule_gap(record)
+            or _is_name_gap(record)
         ], counts
 
     violating_domains = {
@@ -328,6 +348,7 @@ def _violating_records(
         if bucket["needs_user_judgment"]
         > _domain_limit(policy, domain, "max_needs_user_judgment")
         or bucket["tool_rule_gap"] > _domain_limit(policy, domain, "max_tool_rule_gap")
+        or bucket["name_gap"] > _domain_limit(policy, domain, "max_name_gap")
     }
     return [record for record in records if str(record.get("domain") or "unknown") in violating_domains], counts
 
@@ -352,7 +373,7 @@ def _default_log_path(root: Path) -> Path:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _append_log(root: Path, entry: dict[str, object]) -> None:
@@ -379,7 +400,7 @@ def _reason(command: list[str], records: list[dict[str, object]], counts: dict[s
             "HELPER_INVENTORY_FINDING="
             f"{record.get('path')}:{record.get('line')}:"
             f"{record.get('domain')}:{record.get('qualname')}:"
-            f"{record.get('judgment_rule') or record.get('candidate_rule')}"
+            f"{record.get('name_search_rule') or record.get('judgment_rule') or record.get('candidate_rule')}"
         )
     return "\n".join(lines)
 
