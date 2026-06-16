@@ -25,7 +25,6 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 _OP_RE = re.compile(r"\b(?:stablehlo|mhlo|chlo|func|scf|arith)\.[A-Za-z0-9_]+|\breturn\b|\bcall\b")
 _TENSOR_RE = re.compile(r"tensor<([^>]+)>")
@@ -414,7 +413,7 @@ def _collect_tree_leaves(root_name: str, root_index: int, value: object) -> list
         )
     return leaves
 
-def _json_safe(value: Any) -> Any:
+def _json_safe(value: object) -> object:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Mapping):
@@ -427,14 +426,14 @@ def _json_safe(value: Any) -> Any:
 def _collect_problem_assumption_objects(
     root_name: str,
     root_index: int,
-    value: Any,
-) -> list[dict[str, Any]]:
+    value: object,
+) -> list[dict[str, object]]:
     import jax
 
-    def is_assumption_object(node: Any) -> bool:
+    def is_assumption_object(node: object) -> bool:
         return hasattr(node, _PROBLEM_ASSUMPTION_ATTR)
 
-    records: list[dict[str, Any]] = []
+    records: list[dict[str, object]] = []
     leaves, _treedef = jax.tree_util.tree_flatten_with_path(value, is_leaf=is_assumption_object)
     for assumption_index, (path, leaf) in enumerate(leaves):
         if not is_assumption_object(leaf):
@@ -455,7 +454,11 @@ def _collect_problem_assumption_objects(
     return records
 
 
-def _eval_shape(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> Any:
+def _eval_shape(
+    func: Callable[..., object],
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+) -> object:
     try:
         import equinox as eqx
 
@@ -521,8 +524,8 @@ def _collect_public_interface(
         for index, parameter in enumerate(parameters)
         if isinstance(parameter, Mapping)
     ]
-    argument_leaves: list[dict[str, Any]] = []
-    problem_assumptions: list[dict[str, Any]] = []
+    argument_leaves: list[dict[str, object]] = []
+    problem_assumptions: list[dict[str, object]] = []
     for index, arg in enumerate(args):
         name = parameter_names[index] if index < len(parameter_names) else f"arg{index}"
         argument_leaves.extend(_collect_tree_leaves(name, index, arg))
@@ -663,24 +666,24 @@ def _normalize_inputs(value: object) -> tuple[tuple[object, ...], Mapping[str, o
         return tuple(value), {}
     return (value,), {}
 
-def _is_lower_dynamic_leaf(value: Any) -> bool:
+def _is_lower_dynamic_leaf(value: object) -> bool:
     import equinox as eqx
     import jax
 
     return eqx.is_array(value) or isinstance(value, jax.ShapeDtypeStruct)
 
 
-def _has_abstract_dynamic_leaf(value: Any) -> bool:
+def _has_abstract_dynamic_leaf(value: object) -> bool:
     import jax
 
     return any(isinstance(leaf, jax.ShapeDtypeStruct) for leaf in jax.tree_util.tree_leaves(value))
 
 
 def _lower_abstract_inputs(
-    func: Callable[..., Any],
-    args: tuple[Any, ...],
-    kwargs: Mapping[str, Any],
-) -> Any:
+    func: Callable[..., object],
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+) -> object:
     import equinox as eqx
     import jax
     import jax.numpy as jnp
@@ -690,7 +693,7 @@ def _lower_abstract_inputs(
     dynamic, static = eqx.partition((func, args, dict(kwargs)), _is_lower_dynamic_leaf)
     dynamic_flat, dynamic_treedef = jtu.tree_flatten(dynamic)
 
-    def wrapped(*flat_dynamic: Any) -> Any:
+    def wrapped(*flat_dynamic: object) -> object:
         dynamic_tree = jtu.tree_unflatten(dynamic_treedef, flat_dynamic)
         call_func, call_args, call_kwargs = eqx.combine(dynamic_tree, static)
         out = call_func(*call_args, **call_kwargs)
@@ -700,13 +703,17 @@ def _lower_abstract_inputs(
     return jax.jit(wrapped).lower(*dynamic_flat)
 
 
-def _lower(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> Any:
+def _lower(
+    func: Callable[..., object],
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+) -> object:
     if _has_abstract_dynamic_leaf((args, kwargs)):
         return _lower_abstract_inputs(func, args, kwargs)
 
     import equinox as eqx
 
-    filter_jitted: Any = eqx.filter_jit(func)
+    filter_jitted = eqx.filter_jit(func)
     return filter_jitted.lower(*args, **kwargs)
 
 
@@ -1294,7 +1301,7 @@ def _copy_llvm_bitcode_as_text(
     output_dir: Path,
     *,
     relative_prefix: str,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     llvm_dis = _find_llvm_dis()
     if llvm_dis is None:
         return None
@@ -1370,8 +1377,8 @@ def _collect_dump_artifacts(
 def _collect_xla_dump_artifacts(
     dump_dir: Path,
     output_dir: Path,
-) -> dict[str, list[dict[str, Any]]]:
-    artifacts: dict[str, list[dict[str, Any]]] = {
+) -> dict[str, list[dict[str, object]]]:
+    artifacts: dict[str, list[dict[str, object]]] = {
         "executable_sources": [],
         "llvm_ir": [],
         "llvm_bitcode": [],
@@ -1543,7 +1550,7 @@ def _run_executable_configuration_translation_attempt(
     )
 
 
-def _compile_lowered_for_backend_dump(lowered: Any) -> dict[str, Any]:
+def _compile_lowered_for_backend_dump(lowered: object) -> dict[str, object]:
     compile_fn = getattr(lowered, "compile", None)
     if compile_fn is None:
         return {
@@ -1650,8 +1657,8 @@ def _collect_backend_trace(
     iree_cuda_target: str | None,
     compiler_errors: Sequence[str],
     xla_dump_dir: Path | None,
-    xla_compile_record: Mapping[str, Any] | None,
-) -> dict[str, Any]:
+    xla_compile_record: Mapping[str, object] | None,
+) -> dict[str, object]:
     executables = {
         "iree-compile": shutil.which("iree-compile"),
         "iree-run-module": shutil.which("iree-run-module"),
@@ -1930,6 +1937,7 @@ def build_jit_canonical_ir(
     include_source_root: bool,
     include_backend_trace: bool,
 ) -> dict[str, object]:
+    """Build the JIT-canonical IR record for one lowered Python root."""
     repo_root = Path.cwd().resolve()
     with _jax_default_device(input_device):
         func = _load_symbol(python_symbol)
@@ -1937,7 +1945,7 @@ def build_jit_canonical_ir(
         args, kwargs = _normalize_inputs(input_factory())
     lowered = _lower(func, args, kwargs)
     dialect, stablehlo_text, compiler_errors = _compiler_ir_text(lowered)
-    xla_compile_record: Mapping[str, Any] | None = None
+    xla_compile_record: Mapping[str, object] | None = None
     if include_backend_trace and xla_dump_dir is not None:
         xla_compile_record = _compile_lowered_for_backend_dump(lowered)
     operational_ir = _extract_operational_ir(stablehlo_text)
@@ -1987,6 +1995,7 @@ def build_jit_canonical_ir(
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--python-symbol", required=True, help="JIT root as path.py::qualname.")
     parser.add_argument("--input-factory", required=True, help="Concrete lowering input factory as path.py::qualname.")
@@ -2036,6 +2045,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the JIT-canonical IR extractor."""
     args = parse_args(argv)
     _configure_jax_platform(
         args.jax_platform,
