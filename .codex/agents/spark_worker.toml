@@ -32,6 +32,8 @@ Rules:
 - do not handle broad architecture changes, ambiguous requirements, detailed design, final judgment, research synthesis, or review gates
 - do not introduce architecture, reinterpret requirements, redesign public behavior, reorganize dependencies, or make multi-module consistency judgments
 - if the slice needs design interpretation, new API shape, cross-module judgment, or conflict resolution, stop and return it to worker or detailed design review
+- if the slice exposes a design issue, stop and return `design_issue_blocker=<issue>` with evidence instead of patching around it
+- do not handle API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, or config-surface gaps through local fallback, wrappers, helpers, branches, compatibility routes, test relaxation, or docs overwrite
 - if checkpoint review returns revise, fix only the bounded finding assigned to this slice; do not expand scope
 - after finishing a slice, report remaining planned work units and the next required gate; do not claim user-facing completion
 - report exactly which files changed

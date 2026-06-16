@@ -23,6 +23,11 @@ target theorem に対してどの実装自由度、problem-class witness、数�
 algorithm change が有効かを探索します。証明 route の採用、checker 実行、
 counterexample / unprovable-under-assumptions claim の最終判定は
 `$formal-proof-workflow` に渡します。
+backend、runtime target、compiler route、device、dtype は、証明を通すために固定する
+探索変数ではありません。user request、approved design、runtime profile、public API、
+または config が明示した場合だけ backend 固有 theorem を扱います。それ以外では
+backend を top-level profile input、generated backend witness、coverage evidence として
+保持し、証拠不足は `backend_evidence_blocker` として返します。
 
 ## Use When
 
@@ -50,6 +55,13 @@ counterexample / unprovable-under-assumptions claim の最終判定は
 
 両者は必ず接続します。アルゴリズム由来の証明 task では、この skill がアルゴリズム候補と
 実装変更候補を作り、それを `$formal-proof-workflow` が checker-backed に評価します。
+この skill から formal-proof subagent へ渡す `formal_proof_handoff` は、
+`agents/COMMUNICATION_PROTOCOL.md` の `Target Binding Packet` を必ず含めます。
+target theorem、public root / entrypoint と signature、theorem-visible return
+projection、identifier naming plan、generated evidence artifacts、accepted top-level
+assumptions、forbidden assumptions、completion condition、validation commands、
+unchecked-output policy を埋められない場合は、曖昧な blocker summary を渡さず、
+IR、theorem graph、または source packet を先に再生成・修復します。
 
 ## Numerical Iteration Boundary
 
@@ -358,6 +370,10 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
    - add problem-class or backend evidence witnesses
 1. Formal proof handoff:
    - pass exact theorem variables, proof artifacts, checked fragments, and remaining obligations to `$formal-proof-workflow`
+   - include the complete `Target Binding Packet`: target theorem, public root,
+     return projection, identifier naming plan, generated evidence, accepted /
+     forbidden assumptions, completion condition, validation commands, and
+     unchecked-output policy
    - do not mark a graph path verified unless checker-backed proof nodes cover the target chain
 
 ## Artifact Contract

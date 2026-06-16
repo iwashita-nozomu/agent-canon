@@ -32,4 +32,5 @@ Rules:
 - return approve only when product gates and artifact gates both cover the active request
 - return revise when the parent can repair missing evidence or local findings in the same pass
 - return escalate when the diff exposes a design, workflow, or authority gap
+- return escalate when a design issue was absorbed by implementation instead of being recorded as `design_issue_blocker` and returned to design review
 """

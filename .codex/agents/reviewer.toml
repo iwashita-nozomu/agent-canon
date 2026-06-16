@@ -35,6 +35,8 @@ Rules:
 - return revise when the implementation summary or handoff omits the design artifact path, design section, test plan section, or clause IDs for a changed slice
 - return revise when the implementation handoff omits remaining planned work units or next gate status
 - return escalate when a chunk, slice, checkpoint, or subpass is being used to unlock user-facing completion while active clauses or planned work units remain
+- return escalate when the implementation absorbed a design issue instead of returning `design_issue_blocker` with evidence
+- return escalate when API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, or config-surface gaps were handled through local fallback, wrappers, helpers, branches, compatibility routes, test relaxation, or docs overwrite
 - return revise when closeout claims mechanical_completion_loop_complete=yes without artifact evidence for the full loop over the latest diff
 - return revise when closeout claims diff_check_agent_complete=yes without an independent read-only diff-check decision for the latest diff
 - return revise when any must-do or completion-evidence clause lacks corresponding product behavior, code, docs, test, command, artifact, or explicit deferred/rejected clause

@@ -86,11 +86,17 @@ contract listed in `documents/README.md`.
 
 ## Execution Priorities
 
-- 規定の実行 target は GPU です。CPU 実行は user request、環境制約、または task scope 上の明示理由がある場合だけ使い、その理由と影響を validation evidence に残します。
-- 数値的 test / experiment / benchmark の failure は、code・数学仕様・文書 contract の修正先を判定してから扱います。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU alternate route などは、正しい修正先がそこにある場合だけ採用し、必要なら failure として残します。
-- すべての変更では、コードと文書それぞれの責務を第一に考えます。完了判断は実装 surface と document surface が担うべき責務、境界、読者への契約に合っていることを優先します。
-- 設計では、先に抽象責務、概念モデル、非対象、将来 layer、評価軸、既存正本との関係を固定し、そこから実装 slice と validation を導きます。
-- 修正実装は user request、責務、依存 graph、既存正本、検証 gate に結び付けます。局所的に失敗を隠す patch、未設計の alternate route / wrapper / helper、責務にない分岐、test / warning だけを黙らせる変更を検出した場合は、design / skill / workflow / tool の正本を先に直します。
+- 規定の実行 target は GPU です。数値計算、solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment などの計算テストは GPU evidence だけを validation evidence として扱います。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence が accepted artifact です。CPU は format、lint、type check、docs check、dependency/header check など static/docs/tooling validation の対象です。
+- 数値的 test / experiment / benchmark の pass evidence は、code・数学仕様・文書 contract の正しい修正先を判定したうえで採用します。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU alternate route、CPU smoke、CPU-only regression などは failure evidence または修正先判定の材料として扱います。
+- すべての変更では、コードと文書それぞれの責務を第一に考えます。完了判断には、実装 surface と document surface が担うべき責務、境界、読者への契約に合っていることを要求します。
+- 設計では、抽象責務、概念モデル、非対象、将来 layer、評価軸、既存正本との関係を先に固定し、そこから実装 slice と validation を導きます。
+- 修正は user request、責務、依存 graph、既存正本、検証 gate に結び付けます。局所的に失敗を隠す patch、未設計の alternate route / wrapper / helper、責務にない分岐、test / warning だけを黙らせる変更は `design_issue_blocker`、skill/workflow/tool 修正、または正本更新へ戻す finding として扱います。
+- 規定逸脱を見つけた場合、agent は `policy_deviation_blocker=<short description>` と evidence を残し、該当する上位 gate または user 判断へ戻します。active な system / developer / user instruction、AGENTS / ROOT_AGENTS、workflow、skill、design packet、approved plan、allowed paths、validation gate、review gate と現在の行動が矛盾した状態では、blocker 記録と gate 復帰が正規 route です。
+- 規定逸脱の修正は、逸脱を生んだ workflow、skill、tool、handoff、role TOML、AGENTS / ROOT_AGENTS、または設計正本の責務として扱います。実装差分だけの辻褄合わせは out-of-scope route です。
+- backend、runtime target、compiler route、device、dtype は、user request、approved design、runtime profile、または public API / config が明示した場合だけ固定対象です。IREE、XLA、CUDA、CPU、GPU、VMFB、StableHLO、LLVM、FP32 などへの固定が明示されていない場合、backend は top-level input、runtime profile、backend witness、または coverage evidence として保持します。
+- backend 依存の証明・数値誤差・性能・lowering claim に必要な evidence が不足する場合は、`backend_evidence_blocker=<missing evidence>` と対象 profile を記録します。backend 固有の調査や trace は active profile の evidence に限り、アルゴリズムや theorem の正本は backend-independent route を維持します。
+- 実装、調査、証明、レビューの途中で設計上の問題を見つけた場合、agent は `design_issue_blocker=<short description>` と evidence を残して詳細設計 / design review gate へ戻します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の不整合や欠落は、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きではなく、設計側で解決します。run bundle が無い parent-direct task では、編集を止めて user に設計判断を返します。
+- 承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけが同じ実装 pass の修正対象です。判断が必要なら設計問題として扱います。
 - Reader-facing な docs、reports、plans、workflow guides で process、dependency、ownership、routing、state transition、review gate、multi-step flow が非自明な場合は、Mermaid diagram を既定の visual 候補にします。diagram が単純な箇条書きの重複にしかならない場合だけ省略し、省略理由を structure contract、work log、または文書内に短く残します。
 
 ## Mechanical Guardrail Policy

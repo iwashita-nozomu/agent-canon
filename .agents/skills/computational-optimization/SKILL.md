@@ -32,6 +32,12 @@ upstream design ../../../agents/skills/test-design.md adversarial test design bo
    `validation_surface`. Prefer existing solver/library/framework primitives or
    repo helpers as the first implementation surface, and keep correctness
    validation separate from experiment or benchmark evidence.
+1. Do not make the theorem pass by fixing the backend, device, compiler route,
+   runtime target, or dtype unless the user request, approved design, runtime
+   profile, public API, or config explicitly fixes that backend. Backend-specific
+   data is evidence for the active profile, not a replacement for the
+   optimization contract. Missing backend evidence is
+   `backend_evidence_blocker`.
 1. For JAX/XLA/IREE iterative solvers, keep lowering-friendly loop structure in
    the implementation: do not feed residual / convergence / breakdown status
    produced inside `lax.while_loop` back into the next `cond`, and normalize
@@ -40,7 +46,12 @@ upstream design ../../../agents/skills/test-design.md adversarial test design bo
    rule.
 1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
 1. If code changes are needed, use `$test-design` before implementation and include exact small cases, ill-conditioned cases, constraint-boundary cases, derivative checks, non-finite guards, and not-converged status handling when relevant.
-1. Do not green numerical tests by relaxing tolerances, deleting assertions, skipping cases, changing expected values to match current output, or using CPU without an explicit reason.
+1. Do not green numerical tests by relaxing tolerances, deleting assertions,
+   skipping cases, changing expected values to match current output, or running
+   computational tests on CPU; using CPU as substitute evidence is a validation
+   blocker, not pass evidence. Solver, optimizer, JAX/XLA/IREE lowering,
+   convergence, residual, benchmark, and experiment validation must run on the
+   GPU target or be recorded as `gpu_validation_blocker=<reason>`.
 1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.
 1. Keep correctness evidence separate from performance evidence; benchmark claims need reproducibility and confounder review.
 1. Route review by risk: `scientific_computing_reviewer` for math/numerical risk, `benchmark_reviewer` for performance claims, `$python-review` or `$cpp-review` for implementation diffs, and `$report-writing` for reader-facing claims.

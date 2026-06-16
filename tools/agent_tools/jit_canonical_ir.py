@@ -25,6 +25,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 _OP_RE = re.compile(r"\b(?:stablehlo|mhlo|chlo|func|scf|arith)\.[A-Za-z0-9_]+|\breturn\b|\bcall\b")
 _TENSOR_RE = re.compile(r"tensor<([^>]+)>")
@@ -68,10 +69,35 @@ _IREE_PHASES = (
     "hal",
     "vm",
 )
+_PROBLEM_ASSUMPTION_ATTR = "__agent_canon_problem_assumptions__"
+_LLVM_DIS_CANDIDATES = (
+    "llvm-dis",
+    "llvm-dis-23",
+    "llvm-dis-22",
+    "llvm-dis-21",
+    "llvm-dis-20",
+    "llvm-dis-19",
+    "llvm-dis-18",
+    "llvm-dis-17",
+    "llvm-dis-16",
+    "llvm-dis-15",
+    "llvm-dis-14",
+)
 
 
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _find_llvm_dis() -> str | None:
+    return next(
+        (
+            path
+            for candidate in _LLVM_DIS_CANDIDATES
+            if (path := shutil.which(candidate)) is not None
+        ),
+        None,
+    )
 
 
 def _symbol_path_and_qualname(symbol: str) -> tuple[Path, str]:
@@ -388,8 +414,48 @@ def _collect_tree_leaves(root_name: str, root_index: int, value: object) -> list
         )
     return leaves
 
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return repr(value)
 
-def _eval_shape(func: Callable[..., object], args: tuple[object, ...], kwargs: Mapping[str, object]) -> object:
+
+def _collect_problem_assumption_objects(
+    root_name: str,
+    root_index: int,
+    value: Any,
+) -> list[dict[str, Any]]:
+    import jax
+
+    def is_assumption_object(node: Any) -> bool:
+        return hasattr(node, _PROBLEM_ASSUMPTION_ATTR)
+
+    records: list[dict[str, Any]] = []
+    leaves, _treedef = jax.tree_util.tree_flatten_with_path(value, is_leaf=is_assumption_object)
+    for assumption_index, (path, leaf) in enumerate(leaves):
+        if not is_assumption_object(leaf):
+            continue
+        local_path = _tree_key_text(path)
+        public_path = f"{root_name}{local_path}" if local_path else root_name
+        records.append(
+            {
+                "assumption_index": assumption_index,
+                "root_index": root_index,
+                "root_name": root_name,
+                "path": public_path,
+                "local_path": local_path,
+                "python_type": type(leaf).__name__,
+                "metadata": _json_safe(getattr(leaf, _PROBLEM_ASSUMPTION_ATTR)),
+            }
+        )
+    return records
+
+
+def _eval_shape(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> Any:
     try:
         import equinox as eqx
 
@@ -455,12 +521,17 @@ def _collect_public_interface(
         for index, parameter in enumerate(parameters)
         if isinstance(parameter, Mapping)
     ]
-    argument_leaves: list[dict[str, object]] = []
+    argument_leaves: list[dict[str, Any]] = []
+    problem_assumptions: list[dict[str, Any]] = []
     for index, arg in enumerate(args):
         name = parameter_names[index] if index < len(parameter_names) else f"arg{index}"
         argument_leaves.extend(_collect_tree_leaves(name, index, arg))
+        problem_assumptions.extend(_collect_problem_assumption_objects(name, index, arg))
     for offset, (name, value) in enumerate(sorted(kwargs.items())):
         argument_leaves.extend(_collect_tree_leaves(str(name), len(args) + offset, value))
+        problem_assumptions.extend(
+            _collect_problem_assumption_objects(str(name), len(args) + offset, value)
+        )
 
     output_shape = _eval_shape(func, args, kwargs)
     output_roots = output_shape if isinstance(output_shape, tuple) else (output_shape,)
@@ -497,6 +568,7 @@ def _collect_public_interface(
         "return_annotation": signature.get("return_annotation", ""),
         "return_roots": return_roots,
         "return_leaves": return_leaves,
+        "problem_assumptions": problem_assumptions,
         "stablehlo_entry": stablehlo_entry,
         "coverage": {
             "argument_root_count": len(parameters),
@@ -505,6 +577,7 @@ def _collect_public_interface(
             "return_leaf_count": len(return_leaves),
             "stablehlo_argument_count": len(stablehlo_entry["arguments"]),
             "stablehlo_return_leaf_count": len(stablehlo_entry["return_leaves"]),
+            "problem_assumption_count": len(problem_assumptions),
             "has_answer_state_info_return": [
                 root.get("label") for root in return_roots
             ] == ["answer", "state", "info"],
@@ -516,11 +589,34 @@ def _configure_jax_platform(
     platform_name: str | None,
     *,
     cuda_visible_devices: str | None,
+    xla_flags: str | None,
+    xla_dump_dir: Path | None,
 ) -> None:
-    if not platform_name:
-        return
     if "jax" in sys.modules or "jaxlib" in sys.modules:
         raise SystemExit("--jax-platform must be set before importing JAX")
+    if xla_dump_dir is not None:
+        if xla_dump_dir.exists():
+            shutil.rmtree(xla_dump_dir)
+        xla_dump_dir.mkdir(parents=True, exist_ok=True)
+    requested_flags: list[str] = []
+    if xla_flags:
+        requested_flags.extend(xla_flags.split())
+    if xla_dump_dir is not None:
+        requested_flags.append(f"--xla_dump_to={xla_dump_dir}")
+        requested_flags.append("--xla_dump_hlo_as_text")
+        if platform_name in {"cuda", "gpu"}:
+            requested_flags.append("--xla_gpu_dump_llvmir")
+    if requested_flags:
+        existing = os.environ.get("XLA_FLAGS", "").split()
+        merged = [*existing]
+        for flag in requested_flags:
+            flag_key = flag.split("=", maxsplit=1)[0]
+            if any(current.split("=", maxsplit=1)[0] == flag_key for current in merged):
+                continue
+            merged.append(flag)
+        os.environ["XLA_FLAGS"] = " ".join(merged)
+    if not platform_name:
+        return
     platform_name = platform_name.strip()
     if not platform_name:
         return
@@ -567,21 +663,51 @@ def _normalize_inputs(value: object) -> tuple[tuple[object, ...], Mapping[str, o
         return tuple(value), {}
     return (value,), {}
 
-
-def _lower(func: Callable[..., object], args: tuple[object, ...], kwargs: Mapping[str, object], jit_kind: str) -> object:
-    if jit_kind in {"auto", "filter_jit"}:
-        try:
-            import equinox as eqx
-
-            filter_jitted: object = eqx.filter_jit(func)
-            return filter_jitted.lower(*args, **kwargs)
-        except Exception:
-            if jit_kind == "filter_jit":
-                raise
+def _is_lower_dynamic_leaf(value: Any) -> bool:
+    import equinox as eqx
     import jax
 
-    jitted: object = jax.jit(func)
-    return jitted.lower(*args, **kwargs)
+    return eqx.is_array(value) or isinstance(value, jax.ShapeDtypeStruct)
+
+
+def _has_abstract_dynamic_leaf(value: Any) -> bool:
+    import jax
+
+    return any(isinstance(leaf, jax.ShapeDtypeStruct) for leaf in jax.tree_util.tree_leaves(value))
+
+
+def _lower_abstract_inputs(
+    func: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any],
+) -> Any:
+    import equinox as eqx
+    import jax
+    import jax.numpy as jnp
+    import jax.tree_util as jtu
+    from equinox._module import Static
+
+    dynamic, static = eqx.partition((func, args, dict(kwargs)), _is_lower_dynamic_leaf)
+    dynamic_flat, dynamic_treedef = jtu.tree_flatten(dynamic)
+
+    def wrapped(*flat_dynamic: Any) -> Any:
+        dynamic_tree = jtu.tree_unflatten(dynamic_treedef, flat_dynamic)
+        call_func, call_args, call_kwargs = eqx.combine(dynamic_tree, static)
+        out = call_func(*call_args, **call_kwargs)
+        dynamic_out, static_out = eqx.partition(out, eqx.is_array)
+        return jnp.array(0), dynamic_out, Static(static_out)
+
+    return jax.jit(wrapped).lower(*dynamic_flat)
+
+
+def _lower(func: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> Any:
+    if _has_abstract_dynamic_leaf((args, kwargs)):
+        return _lower_abstract_inputs(func, args, kwargs)
+
+    import equinox as eqx
+
+    filter_jitted: Any = eqx.filter_jit(func)
+    return filter_jitted.lower(*args, **kwargs)
 
 
 def _compiler_ir_text(lowered: object) -> tuple[str, str, list[str]]:
@@ -1168,8 +1294,8 @@ def _copy_llvm_bitcode_as_text(
     output_dir: Path,
     *,
     relative_prefix: str,
-) -> dict[str, object] | None:
-    llvm_dis = shutil.which("llvm-dis")
+) -> dict[str, Any] | None:
+    llvm_dis = _find_llvm_dis()
     if llvm_dis is None:
         return None
     with tempfile.TemporaryDirectory(prefix="agent-canon-llvm-dis-") as tmp_text:
@@ -1223,9 +1349,13 @@ def _collect_dump_artifacts(
                 _copy_text_artifact(path, output_dir, relative_prefix=prefix)
             )
         elif suffix == ".s":
-            artifacts["assembly"].append(
-                _copy_text_artifact(path, output_dir, relative_prefix=prefix)
-            )
+            copied = _copy_text_artifact(path, output_dir, relative_prefix=prefix)
+            copied["kind"] = "assembly"
+            artifacts["assembly"].append(copied)
+        elif suffix == ".ptx":
+            copied = _copy_text_artifact(path, output_dir, relative_prefix=prefix)
+            copied["kind"] = "ptx"
+            artifacts["assembly"].append(copied)
         elif suffix == ".o":
             artifacts["object_files"].append(
                 _copy_binary_artifact(path, output_dir, relative_prefix=prefix, kind="object_file")
@@ -1234,6 +1364,53 @@ def _collect_dump_artifacts(
             artifacts["other"].append(
                 _copy_binary_artifact(path, output_dir, relative_prefix=prefix, kind="backend_artifact")
             )
+    return artifacts
+
+
+def _collect_xla_dump_artifacts(
+    dump_dir: Path,
+    output_dir: Path,
+) -> dict[str, list[dict[str, Any]]]:
+    artifacts: dict[str, list[dict[str, Any]]] = {
+        "executable_sources": [],
+        "llvm_ir": [],
+        "llvm_bitcode": [],
+        "object_files": [],
+        "assembly": [],
+        "other": [],
+    }
+    if not dump_dir.exists():
+        return artifacts
+    for path in sorted(dump_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        name = path.name
+        suffix = path.suffix.lower()
+        if name.startswith("LLVMDialectModule.pass-"):
+            continue
+        if suffix == ".ll" and ".ir-" not in name:
+            continue
+        if suffix not in {".ll", ".bc", ".ptx", ".s"}:
+            continue
+        prefix = f"xla_dump/{path.parent.relative_to(dump_dir)}"
+        prefix = prefix.rstrip("/.")
+        if suffix == ".ll":
+            artifacts["llvm_ir"].append(_copy_text_artifact(path, output_dir, relative_prefix=prefix))
+        elif suffix == ".bc":
+            artifacts["llvm_bitcode"].append(
+                _copy_binary_artifact(path, output_dir, relative_prefix=prefix, kind="llvm_bitcode")
+            )
+            disassembled = _copy_llvm_bitcode_as_text(path, output_dir, relative_prefix=prefix)
+            if disassembled is not None:
+                artifacts["llvm_ir"].append(disassembled)
+        elif suffix == ".ptx":
+            copied = _copy_text_artifact(path, output_dir, relative_prefix=prefix)
+            copied["kind"] = "ptx"
+            artifacts["assembly"].append(copied)
+        else:
+            copied = _copy_text_artifact(path, output_dir, relative_prefix=prefix)
+            copied["kind"] = "assembly"
+            artifacts["assembly"].append(copied)
     return artifacts
 
 
@@ -1366,6 +1543,31 @@ def _run_executable_configuration_translation_attempt(
     )
 
 
+def _compile_lowered_for_backend_dump(lowered: Any) -> dict[str, Any]:
+    compile_fn = getattr(lowered, "compile", None)
+    if compile_fn is None:
+        return {
+            "available": False,
+            "returncode": None,
+            "status": "compile_method_unavailable",
+        }
+    try:
+        compiled = compile_fn()
+    except Exception as exc:  # pragma: no cover - backend dependent.
+        return {
+            "available": True,
+            "returncode": 1,
+            "status": "failed",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "available": True,
+        "returncode": 0,
+        "status": "succeeded",
+        "compiled_type": type(compiled).__name__,
+    }
+
+
 def _summarize_mlir_failure(stderr: str) -> dict[str, str | None]:
     first_error: str | None = None
     for line in stderr.splitlines():
@@ -1447,10 +1649,13 @@ def _collect_backend_trace(
     target_backend: str,
     iree_cuda_target: str | None,
     compiler_errors: Sequence[str],
-) -> dict[str, object]:
+    xla_dump_dir: Path | None,
+    xla_compile_record: Mapping[str, Any] | None,
+) -> dict[str, Any]:
     executables = {
         "iree-compile": shutil.which("iree-compile"),
         "iree-run-module": shutil.which("iree-run-module"),
+        "llvm-dis": _find_llvm_dis(),
     }
     base: dict[str, object] = {
         "schema": "agent-canon.typed-backend-trace.v1",
@@ -1464,6 +1669,7 @@ def _collect_backend_trace(
         "coverage": "not_generated",
         "phase_traces": [],
         "compile_attempts": [],
+        "xla_compile": dict(xla_compile_record or {}),
         "executable_sources": [],
         "llvm_ir": [],
         "llvm_bitcode": [],
@@ -1637,6 +1843,20 @@ def _collect_backend_trace(
                 if collected["llvm_ir"]:
                     break
 
+        if xla_dump_dir is not None:
+            xla_artifacts = _collect_xla_dump_artifacts(
+                xla_dump_dir,
+                output_dir,
+            )
+            _merge_artifacts(collected, xla_artifacts)
+            base["xla_compile"] = {
+                **dict(xla_compile_record or {}),
+                "dump_source": "xla_dump_dir",
+                "artifact_counts": {
+                    key: len(value) for key, value in xla_artifacts.items()
+                },
+            }
+
         base["compile_attempts"] = compile_attempt_records
         base["compile_command"] = compile_attempt_records[0]["compile_command"] if compile_attempt_records else []
         if compile_attempt_records:
@@ -1666,6 +1886,7 @@ def _backend_environment(dialect: str, compiler_errors: Sequence[str]) -> dict[s
     executables = {
         "iree-compile": shutil.which("iree-compile"),
         "iree-run-module": shutil.which("iree-run-module"),
+        "llvm-dis": _find_llvm_dis(),
     }
     packages = {
         name: _package_version(name)
@@ -1701,11 +1922,11 @@ def build_jit_canonical_ir(
     *,
     python_symbol: str,
     input_factory_symbol: str,
-    jit_kind: str,
     input_device: str | None,
     backend_trace_dir: Path | None,
     backend_target: str,
     iree_cuda_target: str | None,
+    xla_dump_dir: Path | None,
     include_source_root: bool,
     include_backend_trace: bool,
 ) -> dict[str, object]:
@@ -1714,8 +1935,11 @@ def build_jit_canonical_ir(
         func = _load_symbol(python_symbol)
         input_factory = _load_symbol(input_factory_symbol)
         args, kwargs = _normalize_inputs(input_factory())
-    lowered = _lower(func, args, kwargs, jit_kind)
+    lowered = _lower(func, args, kwargs)
     dialect, stablehlo_text, compiler_errors = _compiler_ir_text(lowered)
+    xla_compile_record: Mapping[str, Any] | None = None
+    if include_backend_trace and xla_dump_dir is not None:
+        xla_compile_record = _compile_lowered_for_backend_dump(lowered)
     operational_ir = _extract_operational_ir(stablehlo_text)
     public_interface = _collect_public_interface(
         python_symbol=python_symbol,
@@ -1736,7 +1960,7 @@ def build_jit_canonical_ir(
             "python_symbol": python_symbol,
             "input_factory_symbol": input_factory_symbol,
             "repo_root": str(repo_root),
-            "jit_kind": jit_kind,
+            "jit_kind": "filter_jit",
         },
         "stablehlo": {
             "dialect": dialect,
@@ -1756,6 +1980,8 @@ def build_jit_canonical_ir(
             target_backend=backend_target,
             iree_cuda_target=iree_cuda_target,
             compiler_errors=compiler_errors,
+            xla_dump_dir=xla_dump_dir,
+            xla_compile_record=xla_compile_record,
         )
     return record
 
@@ -1764,7 +1990,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--python-symbol", required=True, help="JIT root as path.py::qualname.")
     parser.add_argument("--input-factory", required=True, help="Concrete lowering input factory as path.py::qualname.")
-    parser.add_argument("--jit-kind", choices=("auto", "filter_jit", "jax_jit"), default="auto")
     parser.add_argument("--backend-target", default="llvm-cpu", help="IREE HAL backend for typed backend trace generation.")
     parser.add_argument(
         "--iree-cuda-target",
@@ -1784,6 +2009,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--input-device",
         default="cpu",
         help="Device kind used while loading the JIT root and concrete example inputs.",
+    )
+    parser.add_argument(
+        "--xla-flags",
+        help="Additional XLA_FLAGS appended before JAX import, for example '--xla_gpu_dump_llvmir'.",
+    )
+    parser.add_argument(
+        "--xla-dump-dir",
+        help="Directory for XLA CUDA LLVM/PTX dumps collected into the backend trace.",
     )
     parser.add_argument("--backend-trace-dir", help="Directory for generated backend MLIR/LLVM artifacts.")
     parser.add_argument(
@@ -1807,15 +2040,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     _configure_jax_platform(
         args.jax_platform,
         cuda_visible_devices=args.cuda_visible_devices,
+        xla_flags=args.xla_flags,
+        xla_dump_dir=Path(args.xla_dump_dir) if args.xla_dump_dir else None,
     )
     record = build_jit_canonical_ir(
         python_symbol=args.python_symbol,
         input_factory_symbol=args.input_factory,
-        jit_kind=args.jit_kind,
         input_device=args.input_device,
         backend_trace_dir=Path(args.backend_trace_dir) if args.backend_trace_dir else None,
         backend_target=args.backend_target,
         iree_cuda_target=args.iree_cuda_target,
+        xla_dump_dir=Path(args.xla_dump_dir) if args.xla_dump_dir else None,
         include_source_root=not args.no_source_root,
         include_backend_trace=not args.no_backend_trace,
     )

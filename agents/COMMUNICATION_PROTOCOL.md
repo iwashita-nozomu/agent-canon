@@ -44,6 +44,7 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `predicted_tool_rejection_gates`
 - `rejection_preflight_command`
 - `gate_specific_repair_plan`
+- `design_issue_blocker`
 - `open_questions`
 - `status`
 
@@ -94,6 +95,40 @@ enough to execute the role, but bounded enough to avoid broad repo reading.
 - `validation_route`: commands or review gate the parent will use
 - `return_contract`: what changed, what evidence supports it, unresolved
   blockers, and whether more context is needed
+- `design_issue_policy`: if the role finds an API shape, responsibility
+  boundary, path layout, naming, algorithm, theorem target, test oracle,
+  dependency direction, runtime contract, or config-surface gap, it records
+  `design_issue_blocker` with evidence and returns to the design/review gate
+  instead of absorbing the issue with local fallback, wrapper, helper, branch,
+  compatibility route, test relaxation, or docs overwrite
+
+For theorem-driven, algorithm, or implementation handoffs, the capsule also
+includes a `Target Binding Packet`. This prevents a subagent from proving,
+refuting, naming, or implementing a nearby but different claim.
+
+- `target_statement_or_behavior`: exact theorem, property, behavior, or patch
+  slice owned by this role
+- `public_root_or_entrypoint`: public function, generated root, or API surface
+  that the target is about, including its input and return schema
+- `projection_or_call_path`: return field, theorem projection, or code path
+  through which the target is reached
+- `identifier_naming_plan`: exact file, function, class, theorem, artifact,
+  CLI flag, and config-key names this role may create or rename; include the
+  responsibility vocabulary, local naming family, and forbidden generic names
+- `accepted_top_level_assumptions`: assumptions allowed because they are over
+  the target `Problem`, config, runtime environment, backend profile, or
+  approved source packet
+- `forbidden_assumptions`: proof-only state, proof-only config, arbitrary
+  helper variables, surrogate theorem types, or local counterexamples not
+  shown reachable from the public root
+- `current_evidence`: generated code / IR / theorem graph / checker result /
+  dependency-scope artifacts the subagent must consume
+- `completion_condition`: verified, refuted, unprovable-under-assumptions, or
+  patch plus validation; partial suggestions are not completion
+- `unchecked_output_policy`: unchecked theorem sketches, type-incompatible
+  formulas, or implementation suggestions must be labeled as unchecked and
+  must not be adopted by the parent before local checker / validation evidence
+  passes
 
 Do not paste full run transcripts, full dashboards, raw accumulated logs, or
 entire repo docs into the prompt. If a subagent needs more context, it asks for

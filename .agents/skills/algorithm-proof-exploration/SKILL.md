@@ -23,6 +23,15 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    witnesses.
    `$formal-proof-workflow` owns proof-route exploration, formal proof adoption,
    final checker-backed proof, refutation, or unprovability claims.
+1. Every `formal_proof_handoff` produced by this skill must include the
+   `Target Binding Packet` required by `agents/COMMUNICATION_PROTOCOL.md`:
+   target theorem, public root / entrypoint and signature, theorem-visible return
+   projection, identifier naming plan, generated evidence artifacts, accepted
+   top-level assumptions, forbidden assumptions, completion condition,
+   validation commands, and unchecked-output policy. If the current algorithm
+   frontier cannot fill those fields, the next action is to regenerate / repair
+   the IR, theorem graph, or source packet; do not pass a vague blocker summary
+   to a proof subagent.
 1. Fix the whole target theorem first, rooted at the JIT-canonical public
    entrypoint: normally `main(problem, InitializeConfig, ...) -> Answer / State
    / Info` or the equivalent run function. Local convergence, certificate
@@ -41,6 +50,11 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    certificate-returning function. Use StableHLO lowering and backend phase
    trace generation; do not use caller-chosen recursion-depth knobs or
    hand-maintained implementation formulas.
+   Do not choose, freeze, or hardcode a backend to make the algorithm theorem
+   easier. Backend choice remains a top-level runtime/profile/config input or a
+   generated backend witness unless the user request, approved design, public
+   API, or config explicitly scopes the algorithm to one backend. Missing
+   backend coverage is `backend_evidence_blocker`, not an algorithm proof route.
 1. Preserve code shape as executable proof functions before theorem search.
    When the target theorem talks about a concrete implementation path, every
    target-facing data transformation on that path must appear as a Lean
@@ -297,7 +311,7 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    note. A valid connected path is structure evidence, not proof completion.
 1. Hand terminal proof obligations to `$formal-proof-workflow`: checked theorem
    statements, counterexamples, unprovable-under-assumptions witnesses, existing
-   proof search packets, and checker commands.
+   proof search packets, checker commands, and the complete `Target Binding Packet`.
 
 ## Outputs
 
