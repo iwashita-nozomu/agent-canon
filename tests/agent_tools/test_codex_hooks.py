@@ -3137,6 +3137,35 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
 
+    def test_helper_inventory_guard_blocks_name_gap_findings(self) -> None:
+        """Helper inventory guard should count role/action naming review records."""
+        payload, log_entry = self._run_helper_guard_with_changed_python(
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+            inventory_text=(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "print(json.dumps({'records': [{"
+                "'path': 'changed.py', 'line': 1, 'domain': 'main', "
+                "'qualname': '_x', 'helper_candidate': True, "
+                "'candidate_rule': 'main:private-local-converter_normalizer', "
+                "'searchable_name': False, "
+                "'name_search_rule': 'role-token-review:converter_normalizer'}]}))\n"
+            ),
+        )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("role-token-review:converter_normalizer", cast(str, payload["reason"]))
+        self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["records"], 1)
+        self.assertEqual(log_entry["violations"], 1)
+        domain_counts = cast("dict[str, dict[str, int]]", log_entry["domain_counts"])
+        self.assertEqual(domain_counts["main"]["name_gap"], 1)
+
     def test_helper_inventory_guard_skips_read_only_bash_payloads(self) -> None:
         """Helper inventory guard should not block read-only Bash commands."""
         commands = (

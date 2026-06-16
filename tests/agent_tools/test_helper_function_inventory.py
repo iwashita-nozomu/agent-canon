@@ -603,6 +603,55 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertIn("environment", records["_f"]["features"])
             self.assertNotIn("LocalFailure", records)
 
+    def test_name_gap_mode_reports_helpers_without_role_action_tokens(self) -> None:
+        """Name-gap mode should connect inferred roles to searchable action terms."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "names.py").write_text(
+                dedent(
+                    """
+                    from pathlib import Path
+
+                    def _x(raw: str) -> Path:
+                        return Path(raw).expanduser().resolve()
+
+                    def _resolve_path(raw: str) -> Path:
+                        return Path(raw).expanduser().resolve()
+
+                    def public_api(raw: str) -> tuple[Path, Path]:
+                        return _x(raw), _resolve_path(raw)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--only-name-gaps",
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
+            self.assertEqual(set(records), {"_x"})
+            self.assertEqual(records["_x"]["role"], "converter_normalizer")
+            self.assertFalse(records["_x"]["searchable_name"])
+            self.assertEqual(records["_x"]["matched_role_name_tokens"], [])
+            self.assertIn("resolve", records["_x"]["role_name_tokens"])
+            self.assertEqual(payload["name_gaps_reported"], 1)
+
     def test_opaque_text_factory_and_callback_features(self) -> None:
         """Text, encoding, factory, and callback roles should come from AST facts."""
         with tempfile.TemporaryDirectory() as tmp_dir:

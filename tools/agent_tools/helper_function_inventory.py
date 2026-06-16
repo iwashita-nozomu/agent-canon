@@ -15,6 +15,7 @@ import copy
 import itertools
 import json
 import os
+import re
 import subprocess
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -117,6 +118,160 @@ LOCAL_CALLER_CLUSTER_LIMIT = 3
 EVIDENCE_RENDER_LIMIT = 6
 MARKDOWN_EVIDENCE_LIMIT = 4
 REDUNDANT_WITH_EVIDENCE_LIMIT = 3
+ROLE_NAME_TOKENS = {
+    "adapter_bridge": (
+        "adapt",
+        "adapter",
+        "bridge",
+        "connect",
+        "forward",
+        "proxy",
+        "route",
+        "shim",
+        "wrap",
+        "wrapper",
+    ),
+    "cli_parser": ("arg", "args", "cli", "option", "parse", "parser"),
+    "collector_inventory": (
+        "collect",
+        "enumerate",
+        "extract",
+        "find",
+        "gather",
+        "inventory",
+        "list",
+        "scan",
+        "summary",
+        "summarize",
+    ),
+    "command_runner": (
+        "call",
+        "command",
+        "exec",
+        "execute",
+        "invoke",
+        "launch",
+        "run",
+        "spawn",
+    ),
+    "converter_normalizer": (
+        "adapt",
+        "coerce",
+        "convert",
+        "map",
+        "materialize",
+        "normalize",
+        "render",
+        "resolve",
+        "transform",
+        "translate",
+    ),
+    "data_container": (
+        "config",
+        "context",
+        "data",
+        "info",
+        "metadata",
+        "metrics",
+        "model",
+        "options",
+        "packet",
+        "params",
+        "record",
+        "result",
+        "state",
+    ),
+    "exception_type": ("error", "exception", "failure"),
+    "factory_builder": (
+        "build",
+        "construct",
+        "create",
+        "factory",
+        "make",
+        "new",
+    ),
+    "formatter_reporter": (
+        "describe",
+        "emit",
+        "format",
+        "render",
+        "report",
+        "summary",
+        "summarize",
+        "write",
+    ),
+    "general_helper": ("helper", "support"),
+    "numeric_kernel": (
+        "compute",
+        "kernel",
+        "linear",
+        "metric",
+        "numeric",
+        "residual",
+        "score",
+        "solve",
+    ),
+    "parser_loader": (
+        "discover",
+        "load",
+        "materialize",
+        "parse",
+        "read",
+        "resolve",
+    ),
+    "predicate": (
+        "allow",
+        "allows",
+        "can",
+        "check",
+        "contains",
+        "exists",
+        "has",
+        "is",
+        "match",
+        "matches",
+        "needs",
+        "ready",
+        "should",
+        "valid",
+    ),
+    "protocol_interface": ("interface", "port", "protocol"),
+    "state_holder": ("cache", "holder", "registry", "session", "state", "store"),
+    "static_analyzer": (
+        "analyze",
+        "ast",
+        "classify",
+        "detect",
+        "infer",
+        "inspect",
+        "parse",
+        "scan",
+    ),
+    "test_support": ("fixture", "reference", "sample", "support", "test"),
+    "validator_checker": (
+        "assert",
+        "check",
+        "ensure",
+        "guard",
+        "lint",
+        "validate",
+        "verify",
+    ),
+    "workflow_tooling": ("agent", "route", "task", "tool", "workflow"),
+    "writer_mutator": (
+        "append",
+        "emit",
+        "persist",
+        "record",
+        "save",
+        "store",
+        "update",
+        "write",
+    ),
+}
+IDENTIFIER_TOKEN_RE = re.compile(
+    r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+"
+)
 
 
 @dataclass(frozen=True)
@@ -143,6 +298,11 @@ class FunctionRecord:
     visibility: str
     role: str
     secondary_roles: list[str]
+    name_tokens: list[str]
+    role_name_tokens: list[str]
+    matched_role_name_tokens: list[str]
+    searchable_name: bool
+    name_search_rule: str
     confidence: float
     helper_candidate: bool
     candidate_rule: str
@@ -188,6 +348,7 @@ class Inventory:
     symbols_reported: int
     helpers_reported: int
     judgment_required_reported: int
+    name_gaps_reported: int
     role_counts: dict[str, int]
     verdict_counts: dict[str, int]
     records: list[FunctionRecord]
@@ -201,6 +362,7 @@ class InventoryBuildOptions:
     all_functions: bool
     only_auto_helpers: bool
     only_user_judgment: bool
+    only_name_gaps: bool
     changed_only: bool
     baseline_ref: str
     include_vendor: bool
@@ -234,6 +396,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--only-user-judgment",
         action="store_true",
         help="Report only symbols that need user design judgment.",
+    )
+    parser.add_argument(
+        "--only-name-gaps",
+        action="store_true",
+        help=(
+            "Report helper or design-judgment symbols selected for role/action "
+            "token review in responsibility search."
+        ),
     )
     parser.add_argument(
         "--changed",
@@ -1244,6 +1414,39 @@ def confidence(
     return round(min(score, MAX_HELPER_CONFIDENCE), 2)
 
 
+def collect_identifier_tokens(name: str) -> list[str]:
+    """Return searchable lowercase tokens from one Python identifier."""
+    stripped = name.strip("_")
+    if not stripped:
+        return []
+    tokens: list[str] = []
+    for part in re.split(r"[^0-9A-Za-z]+|_", stripped):
+        if not part:
+            continue
+        tokens.extend(match.group(0).lower() for match in IDENTIFIER_TOKEN_RE.finditer(part))
+    return tokens
+
+
+def collect_role_name_tokens(role: str) -> list[str]:
+    """Return the role/action vocabulary that should make a name searchable."""
+    if role in ROLE_NAME_TOKENS:
+        return sorted(set(ROLE_NAME_TOKENS[role]))
+    return sorted(set(collect_identifier_tokens(role)))
+
+
+def collect_name_search_metadata(
+    name: str,
+    role: str,
+) -> tuple[list[str], list[str], list[str], bool, str]:
+    """Return identifier tokens and role-token alignment metadata."""
+    name_parts = collect_identifier_tokens(name)
+    role_parts = collect_role_name_tokens(role)
+    matches = sorted(set(name_parts) & set(role_parts))
+    if matches:
+        return name_parts, role_parts, matches, True, "role-token-match:" + ",".join(matches)
+    return name_parts, role_parts, [], False, f"role-token-review:{role}"
+
+
 class DefinitionCollector(ast.NodeVisitor):
     """Collect Python function definitions from one AST."""
 
@@ -1288,6 +1491,13 @@ class DefinitionCollector(ast.NodeVisitor):
         )
         ordered_roles = [role for role, _count in scores.most_common()]
         role = ordered_roles[0]
+        (
+            name_tokens,
+            expected_name_tokens,
+            matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+        ) = collect_name_search_metadata(node.name, role)
         candidate = is_candidate_symbol(
             kind="function",
             name=node.name,
@@ -1310,6 +1520,11 @@ class DefinitionCollector(ast.NodeVisitor):
                 visibility="private" if node.name.startswith("_") else "public",
                 role=role,
                 secondary_roles=ordered_roles[1:SECONDARY_ROLE_SLICE_STOP],
+                name_tokens=name_tokens,
+                role_name_tokens=expected_name_tokens,
+                matched_role_name_tokens=matched_name_tokens,
+                searchable_name=searchable_name,
+                name_search_rule=name_search_rule,
                 confidence=0.0,
                 helper_candidate=candidate,
                 candidate_rule="",
@@ -1373,6 +1588,13 @@ class DefinitionCollector(ast.NodeVisitor):
         )
         ordered_roles = [role for role, _count in scores.most_common()]
         role = ordered_roles[0]
+        (
+            name_tokens,
+            expected_name_tokens,
+            matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+        ) = collect_name_search_metadata(node.name, role)
         candidate = is_candidate_symbol(
             kind="class",
             name=node.name,
@@ -1392,6 +1614,11 @@ class DefinitionCollector(ast.NodeVisitor):
                 visibility="private" if node.name.startswith("_") else "public",
                 role=role,
                 secondary_roles=ordered_roles[1:SECONDARY_ROLE_SLICE_STOP],
+                name_tokens=name_tokens,
+                role_name_tokens=expected_name_tokens,
+                matched_role_name_tokens=matched_name_tokens,
+                searchable_name=searchable_name,
+                name_search_rule=name_search_rule,
                 confidence=0.0,
                 helper_candidate=candidate,
                 candidate_rule="",
@@ -1657,6 +1884,18 @@ def verdict(record: FunctionRecord) -> str:
     return "not_helper"
 
 
+def should_report_name_gap(record: FunctionRecord) -> bool:
+    """Return whether a helper symbol is selected for role/action name review."""
+    return (
+        not record.searchable_name
+        and (
+            record.helper_candidate
+            or record.needs_user_judgment
+            or record.redundant_helper
+        )
+    )
+
+
 def apply_call_graph(records: list[FunctionRecord]) -> None:
     """Attach simple static incoming and outgoing call counts."""
     maps = call_graph_maps(records)
@@ -1784,6 +2023,8 @@ def attach_verdict(record: FunctionRecord) -> None:
             record.evidence.append(
                 "redundant-with:" + ";".join(record.redundant_with[:REDUNDANT_WITH_EVIDENCE_LIMIT])
             )
+    if record.helper_candidate or record.needs_user_judgment or record.redundant_helper:
+        record.evidence.append(f"name-search:{record.name_search_rule}")
 
 
 def attach_redundancy(records: list[FunctionRecord]) -> None:
@@ -1944,6 +2185,7 @@ def build_inventory(root: Path, options: InventoryBuildOptions) -> Inventory:
         all_functions=options.all_functions,
         include_auto_helpers=include_auto_symbols,
         include_user_judgment=include_judgment_symbols,
+        only_name_gaps=options.only_name_gaps,
         min_confidence=options.min_confidence,
         report_paths=report_paths,
     )
@@ -1952,6 +2194,7 @@ def build_inventory(root: Path, options: InventoryBuildOptions) -> Inventory:
         all_functions=options.all_functions,
         include_auto_helpers=include_auto_symbols,
         include_user_judgment=include_judgment_symbols,
+        only_name_gaps=options.only_name_gaps,
         min_confidence=options.min_confidence,
         report_paths=report_paths,
     )
@@ -1975,6 +2218,7 @@ def build_inventory(root: Path, options: InventoryBuildOptions) -> Inventory:
         symbols_reported=len(selected),
         helpers_reported=sum(1 for record in selected if record.helper_candidate),
         judgment_required_reported=sum(1 for record in selected if record.needs_user_judgment),
+        name_gaps_reported=sum(1 for record in selected if should_report_name_gap(record)),
         role_counts=dict(sorted(role_counts.items())),
         verdict_counts=dict(sorted(verdict_counts.items())),
         records=selected,
@@ -2054,6 +2298,7 @@ def select_records(
     all_functions: bool,
     include_auto_helpers: bool,
     include_user_judgment: bool,
+    only_name_gaps: bool,
     min_confidence: float,
     report_paths: set[str],
 ) -> list[FunctionRecord]:
@@ -2066,6 +2311,7 @@ def select_records(
             or (include_auto_helpers and record.helper_candidate)
             or (include_user_judgment and record.needs_user_judgment)
         )
+        and (not only_name_gaps or should_report_name_gap(record))
         and record.confidence >= min_confidence
         and (not report_paths or record.path in report_paths)
     ]
@@ -2093,12 +2339,20 @@ def render_text(inventory: Inventory) -> str:
         features = ",".join(record.features) if record.features else "none"
         outgoing = ",".join(record.outgoing_internal) if record.outgoing_internal else "none"
         evidence = ",".join(record.evidence[:EVIDENCE_RENDER_LIMIT]) if record.evidence else "none"
+        matched_name_tokens = (
+            ",".join(record.matched_role_name_tokens)
+            if record.matched_role_name_tokens
+            else "none"
+        )
         lines.append(
             "SYMBOL="
             f"{record.path}:{record.line}:{record.qualname} "
             f"kind={record.kind} domain={record.domain} "
             f"verdict={verdict(record)} "
             f"role={record.role} confidence={record.confidence:.2f} "
+            f"searchable_name={str(record.searchable_name).lower()} "
+            f"name_search_rule={record.name_search_rule} "
+            f"matched_name_tokens={matched_name_tokens} "
             f"candidate_rule={record.candidate_rule or 'none'} "
             f"judgment_rule={record.judgment_rule or 'none'} "
             f"redundant={str(record.redundant_helper).lower()} "
@@ -2123,6 +2377,7 @@ def render_text(inventory: Inventory) -> str:
             f"HELPER_INVENTORY_SYMBOLS_REPORTED={inventory.symbols_reported}",
             f"HELPER_INVENTORY_HELPERS={inventory.helpers_reported}",
             f"HELPER_INVENTORY_JUDGMENT_REQUIRED={inventory.judgment_required_reported}",
+            f"HELPER_INVENTORY_NAME_GAPS={inventory.name_gaps_reported}",
             f"HELPER_INVENTORY_CHANGED_ONLY={str(inventory.changed_only).lower()}",
             f"HELPER_INVENTORY_BASELINE_REF={inventory.baseline_ref or 'none'}",
             f"HELPER_INVENTORY_BASELINE_SYMBOLS={inventory.baseline_symbols_seen}",
@@ -2150,6 +2405,7 @@ def render_markdown(inventory: Inventory) -> str:
         ["symbols reported", inventory.symbols_reported],
         ["auto helpers reported", inventory.helpers_reported],
         ["user judgment required", inventory.judgment_required_reported],
+        ["name gaps reported", inventory.name_gaps_reported],
         ["changed only", str(inventory.changed_only).lower()],
         ["baseline ref", inventory.baseline_ref or "none"],
         ["baseline symbols seen", inventory.baseline_symbols_seen],
@@ -2188,8 +2444,8 @@ def render_markdown(inventory: Inventory) -> str:
             "",
             "## Records",
             "",
-            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Redundancy rule | Redundant with | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
-            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Searchable name | Name search rule | Matched name tokens | Candidate rule | Judgment rule | Redundancy rule | Redundant with | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
+            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
         ]
     )
     for record in inventory.records:
@@ -2204,6 +2460,9 @@ def render_markdown(inventory: Inventory) -> str:
                     markdown_cell(verdict(record)),
                     markdown_cell(record.qualname),
                     markdown_cell(record.role),
+                    markdown_cell(str(record.searchable_name).lower()),
+                    markdown_cell(record.name_search_rule),
+                    markdown_cell(", ".join(record.matched_role_name_tokens) or "none"),
                     markdown_cell(record.candidate_rule or "none"),
                     markdown_cell(record.judgment_rule or "none"),
                     markdown_cell(record.redundancy_rule or "none"),
@@ -2248,6 +2507,7 @@ def main() -> int:
             all_functions=args.all_functions,
             only_auto_helpers=args.only_auto_helpers,
             only_user_judgment=args.only_user_judgment,
+            only_name_gaps=args.only_name_gaps,
             changed_only=args.changed,
             baseline_ref=args.baseline_ref,
             include_vendor=args.include_vendor,

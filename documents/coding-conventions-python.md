@@ -121,6 +121,9 @@ def load_config(path: Path) -> dict[str, str]:
   helper は冗長 helper として扱います。`helper_function_inventory.py` の
   `redundant_helper`、`redundancy_rule`、`redundant_with` を見て、既存実装へ
   統合するか、残す理由を design / issue に書きます。
+- helper / local function の名前は、推定 role に対応する action token を含めます。
+  `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps`
+  は、責務検索で再利用候補として見つけやすい名前へ寄せる review 対象を出します。
 - `.codex/hooks/library_implementation_guard.py` と
   `.codex/hooks/helper_first_guard.py` はこの規約の edit-time gate です。
 - `.codex/hooks/cause_investigation_guard.py` は code edit 前の cause evidence

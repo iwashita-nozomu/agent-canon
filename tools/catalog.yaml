@@ -1614,7 +1614,7 @@ entries:
       - tests/agent_tools/test_noncanonical_document_inventory.py
 
   - id: helper-function-inventory
-    summary: Inventories Python helper functions/classes with functional AST facts.
+    summary: Inventories Python helper functions/classes with functional AST facts and role/action name tokens.
     path: tools/agent_tools/helper_function_inventory.py
     family: agent_tools
     role: inventory
