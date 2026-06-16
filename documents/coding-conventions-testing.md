@@ -98,12 +98,16 @@ docs、routing、metadata、string parsing、configuration、structure refactor 
 - `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
   flag など、production path と同じ bug を複製しない expected。
 - `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
+- `Execution Target`: 数値計算、solver、optimizer、JAX / XLA / IREE lowering、
+  convergence、residual、benchmark、experiment validation を実行する GPU target。
+  CPU は計算テストの代替 target にしません。
 
 `Numerical Trigger` がない場合は、数値テストを省きます。その場合も test plan には
 「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
-数値 validation が必要でも、既定は最小の deterministic case です。GPU、long-running、
-broad benchmark、large random sweep は unit test ではなく experiment validation として
-profile、理由、ログ保存先を記録します。
+数値 validation が必要でも、既定は GPU 上の最小 deterministic case です。
+long-running、broad benchmark、large random sweep は unit test ではなく experiment
+validation として profile、理由、ログ保存先を記録します。GPU が使えない場合は
+CPU で計算テストを代替せず、`gpu_validation_blocker=<reason>` と evidence を残します。
 
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
@@ -197,6 +201,9 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 - 悪条件・大規模ケースは **明示的に区別**し、ログに条件を出力します。
 - unit test の既定 dimension は、failure を局所化できる最小サイズにします。
 - GPU / long-running numerical validation は、unit test とは分けて profile と実行理由を記録します。
+- 数値計算、solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、
+  benchmark、experiment validation の計算テストを CPU で実行することを禁止します。
+  GPU が使えない場合は CPU fallback ではなく `gpu_validation_blocker` を残します。
 
 ## 8. 禁止事項
 

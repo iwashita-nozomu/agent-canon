@@ -61,6 +61,11 @@ to satisfy the target theorem under the accepted problem/config/backend
 assumptions, change the algorithmic mechanism itself; do not add proof-only
 `Info` fields, diagnostic gates, or extra runtime checks merely to satisfy the
 proof.
+Do not make the theorem pass by fixing the backend, device, compiler route,
+runtime target, or dtype unless the user request, approved design, runtime
+profile, public API, or config explicitly fixes that backend. Backend-specific
+data is evidence for the active profile, not a replacement for the optimization
+contract. Missing backend evidence is `backend_evidence_blocker`.
 
 ### Tool-Side Iterative Method Handoff
 
@@ -93,12 +98,15 @@ surfaces when the route packet makes them part of the product contract.
 1. Identify the first bad iteration for failures; do not diagnose only from the final NaN, Inf, or residual.
 1. Create an adversarial numeric test plan before implementation: exact small case, ill-conditioned case, constraint-boundary case, non-finite guard, not-converged status, derivative check, and device / dtype case when relevant.
 1. Implement the smallest responsibility-preserving change that matches the contract.
-1. Validate with targeted tests and one protocol-consistent run; record skipped GPU, benchmark, or formal run evidence with reason.
+1. Validate with targeted tests and one protocol-consistent GPU run; record
+   skipped GPU, benchmark, or formal run evidence as a blocker with reason
+   instead of replacing it with CPU computation.
 1. Review numerical claims separately from code style: convergence evidence, stopping status, failure mode, tolerance rationale, and documentation alignment.
 
 ## Validation Rules
 
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route をしません。
+- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route、CPU smoke、CPU-only regression をしません。
+- solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment validation などの計算テストは CPU で実行しません。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残します。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
 - runtime proof-only fields or diagnostic gates are not convergence evidence;
   use them only when they are genuine execution outputs needed by the user-facing

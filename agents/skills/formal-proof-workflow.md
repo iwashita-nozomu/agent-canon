@@ -7,7 +7,6 @@ upstream design ../canonical/skills.md skill canon registry.
 upstream design algorithm-proof-exploration.md proof-guided algorithm exploration workflow.
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
-upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
 upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
@@ -26,7 +25,7 @@ proof obligations / existing proof search / checker command に分解します�
 最終目的は、target claim を checker-backed に証明するか、同じ claim が
 現在の仮定・実装経路からは証明できないことを反例、独立性、または
 仮定不足 witness によって示すことです。
-LLM 生成文、自然言語証明、未実行の theorem stub を証明済みとは扱いません。
+LLM 生成文、自然言語証明、未検査の theorem file を証明済みとは扱いません。
 `blocked`、`not_run`、`unverified` は途中状態であり、skill の完了判定では
 ありません。
 
@@ -36,7 +35,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - 既存 formal library に theorem や lemma があるかを先に探したい
 - proof assistant を使う前に proof obligation、前提、定義不足を棚卸ししたい
 - 論文、scholarly note、optimization / numerical method design の理論 claim を検査可能な形に落としたい
-- JIT 可能な Python 実装 root から StableHLO/backend trace 由来の proof scaffold を作りたい
+- JIT 可能な Python 実装 root から StableHLO/backend trace 由来の generated Lean evidence と theorem graph を作りたい
 
 ## Core References
 
@@ -73,6 +72,15 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   theorem を通してはいけません。証明に必要な可観測値は `Answer` / `State` /
   `Info` の静的 field、または theorem graph が実装 path から再構成する値として
   扱います。
+- formal proof work を subagent に渡す場合は、`agents/COMMUNICATION_PROTOCOL.md`
+  の `Target Binding Packet` を handoff に含めます。target theorem、public root と
+  signature、return projection、identifier naming plan、accepted top-level
+  assumptions、forbidden assumptions、current generated evidence、completion
+  condition、validation commands、unchecked-output policy が最低限必要です。file list
+  だけで「証明を見て」「blocker を探して」と渡してはいけません。unchecked theorem
+  sketch、型が合っていない statement、public root への到達が示されていない local
+  counterexample、algorithm suggestion は、同じ public root と theorem surface に対する
+  checker / validation が通るまで採用しません。
 - IR-to-Lean / theorem-graph tooling は、public root の引数 tree、戻り値 tree、
   `Answer` / `State` / `Info` などの field path、return leaf index の対応を
   生成しなければなりません。目的 theorem はこの high-level projection 関数だけを
@@ -83,6 +91,13 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `jit_canonical_ir.py --python-symbol path.py::qualname --input-factory path.py::factory`
   で StableHLO と backend trace へ lower します。この lowering 結果を
   proof artifact の入口として扱います。
+- backend、runtime target、compiler route、device、dtype を theorem や validation
+  claim を通すために固定してはいけません。backend 固有 theorem は、user request、
+  approved design、runtime profile、public API、または config がその backend を
+  明示した場合だけ有効です。それ以外では backend semantics を top-level profile
+  input、generated backend witness、coverage evidence として保持し、証拠不足は
+  `backend_evidence_blocker=<gap>` として記録します。IREE、XLA、CUDA、CPU、GPU、
+  VMFB、StableHLO、LLVM、FP32 などへ theorem を縮退させて主張を成立させてはいけません。
 - アルゴリズム由来の claim で、証明 path 探索、algorithm change の判断、
   IR / lemma graph / frontier overlay の更新が必要な場合は、先に
   `$algorithm-proof-exploration` を使います。この skill は、その探索結果を
@@ -110,7 +125,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   `proof_selected_local_obligations` として proof note または run artifact に残します。
 - checker 向けの実装 path model は、現在の JIT-canonical IR から
   `tools/bin/agent-canon jit-ir-to-lean` で Lean code graph artifact として
-  生成します。IR `expression_ast` と `control_facts` で evaluation order と
+  生成します。IR の operation tree と `control_facts` で evaluation order と
   branch / loop 形状が得られる場合、手書きの algorithm-specific operation record を
   新しい proof entrypoint にしてはいけません。構造体アクセスは IR 後段の Rust
   projection pass で正規化し、proof theme 側は生成 code graph を消費して型付き補題を
@@ -197,7 +212,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   最適化問題で「微分可能」と言う場合は、対象 `Problem` の目的関数・制約関数の
   微分可能性だけを指します。residual sequence、更新則、proof-introduced helper の
   微分可能性を代替仮定にしてはいけません。
-- checker 向け中間表現、lemma graph、profile library、Lean stub は
+- checker 向け中間表現、lemma graph、profile library、generated Lean file は
   `lean/<proof-theme>/` に置き、再利用する profile / arithmetic library は
   `lean/lib/` に置きます。profile library を読むのは
   `jit_canonical_ir.py` などの証明ツールであり、production algorithm は
@@ -264,7 +279,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   最終命題を一歩進める最弱の局所 proposition へ縮約し、
   `verified`、`refuted`、`unprovable_under_assumptions`、
   `unverified_with_next_witness` のいずれかへ分類します。
-  bare `unverified` は raw generated node や stub の途中状態であり、
+  bare `unverified` は raw generated node や未検査生成 file の途中状態であり、
   frontier node の完了 outcome ではありません。
 - 未証明 frontier node は、(a) 実装 algebra / 既存 algorithm-output projection の直接証明、
   (b) theorem variable を明示した conditional bridge 証明、
@@ -330,7 +345,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - user-facing に進捗を返す前に、現在選択した部品証明をすべて終端状態まで
   処理します。部品証明ごとに `verified`、`refuted`、
   `unprovable_under_assumptions`、またはより小さい named witness を持つ
-  `unverified_with_next_witness` へ到達させ、単なる scaffold 作成、未実行 stub、
+  `unverified_with_next_witness` へ到達させ、単なる未検査の生成物作成、
   「未証明」の列挙だけで返してはいけません。
 - target claim が `verified` / `refuted` /
   `unprovable_under_assumptions` に到達していない状態で user-facing に返す場合は、
@@ -357,7 +372,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   ある場合だけ `necessary_proven` とし、それ以外は `route_sufficient`、
   `candidate`、または `unknown` と明示します。必要性が未証明なら、命題を
   消さずに必要性主張だけを落とすのが proof-status 上の最小修正です。
-- `python3 tools/agent_tools/formal_proof.py` で scaffold と query packet を作ります。
+- JIT-canonical evidence、theorem graph slice、proof search query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
 - Lean では、`documents/tools/lean_capability_matrix.md` を読み、frontier shape に応じて
@@ -377,7 +392,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - Isabelle/HOL では AFP、loaded theory、Sledgehammer result、reconstruction proof を分けます。
 - Coq/Rocq では library search、CoqHammer、SMTCoq、Tactician などの適用範囲と限界を記録します。
 - SMT route は first-order / arithmetic / bit-vector / array など solver-friendly な obligation に限り、証明対象全体の代替にしません。
-- theorem stub に `<FORMAL_TARGET>`、`sorry`、`Admitted`、placeholder が残る限り `proof_status=unverified` とします。
+- theorem file に `<FORMAL_TARGET>`、`sorry`、`Admitted`、placeholder が残る限り `proof_status=unverified` とします。
 - 証明済み claim として採用するには、target proof assistant / solver の実行 log、tool version、import context、source file path を残します。
 - 証明不能 claim として採用するには、失敗ログだけでは足りません。
   `refuted` は反例、実装 trace、または formal model が target conclusion を
@@ -420,22 +435,24 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - assumptions、definitions、notation、domain、expected theorem name を分ける
 1. Algorithm expansion IR:
    - root algorithm から、initialize/config edge、solve/step/update edge、
-     nested solver edge、certificate / diagnostic edge を import / execute せずに
+     nested solver edge、certificate / diagnostic edge を JIT root から
      再帰展開する
    - 既定 route は
-     `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --target-theorem <target> --format json|markdown`
-     とする
+     `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
+     とする。CUDA の有限精度 claim では `--backend-target cuda`、
+     `--iree-cuda-target <sm_xx>`、`--xla-dump-dir <dir>` も渡し、同じ
+     JIT root から XLA-emitted LLVM/PTX を収集する
    - IR node には `source_symbol`、runtime object、数学的 role、residual unit、
      dtype / backend assumption、proof relevance を持たせる
-   - backend arithmetic、IREE FP32、fast-math、denormal、lowered IR などの
-     実行基盤前提は IR の `backend_assumptions` に置く。証明のためだけに
-     production `InitializeConfig` や algorithm state を増やしてはいけない
-   - compiler/runtime semantics が proof theme の本体でない場合は、IREE FP32
-     lowering などを内部証明対象にしない。`backend_assumptions` と
-     `lean/lib` profile に「外部 backend axiom」として置き、対象 algorithm
-     proof はその axiom が与える backend perturbation bound だけを消費する。
-     backend 自体を証明したい task でない限り、lowering / fast-math /
-     denormal / minmax semantics の全証明を本体 proof の blocker にしない
+   - backend arithmetic、IREE/XLA FP32、fast-math、denormal、lowered IR などの
+     実行基盤前提は、まず generated `backend_trace` と Lean の LLVM instruction
+     rows に置く。証明のためだけに production `InitializeConfig` や algorithm
+     state を増やしてはいけない
+   - compiler/runtime semantics が proof theme の本体でない場合でも、LLVM が
+     生成できる環境では外部 axiom に逃がさず、generated instruction trace と
+     `lean/lib` の finite-precision model を typed witness で接続する。LLVM が
+     得られない場合だけ backend coverage frontier として扱い、algorithm proof は
+     その frontier が与える明示的な backend perturbation obligation を消費する
    - 実装アルゴリズムそのものは、IR から抽出した
      `trace follows A_impl / Step_impl` という operational assumption として置く。
      convergence、finite termination、residual reachability、certificate
@@ -490,7 +507,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - 各 attempt は `target_lemma`、`method`、`input_evidence`、`checker_status`、
      `result_status`、`adoption_decision`、`next_frontier` を持つ
    - `result_status=unverified_with_next_witness` の attempt は、`next_frontier` を
-     次の探索対象として即座に再投入する。bare `unverified` は generated stub や
+     次の探索対象として即座に再投入する。bare `unverified` は unchecked generated file や
      未実行 node の状態に限り、frontier の最終分類には使わない
    - `next_frontier` が repository code、既存 proof library、公式 source packet、
      local run artifact、または checker output から導出可能なら、ユーザーへ
@@ -503,8 +520,8 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
    - proof note は探索 log 全体ではなく、現在採用する certified subgraph と
      missing frontier を示す。`verified` と言えるのは checker 済み theorem /
      lemma と、それらだけで接続された target chain に限る
-1. Scaffold:
-   - `formal_proof.py` で plan、stub、existing proof queries、literature queries を生成する
+1. Evidence generation:
+   - JIT-canonical root から StableHLO、backend trace、JIT IR、generated Lean evidence を生成する
    - output は run bundle、report、または project-local proof artifact directory に置く
    - reader-facing proof text は topic ごとに一つの canonical proof note へ統合し、
      theorem statement、assumption ledger、checked fragment status、remaining gap を
@@ -556,11 +573,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 
 ```text
 proof_claim=<path-or-inline-summary>
-proof_plan_json=<path>
-proof_plan_md=<path>
-proof_existing_queries=<path>
-proof_literature_queries=<path>
-proof_stub=<path>
+proof_jit_ir=<path>
+proof_stablehlo=<path>
+proof_generated_lean=<path>
+proof_theorem_graph=<path-or-section-anchor>
 proof_library_trace_module=<path>
 proof_checker_command=<command>
 proof_checker_log=<path|not_run>
@@ -568,7 +584,7 @@ proof_status=<verified|refuted|unprovable_under_assumptions|unverified_with_next
 proof_terminal_outcome=<verified|refuted|unprovable_under_assumptions|open>
 proof_impossibility_certificate=<path-or-section-anchor|none>
 proof_source_packet=<path>
-proof_source_kind=<natural_language|python_ast>
+proof_source_kind=<natural_language|jit_canonical_root|theorem_graph>
 proof_algorithm_ir=<path-or-section-anchor|none>
 proof_goal_directed_slice=<path-or-section-anchor|none>
 proof_selected_local_obligations=<path-or-section-anchor|none>

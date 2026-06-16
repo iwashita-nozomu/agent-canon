@@ -20,8 +20,11 @@ python3 tools/agent_tools/jit_canonical_ir.py \
   --input-factory lean/<topic>/main.py::example_inputs \
   --jax-platform gpu \
   --backend-target cuda \
+  --iree-cuda-target sm_89 \
+  --xla-dump-dir reports/<topic>/xla-dump \
   --out lean/<topic>/<root>_jit_canonical_ir.json \
   --stablehlo-out lean/<topic>/<root>.stablehlo.mlir \
+  --backend-trace-dir lean/<topic>/backend-trace \
   --backend-trace-out lean/<topic>/<root>_backend_trace.json
 ```
 
@@ -49,7 +52,11 @@ When backend trace collection is enabled, the tool also writes:
 
 - backend trace coverage, including compiler availability, phase traces,
   executable source dumps, LLVM IR summaries when available, and explicit
-  coverage status when lowering stops early.
+  coverage status when lowering stops early;
+- optional XLA CUDA compile evidence when `--xla-dump-dir` is supplied. The
+  tool sets `XLA_FLAGS` before importing JAX, compiles the lowered root, and
+  copies final `.ll`, `.bc`, `.ptx`, and assembly artifacts from the XLA dump
+  into the backend trace directory.
 
 When `--no-source-root` is used, `source_root` is metadata-only and
 `main_pattern` is `null`; downstream theorem graphs must use the HLO
@@ -69,6 +76,12 @@ operand text, full instruction text hash, fast-math flags, and whether the
 opcode is a floating-point operation. Bitcode artifacts are also disassembled
 through `llvm-dis` when available and then captured through the same LLVM text
 path.
+
+The tool detects versioned `llvm-dis` executables such as `llvm-dis-15` as well
+as an unversioned `llvm-dis`. `llvm-dis` is only needed when a backend emits
+LLVM bitcode. CUDA XLA dumps usually provide `.ll` text directly; in that case
+`llvm-dis` availability is still recorded in the backend environment but is not
+the source of the captured LLVM text.
 
 The thin operational IR uses these generic kinds:
 

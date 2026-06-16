@@ -1,6 +1,6 @@
 ---
 name: formal-proof-workflow
-description: Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
+description: Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, generated Lean evidence, theorem-graph targets, and checker-gated evidence.
 ---
 
 <!--
@@ -8,7 +8,6 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
-upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
@@ -46,6 +45,15 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    proof-only arguments, trace handles, op ids, binding ids, or proof-only
    state/config. If a theorem needs a value, expose it through the public return
    schema or reconstruct it in the theorem graph from the implementation path.
+1. When handing proof work to a subagent, include the `Target Binding Packet` from
+   `agents/COMMUNICATION_PROTOCOL.md`: exact target theorem, public root and
+   signature, return projection, identifier naming plan, accepted top-level
+   assumptions, forbidden assumptions, current generated evidence, completion
+   condition, validation commands, and unchecked-output policy. Do not ask a
+   subagent to "look at the proof" or "find blockers" from a file list alone.
+   Do not adopt an unchecked theorem sketch, type-incompatible statement, local
+   counterexample, or algorithm suggestion unless it is checked against the same
+   public root and theorem surface.
 1. Treat the terminal goal as either proving the target claim or proving that
    the target cannot be established from the current assumptions and
    implementation path. `blocked`, `not_run`, and `unverified` are intermediate
@@ -60,6 +68,11 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    Retain the StableHLO hash, thin operational ops, backend phase trace, and
    coverage status in the proof artifact. Do not add recursion-depth knobs or
    hand-written operation records.
+   For CUDA finite-precision claims, also pass `--backend-target cuda`,
+   `--iree-cuda-target <sm_xx>`, and `--xla-dump-dir <dir>` so the extractor
+   can collect XLA-emitted `.ll` / `.ptx` artifacts when IREE phase tracing
+   stops before LLVM. Treat missing LLVM rows as a backend coverage frontier,
+   not as permission to introduce external FP axioms.
 1. Generate checker-facing Lean evidence definitions from the current
    JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`. Keep this
    generated evidence layer separate from the theorem graph. The
@@ -75,7 +88,18 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Backend arithmetic is generated trace evidence, not an external backend
    axiom. If backend lowering stops before LLVM or executable code, record the
    last successful backend phase as a coverage gap and decide whether to fix
-   the algorithm, the lowering path, or the backend configuration.
+   the algorithm, the lowering path, or the backend configuration. If an
+   alternate compiler-owned route such as XLA CUDA dump can emit LLVM for the
+   same JIT root, collect that route in the backend trace and lower the
+   resulting instruction list into Lean before reporting a backend frontier.
+   Do not fix a backend, runtime target, compiler route, device, or dtype to
+   make a theorem or validation claim pass. A backend-specific theorem is valid
+   only when the user request, approved design, runtime profile, public API, or
+   config explicitly scopes the theorem to that backend. Otherwise keep backend
+   semantics as top-level profile input, generated backend witness, and coverage
+   evidence. If evidence is missing, record `backend_evidence_blocker=<gap>`
+   instead of narrowing the theorem to IREE, XLA, CUDA, CPU, GPU, VMFB,
+   StableHLO, LLVM, FP32, or another backend surface.
    For target-critical code shape, do not leave implementation-local functions
    as arbitrary proof axioms merely because the first trace generator is shallow.
    Residual bundles, next-state construction, step-length formulas, KKT
@@ -96,7 +120,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    decode, unit conversion, or projection from the implementation type.  If the
    implementation uses finite precision, prove arithmetic claims over the
    rounded value model and `decode` relation consumed by the theorem, not over a
-   field abstraction that the runtime values do not satisfy.
+   field abstraction that the runtime values do not satisfy. Connect backend
+   LLVM instruction evidence to theorem variables through a typed witness such
+   as `BackendFloatWitness`, then consume reusable finite-precision lemmas such
+   as `final_tolerance_survives_decoding_error`.
    For iterative numerical convergence claims, keep the whole-root public
    return theorem as the top-level target. The implemented recurrence and
    stopping scalar, such as `z_next = Step_impl(Problem, Config, z)` and
@@ -220,7 +247,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    For optimization problems, "differentiable" refers to the target `Problem`
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
-1. Store checker-facing IR, theorem graphs, profile libraries, and Lean stubs under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
+1. Store checker-facing IR, theorem graphs, profile libraries, and generated Lean files under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
 1. Build the implementation layer with
    `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
    and then
@@ -277,7 +304,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    to the weakest local proposition that would advance the final theorem, and
    immediately classify the attempt as one of `verified`, `refuted`,
    `unprovable_under_assumptions`, or `unverified_with_next_witness`.
-   Bare `unverified` may describe a raw generated node or stub, but it is not a
+   Bare `unverified` may describe a raw generated node or unchecked generated file, but it is not a
    completed frontier outcome.
 1. For every unverified frontier node, try these routes in order:
    (a) prove the exact implementation algebra or existing algorithm-output
@@ -351,7 +378,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    component proof attempt to a terminal or smaller-frontier state. Each
    component must be `verified`, `refuted`, `unprovable_under_assumptions`, or
    `unverified_with_next_witness` with a strictly smaller named witness; do not
-   return after only scaffolding, unchecked stubs, or a bare list of unproved
+   return after only unchecked generated files or a bare list of unproved
    items.
 1. If the target claim is not terminal when reporting to the user, return a
    nonterminal proof packet, not a thin "unproved" summary. Include: exact
@@ -362,7 +389,6 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    `refuted`, include the counterexample/model/trace; for
    `unprovable_under_assumptions`, include the witness/model showing current
    assumptions do not entail the target.
-1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan, target-language scaffold, existing-proof queries, and literature queries.
 1. Use a writing skill when producing reader-facing proof text: `$academic-writing` for symbol-dense proof notes, `$long-form-writing` for long guide/note form, and `$report-writing` for checker-evidence or audit summaries.
 1. Keep each proof topic's theorem target, assumptions, checked fragments, and remaining gaps in one canonical proof note whenever possible; implementation code-path explanation may live in Design docs, but the proof note must link that Design entry and the mathematical proof text must not be split across competing truth surfaces.
 1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
@@ -446,7 +472,7 @@ Use this pattern before proving implementation-derived algorithm claims.
    and proof-status overlay; only the remaining non-code problem facts, such as
    selected-scope membership, regularity, differentiability, or compactness witnesses,
    may remain as mathematical assumptions.
-1. Put backend arithmetic, IREE FP32, fast-math, denormal, and lowered-IR assumptions in IR `backend_trace`; treat them as theorem variables or witness obligations.
+1. Put backend arithmetic, IREE/XLA FP32, fast-math, denormal, and lowered-IR assumptions in IR `backend_trace`; treat them as theorem variables or witness obligations.
 1. Assign each selected obligation to a formal theorem, existing-proof search, literature evidence, or explicit problem-class/backend assumption.
 
 ## theorem graph

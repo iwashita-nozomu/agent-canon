@@ -305,6 +305,42 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User reported that AgentCanon memory is not accumulating; root memory is a symlink into vendor/agent-canon, but log tools only appended files without persistence.
 
+- 2026-06-16 | failure-avoidance | Subagent handoffs for proof or implementation work must carry a semantic target lock: exact target theorem or behavior, public root, projections, accepted and forbidden assumptions, current evidence, completion condition, and validation route; file lists and broad objectives alone lead to broken implementation.
+  - source: chat
+  - scope: subagent-handoff formal-proof implementation
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: weak subagent context caused broken implementation.
+
+- 2026-06-16 | failure-avoidance | Names introduced by agents must be fixed from responsibility vocabulary, public-root/call-path context, existing naming family, and explicit forbidden names before implementation; vague labels and process-oriented names should be rejected in handoff and review.
+  - source: chat
+  - scope: naming subagent-handoff implementation-proof-artifacts
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: file and function naming was poor.
+
+- 2026-06-16 | failure-avoidance | When an agent finds a design issue, it must not silently absorb it in implementation; it must record a design_issue_blocker and return to the design/review gate or user decision.
+  - source: chat
+  - scope: design-gate implementation subagent-handoff
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: prohibit agents from handling design problems on their own.
+
+- 2026-06-16 | failure-avoidance | When current actions deviate from active instructions, workflow, skill, design packet, plan, allowed paths, validation gate, or review gate, the agent must stop, record policy_deviation_blocker with evidence, and return to the governing gate or user decision instead of continuing with a workaround.
+  - source: chat
+  - scope: runtime-entrypoint workflow-compliance
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: agents tend to deviate from rules; write it clearly in Agent.MD.
+
+- 2026-06-16 | failure-avoidance | Do not make proof, validation, experiment, or implementation claims pass by fixing a backend, runtime target, compiler route, device, or dtype. Keep backend as a top-level profile/config/witness/evidence surface unless the user request or approved design explicitly fixes it; otherwise record backend_evidence_blocker.
+  - source: chat
+  - scope: backend-evidence proof-workflow runtime-profile
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: stop agents from trying to fix the backend.
+
+- 2026-06-16 | failure-avoidance | Do not run numerical, solver, optimizer, JAX/XLA/IREE lowering, convergence, residual, benchmark, or experiment validation as CPU computational tests. Use GPU target evidence or record gpu_validation_blocker; CPU is allowed only for non-computational static/docs/tooling checks.
+  - source: chat
+  - scope: validation-policy numerical-tests gpu-runtime
+  - confidence: likely
+  - evidence: User feedback on 2026-06-16: prohibit doing computation tests on CPU.
+
 ## Open Questions
 
 - まだなし

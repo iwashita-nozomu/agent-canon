@@ -80,6 +80,8 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
 - 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` として残します。implementation surface route、responsibility search、reuse survey、stale surface scan、dependency scope、validation route が揃った時点で、parent 直編集または write-capable subagent handoff へ進みます
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できる変更を実装対象にし、trace が切れた変更は Gate 5-6 の設計更新へ戻します
+- 実装中に設計上の問題を見つけた場合は、`design_issue_blocker` と evidence を記録し、Gate 5-6 へ戻します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きではなく設計側で解決します。
+- 同じ実装 pass で扱う修正は、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従です。判断が必要なものは設計問題として扱います。
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
 - ただし保守的な編集は「最小差分」ではなく、evidence-backed で責務を守ることを意味します。root cause が stale structure、obsolete surface、underspecified harness、または壊れた責務境界にある場合は、削除・置換・rename・canonical surface 更新を含む cohesive edit を design trace に固定して実装します
 - 既存実装や導入済みライブラリで足りる範囲を先に確認し、新規追加が必要な理由を詳細設計に書いてから実装へ進みます

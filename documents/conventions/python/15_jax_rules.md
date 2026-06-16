@@ -17,6 +17,8 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - `lax.while_loop` の `cond` へ、反復本体で作った residual / convergence /
   breakdown などの status feedback を戻しません。
 - GPU tracing では CUDA preallocation を無効にし、backend availability の問題を CPU fallback と混同しません。
+- JAX / XLA / IREE lowering、solver、optimizer、convergence、residual、benchmark、
+  experiment validation の計算テストを CPU で代替実行しません。
 - backend LLVM witness を必要とする JIT root は、計算に使われる動的 tensor leaf を入力に含めます。
 
 ## 規約
@@ -48,6 +50,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
   lowering 対象の while+case 複合制御フローを増やしません。
 - GPU を既定とする tracing / experiment では `XLA_PYTHON_CLIENT_PREALLOCATE=false`
   を import 前に設定します。CUDA backend 自体が初期化できない場合は、GPU 実行失敗の
-  evidence を残してから CPU tracing に切り替え、GPU と CPU の結果を同じ validation として扱いません。
+  evidence と `gpu_validation_blocker=<reason>` を残し、CPU tracing や CPU 計算テストへ
+  切り替えません。
 - LLVM backend witness を生成する JIT root を、全入力が static/constant になる形にしません。
   IREE が executable dispatch を生成せず、VM までは成功しても LLVM `.ll` が空になるためです。

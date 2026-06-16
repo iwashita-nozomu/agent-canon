@@ -541,6 +541,8 @@ exit 条件:
 - `test_plan.md` の nasty case を最低限どこへ落とし込んだか説明できるようにします
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
+- 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
+- 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
 - design section、request clause ID、test plan item に trace できない変更は実装しません
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます

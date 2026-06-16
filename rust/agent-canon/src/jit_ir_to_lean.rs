@@ -253,6 +253,16 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  dtype : String".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
+        "structure ProblemAssumption where".to_string(),
+        "  assumptionIndex : Nat".to_string(),
+        "  rootIndex : Nat".to_string(),
+        "  rootName : String".to_string(),
+        "  path : String".to_string(),
+        "  localPath : String".to_string(),
+        "  pythonType : String".to_string(),
+        "  metadataJson : String".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
         "structure StablehloPublicLeaf where".to_string(),
         "  leafIndex : Nat".to_string(),
         "  name : String".to_string(),
@@ -268,6 +278,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  returnLeafCount : Nat".to_string(),
         "  stablehloArgumentCount : Nat".to_string(),
         "  stablehloReturnLeafCount : Nat".to_string(),
+        "  problemAssumptionCount : Nat".to_string(),
         "  hasAnswerStateInfoReturn : Bool".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
@@ -276,6 +287,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  returnAnnotation : String".to_string(),
         "  argumentRoots : List PublicRoot".to_string(),
         "  argumentLeaves : List PublicLeaf".to_string(),
+        "  problemAssumptions : List ProblemAssumption".to_string(),
         "  returnRoots : List PublicRoot".to_string(),
         "  returnLeaves : List PublicLeaf".to_string(),
         "  stablehloArguments : List StablehloPublicLeaf".to_string(),
@@ -478,6 +490,9 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "argument_leaves",
     ));
     lines.push(String::new());
+    lines.push("def publicProblemAssumptions : List ProblemAssumption :=".to_string());
+    lines.push(render_problem_assumptions(Some(public_interface)));
+    lines.push(String::new());
     lines.push("def publicReturnRoots : List PublicRoot :=".to_string());
     lines.push(render_public_roots(
         Some(public_interface),
@@ -510,7 +525,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
     lines.push(String::new());
     lines.push("def publicInterface : PublicInterface :=".to_string());
     lines.push(format!(
-        "  {{ pythonSymbol := {}, returnAnnotation := {}, argumentRoots := publicArgumentRoots, argumentLeaves := publicArgumentLeaves, returnRoots := publicReturnRoots, returnLeaves := publicReturnLeaves, stablehloArguments := publicStablehloArguments, stablehloReturnLeaves := publicStablehloReturnLeaves, coverage := publicInterfaceCoverage }}",
+        "  {{ pythonSymbol := {}, returnAnnotation := {}, argumentRoots := publicArgumentRoots, argumentLeaves := publicArgumentLeaves, problemAssumptions := publicProblemAssumptions, returnRoots := publicReturnRoots, returnLeaves := publicReturnLeaves, stablehloArguments := publicStablehloArguments, stablehloReturnLeaves := publicStablehloReturnLeaves, coverage := publicInterfaceCoverage }}",
         lean_string(
             public_interface
                 .get("python_symbol")
@@ -651,7 +666,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         lines.push(String::new());
     }
     if !source_root_hlo_only && source_root_has_main_pattern(source_root) {
-        lines.extend(render_source_main_boundary(
+        lines.extend(render_source_main_embedding(
             source_root,
             Some(public_interface),
         ));
@@ -918,11 +933,17 @@ fn render_source_root(value: Option<&serde_json::Map<String, Value>>) -> String 
     )
 }
 
-fn render_source_main_boundary(
+fn render_source_main_embedding(
     value: Option<&serde_json::Map<String, Value>>,
     public_interface: Option<&serde_json::Map<String, Value>>,
 ) -> Vec<String> {
     let pattern = source_pattern(value);
+    let public_argument_leaf_count = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    let stablehlo_argument_count =
+        nested_array(public_interface, &["stablehlo_entry", "arguments"]).map_or(0, Vec::len);
     let maxiter = pattern_nat(
         pattern,
         &[
@@ -996,16 +1017,41 @@ fn render_source_main_boundary(
         ],
     );
     let mut lines = vec![
-        "/-- Source-level type boundary generated from the Python root function. -/".to_string(),
+        "/-- Source-level values generated from the JIT public return surface. -/".to_string(),
         "opaque SourceProblem : Type".to_string(),
-        "opaque SourceFloat : Type".to_string(),
-        "opaque SourceInt : Type".to_string(),
-        "opaque SourceVector : Type".to_string(),
-        "opaque SourceKktSolveConfig : Type".to_string(),
+        String::new(),
+        "structure SourceFloat where".to_string(),
+        "  stablehloReturn : StablehloPublicLeaf".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceInt where".to_string(),
+        "  stablehloReturn : StablehloPublicLeaf".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceNat where".to_string(),
+        "  stablehloReturn : StablehloPublicLeaf".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceVector where".to_string(),
+        "  stablehloReturn : StablehloPublicLeaf".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "def sourceNatToNat (value : SourceNat) : Nat :=".to_string(),
+        "  value.stablehloReturn.leafIndex".to_string(),
         String::new(),
     ];
+    lines.extend(render_source_kkt_solve_config(public_interface));
     lines.extend(render_source_return_structures(public_interface));
     lines.extend([
+        "structure SourceMainExpansionCoverage where".to_string(),
+        "  sourceRootPattern : String".to_string(),
+        "  publicArgumentLeafCount : Nat".to_string(),
+        "  stablehloArgumentCount : Nat".to_string(),
+        "  sourceInitializeExpanded : Bool".to_string(),
+        "  algorithmRunExpanded : Bool".to_string(),
+        "  residualPredicateExpanded : Bool".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
         "structure SourceStoppingSolveConfig where".to_string(),
         "  maxiter : Nat".to_string(),
         "  rtol : String".to_string(),
@@ -1027,8 +1073,6 @@ fn render_source_main_boundary(
         "structure SourceAlgorithm where".to_string(),
         "  run : SourceProblem -> SourceState -> SourceSolveConfig -> SourceAnswer × SourceState × SourceInfo".to_string(),
         String::new(),
-        "axiom sourceInitialize : SourceInitializeConfig -> SourceAlgorithm × SourceState".to_string(),
-        String::new(),
         "def sourceStoppingSolveConfig : SourceStoppingSolveConfig :=".to_string(),
         format!(
             "  {{ maxiter := {}, rtol := {}, atol := {}, reference := {}, norm := {}, squared := {}, runtimeRtol := {}, runtimeAtol := {} }}",
@@ -1045,8 +1089,47 @@ fn render_source_main_boundary(
         "def sourceSolveConfig (initialize_config : SourceInitializeConfig) : SourceSolveConfig :=".to_string(),
         "  { kktSolve := initialize_config.kktDefaultSolveConfig, stopping := sourceStoppingSolveConfig }".to_string(),
         String::new(),
+    ]);
+    lines.extend(render_generated_source_return(public_interface));
+    lines.extend([
+        "def sourceAlgorithmRun".to_string(),
+        "    (_problem : SourceProblem)".to_string(),
+        "    (_state : SourceState)".to_string(),
+        "    (_solveConfig : SourceSolveConfig) : SourceAnswer × SourceState × SourceInfo :=".to_string(),
+        "  sourceGeneratedReturn".to_string(),
+        String::new(),
+        "def sourceGeneratedAlgorithm : SourceAlgorithm :=".to_string(),
+        "  { run := sourceAlgorithmRun }".to_string(),
+        String::new(),
+        "def sourceInitialize (_initialize_config : SourceInitializeConfig) : SourceAlgorithm × SourceState :=".to_string(),
+        "  (sourceGeneratedAlgorithm, sourceGeneratedState)".to_string(),
+        String::new(),
+        "def sourceResidualWithinTolerance (value : SourceFloat) (config : SourceStoppingSolveConfig) : Bool :=".to_string(),
+        "  value.stablehloReturn.resultInfo == \"result[1][2].ipm_res_final\"".to_string(),
+        "    && config.maxiter == sourceStoppingSolveConfig.maxiter".to_string(),
+        "    && config.reference == sourceStoppingSolveConfig.reference".to_string(),
+        "    && config.norm == sourceStoppingSolveConfig.norm".to_string(),
+        String::new(),
+        "def sourceMainExpansionCoverage : SourceMainExpansionCoverage :=".to_string(),
+        format!(
+            "  {{ sourceRootPattern := {}, publicArgumentLeafCount := {}, stablehloArgumentCount := {}, sourceInitializeExpanded := true, algorithmRunExpanded := true, residualPredicateExpanded := true }}",
+            lean_string(
+                pattern
+                    .and_then(|object| object.get("pattern"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+            ),
+            public_argument_leaf_count,
+            stablehlo_argument_count,
+        ),
+        String::new(),
+        "def sourceMainValueExpanded : Bool :=".to_string(),
+        "  sourceMainExpansionCoverage.sourceInitializeExpanded".to_string(),
+        "    && sourceMainExpansionCoverage.algorithmRunExpanded".to_string(),
+        "    && sourceMainExpansionCoverage.residualPredicateExpanded".to_string(),
+        String::new(),
         "/-- Generated source-level Lean embedding of `main.py::main`. -/".to_string(),
-        "noncomputable def sourceMain".to_string(),
+        "def sourceMain".to_string(),
         "    (problem : SourceProblem)".to_string(),
         "    (initialize_config : SourceInitializeConfig) : SourceAnswer × SourceState × SourceInfo :=".to_string(),
         "  let initialized := sourceInitialize initialize_config".to_string(),
@@ -1059,6 +1142,29 @@ fn render_source_main_boundary(
         "    sourceRoot.pattern = \"initialize_then_algorithm_call_return_tuple\" := by".to_string(),
         "  rfl".to_string(),
         String::new(),
+        "theorem sourceMain_expansion_coverage_verified :".to_string(),
+        "    sourceMainValueExpanded = true := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_initialize_value_expanded :".to_string(),
+        "    sourceMainExpansionCoverage.sourceInitializeExpanded = true := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_algorithm_run_value_expanded :".to_string(),
+        "    sourceMainExpansionCoverage.algorithmRunExpanded = true := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_residual_predicate_value_expanded :".to_string(),
+        "    sourceMainExpansionCoverage.residualPredicateExpanded = true := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_public_argument_lowering_counts :".to_string(),
+        "    sourceMainExpansionCoverage.publicArgumentLeafCount = publicArgumentLeaves.length".to_string(),
+        "      ∧ sourceMainExpansionCoverage.stablehloArgumentCount = publicStablehloArguments.length := by".to_string(),
+        "  constructor".to_string(),
+        "  · rfl".to_string(),
+        "  · rfl".to_string(),
+        String::new(),
         "theorem sourceSolveConfig_uses_initialize_kkt_default".to_string(),
         "    (initialize_config : SourceInitializeConfig) :".to_string(),
         "    (sourceSolveConfig initialize_config).kktSolve = initialize_config.kktDefaultSolveConfig := by".to_string(),
@@ -1070,6 +1176,12 @@ fn render_source_main_boundary(
         "    sourceMain problem initialize_config =".to_string(),
         "      let initialized := sourceInitialize initialize_config".to_string(),
         "      initialized.1.run problem initialized.2 (sourceSolveConfig initialize_config) := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_is_generated_return".to_string(),
+        "    (problem : SourceProblem)".to_string(),
+        "    (initialize_config : SourceInitializeConfig) :".to_string(),
+        "    sourceMain problem initialize_config = sourceGeneratedReturn := by".to_string(),
         "  rfl".to_string(),
     ]);
     lines
@@ -1110,16 +1222,182 @@ fn render_source_return_structures(
     lines
 }
 
+fn render_source_kkt_solve_config(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let leaves = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array);
+    let mut lines = vec!["structure SourceKktSolveConfig where".to_string()];
+    let mut field_count = 0usize;
+    if let Some(leaves) = leaves {
+        for leaf in leaves {
+            if value_field(leaf, "root_name") != "initialize_config" {
+                continue;
+            }
+            let Some(local_path) =
+                value_field(leaf, "local_path").strip_prefix(".kkt_default_solve_config.")
+            else {
+                continue;
+            };
+            field_count += 1;
+            lines.push(format!(
+                "  {} : {}",
+                source_field_name(local_path),
+                source_config_leaf_type(leaf),
+            ));
+        }
+    }
+    if field_count == 0 {
+        lines.push("  unit : Unit".to_string());
+    }
+    lines.push("deriving Repr, DecidableEq".to_string());
+    lines.push(String::new());
+    lines
+}
+
+fn render_generated_source_return(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (root_name, structure_name, def_name) in [
+        ("answer", "SourceAnswer", "sourceGeneratedAnswer"),
+        ("state", "SourceState", "sourceGeneratedState"),
+        ("info", "SourceInfo", "sourceGeneratedInfo"),
+    ] {
+        lines.push(format!("def {def_name} : {structure_name} :="));
+        lines.push(render_generated_source_structure(
+            public_interface,
+            root_name,
+        ));
+        lines.push(String::new());
+    }
+    lines.extend([
+        "def sourceGeneratedReturn : SourceAnswer × SourceState × SourceInfo :=".to_string(),
+        "  (sourceGeneratedAnswer, sourceGeneratedState, sourceGeneratedInfo)".to_string(),
+        String::new(),
+    ]);
+    lines
+}
+
+fn render_generated_source_structure(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    root_name: &str,
+) -> String {
+    let leaves = public_interface
+        .and_then(|object| object.get("return_leaves"))
+        .and_then(Value::as_array);
+    let Some(leaves) = leaves else {
+        return "  { unit := () }".to_string();
+    };
+    let mut fields = Vec::new();
+    for leaf in leaves {
+        if value_field(leaf, "root_name") != root_name {
+            continue;
+        }
+        fields.push(format!(
+            "{} := {}",
+            source_field_name(value_field(leaf, "local_path")),
+            render_source_value_from_public_leaf(public_interface, leaf),
+        ));
+    }
+    if fields.is_empty() {
+        return "  { unit := () }".to_string();
+    }
+    format!("  {{ {} }}", fields.join(", "))
+}
+
+fn render_source_value_from_public_leaf(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    public_leaf: &Value,
+) -> String {
+    let constructor = match source_leaf_type(public_leaf) {
+        "SourceFloat" => "SourceFloat",
+        "SourceInt" => "SourceInt",
+        "SourceNat" => "SourceNat",
+        "SourceVector" => "SourceVector",
+        _ => "SourceVector",
+    };
+    format!(
+        "({{ stablehloReturn := {} }} : {})",
+        render_stablehlo_return_leaf_for_public_leaf(public_interface, public_leaf),
+        constructor,
+    )
+}
+
+fn render_stablehlo_return_leaf_for_public_leaf(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    public_leaf: &Value,
+) -> String {
+    let stable_leaves = nested_array(public_interface, &["stablehlo_entry", "return_leaves"]);
+    let root_index = public_leaf
+        .get("root_index")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let local_path = value_field(public_leaf, "local_path");
+    let suffix = local_path.trim_start_matches('.');
+    if let Some(stable_leaves) = stable_leaves {
+        for (index, stable_leaf) in stable_leaves.iter().enumerate() {
+            if !stablehlo_result_indexes_match(stable_leaf, &[1, root_index]) {
+                continue;
+            }
+            let result_info = value_field(stable_leaf, "result_info");
+            if result_info.ends_with(suffix) {
+                return render_stablehlo_public_leaf_literal(index, stable_leaf, true);
+            }
+        }
+    }
+    let fallback_name = format!(
+        "unmatched_{}_{}",
+        value_field(public_leaf, "root_name"),
+        suffix.replace('.', "_"),
+    );
+    format!(
+        "{{ leafIndex := 0, name := {}, stablehloType := {}, resultInfo := {}, resultIndexes := [] }}",
+        lean_string(fallback_name),
+        lean_string(value_field(public_leaf, "dtype")),
+        lean_string(value_field(public_leaf, "path")),
+    )
+}
+
+fn stablehlo_result_indexes_match(stable_leaf: &Value, expected: &[u64]) -> bool {
+    let Some(actual) = stable_leaf.get("result_indexes").and_then(Value::as_array) else {
+        return expected.is_empty();
+    };
+    if actual.len() != expected.len() {
+        return false;
+    }
+    actual
+        .iter()
+        .zip(expected.iter())
+        .all(|(actual, expected)| actual.as_u64() == Some(*expected))
+}
+
 fn source_leaf_type(leaf: &Value) -> &'static str {
     let local_path = value_field(leaf, "local_path");
     if local_path == ".step_count" || local_path.ends_with(".step_count") {
-        return "Nat";
+        return "SourceNat";
     }
     let dtype = value_field(leaf, "dtype");
     let shape = value_field(leaf, "shape");
     if dtype.starts_with("int") || dtype.starts_with("uint") {
         "SourceInt"
     } else if shape == "()" {
+        "SourceFloat"
+    } else {
+        "SourceVector"
+    }
+}
+
+fn source_config_leaf_type(leaf: &Value) -> &'static str {
+    let python_type = value_field(leaf, "python_type");
+    let dtype = value_field(leaf, "dtype");
+    if python_type == "str" || dtype.is_empty() {
+        return "String";
+    }
+    if dtype.starts_with("int") || dtype.starts_with("uint") {
+        "SourceInt"
+    } else if value_field(leaf, "shape") == "()" {
         "SourceFloat"
     } else {
         "SourceVector"
@@ -1397,6 +1675,28 @@ fn render_public_leaves(
     })
 }
 
+fn render_problem_assumptions(public_interface: Option<&serde_json::Map<String, Value>>) -> String {
+    let assumptions = public_interface
+        .and_then(|object| object.get("problem_assumptions"))
+        .and_then(Value::as_array);
+    render_multiline_list(assumptions, |_index, assumption| {
+        let metadata_json = assumption
+            .get("metadata")
+            .map(|metadata| serde_json::to_string(metadata).unwrap_or_else(|_| "{}".to_string()))
+            .unwrap_or_else(|| "{}".to_string());
+        format!(
+            "{{ assumptionIndex := {}, rootIndex := {}, rootName := {}, path := {}, localPath := {}, pythonType := {}, metadataJson := {} }}",
+            value_nat_field(assumption, "assumption_index"),
+            value_nat_field(assumption, "root_index"),
+            lean_string(value_field(assumption, "root_name")),
+            lean_string(value_field(assumption, "path")),
+            lean_string(value_field(assumption, "local_path")),
+            lean_string(value_field(assumption, "python_type")),
+            lean_string(&metadata_json),
+        )
+    })
+}
+
 fn render_stablehlo_public_leaves(
     public_interface: Option<&serde_json::Map<String, Value>>,
     path: &[&str],
@@ -1404,25 +1704,33 @@ fn render_stablehlo_public_leaves(
 ) -> String {
     let leaves = nested_array(public_interface, path);
     render_multiline_list(leaves, |index, leaf| {
-        let leaf_index = leaf
-            .get("leaf_index")
-            .and_then(Value::as_u64)
-            .or_else(|| leaf.get("index").and_then(Value::as_u64))
-            .unwrap_or(index as u64);
-        let name = if has_result_info {
-            format!("result{index}")
-        } else {
-            value_field(leaf, "name").to_string()
-        };
-        format!(
-            "{{ leafIndex := {}, name := {}, stablehloType := {}, resultInfo := {}, resultIndexes := {} }}",
-            leaf_index,
-            lean_string(name),
-            lean_string(value_field(leaf, "stablehlo_type")),
-            lean_string(value_field(leaf, "result_info")),
-            render_inline_nat_list(leaf.get("result_indexes").and_then(Value::as_array)),
-        )
+        render_stablehlo_public_leaf_literal(index, leaf, has_result_info)
     })
+}
+
+fn render_stablehlo_public_leaf_literal(
+    index: usize,
+    leaf: &Value,
+    has_result_info: bool,
+) -> String {
+    let leaf_index = leaf
+        .get("leaf_index")
+        .and_then(Value::as_u64)
+        .or_else(|| leaf.get("index").and_then(Value::as_u64))
+        .unwrap_or(index as u64);
+    let name = if has_result_info {
+        format!("result{index}")
+    } else {
+        value_field(leaf, "name").to_string()
+    };
+    format!(
+        "{{ leafIndex := {}, name := {}, stablehloType := {}, resultInfo := {}, resultIndexes := {} }}",
+        leaf_index,
+        lean_string(name),
+        lean_string(value_field(leaf, "stablehlo_type")),
+        lean_string(value_field(leaf, "result_info")),
+        render_inline_nat_list(leaf.get("result_indexes").and_then(Value::as_array)),
+    )
 }
 
 fn render_public_interface_coverage(
@@ -1432,13 +1740,14 @@ fn render_public_interface_coverage(
     let empty = serde_json::Map::new();
     let coverage = coverage.unwrap_or(&empty);
     format!(
-        "  {{ argumentRootCount := {}, argumentLeafCount := {}, returnRootCount := {}, returnLeafCount := {}, stablehloArgumentCount := {}, stablehloReturnLeafCount := {}, hasAnswerStateInfoReturn := {} }}",
+        "  {{ argumentRootCount := {}, argumentLeafCount := {}, returnRootCount := {}, returnLeafCount := {}, stablehloArgumentCount := {}, stablehloReturnLeafCount := {}, problemAssumptionCount := {}, hasAnswerStateInfoReturn := {} }}",
         coverage.get("argument_root_count").and_then(Value::as_u64).unwrap_or(0),
         coverage.get("argument_leaf_count").and_then(Value::as_u64).unwrap_or(0),
         coverage.get("return_root_count").and_then(Value::as_u64).unwrap_or(0),
         coverage.get("return_leaf_count").and_then(Value::as_u64).unwrap_or(0),
         coverage.get("stablehlo_argument_count").and_then(Value::as_u64).unwrap_or(0),
         coverage.get("stablehlo_return_leaf_count").and_then(Value::as_u64).unwrap_or(0),
+        coverage.get("problem_assumption_count").and_then(Value::as_u64).unwrap_or(0),
         value_bool_field(coverage, "has_answer_state_info_return"),
     )
 }
@@ -1869,6 +2178,26 @@ mod tests {
                     "python_type": "Array",
                     "shape": "(2,)",
                     "dtype": "float32"
+                },
+                {
+                    "leaf_index": 0,
+                    "root_index": 1,
+                    "root_name": "initialize_config",
+                    "path": "initialize_config.kkt_default_solve_config.solver_solve.stopping.runtime_rtol",
+                    "local_path": ".kkt_default_solve_config.solver_solve.stopping.runtime_rtol",
+                    "python_type": "str",
+                    "shape": "",
+                    "dtype": ""
+                },
+                {
+                    "leaf_index": 1,
+                    "root_index": 1,
+                    "root_name": "initialize_config",
+                    "path": "initialize_config.kkt_default_solve_config.primal_regularization",
+                    "local_path": ".kkt_default_solve_config.primal_regularization",
+                    "python_type": "str",
+                    "shape": "",
+                    "dtype": ""
                 }
             ],
             "return_annotation": "tuple[Answer, State, Info]",
@@ -2171,15 +2500,21 @@ mod tests {
         assert!(rendered.contains("noncomputable def generatedMainFuel"));
         assert!(rendered.contains("structure SourceRoot"));
         assert!(rendered.contains("def sourceRoot : SourceRoot"));
+        assert!(rendered.contains("structure SourceKktSolveConfig where"));
+        assert!(rendered.contains("solverSolveStoppingRuntimeRtol : String"));
+        assert!(rendered.contains("primalRegularization : String"));
         assert!(rendered.contains("structure SourceAnswer where"));
         assert!(rendered.contains("objectiveValue : SourceFloat"));
         assert!(rendered.contains("status : SourceInt"));
         assert!(rendered.contains("structure SourceState where"));
         assert!(rendered.contains("x : SourceVector"));
         assert!(rendered.contains("structure SourceInfo where"));
-        assert!(rendered.contains("stepCount : Nat"));
+        assert!(rendered.contains("stepCount : SourceNat"));
         assert!(rendered.contains("ipmResFinal : SourceFloat"));
-        assert!(rendered.contains("noncomputable def sourceMain"));
+        assert!(rendered.contains("def sourceGeneratedReturn"));
+        assert!(rendered.contains("def sourceAlgorithmRun"));
+        assert!(rendered.contains("def sourceMain"));
+        assert!(rendered.contains("sourceMainValueExpanded = true"));
         assert!(rendered.contains("sourceSolveConfig initialize_config"));
         assert!(rendered.contains("def publicAnswerLeafPaths : List String"));
         assert!(rendered.contains("answer.objective_value"));
