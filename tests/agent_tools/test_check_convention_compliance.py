@@ -17,6 +17,7 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
 )
@@ -30,7 +31,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/common/02_naming.md": "check_log_helper_names.py\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
-    "documents/conventions/common/05_docs.md": "docs\n",
+    "documents/conventions/common/05_docs.md": (
+        "docs claim grounding proof obligation provisional wording "
+        "check_convention_compliance.py\n"
+    ),
     "documents/conventions/python/01_scope.md": "scope\n",
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
     "documents/conventions/python/06_comments.md": "comments\n",
@@ -42,7 +46,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
     "documents/coding-conventions-python.md": "python import_responsibility.py\n",
     "documents/coding-conventions-cpp.md": "cpp\n",
-    "documents/coding-conventions-project.md": "project container_config.py\n",
+    "documents/coding-conventions-project.md": (
+        "project container_config.py claim grounding proof obligation "
+        "run-local planning evidence\n"
+    ),
     "documents/coding-conventions-house-style.md": "house\n",
     "documents/coding-conventions-testing.md": "testing\n",
     "documents/coding-conventions-reviews.md": "reviews\n",
@@ -133,6 +140,13 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/md-style-check.md": (
         "prose-reasoning-graph structure-planning format-only "
         "structure_contract=skipped\n"
+    ),
+    "agents/skills/long-form-writing.md": (
+        "数学的 claim proof obligation $formal-proof-workflow provisional wording\n"
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "mathematical claim proof obligation $formal-proof-workflow "
+        "provisional wording\n"
     ),
     "agents/skills/README.md": (
         "prose-reasoning-graph structure-planning md-style-check "
@@ -607,6 +621,51 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_claim_grounding_requires_markers(self) -> None:
+        """Canonical docs must keep prose-claim grounding markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            docs_policy = (
+                root / "documents" / "conventions" / "common" / "05_docs.md"
+            )
+            docs_policy.write_text("docs check_convention_compliance.py\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("missing-marker:claim grounding", result.stdout)
+            self.assertIn("missing-marker:proof obligation", result.stdout)
+
+    def test_document_claim_grounding_rejects_provisional_canon(self) -> None:
+        """Provisional wording in canonical docs needs an evidence route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "long-form-writing.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8")
+                + "\n- まずは近い文書へ claim を入れる。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("provisional-wording-without-grounding", result.stdout)
+
+    def test_minimal_fixture_covers_document_claim_grounding_surfaces(self) -> None:
+        """The minimal test fixture includes every claim grounding surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_CLAIM_GROUNDING_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

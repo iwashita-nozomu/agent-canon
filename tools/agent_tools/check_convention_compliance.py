@@ -6,7 +6,9 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
+# upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
@@ -341,6 +343,42 @@ POSITIVE_RUNTIME_WORDING_SURFACES = (
     "documents/conventions/common/05_docs.md",
     "documents/coding-conventions-project.md",
 )
+DOCUMENT_CLAIM_GROUNDING_MARKERS = {
+    "documents/conventions/common/05_docs.md": (
+        "claim grounding",
+        "proof obligation",
+        "provisional wording",
+        "check_convention_compliance.py",
+    ),
+    "documents/coding-conventions-project.md": (
+        "claim grounding",
+        "proof obligation",
+        "run-local planning evidence",
+    ),
+    "agents/skills/long-form-writing.md": (
+        "数学的 claim",
+        "proof obligation",
+        "$formal-proof-workflow",
+        "provisional wording",
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "mathematical claim",
+        "proof obligation",
+        "$formal-proof-workflow",
+        "provisional wording",
+    ),
+}
+PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
+    r"temporary policy|temporary rule|ad hoc|adhoc)"
+)
+PROVISIONAL_GROUNDING_RE = re.compile(
+    r"(?i)(?:"
+    r"run-local|planning evidence|evidence gap|verification route|"
+    r"prompt-defect|acceptance condition|limitation|"
+    r"受け入れ条件|validation route|責務名|proof_status)"
+)
 PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
     "CONVENTION-WORKFLOW",
@@ -656,6 +694,43 @@ def check_positive_runtime_wording(root: Path) -> list[Finding]:
     return findings
 
 
+def check_document_claim_grounding(root: Path) -> list[Finding]:
+    """Verify canonical docs route prose claims through evidence and proof status."""
+    paths = tuple(DOCUMENT_CLAIM_GROUNDING_MARKERS)
+    findings = check_required_files(root, paths, "document_claim_grounding")
+    for path, markers in DOCUMENT_CLAIM_GROUNDING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "document_claim_grounding",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+        for match in PROVISIONAL_CANONICAL_WORDING_RE.finditer(text):
+            line_start = text.rfind("\n", 0, match.start()) + 1
+            line_end = text.find("\n", match.start())
+            if line_end == -1:
+                line_end = len(text)
+            line = text[line_start:line_end]
+            if PROVISIONAL_GROUNDING_RE.search(line):
+                continue
+            line_no = text.count("\n", 0, match.start()) + 1
+            findings.append(
+                Finding(
+                    "document_claim_grounding",
+                    path,
+                    f"provisional-wording-without-grounding:{line_no}",
+                )
+            )
+    return findings
+
+
 def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
     """Verify AgentCanon PR workflow documents remote verification before push."""
     path = AGENT_CANON_PR_WORKFLOW_PATH
@@ -823,6 +898,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_document_structure_routing(root))
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
+    findings.extend(check_document_claim_grounding(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

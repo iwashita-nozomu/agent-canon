@@ -8,6 +8,7 @@ responsibility Documents Long-Form Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph diagnostics and rewrite handoffs
+upstream design ../../../agents/skills/formal-proof-workflow.md defines mathematical claim proof-obligation routing
 @dependency-end
 -->
 
@@ -25,6 +26,7 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 1. Use prose graph diagnostics, explanation, and integration plan as advisory evidence for section order, paragraph bridges, and split/merge operations.
 1. When the `$prose-reasoning-graph` handoff includes `selected_ordering.ordered_anchors`, use that whole-document topological sentence order as the DSL-to-prose input sequence before drafting sections or paragraphs.
 1. Project graph responsibilities into positive prose contracts: state what each section, tool, workflow, or document owns and what evidence supports it. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
+1. Decompose each mathematical claim into claim, assumptions, definitions, theorem target or proof obligation, `proof_status`, and checker evidence; route it to `$formal-proof-workflow` before projecting it into reader-facing prose when the claim is proof-like or implementation-derived. Keep provisional wording as run-local planning evidence, and project canonical text through scope, acceptance conditions, limitations, or validation routes.
 1. Before writing reader-facing prose, close `fix-now` findings at the DSL/projection stage: revise the structure contract or graph-backed rewrite packet, add/remove/reorder graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
 1. After projecting DSL/projection state to prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's prose-generation prompt and repair that prompt before continuing.
 1. Fix a short summary statement before drafting: main point, purpose, and intended reader.

@@ -35,6 +35,9 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 
 - `documents/` には正本だけを置きます。
 - 実装変更でルールや設計が変わる場合は、対応する文書を同じ変更で更新します。
+- 正本文書の claim grounding では、実装 path、設定 surface、checker / tool
+  output、proof obligation、外部 source packet、または run-local planning evidence の
+  evidence class を明示します。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。

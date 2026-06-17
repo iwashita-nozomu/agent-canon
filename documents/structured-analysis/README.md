@@ -17,7 +17,7 @@ downstream design ../tools/render_dependency_manifest_graph.md documents depende
 
 この directory は、文章解析、report 構造解析、dependency header 解析を
 AgentCanon から将来切り離す場合の集約先である。既存の正本を移動せず、
-まずは独立 tool 化で使う契約、adapter、DB 境界をここに蓄積する。
+独立 tool 化で使う契約、adapter、DB 境界をここに蓄積する。
 
 ## Canon Set
 
