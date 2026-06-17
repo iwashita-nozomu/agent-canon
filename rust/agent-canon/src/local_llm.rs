@@ -1183,11 +1183,19 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
         ),
         (
             "test-design",
-            "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+            "test strategy, brittle tests, contract-only wrappers, or unnecessary numerical tests are in scope",
             vec![
                 vec!["test-design"],
                 vec!["test", "design"],
                 vec!["テスト", "設計"],
+                vec!["contract-only", "wrapper"],
+                vec!["contract", "only", "wrapper"],
+                vec!["契約だけ"],
+                vec!["契約", "wrapper"],
+                vec!["static", "contract", "validation"],
+                vec!["pytest", "smoke"],
+                vec!["execution-only", "test"],
+                vec!["no-crash", "test"],
                 vec!["不要", "テスト"],
                 vec!["不要", "数値テスト"],
                 vec!["数値テスト"],
@@ -1533,6 +1541,56 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
                 ("handoff", 3),
                 ("subagent", 3),
                 ("サブエージェント", 3),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "contract_only_test_policy",
+            "Contract-only wrapper and checker-owned test admission policy",
+            &[
+                "documents/coding-conventions-testing.md",
+                "agents/skills/test-design.md",
+                ".agents/skills/test-design/SKILL.md",
+                "agents/TASK_WORKFLOWS.md",
+                "agents/canonical/CODEX_WORKFLOW.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "pytest smoke added for static contract validation",
+                "execution-only no-crash test for a thin adapter",
+                "numerical smoke for non-numerical routing, metadata, docs, or wrapper changes",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("contract-only wrapper", 18),
+                ("contract only wrapper", 18),
+                ("contract-only adapter", 16),
+                ("thin adapter", 14),
+                ("契約だけ", 18),
+                ("契約だけの wrapper", 20),
+                ("契約だけのラッパー", 20),
+                ("テストを強制", 16),
+                ("testを強制", 16),
+                ("余計なテスト", 14),
+                ("不要なテスト", 14),
+                ("pytest smoke", 14),
+                ("execution-only test", 14),
+                ("no-crash test", 14),
+                ("static-analysis duplicate", 14),
+                ("static-analysis-duplicate-test", 14),
+                ("static contract validation", 14),
+                ("checker-owned validation", 12),
+                ("canonical command evidence", 12),
+                ("runtime behavior", 10),
+                ("observable behavior", 10),
+                ("数値テスト", 9),
+                ("数値 smoke", 9),
+                ("unnecessary test", 10),
+                ("heavy test", 8),
             ],
         ),
         surface_candidate(
@@ -3418,6 +3476,15 @@ mod tests {
     }
 
     #[test]
+    fn skill_route_matches_contract_only_wrapper_tests() {
+        let prompt = "契約だけの wrapper に pytest smoke や execution-only test を足すのをやめたい";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
+    }
+
+    #[test]
     fn skill_route_matches_adaptive_improvement_loop() {
         let prompts = [
             "反復実行系のスキルがうまく作動してない。原因を探して",
@@ -3509,6 +3576,26 @@ mod tests {
             .required_checks
             .iter()
             .any(|command| command.contains("python-algorithm-contract-check")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_contract_only_test_policy() {
+        let request = "契約だけの wrapper で runtime behavior を増やしていないので pytest smoke, execution-only test, no-crash test, 数値テストを足さず static contract validation と canonical command evidence に戻したい";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "contract_only_test_policy");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("coding-conventions-testing")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("test-design")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
     }
 
     #[test]

@@ -18,9 +18,10 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
 
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
-   analysis for the requested object/file, plus tests and docs required by
-   those dependencies. Narrow implementation only after mapping exact target
-   functions, methods, and classes inside that expanded scope.
+   analysis for the requested object/file, plus validation commands and the
+   tests/docs that own observable behavior or reader-facing contracts. Narrow
+   implementation only after mapping exact target functions, methods, and
+   classes inside that expanded scope.
 1. Use `$dependency-analysis` to create a token-light `Change Impact Packet`
    manifest before choosing targets, writing the refactor orchestration plan,
    or launching a write-capable subagent. The packet is the unified
@@ -84,7 +85,8 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
    wave-scoped write-capable `worker`/`spark_worker` agents implement,
-   `test_designer` defines regression coverage before code changes, and a
+   `test_designer` defines regression coverage before behavior-changing or
+   regression-prone code changes, and a
    separate read-only reviewer
    (`python_reviewer`, `cpp_reviewer`, or `reviewer`) reviews the latest diff
    with before/after scan, impact evidence, and `diff_linked_findings`.
@@ -120,5 +122,5 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
    write-scope conflict, or validation isolation. If no such reason exists,
    classify the narrow handoff as `handoff_prompt_gap`, batch the related
    targets, and repair this skill/handoff before launching the next writer.
-1. Run `test_designer` before implementation and keep regression coverage in the same pass.
+1. Run `test_designer` before behavior-changing or regression-prone implementation and keep regression coverage in the same pass. For contract-only wrapper refactors, use static contract validation and canonical command evidence.
 1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.

@@ -44,7 +44,7 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
    - `design_reviewer`
 1. 文書通読レビュー
    - `document_flow_reviewer`
-1. テストケース設計
+1. テストケース設計（behavior-changing / regression-prone / high-risk の場合）
    - `test_designer`
 1. 実装
    - `implementer`
@@ -67,6 +67,11 @@ stage ごとの実行条件、handoff 条件、review separation は prose で�
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
+- contract-only wrapper では、static contract validation、checker-owned validation、
+  canonical command evidence を test plan の代替 evidence として固定します
+- validation repair scope は changed contract、changed lines、または task plan が名指しした
+  checker-owned property に置きます。既存 style debt や周辺 debt は residual evidence と
+  repair route に分けます
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
 - `実行計画 -> 計画レビュー`、`詳細設計 -> 詳細設計レビュー -> 文書通読レビュー`、`実装 -> 実装 checkpoint review` は、それぞれ review decision が `approve` になるまで同じ段を反復します
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として追加し、docs-impact がある場合に別 reviewer で docs completeness review も通します。選定理由は file responsibility と docs-impact に置きます
@@ -278,7 +283,8 @@ concurrent spawn budget:
 標準フロー:
 1. 共通実装フローをそのまま 1 pass で通す
 1. この full scoped route では `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を required stack に入れる
-1. code や test を触る task では `test_designer` を required stack に入れる
+1. observable behavior、test contract、regression-prone code を触る task では `test_designer` を required stack に入れる
+1. contract-only wrapper や checker-owned validation だけの変更では、canonical command evidence を validation route に入れる
 1. 一般説明 prose adapter を使う docs task では `document_flow_reviewer` に加えて docs reviewer を required stack に入れる
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を required stack に入れる
 1. 論文や thesis chapter では `citation_evidence_reviewer` も required stack に入れる
@@ -392,7 +398,9 @@ concurrent spawn budget:
 - 包括 refactor を含む場合は `agents/workflows/comprehensive-refactoring-workflow.md` を overlay とし、解析 baseline、target score、OOP boundary、Path Mapping、Deletion Plan を design artifact に入れる
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
 - `python_reviewer` と `cpp_reviewer` は言語差分に応じて implementation chunk review と final integration review に追加する
-- `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
+- `test_designer` は behavior-changing slice の実装前に static path、failure mode、
+  nasty edge case を洗い、worker が既存 test style で落とし込む。
+  contract-only wrapper slice は checker-owned validation を採用する
 - 同一 worktree では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した writer だけが repo file を編集する
 - 同一 worktree で scope が交差する parallel write は current checkout 内の後続 wave に直列化する
 

@@ -386,6 +386,45 @@ DOCUMENT_CLAIM_GROUNDING_MARKERS = {
         "validation command",
     ),
 }
+TEST_CONTRACT_ROUTING_MARKERS = {
+    "documents/coding-conventions-testing.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "static-analysis-duplicate-test",
+        "canonical command",
+        "Validation repair scope",
+    ),
+    "agents/skills/test-design.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "observable behavior",
+        "validation repair scope",
+    ),
+    ".agents/skills/test-design/SKILL.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "observable behavior",
+        "validation repair scope",
+    ),
+    "agents/TASK_WORKFLOWS.md": (
+        "contract-only wrapper",
+        "checker-owned validation",
+        "canonical command evidence",
+        "validation repair scope",
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "validation tool",
+    ),
+    "agents/templates/test_plan.md": (
+        "validation route",
+        "behavior-owned cases",
+    ),
+}
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
     r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
@@ -749,6 +788,27 @@ def check_document_claim_grounding(root: Path) -> list[Finding]:
     return findings
 
 
+def check_test_contract_routing(root: Path) -> list[Finding]:
+    """Verify contract-only wrappers route to static validation before tests."""
+    paths = tuple(TEST_CONTRACT_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "test_contract_routing")
+    for path, markers in TEST_CONTRACT_ROUTING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "test_contract_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
     """Verify AgentCanon PR workflow documents remote verification before push."""
     path = AGENT_CANON_PR_WORKFLOW_PATH
@@ -917,6 +977,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
+    findings.extend(check_test_contract_routing(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

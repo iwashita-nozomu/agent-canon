@@ -36,6 +36,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 |---|---|---|
 | **最初の pytest 実行** | `pytest tests/<subdir>/test_*.py -v` | → [実行方法](#4-実行方法) |
 | **ユニットテスト作成** | 小さい behavior example + 明示 expected | → [Unit Test Contract](#3-unit-test-contract) |
+| **契約だけの wrapper** | static contract validation + canonical command evidence | → [Contract-Only Wrapper Gate](#32-contract-only-wrapper-gate) |
 | **統合テスト設計** | 異なるレイヤー・複数ケース | → [分類](#2-配置と分類) |
 | **エッジケーステスト** | 乱数 seed 固定 + 悪条件 | → [乱数](#7-乱数大規模テスト) |
 | **テスト失敗の診断** | JSON ログを `tests/logs/` 確認 | → [実行方法](#4-実行方法) |
@@ -108,6 +109,33 @@ docs、routing、metadata、string parsing、configuration、structure refactor 
 long-running、broad benchmark、large random sweep は unit test ではなく experiment
 validation として profile、理由、ログ保存先を記録します。GPU が使えない場合は
 CPU で計算テストを代替せず、`gpu_validation_blocker=<reason>` と evidence を残します。
+
+### 3.2 Contract-Only Wrapper Gate
+
+`contract-only wrapper` は、既存の public contract を名前付け、型付け、設定化、
+薄い adapter 化、または canonical command へ接続するだけの変更です。入力 schema、
+型境界、設定 key、documented entrypoint、dependency header、routing marker、
+checker command のような static contract validation が主な evidence になります。
+
+実行テストの admission 条件は、新しい observable behavior、branch、parser error path、
+state mutation、diagnostic key、serialization shape、external process contract のいずれかです。
+該当する条件がある場合は、Behavior Contract、Observation Level、Oracle、Input Space、
+Adequacy Evidence を test plan に固定してから最小の behavior example を作ります。
+
+contract-only wrapper の validation evidence は次のように固定します。
+
+- type checker、lint、formatter、docs check、dependency review、convention checker、
+  tool catalog、route-surface check の canonical command。
+- `static-analysis-duplicate-test` や `meaningless-generated-execution-test` の
+  finding がある既存 test は、削除、behavior regression への置換、
+  canonical checker validation への移行を repair route として扱います。
+- pytest smoke、execution-only test、no-crash test、exit-code wrapper、数値 smoke は
+  該当 checker command の直接実行を validation route に置きます。
+
+Validation repair scope は、changed contract、changed lines、または task plan が名指しした
+checker-owned property に結び付く finding です。formatter、lint、test-design checker、
+convention checker が既存 style debt や周辺 debt を表出した場合、その finding は residual
+evidence として記録し、現在の diff は requested contract に沿った semantic change に保ちます。
 
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、

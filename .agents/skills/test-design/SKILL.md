@@ -16,9 +16,11 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Fix the target code paths and related test paths.
 1. If related tests exist, run `tools/bin/agent-canon test-design check <related-test-paths...>` before reading whole files. Use `fix-now`, `review`, and `design-hint` findings as the first test-plan inputs.
 1. Statically inspect branches, parsing, error handling, state transitions, observable behavior, and public contract boundaries.
-1. Before adding or recommending a test, decide whether the property is already owned by static analysis, a checker, formatter, dependency review, type checker, lint, docs check, or CI gate. If yes, do not generate a pytest wrapper; route the canonical command as validation evidence instead.
+1. Before adding or recommending a test, decide whether the property is already owned by static analysis, a checker, formatter, dependency review, type checker, lint, docs check, or CI gate. For checker-owned properties, route the canonical command as validation evidence.
+1. Classify validation findings by validation repair scope before applying an autofix. Findings tied to the changed contract, changed lines, or checker-owned property named in the task plan enter the current repair; broad pre-existing style debt becomes residual evidence with a separate repair route.
+1. For a `contract-only wrapper` or thin adapter, classify whether it adds observable behavior, branch logic, parser/error behavior, state mutation, diagnostic keys, serialization shape, or external process behavior. Names, types, forwards, configuration, and documentation for an existing contract use static contract validation and canonical command evidence.
 1. For each test case, fix `Behavior Contract`, `Observation Level`, `Oracle`, `Input Space`, and `Adequacy Evidence`.
-1. Reject generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` when they observe only process success, import success, no-crash, or exit code 0.
+1. Classify generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` as checker-command validation candidates when they observe only process success, import success, no-crash, or exit code 0.
 1. Before proposing numerical, randomized, tolerance, solver, convergence,
    residual, benchmark, or experiment-style tests, apply the Numerical Test Admission Gate from `documents/coding-conventions-testing.md`: record the
    numerical trigger, non-numerical alternative, oracle, GPU target, and budget.

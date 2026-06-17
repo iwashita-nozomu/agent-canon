@@ -20,6 +20,7 @@ from tools.agent_tools.check_convention_compliance import (
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
+    TEST_CONTRACT_ROUTING_MARKERS,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +53,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "run-local planning evidence\n"
     ),
     "documents/coding-conventions-house-style.md": "house\n",
-    "documents/coding-conventions-testing.md": "testing\n",
+    "documents/coding-conventions-testing.md": (
+        "testing contract-only wrapper static contract validation "
+        "static-analysis-duplicate-test canonical command Validation repair scope\n"
+    ),
     "documents/coding-conventions-reviews.md": "reviews\n",
     "documents/coding-conventions-experiments.md": "experiments\n",
     "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
@@ -101,6 +105,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
+        "contract-only wrapper static contract validation canonical command evidence "
+        "validation tool\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -127,6 +133,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$prose-reasoning-graph $structure-planning format-only "
         "structure_contract=skipped\n"
     ),
+    ".agents/skills/test-design/SKILL.md": (
+        "contract-only wrapper static contract validation canonical command evidence "
+        "observable behavior validation repair scope\n"
+    ),
     ".agents/skills/mvp-skeleton/SKILL.md": "mvp core loop vertical slice\n",
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
@@ -141,6 +151,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/md-style-check.md": (
         "prose-reasoning-graph structure-planning format-only "
         "structure_contract=skipped\n"
+    ),
+    "agents/skills/test-design.md": (
+        "contract-only wrapper static contract validation canonical command evidence "
+        "observable behavior validation repair scope\n"
     ),
     "agents/skills/long-form-writing.md": (
         "数学的 claim program contract proof obligation $formal-proof-workflow "
@@ -169,8 +183,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $structure-planning $prose-reasoning-graph "
-        "$md-style-check Document Structure Evidence structure_contract=skipped\n"
+        "$md-style-check Document Structure Evidence structure_contract=skipped "
+        "contract-only wrapper checker-owned validation canonical command evidence "
+        "validation repair scope\n"
     ),
+    "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
         "write-capable handoff\n"
@@ -675,6 +692,31 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in DOCUMENT_CLAIM_GROUNDING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_test_contract_routing_requires_contract_only_wrapper_markers(self) -> None:
+        """Testing policy must route contract-only wrappers to static validation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            testing_policy = root / "documents" / "coding-conventions-testing.md"
+            testing_policy.write_text("testing canonical command\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("test_contract_routing", result.stdout)
+            self.assertIn("missing-marker:contract-only wrapper", result.stdout)
+            self.assertIn("missing-marker:static contract validation", result.stdout)
+
+    def test_minimal_fixture_covers_test_contract_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every test contract routing surface."""
+        missing = sorted(
+            path
+            for path in TEST_CONTRACT_ROUTING_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 
