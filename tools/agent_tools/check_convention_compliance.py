@@ -346,26 +346,44 @@ POSITIVE_RUNTIME_WORDING_SURFACES = (
 DOCUMENT_CLAIM_GROUNDING_MARKERS = {
     "documents/conventions/common/05_docs.md": (
         "claim grounding",
+        "program contract",
+        "public entrypoint",
+        "return projection",
         "proof obligation",
         "provisional wording",
         "check_convention_compliance.py",
     ),
     "documents/coding-conventions-project.md": (
         "claim grounding",
+        "program contract",
         "proof obligation",
         "run-local planning evidence",
     ),
     "agents/skills/long-form-writing.md": (
         "数学的 claim",
+        "program contract",
         "proof obligation",
         "$formal-proof-workflow",
         "provisional wording",
     ),
     ".agents/skills/long-form-writing/SKILL.md": (
         "mathematical claim",
+        "program contract",
         "proof obligation",
         "$formal-proof-workflow",
         "provisional wording",
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "program contract",
+        "public entrypoint",
+        "return projection",
+        "proof obligation",
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "program contract",
+        "public entrypoint",
+        "return projection",
+        "validation command",
     ),
 }
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(

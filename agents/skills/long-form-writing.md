@@ -42,6 +42,9 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 - 数学的 claim は、claim、assumptions、definitions、theorem target または
   proof obligation、`proof_status`、checker evidence に分解し、必要なら
   `$formal-proof-workflow` へ渡してから reader-facing prose に射影する。
+  実装由来 claim では `program contract` を先に固定し、public entrypoint、
+  入力 schema、runtime profile、return projection、observable effect、
+  assumptions / preconditions、validation command を source map に入れる。
   provisional wording は run-local planning evidence として保持し、正本文書では
   scope、受け入れ条件、limitation、または validation route へ置換する
 - reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。structure contract または graph-backed rewrite packet を直し、graph-backed unit の追加・削除・分割・統合・順序変更を行い、graph diagnostics を再実行し、selected profile の active finding がなくなってから draft する

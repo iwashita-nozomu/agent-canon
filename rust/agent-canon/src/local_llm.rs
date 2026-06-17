@@ -1615,13 +1615,14 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
         surface_candidate(
             &lower,
             "document_claim_grounding",
-            "Canonical document claim, proof-status, and evidence-grounding policy",
+            "Canonical document claim, program-contract, proof-status, and evidence-grounding policy",
             &[
                 "documents/conventions/common/05_docs.md",
                 "documents/coding-conventions-project.md",
                 "agents/skills/long-form-writing.md",
                 ".agents/skills/long-form-writing/SKILL.md",
                 "agents/skills/formal-proof-workflow.md",
+                ".agents/skills/formal-proof-workflow/SKILL.md",
                 "tools/agent_tools/check_convention_compliance.py",
             ],
             &[
@@ -1635,18 +1636,29 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
                 "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
             ],
             &[
+                ("program contract", 12),
+                ("program contracts", 12),
+                ("プログラム契約", 12),
+                ("プログラムの契約", 12),
                 ("claim grounding", 10),
                 ("canonical document", 9),
                 ("canonical documents", 9),
+                ("public entrypoint", 9),
+                ("input schema", 9),
+                ("return projection", 9),
                 ("mathematical claim", 9),
                 ("mathematical statement", 9),
                 ("mathematical statements", 9),
+                ("observable effect", 8),
+                ("observable state", 8),
                 ("proof obligation", 9),
                 ("proof_status", 9),
                 ("proof status", 8),
                 ("theorem target", 8),
                 ("checker evidence", 8),
                 ("provisional wording", 8),
+                ("validation command", 8),
+                ("preconditions", 7),
                 ("正本文書", 8),
                 ("文書を正", 8),
                 ("まずは", 8),
@@ -3517,6 +3529,25 @@ mod tests {
             .required_checks
             .iter()
             .any(|command| command.contains("check_convention_compliance.py")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_program_contract() {
+        let request = "プログラムの契約を public entrypoint, input schema, return projection, observable effect, preconditions, validation command として明示したい。";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("long-form-writing")));
+        assert!(candidates[0].rationale.iter().any(
+            |reason| reason.contains("program contract") || reason.contains("プログラムの契約")
+        ));
     }
 
     #[test]

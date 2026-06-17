@@ -38,6 +38,9 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 - 正本文書の claim grounding では、実装 path、設定 surface、checker / tool
   output、proof obligation、外部 source packet、または run-local planning evidence の
   evidence class を明示します。
+- 実装由来 claim は `program contract` として public entrypoint、入力 schema、
+  runtime profile、return projection、observable effect、assumptions / preconditions、
+  validation command を示します。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。

@@ -32,7 +32,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
     "documents/conventions/common/05_docs.md": (
-        "docs claim grounding proof obligation provisional wording "
+        "docs claim grounding program contract public entrypoint "
+        "return projection proof obligation provisional wording "
         "check_convention_compliance.py\n"
     ),
     "documents/conventions/python/01_scope.md": "scope\n",
@@ -47,7 +48,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/coding-conventions-python.md": "python import_responsibility.py\n",
     "documents/coding-conventions-cpp.md": "cpp\n",
     "documents/coding-conventions-project.md": (
-        "project container_config.py claim grounding proof obligation "
+        "project container_config.py claim grounding program contract proof obligation "
         "run-local planning evidence\n"
     ),
     "documents/coding-conventions-house-style.md": "house\n",
@@ -142,11 +143,18 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "structure_contract=skipped\n"
     ),
     "agents/skills/long-form-writing.md": (
-        "数学的 claim proof obligation $formal-proof-workflow provisional wording\n"
+        "数学的 claim program contract proof obligation $formal-proof-workflow "
+        "provisional wording\n"
     ),
     ".agents/skills/long-form-writing/SKILL.md": (
-        "mathematical claim proof obligation $formal-proof-workflow "
+        "mathematical claim program contract proof obligation $formal-proof-workflow "
         "provisional wording\n"
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "program contract public entrypoint return projection proof obligation\n"
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "program contract public entrypoint return projection validation command\n"
     ),
     "agents/skills/README.md": (
         "prose-reasoning-graph structure-planning md-style-check "
@@ -641,6 +649,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("document_claim_grounding", result.stdout)
             self.assertIn("missing-marker:claim grounding", result.stdout)
+            self.assertIn("missing-marker:program contract", result.stdout)
             self.assertIn("missing-marker:proof obligation", result.stdout)
 
     def test_document_claim_grounding_rejects_provisional_canon(self) -> None:

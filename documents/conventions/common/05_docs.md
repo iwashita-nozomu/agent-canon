@@ -45,6 +45,9 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
   proof obligation、`proof_status`、checker evidence を分けて書きます。
   実装由来の数学 claim は public entrypoint、入力 schema、戻り値 projection、
   実装 trace / checker evidence へ接続し、`$formal-proof-workflow` の証明状態表へ渡します。
+- `program contract` は実装由来 claim の入口です。public entrypoint、入力 schema、
+  設定 / runtime profile、return projection、observable state / effect、
+  assumptions / preconditions、validation command を並べます。
 - 実装 claim は、対象 file / symbol / command と validation route を添えます。
   未実装 behavior の文書形は、設計候補または open obligation です。
 - Provisional wording such as `まずは`, `for now`, or `first pass` belongs to run-local planning evidence.
