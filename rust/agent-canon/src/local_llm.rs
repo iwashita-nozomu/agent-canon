@@ -1614,6 +1614,64 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
         ),
         surface_candidate(
             &lower,
+            "document_claim_grounding",
+            "Canonical document claim, proof-status, and evidence-grounding policy",
+            &[
+                "documents/conventions/common/05_docs.md",
+                "documents/coding-conventions-project.md",
+                "agents/skills/long-form-writing.md",
+                ".agents/skills/long-form-writing/SKILL.md",
+                "agents/skills/formal-proof-workflow.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "run-local planning language promoted to canonical policy",
+                "manual prose-only claim validation when checker or proof status is required",
+                "new policy prose without convention-compliance coverage",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("claim grounding", 10),
+                ("canonical document", 9),
+                ("canonical documents", 9),
+                ("mathematical claim", 9),
+                ("mathematical statement", 9),
+                ("mathematical statements", 9),
+                ("proof obligation", 9),
+                ("proof_status", 9),
+                ("proof status", 8),
+                ("theorem target", 8),
+                ("checker evidence", 8),
+                ("provisional wording", 8),
+                ("正本文書", 8),
+                ("文書を正", 8),
+                ("まずは", 8),
+                ("誇張", 7),
+                ("overclaim", 7),
+                ("source authority", 6),
+                ("evidence class", 6),
+                ("assumptions", 5),
+                ("definitions", 5),
+                ("for now", 5),
+                ("first pass", 5),
+                ("first draft", 5),
+                ("proof-like", 5),
+                ("数理", 5),
+                ("数学", 5),
+                ("証明", 5),
+                ("定理", 5),
+                ("ad hoc", 4),
+                ("adhoc", 4),
+                ("checker", 4),
+                ("文書", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
             "personal_codex_runtime",
             "User-level Codex configuration, skills, rules, and hook trust state",
             &[
@@ -3439,6 +3497,26 @@ mod tests {
             .required_checks
             .iter()
             .any(|command| command.contains("python-algorithm-contract-check")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_document_claim_grounding() {
+        let request = "Canonical documents are treated as source authority, but mathematical statements and provisional wording such as まずは become ad hoc policy; route to checker evidence and proof obligation.";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("05_docs.md")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
     }
 
     #[test]
