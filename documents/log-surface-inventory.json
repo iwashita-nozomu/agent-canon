@@ -1636,150 +1636,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_algorithm_ir",
-      "line": 592,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_certified_subgraph",
-      "line": 600,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_checker_command",
-      "line": 585,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_checker_log",
-      "line": 586,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_claim",
-      "line": 579,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_generated_lean",
-      "line": 582,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_goal_directed_slice",
-      "line": 593,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_impossibility_certificate",
-      "line": 589,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_initialize_expansion_graph",
-      "line": 604,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_initialize_root",
-      "line": 603,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_jit_ir",
-      "line": 580,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph",
-      "line": 595,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph_overlay",
-      "line": 598,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph_validation",
-      "line": 597,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_library_trace_module",
-      "line": 584,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_missing_frontier",
-      "line": 601,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_nonterminal_return",
-      "line": 606,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_path_attempts",
-      "line": 599,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_selected_local_obligations",
       "line": 594,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
@@ -1787,39 +1643,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "proof_source_kind",
-      "line": 591,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_source_packet",
-      "line": 590,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_stablehlo",
-      "line": 581,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_status",
-      "line": 587,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_status_table",
+      "field": "proof_certified_subgraph",
       "line": 602,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
@@ -1827,15 +1651,15 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "proof_target_chains",
-      "line": 596,
+      "field": "proof_checker_command",
+      "line": 587,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "proof_terminal_outcome",
+      "field": "proof_checker_log",
       "line": 588,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
@@ -1843,7 +1667,143 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "proof_theorem_graph",
+      "field": "proof_claim",
+      "line": 581,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_generated_lean",
+      "line": 584,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_goal_directed_slice",
+      "line": 595,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_impossibility_certificate",
+      "line": 591,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_expansion_graph",
+      "line": 606,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_root",
+      "line": 605,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_jit_ir",
+      "line": 582,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph",
+      "line": 597,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_overlay",
+      "line": 600,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_validation",
+      "line": 599,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_library_trace_module",
+      "line": 586,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_missing_frontier",
+      "line": 603,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_nonterminal_return",
+      "line": 608,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_path_attempts",
+      "line": 601,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_selected_local_obligations",
+      "line": 596,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_source_kind",
+      "line": 593,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_source_packet",
+      "line": 592,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_stablehlo",
       "line": 583,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
@@ -1851,8 +1811,48 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "proof_status",
+      "line": 589,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_status_table",
+      "line": 604,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_target_chains",
+      "line": 598,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_terminal_outcome",
+      "line": 590,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_theorem_graph",
+      "line": 585,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "proof_trace_alignment_check",
-      "line": 605,
+      "line": 607,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -6770,6 +6770,134 @@
     },
     {
       "certainty": "static",
+      "emitter": "json_object",
+      "field": "call_target",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "dtypes",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "function",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "kind",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "line",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "op_id",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "opcode",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "parent_op_id",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "region_id",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "region_path",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "tensor_types",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "text",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "text_sha256",
+      "line": 1455,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 557,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 560,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 562,
+      "path": "tools/agent_tools/cpp_source_canonical_ir.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
       "line": 162,
@@ -9564,7 +9692,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2078,
+      "line": 2209,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9572,7 +9700,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "operational_ir",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9580,7 +9708,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "public_interface",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9588,7 +9716,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9596,7 +9724,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9604,7 +9732,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_root",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -9612,7 +9740,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "stablehlo",
-      "line": 2069,
+      "line": 2200,
       "path": "tools/agent_tools/jit_canonical_ir.py",
       "surface": "tool"
     },
@@ -15188,7 +15316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 655,
+      "line": 656,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15196,7 +15324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 655,
+      "line": 656,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15204,7 +15332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 655,
+      "line": 656,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15212,7 +15340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 655,
+      "line": 656,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15220,7 +15348,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONTAINER_CONFIG_FINDING",
-      "line": 153,
+      "line": 154,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15228,7 +15356,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 680,
+      "line": 681,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -15236,14 +15364,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 678,
-      "path": "tools/ci/container_config.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CONTAINER_CONFIG_FINDINGS",
       "line": 679,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
@@ -15251,8 +15371,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "CONTAINER_CONFIG_FINDINGS",
+      "line": 680,
+      "path": "tools/ci/container_config.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 672,
+      "line": 673,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -18558,6 +18686,7 @@
     "tools/agent_tools/classify_path_risk.py",
     "tools/agent_tools/compare_agent_run_paths.py",
     "tools/agent_tools/compare_codex_token_footprints.py",
+    "tools/agent_tools/cpp_source_canonical_ir.py",
     "tools/agent_tools/doc_start.py",
     "tools/agent_tools/eval_accumulation_check.py",
     "tools/agent_tools/eval_manifest_paths.py",
