@@ -748,6 +748,14 @@ def owner_map_entrypoint_rows(
     return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
 
 
+def duplicate_root_view_entrypoint(root: Path, path: str) -> bool:
+    """Return whether ``path`` is already covered by the root entrypoint view."""
+    return path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    )
+
+
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
     """Return findings for missing required files."""
     findings: list[Finding] = []
@@ -1062,6 +1070,8 @@ def check_owner_map_entrypoints(root: Path) -> list[Finding]:
     for path in OWNER_MAP_ENTRYPOINT_TABLE_ROWS:
         resolved = readable_path(root, path)
         if resolved is None:
+            continue
+        if duplicate_root_view_entrypoint(root, path):
             continue
         section_rows = owner_map_entrypoint_rows(root, path)
         text = resolved.read_text(encoding="utf-8")

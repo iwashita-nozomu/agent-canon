@@ -821,6 +821,35 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_owner_map_entrypoint_reports_root_view_row_once(self) -> None:
+        """Template AGENTS.md root views do not duplicate owner-map findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            root_agents = root / "ROOT_AGENTS.md"
+            root_agents.write_text(
+                root_agents.read_text(encoding="utf-8").replace(
+                    "vendor/agent-canon/agents/task_catalog.yaml",
+                    "vendor/agent-canon/agents/task_catalog-missing.yaml",
+                ),
+                encoding="utf-8",
+            )
+            agents = root / "AGENTS.md"
+            agents.unlink()
+            agents.symlink_to("ROOT_AGENTS.md")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            finding = (
+                "missing-owner-row:workflow family, spawn budget, role topology"
+            )
+            self.assertEqual(result.stdout.count(finding), 1, result.stdout)
+            self.assertIn(
+                "owner_map_entrypoints:ROOT_AGENTS.md:" + finding,
+                result.stdout,
+            )
+
     def test_owner_map_entrypoint_requires_workflow_task_catalog_row(self) -> None:
         """Workflow owner row is required even when later reader rows repeat it."""
         with tempfile.TemporaryDirectory() as tmp_dir:
