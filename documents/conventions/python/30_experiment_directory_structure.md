@@ -28,7 +28,7 @@ upstream design ../README.md convention index
 ### 2. topic ごとの配置
 
 - 単独で完結する experiment は `experiments/<topic>/` に置きます。
-- `experiments/` 配下の topic ディレクトリには、少なくとも README、`cases.py`、`experimentcode.py`、`result/` を置ける形にします。
+- `experiments/` 配下の topic ディレクトリには、少なくとも README、`cases.py`、`config.yaml`、`run.py`、`visualize.ipynb`、`result/` を置ける形にします。
 - topic ディレクトリ名は `snake_case` を使います。
 
 ### 3. 推奨レイアウト
@@ -39,7 +39,9 @@ experiments/
 └── <topic>/
     ├── README.md
     ├── cases.py
-    ├── experimentcode.py
+    ├── config.yaml
+    ├── run.py
+    ├── visualize.ipynb
     └── result/
         └── <run_name>/
 ```
@@ -52,9 +54,10 @@ experiments/report/
 ### 4. どこへ何を置くか
 
 - topic をまたいで再利用する protocol や scheduler は pip installed `experiment_runner` 側へ置きます。
-- その topic のためだけに存在する `cases.py` と `experimentcode.py` は `experiments/<topic>/` に置きます。
+- その topic のためだけに存在する `cases.py`、`config.yaml`、`run.py`、`visualize.ipynb` は `experiments/<topic>/` に置きます。
 - `cases.py` には case 列の展開と `resource_estimate(case)` を置きます。
-- `experimentcode.py` には `task(case, context)`、`context_builder(case)`、必要なら `initializer(context)` と `SkipController` を置きます。
+- `run.py` には `main::main`、runner 起動、final summary 生成を置きます。
+- `visualize.ipynb` には run artifact を読む図表化 cell を置きます。
 - 可視化や report 用の生成物は `result/<run_name>/` にまとめます。
 - topic 固有ディレクトリの README や note から、定式化と比較対象を必ず辿れるようにします。
 - 長時間実行で生成される JSON、JSONL、HTML、SVG、ログは `result/<run_name>/` に集約します。

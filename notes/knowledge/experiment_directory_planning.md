@@ -27,7 +27,9 @@ upstream design README.md notes lifecycle index
 
 - `experiments/<topic>/README.md`
 - `experiments/<topic>/cases.py`
-- `experiments/<topic>/experimentcode.py`
+- `experiments/<topic>/config.yaml`
+- `experiments/<topic>/run.py`
+- `experiments/<topic>/visualize.ipynb`
 - `experiments/<topic>/result/<run_name>/`
 - `experiments/report/<run_name>.md`
 

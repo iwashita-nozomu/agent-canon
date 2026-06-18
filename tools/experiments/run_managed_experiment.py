@@ -32,6 +32,8 @@ FILE_READ_CHUNK_BYTES = 1024 * 1024
 STREAM_TERMINATION_TIMEOUT_SECONDS = 10
 INTERRUPTED_EXIT_CODE = 130
 DURATION_ROUND_DIGITS = 3
+REGISTERED_COMMAND_KINDS = ("default", "formal")
+LEGACY_REGISTERED_COMMAND_ALIASES = {"smoke": "default"}
 
 
 @dataclass(frozen=True)
@@ -156,8 +158,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--use-registered-command",
-        choices=("smoke", "formal"),
-        help="Execute the canonical inner command from experiments/registry.toml for this topic.",
+        help="Execute a registered inner command from experiments/registry.toml for this topic.",
     )
     parser.add_argument(
         "--report-path",
@@ -182,7 +183,7 @@ def parse_args() -> argparse.Namespace:
         metavar="KEY=JSON",
         help=(
             "Add one JSON-encoded config value to result/<run_name>/config.json. "
-            "Example: --config seed=0 --config protocol='\"smoke\"'."
+            "Example: --config seed=0 --config enabled=true."
         ),
     )
     parser.add_argument(
@@ -324,7 +325,8 @@ def build_registry_config_snapshot(registry: RegistryContext) -> dict[str, objec
         "name": registry.entry.get("name"),
         "canonical_entrypoint": registry.entry.get("canonical_entrypoint"),
         "default_variant": registry.entry.get("default_variant"),
-        "smoke_inner_command": registry.entry.get("smoke_inner_command"),
+        "default_inner_command": registry.entry.get("default_inner_command")
+        or registry.entry.get("smoke_inner_command"),
         "formal_inner_command": registry.entry.get("formal_inner_command"),
     }
 
@@ -675,16 +677,40 @@ def format_command(command: list[str], placeholders: dict[str, str]) -> list[str
     return [token.format(**placeholders) for token in command]
 
 
+def normalize_registered_command_kind(command_kind: str) -> str:
+    """Return the canonical registered command kind."""
+    normalized = LEGACY_REGISTERED_COMMAND_ALIASES.get(command_kind, command_kind)
+    if normalized not in REGISTERED_COMMAND_KINDS:
+        allowed = ", ".join(REGISTERED_COMMAND_KINDS)
+        raise ValueError(f"unsupported registered command {command_kind!r}; expected {allowed}")
+    return normalized
+
+
+def registered_command_keys(command_kind: str) -> tuple[str, ...]:
+    """Return preferred registry keys for one command kind."""
+    normalized = normalize_registered_command_kind(command_kind)
+    keys = [f"{normalized}_inner_command"]
+    if normalized == "default":
+        keys.append("smoke_inner_command")
+    return tuple(keys)
+
+
 def command_from_registry(
     registry_entry: dict[str, object],
     command_kind: str,
     placeholders: dict[str, str],
 ) -> list[str]:
     """Return one formatted command from the registry."""
-    command_key = f"{command_kind}_inner_command"
-    raw_command = registry_entry.get(command_key)
-    if not isinstance(raw_command, str) or not raw_command.strip():
-        raise ValueError(f"registry entry is missing {command_key}")
+    checked_keys = registered_command_keys(command_kind)
+    raw_command: str | None = None
+    for command_key in checked_keys:
+        raw_value = registry_entry.get(command_key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            raw_command = raw_value
+            break
+    else:
+        raise ValueError(f"registry entry is missing one of {', '.join(checked_keys)}")
+    assert raw_command is not None
     return [token.format(**placeholders) for token in shlex.split(raw_command)]
 
 
@@ -694,7 +720,7 @@ def resolve_registered_command_match(
     """Return the matching registered command kind when one exists."""
     if not registry.available:
         return None
-    for command_kind in ("smoke", "formal"):
+    for command_kind in REGISTERED_COMMAND_KINDS:
         try:
             registered_command = command_from_registry(
                 registry.entry, command_kind, placeholders
@@ -826,17 +852,14 @@ def select_command(
             raise ValueError(
                 "--use-registered-command requires experiments/registry.toml"
             )
+        registered_kind = normalize_registered_command_kind(use_registered_command)
         command = command_from_registry(
-            registry.entry, use_registered_command, placeholders
+            registry.entry, registered_kind, placeholders
         )
         return CommandSelection(
             command=command,
-            source=f"registered:{use_registered_command}",
-            registered_match=resolve_registered_command_match(
-                registry,
-                command,
-                placeholders,
-            ),
+            source=f"registered:{registered_kind}",
+            registered_match=registered_kind,
         )
     command = format_command(manual_command, placeholders)
     return CommandSelection(
