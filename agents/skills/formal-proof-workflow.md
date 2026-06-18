@@ -197,6 +197,21 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   一律に除外しません。`P` がそれらの妥当性なら tree root として採用し、`P` が solver
   return / residual decrease なら、その戻り値に代入されない観測 path は substitution
   tree 外の execution evidence として扱います。
+- 定義だけで閉じる proof route は、採用前に循環性として分類します。候補となる
+  "必要十分条件" が `Iff.rfl`、`rfl`、または target predicate を同じ
+  stop / reachability predicate へ unfold するだけで閉じる場合、その theorem graph node は
+  `circularity_check` または `projection_only` です。これは theorem surface を
+  正しく投影できた構造証拠ですが、substantive な `Problem` / config 条件でも
+  finite-stop / convergence proof の完了でもありません。次 frontier は、その投影が
+  露出した非循環命題、典型的には実装 recurrence の residual reachability、
+  ranking / contraction、またはそれを導く problem-class witness です。
+  循環性は theorem 名、predicate 名、`certified` などの語彙ではなく、命題グラフの
+  到達可能性で判定します。conclusion node、certified-convergence node、または proposed
+  iff side から、definition / projection / equivalence / existential-lift /
+  certificate-inclusion edge を辿って、独立条件として採用したい problem class、
+  stop predicate、certificate、quantitative bound に到達するなら、その route は
+  `circularity_check` です。名前が違う場合や Lean proof が単一の `rfl` でない場合も、
+  graph が到達すれば convergence / finite-stop の必要十分条件として採用してはいけません。
 - backend / dtype / IREE / finite-precision semantics は production code や
   `InitializeConfig` へ proof-only field として足さず、JIT-canonical IR の
   `backend_assumptions` と Lemma Dependency Graph overlay に theorem variable /
@@ -396,6 +411,14 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   ある場合だけ `necessary_proven` とし、それ以外は `route_sufficient`、
   `candidate`、または `unknown` と明示します。必要性が未証明なら、命題を
   消さずに必要性主張だけを落とすのが proof-status 上の最小修正です。
+- `Condition ↔ Target` が `Condition := Target` の定義展開としてだけ成立する場合、
+  その route は `necessary_proven` ではなく `circularity_check` です。
+  これは語彙検査ではなく graph 検査で行います。target / conclusion 側から
+  proof-consumption edge を辿って、独立な `Problem` / config 条件として採用したい
+  node に戻るかを確認し、戻る path があれば route-certificate evidence としてだけ扱います。
+  proof graph 構造解析では、この node を採用済み target-chain 証明から外し、
+  `Target` を public inputs から導くための非循環 next witness を必ず別 node として
+  作ります。
 - JIT-canonical evidence、theorem graph slice、proof search query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。

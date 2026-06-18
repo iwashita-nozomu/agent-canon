@@ -8,13 +8,13 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
-upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
 upstream implementation ../../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
 upstream implementation ../../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
+upstream implementation ../../../tools/agent_tools/theorem_graph_circularity_check.py checks proposition-graph circularity for theorem routes
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
 -->
@@ -205,6 +205,26 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    code-aligned proof. If a leaf is free prose, an unrooted helper theorem, or a
    proof-only assumption, remove that path or reconnect it to code/argument/
    backend evidence.
+   Classify definition-only proof routes before adopting them. If a candidate
+   "necessary and sufficient condition" closes by `Iff.rfl`, pure `rfl`, or only
+   unfolding the target predicate into the same stop/reachability predicate,
+   mark the graph node as `circularity_check` or `projection_only`. Such a node
+   is valid structural evidence about the theorem surface, but it is not a
+   substantive `Problem` / config condition and must not close a convergence or
+   finite-stop proof. The next frontier is the non-circular obligation exposed
+   by that projection, usually residual reachability, a ranking/contraction
+   lemma for the implemented recurrence, or a problem-class witness that implies
+   the projected stop predicate.
+   Circularity must be checked on the proposition graph, not by vocabulary,
+   theorem names, or local proof style. A route is circular when the conclusion
+   node, certified-convergence node, or proposed iff side reaches the candidate
+   problem class, stop predicate, certificate, or quantitative bound through
+   definition, projection, equivalence, existential-lift, or
+   certificate-inclusion edges. Run the theorem graph circularity checker before
+   adopting a necessary/sufficient convergence or finite-stop claim; if the
+   graph reaches the proposed condition from the conclusion side, keep the row as
+   `circularity_check` even when the names differ and the Lean proof is not a
+   single `rfl`.
 1. After any algorithm update that changes initialization, cold-start,
    Phase-I, basin-entry, or selected-scope-entry logic, regenerate the selected
    route's IR/source-envelope evidence, generated Lean operational evidence,
@@ -363,6 +383,15 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    checker-backed necessity/refutation/minimality result establishes that
    status. Label them as `necessary_proven`, `route_sufficient`, `candidate`,
    `unknown`, or `algorithmic_blocker_proven`.
+   Definitionally equivalent wrappers are never `necessary_proven` by
+   themselves. If a theorem only states `Condition ↔ Target` because
+   `Condition` was defined as `Target`, record it as `circularity_check` and
+   continue proof search on the smallest non-circular proposition needed to
+   imply `Target` from the public inputs.
+   Do not implement this as a vocabulary scan over theorem names or predicate
+   names. The check is a graph reachability question: from the target/conclusion
+   side, follow only proof-consumption edges and fail the route if it reaches a
+   node that is supposed to be the independent `Problem` / config condition.
 1. Recursively re-enter the frontier loop on every named
    `unverified_with_next_witness` item until it is verified, refuted, proved
    unprovable under the current assumptions, or explicitly remains open with a
