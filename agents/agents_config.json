@@ -843,44 +843,6 @@
         ],
         "notes": "The report reviewer records report-structure and evidence-traceability findings only in the report review artifact."
       }
-    },
-    {
-      "id": "critical_guardian",
-      "codex_agents": [
-        "project_reviewer"
-      ],
-      "tier": "governance",
-      "activation": "always_on",
-      "always_evaluates": [
-        "pull_requests",
-        "skill_executions",
-        "releases",
-        "scheduled_reviews"
-      ],
-      "owns": [
-        "critical_risk_assessment",
-        "security_threat_detection",
-        "architecture_validation",
-        "testing_completeness_check",
-        "dependency_conflict_analysis",
-        "implementation_gap_detection"
-      ],
-      "required_outputs": [
-        "critical_review.md"
-      ],
-      "authority": {
-        "can_block_merge": true,
-        "can_request_changes": true,
-        "can_downvote_health_score": true,
-        "escalation_capable": true
-      },
-      "write_policy": {
-        "mode": "artifacts_only",
-        "allowed_artifacts": [
-          "critical_review"
-        ],
-        "notes": "The critical guardian provides always-on critical assessment of risks, security threats, and implementation completeness. Can block merge on critical issues only. Provides alternative suggestions and gap analysis."
-      }
     }
   ],
   "handoffs": [
@@ -1201,23 +1163,18 @@
     },
     {
       "from": "implementer",
-      "to": "critical_guardian",
-      "gate": "implementation is complete and ready for critical assessment"
+      "to": "project_reviewer",
+      "gate": "implementation is complete and ready for project review"
     },
     {
       "from": "final_reviewer",
-      "to": "critical_guardian",
-      "gate": "implementation ready for critical risk and security assessment"
+      "to": "project_reviewer",
+      "gate": "implementation ready for project integration assessment"
     },
     {
       "from": "experimenter",
-      "to": "critical_guardian",
-      "gate": "experimental results ready for critical validation"
-    },
-    {
-      "from": "critical_guardian",
-      "to": "manager_reviewer",
-      "gate": "critical assessment complete, escalation required or merge approval given"
+      "to": "project_reviewer",
+      "gate": "experimental results ready for project integration assessment"
     }
   ],
   "context_policies": [
@@ -1553,29 +1510,6 @@
         "hidden_chain_of_thought",
         "direct_session_memory"
       ]
-    },
-    {
-      "roles": [
-        "critical_guardian"
-      ],
-      "mode": "assessment_view",
-      "share_only": [
-        "intent_brief.md",
-        "design_brief.md",
-        "design_review.md",
-        "document_flow_review.md",
-        "change_review.md",
-        "final_review.md",
-        "experiment_log.md",
-        "experiment_review.md",
-        "research_notes.md",
-        "research_review.md"
-      ],
-      "do_not_share": [
-        "hidden_chain_of_thought",
-        "private_debugging_notes"
-      ],
-      "notes": "Critical guardian has read-only access to all significant artifacts to perform comprehensive risk, security, and completeness assessment."
     }
   ],
   "activation_rules": [
@@ -1625,7 +1559,7 @@
     },
     {
       "role": "project_reviewer",
-      "when": "task is comprehensive, repo-wide, workflow-heavy, or has integration risk across code, docs, tools, and runtime"
+      "when": "task is comprehensive, repo-wide, workflow-heavy, has integration risk across code, docs, tools, and runtime, creates a pull request, completes a skill execution, initiates a release, or enters scheduled review"
     },
     {
       "role": "docs_workflow_steward",
@@ -1670,10 +1604,6 @@
     {
       "role": "ml_science_reviewer",
       "when": "research perspective review pack is requested for assumptions, limitations, uncertainty, or reader-facing reporting"
-    },
-    {
-      "role": "critical_guardian",
-      "when": "pull request created, skill execution completed, release initiated, or scheduled daily review at 02:00 UTC"
     }
   ],
   "quality_gates": [
@@ -1723,7 +1653,6 @@
     "benchmark_review": "benchmark_review.md",
     "artifact_review": "artifact_review.md",
     "fair_data_review": "fair_data_review.md",
-    "ml_science_review": "ml_science_review.md",
-    "critical_review": "critical_review.md"
+    "ml_science_review": "ml_science_review.md"
   }
 }

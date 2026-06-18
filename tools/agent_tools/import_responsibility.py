@@ -101,22 +101,33 @@ class Report:
 class ScopeIndex:
     """Resolve repository paths to responsibility scope IDs."""
 
-    def __init__(self, scopes: Sequence[Scope]) -> None:
+    def __init__(self, scopes: Sequence[Scope], root: Path) -> None:
         """Store scopes for path lookup."""
         self.scopes = tuple(scopes)
+        self.root = root.resolve()
 
     def scope_for(self, path: str) -> str | None:
         """Return the most specific scope covering a path."""
+        scope_path = self.scope_path(path)
         matches: list[tuple[int, str]] = []
         for scope in self.scopes:
-            if any(pattern_covers(pattern, path) for pattern in scope.exclude_paths):
+            if any(pattern_covers(pattern, scope_path) for pattern in scope.exclude_paths):
                 continue
             for pattern in scope.paths:
-                if pattern_covers(pattern, path):
+                if pattern_covers(pattern, scope_path):
                     matches.append((len(pattern), scope.scope_id))
         if not matches:
             return None
         return sorted(matches)[-1][1]
+
+    def scope_path(self, path: str) -> str:
+        """Return the canonical path used for scope lookup."""
+        candidate = self.root / path
+        try:
+            resolved = candidate.resolve().relative_to(self.root).as_posix()
+        except ValueError:
+            return path
+        return resolved if resolved != path else path
 
 
 class ImportCollector(ast.NodeVisitor):
@@ -215,7 +226,7 @@ def mapping_list(value: object) -> tuple[Mapping[str, object], ...]:
     )
 
 
-def load_scope_index(path: Path) -> tuple[ScopeIndex, dict[str, ImportRule]]:
+def load_scope_index(root: Path, path: Path) -> tuple[ScopeIndex, dict[str, ImportRule]]:
     """Load scopes and import rules from a responsibility manifest."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     scopes = tuple(
@@ -233,7 +244,7 @@ def load_scope_index(path: Path) -> tuple[ScopeIndex, dict[str, ImportRule]]:
         )
         for item in mapping_list(data.get("import_rule"))
     }
-    return ScopeIndex(scopes), rules
+    return ScopeIndex(scopes, root), rules
 
 
 def resolve_manifest_path(root: Path, manifest: str) -> Path:
@@ -541,7 +552,7 @@ def check_imports(
     baseline_ref: str,
 ) -> Report:
     """Check import usage and responsibility boundaries."""
-    scope_index, rules = load_scope_index(resolve_manifest_path(root, manifest))
+    scope_index, rules = load_scope_index(root, resolve_manifest_path(root, manifest))
     findings: list[Finding] = []
     import_count = 0
     checked_paths = checked_python_paths(
@@ -562,7 +573,12 @@ def check_imports(
     return Report(
         files=len(checked_paths),
         imports=import_count,
-        findings=tuple(sorted(findings, key=lambda item: (item.path, item.line, item.check, item.detail))),
+        findings=tuple(
+            sorted(
+                dict.fromkeys(findings),
+                key=lambda item: (item.path, item.line, item.check, item.detail),
+            )
+        ),
     )
 
 

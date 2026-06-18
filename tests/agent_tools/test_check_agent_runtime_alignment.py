@@ -182,6 +182,132 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 },
             )
 
+    def test_public_skill_document_contract_rejects_extra_public_doc(self) -> None:
+        """Public skill docs must be catalog-backed instead of internal routines."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True)
+            (root / "agents" / "internal-routines").mkdir(parents=True)
+            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "extra.md").write_text("# Extra\n", encoding="utf-8")
+            (root / "agents" / "internal-routines" / "README.md").write_text(
+                "# Internal\n",
+                encoding="utf-8",
+            )
+            catalog = {
+                "skill_families": [
+                    {
+                        "id": "example",
+                        "canonical_doc": "agents/skills/example.md",
+                        "shim": ".agents/skills/example/SKILL.md",
+                    }
+                ]
+            }
+
+            with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
+                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+
+    def test_public_skill_document_contract_rejects_nested_extra_public_doc(self) -> None:
+        """Nested Markdown in agents/skills also belongs to the public contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills" / "extra").mkdir(parents=True)
+            (root / "agents" / "internal-routines").mkdir(parents=True)
+            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "extra" / "note.md").write_text(
+                "# Extra\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "internal-routines" / "README.md").write_text(
+                "# Internal\n",
+                encoding="utf-8",
+            )
+            catalog = {
+                "skill_families": [
+                    {
+                        "id": "example",
+                        "canonical_doc": "agents/skills/example.md",
+                        "shim": ".agents/skills/example/SKILL.md",
+                    }
+                ]
+            }
+
+            with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
+                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+
+    def test_public_skill_document_contract_accepts_catalog_docs_and_internal_routines(self) -> None:
+        """Internal routines live outside the public skill doc contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True)
+            (root / "agents" / "internal-routines").mkdir(parents=True)
+            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "internal-routines" / "README.md").write_text(
+                "# Internal\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "internal-routines" / "review.md").write_text(
+                "# Review\n",
+                encoding="utf-8",
+            )
+            catalog = {
+                "skill_families": [
+                    {
+                        "id": "example",
+                        "canonical_doc": "agents/skills/example.md",
+                        "shim": ".agents/skills/example/SKILL.md",
+                    }
+                ]
+            }
+
+            runtime_alignment.validate_public_skill_document_contract(catalog, root)
+
+    def test_public_skill_shims_reject_extra_shim_without_catalog_entry(self) -> None:
+        """Runtime discovery shims must match the public skill catalog."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True)
+            (root / "agents" / "internal-routines").mkdir(parents=True)
+            (root / ".agents" / "skills" / "example").mkdir(parents=True)
+            (root / ".agents" / "skills" / "extra").mkdir(parents=True)
+            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: example",
+                        "    purpose: Example public skill.",
+                        "    canonical_doc: agents/skills/example.md",
+                        "    shim: .agents/skills/example/SKILL.md",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "internal-routines" / "README.md").write_text(
+                "# Internal\n",
+                encoding="utf-8",
+            )
+            (root / ".agents" / "skills" / "example" / "SKILL.md").write_text(
+                "---\nname: example\n---\n# Example\n",
+                encoding="utf-8",
+            )
+            (root / ".agents" / "skills" / "extra" / "SKILL.md").write_text(
+                "---\nname: extra\n---\n# Extra\n",
+                encoding="utf-8",
+            )
+
+            with (
+                patch.object(runtime_alignment, "ROOT", root),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                self.assertRaisesRegex(RuntimeError, "missing catalog entries: extra"),
+            ):
+                runtime_alignment.validate_public_skill_shims()
+
     def test_runtime_max_depth_is_exposed_for_spawn_policy(self) -> None:
         """The generator must expose max_depth for delegated spawn policies."""
         self.assertEqual(codex_runtime_max_depth(), 2)

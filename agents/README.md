@@ -29,6 +29,7 @@ agent runtime、workflow、skill、subagent のどこを開くかだけを決め
 | Codex task の実行順を見る | [canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md), [canonical/CLI_ENTRYPOINTS.md](canonical/CLI_ENTRYPOINTS.md) | bootstrap、plan、implementation、closeout の順序を確認する |
 | run artifact の置き場を確認する | [canonical/ARTIFACT_PLACEMENT.md](canonical/ARTIFACT_PLACEMENT.md) | reports、issues、notes、experiments の責務を分ける |
 | skill を選ぶ | [skills/README.md](skills/README.md), [skills/catalog.yaml](skills/catalog.yaml) | 個別 skill 文書へ進む前に family と trigger を決める |
+| internal routine を確認する | [internal-routines/README.md](internal-routines/README.md) | workflow が呼ぶ review / validation / compatibility routine を見る |
 
 個別 skill のリンク一覧は `skills/README.md` と `skills/catalog.yaml` に集約します。
 この hub には常用 skill の抜粋を増やしません。
@@ -43,7 +44,8 @@ agent runtime、workflow、skill、subagent のどこを開くかだけを決め
 ## Skills And Subagents
 
 - Public Codex skill discovery: `.agents/skills/`
-- Human-readable public, internal, and compatibility skill docs: `agents/skills/`
+- Human-readable public skill docs: `agents/skills/`
+- Workflow-routed internal and compatibility routines: `agents/internal-routines/`
 - Codex runtime config and subagent registry: `.codex/config.toml`
 - Codex role behavior: `.codex/agents/*.toml`
 - Eval manifest source contracts: `evidence/agent-evals/`
@@ -55,7 +57,7 @@ agent runtime、workflow、skill、subagent のどこを開くかだけを決め
 - Lite scoped always-on roles:
   - `manager`, `implementer`, `change_reviewer`, `verifier`, `auditor`
 - Specialist roles:
-  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `prompt_config_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
+  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `prompt_config_reviewer`, `project_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`
 - `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。

@@ -79,6 +79,24 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("scope-import:app/main.py:1:app->tools", result.stdout)
 
+    def test_duplicate_scope_import_findings_are_collapsed(self) -> None:
+        """One import statement should emit one stable scope finding."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_file(
+                root,
+                "app/main.py",
+                "from tools.helper import OTHER, VALUE\n\nRESULT = OTHER + VALUE\n",
+            )
+            self.write_file(root, "tools/helper.py", "OTHER = 1\nVALUE = 2\n")
+
+            result = self.run_checker(root, "app/main.py")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.count("IMPORT_RESPONSIBILITY_FINDING="), 1)
+            self.assertIn("IMPORT_RESPONSIBILITY_FINDINGS=1", result.stdout)
+
     def test_allowed_scope_import_passes(self) -> None:
         """Declared import rules allow intentional local scope crossings."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -88,6 +106,49 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.write_file(root, "app/lib.py", "VALUE = 1\n")
 
             result = self.run_checker(root, "tests/test_main.py")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
+
+    def test_symlinked_root_view_uses_source_scope(self) -> None:
+        """Root-view symlinks should be scoped by their AgentCanon source."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_file(
+                root,
+                "responsibility-scope.toml",
+                "\n".join(
+                    [
+                        'catalog_kind = "agent_canon_responsibility_scope"',
+                        "version = 1",
+                        "[[scope]]",
+                        'id = "agent-canon-runtime-view"',
+                        'paths = ["vendor/agent-canon/**", "tools"]',
+                        "",
+                        "[[scope]]",
+                        'id = "template-active-contract"',
+                        'paths = ["tests/**"]',
+                        "",
+                    ]
+                ),
+            )
+            self.write_file(
+                root,
+                "vendor/agent-canon/tests/agent_tools/test_helper.py",
+                "from tools.agent_tools.helper import VALUE\n\nRESULT = VALUE\n",
+            )
+            self.write_file(
+                root,
+                "vendor/agent-canon/tools/agent_tools/helper.py",
+                "VALUE = 1\n",
+            )
+            (root / "tests" / "agent_tools").mkdir(parents=True)
+            (root / "tools").symlink_to("vendor/agent-canon/tools", target_is_directory=True)
+            (root / "tests" / "agent_tools" / "test_helper.py").symlink_to(
+                "../../vendor/agent-canon/tests/agent_tools/test_helper.py"
+            )
+
+            result = self.run_checker(root, "tests/agent_tools/test_helper.py")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)

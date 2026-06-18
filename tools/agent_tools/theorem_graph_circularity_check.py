@@ -14,9 +14,10 @@ import argparse
 import json
 import sys
 from collections import defaultdict, deque
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 
 @dataclass(frozen=True)
@@ -52,32 +53,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_graph(path: Path) -> dict[str, Any]:
+def load_graph(path: Path) -> dict[str, object]:
     """Load theorem graph JSON."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("graph must be a JSON object")
-    return cast(dict[str, Any], payload)
+    return cast(dict[str, object], payload)
 
 
-def rows(value: object) -> list[dict[str, Any]]:
+def rows(value: object) -> list[dict[str, object]]:
     """Return object rows from a JSON list."""
     if not isinstance(value, list):
         return []
-    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+    items = cast(list[object], value)
+    return [cast(dict[str, object], item) for item in items if isinstance(item, dict)]
 
 
 def string_set(value: object) -> set[str]:
     """Return a set of strings from a JSON list."""
     if not isinstance(value, list):
         return set()
-    return {str(item) for item in value}
+    return {str(item) for item in cast(list[object], value)}
 
 
-def graph_indexes(graph: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+def graph_indexes(
+    graph: Mapping[str, object],
+) -> tuple[dict[str, dict[str, object]], dict[str, list[dict[str, object]]]]:
     """Return node and outgoing-edge indexes."""
     nodes = {str(node["id"]): node for node in rows(graph.get("nodes")) if "id" in node}
-    outgoing: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    outgoing: dict[str, list[dict[str, object]]] = defaultdict(list)
     for edge in rows(graph.get("edges")):
         if "source" not in edge or "target" not in edge:
             continue
@@ -88,8 +92,8 @@ def graph_indexes(graph: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dic
 def reachable_path(
     *,
     start: str,
-    nodes: dict[str, dict[str, Any]],
-    outgoing: dict[str, list[dict[str, Any]]],
+    nodes: Mapping[str, Mapping[str, object]],
+    outgoing: Mapping[str, list[dict[str, object]]],
     allowed_edge_kinds: set[str],
     forbidden_node_kinds: set[str],
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
@@ -116,8 +120,8 @@ def reachable_path(
 
 
 def detect_directed_cycles(
-    nodes: dict[str, dict[str, Any]],
-    outgoing: dict[str, list[dict[str, Any]]],
+    nodes: Mapping[str, Mapping[str, object]],
+    outgoing: Mapping[str, list[dict[str, object]]],
 ) -> list[tuple[str, ...]]:
     """Detect simple directed cycles for diagnostic evidence."""
     cycles: set[tuple[str, ...]] = set()
@@ -149,7 +153,7 @@ def detect_directed_cycles(
 
 
 def check_circularity(
-    graph: dict[str, Any],
+    graph: Mapping[str, object],
 ) -> tuple[list[CircularityFinding], list[str], list[tuple[str, ...]]]:
     """Run configured circularity checks."""
     nodes, outgoing = graph_indexes(graph)
