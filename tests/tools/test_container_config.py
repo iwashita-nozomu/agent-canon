@@ -56,6 +56,10 @@ POST_CREATE_LEAN_SNIPPETS = (
     "lean --version",
     "lake --version",
 )
+POST_CREATE_CODEX_SNIPPETS = (
+    "codex --version >/dev/null",
+    "npm install -g @openai/codex",
+)
 
 
 def run_validator(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -220,7 +224,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 'git config --global --add safe.directory "$workspace"',
                 "repo-local Python dependency installer absent",
                 "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg",
-                "npm install -g @openai/codex",
+                *POST_CREATE_CODEX_SNIPPETS,
                 "rustup toolchain install",
                 "rustfmt",
                 "clippy",
@@ -303,7 +307,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 'git config --global --add safe.directory "$workspace"',
                 "repo-local Python dependency installer absent",
                 "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg",
-                "npm install -g @openai/codex",
+                *POST_CREATE_CODEX_SNIPPETS,
                 "rustup toolchain install",
                 "rustfmt",
                 "clippy",

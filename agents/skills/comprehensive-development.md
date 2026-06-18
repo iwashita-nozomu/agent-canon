@@ -55,7 +55,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 1. `execution_planner` に stage order と `Write Scope Per Agent:` を書かせます。
 1. `plan_reviewer` に review separation、rollback point、parallel write safety を見させます。
 1. `detailed_designer` と `detailed_design_reviewer` を通したあと、一般説明 prose の文書があるなら `document_flow_reviewer` と docs reviewer を通します。
-1. code 変更では `test_designer` を立てて static path と nasty case を `test_plan.md` に固定します。
+1. observable behavior、regression risk、または test contract を変える code 変更では `test_designer` を立てて static path と nasty case を `test_plan.md` に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
 1. `worker` は bounded slice だけを担当し、親が 1 本ずつ統合します。
 1. `project_reviewer` を closeout に再投入し、slice ごとではなく全体の integration risk を閉じます。
 

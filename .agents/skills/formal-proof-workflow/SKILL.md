@@ -24,6 +24,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
 1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, use the JIT-canonical public root consumed by the theorem.
+1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan,
+   target-language scaffold, existing formal proofs search packet, and
+   literature queries before adopting theorem text or proof obligations.
 1. For implementation-derived algorithm proofs, always start from the whole
    target theorem over the JIT-canonical public entrypoint, normally the
    `main(problem, InitializeConfig, ...)` or equivalent run function and its
@@ -31,6 +34,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    helper lemma, inner solver claim, loop-control fact, residual component, or
    hand-selected local theorem unless it is selected by recursively decomposing
    that top-level main theorem.
+1. For implementation-derived claims, fix a `program contract` before theorem
+   text or reader-facing prose: public entrypoint, input schema, runtime
+   profile, return projection, observable effect, assumptions / preconditions,
+   and checker / validation command.
 1. Build the theorem statement from the public root's static argument schema
    and return schema. The target theorem must talk about `let out := main
    problem config` and its returned `Answer` / `State` / `Info` fields, or

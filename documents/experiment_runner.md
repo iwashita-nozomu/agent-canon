@@ -105,7 +105,9 @@ upstream design README.md durable document index
   - 必要なら `SkipController`
   - runner 起動と final summary 生成
 
-実験ごとに worker class や scheduler class を増やすことを既定にしません。まずは `StandardWorker` と `StandardFullResourceScheduler` を使います。
+実験ごとの既定構成は `StandardWorker` と `StandardFullResourceScheduler` です。
+worker class や scheduler class を増やす場合は、topic 固有の resource model と
+validation route を README または run plan に書きます。
 
 ## 3.1 topic の公開入口
 

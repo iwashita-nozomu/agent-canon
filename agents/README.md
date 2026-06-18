@@ -60,7 +60,9 @@ agent runtime、workflow、skill、subagent のどこを開くかだけを決め
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
-- code 変更では `test_designer` を実装前に立て、最も意地の悪い case を `test_plan.md` に固定します。
+- behavior-changing、regression-prone、または high-risk code 変更では
+  `test_designer` を実装前に立て、最も意地の悪い case を `test_plan.md` に固定します。
+  contract-only wrapper では checker-owned validation と static contract evidence を使います。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
 - repo file edit は parent-managed write scope で割り当て、同一 path / ownership / public API surface を複数 writer に割り当てません。
 - `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。

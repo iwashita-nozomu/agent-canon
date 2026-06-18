@@ -9,6 +9,21 @@ skill_families:
     purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
     shim: .agents/skills/agent-orchestration/SKILL.md
+    routing:
+      stage_policy: active
+      reason: workflow, skill, subagent, or stage routing is part of the request
+      triggers:
+        - ["どのスキル"]
+        - ["どのskill"]
+        - ["スキル選択"]
+        - ["skill selection"]
+        - ["routing", "skill"]
+        - ["ルーティング", "スキル"]
+        - ["マルチエージェント"]
+        - ["サブエージェント", "起動"]
+        - ["subagent", "routing"]
+        - ["workflow=", "skills="]
+        - ["根本", "設計", "見直"]
   - id: repo-onboarding
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
@@ -17,6 +32,23 @@ skill_families:
     purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
     canonical_doc: agents/skills/task-routing.md
     shim: .agents/skills/task-routing/SKILL.md
+    routing:
+      stage_policy: active
+      reason: skill/tool routing architecture or route contract design is in scope
+      triggers:
+        - ["ルーティング", "改善"]
+        - ["ルーティング", "リファクタ"]
+        - ["routing", "redesign"]
+        - ["routing", "architecture"]
+        - ["route", "contract"]
+        - ["skill", "tool", "routing"]
+        - ["skill", "走査"]
+        - ["skill", "scan"]
+        - ["スキル", "走査"]
+        - ["スキル", "一つずつ"]
+        - ["スキル選択", "ルーティング"]
+        - ["スキル", "ツール", "ルーティング"]
+        - ["根本", "設計", "見直"]
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
@@ -29,10 +61,27 @@ skill_families:
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
     shim: .agents/skills/subagent-bootstrap/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: explicit subagent or multi-agent execution requires run-local specialist routing
+      triggers:
+        - ["マルチエージェント"]
+        - ["サブエージェント"]
+        - ["subagent"]
+        - ["multi-agent"]
   - id: change-review
     purpose: Review diffs for regressions, missing validation, and stale docs.
     canonical_doc: agents/skills/change-review.md
     shim: .agents/skills/change-review/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: review findings or implementation changes need findings-first review
+      triggers:
+        - ["全体", "レビュー"]
+        - ["review", "findings"]
+        - ["diff", "review"]
+        - ["コード", "レビュー"]
+        - ["根本", "設計", "レビュー"]
   - id: python-review
     purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
     canonical_doc: agents/skills/python-review.md
@@ -45,10 +94,33 @@ skill_families:
     purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
+    routing:
+      stage_policy: active
+      reason: OOP readability or readability guard evidence is in scope
+      triggers:
+        - ["oop", "readability"]
+        - ["oop", "可読"]
+        - ["オブジェクト指向", "可読"]
+        - ["readability", "guard"]
+        - ["readability", "check"]
+        - ["可読性", "class"]
+        - ["可読性", "method"]
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
     shim: .agents/skills/result-artifact-writeout/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: raw results, reports, manifests, or accumulated evidence must be written out
+      triggers:
+        - ["結果書き出し"]
+        - ["結果を書き出"]
+        - ["result writeout"]
+        - ["artifact", "evidence"]
+        - ["artifact", "report"]
+        - ["run bundle", "evidence"]
+        - ["蓄積分析", "レポート"]
+        - ["ログ", "レポート", "残"]
   - id: tool-finding-report
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
@@ -57,6 +129,25 @@ skill_families:
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
     shim: .agents/skills/agent-log-analysis/SKILL.md
+    routing:
+      stage_policy: active
+      reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
+      triggers:
+        - ["routing miss"]
+        - ["selection gap"]
+        - ["routing", "coverage"]
+        - ["toolcall", "skillcall", "coverage"]
+        - ["toolcall", "skillcall", "routing"]
+        - ["toolcall", "skillcall", "miss"]
+        - ["toolcall", "skillcall", "50"]
+        - ["toolcall", "skillcall", "されない"]
+        - ["ルーティング", "ログ"]
+        - ["ログ", "skill"]
+        - ["ログ", "tool"]
+        - ["toolcall", "skillcall", "ルーティング"]
+        - ["runbundle", "agent", "レポート"]
+        - ["run bundle", "agent", "report"]
+        - ["過去", "agent", "レポート"]
   - id: agent-eval-accumulation
     purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
     canonical_doc: agents/skills/agent-eval-accumulation.md
@@ -65,10 +156,38 @@ skill_families:
     purpose: Update AgentCanon source, parent submodule pins, root runtime views, and parent update TODO state through the canonical high-level route.
     canonical_doc: agents/skills/agent-canon-update.md
     shim: .agents/skills/agent-canon-update/SKILL.md
+    routing:
+      stage_policy: active
+      reason: AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope
+      triggers:
+        - ["ensure-latest"]
+        - ["parent", "pin", "vendor"]
+        - ["submodule", "pin"]
+        - ["agentcanon", "update"]
+        - ["agent-canon", "update"]
+        - ["vendor/agent-canon"]
   - id: pr-processing
     purpose: Process GitHub pull request and issue queues by inventorying state, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
     shim: .agents/skills/pr-processing/SKILL.md
+    routing:
+      stage_policy: active
+      reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
+      triggers:
+        - ["pr", "処理"]
+        - ["pr", "merge"]
+        - ["pr", "マージ"]
+        - ["pr", "取り込"]
+        - ["pr", "片づ"]
+        - ["pull request"]
+        - ["pull request", "merge"]
+        - ["merge queue"]
+        - ["conflict", "解消"]
+        - ["コンフリクト", "解消"]
+        - ["issue", "triage"]
+        - ["issue", "処理"]
+        - ["branch protection"]
+        - ["required checks"]
   - id: agent-update-branch
     purpose: Isolate memory, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
     canonical_doc: agents/skills/agent-update-branch.md
@@ -81,10 +200,32 @@ skill_families:
     purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
     canonical_doc: agents/skills/prose-reasoning-graph.md
     shim: .agents/skills/prose-reasoning-graph/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: prose structure graphing, diagnostics, or rewrite handoff is in scope
+      triggers:
+        - ["文章構造", "graph"]
+        - ["文章構造", "グラフ"]
+        - ["段落", "接続"]
+        - ["段落", "統合"]
+        - ["dsl", "文章"]
+        - ["prose", "graph"]
+        - ["prose", "reasoning"]
+        - ["rewrite", "packet"]
+        - ["claim", "evidence", "graph"]
   - id: structure-planning
     purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md
     shim: .agents/skills/structure-planning/SKILL.md
+    routing:
+      stage_policy: active
+      reason: nontrivial design or document structure must be fixed before edits
+      triggers:
+        - ["構造解析"]
+        - ["文書", "構造", "解析"]
+        - ["設計", "構造"]
+        - ["structure", "contract"]
+        - ["根本", "設計", "構造"]
   - id: html-output
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md
@@ -97,14 +238,74 @@ skill_families:
     purpose: Statically diagnose brittle tests and design resilient behavior contracts, oracles, property/metamorphic candidates, and adversarial cases before implementation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
+    routing:
+      stage_policy: active
+      reason: test strategy, brittle tests, contract-only wrappers, or unnecessary numerical tests are in scope
+      triggers:
+        - ["test-design"]
+        - ["test", "design"]
+        - ["テスト", "設計"]
+        - ["contract-only", "wrapper"]
+        - ["contract", "only", "wrapper"]
+        - ["契約だけ"]
+        - ["契約", "wrapper"]
+        - ["static", "contract", "validation"]
+        - ["pytest", "smoke"]
+        - ["execution-only", "test"]
+        - ["no-crash", "test"]
+        - ["不要", "テスト"]
+        - ["不要", "数値テスト"]
+        - ["数値テスト"]
+        - ["数値", "テスト"]
+        - ["numerical", "test"]
+        - ["numeric", "test"]
+        - ["unnecessary", "test"]
+        - ["heavy", "test"]
+        - ["brittle", "test"]
+        - ["tolerance", "test"]
+        - ["seed", "test"]
   - id: refactor-loop
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
     shim: .agents/skills/refactor-loop/SKILL.md
+    routing:
+      stage_policy: active
+      reason: behavior-preserving refactor work needs an explicit loop and review gates
+      triggers:
+        - ["リファクタ"]
+        - ["refactor"]
+        - ["refactoring"]
+        - ["behavior-preserving"]
+        - ["repair slice"]
+        - ["抽象化"]
   - id: structure-refactor
     purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
     canonical_doc: agents/skills/structure-refactor.md
     shim: .agents/skills/structure-refactor/SKILL.md
+    routing:
+      stage_policy: active
+      reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
+      triggers:
+        - ["レポ", "リファクタ"]
+        - ["repo", "refactor"]
+        - ["repository", "refactor"]
+        - ["repo", "structure"]
+        - ["repository", "structure"]
+        - ["ディレクトリ", "構成"]
+        - ["directory", "structure"]
+        - ["path", "layout"]
+        - ["path", "responsibility"]
+        - ["source", "ownership"]
+        - ["構造", "レビュー"]
+        - ["構造", "review"]
+        - ["structure", "review"]
+        - ["structural", "review"]
+        - ["構造", "スキル", "弱"]
+        - ["構成", "考え直"]
+        - ["~/.codex"]
+        - [".codex", "config"]
+        - ["codex", "personal", "runtime"]
+        - ["personal", "runtime", "surface"]
   - id: user-guided-debugging
     purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
     canonical_doc: agents/skills/user-guided-debugging.md
@@ -125,6 +326,27 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: Markdown style, links, headings, or docs lint are in scope
+      triggers:
+        - ["md-style"]
+        - ["docs-check"]
+        - ["agent-canon", "docs"]
+        - ["docs", "format"]
+        - ["docs", "check"]
+        - ["markdownlint"]
+        - ["markdown", "lint"]
+        - ["markdown", "heading"]
+        - ["markdown", "link"]
+        - ["markdown", "formatter"]
+        - ["format_markdown"]
+        - ["formatter", "adjacent"]
+        - ["フォーマッタ"]
+        - ["フォーマット", "周辺"]
+        - ["通してすらない"]
+        - ["マークダウン", "体裁"]
+        - ["マークダウン", "リンク"]
   - id: mvp-skeleton
     purpose: Keep MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
     canonical_doc: agents/skills/mvp-skeleton.md
@@ -157,6 +379,24 @@ skill_families:
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md
     shim: .agents/skills/adaptive-improvement-loop/SKILL.md
+    routing:
+      stage_policy: active
+      reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
+      triggers:
+        - ["反復実行"]
+        - ["継続反復"]
+        - ["改善ループ"]
+        - ["改善", "backlog"]
+        - ["実験", "改善", "反復"]
+        - ["実験", "チューニング", "継続"]
+        - ["調査", "チューニング", "反復"]
+        - ["code change", "run", "継続反復"]
+        - ["iterative", "code improvement"]
+        - ["iterative", "tuning"]
+        - ["backlog-driven", "outer loop"]
+        - ["adaptive", "improvement", "loop"]
+        - ["experiment", "tuning", "loop"]
+        - ["research", "tuning", "improvement"]
   - id: literature-survey
     purpose: Search for primary sources, prior art, contradictory evidence, and reusable bibliography structure.
     canonical_doc: agents/skills/literature-survey.md
@@ -181,6 +421,16 @@ skill_families:
     purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
     canonical_doc: agents/skills/comprehensive-development.md
     shim: .agents/skills/comprehensive-development/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation
+      triggers:
+        - ["根本", "設計", "ルーティング"]
+        - ["根本", "設計", "routing"]
+        - ["全体", "レビュー", "修正"]
+        - ["architecture", "redesign"]
+        - ["workflow", "tools", "docs"]
+        - ["repo-wide", "routing"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -193,3 +443,14 @@ skill_families:
     purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
     shim: .agents/skills/agent-learning/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: user feedback or recurrence prevention should become durable agent learning
+      triggers:
+        - ["人間からのフィードバック"]
+        - ["runtime feedback"]
+        - ["再発防止"]
+        - ["こういう止まり方"]
+        - ["フィードバック", "修正"]
+        - ["feedback", "repair"]
+        - ["memory", "feedback"]

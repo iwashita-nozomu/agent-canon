@@ -320,6 +320,89 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
 
+    def test_prompt_route_invalid_catalog_fails_structured(self) -> None:
+        """Invalid catalog routing should return a structured router error."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: task-routing",
+                        "    routing:",
+                        "      stage_policy: someday",
+                        "      reason: bad fixture",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "routing",
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("SKILL_ROUTER_ERROR=", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_prompt_route_malformed_catalog_yaml_fails_structured(self) -> None:
+        """Malformed catalog YAML should return a structured router error."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text("skill_families: [unterminated\n", encoding="utf-8")
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "routing",
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("SKILL_ROUTER_ERROR=", result.stderr)
+        self.assertIn("YAML parse failed", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_prompt_route_duplicate_catalog_skill_fails_structured(self) -> None:
+        """Duplicate catalog skill IDs should fail before route selection."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: task-routing",
+                        "  - id: task-routing",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "routing",
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("SKILL_ROUTER_ERROR=duplicate skill catalog id: task-routing", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_prompt_routes_formatter_adjacent_checks_to_markdown_style(self) -> None:
         """Formatter-adjacent check complaints should route to Markdown style checks."""
         result = self.run_route(
@@ -375,6 +458,39 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("pr-processing", decision["skills"])
         self.assertIn("pr-processing", decision["matched_skills"])
+
+    def test_prompt_routes_pr_skill_scan_routing_refactor(self) -> None:
+        """PR intake followed by skill scan and routing refactor should not fall through."""
+        prompt = (
+            "PRをすべて取り込み、その後、Skillを一つずつ走査し"
+            "ルーティングも含めてリファクタリング。実装時の抽象化不足も修正対象。"
+        )
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        for skill in ("task-routing", "pr-processing", "refactor-loop"):
+            self.assertIn(skill, python_decision["matched_skills"])
+            self.assertIn(skill, python_decision["active_skills"])
+        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        for key in (
+            "skills",
+            "active_skills",
+            "deferred_skills",
+            "matched_skills",
+        ):
+            self.assertEqual(python_decision[key], rust_decision[key], key)
 
     def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
         """Unneeded numerical-test complaints should activate test-design routing."""

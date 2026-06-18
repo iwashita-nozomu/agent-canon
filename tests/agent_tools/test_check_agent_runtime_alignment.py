@@ -158,6 +158,30 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         ):
             runtime_alignment.validate_project_config()
 
+    def test_skill_routing_schema_rejects_unknown_stage_policy(self) -> None:
+        """Skill routing stage policy values must match implemented behavior."""
+        with self.assertRaisesRegex(RuntimeError, "routing.stage_policy"):
+            runtime_alignment.validate_skill_routing_entry(
+                "task-routing",
+                {
+                    "stage_policy": "explicit_only",
+                    "reason": "fixture",
+                    "triggers": [["routing"]],
+                },
+            )
+
+    def test_skill_routing_schema_rejects_non_string_reason(self) -> None:
+        """Skill routing reasons must be typed strings."""
+        with self.assertRaisesRegex(RuntimeError, "routing.reason"):
+            runtime_alignment.validate_skill_routing_entry(
+                "task-routing",
+                {
+                    "stage_policy": "active",
+                    "reason": 3,
+                    "triggers": [["routing"]],
+                },
+            )
+
     def test_runtime_max_depth_is_exposed_for_spawn_policy(self) -> None:
         """The generator must expose max_depth for delegated spawn policies."""
         self.assertEqual(codex_runtime_max_depth(), 2)

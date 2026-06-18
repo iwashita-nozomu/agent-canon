@@ -58,6 +58,10 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   全体命題から始めます。戻り値 `Answer` / `State` / `Info` の仕様を
   target theorem にし、補助定理、内側 solver、loop-control、残差成分、
   局所収束命題は、その全体命題を再帰分解して必要になった場合だけ選びます。
+- 実装由来 claim の `program contract` は、public entrypoint、入力 schema、
+  runtime profile、return projection、observable effect、assumptions /
+  preconditions、checker / validation command を束ねた入口です。theorem target、
+  proof obligation、reader-facing proof note はこの契約から射影します。
 - 目的定理は public entrypoint の静的な引数 schema と戻り値 schema から作ります。
   低レベルの op id、binding、region、frame、trace row、または
   `generatedMainFuel` の内部 state を目的定理の表面にしてはいけません。
@@ -439,9 +443,11 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
      再帰展開する
    - 既定 route は
      `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
-     とする。CUDA の有限精度 claim では `--backend-target cuda`、
-     `--iree-cuda-target <sm_xx>`、`--xla-dump-dir <dir>` も渡し、同じ
-     JIT root から XLA-emitted LLVM/PTX を収集する
+     とする。CUDA の有限精度 claim では `AGENT_CANON_JIT_JAX_PLATFORM`、
+     `AGENT_CANON_JIT_BACKEND_TARGET`、
+     `AGENT_CANON_JIT_IREE_CUDA_TARGET` を環境変数で固定し、
+     `--xla-dump-dir <dir>` も渡して、同じ JIT root から XLA-emitted
+     LLVM/PTX を収集する
    - IR node には `source_symbol`、runtime object、数学的 role、residual unit、
      dtype / backend assumption、proof relevance を持たせる
    - backend arithmetic、IREE/XLA FP32、fast-math、denormal、lowered IR などの

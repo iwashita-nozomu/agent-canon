@@ -2,6 +2,8 @@
 @dependency-start
 responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy
+downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates document claim grounding
 @dependency-end
 -->
 
@@ -33,6 +35,28 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。
 - 箇条書きは `-` を基本にし、パス・識別子・コマンドはバッククォートで示します。
 
+## Claim Grounding
+
+- `claim grounding` では、正本文書の claim を evidence class と一緒に書きます。
+  evidence class は、実装 path、設定 surface、checker / tool output、
+  proof obligation、外部 source packet、または run-local planning evidence の
+  いずれかです。
+- 数学的 claim は、claim、assumptions、definitions、theorem target または
+  proof obligation、`proof_status`、checker evidence を分けて書きます。
+  実装由来の数学 claim は public entrypoint、入力 schema、戻り値 projection、
+  実装 trace / checker evidence へ接続し、`$formal-proof-workflow` の証明状態表へ渡します。
+- `program contract` は実装由来 claim の入口です。public entrypoint、入力 schema、
+  設定 / runtime profile、return projection、observable state / effect、
+  assumptions / preconditions、validation command を並べます。
+- 実装 claim は、対象 file / symbol / command と validation route を添えます。
+  未実装 behavior の文書形は、設計候補または open obligation です。
+- Provisional wording such as `まずは`, `for now`, or `first pass` belongs to run-local planning evidence.
+  正本文書では、同じ内容を受け入れ条件、scope、
+  validation route、または明示的な limitation として書きます。
+- 誇張に見える claim は、測定対象、条件、evidence path、`proof_status` を持つ
+  限定 claim へ分解します。`verified` は checker が通った artifact と対応している場合に
+  使います。
+
 ## 規範表現
 
 - `documents/` 配下の正本文書では、実行条件を `必須`、`受け入れ条件`、`完了条件`、`例外` などの positive label で整理します。
@@ -54,3 +78,5 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 ## 検証
 
 - この文書の規範表現、positive label、検証経路は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
+- `claim grounding`、provisional wording、proof obligation の wiring は
+  `python3 tools/agent_tools/check_convention_compliance.py` で確認します。

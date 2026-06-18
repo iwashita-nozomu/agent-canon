@@ -17,8 +17,10 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
+    TEST_CONTRACT_ROUTING_MARKERS,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +32,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/common/02_naming.md": "check_log_helper_names.py\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
-    "documents/conventions/common/05_docs.md": "docs\n",
+    "documents/conventions/common/05_docs.md": (
+        "docs claim grounding program contract public entrypoint "
+        "return projection proof obligation provisional wording "
+        "check_convention_compliance.py\n"
+    ),
     "documents/conventions/python/01_scope.md": "scope\n",
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
     "documents/conventions/python/06_comments.md": "comments\n",
@@ -42,9 +48,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
     "documents/coding-conventions-python.md": "python import_responsibility.py\n",
     "documents/coding-conventions-cpp.md": "cpp\n",
-    "documents/coding-conventions-project.md": "project container_config.py\n",
+    "documents/coding-conventions-project.md": (
+        "project container_config.py claim grounding program contract proof obligation "
+        "run-local planning evidence\n"
+    ),
     "documents/coding-conventions-house-style.md": "house\n",
-    "documents/coding-conventions-testing.md": "testing\n",
+    "documents/coding-conventions-testing.md": (
+        "testing contract-only wrapper static contract validation "
+        "static-analysis-duplicate-test canonical command Validation repair scope\n"
+    ),
     "documents/coding-conventions-reviews.md": "reviews\n",
     "documents/coding-conventions-experiments.md": "experiments\n",
     "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
@@ -93,6 +105,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
+        "contract-only wrapper static contract validation canonical command evidence "
+        "validation tool\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -119,6 +133,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$prose-reasoning-graph $structure-planning format-only "
         "structure_contract=skipped\n"
     ),
+    ".agents/skills/test-design/SKILL.md": (
+        "contract-only wrapper static contract validation canonical command evidence "
+        "observable behavior validation repair scope\n"
+    ),
     ".agents/skills/mvp-skeleton/SKILL.md": "mvp core loop vertical slice\n",
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
@@ -134,6 +152,24 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning format-only "
         "structure_contract=skipped\n"
     ),
+    "agents/skills/test-design.md": (
+        "contract-only wrapper static contract validation canonical command evidence "
+        "observable behavior validation repair scope\n"
+    ),
+    "agents/skills/long-form-writing.md": (
+        "数学的 claim program contract proof obligation $formal-proof-workflow "
+        "provisional wording\n"
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "mathematical claim program contract proof obligation $formal-proof-workflow "
+        "provisional wording\n"
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "program contract public entrypoint return projection proof obligation\n"
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "program contract public entrypoint return projection validation command\n"
+    ),
     "agents/skills/README.md": (
         "prose-reasoning-graph structure-planning md-style-check "
         "structure_contract=skipped\n"
@@ -147,8 +183,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $structure-planning $prose-reasoning-graph "
-        "$md-style-check Document Structure Evidence structure_contract=skipped\n"
+        "$md-style-check Document Structure Evidence structure_contract=skipped "
+        "contract-only wrapper checker-owned validation canonical command evidence "
+        "validation repair scope\n"
     ),
+    "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
         "write-capable handoff\n"
@@ -607,6 +646,77 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_claim_grounding_requires_markers(self) -> None:
+        """Canonical docs must keep prose-claim grounding markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            docs_policy = (
+                root / "documents" / "conventions" / "common" / "05_docs.md"
+            )
+            docs_policy.write_text("docs check_convention_compliance.py\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("missing-marker:claim grounding", result.stdout)
+            self.assertIn("missing-marker:program contract", result.stdout)
+            self.assertIn("missing-marker:proof obligation", result.stdout)
+
+    def test_document_claim_grounding_rejects_provisional_canon(self) -> None:
+        """Provisional wording in canonical docs needs an evidence route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "long-form-writing.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8")
+                + "\n- まずは近い文書へ claim を入れる。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("provisional-wording-without-grounding", result.stdout)
+
+    def test_minimal_fixture_covers_document_claim_grounding_surfaces(self) -> None:
+        """The minimal test fixture includes every claim grounding surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_CLAIM_GROUNDING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_test_contract_routing_requires_contract_only_wrapper_markers(self) -> None:
+        """Testing policy must route contract-only wrappers to static validation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            testing_policy = root / "documents" / "coding-conventions-testing.md"
+            testing_policy.write_text("testing canonical command\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("test_contract_routing", result.stdout)
+            self.assertIn("missing-marker:contract-only wrapper", result.stdout)
+            self.assertIn("missing-marker:static contract validation", result.stdout)
+
+    def test_minimal_fixture_covers_test_contract_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every test contract routing surface."""
+        missing = sorted(
+            path
+            for path in TEST_CONTRACT_ROUTING_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 
