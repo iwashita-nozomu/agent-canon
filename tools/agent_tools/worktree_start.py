@@ -249,8 +249,9 @@ def main() -> int:
     print("  1. Confirm legacy action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
     print(
-        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> "
-        "--message '<what changed>' --next '<next>' after each meaningful step."
+        "  3. Use python3 tools/agent_tools/work_log.py --run-id <run-id> "
+        "--kind <kind> --message '<what changed>' --next '<next>' "
+        "after each meaningful step."
     )
     print("  4. Start editing only after the current checkout run-local handoff is updated.")
     return 0
