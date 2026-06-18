@@ -208,7 +208,6 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
 SKILL_ROUTING_PROMPTS = (
     ".agents/skills/agent-orchestration/SKILL.md",
     "agents/skills/agent-orchestration.md",
-    "agents/TASK_WORKFLOWS.md",
 )
 
 SKILL_ROUTING_MARKERS = (
@@ -217,8 +216,6 @@ SKILL_ROUTING_MARKERS = (
     "$subagent-bootstrap",
     "task-shape skill",
     "check_convention_compliance.py",
-    "vertical dynamic wave",
-    "write-capable handoff",
 )
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
     ".agents/skills/agent-orchestration/SKILL.md": (
@@ -271,13 +268,6 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "format-only docs work",
         "prose-reasoning-graph",
         "structure-planning",
-    ),
-    "agents/TASK_WORKFLOWS.md": (
-        "$structure-planning",
-        "$prose-reasoning-graph",
-        "$md-style-check",
-        "Document Structure Evidence",
-        "structure_contract=skipped",
     ),
     "agents/workflows/long-form-writing-workflow.md": (
         "$structure-planning",
@@ -408,12 +398,6 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "observable behavior",
         "validation repair scope",
     ),
-    "agents/TASK_WORKFLOWS.md": (
-        "contract-only wrapper",
-        "checker-owned validation",
-        "canonical command evidence",
-        "validation repair scope",
-    ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "contract-only wrapper",
         "static contract validation",
@@ -508,12 +492,122 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "CRITICAL_BLOCKING_CHILD_HOOKS",
         "warning/evidence",
     ),
+}
+OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
     "ROOT_AGENTS.md": (
-        "Mechanical Guardrail Policy",
-        "高確信で公開事故になるものだけを block 対象",
-        "hook 設定を維持したまま",
-        "strict block mode",
+        (
+            "## Runtime Owner Map",
+            (
+                (
+                    "workflow family, spawn budget, role topology",
+                    "vendor/agent-canon/agents/task_catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "subagent lifecycle, same-role instances, wave ledger",
+                    "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
+                    "workflow_monitor.py",
+                ),
+                (
+                    "role behavior and stage conditions",
+                    "vendor/agent-canon/.codex/agents/*.toml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "skill routing and public skill surface",
+                    "vendor/agent-canon/agents/skills/catalog.yaml",
+                    "agent-canon local-llm route-skill",
+                ),
+                (
+                    "report and closeout structure",
+                    "task_close.py",
+                    "closeout gate",
+                ),
+            ),
+        ),
     ),
+    "AGENTS.md": (
+        (
+            "## Runtime Owner Map",
+            (
+                (
+                    "root runtime entrypoint",
+                    "ROOT_AGENTS.md",
+                    "bash tools/sync_agent_canon.sh check",
+                ),
+                (
+                    "workflow family, spawn budget, role topology",
+                    "agents/task_catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "public skill registry",
+                    "agents/skills/catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "shared-canon update",
+                    "tools/update_agent_canon.sh",
+                    "AgentCanon PR gate",
+                ),
+            ),
+        ),
+    ),
+    "agents/TASK_WORKFLOWS.md": (
+        (
+            "## Workflow Contract Owners",
+            (
+                (
+                    "workflow family and spawn budget",
+                    "agents/task_catalog.yaml",
+                ),
+                (
+                    "role topology and same-role instance schema",
+                    "agents/task_catalog.yaml",
+                ),
+                (
+                    "default specialists and review packs",
+                    "agents/task_catalog.yaml",
+                    "agents/agents_config.json",
+                ),
+                (
+                    "run bundle, declared workflow / skills / review, and dynamic wave ledger",
+                    "task_start.py",
+                    "bootstrap_agent_run.py",
+                    "workflow_monitor.py",
+                ),
+                (
+                    "skill selection",
+                    "agents/skills/catalog.yaml",
+                    "agent-canon local-llm route-skill",
+                ),
+                (
+                    "implementation stage gate",
+                    "agents/workflows/implementation-waterfall-workflow.md",
+                ),
+                (
+                    "implementation packet schema",
+                    "agents/COMMUNICATION_PROTOCOL.md",
+                ),
+                (
+                    "closeout authority",
+                    "task_close.py",
+                    "report_artifact_checks.py",
+                ),
+            ),
+        ),
+    ),
+}
+OWNER_MAP_ENTRYPOINT_MARKERS = {
+    path: tuple(
+        dict.fromkeys(
+            marker
+            for heading, rows in section_rows
+            for row in ((heading,), *rows)
+            for marker in row
+        )
+    )
+    for path, section_rows in OWNER_MAP_ENTRYPOINT_TABLE_ROWS.items()
 }
 NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
@@ -595,6 +689,71 @@ def read_text(root: Path, relative_path: str) -> str:
     if resolved is None:
         return (root / relative_path).read_text(encoding="utf-8")
     return resolved.read_text(encoding="utf-8")
+
+
+def markdown_section_lines(text: str, heading: str) -> list[str] | None:
+    """Return lines under a Markdown heading until the next peer heading."""
+    lines = text.splitlines()
+    heading_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == heading),
+        None,
+    )
+    if heading_index is None:
+        return None
+    heading_level = len(heading) - len(heading.lstrip("#"))
+    section: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            next_level = len(stripped) - len(stripped.lstrip("#"))
+            if next_level <= heading_level:
+                break
+        section.append(line)
+    return section
+
+
+def markdown_table_rows(lines: Sequence[str]) -> list[str]:
+    """Return Markdown table data rows from a section."""
+    rows: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not (stripped.startswith("|") and stripped.endswith("|")):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if all(cell and set(cell) <= set("-: ") for cell in cells):
+            continue
+        rows.append(stripped)
+    return rows
+
+
+def same_resolved_file(left: Path | None, right: Path | None) -> bool:
+    """Return whether two optional paths point to the same filesystem entry."""
+    if left is None or right is None:
+        return False
+    try:
+        return left.resolve(strict=True) == right.resolve(strict=True)
+    except OSError:
+        return False
+
+
+def owner_map_entrypoint_rows(
+    root: Path, path: str
+) -> Sequence[tuple[str, Sequence[tuple[str, ...]]]]:
+    """Return owner-map rows for the entrypoint role active at ``path``."""
+    if path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    ):
+        return OWNER_MAP_ENTRYPOINT_TABLE_ROWS["ROOT_AGENTS.md"]
+    return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
+
+
+def duplicate_root_view_entrypoint(root: Path, path: str) -> bool:
+    """Return whether ``path`` is already covered by the root entrypoint view."""
+    return path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    )
 
 
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
@@ -901,6 +1060,58 @@ def check_hook_guardrail_policy(root: Path) -> list[Finding]:
     return findings
 
 
+def check_owner_map_entrypoints(root: Path) -> list[Finding]:
+    """Verify thin entrypoint docs keep required owner-map anchors."""
+    findings = check_required_files(
+        root,
+        tuple(OWNER_MAP_ENTRYPOINT_TABLE_ROWS),
+        "owner_map_entrypoints",
+    )
+    for path in OWNER_MAP_ENTRYPOINT_TABLE_ROWS:
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        if duplicate_root_view_entrypoint(root, path):
+            continue
+        section_rows = owner_map_entrypoint_rows(root, path)
+        text = resolved.read_text(encoding="utf-8")
+        for heading, expected_rows in section_rows:
+            section = markdown_section_lines(text, heading)
+            if section is None:
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-heading:{heading}",
+                    )
+                )
+                continue
+            table_rows = markdown_table_rows(section)
+            if not table_rows:
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-owner-table:{heading}",
+                    )
+                )
+                continue
+            for row_markers in expected_rows:
+                if any(
+                    all(marker in row for marker in row_markers)
+                    for row in table_rows
+                ):
+                    continue
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-owner-row:{row_markers[0]}",
+                    )
+                )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -948,7 +1159,10 @@ def check_legacy_forwarder_warning_policy(root: Path) -> list[Finding]:
 
     policy_text = "\n".join(
         resolved.read_text(encoding="utf-8", errors="replace")
-        for path in ("ROOT_AGENTS.md", "AGENTS.md")
+        for path in (
+            "documents/codex-configuration-reference.md",
+            ".codex/README.md",
+        )
         if (resolved := readable_path(root, path)) is not None
     )
     if policy_text:
@@ -982,6 +1196,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
+    findings.extend(check_owner_map_entrypoints(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

@@ -284,7 +284,6 @@ def selected_review_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
         "verifier",
         "auditor",
         "docs_workflow_steward",
-        "critical_guardian",
     }
     return tuple(
         role.id

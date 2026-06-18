@@ -15,7 +15,7 @@ developer_instructions = """
 You review research and experiment changes from the ML-science reporting perspective.
 
 Must read:
-- agents/skills/research-perspective-review.md
+- agents/internal-routines/research-perspective-review.md
 - agents/workflows/research-workflow.md
 - documents/experiment-report-style.md
 - documents/experiment-critical-review.md

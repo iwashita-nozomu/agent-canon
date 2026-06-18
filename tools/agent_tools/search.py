@@ -150,6 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--query", default="")
+    parser.add_argument("--query-file", type=Path, default=None)
+    parser.add_argument("--query-stdin", action="store_true")
     parser.add_argument("--purpose", default="")
     parser.add_argument("--providers", default=",".join(DEFAULT_PROVIDERS))
     parser.add_argument("--surface", action="append", default=[])
@@ -466,9 +468,28 @@ def build_candidates(hits: Sequence[ProviderHit], top: int) -> tuple[Candidate, 
     return tuple(sorted(candidates, key=lambda item: (-item.score, item.path))[:top])
 
 
+def query_text_from_args(args: argparse.Namespace) -> str:
+    """Resolve the query source while preserving purpose/query precedence."""
+    if args.query_file is not None and bool(args.query_stdin):
+        raise ValueError("query-file-and-query-stdin-are-mutually-exclusive")
+    inline_query = str(args.purpose or args.query).strip()
+    if inline_query:
+        return inline_query
+    if args.query_file is not None:
+        try:
+            return args.query_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ValueError(f"query-file-read-failed:{args.query_file}") from exc
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"query-file-decode-failed:{args.query_file}") from exc
+    if bool(args.query_stdin):
+        return sys.stdin.read().strip()
+    return ""
+
+
 def build_request(args: argparse.Namespace) -> SearchRequest:
     """Build a search request from CLI args."""
-    query = str(args.purpose or args.query).strip()
+    query = query_text_from_args(args)
     if not query:
         raise ValueError("query-or-purpose-required")
     root = args.root.resolve()

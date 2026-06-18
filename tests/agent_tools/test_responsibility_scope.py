@@ -98,6 +98,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
         report = json.loads(result.stdout)
         scopes = {scope["scope_id"]: scope for scope in report["scopes"]}
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
+        runtime_paths = set(scopes["runtime-entrypoints"]["paths"])
 
         self.assertIn("evidence", paths)
         self.assertIn("evidence/**", paths)
@@ -115,6 +116,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             "documents/runtime-log-archive.md",
             scopes["shared-policy-documents"]["exclude_paths"],
         )
+        self.assertIn(".vscode/**", runtime_paths)
 
     def test_scope_overlap_fails_without_exclusion(self) -> None:
         """A tracked file must not be claimed by multiple responsibility scopes."""

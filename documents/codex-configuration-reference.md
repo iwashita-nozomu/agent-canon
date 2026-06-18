@@ -546,6 +546,13 @@ severity rules:
   a checker, warning hook, closeout gate, role TOML, workflow eval, or PR gate
   before adding more prompt-only prohibitions.
 
+Legacy forwarders and migration wrappers report migration evidence through
+stable warning fields. A deprecated forwarder emits `*_FORWARDER=deprecated`,
+`*_FORWARDER_SEVERITY=fix-now`, caller chain, and the canonical command route.
+The tool implementation owns detailed fields such as `FORWARDER_CALLER`,
+`FORWARDER_ACTION`, `FORWARDER_PROMPT`, and `caller_process_chain`; this
+configuration reference owns the operator-facing routing policy.
+
 Template-specific hook behavior:
 
 - `hooks.json` wires one `hook_dispatcher.py` command per active lifecycle

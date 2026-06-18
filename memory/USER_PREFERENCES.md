@@ -180,6 +180,9 @@ upstream design README.md memory surface index
 - 2026-06-15 | Use GitHub Issues as durable work tracking when appropriate, and include issue cleanup or explicit issue status confirmation in closeout.
   - source: chat
 
+- 2026-06-18 | 証明や実装の説明では、エージェントが勝手に作った抽象名・ラベルで説明せず、実在するコード名・定理名・数式・入出力に基づいて説明する。新しい便宜名を使う場合は導入理由と非正本であることを明示する。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

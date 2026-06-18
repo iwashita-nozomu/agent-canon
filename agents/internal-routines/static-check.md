@@ -20,7 +20,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `agents/skills/static-validation.md`
+- `agents/internal-routines/static-validation.md`
 - `documents/tools/README.md`
 - `tools/ci/run_all_checks.sh`
 - `tools/bin/agent-canon docs check`
