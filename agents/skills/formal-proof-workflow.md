@@ -58,6 +58,10 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   全体命題から始めます。戻り値 `Answer` / `State` / `Info` の仕様を
   target theorem にし、補助定理、内側 solver、loop-control、残差成分、
   局所収束命題は、その全体命題を再帰分解して必要になった場合だけ選びます。
+- 実装由来 claim の `program contract` は、public entrypoint、入力 schema、
+  runtime profile、return projection、observable effect、assumptions /
+  preconditions、checker / validation command を束ねた入口です。theorem target、
+  proof obligation、reader-facing proof note はこの契約から射影します。
 - 目的定理は public entrypoint の静的な引数 schema と戻り値 schema から作ります。
   低レベルの op id、binding、region、frame、trace row、または
   `generatedMainFuel` の内部 state を目的定理の表面にしてはいけません。

@@ -57,7 +57,7 @@ upstream design README.md agent canon overview
 - 既定の流れは workflow family で変わります。明白な 1 file / 単一 abstraction 修正は `Scoped Change Lite`、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
-- code 変更では `test_designer` を別 instance で立て、実装前に nasty case を洗います。
+- observable behavior、regression risk、または test contract を変える code 変更では `test_designer` を別 instance で立て、実装前に nasty case を洗います。contract-only wrapper は static contract validation と canonical command evidence を使います。
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。
 - write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。

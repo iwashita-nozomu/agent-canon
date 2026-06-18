@@ -35,6 +35,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    helper lemma, inner solver claim, loop-control fact, residual component, or
    hand-selected local theorem unless it is selected by recursively decomposing
    that top-level main theorem.
+1. For implementation-derived claims, fix a `program contract` before theorem
+   text or reader-facing prose: public entrypoint, input schema, runtime
+   profile, return projection, observable effect, assumptions / preconditions,
+   and checker / validation command.
 1. Build the theorem statement from the public root's static argument schema
    and return schema. The target theorem must talk about `let out := main
    problem config` and its returned `Answer` / `State` / `Info` fields, or

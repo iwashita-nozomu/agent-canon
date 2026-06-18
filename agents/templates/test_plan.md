@@ -26,4 +26,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Implementation Notes
 
-<!-- Record where the worker must add or extend tests while mirroring existing test style. -->
+<!-- Record the validation route. For behavior-owned cases, record where the worker adds or extends tests while mirroring existing test style. -->

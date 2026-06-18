@@ -1183,11 +1183,19 @@ fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>
         ),
         (
             "test-design",
-            "test strategy, brittle tests, or unnecessary numerical tests are in scope",
+            "test strategy, brittle tests, contract-only wrappers, or unnecessary numerical tests are in scope",
             vec![
                 vec!["test-design"],
                 vec!["test", "design"],
                 vec!["テスト", "設計"],
+                vec!["contract-only", "wrapper"],
+                vec!["contract", "only", "wrapper"],
+                vec!["契約だけ"],
+                vec!["契約", "wrapper"],
+                vec!["static", "contract", "validation"],
+                vec!["pytest", "smoke"],
+                vec!["execution-only", "test"],
+                vec!["no-crash", "test"],
                 vec!["不要", "テスト"],
                 vec!["不要", "数値テスト"],
                 vec!["数値テスト"],
@@ -1537,6 +1545,56 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
         ),
         surface_candidate(
             &lower,
+            "contract_only_test_policy",
+            "Contract-only wrapper and checker-owned test admission policy",
+            &[
+                "documents/coding-conventions-testing.md",
+                "agents/skills/test-design.md",
+                ".agents/skills/test-design/SKILL.md",
+                "agents/TASK_WORKFLOWS.md",
+                "agents/canonical/CODEX_WORKFLOW.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "pytest smoke added for static contract validation",
+                "execution-only no-crash test for a thin adapter",
+                "numerical smoke for non-numerical routing, metadata, docs, or wrapper changes",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("contract-only wrapper", 18),
+                ("contract only wrapper", 18),
+                ("contract-only adapter", 16),
+                ("thin adapter", 14),
+                ("契約だけ", 18),
+                ("契約だけの wrapper", 20),
+                ("契約だけのラッパー", 20),
+                ("テストを強制", 16),
+                ("testを強制", 16),
+                ("余計なテスト", 14),
+                ("不要なテスト", 14),
+                ("pytest smoke", 14),
+                ("execution-only test", 14),
+                ("no-crash test", 14),
+                ("static-analysis duplicate", 14),
+                ("static-analysis-duplicate-test", 14),
+                ("static contract validation", 14),
+                ("checker-owned validation", 12),
+                ("canonical command evidence", 12),
+                ("runtime behavior", 10),
+                ("observable behavior", 10),
+                ("数値テスト", 9),
+                ("数値 smoke", 9),
+                ("unnecessary test", 10),
+                ("heavy test", 8),
+            ],
+        ),
+        surface_candidate(
+            &lower,
             "numerical_iterative_algorithm_contract",
             "Computational optimization and iterative algorithm contract",
             &[
@@ -1610,6 +1668,76 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
                 ("責務", 2),
                 ("responsibility-scope", 5),
                 ("root view", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "document_claim_grounding",
+            "Canonical document claim, program-contract, proof-status, and evidence-grounding policy",
+            &[
+                "documents/conventions/common/05_docs.md",
+                "documents/coding-conventions-project.md",
+                "agents/skills/long-form-writing.md",
+                ".agents/skills/long-form-writing/SKILL.md",
+                "agents/skills/formal-proof-workflow.md",
+                ".agents/skills/formal-proof-workflow/SKILL.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "run-local planning language promoted to canonical policy",
+                "manual prose-only claim validation when checker or proof status is required",
+                "new policy prose without convention-compliance coverage",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("program contract", 12),
+                ("program contracts", 12),
+                ("プログラム契約", 12),
+                ("プログラムの契約", 12),
+                ("claim grounding", 10),
+                ("canonical document", 9),
+                ("canonical documents", 9),
+                ("public entrypoint", 9),
+                ("input schema", 9),
+                ("return projection", 9),
+                ("mathematical claim", 9),
+                ("mathematical statement", 9),
+                ("mathematical statements", 9),
+                ("observable effect", 8),
+                ("observable state", 8),
+                ("proof obligation", 9),
+                ("proof_status", 9),
+                ("proof status", 8),
+                ("theorem target", 8),
+                ("checker evidence", 8),
+                ("provisional wording", 8),
+                ("validation command", 8),
+                ("preconditions", 7),
+                ("正本文書", 8),
+                ("文書を正", 8),
+                ("まずは", 8),
+                ("誇張", 7),
+                ("overclaim", 7),
+                ("source authority", 6),
+                ("evidence class", 6),
+                ("assumptions", 5),
+                ("definitions", 5),
+                ("for now", 5),
+                ("first pass", 5),
+                ("first draft", 5),
+                ("proof-like", 5),
+                ("数理", 5),
+                ("数学", 5),
+                ("証明", 5),
+                ("定理", 5),
+                ("ad hoc", 4),
+                ("adhoc", 4),
+                ("checker", 4),
+                ("文書", 4),
             ],
         ),
         surface_candidate(
@@ -3348,6 +3476,15 @@ mod tests {
     }
 
     #[test]
+    fn skill_route_matches_contract_only_wrapper_tests() {
+        let prompt = "契約だけの wrapper に pytest smoke や execution-only test を足すのをやめたい";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
+    }
+
+    #[test]
     fn skill_route_matches_adaptive_improvement_loop() {
         let prompts = [
             "反復実行系のスキルがうまく作動してない。原因を探して",
@@ -3439,6 +3576,65 @@ mod tests {
             .required_checks
             .iter()
             .any(|command| command.contains("python-algorithm-contract-check")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_contract_only_test_policy() {
+        let request = "契約だけの wrapper で runtime behavior を増やしていないので pytest smoke, execution-only test, no-crash test, 数値テストを足さず static contract validation と canonical command evidence に戻したい";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "contract_only_test_policy");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("coding-conventions-testing")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("test-design")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_document_claim_grounding() {
+        let request = "Canonical documents are treated as source authority, but mathematical statements and provisional wording such as まずは become ad hoc policy; route to checker evidence and proof obligation.";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("05_docs.md")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_program_contract() {
+        let request = "プログラムの契約を public entrypoint, input schema, return projection, observable effect, preconditions, validation command として明示したい。";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("long-form-writing")));
+        assert!(candidates[0].rationale.iter().any(
+            |reason| reason.contains("program contract") || reason.contains("プログラムの契約")
+        ));
     }
 
     #[test]

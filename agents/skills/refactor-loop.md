@@ -34,7 +34,7 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 
 1. refactor-loop の対象 file は、最初に user が指した file だけで固定しません。
    まず依存解析で requested object / file から到達する依存 file、依存元 file、
-   関連 test / docs を展開し、その dependency-expanded scope 全体を候補集合に
+   関連 test / docs / validation command を展開し、その dependency-expanded scope 全体を候補集合に
    します。実装対象は、その展開済み scope 内で関数、method、class 単位に
    絞り込んでから決めます。
 1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff

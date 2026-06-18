@@ -112,7 +112,9 @@ parent は launch mechanics、budget、fresh lifecycle、wave ledger の整合�
 `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` を推奨形にします。
 parent または delegated stage owner が実際に spawn / skip / replacement を行ったら、`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...` で `schedule.md` と `workflow_monitoring.md` を同じ `wave_id` で更新します。delegated child wave は `remaining_spawn_budget` を必ず含めます。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
-code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
+behavior-changing、regression-prone、または high-risk code change では
+`test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
+contract-only wrapper では checker-owned validation と static contract evidence を handoff に入れます。
 包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定で立てます。
 Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。

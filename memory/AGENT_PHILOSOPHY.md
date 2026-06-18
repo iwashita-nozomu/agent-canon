@@ -289,6 +289,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: 20260615 iterative-method routing repair: route-implementation-surface now returns numerical_iterative_algorithm_contract
 
+- 2026-06-17 | interaction-observation | Contract-only wrappers should route verification to static contract checks and existing checker evidence before adding runtime or pytest wrappers.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User reported agents forcing tests around contract-only wrappers and creating unnecessary work.
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
