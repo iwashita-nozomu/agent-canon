@@ -13,6 +13,7 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
 upstream implementation ../../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
 upstream implementation ../../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
+upstream implementation ../../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 upstream implementation ../../../tools/agent_tools/theorem_graph_circularity_check.py checks proposition-graph circularity for theorem routes
 upstream design ../../../agents/skills/literature-survey.md source search policy
@@ -26,14 +27,14 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. For algorithm-derived claims that require proof-path search, algorithm
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
-1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, first choose the machine evidence route that matches the implementation source: JIT-canonical public root for JIT-capable Python roots, or C++ source envelope plus shared thin operational IR for C++ template algorithm roots.
+1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, first choose the machine evidence route that matches the implementation source: JIT-canonical public root for JIT-capable Python roots, or the single C++ full-expansion route for C++ template algorithm roots.
 1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan,
    target-language scaffold, existing formal proofs search packet, and
    literature queries before adopting theorem text or proof obligations.
 1. For implementation-derived algorithm proofs, always start from the whole
    target theorem over the public entrypoint, normally the JIT-canonical
    `main(problem, InitializeConfig, ...)`, the C++ template root selected by
-   `cpp_source_canonical_ir.py --cpp-symbol`, or an equivalent run function and its
+   `cpp_template_to_lean.py --cpp-symbol`, or an equivalent run function and its
    returned `Answer` / `State` / `Info` specification. Do not begin from a
    helper lemma, inner solver claim, loop-control fact, residual component, or
    hand-selected local theorem unless it is selected by recursively decomposing
@@ -84,20 +85,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    can collect XLA-emitted `.ll` / `.ptx` artifacts when IREE phase tracing
    stops before LLVM. Treat missing LLVM rows as a backend coverage frontier,
    not as permission to introduce external FP axioms.
-   Build C++ source evidence with
-   `python3 tools/agent_tools/cpp_source_canonical_ir.py --cpp-symbol <path.hpp::qualname> --format json --out <record.json>`,
-   then render generic Lean evidence with
-   `python3 tools/agent_tools/operational_ir_to_lean.py --ir <record.json> --namespace <Lean.Namespace> --out <Generated.lean>`.
-   The renderer rejects unresolved calls and unassigned operations before Lean
-   output; repair coverage gaps in the extractor or selected C++ root before
-   treating the generated evidence as accepted proof input.
+   Build C++ source evidence and Lean evidence with
+   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>`.
+   The tool fully expands the selected C++ source route and rejects unresolved
+   calls and unassigned operations before Lean output; repair coverage gaps in
+   the extractor or selected C++ root before treating the generated evidence as
+   accepted proof input.
 1. Generate checker-facing Lean evidence definitions from the current
    JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`, or from the
-   shared thin operational IR / C++ envelope with
-   `python3 tools/agent_tools/operational_ir_to_lean.py`. Keep this
+   C++ template source route with
+   `python3 tools/agent_tools/cpp_template_to_lean.py`. Keep this
    generated evidence layer separate from the theorem graph. The JIT-generated
    layer owns root identity, StableHLO hash, operational op kinds, dtype
-   coverage, and backend trace coverage; the generic operational renderer owns
+   coverage, and backend trace coverage; the C++ full-expansion route owns
    source provenance, public-interface metadata, source facts, operational
    rows, expansion edges, and coverage facts. Mathematical propositions such
    as residual decrease, KKT regularity, direction quality, and finite
@@ -299,9 +299,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    and then
    `tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean>`.
    For C++ template source roots, run
-   `python3 tools/agent_tools/cpp_source_canonical_ir.py --cpp-symbol <path.hpp::qualname> --format json --out <record.json>`
-   and then
-   `python3 tools/agent_tools/operational_ir_to_lean.py --ir <record.json> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean>`.
+   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out <record.json>`.
    Convert the generated implementation evidence layer into theorem graph overlays with
    the current theorem-graph tool, not by passing theorem-profile options to
    IR extraction tools. Retain `proof_lemma_graph`,

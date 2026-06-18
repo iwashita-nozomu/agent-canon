@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents tools/agent_tools/cpp_source_canonical_ir.py usage and output contract.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py defines the shared thin operational IR shape.
+downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py owns the canonical C++ to Lean route.
 downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR.
 downstream implementation ../../tests/agent_tools/test_cpp_source_canonical_ir.py validates C++ source extraction.
 @dependency-end
@@ -11,8 +12,9 @@ downstream implementation ../../tests/agent_tools/test_cpp_source_canonical_ir.p
 
 `tools/agent_tools/cpp_source_canonical_ir.py` extracts a source-only C++ slice
 and emits the same nested thin operational IR used by the JIT-canonical Python
-frontend. It is a source evidence helper for proof workflow design; it is not a
-C++ compiler frontend and it does not generate Lean files.
+frontend. It is the internal source envelope producer and diagnostic record
+tool behind `cpp_template_to_lean.py`; it is not the canonical user-facing C++
+to Lean route.
 
 ## Command
 
@@ -56,27 +58,28 @@ records unless that list is empty and every operation is assigned to a region.
 ## Boundary
 
 This tool deliberately does not emit `stablehlo`, `backend_trace`, backend
-environment records, mathematical proof obligations, theorem slices, or backend
-assumptions. The previous C++ Algorithm Expansion IR prototype was
-proof-oriented; this tool keeps only the source indexing and call-resolution
+environment records, mathematical proof obligations, theorem slices, backend
+assumptions, or Lean files. The previous C++ Algorithm Expansion IR prototype
+was proof-oriented; this tool keeps only the source indexing and call-resolution
 idea and joins the current operational IR surface.
 
-Current `tools/bin/agent-canon jit-ir-to-lean` consumes JIT-canonical records
-with StableHLO and JAX public-interface coverage. For source-only C++ evidence,
-use the generic renderer:
+For C++ template algorithm roots, use the single full-expansion route:
 
 ```bash
-python3 tools/agent_tools/operational_ir_to_lean.py \
-  --ir reports/cpp-source-ir/solve.json \
+python3 tools/agent_tools/cpp_template_to_lean.py \
+  --root . \
+  --cpp-symbol include/algorithm.hpp::solve \
   --namespace Generated.CppSolve \
   --module-name SolveOperationalIr \
-  --out lean/cpp_solve/Generated/SolveOperationalIr.lean
+  --out lean/cpp_solve/Generated/SolveOperationalIr.lean \
+  --record-out reports/cpp-source-ir/solve.json
 ```
 
-That command consumes the nested thin operational IR and preserves the C++
-wrapper's provenance, public-interface metadata, source facts, and structural
-coverage as Lean evidence data. It does not emit StableHLO/backend evidence and
-does not claim semantic proof of the C++ algorithm.
+That command invokes this extractor internally, checks complete operational
+coverage, and renders Lean evidence only after the selected C++ source route has
+no unresolved call targets and no unassigned operation rows. It does not emit
+StableHLO/backend evidence and does not claim semantic proof of the C++
+algorithm.
 
 The extraction contract prioritizes complete coverage for the selected source
 route. If source parsing or call resolution leaves unresolved targets, the

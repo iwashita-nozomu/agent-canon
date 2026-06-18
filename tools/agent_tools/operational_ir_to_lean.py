@@ -4,7 +4,7 @@
 # upstream design ../../documents/tools/operational_ir_to_lean.md documents the renderer contract.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md defines the C++ source envelope.
 # upstream implementation cpp_source_canonical_ir.py produces C++ source-canonical IR records.
-# downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py validates the renderer.
+# downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py tests it.
 # @dependency-end
 """Render shared thin operational IR records as Lean evidence definitions."""
 

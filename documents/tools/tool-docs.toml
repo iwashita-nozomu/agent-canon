@@ -170,6 +170,13 @@ language = "python"
 summary = "C++ source-only operational IR wrapper documentation."
 
 [[tool]]
+id = "cpp-template-to-lean"
+tool = "tools/agent_tools/cpp_template_to_lean.py"
+doc = "documents/tools/cpp_template_to_lean.md"
+language = "python"
+summary = "Full C++ template source root to complete Lean evidence route documentation."
+
+[[tool]]
 id = "operational-ir-to-lean"
 tool = "tools/agent_tools/operational_ir_to_lean.py"
 doc = "documents/tools/operational_ir_to_lean.md"

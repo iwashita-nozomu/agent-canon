@@ -12,6 +12,7 @@ upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Math
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
 upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
 upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions.
+upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
@@ -38,7 +39,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 - proof assistant を使う前に proof obligation、前提、定義不足を棚卸ししたい
 - 論文、scholarly note、optimization / numerical method design の理論 claim を検査可能な形に落としたい
 - JIT 可能な Python 実装 root から StableHLO/backend trace 由来の generated Lean evidence と theorem graph を作りたい
-- C++ template algorithm root から source envelope / thin operational IR 由来の generated Lean evidence を作りたい
+- C++ template algorithm root から full-expansion route で generated Lean evidence を作りたい
 
 ## Core References
 
@@ -59,7 +60,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 - 実装由来のアルゴリズム claim は、必ず実装正本の public entrypoint に対する
   全体命題から始めます。JIT route では
   `main(problem, InitializeConfig, ...)` または同等の run 関数、C++ source route では
-  `cpp_source_canonical_ir.py --cpp-symbol` で選んだ C++ template root を public root
+  `cpp_template_to_lean.py --cpp-symbol` で選んだ C++ template root を public root
   として扱います。戻り値 `Answer` / `State` / `Info` の仕様、または C++ root から
   生成した public-interface / source-fact projection を target theorem にし、
   補助定理、内側 solver、loop-control、残差成分、局所収束命題は、その全体命題を
@@ -101,10 +102,10 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   JIT 可能な Python public root は
   `jit_canonical_ir.py --python-symbol path.py::qualname --input-factory path.py::factory`
   で StableHLO と backend trace へ lower します。C++ template algorithm を
-  source of truth にする場合は、`cpp_source_canonical_ir.py --cpp-symbol path.hpp::qualname`
-  で C++ source envelope と `agent-canon.thin-operational-ir.v2` を作り、
-  `operational_ir_to_lean.py --ir <record.json> --namespace <Lean.Namespace>`
-  で Lean evidence definitions へ render します。どちらの lowering 結果も
+  source of truth にする場合は、
+  `cpp_template_to_lean.py --cpp-symbol path.hpp::qualname --namespace <Lean.Namespace>`
+  で C++ source envelope、完全展開済み `agent-canon.thin-operational-ir.v2`、
+  Lean evidence definitions を一つの tool route で生成します。どちらの lowering 結果も
   proof artifact の入口ですが、それ自体は semantic proof ではありません。
 - backend、runtime target、compiler route、device、dtype を theorem や validation
   claim を通すために固定してはいけません。backend 固有 theorem は、user request、
@@ -138,15 +139,17 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   狭めているなら、problem-class witness または algorithmic choice として
   `$algorithm-proof-exploration` に戻します。
 - 実装由来 IR は、JIT route では `python3 tools/agent_tools/jit_canonical_ir.py`、
-  C++ source route では `python3 tools/agent_tools/cpp_source_canonical_ir.py`
-  で作成し、`proof_algorithm_ir`、`proof_goal_directed_slice`、
+  C++ source route では `python3 tools/agent_tools/cpp_template_to_lean.py`
+  で full-expansion record と generated Lean evidence を作成し、
+  `proof_algorithm_ir`、`proof_goal_directed_slice`、
   `proof_selected_local_obligations` として proof note または run artifact に残します。
 - checker 向けの実装 path evidence は、JIT-canonical IR では
   `tools/bin/agent-canon jit-ir-to-lean` で Lean evaluator / code graph artifact を
-  生成し、共有 thin operational IR / C++ source envelope では
-  `python3 tools/agent_tools/operational_ir_to_lean.py` で
+  生成し、C++ source route では
+  `python3 tools/agent_tools/cpp_template_to_lean.py` で
   `OperationalFunction`、`OperationalRegion`、`OperationalOp`、
   `ExpansionEdge`、`OperationalCoverage` などの Lean evidence definitions を生成します。
+  C++ route は unresolved call target と unassigned op を Lean 出力前に拒否します。
   Generic operational IR renderer は Lean 関数 lowering や
   `ImplementationFunction` / `FunctionTrace` / `CodeEquation` schema を主張しません。
   IR の operation tree と source facts で evaluation order と branch / loop 形状が
@@ -572,8 +575,8 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 1. Evidence generation:
    - 実装正本に合う selected route から generated Lean evidence を生成する。
      JIT route では StableHLO、backend trace、JIT IR、generated Lean evidence、
-     C++ source route では source envelope、source facts、thin operational IR、
-     generated Lean evidence を生成する
+     C++ source route では `cpp_template_to_lean.py` で source envelope、
+     source facts、thin operational IR、generated Lean evidence を生成する
    - output は run bundle、report、または project-local proof artifact directory に置く
    - reader-facing proof text は topic ごとに一つの canonical proof note へ統合し、
      theorem statement、assumption ledger、checked fragment status、remaining gap を

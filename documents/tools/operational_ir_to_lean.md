@@ -4,6 +4,7 @@ responsibility Documents tools/agent_tools/operational_ir_to_lean.py usage and o
 upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean evidence definitions.
 upstream design cpp_source_canonical_ir.md defines the C++ source envelope.
 upstream design jit_canonical_ir.md defines the shared thin operational IR shape.
+downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py owns the canonical C++ template source route.
 downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py validates the renderer.
 @dependency-end
 -->
@@ -12,8 +13,10 @@ downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py
 
 `tools/agent_tools/operational_ir_to_lean.py` renders shared
 `agent-canon.thin-operational-ir.v2` records into dependency-free Lean evidence
-definitions. It is the generic operational evidence route used by source
-wrappers such as `cpp_source_canonical_ir.py`.
+definitions. It is the generic renderer for already-expanded operational
+records. For C++ template source roots, use `cpp_template_to_lean.py`, which
+runs source expansion, complete-coverage checking, and Lean rendering as one
+canonical tool operation.
 
 ## Command
 
@@ -30,6 +33,10 @@ python3 tools/agent_tools/operational_ir_to_lean.py \
 - a direct `agent-canon.thin-operational-ir.v2` JSON record; or
 - an envelope containing an `operational_ir` object, such as
   `agent-canon.cpp-source-canonical-ir.v1`.
+
+This input mode is intended for diagnostics, non-C++ wrappers, and proof
+artifacts that already own the expansion record. It is not the canonical C++ to
+Lean user route.
 
 When `--out` is omitted, Lean text is written to stdout. `--module-name` is
 optional and defaults from root metadata when available.

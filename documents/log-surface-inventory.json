@@ -1636,7 +1636,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_algorithm_ir",
-      "line": 594,
+      "line": 643,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1644,7 +1644,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_certified_subgraph",
-      "line": 602,
+      "line": 651,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1652,7 +1652,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_command",
-      "line": 587,
+      "line": 636,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1660,7 +1660,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_log",
-      "line": 588,
+      "line": 637,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1668,7 +1668,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_claim",
-      "line": 581,
+      "line": 630,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1676,7 +1676,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_generated_lean",
-      "line": 584,
+      "line": 633,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1684,7 +1684,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_goal_directed_slice",
-      "line": 595,
+      "line": 644,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1692,7 +1692,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_impossibility_certificate",
-      "line": 591,
+      "line": 640,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1700,7 +1700,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_initialize_expansion_graph",
-      "line": 606,
+      "line": 655,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1708,7 +1708,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_initialize_root",
-      "line": 605,
+      "line": 654,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1716,7 +1716,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_jit_ir",
-      "line": 582,
+      "line": 631,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1724,7 +1724,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph",
-      "line": 597,
+      "line": 646,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1732,7 +1732,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph_overlay",
-      "line": 600,
+      "line": 649,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1740,7 +1740,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_lemma_graph_validation",
-      "line": 599,
+      "line": 648,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1748,7 +1748,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_library_trace_module",
-      "line": 586,
+      "line": 635,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1756,7 +1756,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_missing_frontier",
-      "line": 603,
+      "line": 652,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1764,7 +1764,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_nonterminal_return",
-      "line": 608,
+      "line": 657,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1772,7 +1772,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_path_attempts",
-      "line": 601,
+      "line": 650,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1780,7 +1780,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_selected_local_obligations",
-      "line": 596,
+      "line": 645,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1788,7 +1788,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_kind",
-      "line": 593,
+      "line": 642,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1796,7 +1796,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_source_packet",
-      "line": 592,
+      "line": 641,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1804,7 +1804,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_stablehlo",
-      "line": 583,
+      "line": 632,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1812,7 +1812,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_status",
-      "line": 589,
+      "line": 638,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1820,7 +1820,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_status_table",
-      "line": 604,
+      "line": 653,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1828,7 +1828,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_target_chains",
-      "line": 598,
+      "line": 647,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1836,7 +1836,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_terminal_outcome",
-      "line": 590,
+      "line": 639,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1844,7 +1844,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_theorem_graph",
-      "line": 585,
+      "line": 634,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1852,7 +1852,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_trace_alignment_check",
-      "line": 607,
+      "line": 656,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -6772,7 +6772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "call_target",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6780,7 +6780,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "dtypes",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6788,7 +6788,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "function",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6796,7 +6796,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "kind",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6804,7 +6804,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "line",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6812,7 +6812,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "op_id",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6820,7 +6820,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "opcode",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6828,7 +6828,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "parent_op_id",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6836,7 +6836,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "region_id",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6844,7 +6844,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "region_path",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6852,7 +6852,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tensor_types",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6860,7 +6860,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "text",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -6868,7 +6868,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "text_sha256",
-      "line": 1455,
+      "line": 1461,
       "path": "tools/agent_tools/cpp_source_canonical_ir.py",
       "surface": "tool"
     },
@@ -9820,7 +9820,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "results",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9828,7 +9828,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9836,7 +9836,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "target_theorem",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9844,7 +9844,23 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 82,
+      "line": 97,
+      "path": "tools/agent_tools/lean_recursive_proof_search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 120,
+      "path": "tools/agent_tools/lean_recursive_proof_search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 145,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9852,7 +9868,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LEAN_RECURSIVE_PROOF_TARGET",
-      "line": 170,
+      "line": 289,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9860,7 +9876,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LEAN_RECURSIVE_PROOF_TARGETS",
-      "line": 167,
+      "line": 285,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -13606,6 +13622,102 @@
       "field": "WORKSPACE_ROOT",
       "line": 325,
       "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "check_count",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "directed_cycles",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "findings",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "passed_checks",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY",
+      "line": 201,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_CHECKS",
+      "line": 202,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_FINDING",
+      "line": 209,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_FINDINGS",
+      "line": 203,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_PASS",
+      "line": 214,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_PASSED",
+      "line": 204,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_DIRECTED_CYCLES",
+      "line": 205,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
       "surface": "tool"
     },
     {
@@ -17628,7 +17740,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_EVAL_LOG_PARK",
-      "line": 276,
+      "line": 279,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17652,7 +17764,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_EVAL_LOG_PARK_COMMIT",
-      "line": 277,
+      "line": 280,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17668,54 +17780,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_BLOCK_REASON",
-      "line": 316,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_CONFLICT_COMMAND",
-      "line": 318,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
-      "line": 373,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
-      "line": 377,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
-      "line": 381,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE_ROUTE",
-      "line": 374,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_POST_MERGE_COMMAND",
       "line": 319,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -17723,103 +17787,31 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_POST_MERGE_COMMAND",
-      "line": 398,
+      "field": "AGENT_CANON_LATEST_CONFLICT_COMMAND",
+      "line": 321,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR",
-      "line": 383,
+      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
+      "line": 376,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR",
-      "line": 388,
+      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
+      "line": 380,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK",
-      "line": 390,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK",
-      "line": 395,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TODOS",
-      "line": 410,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TODOS",
-      "line": 418,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TODOS",
-      "line": 427,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TODOS",
-      "line": 438,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TODOS",
-      "line": 442,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 315,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 378,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE",
       "line": 384,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -17827,7 +17819,39 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "field": "AGENT_CANON_LATEST_DIRTY_PRESERVE_ROUTE",
+      "line": 377,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_POST_MERGE_COMMAND",
+      "line": 322,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_POST_MERGE_COMMAND",
+      "line": 401,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR",
+      "line": 386,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR",
       "line": 391,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -17835,8 +17859,56 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 396,
+      "field": "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK",
+      "line": 393,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK",
+      "line": 398,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TODOS",
+      "line": 413,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TODOS",
+      "line": 421,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TODOS",
+      "line": 430,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TODOS",
+      "line": 441,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TODOS",
+      "line": 445,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17844,7 +17916,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 428,
+      "line": 318,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17852,7 +17924,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 473,
+      "line": 381,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17860,7 +17932,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 511,
+      "line": 387,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17868,7 +17940,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 526,
+      "line": 394,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17876,70 +17948,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_TOOL_RESULT",
-      "line": 538,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_WORKFLOW",
-      "line": 317,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_WORKFLOW",
-      "line": 397,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_TOOL_REBUILD",
-      "line": 448,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_TOOL_REBUILD",
-      "line": 552,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 320,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 385,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 392,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
       "line": 399,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -17947,8 +17955,72 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 419,
+      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "line": 431,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "line": 476,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "line": 514,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "line": 529,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_TOOL_RESULT",
+      "line": 541,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_WORKFLOW",
+      "line": 320,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_WORKFLOW",
+      "line": 400,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 451,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 555,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17956,7 +18028,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 429,
+      "line": 323,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17964,7 +18036,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 474,
+      "line": 388,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17972,7 +18044,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 512,
+      "line": 395,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17980,7 +18052,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 527,
+      "line": 402,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17988,7 +18060,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 539,
+      "line": 422,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -17996,7 +18068,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 602,
+      "line": 432,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18004,7 +18076,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 610,
+      "line": 477,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18012,7 +18084,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 619,
+      "line": 515,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18020,7 +18092,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 634,
+      "line": 530,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18028,7 +18100,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 651,
+      "line": 542,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18036,7 +18108,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 661,
+      "line": 605,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18044,7 +18116,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 685,
+      "line": 613,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18052,7 +18124,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 707,
+      "line": 622,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18060,7 +18132,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 718,
+      "line": 637,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18068,7 +18140,47 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 726,
+      "line": 654,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 664,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 688,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 710,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 721,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 729,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18076,150 +18188,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_backup_ref",
-      "line": 627,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_conflict_files",
-      "line": 659,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_prefix",
-      "line": 679,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_result",
-      "line": 683,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_result",
-      "line": 690,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_result",
-      "line": 695,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_target_branch",
-      "line": 680,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_worktree_status",
-      "line": 684,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_preserve_worktree_status",
-      "line": 696,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_restore",
-      "line": 705,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_restore",
-      "line": 716,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_restore",
-      "line": 724,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_stash_dropped",
-      "line": 717,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_stash_kept",
-      "line": 706,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_stash_kept",
-      "line": 725,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_stash_ref",
-      "line": 700,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_dirty_stash_sha",
-      "line": 701,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_post_head",
-      "line": 615,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_post_head",
       "line": 630,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -18227,8 +18195,152 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_conflict_files",
+      "line": 662,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_prefix",
+      "line": 682,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_result",
+      "line": 686,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_result",
+      "line": 693,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_result",
+      "line": 698,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_target_branch",
+      "line": 683,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_worktree_status",
+      "line": 687,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_preserve_worktree_status",
+      "line": 699,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_restore",
+      "line": 708,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_restore",
+      "line": 719,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_restore",
+      "line": 727,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_stash_dropped",
+      "line": 720,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_stash_kept",
+      "line": 709,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_stash_kept",
+      "line": 728,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_stash_ref",
+      "line": 703,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_dirty_stash_sha",
+      "line": 704,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_post_head",
-      "line": 647,
+      "line": 618,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_post_head",
+      "line": 633,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_post_head",
+      "line": 650,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18236,7 +18348,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_pre_head",
-      "line": 596,
+      "line": 599,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18244,7 +18356,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_prefix",
-      "line": 592,
+      "line": 595,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18252,7 +18364,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_remote_main_in_post_head",
-      "line": 298,
+      "line": 301,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18260,6 +18372,14 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_remote_main_in_post_head",
+      "line": 305,
+      "path": "tools/update_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_merge_remote_main_verified",
       "line": 302,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
@@ -18268,15 +18388,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_remote_main_verified",
-      "line": 299,
-      "path": "tools/update_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_merge_remote_main_verified",
-      "line": 303,
+      "line": 306,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18284,7 +18396,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 600,
+      "line": 603,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18292,7 +18404,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 608,
+      "line": 611,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18300,7 +18412,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 617,
+      "line": 620,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18308,7 +18420,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 632,
+      "line": 635,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18316,7 +18428,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 649,
+      "line": 652,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18324,7 +18436,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_result",
-      "line": 658,
+      "line": 661,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18332,7 +18444,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_source",
-      "line": 593,
+      "line": 596,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18340,7 +18452,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_source_sha",
-      "line": 594,
+      "line": 597,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18348,7 +18460,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_target_branch",
-      "line": 595,
+      "line": 598,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18356,7 +18468,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_worktree_status",
-      "line": 599,
+      "line": 602,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18364,7 +18476,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_merge_worktree_status",
-      "line": 605,
+      "line": 608,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18372,7 +18484,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 601,
+      "line": 604,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18380,7 +18492,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 609,
+      "line": 612,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18388,7 +18500,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 618,
+      "line": 621,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18396,7 +18508,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 633,
+      "line": 636,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18404,7 +18516,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 650,
+      "line": 653,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18412,7 +18524,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_parent_pin_pending",
-      "line": 660,
+      "line": 663,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
     },
@@ -18687,6 +18799,7 @@
     "tools/agent_tools/compare_agent_run_paths.py",
     "tools/agent_tools/compare_codex_token_footprints.py",
     "tools/agent_tools/cpp_source_canonical_ir.py",
+    "tools/agent_tools/cpp_template_to_lean.py",
     "tools/agent_tools/doc_start.py",
     "tools/agent_tools/eval_accumulation_check.py",
     "tools/agent_tools/eval_manifest_paths.py",
@@ -18716,6 +18829,7 @@
     "tools/agent_tools/log_user_preference.py",
     "tools/agent_tools/mid_task_user_input_policy.py",
     "tools/agent_tools/noncanonical_document_inventory.py",
+    "tools/agent_tools/operational_ir_to_lean.py",
     "tools/agent_tools/parent_repo_readiness.py",
     "tools/agent_tools/persist_agent_memory.py",
     "tools/agent_tools/prose_reasoning_graph.py",
@@ -18741,6 +18855,7 @@
     "tools/agent_tools/task_authority.py",
     "tools/agent_tools/task_close.py",
     "tools/agent_tools/task_start.py",
+    "tools/agent_tools/theorem_graph_circularity_check.py",
     "tools/agent_tools/tool_catalog.py",
     "tools/agent_tools/tool_drift.py",
     "tools/agent_tools/tool_path_policy.py",

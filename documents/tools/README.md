@@ -32,6 +32,7 @@ downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature r
 downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
 downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
 downstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
+downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template source roots into Lean evidence
 downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end
@@ -99,7 +100,7 @@ to choose a route:
   `tools/agent_tools/route.py --area search`.
 - Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
   `tool_proof_coverage.py`, `jit_canonical_ir.py`,
-  `operational_ir_to_lean.py`,
+  `cpp_template_to_lean.py`,
   `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
 
 Graph visualization follows the Prose Reasoning Graph DSL projection contract.
