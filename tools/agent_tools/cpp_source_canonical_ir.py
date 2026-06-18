@@ -129,7 +129,7 @@ FUNCTION_HEADER_RE = re.compile(
     r"(?P<prefix>(?:[A-Za-z_][\w:<>~*&,\s]+\s+)?)"
     r"(?P<name>[A-Za-z_~][\w:]*)\s*"
     r"\((?P<params>(?:[^;{}()]|\{\})*)\)\s*"
-    r"(?P<suffix>(?:const\b|noexcept\b|override\b|final\b|->\s*[^{};]+|\s)*)\{",
+    r"(?P<suffix>[^{};]*)\{",
     re.MULTILINE,
 )
 RECORD_RE = re.compile(r"\b(?P<kind>class|struct)\s+(?P<name>[A-Za-z_]\w*)[^;{}]*\{")
