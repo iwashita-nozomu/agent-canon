@@ -13,6 +13,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "cpp_source_canonical_ir.py"
@@ -86,7 +87,7 @@ def write_algorithm_fixture(root: Path) -> Path:
     return source
 
 
-def load_json_result(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
+def load_json_result(result: subprocess.CompletedProcess[str]) -> Any:
     """Assert a successful tool result and parse JSON."""
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -298,6 +299,49 @@ def test_cpp_source_canonical_ir_deduplicates_call_target_edges(tmp_path: Path) 
         if op.get("opcode") == "cxx.call" and op.get("target_symbol") == "residual"
     ]
     assert len(residual_calls) == 2
+
+
+def test_cpp_source_canonical_ir_enumerates_static_code_paths(tmp_path: Path) -> None:
+    """Branch and loop alternatives should be explicit machine-readable paths."""
+    source = tmp_path / "include" / "branching.hpp"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        textwrap.dedent(
+            """
+            int solve(int x) {
+              if (x > 0) {
+                x = x + 1;
+              } else {
+                x = x - 1;
+              }
+              while (x < 10) {
+                x = x + 1;
+              }
+              return x;
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    payload = load_json_result(
+        run_tool(tmp_path, "--cpp-symbol", f"{source}::solve", "--format", "json")
+    )
+
+    code_paths = payload["operational_ir"]["code_paths"]
+    coverage = payload["operational_ir"]["coverage"]
+    assert coverage["if_count"] == 1
+    assert coverage["while_count"] == 1
+    assert coverage["code_path_count"] == 4
+    assert coverage["code_path_decision_count"] == 8
+    assert coverage["unmapped_code_path_functions"] == []
+    summaries = {path["summary"] for path in code_paths}
+    assert summaries == {
+        "if@2:then -> while@7:skip",
+        "if@2:then -> while@7:enter",
+        "if@2:else -> while@7:skip",
+        "if@2:else -> while@7:enter",
+    }
 
 
 def test_cpp_source_canonical_ir_markdown_and_deterministic_json(tmp_path: Path) -> None:

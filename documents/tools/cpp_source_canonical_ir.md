@@ -41,7 +41,8 @@ The tool writes an `agent-canon.cpp-source-canonical-ir.v1` JSON record with:
 - `source_facts`: assignment and return equations extracted from the
   reachable parsed functions;
 - `operational_ir`: an `agent-canon.thin-operational-ir.v2` record containing
-  functions, regions, operations, expansion edges, and coverage counters.
+  functions, regions, operations, expansion edges, code paths, and coverage
+  counters.
 
 The nested thin operational IR uses the generic operation kinds:
 
@@ -54,6 +55,14 @@ Function bodies are represented as regions. Resolved source calls add
 calls remain visible as primitive call rows and are listed under
 `coverage.unresolved_call_targets`; downstream Lean evidence generation rejects
 records unless that list is empty and every operation is assigned to a region.
+
+For every reachable parsed function, the tool emits at least one `code_paths`
+row. Straight-line functions have one `straight_line` path. `if` contributes
+`then` and `else` alternatives, `while` and `for` contribute `skip` and `enter`
+alternatives, and `switch` contributes one alternative per shallow `case` /
+`default` label when labels are visible. The tool enumerates the Cartesian
+product of those static alternatives per function. This is a complete
+source-shape path-class summary, not dynamic loop unrolling.
 
 ## Boundary
 
@@ -75,11 +84,11 @@ python3 tools/agent_tools/cpp_template_to_lean.py \
   --record-out reports/cpp-source-ir/solve.json
 ```
 
-That command invokes this extractor internally, checks complete operational
-coverage, and renders Lean evidence only after the selected C++ source route has
-no unresolved call targets and no unassigned operation rows. It does not emit
-StableHLO/backend evidence and does not claim semantic proof of the C++
-algorithm.
+That command invokes this extractor internally, checks complete operational and
+code-path coverage, and renders Lean evidence only after the selected C++ source
+route has no unresolved call targets, no unassigned operation rows, and no
+reachable function missing a code-path row. It does not emit StableHLO/backend
+evidence and does not claim semantic proof of the C++ algorithm.
 
 The extraction contract prioritizes complete coverage for the selected source
 route. If source parsing or call resolution leaves unresolved targets, the

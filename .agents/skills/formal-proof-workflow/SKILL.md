@@ -99,7 +99,8 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    layer owns root identity, StableHLO hash, operational op kinds, dtype
    coverage, and backend trace coverage; the C++ full-expansion route owns
    source provenance, public-interface metadata, source facts, operational
-   rows, expansion edges, and coverage facts. Mathematical propositions such
+   rows, expansion edges, static code-path rows, path decisions, and coverage facts.
+   Mathematical propositions such
    as residual decrease, KKT regularity, direction quality, and finite
    termination belong only in the theorem graph.
    Require the generated layer or theorem-graph projection layer to expose the

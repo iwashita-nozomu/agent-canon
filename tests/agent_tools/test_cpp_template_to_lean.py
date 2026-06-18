@@ -116,11 +116,15 @@ def test_cpp_template_to_lean_single_step_emits_record_and_lean(tmp_path: Path) 
     assert operational_ir["schema"] == "agent-canon.thin-operational-ir.v2"
     assert operational_ir["coverage"]["unassigned_op_count"] == 0
     assert operational_ir["coverage"]["unresolved_call_targets"] == []
+    assert operational_ir["coverage"]["unmapped_code_path_functions"] == []
+    assert operational_ir["code_paths"]
     text = out.read_text(encoding="utf-8")
     assert "namespace Smoke" in text
     assert "namespace SolveGenerated" in text
     assert "def publicInterfaceFields : List KeyValue" in text
     assert "def operationalCoverage : OperationalCoverage" in text
+    assert "def codePaths : List CodePath" in text
+    assert "def codePathCoverageComplete : Bool" in text
     assert "Stepper.step" in text
     assert "kkt_residual" in text
 
@@ -148,6 +152,7 @@ def test_cpp_template_to_lean_stdout_path_is_deterministic(tmp_path: Path) -> No
     assert "namespace solve_operational_ir" in first.stdout
     assert "return_equation" in first.stdout
     assert "def operationalCoverage : OperationalCoverage" in first.stdout
+    assert "def codePaths : List CodePath" in first.stdout
 
 
 def test_cpp_template_to_lean_rejects_invalid_namespace(tmp_path: Path) -> None:

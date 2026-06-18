@@ -83,6 +83,10 @@ STANDARD_COVERAGE_FIELDS = frozenset(
         "case_count",
         "if_count",
         "call_count",
+        "code_path_count",
+        "code_path_decision_count",
+        "max_code_path_decisions",
+        "unmapped_code_path_functions",
     }
 )
 JSON_METADATA_ENCODER = json.JSONEncoder(
@@ -510,6 +514,43 @@ def render_op(row: Mapping[str, object]) -> str:
     )
 
 
+def render_code_path_decision(row: Mapping[str, object]) -> str:
+    """Render one code-path decision row."""
+    return (
+        "{ "
+        f"opId := {lean_string(string_field(row, 'op_id'))}, "
+        f"kind := {lean_string(string_field(row, 'kind'))}, "
+        f"choice := {lean_string(string_field(row, 'choice'))}, "
+        f"condition := {lean_string(string_field(row, 'condition'))}, "
+        f"line := {lean_nat(int_field(row, 'line'))} "
+        "}"
+    )
+
+
+def render_code_path_decisions(rows: Sequence[Mapping[str, object]]) -> str:
+    """Render a Lean list of code-path decision rows."""
+    if not rows:
+        return "[]"
+    return "[" + ", ".join(render_code_path_decision(row) for row in rows) + "]"
+
+
+def render_code_path(row: Mapping[str, object]) -> str:
+    """Render one code-path row."""
+    op_ids = string_list(row.get("op_ids", []), "code_path.op_ids")
+    decisions = mapping_list(row.get("decisions", []), "code_path.decisions")
+    return (
+        "{ "
+        f"pathId := {lean_string(string_field(row, 'path_id'))}, "
+        f"functionName := {lean_string(string_field(row, 'function'))}, "
+        f"regionId := {lean_string(string_field(row, 'region_id'))}, "
+        f"opIds := {lean_string_list(op_ids)}, "
+        f"decisions := {render_code_path_decisions(decisions)}, "
+        f"decisionCount := {lean_nat(int_field(row, 'decision_count'))}, "
+        f"summary := {lean_string(string_field(row, 'summary'))} "
+        "}"
+    )
+
+
 def render_rows(
     definition_name: str,
     lean_type: str,
@@ -544,6 +585,7 @@ def render_coverage(row: Mapping[str, object]) -> list[str]:
     """Render the operational coverage definition."""
     unassigned_ids = required_string_list(row, "unassigned_op_ids")
     unresolved_targets = required_string_list(row, "unresolved_call_targets")
+    unmapped_code_path_functions = required_string_list(row, "unmapped_code_path_functions")
     return [
         "def operationalCoverage : OperationalCoverage := {",
         f"  functionCount := {lean_nat(required_int_field(row, 'function_count'))},",
@@ -559,18 +601,30 @@ def render_coverage(row: Mapping[str, object]) -> list[str]:
         f"  caseCount := {lean_nat(required_int_field(row, 'case_count'))},",
         f"  ifCount := {lean_nat(required_int_field(row, 'if_count'))},",
         f"  callCount := {lean_nat(required_int_field(row, 'call_count'))},",
+        f"  codePathCount := {lean_nat(required_int_field(row, 'code_path_count'))},",
+        "  codePathDecisionCount := "
+        f"{lean_nat(required_int_field(row, 'code_path_decision_count'))},",
+        "  maxCodePathDecisions := "
+        f"{lean_nat(required_int_field(row, 'max_code_path_decisions'))},",
+        f"  unmappedCodePathFunctions := {lean_string_list(unmapped_code_path_functions)},",
         f"  metadata := {render_metadata(coverage_metadata(row))}",
         "}",
         "",
         "def unresolvedCallTargets : List String := operationalCoverage.unresolvedCallTargets",
+        "def unmappedCodePathFunctions : List String :=",
+        "  operationalCoverage.unmappedCodePathFunctions",
+        "def codePathCoverageComplete : Bool :=",
+        "  operationalCoverage.unmappedCodePathFunctions.isEmpty &&",
+        "  operationalCoverage.codePathCount >= operationalCoverage.functionCount",
         "def coverageComplete : Bool :=",
         "  operationalCoverage.unresolvedCallTargets.isEmpty &&",
-        "  operationalCoverage.unassignedOpCount == 0",
+        "  operationalCoverage.unassignedOpCount == 0 &&",
+        "  codePathCoverageComplete",
     ]
 
 
-def render_structures() -> list[str]:
-    """Render shared Lean structure definitions."""
+def render_base_structures() -> list[str]:
+    """Render common Lean structure definitions."""
     return [
         "structure KeyValue where",
         "  key : String",
@@ -632,6 +686,36 @@ def render_structures() -> list[str]:
         "  metadata : List KeyValue",
         "deriving Repr, DecidableEq",
         "",
+    ]
+
+
+def render_code_path_structures() -> list[str]:
+    """Render code-path Lean structure definitions."""
+    return [
+        "structure CodePathDecision where",
+        "  opId : String",
+        "  kind : String",
+        "  choice : String",
+        "  condition : String",
+        "  line : Nat",
+        "deriving Repr, DecidableEq",
+        "",
+        "structure CodePath where",
+        "  pathId : String",
+        "  functionName : String",
+        "  regionId : String",
+        "  opIds : List String",
+        "  decisions : List CodePathDecision",
+        "  decisionCount : Nat",
+        "  summary : String",
+        "deriving Repr, DecidableEq",
+        "",
+    ]
+
+
+def render_coverage_structure() -> list[str]:
+    """Render operational coverage Lean structure definitions."""
+    return [
         "structure OperationalCoverage where",
         "  functionCount : Nat",
         "  regionCount : Nat",
@@ -646,8 +730,21 @@ def render_structures() -> list[str]:
         "  caseCount : Nat",
         "  ifCount : Nat",
         "  callCount : Nat",
+        "  codePathCount : Nat",
+        "  codePathDecisionCount : Nat",
+        "  maxCodePathDecisions : Nat",
+        "  unmappedCodePathFunctions : List String",
         "  metadata : List KeyValue",
         "deriving Repr, DecidableEq",
+    ]
+
+
+def render_structures() -> list[str]:
+    """Render shared Lean structure definitions."""
+    return [
+        *render_base_structures(),
+        *render_code_path_structures(),
+        *render_coverage_structure(),
     ]
 
 
@@ -665,6 +762,7 @@ def render_lean(
         operational_ir.get("expansion_edges", []),
         "operational_ir.expansion_edges",
     )
+    code_paths = mapping_list(operational_ir.get("code_paths", []), "operational_ir.code_paths")
     ops = mapping_list(operational_ir.get("ops", []), "operational_ir.ops")
     coverage = object_mapping(operational_ir.get("coverage"), "operational_ir.coverage")
     allowed_kinds = string_list(operational_ir.get("allowed_kinds", []), "allowed_kinds")
@@ -710,6 +808,8 @@ def render_lean(
     lines.append("")
     lines.extend(render_rows("expansionEdges", "ExpansionEdge", edges, render_edge))
     lines.append("")
+    lines.extend(render_rows("codePaths", "CodePath", code_paths, render_code_path))
+    lines.append("")
     lines.extend(render_rows("operationalOps", "OperationalOp", ops, render_op))
     lines.append("")
     lines.extend(render_coverage(coverage))
@@ -725,12 +825,26 @@ def enforce_complete_coverage(render_input: RenderInput) -> None:
     )
     unresolved = required_string_list(coverage, "unresolved_call_targets")
     unassigned = required_int_field(coverage, "unassigned_op_count")
-    if unresolved or unassigned:
+    unmapped_code_path_functions = required_string_list(
+        coverage,
+        "unmapped_code_path_functions",
+    )
+    code_path_count = required_int_field(coverage, "code_path_count")
+    function_count = required_int_field(coverage, "function_count")
+    if unresolved or unassigned or unmapped_code_path_functions or code_path_count < function_count:
         unresolved_text = ", ".join(unresolved) if unresolved else "<none>"
+        unmapped_text = (
+            ", ".join(unmapped_code_path_functions)
+            if unmapped_code_path_functions
+            else "<none>"
+        )
         raise ValueError(
             "incomplete operational coverage: "
             f"unresolved_call_targets=[{unresolved_text}], "
-            f"unassigned_op_count={unassigned}"
+            f"unassigned_op_count={unassigned}, "
+            f"unmapped_code_path_functions=[{unmapped_text}], "
+            f"code_path_count={code_path_count}, "
+            f"function_count={function_count}"
         )
 
 

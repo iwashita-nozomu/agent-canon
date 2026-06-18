@@ -16,7 +16,9 @@ import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
+from itertools import product
 from pathlib import Path
+from typing import cast
 
 CXX_KEYWORDS = frozenset(
     {
@@ -150,6 +152,9 @@ BRACE_INITIALIZER_RE = re.compile(
 RETURN_RE = re.compile(r"\breturn\s+(?P<expr>[^;]+);")
 IF_RE = re.compile(r"\bif\s*\(")
 WHILE_RE = re.compile(r"\bwhile\s*\(")
+FOR_RE = re.compile(r"\bfor\s*\(")
+SWITCH_RE = re.compile(r"\bswitch\s*\(")
+CASE_LABEL_RE = re.compile(r"\bcase\s+(?P<label>[^:]+):|\bdefault\s*:")
 
 
 @dataclass(frozen=True)
@@ -210,6 +215,19 @@ class CxxCallSite:
 
 
 @dataclass(frozen=True)
+class CxxControlSite:
+    """One C++ control-flow site with static path alternatives."""
+
+    keyword: str
+    kind: str
+    opcode: str
+    line: int
+    offset: int
+    condition: str
+    alternatives: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class CxxSourceFact:
     """One shallow source equation extracted from a C++ function body."""
 
@@ -232,6 +250,7 @@ class OperationalTables:
     functions: list[dict[str, object]]
     regions: list[dict[str, object]]
     expansion_edges: list[dict[str, object]]
+    code_paths: list[dict[str, object]]
     function_signatures: list[str]
     region_by_function: dict[str, dict[str, object]]
 
@@ -269,6 +288,24 @@ def normalize_space(value: str) -> str:
     return " ".join(value.strip().split())
 
 
+def int_value(value: object, default: int = 0) -> int:
+    """Return an integer JSON-ish value."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return default
+
+
+def mapping_value(value: object) -> Mapping[str, object]:
+    """Return a JSON object mapping or an empty mapping."""
+    if isinstance(value, Mapping):
+        return cast(Mapping[str, object], value)
+    return {}
+
+
 def relative_path(path: Path, root: Path) -> str:
     """Return a stable POSIX relative path when possible."""
     try:
@@ -299,6 +336,26 @@ def find_matching_brace(source: str, open_offset: int) -> int:
             if depth == 0:
                 return offset
     raise ValueError(f"unclosed brace at offset {open_offset}")
+
+
+def find_matching_delimiter(
+    source: str,
+    open_offset: int,
+    *,
+    open_char: str,
+    close_char: str,
+) -> int:
+    """Return the matching close delimiter offset."""
+    depth = 0
+    for offset in range(open_offset, len(source)):
+        char = source[offset]
+        if char == open_char:
+            depth += 1
+        elif char == close_char:
+            depth -= 1
+            if depth == 0:
+                return offset
+    raise ValueError(f"unclosed delimiter at offset {open_offset}")
 
 
 def split_top_level_csv(text: str) -> tuple[str, ...]:
@@ -714,6 +771,102 @@ def source_line_for_body_match(symbol: CxxSymbol, match: re.Match[str]) -> int:
     return symbol.lineno + line_for_offset(symbol.body_text, match.start()) - 1
 
 
+def control_condition(body: str, match: re.Match[str]) -> str:
+    """Return a normalized parenthesized control condition."""
+    open_offset = match.end() - 1
+    try:
+        close_offset = find_matching_delimiter(
+            body,
+            open_offset,
+            open_char="(",
+            close_char=")",
+        )
+    except ValueError:
+        return ""
+    return normalize_space(body[open_offset + 1 : close_offset])
+
+
+def switch_alternatives(body: str, match: re.Match[str]) -> tuple[str, ...]:
+    """Return static switch path alternatives from shallow case labels."""
+    try:
+        condition_close = find_matching_delimiter(
+            body,
+            match.end() - 1,
+            open_char="(",
+            close_char=")",
+        )
+    except ValueError:
+        return ("case_or_default",)
+    open_brace = body.find("{", condition_close)
+    if open_brace == -1:
+        return ("case_or_default",)
+    try:
+        close_brace = find_matching_brace(body, open_brace)
+    except ValueError:
+        return ("case_or_default",)
+    labels: list[str] = []
+    for label_match in CASE_LABEL_RE.finditer(body[open_brace + 1 : close_brace]):
+        label = label_match.group("label")
+        labels.append(f"case:{normalize_space(label)}" if label is not None else "default")
+    return tuple(labels or ("case_or_default",))
+
+
+def collect_control_sites(symbol: CxxSymbol) -> tuple[CxxControlSite, ...]:
+    """Collect C++ control-flow sites with static path alternatives."""
+    if not symbol.body_text:
+        return ()
+    sites: list[CxxControlSite] = []
+    for match in IF_RE.finditer(symbol.body_text):
+        sites.append(
+            CxxControlSite(
+                keyword="if",
+                kind="If",
+                opcode="cxx.if",
+                line=source_line_for_body_match(symbol, match),
+                offset=match.start(),
+                condition=control_condition(symbol.body_text, match),
+                alternatives=("then", "else"),
+            )
+        )
+    for match in WHILE_RE.finditer(symbol.body_text):
+        sites.append(
+            CxxControlSite(
+                keyword="while",
+                kind="While",
+                opcode="cxx.while",
+                line=source_line_for_body_match(symbol, match),
+                offset=match.start(),
+                condition=control_condition(symbol.body_text, match),
+                alternatives=("skip", "enter"),
+            )
+        )
+    for match in FOR_RE.finditer(symbol.body_text):
+        sites.append(
+            CxxControlSite(
+                keyword="for",
+                kind="While",
+                opcode="cxx.for",
+                line=source_line_for_body_match(symbol, match),
+                offset=match.start(),
+                condition=control_condition(symbol.body_text, match),
+                alternatives=("skip", "enter"),
+            )
+        )
+    for match in SWITCH_RE.finditer(symbol.body_text):
+        sites.append(
+            CxxControlSite(
+                keyword="switch",
+                kind="Case",
+                opcode="cxx.switch",
+                line=source_line_for_body_match(symbol, match),
+                offset=match.start(),
+                condition=control_condition(symbol.body_text, match),
+                alternatives=switch_alternatives(symbol.body_text, match),
+            )
+        )
+    return tuple(sorted(sites, key=lambda site: (site.offset, site.keyword)))
+
+
 def method_call_sites(
     index: CxxIndex,
     symbol: CxxSymbol,
@@ -1015,7 +1168,11 @@ def append_op(tables: OperationalTables, region: dict[str, object], spec: OpSpec
     }
     record.update(spec.extra)
     tables.ops.append(record)
-    region["op_ids"].append(spec.op_id)
+    op_ids = region.get("op_ids")
+    if isinstance(op_ids, list):
+        cast(list[object], op_ids).append(spec.op_id)
+    else:
+        region["op_ids"] = [spec.op_id]
 
 
 def collect_control_ops(
@@ -1024,43 +1181,30 @@ def collect_control_ops(
     region: dict[str, object],
 ) -> None:
     """Collect shallow C++ control-operation markers."""
-    for match in IF_RE.finditer(symbol.body_text):
+    for site in collect_control_sites(symbol):
         append_op(
             tables,
             region,
             OpSpec(
                 op_id=next_op_id(tables),
-                kind="If",
-                opcode="cxx.if",
-                line=source_line_for_body_match(symbol, match),
-                text="if",
+                kind=site.kind,
+                opcode=site.opcode,
+                line=site.line,
+                text=f"{site.keyword} ({site.condition})",
                 function=symbol.qualname,
                 parent_op_id="",
                 call_target="",
-                extra={},
-            ),
-        )
-    for match in WHILE_RE.finditer(symbol.body_text):
-        append_op(
-            tables,
-            region,
-            OpSpec(
-                op_id=next_op_id(tables),
-                kind="While",
-                opcode="cxx.while",
-                line=source_line_for_body_match(symbol, match),
-                text="while",
-                function=symbol.qualname,
-                parent_op_id="",
-                call_target="",
-                extra={},
+                extra={
+                    "condition": site.condition,
+                    "path_alternatives": list(site.alternatives),
+                },
             ),
         )
 
 
 def new_operational_tables(index: CxxIndex, root_symbol: str) -> OperationalTables:
     """Create operational IR tables with the module root region."""
-    module_region = {
+    module_region: dict[str, object] = {
         "region_id": "region_00000",
         "kind": "module",
         "parent_function": "",
@@ -1068,7 +1212,7 @@ def new_operational_tables(index: CxxIndex, root_symbol: str) -> OperationalTabl
         "depth": 0,
         "line_start": 1,
         "line_end": len(index.source_text.splitlines()),
-        "op_ids": [],
+        "op_ids": list[str](),
     }
     return OperationalTables(
         ops=[],
@@ -1082,6 +1226,7 @@ def new_operational_tables(index: CxxIndex, root_symbol: str) -> OperationalTabl
                 "to": f"function:{root_symbol}",
             }
         ],
+        code_paths=[],
         function_signatures=[],
         region_by_function={},
     )
@@ -1113,7 +1258,7 @@ def append_function_rows(
                 extra={"source_symbol": symbol.qualname},
             ),
         )
-        body_region = {
+        body_region: dict[str, object] = {
             "region_id": f"region_{len(tables.regions):05d}",
             "kind": "function_body",
             "parent_function": symbol.qualname,
@@ -1121,7 +1266,7 @@ def append_function_rows(
             "depth": 1,
             "line_start": symbol.lineno,
             "line_end": symbol.end_lineno or symbol.lineno,
-            "op_ids": [],
+            "op_ids": list[str](),
         }
         tables.regions.append(body_region)
         tables.region_by_function[symbol.qualname] = body_region
@@ -1249,6 +1394,105 @@ def append_body_ops(
         append_call_ops(tables, index, symbol, region)
 
 
+def control_op_key(symbol: CxxSymbol, site: CxxControlSite) -> tuple[str, str, int, str]:
+    """Return the stable key used to bind a control site to an op row."""
+    return (symbol.qualname, site.opcode, site.line, site.condition)
+
+
+def control_op_bindings(tables: OperationalTables) -> dict[tuple[str, str, int, str], str]:
+    """Return control op ids keyed by function/opcode/line/condition."""
+    bindings: dict[tuple[str, str, int, str], str] = {}
+    for op in tables.ops:
+        if str(op.get("opcode")) not in {"cxx.if", "cxx.while", "cxx.for", "cxx.switch"}:
+            continue
+        key = (
+            str(op.get("function", "")),
+            str(op.get("opcode", "")),
+            int_value(op.get("line", 0)),
+            str(op.get("condition", "")),
+        )
+        bindings[key] = str(op["op_id"])
+    return bindings
+
+
+def code_path_decision(
+    symbol: CxxSymbol,
+    site: CxxControlSite,
+    choice: str,
+    bindings: Mapping[tuple[str, str, int, str], str],
+) -> dict[str, object]:
+    """Build one code-path decision row."""
+    return {
+        "op_id": bindings.get(control_op_key(symbol, site), ""),
+        "kind": site.keyword,
+        "choice": choice,
+        "condition": site.condition,
+        "line": site.line,
+    }
+
+
+def code_path_rows_for_symbol(
+    tables: OperationalTables,
+    symbol: CxxSymbol,
+    bindings: Mapping[tuple[str, str, int, str], str],
+) -> tuple[dict[str, object], ...]:
+    """Enumerate static control-flow path alternatives for one function."""
+    region = tables.region_by_function[symbol.qualname]
+    raw_op_ids = region.get("op_ids", [])
+    op_ids = (
+        [str(op_id) for op_id in cast(list[object], raw_op_ids)]
+        if isinstance(raw_op_ids, list)
+        else []
+    )
+    sites = collect_control_sites(symbol)
+    if not sites:
+        return (
+            {
+                "path_id": f"path:{symbol.qualname}:00000",
+                "function": symbol.qualname,
+                "region_id": region["region_id"],
+                "op_ids": op_ids,
+                "decisions": [],
+                "decision_count": 0,
+                "summary": "straight_line",
+            },
+        )
+    paths: list[dict[str, object]] = []
+    for path_index, choices in enumerate(product(*(site.alternatives for site in sites))):
+        decisions = [
+            code_path_decision(symbol, site, choice, bindings)
+            for site, choice in zip(sites, choices, strict=True)
+        ]
+        summary = " -> ".join(
+            f"{decision['kind']}@{decision['line']}:{decision['choice']}"
+            for decision in decisions
+        )
+        paths.append(
+            {
+                "path_id": f"path:{symbol.qualname}:{path_index:05d}",
+                "function": symbol.qualname,
+                "region_id": region["region_id"],
+                "op_ids": op_ids,
+                "decisions": decisions,
+                "decision_count": len(decisions),
+                "summary": summary,
+            }
+        )
+    return tuple(paths)
+
+
+def append_code_paths(
+    tables: OperationalTables,
+    index: CxxIndex,
+    reachable_symbols: Sequence[str],
+) -> None:
+    """Append static code-path rows for every reachable function."""
+    bindings = control_op_bindings(tables)
+    for symbol_name in reachable_symbols:
+        symbol = index.symbols[symbol_name]
+        tables.code_paths.extend(code_path_rows_for_symbol(tables, symbol, bindings))
+
+
 def operational_coverage(tables: OperationalTables) -> dict[str, object]:
     """Build coverage counters for the assembled operational IR."""
     known_region_ids = {region["region_id"] for region in tables.regions}
@@ -1266,6 +1510,12 @@ def operational_coverage(tables: OperationalTables) -> dict[str, object]:
         }
     )
     assigned_region_ids = {op["region_id"] for op in tables.ops}
+    code_path_functions = {str(path["function"]) for path in tables.code_paths}
+    function_names = {str(function["name"]) for function in tables.functions}
+    unmapped_code_path_functions = sorted(function_names - code_path_functions)
+    code_path_decision_count = sum(
+        int_value(path.get("decision_count", 0)) for path in tables.code_paths
+    )
     return {
         "function_count": len(tables.functions),
         "region_count": len(tables.regions),
@@ -1276,13 +1526,20 @@ def operational_coverage(tables: OperationalTables) -> dict[str, object]:
         "unassigned_op_ids": unassigned_ops,
         "unresolved_call_targets": unresolved_call_targets,
         "max_region_depth": max(
-            (int(region["depth"]) for region in tables.regions),
+            (int_value(region.get("depth", 0)) for region in tables.regions),
             default=0,
         ),
         "while_count": sum(1 for op in tables.ops if op["kind"] == "While"),
         "case_count": sum(1 for op in tables.ops if op["kind"] == "Case"),
         "if_count": sum(1 for op in tables.ops if op["kind"] == "If"),
         "call_count": sum(1 for op in tables.ops if op["kind"] == "Call"),
+        "code_path_count": len(tables.code_paths),
+        "code_path_decision_count": code_path_decision_count,
+        "max_code_path_decisions": max(
+            (int_value(path.get("decision_count", 0)) for path in tables.code_paths),
+            default=0,
+        ),
+        "unmapped_code_path_functions": unmapped_code_path_functions,
     }
 
 
@@ -1292,6 +1549,7 @@ def build_thin_operational_ir(index: CxxIndex, root_symbol: str) -> dict[str, ob
     tables = new_operational_tables(index, root_symbol)
     append_function_rows(tables, index, reachable_symbols)
     append_body_ops(tables, index, reachable_symbols)
+    append_code_paths(tables, index, reachable_symbols)
     return {
         "schema": "agent-canon.thin-operational-ir.v2",
         "allowed_kinds": ALLOWED_OPERATION_KINDS,
@@ -1299,6 +1557,7 @@ def build_thin_operational_ir(index: CxxIndex, root_symbol: str) -> dict[str, ob
         "functions": tables.functions,
         "regions": tables.regions,
         "expansion_edges": tables.expansion_edges,
+        "code_paths": tables.code_paths,
         "ops": tables.ops,
         "coverage": operational_coverage(tables),
     }
@@ -1371,6 +1630,7 @@ def build_cpp_source_canonical_ir(cpp_symbol: str, *, root: Path) -> dict[str, o
     index = load_cxx_index(path.resolve(), root.resolve())
     symbol = find_symbol(index, qualname)
     operational_ir = build_thin_operational_ir(index, qualname)
+    operational_coverage_record = mapping_value(operational_ir.get("coverage"))
     return {
         "schema": "agent-canon.cpp-source-canonical-ir.v1",
         "root": {
@@ -1388,7 +1648,9 @@ def build_cpp_source_canonical_ir(cpp_symbol: str, *, root: Path) -> dict[str, o
         "coverage": {
             "record_count": len(index.records),
             "indexed_symbol_count": len(index.symbols),
-            "reachable_function_count": operational_ir["coverage"]["function_count"],
+            "reachable_function_count": int_value(
+                operational_coverage_record.get("function_count", 0)
+            ),
             "parse_warning_count": len(index.parse_warnings),
             "source_only": True,
         },
@@ -1397,59 +1659,59 @@ def build_cpp_source_canonical_ir(cpp_symbol: str, *, root: Path) -> dict[str, o
 
 def render_markdown(record: Mapping[str, object]) -> str:
     """Render a compact Markdown report."""
-    root = record["root"]
-    source_root = record["source_root"]
-    operational_ir = record["operational_ir"]
-    public_interface = record["public_interface"]
-    source_facts = record["source_facts"]
-    assert isinstance(root, Mapping)
-    assert isinstance(source_root, Mapping)
-    assert isinstance(operational_ir, Mapping)
-    assert isinstance(public_interface, Mapping)
-    assert isinstance(source_facts, Mapping)
-    coverage = operational_ir.get("coverage", {})
+    root = mapping_value(record.get("root"))
+    source_root = mapping_value(record.get("source_root"))
+    operational_ir = mapping_value(record.get("operational_ir"))
+    public_interface = mapping_value(record.get("public_interface"))
+    source_facts = mapping_value(record.get("source_facts"))
+    coverage = mapping_value(operational_ir.get("coverage"))
+    public_interface_coverage = mapping_value(public_interface.get("coverage"))
+    source_facts_coverage = mapping_value(source_facts.get("coverage"))
     lines = [
         "# C++ Source Canonical IR",
         "",
         f"- schema: `{record['schema']}`",
-        f"- cpp_symbol: `{root['cpp_symbol']}`",
-        f"- source_path: `{root['source_path']}`",
-        f"- root_function: `{source_root['qualname']}`",
+        f"- cpp_symbol: `{root.get('cpp_symbol', '')}`",
+        f"- source_path: `{root.get('source_path', '')}`",
+        f"- root_function: `{source_root.get('qualname', '')}`",
         "",
         "## Public Interface",
         "",
         f"- return_type: `{public_interface.get('return_type', '')}`",
-        f"- parameter_count: `{public_interface.get('coverage', {}).get('parameter_count', 0)}`",
+        f"- parameter_count: `{public_interface_coverage.get('parameter_count', 0)}`",
         "",
         "## Operational IR Coverage",
         "",
         f"- functions: `{coverage.get('function_count', 0)}`",
         f"- ops: `{coverage.get('op_count', 0)}`",
         f"- calls: `{coverage.get('call_count', 0)}`",
+        f"- code_paths: `{coverage.get('code_path_count', 0)}`",
+        f"- unmapped_code_path_functions: `{coverage.get('unmapped_code_path_functions', [])}`",
         f"- unresolved_call_targets: `{coverage.get('unresolved_call_targets', [])}`",
         "",
         "## Source Facts",
         "",
-        f"- fact_count: `{source_facts.get('coverage', {}).get('fact_count', 0)}`",
+        f"- fact_count: `{source_facts_coverage.get('fact_count', 0)}`",
     ]
     return "\n".join(lines) + "\n"
 
 
 def render_text(record: Mapping[str, object]) -> str:
     """Render a compact text report."""
-    root = record["root"]
-    operational_ir = record["operational_ir"]
-    assert isinstance(root, Mapping)
-    assert isinstance(operational_ir, Mapping)
-    coverage = operational_ir.get("coverage", {})
+    root = mapping_value(record.get("root"))
+    operational_ir = mapping_value(record.get("operational_ir"))
+    coverage = mapping_value(operational_ir.get("coverage"))
     return "\n".join(
         [
             f"schema={record['schema']}",
-            f"cpp_symbol={root['cpp_symbol']}",
-            f"source_path={root['source_path']}",
+            f"cpp_symbol={root.get('cpp_symbol', '')}",
+            f"source_path={root.get('source_path', '')}",
             f"function_count={coverage.get('function_count', 0)}",
             f"op_count={coverage.get('op_count', 0)}",
             f"call_count={coverage.get('call_count', 0)}",
+            f"code_path_count={coverage.get('code_path_count', 0)}",
+            "unmapped_code_path_functions="
+            f"{coverage.get('unmapped_code_path_functions', [])}",
             f"unresolved_call_targets={coverage.get('unresolved_call_targets', [])}",
         ]
     ) + "\n"

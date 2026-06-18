@@ -148,8 +148,10 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   生成し、C++ source route では
   `python3 tools/agent_tools/cpp_template_to_lean.py` で
   `OperationalFunction`、`OperationalRegion`、`OperationalOp`、
-  `ExpansionEdge`、`OperationalCoverage` などの Lean evidence definitions を生成します。
-  C++ route は unresolved call target と unassigned op を Lean 出力前に拒否します。
+  `ExpansionEdge`、`CodePath`、`CodePathDecision`、`OperationalCoverage`
+  などの Lean evidence definitions を生成します。
+  C++ route は unresolved call target、unassigned op、または code-path row を持たない
+  reachable function を Lean 出力前に拒否します。
   Generic operational IR renderer は Lean 関数 lowering や
   `ImplementationFunction` / `FunctionTrace` / `CodeEquation` schema を主張しません。
   IR の operation tree と source facts で evaluation order と branch / loop 形状が

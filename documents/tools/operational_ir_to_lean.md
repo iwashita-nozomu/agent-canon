@@ -43,8 +43,10 @@ optional and defaults from root metadata when available.
 
 Generation requires complete operational coverage. The renderer fails before
 writing Lean when `coverage.unresolved_call_targets` is non-empty,
-`coverage.unassigned_op_count` is nonzero, or the required completeness fields
-are absent.
+`coverage.unassigned_op_count` is nonzero,
+`coverage.unmapped_code_path_functions` is non-empty, `coverage.code_path_count`
+does not cover all reachable functions, or the required completeness fields are
+absent.
 
 ## Output Contract
 
@@ -55,8 +57,11 @@ The generated Lean module contains evidence definitions for:
 - source facts when the input envelope provides them;
 - allowed operation kinds and function signatures;
 - operational functions, regions, operations, and expansion edges;
+- static code-path rows and per-path control decisions;
 - structural coverage counters;
 - `unresolvedCallTargets`, which must be empty for generated output;
+- `unmappedCodePathFunctions`, which must be empty for generated output;
+- `codePathCoverageComplete`;
 - `coverageComplete`, a Boolean coverage fact.
 
 The renderer preserves non-standard operation and coverage fields as key-value

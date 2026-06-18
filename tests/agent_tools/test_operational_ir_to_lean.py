@@ -47,6 +47,44 @@ def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def thin_ir_code_paths() -> list[dict[str, object]]:
+    """Return fully covered code-path fixture rows."""
+    return [
+        {
+            "path_id": "path:solve:00000",
+            "function": "solve",
+            "region_id": "region_00000",
+            "op_ids": ["op_00000"],
+            "decisions": [],
+            "decision_count": 0,
+            "summary": "straight_line",
+        }
+    ]
+
+
+def thin_ir_coverage() -> dict[str, object]:
+    """Return fully covered thin-operational-IR counters."""
+    return {
+        "function_count": 1,
+        "region_count": 1,
+        "expansion_edge_count": 1,
+        "op_count": 1,
+        "assigned_region_count": 1,
+        "unassigned_op_count": 0,
+        "unassigned_op_ids": [],
+        "unresolved_call_targets": [],
+        "max_region_depth": 0,
+        "while_count": 0,
+        "case_count": 0,
+        "if_count": 0,
+        "call_count": 0,
+        "code_path_count": 1,
+        "code_path_decision_count": 0,
+        "max_code_path_decisions": 0,
+        "unmapped_code_path_functions": [],
+    }
+
+
 def thin_ir_payload() -> dict[str, object]:
     """Return a fully covered thin-operational-IR fixture."""
     return {
@@ -83,6 +121,7 @@ def thin_ir_payload() -> dict[str, object]:
                 "to": "function:solve",
             }
         ],
+        "code_paths": thin_ir_code_paths(),
         "ops": [
             {
                 "op_id": "op_00000",
@@ -101,21 +140,7 @@ def thin_ir_payload() -> dict[str, object]:
                 "target_symbol": "",
             }
         ],
-        "coverage": {
-            "function_count": 1,
-            "region_count": 1,
-            "expansion_edge_count": 1,
-            "op_count": 1,
-            "assigned_region_count": 1,
-            "unassigned_op_count": 0,
-            "unassigned_op_ids": [],
-            "unresolved_call_targets": [],
-            "max_region_depth": 0,
-            "while_count": 0,
-            "case_count": 0,
-            "if_count": 0,
-            "call_count": 0,
-        },
+        "coverage": thin_ir_coverage(),
     }
 
 
@@ -140,6 +165,17 @@ def thin_ir_payload_with_unassigned_op() -> dict[str, object]:
     assert isinstance(coverage, dict)
     coverage["unassigned_op_count"] = 1
     coverage["unassigned_op_ids"] = ["op_missing_region"]
+    return payload
+
+
+def thin_ir_payload_with_unmapped_code_path() -> dict[str, object]:
+    """Return a thin-operational-IR fixture with missing code-path coverage."""
+    payload = thin_ir_payload()
+    payload["code_paths"] = []
+    coverage = payload["coverage"]
+    assert isinstance(coverage, dict)
+    coverage["code_path_count"] = 0
+    coverage["unmapped_code_path_functions"] = ["solve"]
     return payload
 
 
@@ -299,6 +335,8 @@ def test_operational_ir_to_lean_is_deterministic(tmp_path: Path) -> None:
     assert first.returncode == 0, first.stderr
     assert first.stdout == second.stdout
     assert "def operationalCoverage : OperationalCoverage" in first.stdout
+    assert "def codePaths : List CodePath" in first.stdout
+    assert "def codePathCoverageComplete : Bool" in first.stdout
 
 
 def test_operational_ir_to_lean_out_file_and_default_module(tmp_path: Path) -> None:
@@ -343,6 +381,20 @@ def test_operational_ir_to_lean_coverage_gate_rejects_unassigned_ops(
     assert result.returncode != 0
     assert "incomplete operational coverage" in result.stderr
     assert "unassigned_op_count=1" in result.stderr
+
+
+def test_operational_ir_to_lean_coverage_gate_rejects_unmapped_code_paths(
+    tmp_path: Path,
+) -> None:
+    """Missing code-path rows should fail before Lean output is produced."""
+    ir = tmp_path / "unmapped_code_paths.json"
+    write_json(ir, thin_ir_payload_with_unmapped_code_path())
+
+    result = run_tool("--ir", str(ir), "--namespace", "Smoke")
+
+    assert result.returncode != 0
+    assert "incomplete operational coverage" in result.stderr
+    assert "unmapped_code_path_functions=[solve]" in result.stderr
 
 
 def test_operational_ir_to_lean_rejects_missing_coverage_completeness_fields(

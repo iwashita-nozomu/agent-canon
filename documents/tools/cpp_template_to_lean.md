@@ -14,7 +14,8 @@ downstream design ../tools/README.md lists proof and algorithm tool routes.
 `tools/agent_tools/cpp_template_to_lean.py` is the canonical C++ template
 algorithm to Lean evidence route. It takes one C++ source root, fully expands
 the reachable parsed source implementation into the shared thin operational IR,
-checks complete coverage, and writes Lean evidence definitions in one command.
+enumerates static branch / loop / switch path classes, checks complete
+coverage, and writes Lean evidence definitions in one command.
 
 The lower-level `cpp_source_canonical_ir.py` and `operational_ir_to_lean.py`
 tools remain implementation components and diagnostic helpers. Formal proof
@@ -49,13 +50,16 @@ The command performs the route as one tool operation:
 1. Resolve the selected C++ root from `--cpp-symbol`.
 2. Build an `agent-canon.cpp-source-canonical-ir.v1` source envelope.
 3. Fully expand reachable parsed calls into `agent-canon.thin-operational-ir.v2`.
-4. Reject incomplete operational coverage before writing Lean.
-5. Render Lean evidence definitions from the complete expanded record.
+4. Enumerate `code_paths` for every reachable parsed function.
+5. Reject incomplete operational or code-path coverage before writing Lean.
+6. Render Lean evidence definitions from the complete expanded record.
 
 Coverage is complete only when:
 
 - `coverage.unresolved_call_targets` is present and empty;
 - `coverage.unassigned_op_count` is present and zero;
+- `coverage.unmapped_code_path_functions` is present and empty;
+- `coverage.code_path_count` covers all reachable parsed functions;
 - all required structural counters needed by the renderer are present.
 
 If coverage is incomplete, the command fails with `incomplete operational
@@ -72,8 +76,11 @@ The generated Lean module contains evidence definitions for:
 - source facts;
 - allowed operation kinds and function signatures;
 - operational functions, regions, operations, and expansion edges;
+- static code-path rows and code-path decisions;
 - structural coverage counters;
 - empty `unresolvedCallTargets`;
+- empty `unmappedCodePathFunctions`;
+- `codePathCoverageComplete`;
 - `coverageComplete`, a Boolean coverage fact.
 
 The optional JSON record contains the same C++ source envelope documented by
@@ -83,7 +90,9 @@ The optional JSON record contains the same C++ source envelope documented by
 
 This tool does not prove C++ correctness, floating-point semantics, progress,
 termination, residual quality, certificate soundness, or backend lowering
-correctness. It only provides complete implementation-shape evidence for the
-selected source route. Theorem targets, assumptions, bridge lemmas, and
-checker-backed proof status remain owned by `$formal-proof-workflow` and the
-project proof theme.
+correctness. It also does not dynamically unroll loops. Loop evidence is a
+complete static path-class summary: zero-iteration and one-or-more-iteration
+classes for `while` / `for`, plus condition and source-line evidence. It only
+provides complete implementation-shape evidence for the selected source route.
+Theorem targets, assumptions, bridge lemmas, and checker-backed proof status
+remain owned by `$formal-proof-workflow` and the project proof theme.
