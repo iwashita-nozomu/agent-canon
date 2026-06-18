@@ -326,6 +326,27 @@ entries:
     tests:
       - tests/agent_tools/test_jit_canonical_ir.py
 
+  - id: cpp-source-canonical-ir
+    summary: Extracts source-only C++ records into the shared thin operational IR.
+    path: tools/agent_tools/cpp_source_canonical_ir.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/cpp_source_canonical_ir.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/cpp_source_canonical_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_cpp_source_canonical_ir.py
+
   - id: jit-ir-to-lean
     summary: Lowers JIT-canonical IR records into generated Lean evidence definitions.
     path: rust/agent-canon/src/jit_ir_to_lean.rs

@@ -30,6 +30,7 @@ downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Math
 downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
 downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
 downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end

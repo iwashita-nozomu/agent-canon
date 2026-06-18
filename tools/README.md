@@ -28,6 +28,7 @@ downstream implementation agent_tools/formal_proof.py builds formal-proof scaffo
 downstream implementation agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 downstream implementation agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream implementation agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
 downstream implementation ../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream implementation ../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 @dependency-end
