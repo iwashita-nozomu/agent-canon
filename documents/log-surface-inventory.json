@@ -1636,7 +1636,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_algorithm_ir",
-      "line": 594,
+      "line": 617,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1644,7 +1644,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_certified_subgraph",
-      "line": 602,
+      "line": 625,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1652,7 +1652,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_command",
-      "line": 587,
+      "line": 610,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1660,7 +1660,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_checker_log",
-      "line": 588,
+      "line": 611,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1668,158 +1668,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_claim",
-      "line": 581,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_generated_lean",
-      "line": 584,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_goal_directed_slice",
-      "line": 595,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_impossibility_certificate",
-      "line": 591,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_initialize_expansion_graph",
-      "line": 606,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_initialize_root",
-      "line": 605,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_jit_ir",
-      "line": 582,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph",
-      "line": 597,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph_overlay",
-      "line": 600,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_lemma_graph_validation",
-      "line": 599,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_library_trace_module",
-      "line": 586,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_missing_frontier",
-      "line": 603,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_nonterminal_return",
-      "line": 608,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_path_attempts",
-      "line": 601,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_selected_local_obligations",
-      "line": 596,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_source_kind",
-      "line": 593,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_source_packet",
-      "line": 592,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_stablehlo",
-      "line": 583,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_status",
-      "line": 589,
-      "path": "agents/skills/formal-proof-workflow.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "proof_status_table",
       "line": 604,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
@@ -1827,8 +1675,160 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "proof_generated_lean",
+      "line": 607,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_goal_directed_slice",
+      "line": 618,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_impossibility_certificate",
+      "line": 614,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_expansion_graph",
+      "line": 629,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_initialize_root",
+      "line": 628,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_jit_ir",
+      "line": 605,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph",
+      "line": 620,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_overlay",
+      "line": 623,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_lemma_graph_validation",
+      "line": 622,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_library_trace_module",
+      "line": 609,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_missing_frontier",
+      "line": 626,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_nonterminal_return",
+      "line": 631,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_path_attempts",
+      "line": 624,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_selected_local_obligations",
+      "line": 619,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_source_kind",
+      "line": 616,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_source_packet",
+      "line": 615,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_stablehlo",
+      "line": 606,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_status",
+      "line": 612,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "proof_status_table",
+      "line": 627,
+      "path": "agents/skills/formal-proof-workflow.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "proof_target_chains",
-      "line": 598,
+      "line": 621,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1836,7 +1836,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_terminal_outcome",
-      "line": 590,
+      "line": 613,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1844,7 +1844,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_theorem_graph",
-      "line": 585,
+      "line": 608,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -1852,7 +1852,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "proof_trace_alignment_check",
-      "line": 607,
+      "line": 630,
       "path": "agents/skills/formal-proof-workflow.md",
       "surface": "skill"
     },
@@ -5500,7 +5500,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 1121,
+      "line": 1124,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -9756,7 +9756,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "results",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9764,7 +9764,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9772,7 +9772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "target_theorem",
-      "line": 209,
+      "line": 333,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9780,7 +9780,23 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 82,
+      "line": 97,
+      "path": "tools/agent_tools/lean_recursive_proof_search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 120,
+      "path": "tools/agent_tools/lean_recursive_proof_search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 145,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9788,7 +9804,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LEAN_RECURSIVE_PROOF_TARGET",
-      "line": 170,
+      "line": 289,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -9796,7 +9812,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LEAN_RECURSIVE_PROOF_TARGETS",
-      "line": 167,
+      "line": 285,
       "path": "tools/agent_tools/lean_recursive_proof_search.py",
       "surface": "tool"
     },
@@ -13542,6 +13558,102 @@
       "field": "WORKSPACE_ROOT",
       "line": 324,
       "path": "tools/agent_tools/task_start.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "check_count",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "directed_cycles",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "findings",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "passed_checks",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 257,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY",
+      "line": 201,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_CHECKS",
+      "line": 202,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_FINDING",
+      "line": 209,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_FINDINGS",
+      "line": 203,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_PASS",
+      "line": 214,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_CIRCULARITY_PASSED",
+      "line": 204,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "THEOREM_GRAPH_DIRECTED_CYCLES",
+      "line": 205,
+      "path": "tools/agent_tools/theorem_graph_circularity_check.py",
       "surface": "tool"
     },
     {
@@ -18657,6 +18769,7 @@
     "tools/agent_tools/task_authority.py",
     "tools/agent_tools/task_close.py",
     "tools/agent_tools/task_start.py",
+    "tools/agent_tools/theorem_graph_circularity_check.py",
     "tools/agent_tools/tool_catalog.py",
     "tools/agent_tools/tool_drift.py",
     "tools/agent_tools/tool_path_policy.py",
