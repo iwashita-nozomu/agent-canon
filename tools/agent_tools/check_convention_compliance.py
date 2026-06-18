@@ -726,6 +726,28 @@ def markdown_table_rows(lines: Sequence[str]) -> list[str]:
     return rows
 
 
+def same_resolved_file(left: Path | None, right: Path | None) -> bool:
+    """Return whether two optional paths point to the same filesystem entry."""
+    if left is None or right is None:
+        return False
+    try:
+        return left.resolve(strict=True) == right.resolve(strict=True)
+    except OSError:
+        return False
+
+
+def owner_map_entrypoint_rows(
+    root: Path, path: str
+) -> Sequence[tuple[str, Sequence[tuple[str, ...]]]]:
+    """Return owner-map rows for the entrypoint role active at ``path``."""
+    if path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    ):
+        return OWNER_MAP_ENTRYPOINT_TABLE_ROWS["ROOT_AGENTS.md"]
+    return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
+
+
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
     """Return findings for missing required files."""
     findings: list[Finding] = []
@@ -1037,10 +1059,11 @@ def check_owner_map_entrypoints(root: Path) -> list[Finding]:
         tuple(OWNER_MAP_ENTRYPOINT_TABLE_ROWS),
         "owner_map_entrypoints",
     )
-    for path, section_rows in OWNER_MAP_ENTRYPOINT_TABLE_ROWS.items():
+    for path in OWNER_MAP_ENTRYPOINT_TABLE_ROWS:
         resolved = readable_path(root, path)
         if resolved is None:
             continue
+        section_rows = owner_map_entrypoint_rows(root, path)
         text = resolved.read_text(encoding="utf-8")
         for heading, expected_rows in section_rows:
             section = markdown_section_lines(text, heading)

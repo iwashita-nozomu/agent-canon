@@ -808,6 +808,19 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("owner_map_entrypoints", result.stdout)
             self.assertIn("missing-owner-row:public skill registry", result.stdout)
 
+    def test_owner_map_entrypoint_accepts_template_agents_root_view(self) -> None:
+        """Template AGENTS.md views use ROOT_AGENTS owner-map rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            agents = root / "AGENTS.md"
+            agents.unlink()
+            agents.symlink_to("ROOT_AGENTS.md")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_owner_map_entrypoint_requires_workflow_task_catalog_row(self) -> None:
         """Workflow owner row is required even when later reader rows repeat it."""
         with tempfile.TemporaryDirectory() as tmp_dir:
