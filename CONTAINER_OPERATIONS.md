@@ -111,6 +111,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
   JSON inspection helpers such as `jq`, and post-create bootstrap belong in
   `.devcontainer/post-create.sh`.
+- Codex CLI setup validates `codex --version` before returning. Command absence
+  or a broken wrapper triggers the canonical `npm install -g @openai/codex`
+  install command during post-create.
 - Public-repository security scanners used by agents, including `gitleaks`,
   `trufflehog`, and `detect-secrets`, belong in `.devcontainer/post-create.sh`.
   They are audit tooling, not project runtime dependencies, and must not be

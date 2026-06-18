@@ -69,6 +69,7 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "repo-local Python dependency installer absent",
     "cli.github.com/packages",
     "apt_install gh",
+    "codex --version >/dev/null",
     "npm install -g @openai/codex",
     "rustup toolchain install",
     "rustfmt",

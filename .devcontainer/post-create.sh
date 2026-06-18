@@ -96,12 +96,13 @@ install_github_cli() {
 }
 
 install_codex_cli() {
-  if command -v codex >/dev/null 2>&1; then
+  if command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1; then
     return
   fi
   install_node_for_codex
   run_as_root env "PATH=${PATH}" npm install -g @openai/codex
   run_as_root env "PATH=${PATH}" npm cache clean --force
+  codex --version >/dev/null
 }
 
 install_json_cli_tools() {
