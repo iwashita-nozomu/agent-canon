@@ -107,8 +107,10 @@ docs、routing、metadata、string parsing、configuration、structure refactor 
 「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
 数値 validation が必要でも、既定は GPU 上の最小 deterministic case です。
 long-running、broad benchmark、large random sweep は unit test ではなく experiment
-validation として profile、理由、ログ保存先を記録します。GPU が使えない場合は
-CPU で計算テストを代替せず、`gpu_validation_blocker=<reason>` と evidence を残します。
+validation として profile、理由、ログ保存先を記録します。GPU backend で起動する
+child は先に空き GPU slot を探索します。slot が得られない場合は
+`gpu_validation_blocker=<reason>` と slot evidence を残します。CPU backend は
+user request、runtime profile、または明示 env で固定された validation target として扱います。
 
 ### 3.2 Contract-Only Wrapper Gate
 
@@ -230,8 +232,9 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 - unit test の既定 dimension は、failure を局所化できる最小サイズにします。
 - GPU / long-running numerical validation は、unit test とは分けて profile と実行理由を記録します。
 - 数値計算、solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、
-  benchmark、experiment validation の計算テストを CPU で実行することを禁止します。
-  GPU が使えない場合は CPU fallback ではなく `gpu_validation_blocker` を残します。
+  benchmark、experiment validation の計算テストは GPU backend と slot evidence を
+  validation record に残します。slot が得られない場合は `gpu_validation_blocker`
+  を残します。CPU backend は明示 env / profile の時だけ validation target にします。
 
 ## 8. 禁止事項
 

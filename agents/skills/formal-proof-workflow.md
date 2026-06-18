@@ -443,9 +443,11 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
      再帰展開する
    - 既定 route は
      `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
-     とする。CUDA の有限精度 claim では `--backend-target cuda`、
-     `--iree-cuda-target <sm_xx>`、`--xla-dump-dir <dir>` も渡し、同じ
-     JIT root から XLA-emitted LLVM/PTX を収集する
+     とする。CUDA の有限精度 claim では `AGENT_CANON_JIT_JAX_PLATFORM`、
+     `AGENT_CANON_JIT_BACKEND_TARGET`、
+     `AGENT_CANON_JIT_IREE_CUDA_TARGET` を環境変数で固定し、
+     `--xla-dump-dir <dir>` も渡して、同じ JIT root から XLA-emitted
+     LLVM/PTX を収集する
    - IR node には `source_symbol`、runtime object、数学的 role、residual unit、
      dtype / backend assumption、proof relevance を持たせる
    - backend arithmetic、IREE/XLA FP32、fast-math、denormal、lowered IR などの

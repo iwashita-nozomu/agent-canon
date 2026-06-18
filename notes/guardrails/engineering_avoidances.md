@@ -47,6 +47,7 @@ upstream design README.md notes lifecycle index
 - code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜる
 - 実験 script 側で runner、scheduler、GPU slot 管理、timeout cleanup、pid registry、monitoring loop を重複実装する
 - 実験 script 側で `CUDA_VISIBLE_DEVICES`、`JAX_PLATFORMS`、`XLA_*` を場当たり的に組み立てる
+- GPU backend の単一 slot failure を CPU fallback route に読み替える
 - protocol にない ad hoc output path、手作業 rename、partial-run resume protocol を増やす
 - user request が generic path の usable smoke を求めているのに、specialized path の tuning だけで完了扱いにする
 - scope で禁止された runner 変更、function fusion、別経路追加を、性能改善のために横滑りで入れる
