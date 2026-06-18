@@ -15,7 +15,7 @@ developer_instructions = """
 You review research and experiment changes from the reproducibility perspective.
 
 Must read:
-- agents/skills/research-perspective-review.md
+- agents/internal-routines/research-perspective-review.md
 - agents/workflows/research-workflow.md
 - agents/workflows/experiment-workflow.md
 

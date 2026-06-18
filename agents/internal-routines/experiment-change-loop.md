@@ -20,10 +20,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `agents/skills/experiment-workflow.md`
+- `agents/internal-routines/experiment-workflow.md`
 - `agents/skills/research-workflow.md`
-- `agents/skills/critical-review.md`
-- `agents/skills/report-review.md`
+- `agents/internal-routines/critical-review.md`
+- `agents/internal-routines/report-review.md`
 - `agents/workflows/experiment-workflow.md`
 - `agents/workflows/research-workflow.md`
 - `agents/templates/experiment_change_loop.md`

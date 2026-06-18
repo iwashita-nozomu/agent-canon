@@ -3,7 +3,7 @@
 @dependency-start
 responsibility Documents logic-gap-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design prose-reasoning-graph.md prose graph logic diagnostic overlay
+upstream design ../skills/prose-reasoning-graph.md prose graph logic diagnostic overlay
 @dependency-end
 -->
 
@@ -21,7 +21,7 @@ upstream design prose-reasoning-graph.md prose graph logic diagnostic overlay
 ## Core References
 
 - `agents/workflows/academic-writing-workflow.md`
-- `agents/skills/critical-review.md`
+- `agents/internal-routines/critical-review.md`
 - `documents/REVIEW_PROCESS.md`
 
 ## Mandatory Checklist

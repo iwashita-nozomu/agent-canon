@@ -315,7 +315,6 @@ workflow_families:
       specialists:
         - scheduler
         - schedule_reviewer
-        - critical_guardian
         - researcher
         - research_reviewer
         - infra_steward
@@ -492,7 +491,6 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
-      - critical_guardian
       - project_reviewer
       - docs_workflow_steward
       - prompt_config_reviewer
@@ -506,7 +504,6 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
-      - critical_guardian
       - project_reviewer
       - docs_workflow_steward
       - prompt_config_reviewer

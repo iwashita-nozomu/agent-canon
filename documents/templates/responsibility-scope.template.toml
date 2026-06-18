@@ -27,9 +27,14 @@ class_values = [
 ]
 
 required_coverage = [
+  ".agents",
+  ".codex",
+  ".devcontainer",
   ".github",
+  ".vscode",
   "documents",
   "docker",
+  "evidence",
   "experiments",
   "python",
   "scripts",
@@ -83,6 +88,10 @@ paths = [
   "agents/**",
   ".agents/**",
   ".codex/**",
+  ".devcontainer/**",
+  ".vscode/**",
+  "evidence",
+  "evidence/**",
   "mcp/**",
   "tools/**",
   "AGENTS.md",

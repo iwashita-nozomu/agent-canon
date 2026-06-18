@@ -3,6 +3,9 @@
 @dependency-start
 responsibility Documents comprehensive-development for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../task_catalog.yaml workflow family spawn budget and role topology owner
+upstream design ../agents_config.json permanent team role ownership and write policy owner
+upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
 @dependency-end
 -->
 
@@ -10,7 +13,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Purpose
 
 code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更を、1 本の umbrella workflow と explicit subagent routing で進めます。
-この skill では裁量を残さず、固定役割・固定順序・単一 writer で進めます。
+この skill は route packet と reader contract に限定し、spawn budget、role topology、role ownership、write policy は正本 surface へ委譲します。
 
 ## Use When
 
@@ -20,11 +23,11 @@ code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変�
 
 ## Core References
 
+- `agents/task_catalog.yaml` (`workflow_families[].id: comprehensive_development`)
+- `agents/agents_config.json`
 - `agents/TASK_WORKFLOWS.md`
-- `agents/canonical/CODEX_WORKFLOW.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
-- `agents/workflows/implementation-waterfall-workflow.md`
 
 ## Standard Bundle
 
@@ -36,34 +39,21 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-固定 Codex stack:
-
-- `project_reviewer`
-- `docs_workflow_steward`
-- `test_designer`
-- `python_reviewer`
-- `cpp_reviewer`
-
 ## Default Sequence
 
 1. family を `Comprehensive Development` に固定します。
-1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
-1. parent session が planning を含むなら、plan-mode command を先に有効化します。official Codex CLI では `/plan` です。
-1. `/agent` が使える runtime では inventory を確認し、使えない runtime では `.codex/agents/*.toml` をそのまま使います。
-1. `project_reviewer` を intake gate として立て、repo-wide completeness と collision risk を先に見ます。
-1. Python 差分なら `python_reviewer`、C / C++ 差分なら `cpp_reviewer` を早めに追加し、言語別の build / test / boundary risk を先に見ます。
-1. `execution_planner` に stage order と `Write Scope Per Agent:` を書かせます。
-1. `plan_reviewer` に review separation、rollback point、parallel write safety を見させます。
-1. `detailed_designer` と `detailed_design_reviewer` を通したあと、一般説明 prose の文書があるなら `document_flow_reviewer` と docs reviewer を通します。
-1. observable behavior、regression risk、または test contract を変える code 変更では `test_designer` を立てて static path と nasty case を `test_plan.md` に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
-1. `worker` は bounded slice だけを担当し、親が 1 本ずつ統合します。
-1. `project_reviewer` を closeout に再投入し、slice ごとではなく全体の integration risk を閉じます。
+1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
+1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
+1. `agents/canonical/CODEX_SUBAGENTS.md` で Codex inventory、activation、runtime surface を確認します。
+1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
+1. `agents/COMMUNICATION_PROTOCOL.md` の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
+1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
+1. closeout では `project_reviewer` を integration gate として使い、catalog / config / inventory と実 diff の同期を確認します。
 
 ## Parent-Managed Write Scope
 
-- parent は writer ごとの allowed path / directory を `team_manifest.yaml` の write policy で固定します。
-- same directory / same public API surface の parallel write を許可しません。
-- write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
+- parent は `team_manifest.yaml` に writer ごとの allowed path / directory、integration order、validation route を固定します。
+- colliding writer scope は current checkout 内の後続 wave に serialize します。
 - reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary

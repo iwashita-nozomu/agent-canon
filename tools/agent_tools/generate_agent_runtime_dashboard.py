@@ -87,6 +87,7 @@ MINUTES_PER_HOUR = 60
 SECONDS_PER_MINUTE = 60
 PERCENT_SCALE = 100.0
 UNKNOWN_RESET_BASIS = "untracked-or-unknown"
+HOOK_FAMILY_COMMIT_SUFFIX_RE = re.compile(r"-(?:[0-9a-f]{7,40}|no-git-head)$")
 MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
     "agent-canon-cli",
@@ -1588,6 +1589,7 @@ def compact_hook_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> li
 def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return generated missing-workflow dimensions without raw log files."""
     breakdown = summary.hook_workflow_breakdown
+    schema = hook_schema_breakdown(summary)
     return [
         "| metric | value |",
         "| --- | --- |",
@@ -1598,6 +1600,12 @@ def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummar
         f"| `missing_namespaces` | `{compact_counter_summary(breakdown.missing_workflow_namespaces)}` |",
         f"| `missing_statuses` | `{compact_counter_summary(breakdown.missing_workflow_statuses)}` |",
         f"| `missing_tools` | `{compact_counter_summary(breakdown.missing_workflow_tools)}` |",
+        f"| `unknown_event_count` | `{schema['unknown_event_count']}` |",
+        f"| `namespace_debt_by_hook_family` | `{compact_mapping_summary(schema['namespace_debt_by_hook_family'])}` |",
+        f"| `status_by_hook_family` | `{compact_nested_mapping_summary(schema['status_by_hook_family'])}` |",
+        f"| `failure_by_hook_family` | `{compact_nested_mapping_summary(schema['failure_by_hook_family'])}` |",
+        f"| `skip_by_hook_family` | `{compact_nested_mapping_summary(schema['skip_by_hook_family'])}` |",
+        f"| `oop_applicability` | `{compact_oop_applicability(schema['oop_applicability'])}` |",
     ]
 
 
@@ -1751,6 +1759,164 @@ def compact_counter_summary(counter: Counter[str]) -> str:
         f"{key}={value}"
         for key, value in counter.most_common(MAX_COMPACT_REPORT_LINES)
     )
+
+
+def compact_mapping_summary(mapping: object) -> str:
+    """Return a compact sorted mapping summary for one table cell."""
+    if not isinstance(mapping, dict) or not mapping:
+        return "none"
+    items = sorted((str(key), int(value)) for key, value in mapping.items())
+    return ", ".join(f"{key}={value}" for key, value in items[:MAX_COMPACT_REPORT_LINES])
+
+
+def compact_nested_mapping_summary(mapping: object) -> str:
+    """Return a compact nested counter summary for one table cell."""
+    if not isinstance(mapping, dict) or not mapping:
+        return "none"
+    parts: list[str] = []
+    for key, value in sorted(mapping.items()):
+        if not isinstance(value, dict) or not value:
+            continue
+        parts.append(f"{key}:({compact_mapping_summary(value)})")
+    return ", ".join(parts[:MAX_COMPACT_REPORT_LINES]) if parts else "none"
+
+
+def compact_oop_applicability(payload: object) -> str:
+    """Return compact OOP applicability counts for one table cell."""
+    if not isinstance(payload, dict):
+        return "none"
+    return (
+        f"applicable={payload.get('applicable_count', 0)}, "
+        f"not_applicable={payload.get('not_applicable_count', 0)}, "
+        f"missing_reason={payload.get('missing_reason_count', 0)}"
+    )
+
+
+def render_dashboard_api(summary: RuntimeDashboardSummary) -> str:
+    """Render the stable agent-facing dashboard API JSON."""
+    payload: dict[str, object] = {
+        "schema": "agent_runtime_dashboard.v1",
+        "root": summary.root.as_posix(),
+        "recent_days": summary.recent_days if summary.recent_days is not None else "all",
+        "hook_files": len(summary.hook_files),
+        "hook_entries": summary.hook_entries,
+    }
+    payload.update(hook_schema_breakdown(summary))
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def hook_schema_breakdown(summary: RuntimeDashboardSummary) -> dict[str, object]:
+    """Return compact hook-family dimensions needed for routing repair."""
+    unknown_events_by_file: Counter[str] = Counter()
+    status_by_hook_family: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    failure_by_hook_family: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    skip_by_hook_family: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    namespace_debt_by_hook_family: Counter[str] = Counter()
+    oop_applicability = OopApplicabilityAccumulator()
+    for hook_file in summary.hook_files:
+        family = hook_family(hook_file)
+        file_label = relative_path_label(hook_file, summary.root)
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file,
+            summary.recent_cutoff_epoch,
+        ):
+            status = str(entry.get("status") or "unknown")
+            event = str(entry.get("event") or "missing_event")
+            status_by_hook_family[family][status] += 1
+            if event in ("UnknownHookEvent", "missing_event"):
+                unknown_events_by_file[file_label] += 1
+            if not str(entry.get("hook_log_namespace") or "").strip():
+                namespace_debt_by_hook_family[family] += 1
+            failure_key = hook_failure_key(entry, status)
+            if failure_key:
+                failure_by_hook_family[family][failure_key] += 1
+            skip_key = hook_skip_key(entry, status)
+            if skip_key:
+                skip_by_hook_family[family][skip_key] += 1
+            if family == "oop_readability_guard":
+                oop_applicability.add(entry, status)
+    return {
+        "unknown_event_count": sum(unknown_events_by_file.values()),
+        "unknown_events_by_file": counter_to_dict(unknown_events_by_file),
+        "status_by_hook_family": nested_counter_to_dict(status_by_hook_family),
+        "failure_by_hook_family": nested_counter_to_dict(failure_by_hook_family),
+        "skip_by_hook_family": nested_counter_to_dict(skip_by_hook_family),
+        "namespace_debt_by_hook_family": counter_to_dict(namespace_debt_by_hook_family),
+        "oop_applicability": oop_applicability.to_payload(),
+    }
+
+
+@dataclass
+class OopApplicabilityAccumulator:
+    """Mutable OOP applicability counters for dashboard API output."""
+
+    applicable_count: int = 0
+    not_applicable_count: int = 0
+    missing_reason_count: int = 0
+    reasons_by_status: defaultdict[str, Counter[str]] = field(
+        default_factory=lambda: defaultdict(Counter)
+    )
+
+    def add(self, entry: dict[str, object], status: str) -> None:
+        """Add one OOP hook entry."""
+        checked = entry.get("checked")
+        applicable = checked is True or (
+            checked is None and status not in {"skip", "skipped", "unknown"}
+        )
+        if applicable:
+            self.applicable_count += 1
+            return
+        self.not_applicable_count += 1
+        reason = str(entry.get("skip_reason") or "").strip()
+        if not reason:
+            self.missing_reason_count += 1
+            reason = "missing_reason"
+        self.reasons_by_status[status][reason] += 1
+
+    def to_payload(self) -> dict[str, object]:
+        """Return a JSON-friendly OOP applicability payload."""
+        return {
+            "applicable_count": self.applicable_count,
+            "not_applicable_count": self.not_applicable_count,
+            "missing_reason_count": self.missing_reason_count,
+            "reasons_by_status": nested_counter_to_dict(self.reasons_by_status),
+        }
+
+
+def hook_family(path: Path) -> str:
+    """Return the stable hook family name for one hook JSONL path."""
+    return HOOK_FAMILY_COMMIT_SUFFIX_RE.sub("", path.stem)
+
+
+def hook_failure_key(entry: dict[str, object], status: str) -> str:
+    """Return the failure bucket for one hook entry, or empty when healthy."""
+    fingerprint = str(entry.get("failure_fingerprint") or "").strip()
+    if fingerprint:
+        return fingerprint
+    if status in {"fail", "warn", "error"}:
+        return status
+    return ""
+
+
+def hook_skip_key(entry: dict[str, object], status: str) -> str:
+    """Return the skip bucket for one hook entry, or empty when not skipped."""
+    if status not in {"skip", "skipped"}:
+        return ""
+    return str(entry.get("skip_reason") or "").strip() or "missing_reason"
+
+
+def counter_to_dict(counter: Counter[str]) -> dict[str, int]:
+    """Return a stable JSON object from a counter."""
+    return dict(sorted((key, int(value)) for key, value in counter.items()))
+
+
+def nested_counter_to_dict(mapping: dict[str, Counter[str]]) -> dict[str, dict[str, int]]:
+    """Return a stable JSON object from nested counters."""
+    return {
+        key: counter_to_dict(value)
+        for key, value in sorted(mapping.items())
+        if value
+    }
 
 
 def read_prompt_tool_breakdown(
@@ -3657,6 +3823,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--api-out",
+        "--api-output",
+        dest="api_out",
+        type=Path,
+        help="Optional stable JSON API summary path for agent log analysis.",
+    )
+    parser.add_argument(
         "--recent-days",
         type=int,
         help=(
@@ -3679,6 +3852,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.compact_out is not None:
         args.compact_out.parent.mkdir(parents=True, exist_ok=True)
         args.compact_out.write_text(render_compact_dashboard(summary), encoding="utf-8")
+    if args.api_out is not None:
+        args.api_out.parent.mkdir(parents=True, exist_ok=True)
+        args.api_out.write_text(render_dashboard_api(summary), encoding="utf-8")
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")

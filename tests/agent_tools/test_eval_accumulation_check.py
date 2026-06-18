@@ -90,6 +90,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertEqual(payload["status"], "fail")
             self.assertGreater(payload["finding_count"], 0)
             self.assertIn("hook_run_id", payload["finding_counts"])
+            self.assertIn("hook_legacy_missing_namespace", payload)
+            self.assertIn("hook_namespace_debt", payload)
 
     def test_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
         """Accumulated hook logs missing namespaces remain visible for repair."""
@@ -105,6 +107,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
     def test_external_hook_archive_entries_are_counted(self) -> None:

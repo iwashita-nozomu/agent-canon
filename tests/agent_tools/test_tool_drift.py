@@ -333,7 +333,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_subagent_wave_routing_contract(root)
-            workflow = root / "agents" / "TASK_WORKFLOWS.md"
+            workflow = root / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
                     "vertical dynamic wave",
@@ -347,8 +347,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-text:subagent_wave_routing:"
-                "agents/TASK_WORKFLOWS.md:"
-                "missing-workflow-vertical-wave-policy",
+                "agents/canonical/CODEX_SUBAGENTS.md:"
+                "missing-canonical-vertical-wave-policy",
                 result.stdout,
             )
 
@@ -357,7 +357,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_subagent_wave_routing_contract(root)
-            orchestrated = root / "agents" / "TASK_WORKFLOWS.md"
+            orchestrated = root / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
             orchestrated.write_text(
                 orchestrated.read_text(encoding="utf-8").replace(
                     "write-capable handoff",
@@ -372,8 +372,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-text:subagent_wave_routing:"
-                "agents/TASK_WORKFLOWS.md:"
-                "missing-workflow-write-capable-handoff-policy",
+                "agents/canonical/CODEX_SUBAGENTS.md:"
+                "missing-canonical-write-capable-handoff-policy",
                 result.stdout,
             )
 

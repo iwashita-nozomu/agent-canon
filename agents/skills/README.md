@@ -8,7 +8,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 @dependency-end
 -->
 
-このディレクトリは、Codex skill 文書の人間向け正本です。
+このディレクトリは、public Codex skill 文書の人間向け正本です。
 機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にします。
 
 ## Rules
@@ -19,6 +19,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 - 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
+- Workflow-routed internal routine は `agents/internal-routines/` に置きます。
 
 ## Public Skill Surface
 
@@ -78,23 +79,12 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 ## Internal Review And Runtime Routines
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
-- artifact placement、CLI adapter、static validation は `agents/canonical/` と `documents/REVIEW_PROCESS.md` の責務に寄せます。
-- `.agents/skills/<skill>/SKILL.md` shim がない `agents/skills/*.md` は internal、compatibility、または workflow-owned reference doc です。人間は `agents/skills/` から発見できますが、Codex の public skill discovery には出さず、public skill へ昇格するときだけ shim と `.codex/config.toml` の `[[skills.config]]` を追加します。
-- agent orchestration は public skill として先頭に出し、task 開始時に runtime が必ず拾えるようにします。
+- artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/REVIEW_PROCESS.md` の責務に寄せます。
+- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim、`.codex/config.toml` の `[[skills.config]]` を同じ変更で追加します。
+- agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
-
-Internal / compatibility review docs that remain routable by workflow, but are not public Codex skills:
-
-| Doc | Status | Public Route |
-| --- | ------ | ------------ |
-| `project-review` | internal repo-wide review routine | `$comprehensive-development` / `project_reviewer` |
-| `report-review` | internal report-quality review routine | `$report-writing` / `report_reviewer` |
-| `critical-review` | internal experiment/report critique routine | `$research-workflow` / `critical_guardian` |
-| `static-check` | internal checker-result interpretation routine | `$tool-finding-report` |
-| `docs-completeness-review` | internal docs review routine | `$document-canon-cleanup` |
-| `docs-consistency-review` | internal docs review routine | `$document-canon-cleanup` |
-| `code-review` | compatibility review doc | `$change-review` |
+- Internal / compatibility review docs の一覧と route は [internal-routines/README.md](../internal-routines/README.md) に集約します。
 
 ## Codex Defaults
 
