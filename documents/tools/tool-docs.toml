@@ -163,6 +163,27 @@ language = "python"
 summary = "JIT root to StableHLO-derived operational IR and backend trace documentation."
 
 [[tool]]
+id = "cpp-source-canonical-ir"
+tool = "tools/agent_tools/cpp_source_canonical_ir.py"
+doc = "documents/tools/cpp_source_canonical_ir.md"
+language = "python"
+summary = "C++ source-only operational IR wrapper documentation."
+
+[[tool]]
+id = "cpp-template-to-lean"
+tool = "tools/agent_tools/cpp_template_to_lean.py"
+doc = "documents/tools/cpp_template_to_lean.md"
+language = "python"
+summary = "Full C++ template source root to complete Lean evidence route documentation."
+
+[[tool]]
+id = "operational-ir-to-lean"
+tool = "tools/agent_tools/operational_ir_to_lean.py"
+doc = "documents/tools/operational_ir_to_lean.md"
+language = "python"
+summary = "Shared thin operational IR to Lean evidence renderer documentation."
+
+[[tool]]
 id = "jit-ir-to-lean"
 tool = "rust/agent-canon/src/jit_ir_to_lean.rs"
 doc = "documents/tools/jit_ir_to_lean.md"

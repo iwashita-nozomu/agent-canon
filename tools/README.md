@@ -28,6 +28,9 @@ downstream implementation agent_tools/formal_proof.py builds formal-proof scaffo
 downstream implementation agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 downstream implementation agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
 downstream implementation agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
+downstream implementation agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
+downstream implementation agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
+downstream implementation agent_tools/cpp_template_to_lean.py fully expands C++ template source roots into Lean evidence
 downstream implementation ../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 downstream implementation ../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 @dependency-end
@@ -292,6 +295,8 @@ findings for resilient test planning.
   - `lean_proof_env.py` は Mathlib / Aesop / Plausible / LeanSearchClient を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke`、`agent-smoke`、`counterexample-smoke`、`all-smoke`、または `check-file` で proof-search、theorem-search、counterexample、generated proof stub を検査します。active theorem package では依存を一度 pin して `lake build` で再利用し、この tool は探索用・fallback 用の環境確認に使います。個別 proof package に ad hoc な Lean 依存を入れず、環境責務をこの tool に集約します。
   - `tool_proof_coverage.py` は `tools/catalog.yaml` の全 tool に対して behavior / performance の Lean proof obligation を列挙します。通常 mode は coverage を生成し、`--require-lean-verified` は全 tool が checker 済み Lean artifact を持つまで fail します。
   - `jit_canonical_ir.py` は JIT 可能な正本関数を lower し、StableHLO 由来の薄い operational IR、StableHLO text、backend phase trace を生成します。
+  - `cpp_template_to_lean.py` は C++ template source root から source envelope、完全展開済み thin operational IR、Lean evidence definitions までを単一 route で生成します。
+  - `operational_ir_to_lean.py` は既に展開済みの `agent-canon.thin-operational-ir.v2` と envelope から、StableHLO / backend 非依存の Lean evidence definitions を生成する内部 renderer です。
   - `agent-canon jit-ir-to-lean` は JIT-canonical IR record から Lean の generated evidence definitions と fuel 付き operational evaluator を生成します。
   - graph visualization は `documents/prose-reasoning-graph/dsl-spec.md` の projection contract に寄せます。dependency graph、semantic provider HTML、runtime dashboard などの viewer は source fact を DSL adapter payload として扱い、pass / fail authority は各 domain producer に戻します。
   - `agent-canon test-design check` は既存 test の oracle 不在、static analysis の重複 wrapper、generated execution-only placeholder、private detail 結合、mock call 過指定、全文 output / error prose 固定、sleep、unseeded randomness、property / metamorphic 候補を compact finding として出します。`fix-now` は修正対象、`review` と `design-hint` は `$test-design` の計画入力です。
