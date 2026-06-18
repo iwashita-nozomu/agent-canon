@@ -21,9 +21,10 @@ upstream design README.md durable document index
 ## 2. ディレクトリ構成
 
 - 実験は `experiments/<topic>/` に置きます。
-- topic ごとに `README.md`、`cases.*`、`experiment.*`、`notebooks/`、`result/` を基準にします。
+- topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を持つ正本 entrypoint です。
-- 可視化は `experiments/<topic>/notebooks/` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
+- 新規 topic は、実験名を固定してから AgentCanon template path `vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーし、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
+- 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。

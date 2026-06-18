@@ -13,10 +13,9 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-
-import tomllib
 
 MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
 
@@ -53,8 +52,6 @@ def load_registry(path: Path) -> dict[str, object]:
     """Load one TOML registry."""
     with path.open("rb") as handle:
         data = tomllib.load(handle)
-    if not isinstance(data, dict):
-        raise ValueError("registry TOML root must be a table")
     return data
 
 
@@ -144,6 +141,36 @@ def maybe_string(entry: dict[str, object], key: str) -> str | None:
     return stripped or None
 
 
+def registered_command_value(entry: dict[str, object], command_kind: str) -> str | None:
+    """Return one registered command, including legacy default aliases."""
+    keys = [f"{command_kind}_inner_command"]
+    if command_kind == "default":
+        keys.append("smoke_inner_command")
+    for key in keys:
+        value = maybe_string(entry, key)
+        if value is not None:
+            return value
+    return None
+
+
+def require_registered_command(
+    findings: list[Finding],
+    topic_name: str,
+    entry: dict[str, object],
+    command_kind: str,
+) -> str | None:
+    """Return one required registered command."""
+    command = registered_command_value(entry, command_kind)
+    if command is None:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: missing registered command field for {command_kind}",
+            )
+        )
+    return command
+
+
 def maybe_string_list(
     findings: list[Finding],
     scope_name: str,
@@ -219,8 +246,8 @@ def validate_topic(
     result_root_raw = require_string(findings, topic_name, topic, "result_root")
     report_root_raw = require_string(findings, topic_name, topic, "report_root")
     default_variant = require_string(findings, topic_name, topic, "default_variant")
-    smoke_command = require_string(findings, topic_name, topic, "smoke_inner_command")
-    formal_command = require_string(findings, topic_name, topic, "formal_inner_command")
+    default_command = require_registered_command(findings, topic_name, topic, "default")
+    formal_command = maybe_string(topic, "formal_inner_command")
     if any(
         value is None
         for value in (
@@ -231,8 +258,7 @@ def validate_topic(
             result_root_raw,
             report_root_raw,
             default_variant,
-            smoke_command,
-            formal_command,
+            default_command,
         )
     ):
         return
@@ -243,8 +269,7 @@ def validate_topic(
     assert result_root_raw is not None
     assert report_root_raw is not None
     assert default_variant is not None
-    assert smoke_command is not None
-    assert formal_command is not None
+    assert default_command is not None
 
     allowed_status = {"template", "draft", "active", "paused", "archived"}
     if status not in allowed_status:
@@ -260,9 +285,14 @@ def validate_topic(
     topic_readme = repo_root / readme_raw
     result_root = repo_root / result_root_raw
     report_root = repo_root / report_root_raw
-    expected_topic_dir = repo_root / "experiments" / topic_name
-    expected_entrypoint_raw = f"experiments/{topic_name}/run.py"
-    expected_config_raw = f"experiments/{topic_name}/config.yaml"
+    topic_template_dir = defaults.get("topic_template_dir")
+    if topic_name == "_template" and isinstance(topic_template_dir, str):
+        expected_topic_dir_raw = topic_template_dir
+    else:
+        expected_topic_dir_raw = f"experiments/{topic_name}"
+    expected_topic_dir = repo_root / expected_topic_dir_raw
+    expected_entrypoint_raw = f"{expected_topic_dir_raw}/run.py"
+    expected_config_raw = f"{expected_topic_dir_raw}/config.yaml"
     expected_entrypoint = repo_root / expected_entrypoint_raw
     expected_config = repo_root / expected_config_raw
 
@@ -271,7 +301,7 @@ def validate_topic(
             Finding(
                 "warning",
                 f"{topic_name}: topic_dir is {topic_dir_raw}, "
-                f"expected experiments/{topic_name} for the default layout",
+                f"expected {expected_topic_dir_raw} for the default layout",
             )
         )
     if entrypoint_raw != expected_entrypoint_raw:
@@ -306,22 +336,10 @@ def validate_topic(
         findings.append(Finding("error", f"{topic_name}: report_root is missing: {report_root}"))
 
     managed_runner = defaults.get("managed_runner")
-    for command_kind, command_text in (("smoke", smoke_command), ("formal", formal_command)):
-        if "{run_dir}" not in command_text:
-            findings.append(
-                Finding(
-                    "error",
-                    f"{topic_name}: {command_kind}_inner_command must contain {{run_dir}}",
-                )
-            )
-        if "{config_path}" not in command_text:
-            findings.append(
-                Finding(
-                    "error",
-                    f"{topic_name}: {command_kind}_inner_command must contain "
-                    "{config_path} so exported run configuration is part of the protocol",
-                )
-            )
+    registered_commands = [("default", default_command)]
+    if formal_command is not None:
+        registered_commands.append(("formal", formal_command))
+    for command_kind, command_text in registered_commands:
         if entrypoint_raw not in command_text:
             findings.append(
                 Finding(
@@ -343,12 +361,19 @@ def validate_topic(
                 )
             )
 
-    if default_variant not in {"smoke", "formal", "manual"}:
+    if default_variant not in {"default", "formal", "manual", "smoke"}:
         findings.append(
             Finding(
                 "error",
-                f"{topic_name}: default_variant must be smoke, formal, or manual; "
+                f"{topic_name}: default_variant must be default, formal, or manual; "
                 f"got {default_variant!r}",
+            )
+        )
+    if default_variant == "formal" and formal_command is None:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: default_variant is formal but formal_inner_command is missing",
             )
         )
 

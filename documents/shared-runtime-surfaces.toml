@@ -305,6 +305,7 @@ mode = "removed_legacy"
 owner = "legacy"
 class = "removed_legacy"
 paths = [
+  "mcp",
   "documents/WORKFLOW_GUIDE.md",
   "documents/academic-writing-workflow.md",
   "documents/adaptive-improvement-workflow.md",

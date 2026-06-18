@@ -41,7 +41,23 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 
 ### 1. 準備
 
-実装や run に入る前に、最低限次を固定します。
+実装や run に入る前に、最初に実験名 `<topic>` を固定します。
+新規 topic は AgentCanon template path
+`vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーして始めます。
+
+```bash
+cp -r vendor/agent-canon/experiments/_template experiments/<topic>
+```
+
+コピー後は次の順で編集します。
+
+1. `run.py` の `main::main`
+1. `cases.py`
+1. `config.yaml`
+1. `visualize.ipynb`
+1. `README.md`
+
+その後、最低限次を固定します。
 
 - `Question:`
   - 今回の実験で何を確かめたいか。速度、精度、メモリ、failure pattern、安定性のどれが主題か。
@@ -56,7 +72,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - `Artifact Plan:`
   - 実験ディレクトリ、`result/<run_name>/` の出力先、`result/<run_name>/logs/` のログ置き場、`experiments/report/<run_name>.md` の置き場を先に固定します。
 - `Visualization Plan:`
-  - 可視化 notebook を `experiments/<topic>/notebooks/` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
+  - 可視化 notebook を `experiments/<topic>/visualize.ipynb` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
 - `Naming Plan:`
   - topic 名、run_name、result ディレクトリ名、report 名の規則を先に決め、topic README か対応する正本文書へ残します。
 - `Registry Plan:`
@@ -86,7 +102,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - run-local log
   - `experiments/<topic>/result/<run_name>/logs/`
 - 可視化 notebook
-  - `experiments/<topic>/notebooks/`
+  - `experiments/<topic>/visualize.ipynb`
 - 1 回の実験 report
   - `experiments/report/<run_name>.md`
 - 複数 run をまたぐ要約や知見
@@ -109,7 +125,7 @@ top-level の `reports/` は project-wide な review、automation、management r
   - `result/<run_name>/logs/`
   - 図を出力する場合は `result/<run_name>/figures/`
 - 可視化 notebook
-  - `notebooks/<run_name>.ipynb` または topic README で固定した notebook 名
+  - `visualize.ipynb`
 - report 名
   - `experiments/report/<run_name>.md`
 
@@ -137,9 +153,9 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
   - 実験目的、コード配置、Make target、YAML config、出力先、可視化 notebook、report の入口、命名規則を書く。
 - `cases.py`
   - case 定義、difficulty range、resource estimate を置く。
-- `experimentcode.py`
+- `run.py`
   - orchestration と CLI に集中させる。
-- `notebooks/`
+- `visualize.ipynb`
   - run artifact を読む可視化 notebook を置く。Notebook は説明と図表化を担い、正式 run の起動や test を担いません。
 - `result/`
   - `result/<run_name>/` ごとに JSON、JSONL、`logs/`、図を置く。
@@ -164,7 +180,7 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - 実験コードの topic パス
 - `result/<run_name>/` の canonical 出力先
 - `result/<run_name>/logs/` のログ置き場
-- `notebooks/` の可視化入口
+- `visualize.ipynb` の可視化入口
 - `experiments/report/<run_name>.md` の置き場
 - 関連する `notes/` を使う場合はその入口
 - run_name の形式
@@ -207,7 +223,7 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - `ruff check`
   - import、未使用変数、到達不能コード、雑な例外処理を早めに落とす。
 - CLI help
-  - `python experimentcode.py --help` が通ることを確認する。
+  - `python experiments/<topic>/run.py --help` または topic README で固定した直接入口が通ることを確認する。
 - import path
   - top-level import と package path が壊れていないことを確認する。
 - 出力 schema
@@ -304,7 +320,7 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 - `run_manifest.json`
 - `run.log`
 - `logs/`
-- `notebooks/<run_name>.ipynb` または topic README で指定した可視化 notebook
+- `visualize.ipynb`
 - report へのリンク
 - `Result Summary:`
 - `Quantitative Summary:`
@@ -337,7 +353,7 @@ carry-over のルールは次です。
 
 - 実行ごとの生成物は `experiments/<topic>/result/<run_name>/` に残す
 - 実行ごとの追加ログは `experiments/<topic>/result/<run_name>/logs/` に残す
-- 可視化 notebook は `experiments/<topic>/notebooks/` に残し、run artifact を読む形にする
+- 可視化 notebook は `experiments/<topic>/visualize.ipynb` に残し、run artifact を読む形にする
 - 1 回の実験 report は `experiments/report/<run_name>.md` に残す
 - 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない

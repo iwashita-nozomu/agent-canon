@@ -9,9 +9,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tomllib
-
+from pathlib import Path
 
 DEFAULTS_KEY_ORDER = (
     "managed_runner",
@@ -30,6 +29,7 @@ TOPIC_KEY_ORDER = (
     "result_root",
     "report_root",
     "default_variant",
+    "default_inner_command",
     "smoke_inner_command",
     "formal_inner_command",
     "required_eval_artifacts",

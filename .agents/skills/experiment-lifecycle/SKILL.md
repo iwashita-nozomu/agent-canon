@@ -16,11 +16,12 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines experime
 
 1. Read `agents/skills/experiment-lifecycle.md`.
 1. Keep execution steps, result paths, and report locations consistent with the canonical experiment workflow.
+1. For a new experiment topic, fix the topic name first, copy AgentCanon template path `vendor/agent-canon/experiments/_template/` to `experiments/<topic>/`, then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order.
 1. Treat `experiments/registry.toml` as the canonical topic registry for entrypoints and registered smoke/formal commands.
 1. For formal or server-side runs, use a project `Makefile` target that calls `tools/experiments/run_managed_experiment.py` so `run_manifest.json` and `run.log` are captured automatically.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a `config.json` or YAML snapshot, and registered commands must consume `{config_path}`.
 1. Require `experiments/<topic>/README.md` to describe the experiment content, question, comparison target, standard commands, config source, visualization notebook, output schema, and run_name convention before formal execution.
-1. Put visualization in Jupyter notebooks under `experiments/<topic>/notebooks/`; notebooks read run artifacts and render figures/tables, but they must not be the formal run launcher, fine-grained test surface, or config source of truth.
+1. Put the visualization notebook at `experiments/<topic>/visualize.ipynb`; notebooks read run artifacts and render figures/tables, but they must not be the formal run launcher, fine-grained test surface, or config source of truth.
 1. Ensure every run has `result/<run_name>/logs/`; keep the managed top-level `run.log` for wrapper output and place additional stdout, stderr, tool, or diagnostic logs under `logs/`.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, metric contract, invalid interpretations, and validation gate before running or writing.
 1. For experiment plans or reports with nontrivial paragraph order or causal/evidence transitions, ask `$structure-planning` to use `agent-canon semantic-index discourse-relations --profile experiment-report` or `--profile methods-protocol` as advisory edge evidence.

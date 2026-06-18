@@ -98,7 +98,7 @@ upstream design README.md durable document index
   - case 列の展開
   - difficulty range
   - `resource_estimate(case)`
-- `experimentcode.py`
+- `run.py`
   - `task(case, context)`
   - `context_builder(case)`
   - 必要なら `initializer(context)`
@@ -115,7 +115,7 @@ validation route を README または run plan に書きます。
 Make target の両方を持ちます。
 
 - Python entrypoint
-  - `experiments/<topic>/experimentcode.py`
+  - `experiments/<topic>/run.py`
   - `--config experiments/<topic>/config.yaml`
   - `--run-dir experiments/<topic>/result/<run_name>`
   - 必要なら `--limit`、`--site`、`--day` などの入力範囲指定
