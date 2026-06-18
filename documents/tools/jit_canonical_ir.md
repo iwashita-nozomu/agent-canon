@@ -15,18 +15,29 @@ proof directories may call it, but they do not own the tool contract.
 ## Command
 
 ```bash
+export AGENT_CANON_JIT_JAX_PLATFORM=gpu
+export AGENT_CANON_JIT_BACKEND_TARGET=cuda
+export AGENT_CANON_JIT_IREE_CUDA_TARGET=sm_89
+
 python3 tools/agent_tools/jit_canonical_ir.py \
   --python-symbol lean/<topic>/main.py::main \
   --input-factory lean/<topic>/main.py::example_inputs \
-  --jax-platform gpu \
-  --backend-target cuda \
-  --iree-cuda-target sm_89 \
   --xla-dump-dir reports/<topic>/xla-dump \
   --out lean/<topic>/<root>_jit_canonical_ir.json \
   --stablehlo-out lean/<topic>/<root>.stablehlo.mlir \
   --backend-trace-dir lean/<topic>/backend-trace \
   --backend-trace-out lean/<topic>/<root>_backend_trace.json
 ```
+
+Backend and runtime target selection is supplied through environment variables.
+The tool reads `AGENT_CANON_JIT_JAX_PLATFORM`,
+`AGENT_CANON_JIT_BACKEND_TARGET`, `AGENT_CANON_JIT_INPUT_DEVICE`,
+`AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES`, and
+`AGENT_CANON_JIT_IREE_CUDA_TARGET` before importing JAX. When the JAX platform is
+GPU/CUDA and no CUDA device env is already fixed, the tool probes `nvidia-smi`
+for an available GPU slot and sets `CUDA_VISIBLE_DEVICES` for that child
+process. When slot selection fails, it exits with `gpu_slot_blocker=...`; CPU
+lowering is selected through an explicit JIT env profile.
 
 For a proof theme whose root is the lowered `main` StableHLO, omit
 `--backend-trace-dir` / `--backend-trace-out` and pass both

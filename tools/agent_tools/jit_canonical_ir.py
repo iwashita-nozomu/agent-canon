@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import dataclasses
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -69,6 +70,14 @@ _IREE_PHASES = (
     "vm",
 )
 _PROBLEM_ASSUMPTION_ATTR = "__agent_canon_problem_assumptions__"
+ENV_JIT_JAX_PLATFORM = "AGENT_CANON_JIT_JAX_PLATFORM"
+ENV_JIT_BACKEND_TARGET = "AGENT_CANON_JIT_BACKEND_TARGET"
+ENV_JIT_INPUT_DEVICE = "AGENT_CANON_JIT_INPUT_DEVICE"
+ENV_JIT_CUDA_VISIBLE_DEVICES = "AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES"
+ENV_JIT_IREE_CUDA_TARGET = "AGENT_CANON_JIT_IREE_CUDA_TARGET"
+ENV_GPU_SLOT_MAX_MEMORY_MIB = "AGENT_CANON_GPU_SLOT_MAX_MEMORY_MIB"
+ENV_GPU_SLOT_MAX_UTILIZATION_PERCENT = "AGENT_CANON_GPU_SLOT_MAX_UTILIZATION_PERCENT"
+_GPU_PLATFORM_NAMES = frozenset({"cuda", "gpu"})
 _LLVM_DIS_CANDIDATES = (
     "llvm-dis",
     "llvm-dis-23",
@@ -84,6 +93,15 @@ _LLVM_DIS_CANDIDATES = (
 )
 
 
+@dataclasses.dataclass(frozen=True)
+class _RuntimeBackendConfig:
+    jax_platform: str
+    input_device: str | None
+    backend_target: str | None
+    cuda_visible_devices: str | None
+    iree_cuda_target: str | None
+
+
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -97,6 +115,146 @@ def _find_llvm_dis() -> str | None:
         ),
         None,
     )
+
+
+def _env_text(name: str, *, keep_empty: bool = False) -> str | None:
+    if name not in os.environ:
+        return None
+    value = os.environ[name].strip()
+    if value or keep_empty:
+        return value
+    return None
+
+
+def _required_env_text(name: str) -> str:
+    value = _env_text(name)
+    if value is None:
+        raise SystemExit(f"backend_env_missing={name}")
+    return value
+
+
+def _env_int(name: str, default: int) -> int:
+    value = _env_text(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise SystemExit(f"invalid_int_env={name}:{value}") from exc
+
+
+def _parse_gpu_slot_line(line: str) -> dict[str, int | str] | None:
+    cells = [cell.strip() for cell in line.split(",")]
+    if len(cells) != 3:
+        return None
+    try:
+        return {
+            "index": cells[0],
+            "memory_used_mib": int(cells[1]),
+            "utilization_percent": int(cells[2]),
+        }
+    except ValueError:
+        return None
+
+
+def _query_gpu_slots() -> list[dict[str, int | str]]:
+    command = [
+        "nvidia-smi",
+        "--query-gpu=index,memory.used,utilization.gpu",
+        "--format=csv,noheader,nounits",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(f"gpu_slot_blocker=nvidia_smi_unavailable:{exc}") from exc
+    if result.returncode != 0:
+        reason = result.stderr.strip() or result.stdout.strip() or str(result.returncode)
+        raise SystemExit(f"gpu_slot_blocker=nvidia_smi_failed:{reason}")
+    slots = [
+        slot
+        for line in result.stdout.splitlines()
+        if (slot := _parse_gpu_slot_line(line)) is not None
+    ]
+    if not slots:
+        raise SystemExit("gpu_slot_blocker=no_parseable_nvidia_smi_slots")
+    return slots
+
+
+def _select_available_gpu_slot() -> str:
+    max_memory = _env_int(ENV_GPU_SLOT_MAX_MEMORY_MIB, 256)
+    max_utilization = _env_int(ENV_GPU_SLOT_MAX_UTILIZATION_PERCENT, 5)
+    for slot in _query_gpu_slots():
+        if (
+            int(slot["memory_used_mib"]) <= max_memory
+            and int(slot["utilization_percent"]) <= max_utilization
+        ):
+            return str(slot["index"])
+    raise SystemExit(
+        "gpu_slot_blocker=no_available_slot:"
+        f"memory_mib<={max_memory},utilization_percent<={max_utilization}"
+    )
+
+
+def resolve_cuda_visible_devices(requested: str | None) -> str:
+    """Return the explicit or selected CUDA slot for a GPU JIT child."""
+    standard = _env_text("CUDA_VISIBLE_DEVICES", keep_empty=True)
+    agent_value = _env_text(ENV_JIT_CUDA_VISIBLE_DEVICES, keep_empty=True)
+    if requested is not None:
+        agent_value = requested.strip()
+    if standard is not None and agent_value is not None and standard != agent_value:
+        raise SystemExit(
+            "gpu_slot_blocker=conflicting_cuda_visible_devices:"
+            f"CUDA_VISIBLE_DEVICES={standard!r},"
+            f"{ENV_JIT_CUDA_VISIBLE_DEVICES}={agent_value!r}"
+        )
+    selected = standard if standard is not None else agent_value
+    if selected is not None:
+        if not selected:
+            raise SystemExit("gpu_slot_blocker=empty_cuda_visible_devices")
+        return selected
+    nvidia_visible = _env_text("NVIDIA_VISIBLE_DEVICES")
+    if nvidia_visible and nvidia_visible.lower() != "all":
+        return nvidia_visible
+    return _select_available_gpu_slot()
+
+
+def resolve_runtime_backend_config(
+    *,
+    include_backend_trace: bool,
+) -> _RuntimeBackendConfig:
+    """Read the JIT backend/runtime contract from environment variables."""
+    jax_platform = _required_env_text(ENV_JIT_JAX_PLATFORM)
+    backend_target = _env_text(ENV_JIT_BACKEND_TARGET)
+    if include_backend_trace and backend_target is None:
+        raise SystemExit(f"backend_env_missing={ENV_JIT_BACKEND_TARGET}")
+    return _RuntimeBackendConfig(
+        jax_platform=jax_platform,
+        input_device=_env_text(ENV_JIT_INPUT_DEVICE),
+        backend_target=backend_target,
+        cuda_visible_devices=_env_text(ENV_JIT_CUDA_VISIBLE_DEVICES, keep_empty=True),
+        iree_cuda_target=_env_text(ENV_JIT_IREE_CUDA_TARGET),
+    )
+
+
+def _backend_runtime_env_snapshot() -> dict[str, str]:
+    names = (
+        ENV_JIT_JAX_PLATFORM,
+        ENV_JIT_BACKEND_TARGET,
+        ENV_JIT_INPUT_DEVICE,
+        ENV_JIT_CUDA_VISIBLE_DEVICES,
+        ENV_JIT_IREE_CUDA_TARGET,
+        "CUDA_VISIBLE_DEVICES",
+        "NVIDIA_VISIBLE_DEVICES",
+        "JAX_PLATFORMS",
+        "JAX_PLATFORM_NAME",
+    )
+    return {name: os.environ[name] for name in names if name in os.environ}
 
 
 def _symbol_path_and_qualname(symbol: str) -> tuple[Path, str]:
@@ -596,7 +754,7 @@ def _configure_jax_platform(
     xla_dump_dir: Path | None,
 ) -> None:
     if "jax" in sys.modules or "jaxlib" in sys.modules:
-        raise SystemExit("--jax-platform must be set before importing JAX")
+        raise SystemExit(f"{ENV_JIT_JAX_PLATFORM} must be set before importing JAX")
     if xla_dump_dir is not None:
         if xla_dump_dir.exists():
             shutil.rmtree(xla_dump_dir)
@@ -607,7 +765,7 @@ def _configure_jax_platform(
     if xla_dump_dir is not None:
         requested_flags.append(f"--xla_dump_to={xla_dump_dir}")
         requested_flags.append("--xla_dump_hlo_as_text")
-        if platform_name in {"cuda", "gpu"}:
+        if platform_name in _GPU_PLATFORM_NAMES:
             requested_flags.append("--xla_gpu_dump_llvmir")
     if requested_flags:
         existing = os.environ.get("XLA_FLAGS", "").split()
@@ -628,11 +786,11 @@ def _configure_jax_platform(
         # Keep it independent of CUDA device memory by avoiding CUDA discovery.
         os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
         os.environ["JAX_PLATFORMS"] = "cpu"
-    if platform_name in {"cuda", "gpu"}:
+    if platform_name in _GPU_PLATFORM_NAMES:
         platform_name = "gpu"
-        if cuda_visible_devices is not None:
-            os.environ.setdefault("CUDA_VISIBLE_DEVICES", cuda_visible_devices)
-            os.environ.setdefault("NVIDIA_VISIBLE_DEVICES", cuda_visible_devices)
+        resolved_cuda_visible_devices = resolve_cuda_visible_devices(cuda_visible_devices)
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", resolved_cuda_visible_devices)
+        os.environ.setdefault("NVIDIA_VISIBLE_DEVICES", resolved_cuda_visible_devices)
         os.environ.setdefault("XLA_PYTHON_CLIENT_ALLOCATOR", "platform")
         os.environ.setdefault("XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR", "false")
     os.environ["JAX_PLATFORM_NAME"] = platform_name
@@ -1289,9 +1447,7 @@ def _iree_target_args(
         f"--iree-hal-target-backends={target_backend}",
         "--mlir-disable-threading",
     ]
-    if target_backend == "llvm-cpu":
-        args.append("--iree-llvmcpu-target-cpu=generic")
-    if target_backend == "cuda" and iree_cuda_target:
+    if iree_cuda_target:
         args.append(f"--iree-cuda-target={iree_cuda_target}")
     return args
 
@@ -1668,7 +1824,7 @@ def _collect_backend_trace(
         "schema": "agent-canon.typed-backend-trace.v1",
         "target_backend": target_backend,
         "target_options": {
-            "iree_cuda_target": iree_cuda_target if target_backend == "cuda" else None,
+            "iree_cuda_target": iree_cuda_target,
         },
         "executables": executables,
         "compiler_ir_errors": list(compiler_errors),
@@ -1786,25 +1942,6 @@ def _collect_backend_trace(
                 embedded_vmfb,
             )
         )
-        if target_backend == "llvm-cpu":
-            system_dump = tmp / "full_dump_system_library"
-            system_vmfb = tmp / "full_system_library.vmfb"
-            attempts.append(
-                (
-                    "full_dump_system_library",
-                    [
-                        compiler,
-                        str(stablehlo_path),
-                        *_iree_target_args(target_backend, iree_cuda_target=iree_cuda_target),
-                        "--iree-llvmcpu-link-embedded=false",
-                        f"--iree-hal-dump-executable-files-to={system_dump}",
-                        "-o",
-                        str(system_vmfb),
-                    ],
-                    system_dump,
-                    system_vmfb,
-                )
-            )
         executable_targets_dump = tmp / "executable_targets_dump"
         executable_targets_out = tmp / "executable_targets.mlir"
         attempts.append(
@@ -1919,6 +2056,7 @@ def _backend_environment(dialect: str, compiler_errors: Sequence[str]) -> dict[s
         "packages": packages,
         "jax_default_backend": jax.default_backend(),
         "jax_devices": devices,
+        "runtime_selection_env": _backend_runtime_env_snapshot(),
         "executables": executables,
         "compiler_ir_errors": list(compiler_errors),
         "float_semantics_policy": "Backend FP semantics are generated from backend trace coverage, not accepted as an external axiom.",
@@ -1931,7 +2069,7 @@ def build_jit_canonical_ir(
     input_factory_symbol: str,
     input_device: str | None,
     backend_trace_dir: Path | None,
-    backend_target: str,
+    backend_target: str | None,
     iree_cuda_target: str | None,
     xla_dump_dir: Path | None,
     include_source_root: bool,
@@ -1981,6 +2119,8 @@ def build_jit_canonical_ir(
         "source_root": source_root,
     }
     if include_backend_trace:
+        if backend_target is None:
+            raise SystemExit(f"backend_env_missing={ENV_JIT_BACKEND_TARGET}")
         record["backend_environment"] = _backend_environment(dialect, compiler_errors)
         record["backend_trace"] = _collect_backend_trace(
             stablehlo_text,
@@ -1996,29 +2136,17 @@ def build_jit_canonical_ir(
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Backend/runtime selection is read from environment variables: "
+            f"{ENV_JIT_JAX_PLATFORM}, {ENV_JIT_BACKEND_TARGET}, "
+            f"{ENV_JIT_INPUT_DEVICE}, {ENV_JIT_CUDA_VISIBLE_DEVICES}, "
+            f"{ENV_JIT_IREE_CUDA_TARGET}."
+        ),
+    )
     parser.add_argument("--python-symbol", required=True, help="JIT root as path.py::qualname.")
     parser.add_argument("--input-factory", required=True, help="Concrete lowering input factory as path.py::qualname.")
-    parser.add_argument("--backend-target", default="llvm-cpu", help="IREE HAL backend for typed backend trace generation.")
-    parser.add_argument(
-        "--iree-cuda-target",
-        help="IREE CUDA architecture target passed when --backend-target=cuda, for example sm_89.",
-    )
-    parser.add_argument(
-        "--jax-platform",
-        default="gpu",
-        help="Optional JAX lowering platform, for example cpu, gpu, or tpu.",
-    )
-    parser.add_argument(
-        "--cuda-visible-devices",
-        default="0",
-        help="CUDA_VISIBLE_DEVICES value used when --jax-platform selects gpu/cuda.",
-    )
-    parser.add_argument(
-        "--input-device",
-        default="cpu",
-        help="Device kind used while loading the JIT root and concrete example inputs.",
-    )
     parser.add_argument(
         "--xla-flags",
         help="Additional XLA_FLAGS appended before JAX import, for example '--xla_gpu_dump_llvmir'.",
@@ -2047,19 +2175,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the JIT-canonical IR extractor."""
     args = parse_args(argv)
+    runtime_config = resolve_runtime_backend_config(
+        include_backend_trace=not args.no_backend_trace,
+    )
     _configure_jax_platform(
-        args.jax_platform,
-        cuda_visible_devices=args.cuda_visible_devices,
+        runtime_config.jax_platform,
+        cuda_visible_devices=runtime_config.cuda_visible_devices,
         xla_flags=args.xla_flags,
         xla_dump_dir=Path(args.xla_dump_dir) if args.xla_dump_dir else None,
     )
     record = build_jit_canonical_ir(
         python_symbol=args.python_symbol,
         input_factory_symbol=args.input_factory,
-        input_device=args.input_device,
+        input_device=runtime_config.input_device,
         backend_trace_dir=Path(args.backend_trace_dir) if args.backend_trace_dir else None,
-        backend_target=args.backend_target,
-        iree_cuda_target=args.iree_cuda_target,
+        backend_target=runtime_config.backend_target,
+        iree_cuda_target=runtime_config.iree_cuda_target,
         xla_dump_dir=Path(args.xla_dump_dir) if args.xla_dump_dir else None,
         include_source_root=not args.no_source_root,
         include_backend_trace=not args.no_backend_trace,

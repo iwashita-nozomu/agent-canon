@@ -52,6 +52,10 @@ GitHub/submodule-first repositories.
 acceptable evidence for every small change. The selected validation must match
 the changed paths and risk class, and the PR or run bundle must state why that
 set is sufficient.
+GPU backend validation first selects an available GPU slot and records slot
+evidence; missing slots produce `gpu_validation_blocker=<reason>`.
+Backend selection values are supplied through environment variables rather
+than implementation-code defaults.
 
 
 ## Check Matrix

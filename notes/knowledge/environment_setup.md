@@ -15,10 +15,16 @@ upstream design README.md notes lifecycle index
 
 ## JAX / GPU
 
-- GPU を固定したい child では `CUDA_VISIBLE_DEVICES` を明示します。
+- GPU backend の child では、runner / tool が空き GPU slot を確認してから
+  `CUDA_VISIBLE_DEVICES` を固定します。
 - GPU の先取りを避けたいときは `XLA_PYTHON_CLIENT_PREALLOCATE=false` を使います。
-- CPU に逃がしたいときは `JAX_PLATFORMS=cpu` を使います。
+- CPU backend は user request、runtime profile、または明示 env で固定された
+  compiler-only / CPU profile として扱います。
+- GPU slot が埋まっている場合は別 slot を探索し、見つからない場合は
+  `gpu_slot_blocker=<reason>` と slot evidence を残します。
 - JAX / XLA の標準 env は experiment script 側で ad hoc に組まず、共通 helper か runner 側で組み立てます。
+- backend / runtime target は env で固定し、implementation code の default 値で
+  選びません。
 - `jax` や `jax.numpy` を import する前に env を適用します。
 - case ごとの fresh child process を前提にし、process-local state の再利用を期待しません。
 

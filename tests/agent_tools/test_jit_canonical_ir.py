@@ -7,11 +7,50 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
+import types
 from pathlib import Path
+from typing import Protocol, cast
+
+import pytest
+
+
+class _JitToolModule(Protocol):
+    subprocess: types.ModuleType
+
+    def resolve_runtime_backend_config(
+        self,
+        *,
+        include_backend_trace: bool,
+    ) -> object: ...
+
+    def resolve_cuda_visible_devices(self, requested: str | None) -> str: ...
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def _jit_env(**overrides: str) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(overrides)
+    return env
+
+
+def _load_jit_tool_module() -> _JitToolModule:
+    tool_path = Path(__file__).resolve().parents[2] / "tools/agent_tools/jit_canonical_ir.py"
+    spec = importlib.util.spec_from_file_location("_agent_canon_test_jit_tool", tool_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return cast(_JitToolModule, module)
 
 
 def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -> None:
@@ -43,8 +82,6 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
             f"{root}::main",
             "--input-factory",
             f"{root}::example_inputs",
-            "--jax-platform",
-            "cpu",
             "--backend-trace-dir",
             str(backend_dir),
             "--out",
@@ -54,7 +91,11 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
             "--backend-trace-out",
             str(backend_trace),
         ],
-        cwd=Path(__file__).resolve().parents[4],
+        cwd=_repo_root(),
+        env=_jit_env(
+            AGENT_CANON_JIT_JAX_PLATFORM="cpu",
+            AGENT_CANON_JIT_BACKEND_TARGET="llvm-cpu",
+        ),
         check=True,
     )
 
@@ -74,7 +115,6 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
     kinds = {op["kind"] for op in record["operational_ir"]["ops"]}
     assert {"Function", "Primitive", "Return"}.issubset(kinds)
     assert record["backend_trace"]["schema"] == "agent-canon.typed-backend-trace.v1"
-    assert record["backend_trace"]["compile_attempts"]
     assert record["backend_trace"]["coverage"] in {
         "generated_with_llvm",
         "generated_without_llvm_text",
@@ -84,6 +124,7 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
         "compiler_unavailable",
     }
     if shutil.which("iree-compile") is not None:
+        assert record["backend_trace"]["compile_attempts"]
         assert record["backend_trace"]["coverage"] == "generated_with_llvm"
         assert record["backend_trace"]["llvm_ir"]
         llvm_modules = record["backend_trace"]["llvm_ir"]
@@ -140,14 +181,13 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
             f"{root}::main",
             "--input-factory",
             f"{root}::example_inputs",
-            "--jax-platform",
-            "cpu",
             "--no-source-root",
             "--no-backend-trace",
             "--out",
             str(out),
         ],
-        cwd=Path(__file__).resolve().parents[4],
+        cwd=_repo_root(),
+        env=_jit_env(AGENT_CANON_JIT_JAX_PLATFORM="cpu"),
         check=True,
     )
 
@@ -235,14 +275,13 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
             f"{root}::main",
             "--input-factory",
             f"{root}::example_inputs",
-            "--jax-platform",
-            "cpu",
             "--no-source-root",
             "--no-backend-trace",
             "--out",
             str(out),
         ],
-        cwd=Path(__file__).resolve().parents[4],
+        cwd=_repo_root(),
+        env=_jit_env(AGENT_CANON_JIT_JAX_PLATFORM="cpu"),
         check=True,
     )
 
@@ -267,3 +306,42 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
         for leaf in public_interface["return_leaves"]
         if leaf["root_name"] == "info"
     ] == ["info.step_count", "info.ipm_res_final"]
+
+
+def test_jit_runtime_backend_config_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    tool = _load_jit_tool_module()
+    monkeypatch.delenv("AGENT_CANON_JIT_JAX_PLATFORM", raising=False)
+
+    with pytest.raises(SystemExit, match="backend_env_missing=AGENT_CANON_JIT_JAX_PLATFORM"):
+        tool.resolve_runtime_backend_config(include_backend_trace=False)
+
+
+def test_jit_gpu_platform_selects_open_slot(monkeypatch: pytest.MonkeyPatch) -> None:
+    tool = _load_jit_tool_module()
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.delenv("NVIDIA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.delenv("AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES", raising=False)
+
+    def fake_run(
+        command: list[str],
+        *,
+        text: bool,
+        capture_output: bool,
+        check: bool,
+        timeout: int,
+    ) -> subprocess.CompletedProcess[str]:
+        assert command[0] == "nvidia-smi"
+        assert text is True
+        assert capture_output is True
+        assert check is False
+        assert timeout == 5
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="0, 2048, 80\n1, 0, 0\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(tool.subprocess, "run", fake_run)
+
+    assert tool.resolve_cuda_visible_devices(None) == "1"
