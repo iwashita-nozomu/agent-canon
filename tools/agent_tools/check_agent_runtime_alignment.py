@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import tempfile
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -484,7 +485,9 @@ def validate_public_skill_shims() -> None:
     validate_public_skill_document_contract(data)
 
 
-def validate_public_skill_document_contract(data: dict[str, object], root: Path = ROOT) -> None:
+def validate_public_skill_document_contract(
+    data: Mapping[str, object], root: Path = ROOT
+) -> None:
     """Check that agents/skills contains only catalog-backed public skills."""
     public_doc_root = root / "agents" / "skills"
     internal_routine_root = root / "agents" / "internal-routines"
