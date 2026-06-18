@@ -103,6 +103,15 @@ whose combined certified subgraph can close the target theorem. Adopt
 rules out the target under the current theorem scope, not merely one generated
 proof route.
 
+When proof graph structural analysis finds a condition that closes only by
+unfolding into the target predicate itself, classify it as `projection_only` or
+`circularity_check`, not as a substantive necessary/sufficient condition. Such
+nodes are useful because they identify the public return projection or stopping
+scalar, but the graph must continue to a separate non-circular edge rooted in
+code facts, public `Problem` / config inputs, backend evidence, or a formal
+library theorem. A certified convergence or finite-stop subgraph must not rely
+on `Condition := Target` as its terminal problem-class witness.
+
 When a scaffold becomes a checked proof fragment, keep the package-retained
 trace current instead of leaving the evidence only in a work log. Add the
 checked theorem or solver artifact to the trace module, record the checker

@@ -10,6 +10,7 @@ upstream design ../../../agents/skills/algorithm-proof-exploration.md canonical 
 upstream design ../../../agents/skills/formal-proof-workflow.md checker-backed claim workflow.
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py builds JIT-canonical implementation IR and backend traces.
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
+upstream implementation ../../../tools/agent_tools/theorem_graph_circularity_check.py checks theorem graph circularity before classifying problem-class conditions.
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
 @dependency-end
 -->
@@ -136,6 +137,20 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    refute those candidates, then rerun the target proof. Repeat until `P` is
    proved, refuted, shown unprovable under the current top-level assumptions, or
    reduced to a strictly smaller named witness.
+   When a candidate condition proves `P` only because it is definitionally the
+   same predicate as `P`, classify it as `projection_only` /
+   `circularity_check`. Do not treat that candidate as an algorithmic success or
+   a `Problem` condition. The algorithm frontier must instead move to the
+   non-circular mechanism that would make `P` true, such as residual
+   reachability for the implemented recurrence, a finite ranking function, a
+   contraction/decrease lemma, or a problem-class witness that implies the
+   projected stopping scalar.
+   Run this circularity check on the theorem graph, not on names or vocabulary.
+   A route remains circular if the proposition graph connects the conclusion
+   side back to the candidate condition through definition, projection,
+   equivalence, existential-lift, or certificate-inclusion edges. Do not accept a
+   necessary/sufficient problem class merely because the terms were renamed or
+   the proof did not close by a single definitional step.
 1. For theorem-critical intermediate formulas, use
    `python3 tools/agent_tools/jit_canonical_ir.py` after theorem graph
    generation. Check assignment and return equations per iteration unit
@@ -147,6 +162,17 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
    and humans may add candidate algorithm changes, certificate edges, source
    packets, and formal-proof handoff decisions as overlay data, but must not
    hand-edit generated IR facts into a proof result.
+   Structural analysis must distinguish projection evidence from numerical
+   progress evidence. A theorem graph path that goes
+   `Condition := Target -> Target` is connected but circular; it is kept as
+   `circularity_check` and excluded from certified convergence / finite-stop
+   subgraphs until a separate non-circular edge derives the condition from
+   `Problem`, config, generated code facts, backend profile, or a formal-library
+   theorem.
+   The exclusion is graph-based: start from the target/conclusion node, follow
+   proof-consumption edges, and reject the route if that path reaches the node
+   being proposed as an independent problem class or certificate. Vocabulary
+   checks are not sufficient evidence of non-circularity.
 1. Extract an algorithm frontier from the graph, not from prose order. Pick
    target-facing blockers by algorithmic impact and reduce each to one of:
    implementation identity, returned-value projection, numerical
