@@ -129,13 +129,24 @@ Concrete numeric primitive semantics and theorem-specific mathematical claims
 remain separate proof-graph work.
 
 For source-level public roots, the generated module must not hide shallow
-expansion as an arbitrary theorem premise. The generator constructs source
-return structures from the JIT public StableHLO return leaves and emits
+projection as value expansion. The generator constructs source return
+structures from the JIT public StableHLO return leaves and emits
 `sourceInitialize`, `sourceAlgorithmRun`, `sourceResidualWithinTolerance`, and
-`sourceMain` as Lean definitions. The coverage theorem records
-`sourceMainValueExpanded = true`. Proof themes consume those
-definitions as the source value layer, then add theorem-specific numerical
-claims separately.
+`sourceMain` as Lean definitions. The coverage theorem records public return
+projection separately from value-level expansion:
+
+```lean
+sourceMainProjectionExpanded = true
+sourceMainValueExpanded = false
+```
+
+`sourceMainProjectionExpanded = true` means the public root, public argument
+tree, return roots, return leaves, and source call shape are represented.
+`sourceMainValueExpanded = false` means the generated source layer is still a
+return-leaf projection layer, not a decoded numeric semantics layer. Proof
+themes may consume those definitions as projection evidence, but theorem
+specific numerical claims must be supplied by generated operational evaluators,
+backend witnesses, or problem/config-derived mathematical lemmas.
 Visible public-input configuration leaves are also emitted as structured source
 types when they are part of the root data flow. For PDIPM-style roots this
 includes `InitializeConfig.kkt_default_solve_config`: the generated
