@@ -88,8 +88,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    `python3 tools/agent_tools/cpp_source_canonical_ir.py --cpp-symbol <path.hpp::qualname> --format json --out <record.json>`,
    then render generic Lean evidence with
    `python3 tools/agent_tools/operational_ir_to_lean.py --ir <record.json> --namespace <Lean.Namespace> --out <Generated.lean>`.
-   Use `--require-complete-coverage` only when unresolved calls and unassigned
-   ops must be rejected by the generator.
+   The renderer rejects unresolved calls and unassigned operations before Lean
+   output; repair coverage gaps in the extractor or selected C++ root before
+   treating the generated evidence as accepted proof input.
 1. Generate checker-facing Lean evidence definitions from the current
    JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`, or from the
    shared thin operational IR / C++ envelope with
@@ -122,7 +123,8 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    instead of narrowing the theorem to IREE, XLA, CUDA, CPU, GPU, VMFB,
    StableHLO, LLVM, FP32, or another backend surface.
    For target-critical code shape, do not leave implementation-local functions
-   as arbitrary proof axioms merely because the first trace generator is shallow.
+   as arbitrary proof axioms merely because the current trace generator does not
+   yet expose the required function body.
    Residual bundles, next-state construction, step-length formulas, KKT
    reconstruction, stopping residual aggregation, and other target-facing code
    path functions must be implemented as Lean functions whose fields correspond

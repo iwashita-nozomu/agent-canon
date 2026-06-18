@@ -157,8 +157,8 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   proof graph は別物です。code path が Lean 関数へ完全に lower されたと主張する前に、
   JIT-specific generator では生成 Lean module の
   `generated_function_lowering_coverage_verified` を checker で通し、generic
-  operational IR renderer では `coverageComplete = true` と
-  `--require-complete-coverage` の generator pass を evidence に含めます。生成名の
+  operational IR renderer では generator が complete coverage を既定で要求し、
+  `coverageComplete = true` の generated evidence を出したことを evidence に含めます。生成名の
   `rg` 確認や prose inspection だけを coverage evidence として採用してはいけません。
   proof graph は proposition と theorem dependency edge を持ちます。`theorem X by A, B, f`
   のような route は、`A` と `B` が proof premise、`f` が JIT-generated code graph

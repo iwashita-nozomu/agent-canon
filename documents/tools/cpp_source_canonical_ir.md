@@ -36,7 +36,7 @@ The tool writes an `agent-canon.cpp-source-canonical-ir.v1` JSON record with:
 - `source_root`: source path, root qualname, span, source hash, parameters,
   return type, and parser warnings;
 - `public_interface`: source-level parameter and return-type metadata;
-- `source_facts`: shallow assignment and return equations extracted from the
+- `source_facts`: assignment and return equations extracted from the
   reachable parsed functions;
 - `operational_ir`: an `agent-canon.thin-operational-ir.v2` record containing
   functions, regions, operations, expansion edges, and coverage counters.
@@ -50,7 +50,8 @@ Function, Let, Call, If, While, Case, Tuple, Projection, Primitive, Return
 Function bodies are represented as regions. Resolved source calls add
 `call_target` expansion edges to parsed target functions. Unresolved or external
 calls remain visible as primitive call rows and are listed under
-`coverage.unresolved_call_targets`.
+`coverage.unresolved_call_targets`; downstream Lean evidence generation rejects
+records unless that list is empty and every operation is assigned to a region.
 
 ## Boundary
 
@@ -77,8 +78,7 @@ wrapper's provenance, public-interface metadata, source facts, and structural
 coverage as Lean evidence data. It does not emit StableHLO/backend evidence and
 does not claim semantic proof of the C++ algorithm.
 
-The parser is lightweight. It handles common record declarations, namespaces,
-function and method definitions, local constructor assignments, direct calls,
-object method calls, brace construction, assignment facts, return facts, and
-shallow `if` / `while` markers. It reports unresolved targets instead of
-hiding parser limits.
+The extraction contract prioritizes complete coverage for the selected source
+route. If source parsing or call resolution leaves unresolved targets, the
+record is a repair input for the extractor or selected C++ root, not an accepted
+Lean evidence artifact.

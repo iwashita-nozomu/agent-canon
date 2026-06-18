@@ -34,9 +34,10 @@ python3 tools/agent_tools/operational_ir_to_lean.py \
 When `--out` is omitted, Lean text is written to stdout. `--module-name` is
 optional and defaults from root metadata when available.
 
-Use `--require-complete-coverage` only when the caller wants generation to fail
-if `coverage.unresolved_call_targets` is non-empty or
-`coverage.unassigned_op_count` is nonzero.
+Generation requires complete operational coverage. The renderer fails before
+writing Lean when `coverage.unresolved_call_targets` is non-empty,
+`coverage.unassigned_op_count` is nonzero, or the required completeness fields
+are absent.
 
 ## Output Contract
 
@@ -48,7 +49,7 @@ The generated Lean module contains evidence definitions for:
 - allowed operation kinds and function signatures;
 - operational functions, regions, operations, and expansion edges;
 - structural coverage counters;
-- `unresolvedCallTargets`;
+- `unresolvedCallTargets`, which must be empty for generated output;
 - `coverageComplete`, a Boolean coverage fact.
 
 The renderer preserves non-standard operation and coverage fields as key-value

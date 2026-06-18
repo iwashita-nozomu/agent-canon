@@ -761,11 +761,6 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Nested Lean namespace for this generated module. Defaults from root metadata.",
     )
     parser.add_argument("--out", help="Optional output path. When omitted, print to stdout.")
-    parser.add_argument(
-        "--require-complete-coverage",
-        action="store_true",
-        help="Fail when unresolved call targets or unassigned ops remain in coverage.",
-    )
     return parser.parse_args(list(argv))
 
 
@@ -777,8 +772,7 @@ def main(argv: Sequence[str]) -> int:
         record = load_record(Path(args.ir))
         render_input = normalize_render_input(record)
         module_name = validate_namespace(str(args.module_name or render_input.module_name))
-        if args.require_complete_coverage:
-            enforce_complete_coverage(render_input)
+        enforce_complete_coverage(render_input)
         rendered = render_lean(render_input, namespace=namespace, module_name=module_name)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc

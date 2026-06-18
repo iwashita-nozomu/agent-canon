@@ -48,7 +48,7 @@ def write_json(path: Path, payload: object) -> None:
 
 
 def thin_ir_payload() -> dict[str, object]:
-    """Return a compact thin-operational-IR fixture."""
+    """Return a fully covered thin-operational-IR fixture."""
     return {
         "schema": "agent-canon.thin-operational-ir.v2",
         "allowed_kinds": ["Function", "Let", "Call", "Return"],
@@ -120,7 +120,7 @@ def thin_ir_payload() -> dict[str, object]:
 
 
 def thin_ir_payload_with_unresolved(unresolved_targets: list[str]) -> dict[str, object]:
-    """Return a compact thin-operational-IR fixture with unresolved calls."""
+    """Return a thin-operational-IR fixture with unresolved calls."""
     payload = thin_ir_payload()
     ops = payload["ops"]
     coverage = payload["coverage"]
@@ -134,7 +134,7 @@ def thin_ir_payload_with_unresolved(unresolved_targets: list[str]) -> dict[str, 
 
 
 def thin_ir_payload_with_unassigned_op() -> dict[str, object]:
-    """Return a compact thin-operational-IR fixture with unassigned op coverage."""
+    """Return a thin-operational-IR fixture with unassigned op coverage."""
     payload = thin_ir_payload()
     coverage = payload["coverage"]
     assert isinstance(coverage, dict)
@@ -204,7 +204,7 @@ def cpp_envelope_payload_with_unresolved(unresolved_targets: list[str]) -> dict[
 
 
 def write_algorithm_fixture(root: Path) -> Path:
-    """Write a compact C++ algorithm fixture."""
+    """Write a C++ algorithm fixture."""
     source = root / "include" / "algorithm.hpp"
     source.parent.mkdir(parents=True)
     source.write_text(
@@ -319,41 +319,26 @@ def test_operational_ir_to_lean_out_file_and_default_module(tmp_path: Path) -> N
 
 
 def test_operational_ir_to_lean_coverage_gate(tmp_path: Path) -> None:
-    """Incomplete coverage should render by default and fail only under the strict gate."""
+    """Unresolved calls should fail before Lean output is produced."""
     ir = tmp_path / "unresolved.json"
     write_json(ir, cpp_envelope_payload_with_unresolved(["external_call"]))
 
-    default = run_tool("--ir", str(ir), "--namespace", "Smoke")
-    strict = run_tool(
-        "--ir",
-        str(ir),
-        "--namespace",
-        "Smoke",
-        "--require-complete-coverage",
-    )
+    result = run_tool("--ir", str(ir), "--namespace", "Smoke")
 
-    assert default.returncode == 0, default.stderr
-    assert 'unresolvedCallTargets := ["external_call"]' in default.stdout
-    assert "def coverageComplete : Bool" in default.stdout
-    assert strict.returncode != 0
-    assert "incomplete operational coverage" in strict.stderr
-    assert "external_call" in strict.stderr
+    assert result.returncode != 0
+    assert "incomplete operational coverage" in result.stderr
+    assert "external_call" in result.stderr
+    assert result.stdout == ""
 
 
 def test_operational_ir_to_lean_coverage_gate_rejects_unassigned_ops(
     tmp_path: Path,
 ) -> None:
-    """The strict coverage gate should reject unassigned operation rows."""
+    """Unassigned operation rows should fail before Lean output is produced."""
     ir = tmp_path / "unassigned.json"
     write_json(ir, thin_ir_payload_with_unassigned_op())
 
-    result = run_tool(
-        "--ir",
-        str(ir),
-        "--namespace",
-        "Smoke",
-        "--require-complete-coverage",
-    )
+    result = run_tool("--ir", str(ir), "--namespace", "Smoke")
 
     assert result.returncode != 0
     assert "incomplete operational coverage" in result.stderr
@@ -372,18 +357,9 @@ def test_operational_ir_to_lean_rejects_missing_coverage_completeness_fields(
     write_json(ir, payload)
 
     default = run_tool("--ir", str(ir), "--namespace", "Smoke")
-    strict = run_tool(
-        "--ir",
-        str(ir),
-        "--namespace",
-        "Smoke",
-        "--require-complete-coverage",
-    )
 
     assert default.returncode != 0
     assert "missing required coverage field: unresolved_call_targets" in default.stderr
-    assert strict.returncode != 0
-    assert "missing required coverage field: unresolved_call_targets" in strict.stderr
 
 
 def test_operational_ir_to_lean_cpp_source_pipeline(tmp_path: Path) -> None:

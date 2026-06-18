@@ -745,11 +745,16 @@ def method_call_sites(
     return tuple(sites)
 
 
-def direct_call_candidate(body: str, match: re.Match[str]) -> bool:
+def direct_call_candidate(index: CxxIndex, body: str, match: re.Match[str]) -> bool:
     """Return whether a direct-call regex match is a candidate call edge."""
     name = match.group("name")
     if name in CXX_KEYWORDS or name in CONTROL_CALLS:
         return False
+    leaf = normalize_qualname(name).rsplit(".", 1)[-1]
+    if leaf in index.records:
+        tail = body[match.end() : match.end() + 80]
+        if re.match(r"\s*[^;{}()]*[;{]", tail):
+            return False
     return not (match.start() > 0 and body[match.start() - 1] in ".>")
 
 
@@ -761,7 +766,7 @@ def direct_call_sites(
     """Collect direct function or constructor call sites."""
     sites: list[CxxCallSite] = []
     for match in DIRECT_CALL_RE.finditer(symbol.body_text):
-        if not direct_call_candidate(symbol.body_text, match):
+        if not direct_call_candidate(index, symbol.body_text, match):
             continue
         name = match.group("name")
         target_symbol, resolved = resolve_direct_call(name, index, symbol)
@@ -1256,6 +1261,7 @@ def operational_coverage(tables: OperationalTables) -> dict[str, object]:
             for op in tables.ops
             if op["opcode"] == "cxx.call"
             and not op.get("call_target")
+            and not bool(op.get("resolved"))
             and str(op.get("target_symbol", ""))
         }
     )
