@@ -13,7 +13,6 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "cpp_source_canonical_ir.py"
@@ -87,7 +86,7 @@ def write_algorithm_fixture(root: Path) -> Path:
     return source
 
 
-def load_json_result(result: subprocess.CompletedProcess[str]) -> Any:
+def load_json_result(result: subprocess.CompletedProcess[str]):
     """Assert a successful tool result and parse JSON."""
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
