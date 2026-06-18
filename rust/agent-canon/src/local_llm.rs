@@ -27,6 +27,7 @@ use std::thread;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use yaml_rust2::{Yaml, YamlLoader};
 
 const DEFAULT_MODEL: &str = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M";
 const DEFAULT_MAX_BYTES: usize = 24_000;
@@ -35,6 +36,7 @@ const DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE: usize = 4;
 const DEFAULT_PROSE_IR_TERM_BATCH_SIZE: usize = 32;
 const DEFAULT_PROSE_IR_LLM_JOBS: usize = 4;
 const PROMPT_DIGEST_LENGTH: usize = 12;
+const SKILL_CATALOG_PATH: &str = "agents/skills/catalog.yaml";
 const LOCAL_LLM_CPU_ENV: [(&str, &str); 4] = [
     ("CUDA_VISIBLE_DEVICES", ""),
     ("NVIDIA_VISIBLE_DEVICES", "void"),
@@ -268,9 +270,17 @@ struct SurfaceRouteDecision {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SkillRouteMatch {
-    skill: &'static str,
-    reason: &'static str,
+    skill: String,
+    reason: String,
     explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRoutingRule {
+    skill: String,
+    reason: String,
+    stage_policy: String,
+    triggers: Vec<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -927,7 +937,21 @@ fn run_route_skill(args: &LocalLlmArgs) -> i32 {
             return 2;
         }
     };
-    let decision = decide_skill_route(&prompt, &parsed.mode);
+    let source_root = match source_root_for(&parsed.root) {
+        Ok(root) => root,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let rules = match load_skill_route_rules(&source_root) {
+        Ok(rules) => rules,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let decision = decide_skill_route_with_rules(&prompt, &parsed.mode, &rules);
     match parsed.format {
         RouteOutputFormat::Json => print_skill_route_json(&decision),
         RouteOutputFormat::Text => print_skill_route_text(&decision),
@@ -935,9 +959,21 @@ fn run_route_skill(args: &LocalLlmArgs) -> i32 {
     0
 }
 
+#[cfg(test)]
 fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision {
+    let source_root =
+        default_source_root().expect("AgentCanon source root exists for skill routing");
+    let rules = load_skill_route_rules(&source_root).expect("skill routing catalog loads");
+    decide_skill_route_with_rules(prompt, requested_mode, &rules)
+}
+
+fn decide_skill_route_with_rules(
+    prompt: &str,
+    requested_mode: &str,
+    rules: &[SkillRoutingRule],
+) -> SkillRouteDecision {
     let active_mode = infer_skill_route_mode(prompt, requested_mode);
-    let matches = matched_skill_routes(prompt);
+    let matches = matched_skill_routes(prompt, rules);
     let matched_skills = matches
         .iter()
         .map(|item| item.skill.to_string())
@@ -951,7 +987,7 @@ fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision 
 
     let mut active_skills = vec!["agent-orchestration".to_string()];
     for item in &matches {
-        if item.explicit || is_current_stage_skill(item.skill) {
+        if item.explicit || is_current_stage_skill(&item.skill, rules) {
             active_skills.push(item.skill.to_string());
         }
     }
@@ -992,18 +1028,23 @@ fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision 
     }
 }
 
-fn matched_skill_routes(prompt: &str) -> Vec<SkillRouteMatch> {
+fn matched_skill_routes(prompt: &str, rules: &[SkillRoutingRule]) -> Vec<SkillRouteMatch> {
     let text = prompt.to_lowercase();
     let mut matches = Vec::new();
-    for (skill, reason, groups) in skill_route_rules() {
-        let explicit = public_skill_name_mentioned(&text, skill);
-        if explicit || groups.iter().any(|group| text_matches_group(&text, group)) {
+    for rule in rules {
+        let explicit = public_skill_name_mentioned(&text, &rule.skill);
+        if explicit
+            || rule
+                .triggers
+                .iter()
+                .any(|group| text_matches_group(&text, group))
+        {
             matches.push(SkillRouteMatch {
-                skill,
+                skill: rule.skill.clone(),
                 reason: if explicit {
-                    "prompt explicitly names public skill"
+                    "prompt explicitly names public skill".to_string()
                 } else {
-                    reason
+                    rule.reason.clone()
                 },
                 explicit,
             });
@@ -1012,291 +1053,117 @@ fn matched_skill_routes(prompt: &str) -> Vec<SkillRouteMatch> {
     matches
 }
 
-fn skill_route_rules() -> Vec<(&'static str, &'static str, Vec<Vec<&'static str>>)> {
-    vec![
-        (
-            "agent-orchestration",
-            "workflow, skill, subagent, or stage routing is part of the request",
-            vec![
-                vec!["どのスキル"],
-                vec!["どのskill"],
-                vec!["スキル選択"],
-                vec!["skill selection"],
-                vec!["routing", "skill"],
-                vec!["ルーティング", "スキル"],
-                vec!["マルチエージェント"],
-                vec!["サブエージェント", "起動"],
-                vec!["subagent", "routing"],
-                vec!["workflow=", "skills="],
-                vec!["根本", "設計", "見直"],
-            ],
-        ),
-        (
-            "task-routing",
-            "skill/tool routing architecture or route contract design is in scope",
-            vec![
-                vec!["ルーティング", "改善"],
-                vec!["routing", "redesign"],
-                vec!["routing", "architecture"],
-                vec!["route", "contract"],
-                vec!["skill", "tool", "routing"],
-                vec!["スキル選択", "ルーティング"],
-                vec!["スキル", "ツール", "ルーティング"],
-                vec!["根本", "設計", "見直"],
-            ],
-        ),
-        (
-            "comprehensive-development",
-            "repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation",
-            vec![
-                vec!["根本", "設計", "ルーティング"],
-                vec!["根本", "設計", "routing"],
-                vec!["全体", "レビュー", "修正"],
-                vec!["architecture", "redesign"],
-                vec!["workflow", "tools", "docs"],
-                vec!["repo-wide", "routing"],
-            ],
-        ),
-        (
-            "structure-planning",
-            "nontrivial design or document structure must be fixed before edits",
-            vec![
-                vec!["構造解析"],
-                vec!["文書", "構造", "解析"],
-                vec!["設計", "構造"],
-                vec!["structure", "contract"],
-                vec!["根本", "設計", "構造"],
-            ],
-        ),
-        (
-            "structure-refactor",
-            "repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope",
-            vec![
-                vec!["レポ", "リファクタ"],
-                vec!["repo", "refactor"],
-                vec!["repository", "refactor"],
-                vec!["repo", "structure"],
-                vec!["repository", "structure"],
-                vec!["ディレクトリ", "構成"],
-                vec!["directory", "structure"],
-                vec!["path", "layout"],
-                vec!["path", "responsibility"],
-                vec!["source", "ownership"],
-                vec!["構造", "レビュー"],
-                vec!["構造", "review"],
-                vec!["structure", "review"],
-                vec!["structural", "review"],
-                vec!["構造", "スキル", "弱"],
-                vec!["構成", "考え直"],
-                vec!["~/.codex"],
-                vec![".codex", "config"],
-                vec!["codex", "personal", "runtime"],
-                vec!["personal", "runtime", "surface"],
-            ],
-        ),
-        (
-            "subagent-bootstrap",
-            "explicit subagent or multi-agent execution requires run-local specialist routing",
-            vec![
-                vec!["マルチエージェント"],
-                vec!["サブエージェント"],
-                vec!["subagent"],
-                vec!["multi-agent"],
-            ],
-        ),
-        (
-            "agent-learning",
-            "user feedback or recurrence prevention should become durable agent learning",
-            vec![
-                vec!["人間からのフィードバック"],
-                vec!["runtime feedback"],
-                vec!["再発防止"],
-                vec!["こういう止まり方"],
-                vec!["フィードバック", "修正"],
-                vec!["feedback", "repair"],
-                vec!["memory", "feedback"],
-            ],
-        ),
-        (
-            "agent-log-analysis",
-            "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
-            vec![
-                vec!["routing miss"],
-                vec!["selection gap"],
-                vec!["routing", "coverage"],
-                vec!["toolcall", "skillcall", "coverage"],
-                vec!["toolcall", "skillcall", "routing"],
-                vec!["toolcall", "skillcall", "miss"],
-                vec!["toolcall", "skillcall", "50"],
-                vec!["toolcall", "skillcall", "されない"],
-                vec!["ルーティング", "ログ"],
-                vec!["ログ", "skill"],
-                vec!["ログ", "tool"],
-                vec!["toolcall", "skillcall", "ルーティング"],
-                vec!["runbundle", "agent", "レポート"],
-                vec!["run bundle", "agent", "report"],
-                vec!["過去", "agent", "レポート"],
-            ],
-        ),
-        (
-            "adaptive-improvement-loop",
-            "backlog-driven iterative experiment, tuning, or code improvement loop is in scope",
-            vec![
-                vec!["反復実行"],
-                vec!["継続反復"],
-                vec!["改善ループ"],
-                vec!["改善", "backlog"],
-                vec!["実験", "改善", "反復"],
-                vec!["実験", "チューニング", "継続"],
-                vec!["調査", "チューニング", "反復"],
-                vec!["code change", "run", "継続反復"],
-                vec!["iterative", "code improvement"],
-                vec!["iterative", "tuning"],
-                vec!["backlog-driven", "outer loop"],
-                vec!["adaptive", "improvement", "loop"],
-                vec!["experiment", "tuning", "loop"],
-                vec!["research", "tuning", "improvement"],
-            ],
-        ),
-        (
-            "agent-canon-update",
-            "AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope",
-            vec![
-                vec!["ensure-latest"],
-                vec!["parent", "pin", "vendor"],
-                vec!["submodule", "pin"],
-                vec!["agentcanon", "update"],
-                vec!["agent-canon", "update"],
-                vec!["vendor/agent-canon"],
-            ],
-        ),
-        (
-            "change-review",
-            "review findings or implementation changes need findings-first review",
-            vec![
-                vec!["全体", "レビュー"],
-                vec!["review", "findings"],
-                vec!["diff", "review"],
-                vec!["コード", "レビュー"],
-                vec!["根本", "設計", "レビュー"],
-            ],
-        ),
-        (
-            "test-design",
-            "test strategy, brittle tests, contract-only wrappers, or unnecessary numerical tests are in scope",
-            vec![
-                vec!["test-design"],
-                vec!["test", "design"],
-                vec!["テスト", "設計"],
-                vec!["contract-only", "wrapper"],
-                vec!["contract", "only", "wrapper"],
-                vec!["契約だけ"],
-                vec!["契約", "wrapper"],
-                vec!["static", "contract", "validation"],
-                vec!["pytest", "smoke"],
-                vec!["execution-only", "test"],
-                vec!["no-crash", "test"],
-                vec!["不要", "テスト"],
-                vec!["不要", "数値テスト"],
-                vec!["数値テスト"],
-                vec!["数値", "テスト"],
-                vec!["numerical", "test"],
-                vec!["numeric", "test"],
-                vec!["unnecessary", "test"],
-                vec!["heavy", "test"],
-                vec!["brittle", "test"],
-                vec!["tolerance", "test"],
-                vec!["seed", "test"],
-            ],
-        ),
-        (
-            "md-style-check",
-            "Markdown style, links, headings, or docs lint are in scope",
-            vec![
-                vec!["md-style"],
-                vec!["docs-check"],
-                vec!["agent-canon", "docs"],
-                vec!["docs", "format"],
-                vec!["docs", "check"],
-                vec!["markdownlint"],
-                vec!["markdown", "lint"],
-                vec!["markdown", "heading"],
-                vec!["markdown", "link"],
-                vec!["markdown", "formatter"],
-                vec!["format_markdown"],
-                vec!["formatter", "adjacent"],
-                vec!["フォーマッタ"],
-                vec!["フォーマット", "周辺"],
-                vec!["通してすらない"],
-                vec!["マークダウン", "体裁"],
-                vec!["マークダウン", "リンク"],
-            ],
-        ),
-        (
-            "oop-readability-check",
-            "OOP readability or readability guard evidence is in scope",
-            vec![
-                vec!["oop", "readability"],
-                vec!["oop", "可読"],
-                vec!["オブジェクト指向", "可読"],
-                vec!["readability", "guard"],
-                vec!["readability", "check"],
-                vec!["可読性", "class"],
-                vec!["可読性", "method"],
-            ],
-        ),
-        (
-            "result-artifact-writeout",
-            "raw results, reports, manifests, or accumulated evidence must be written out",
-            vec![
-                vec!["結果書き出し"],
-                vec!["結果を書き出"],
-                vec!["result writeout"],
-                vec!["artifact", "evidence"],
-                vec!["artifact", "report"],
-                vec!["run bundle", "evidence"],
-                vec!["蓄積分析", "レポート"],
-                vec!["ログ", "レポート", "残"],
-            ],
-        ),
-        (
-            "prose-reasoning-graph",
-            "prose structure graphing, diagnostics, or rewrite handoff is in scope",
-            vec![
-                vec!["文章構造", "graph"],
-                vec!["文章構造", "グラフ"],
-                vec!["段落", "接続"],
-                vec!["段落", "統合"],
-                vec!["dsl", "文章"],
-                vec!["prose", "graph"],
-                vec!["prose", "reasoning"],
-                vec!["rewrite", "packet"],
-                vec!["claim", "evidence", "graph"],
-            ],
-        ),
-        (
-            "pr-processing",
-            "pull request, merge queue, conflict repair, or issue triage processing is in scope",
-            vec![
-                vec!["pr", "処理"],
-                vec!["pr", "merge"],
-                vec!["pr", "マージ"],
-                vec!["pull request"],
-                vec!["pull request", "merge"],
-                vec!["merge queue"],
-                vec!["queue cleanup"],
-                vec!["conflict", "解消"],
-                vec!["コンフリクト", "解消"],
-                vec!["issue", "triage"],
-                vec!["issue", "処理"],
-                vec!["branch protection"],
-                vec!["required checks"],
-            ],
-        ),
-    ]
+fn default_skill_route_reason() -> String {
+    "prompt explicitly names public skill".to_string()
 }
 
-fn text_matches_group(text: &str, group: &[&str]) -> bool {
+fn default_skill_stage_policy() -> String {
+    "deferred".to_string()
+}
+
+#[cfg(test)]
+fn default_source_root() -> Result<PathBuf, String> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if let Some(root) = manifest_dir.parent().and_then(|path| path.parent()) {
+        if root.join(SKILL_CATALOG_PATH).is_file() {
+            return Ok(root.to_path_buf());
+        }
+    }
+    source_root_for(Path::new("."))
+}
+
+fn load_skill_route_rules(root: &Path) -> Result<Vec<SkillRoutingRule>, String> {
+    let path = root.join(SKILL_CATALOG_PATH);
+    let raw = fs::read_to_string(&path)
+        .map_err(|error| format!("skill-catalog-read-failed:{}:{error}", path.display()))?;
+    let documents = YamlLoader::load_from_str(&raw)
+        .map_err(|error| format!("skill-catalog-yaml-failed:{}:{error}", path.display()))?;
+    let catalog = documents
+        .first()
+        .ok_or_else(|| format!("skill-catalog-empty:{}", path.display()))?;
+    let families = catalog["skill_families"]
+        .as_vec()
+        .ok_or_else(|| "skill-catalog-missing-skill-families".to_string())?;
+    let mut rules = Vec::with_capacity(families.len());
+    for entry in families {
+        let skill_id = yaml_required_string(entry, "id", "skill_families")?;
+        let routing = &entry["routing"];
+        let reason = yaml_optional_string(routing, "reason", &skill_id)?
+            .unwrap_or_else(default_skill_route_reason);
+        let stage_policy = yaml_optional_string(routing, "stage_policy", &skill_id)?
+            .unwrap_or_else(default_skill_stage_policy);
+        let triggers = yaml_trigger_groups(routing, "triggers", &skill_id)?;
+        if !matches!(stage_policy.as_str(), "active" | "deferred") {
+            return Err(format!(
+                "skill-catalog-invalid-stage-policy:{}:{}",
+                skill_id, stage_policy
+            ));
+        }
+        if reason.trim().is_empty() {
+            return Err(format!("skill-catalog-empty-routing-reason:{}", skill_id));
+        }
+        rules.push(SkillRoutingRule {
+            skill: skill_id,
+            reason,
+            stage_policy,
+            triggers,
+        });
+    }
+    Ok(rules)
+}
+
+fn yaml_required_string(node: &Yaml, key: &str, context: &str) -> Result<String, String> {
+    yaml_optional_string(node, key, context)?
+        .ok_or_else(|| format!("skill-catalog-missing-string:{context}.{key}"))
+}
+
+fn yaml_optional_string(node: &Yaml, key: &str, context: &str) -> Result<Option<String>, String> {
+    if node.is_badvalue() || node.is_null() {
+        return Ok(None);
+    }
+    let value = &node[key];
+    if value.is_badvalue() || value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_str()
+        .map(|raw| Some(raw.to_string()))
+        .ok_or_else(|| format!("skill-catalog-field-not-string:{context}.{key}"))
+}
+
+fn yaml_trigger_groups(node: &Yaml, key: &str, skill_id: &str) -> Result<Vec<Vec<String>>, String> {
+    if node.is_badvalue() || node.is_null() || node[key].is_badvalue() || node[key].is_null() {
+        return Ok(Vec::new());
+    }
+    let groups = node[key]
+        .as_vec()
+        .ok_or_else(|| format!("skill-catalog-routing-triggers-not-list:{skill_id}"))?;
+    let mut result = Vec::with_capacity(groups.len());
+    for group in groups {
+        let terms = group
+            .as_vec()
+            .ok_or_else(|| format!("skill-catalog-routing-trigger-not-list:{skill_id}"))?;
+        if terms.is_empty() {
+            return Err(format!("skill-catalog-empty-routing-trigger:{skill_id}"));
+        }
+        let mut normalized_terms = Vec::with_capacity(terms.len());
+        for term in terms {
+            let Some(raw_term) = term.as_str() else {
+                return Err(format!(
+                    "skill-catalog-routing-trigger-term-not-string:{skill_id}"
+                ));
+            };
+            if raw_term.trim().is_empty() {
+                return Err(format!("skill-catalog-empty-routing-trigger:{skill_id}"));
+            }
+            normalized_terms.push(raw_term.to_string());
+        }
+        result.push(normalized_terms);
+    }
+    Ok(result)
+}
+
+fn text_matches_group(text: &str, group: &[String]) -> bool {
     group.iter().all(|term| text.contains(&term.to_lowercase()))
 }
 
@@ -1345,18 +1212,10 @@ fn infer_skill_route_mode(prompt: &str, requested_mode: &str) -> String {
     }
 }
 
-fn is_current_stage_skill(skill: &str) -> bool {
-    matches!(
-        skill,
-        "agent-orchestration"
-            | "task-routing"
-            | "agent-canon-update"
-            | "agent-log-analysis"
-            | "structure-planning"
-            | "structure-refactor"
-            | "test-design"
-            | "adaptive-improvement-loop"
-    )
+fn is_current_stage_skill(skill: &str, rules: &[SkillRoutingRule]) -> bool {
+    rules
+        .iter()
+        .any(|rule| rule.skill == skill && rule.stage_policy == "active")
 }
 
 fn ordered_unique_strings(values: Vec<String>) -> Vec<String> {

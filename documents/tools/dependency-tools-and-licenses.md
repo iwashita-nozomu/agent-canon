@@ -134,16 +134,21 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 ## Rust Crate Dependency Snapshot
 
 The AgentCanon Rust CLI declared its own license as Apache-2.0 in
-`rust/agent-canon/Cargo.toml`. On 2026-06-11, `cargo metadata` for
-`rust/agent-canon/Cargo.toml` reported only these license families in direct and
+`rust/agent-canon/Cargo.toml`. On 2026-06-18, `cargo metadata` for
+`rust/agent-canon/Cargo.toml` reported these license families in direct and
 transitive crates:
 
 - Apache-2.0
 - MIT
 - MIT OR Apache-2.0 / MIT/Apache-2.0
-- Unlicense OR MIT
+- (Apache-2.0 OR MIT) AND BSD-3-Clause
 - BSD-2-Clause OR Apache-2.0 OR MIT
+- Unlicense OR MIT
+- Zlib
 - Unicode-3.0, through `unicode-ident`
+
+The direct Rust CLI dependency `yaml-rust2` was added for catalog-backed YAML
+routing metadata parsing and reports `MIT OR Apache-2.0` in `cargo metadata`.
 
 The exact crate set is lockfile- and registry-dependent. Regenerate the snapshot
 with the command in [Verification Policy](#verification-policy) before publishing
