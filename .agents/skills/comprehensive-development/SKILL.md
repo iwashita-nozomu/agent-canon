@@ -6,6 +6,9 @@ description: Use when a repo-wide task spans code, docs, tools, workflows, and r
 @dependency-start
 responsibility Documents Comprehensive Development for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/task_catalog.yaml workflow family spawn budget and role topology owner
+upstream design ../../../agents/agents_config.json permanent team role ownership and write policy owner
+upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
 @dependency-end
 -->
 
@@ -14,7 +17,9 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 1. Read `agents/skills/comprehensive-development.md`.
 1. Set `workflow=Comprehensive Development` and declare `skills=<...>`, `review=<...>`.
-1. Bootstrap the standard bundle with `scheduler`, `schedule_reviewer`, `researcher`, `research_reviewer`, `infra_steward`, `infra_reviewer`, and `critical_guardian`.
-1. If available, use `/collab` Plan mode before planning and `/agent` to inspect the Codex inventory.
-1. Always add `project_reviewer`, `docs_workflow_steward`, and `python_reviewer` as the fixed integration stack.
-1. Keep colliding writers out of the same wave. Do not run same-directory parallel writes; use later waves in the current checkout when multiple writers are needed.
+1. Read `agents/task_catalog.yaml` for the `comprehensive_development` family `spawn_budget`, `role_topology`, `roles`, and `subagent_prompt`.
+1. Read `agents/agents_config.json` for permanent team role ownership, required output, and write policy.
+1. Read `agents/canonical/CODEX_SUBAGENTS.md` for Codex inventory, activation, and runtime surface routing.
+1. Bootstrap the standard bundle, then mirror catalog / config ownership into `team_manifest.yaml`.
+1. Use `project_reviewer` as the repo-wide integration reviewer named by the catalog and config surfaces.
+1. Assign colliding writers to later waves in the current checkout when multiple writers are needed.

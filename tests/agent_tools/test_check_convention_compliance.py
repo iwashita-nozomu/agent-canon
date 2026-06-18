@@ -19,6 +19,7 @@ from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    OWNER_MAP_ENTRYPOINT_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
@@ -92,6 +93,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/codex-configuration-reference.md": (
         "## Hook Severity Policy\n"
         "fail-open CRITICAL_BLOCKING_CHILD_HOOKS warning/evidence\n"
+        "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
+        "caller chain canonical command\n"
     ),
     "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
     "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
@@ -180,12 +183,27 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
-        "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "task-shape skill check_convention_compliance.py vertical dynamic wave "
-        "write-capable handoff $structure-planning $prose-reasoning-graph "
-        "$md-style-check Document Structure Evidence structure_contract=skipped "
-        "contract-only wrapper checker-owned validation canonical command evidence "
-        "validation repair scope\n"
+        "## Workflow Contract Owners\n\n"
+        "| Contract | Owner Surface |\n"
+        "| -------- | ------------- |\n"
+        "| workflow family and spawn budget | `agents/task_catalog.yaml` |\n"
+        "| role topology and same-role instance schema | `agents/task_catalog.yaml` |\n"
+        "| default specialists and review packs | "
+        "`agents/task_catalog.yaml`; `agents/agents_config.json` |\n"
+        "| run bundle, declared workflow / skills / review, and dynamic wave ledger | "
+        "`task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
+        "| skill selection | `agents/skills/catalog.yaml`; "
+        "`agent-canon local-llm route-skill` |\n"
+        "| implementation stage gate | "
+        "`agents/workflows/implementation-waterfall-workflow.md` |\n"
+        "| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md` |\n"
+        "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
+        "## Workflow Family Reader Paths\n\n"
+        "| Family | Owner Row |\n"
+        "| ------ | --------- |\n"
+        "| Scoped Change | `agents/task_catalog.yaml` "
+        "`workflow_families[].id=scoped_change` |\n\n"
+        "Implementation Flow Graph\n"
     ),
     "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
@@ -252,11 +270,35 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED\n"
     ),
     "ROOT_AGENTS.md": (
-        "## Mechanical Guardrail Policy\n"
-        "高確信で公開事故になるものだけを block 対象 "
-        "hook 設定を維持したまま strict block mode\n"
-        "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
-        "caller chain canonical command\n"
+        "## Runtime Owner Map\n\n"
+        "| Contract | Owner Surface | Evidence / Checker |\n"
+        "| -------- | ------------- | ------------------ |\n"
+        "| workflow family, spawn budget, role topology | "
+        "`vendor/agent-canon/agents/task_catalog.yaml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| subagent lifecycle, same-role instances, wave ledger | "
+        "`vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | "
+        "`workflow_monitor.py` |\n"
+        "| role behavior and stage conditions | "
+        "`vendor/agent-canon/.codex/agents/*.toml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| skill routing and public skill surface | "
+        "`vendor/agent-canon/agents/skills/catalog.yaml` | "
+        "`agent-canon local-llm route-skill` |\n"
+        "| report and closeout structure | `task_close.py` | closeout gate |\n"
+    ),
+    "AGENTS.md": (
+        "## Runtime Owner Map\n\n"
+        "| Contract | Owner Surface | Validation |\n"
+        "| -------- | ------------- | ---------- |\n"
+        "| root runtime entrypoint | `ROOT_AGENTS.md` | "
+        "`bash tools/sync_agent_canon.sh check` |\n"
+        "| workflow family, spawn budget, role topology | "
+        "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
+        "| public skill registry | `agents/skills/catalog.yaml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| shared-canon update | `tools/update_agent_canon.sh` | "
+        "AgentCanon PR gate |\n"
     ),
 }
 
@@ -560,15 +602,15 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-marker:FORWARDER_CALLER", result.stdout)
             self.assertIn("missing-marker:FORWARDER_ACTION", result.stdout)
 
-    def test_skill_routing_requires_vertical_wave_policy(self) -> None:
-        """Skill routing prompts must keep the vertical wave policy marker."""
+    def test_skill_routing_requires_codex_task_workflow_marker(self) -> None:
+        """Skill routing prompts must keep execution-stage skill markers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "TASK_WORKFLOWS.md"
-            workflow.write_text(
-                workflow.read_text(encoding="utf-8").replace(
-                    " vertical dynamic wave",
+            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " $codex-task-workflow",
                     "",
                 ),
                 encoding="utf-8",
@@ -578,17 +620,17 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("skill_routing", result.stdout)
-            self.assertIn("missing-marker:vertical dynamic wave", result.stdout)
+            self.assertIn("missing-marker:$codex-task-workflow", result.stdout)
 
-    def test_skill_routing_requires_write_capable_handoff(self) -> None:
-        """Skill routing prompts must include the write-capable handoff marker."""
+    def test_skill_routing_requires_subagent_bootstrap_marker(self) -> None:
+        """Skill routing prompts must keep handoff-stage skill markers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "TASK_WORKFLOWS.md"
-            workflow.write_text(
-                workflow.read_text(encoding="utf-8").replace(
-                    "write-capable handoff",
+            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " $subagent-bootstrap",
                     "",
                     1,
                 ),
@@ -599,7 +641,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("skill_routing", result.stdout)
-            self.assertIn("missing-marker:write-capable handoff", result.stdout)
+            self.assertIn("missing-marker:$subagent-bootstrap", result.stdout)
 
     def test_document_structure_routing_requires_structure_planning(self) -> None:
         """Document edit routing must keep structure analysis markers."""
@@ -717,6 +759,107 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in TEST_CONTRACT_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_owner_map_entrypoint_requires_root_owner_rows(self) -> None:
+        """Root runtime entrypoints keep structure-backed owner anchors."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            root_agents = root / "ROOT_AGENTS.md"
+            root_agents.write_text(
+                root_agents.read_text(encoding="utf-8").replace(
+                    "vendor/agent-canon/agents/task_catalog.yaml",
+                    "vendor/agent-canon/agents/task_catalog-missing.yaml",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn(
+                "missing-owner-row:workflow family, spawn budget, role topology",
+                result.stdout,
+            )
+
+    def test_owner_map_entrypoint_requires_agent_owner_rows(self) -> None:
+        """Standalone AgentCanon entrypoint keeps public skill owner row."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            agents = root / "AGENTS.md"
+            agents.write_text(
+                agents.read_text(encoding="utf-8").replace(
+                    "| public skill registry | `agents/skills/catalog.yaml` | "
+                    "`check_agent_runtime_alignment.py` |\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn("missing-owner-row:public skill registry", result.stdout)
+
+    def test_owner_map_entrypoint_requires_workflow_task_catalog_row(self) -> None:
+        """Workflow owner row is required even when later reader rows repeat it."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflows = root / "agents" / "TASK_WORKFLOWS.md"
+            workflows.write_text(
+                workflows.read_text(encoding="utf-8").replace(
+                    "| workflow family and spawn budget | "
+                    "`agents/task_catalog.yaml` |\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn(
+                "missing-owner-row:workflow family and spawn budget",
+                result.stdout,
+            )
+
+    def test_owner_map_entrypoint_requires_workflow_owner_rows(self) -> None:
+        """Workflow reader map keeps the concrete implementation owners."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflows = root / "agents" / "TASK_WORKFLOWS.md"
+            workflows.write_text(
+                workflows.read_text(encoding="utf-8").replace(
+                    "agent-canon local-llm route-skill",
+                    "skill router owner omitted",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn(
+                "missing-owner-row:skill selection",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_owner_map_entrypoint_surfaces(self) -> None:
+        """The minimal test fixture includes every owner-map entrypoint."""
+        missing = sorted(
+            path
+            for path in OWNER_MAP_ENTRYPOINT_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

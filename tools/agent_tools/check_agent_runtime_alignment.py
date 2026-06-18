@@ -2,6 +2,8 @@
 # @dependency-start
 # responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
+# upstream design ../../agents/skills/README.md public skill surface contract
+# upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
@@ -43,6 +45,8 @@ PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
+INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 FRONTMATTER_OPEN_MARKER = "---\n"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
@@ -463,6 +467,66 @@ def validate_public_skill_shims() -> None:
         )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
         validate_skill_routing_entry(skill_id, entry.get("routing"))
+    observed_shim_ids = {
+        path.parent.name
+        for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
+    }
+    extra_shims = sorted(observed_shim_ids - observed_skill_ids)
+    missing_shims = sorted(observed_skill_ids - observed_shim_ids)
+    ensure(
+        not extra_shims,
+        "public skill shims missing catalog entries: " + ", ".join(extra_shims),
+    )
+    ensure(
+        not missing_shims,
+        "skill catalog entries missing public shims: " + ", ".join(missing_shims),
+    )
+    validate_public_skill_document_contract(data)
+
+
+def validate_public_skill_document_contract(data: dict[str, object], root: Path = ROOT) -> None:
+    """Check that agents/skills contains only catalog-backed public skills."""
+    public_doc_root = root / "agents" / "skills"
+    internal_routine_root = root / "agents" / "internal-routines"
+    ensure(public_doc_root.is_dir(), "public skill doc root missing: agents/skills")
+    ensure(
+        internal_routine_root.is_dir(),
+        "internal routine root missing: agents/internal-routines",
+    )
+    ensure(
+        (internal_routine_root / "README.md").is_file(),
+        "internal routine README missing: agents/internal-routines/README.md",
+    )
+    families = data.get("skill_families", [])
+    ensure(isinstance(families, list), "skill_families must be a list")
+    catalog_docs: set[str] = set()
+    for entry in families:
+        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
+        canonical_doc = str(entry.get("canonical_doc", "")).strip()
+        ensure(canonical_doc, "skill_families canonical_doc must be non-empty")
+        canonical_path = root / canonical_doc
+        ensure(
+            canonical_path.resolve().is_relative_to(public_doc_root.resolve()),
+            f"{entry.get('id')} canonical doc must live under agents/skills: {canonical_doc}",
+        )
+        catalog_docs.add(canonical_path.relative_to(root).as_posix())
+    public_docs = {
+        path.relative_to(root).as_posix()
+        for path in public_doc_root.rglob("*.md")
+        if path.name != "README.md"
+    }
+    extra_public_docs = sorted(public_docs - catalog_docs)
+    missing_public_docs = sorted(catalog_docs - public_docs)
+    ensure(
+        not extra_public_docs,
+        "agents/skills contains non-catalog public docs: "
+        + ", ".join(extra_public_docs),
+    )
+    ensure(
+        not missing_public_docs,
+        "skill catalog canonical docs missing from agents/skills: "
+        + ", ".join(missing_public_docs),
+    )
 
 
 def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
@@ -498,15 +562,32 @@ def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
-        ensure("Intake Responsibility Wave" in text, f"{path} missing intake responsibility contract")
-        ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
-        ensure("Agent Wave Ledger" in text, f"{path} missing Agent Wave Ledger contract")
-        for role_id in INITIAL_INTAKE_MARKERS:
-            ensure(role_id in text, f"{path} missing intake responsibility role {role_id}")
-        ensure(
-            "max_depth = 2" in text and "delegated_spawn_policy" in text,
-            f"{path} must state bounded nested spawn and delegated_spawn_policy",
-        )
+        if path.name == "TASK_WORKFLOWS.md":
+            for marker in (
+                "Workflow Contract Owners",
+                "agents/task_catalog.yaml",
+                "agents/agents_config.json",
+                ".codex/agents/*.toml",
+                "task_start.py",
+                "bootstrap_agent_run.py",
+                "workflow_monitor.py",
+                "agent-canon local-llm route-skill",
+                "Implementation Flow Graph",
+            ):
+                ensure(marker in text, f"{path} missing owner-map marker: {marker}")
+        else:
+            ensure(
+                "Intake Responsibility Wave" in text,
+                f"{path} missing intake responsibility contract",
+            )
+            ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
+            ensure("Agent Wave Ledger" in text, f"{path} missing Agent Wave Ledger contract")
+            for role_id in INITIAL_INTAKE_MARKERS:
+                ensure(role_id in text, f"{path} missing intake responsibility role {role_id}")
+            ensure(
+                "max_depth = 2" in text and "delegated_spawn_policy" in text,
+                f"{path} must state bounded nested spawn and delegated_spawn_policy",
+            )
         ensure(
             "subagents do not spawn subagents" not in text,
             f"{path} must not prohibit bounded nested subagent spawn",

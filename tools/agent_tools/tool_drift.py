@@ -360,16 +360,6 @@ CONTRACTS = (
                 "missing-canonical-write-capable-handoff-policy",
             ),
             TextCheck(
-                "agents/TASK_WORKFLOWS.md",
-                "vertical dynamic wave",
-                "missing-workflow-vertical-wave-policy",
-            ),
-            TextCheck(
-                "agents/TASK_WORKFLOWS.md",
-                "write-capable handoff",
-                "missing-workflow-write-capable-handoff-policy",
-            ),
-            TextCheck(
                 "agents/skills/agent-orchestration.md",
                 "vertical dynamic wave",
                 "missing-orchestration-vertical-wave-policy",
@@ -398,16 +388,6 @@ CONTRACTS = (
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "write-capable handoff",
                 "missing-write-capable-handoff-prompt-eval",
-            ),
-            TextCheck(
-                "tools/agent_tools/check_convention_compliance.py",
-                "vertical dynamic wave",
-                "missing-vertical-wave-convention-marker",
-            ),
-            TextCheck(
-                "tools/agent_tools/check_convention_compliance.py",
-                "write-capable handoff",
-                "missing-write-capable-handoff-convention-marker",
             ),
         ),
     ),

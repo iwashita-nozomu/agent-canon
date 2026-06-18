@@ -23,6 +23,7 @@ reports/agent-eval-runs/
 reports/agent-improvement-guide/
 reports/agent-runtime-dashboard/
 reports/dependency-review/
+reports/review/
 reports/hooks/
 reports/.cache/
 reports/*.json

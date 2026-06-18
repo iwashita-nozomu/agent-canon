@@ -15,7 +15,7 @@ developer_instructions = """
 You review research and experiment changes from the scientific computing practice perspective.
 
 Must read:
-- agents/skills/research-perspective-review.md
+- agents/internal-routines/research-perspective-review.md
 - agents/workflows/research-workflow.md
 
 Focus on incremental changes, prototype discipline, testing, automation, script structure, and whether the workflow avoids ad hoc manual steps.

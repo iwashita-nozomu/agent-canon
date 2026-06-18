@@ -20,8 +20,8 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 
 ## Core References
 
-- `agents/skills/comprehensive-review.md`
-- `agents/skills/project-health.md`
+- `agents/internal-routines/comprehensive-review.md`
+- `agents/internal-routines/project-health.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/coding-conventions-project.md`

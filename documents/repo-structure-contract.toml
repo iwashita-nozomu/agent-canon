@@ -50,6 +50,7 @@ allowed_top_level = [
   ".dockerignore",
   ".github",
   ".gitignore",
+  ".vscode",
   "AGENTS.md",
   "CONTAINER_OPERATIONS.md",
   "LICENSE",
@@ -60,6 +61,7 @@ allowed_top_level = [
   "codex-cli-guide",
   "completion-first-review",
   "documents",
+  "evidence",
   "goal.md",
   "helper_inventory_guard_policy.json",
   "issues",
@@ -96,6 +98,11 @@ category = "agent_runtime"
 
 [[profile.required]]
 path = "agents/skills"
+kind = "dir"
+category = "agent_runtime"
+
+[[profile.required]]
+path = "agents/internal-routines"
 kind = "dir"
 category = "agent_runtime"
 
@@ -232,6 +239,7 @@ allowed_top_level = [
   "cmake",
   "docker",
   "documents",
+  "evidence",
   "experiments",
   "goal.md",
   "include",

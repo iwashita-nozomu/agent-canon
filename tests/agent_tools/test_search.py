@@ -96,6 +96,20 @@ def run_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def run_search_with_input(
+    root: Path, input_text: str, *args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run search.py with stdin against a temporary root."""
+    return subprocess.run(
+        [sys.executable, str(SEARCH), "--root", str(root), *args],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        input=input_text,
+    )
+
+
 class CoordinatedSearchTest(unittest.TestCase):
     """Verify purpose-based candidate generation."""
 
@@ -123,6 +137,156 @@ class CoordinatedSearchTest(unittest.TestCase):
             self.assertIn("tools/dependency_graph.py", candidates)
             self.assertIn("tool", candidates["tools/dependency_graph.py"]["providers"])
             self.assertIn("llm", candidates["tools/dependency_graph.py"]["providers"])
+
+    def test_query_file_returns_tool_candidate(self) -> None:
+        """File-backed long queries should use the same search pipeline."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+            query_file = root / "query.txt"
+            query_file.write_text(
+                "find tool for dependency graph edit scope validation",
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--query-file",
+                str(query_file),
+                "--providers",
+                "tool",
+                "--surface",
+                ".",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            candidates = {item["path"]: item for item in payload["candidates"]}
+            self.assertIn("tools/dependency_graph.py", candidates)
+
+    def test_query_stdin_returns_tool_candidate(self) -> None:
+        """Stdin-backed long queries should use the same search pipeline."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+
+            result = run_search_with_input(
+                root,
+                "find tool for dependency graph edit scope validation",
+                "--query-stdin",
+                "--providers",
+                "tool",
+                "--surface",
+                ".",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            candidates = {item["path"]: item for item in payload["candidates"]}
+            self.assertIn("tools/dependency_graph.py", candidates)
+
+    def test_missing_query_file_uses_cli_failure_contract(self) -> None:
+        """Missing query files should use the normal CLI failure envelope."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+
+            result = run_search(
+                root,
+                "--query-file",
+                str(root / "missing-query.txt"),
+                "--providers",
+                "tool",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("AGENT_SEARCH=fail", result.stderr)
+            self.assertIn("query-file-read-failed", result.stderr)
+
+    def test_empty_query_file_uses_cli_failure_contract(self) -> None:
+        """Empty query files should use the normal empty-query failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+            query_file = root / "query.txt"
+            query_file.write_text("", encoding="utf-8")
+
+            result = run_search(
+                root,
+                "--query-file",
+                str(query_file),
+                "--providers",
+                "tool",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("AGENT_SEARCH=fail", result.stderr)
+            self.assertIn("query-or-purpose-required", result.stderr)
+
+    def test_inline_query_precedes_query_file(self) -> None:
+        """Inline query values preserve existing precedence over file input."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+            query_file = root / "query.txt"
+            query_file.write_text("alpha dispatch workflow implementation target", encoding="utf-8")
+
+            result = run_search(
+                root,
+                "--query",
+                "find tool for dependency graph edit scope validation",
+                "--query-file",
+                str(query_file),
+                "--providers",
+                "tool",
+                "--surface",
+                ".",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            candidates = {item["path"]: item for item in payload["candidates"]}
+            self.assertIn("tools/dependency_graph.py", candidates)
+            self.assertNotIn("python/workflow.py", candidates)
+
+    def test_query_file_and_stdin_are_mutually_exclusive(self) -> None:
+        """Long-query input modes should have one active source."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_search_fixture(root)
+            query_file = root / "query.txt"
+            query_file.write_text(
+                "find tool for dependency graph edit scope validation",
+                encoding="utf-8",
+            )
+
+            result = run_search_with_input(
+                root,
+                "alpha dispatch workflow implementation target",
+                "--query-file",
+                str(query_file),
+                "--query-stdin",
+                "--providers",
+                "tool",
+                "--surface",
+                ".",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("AGENT_SEARCH=fail", result.stderr)
+            self.assertIn("mutually-exclusive", result.stderr)
 
     def test_purpose_returns_header_and_code_dependency_candidates(self) -> None:
         """Header dependency and Python call facts should both contribute candidates."""
