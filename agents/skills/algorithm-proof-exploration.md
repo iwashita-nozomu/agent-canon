@@ -215,6 +215,17 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
      until `P` is proved, refuted, shown unprovable under the current top-level
      assumptions, or reduced to a strictly smaller named witness. A flat
      candidate list is only input to this loop.
+  - 候補条件が `P` と定義的に同じ predicate であるためにだけ証明できる場合は、
+    `projection_only` / `circularity_check` と分類します。これは theorem surface
+    の投影証拠であり、algorithmic success や `Problem` 条件ではありません。
+    frontier は、`P` を真にする非循環 mechanism、すなわち実装 recurrence の
+    residual reachability、finite ranking、contraction/decrease、またはそれを
+    含意する problem-class witness へ進めます。
+    循環性は theorem 名や predicate 名の語彙ではなく、命題グラフ上の到達可能性で
+    判定します。conclusion 側から definition / projection / equivalence /
+    existential-lift / certificate-inclusion edge を辿って、独立条件として採用したい
+    problem class や certificate に戻る route は、名前を変えていても
+    `circularity_check` です。
 1. Algorithm frontier extraction:
    - choose graph frontier nodes by their algorithmic impact, not prose order
    - normalize each target-facing blocker to implementation identity,
@@ -234,6 +245,15 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
     その top-level 仮定と抽出済み code path から証明します。
     implementation trace や backend/runtime semantics のような architecture
     assumption は許可しますが、Problem/config assumption とは別ラベルにします。
+  - proof graph 構造解析では、projection evidence と numerical progress evidence を
+    分離します。`Condition := Target -> Target` という path は connected でも
+    循環です。`circularity_check` として保持し、`Problem`、config、generated
+    code facts、backend profile、または formal-library theorem から condition を導く
+    別の非循環 edge が入るまで、finite-stop / convergence の certified subgraph に
+    採用しません。
+    この除外は graph-based です。target / conclusion node から proof-consumption edge を
+    辿り、独立条件として採用したい node に到達するかを見ることで判定します。
+    語彙検査だけで「非循環」と判断してはいけません。
   - ほしい局所仮定は premise ではなく導出 target として扱います。各中間条件に
     candidate lemma 名を付け、すべての変数を `Problem`、config、IR が抽出した
     path state、code fact、または許可された architecture boundary のどれかへ

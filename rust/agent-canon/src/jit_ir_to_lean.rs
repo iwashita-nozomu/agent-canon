@@ -176,7 +176,10 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  kind : String".to_string(),
         "  opcode : String".to_string(),
         "  line : Nat".to_string(),
+        "  text : String".to_string(),
         "  textSha256 : String".to_string(),
+        "  resultNames : List String".to_string(),
+        "  operandNames : List String".to_string(),
         "  dtypes : List String".to_string(),
         "  functionName : String".to_string(),
         "  regionId : String".to_string(),
@@ -438,13 +441,21 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         for (index, op) in ops.iter().enumerate() {
             let comma = if index + 1 == ops.len() { "" } else { "," };
             let line_value = op.get("line").and_then(Value::as_u64).unwrap_or(0);
+            let text = value_field(op, "text");
+            let result_names = operation_result_names(text);
+            let operand_names = operation_operand_names(text, &result_names);
+            let result_values: Vec<Value> = result_names.into_iter().map(Value::String).collect();
+            let operand_values: Vec<Value> = operand_names.into_iter().map(Value::String).collect();
             lines.push(format!(
-                "    {{ opId := {}, kind := {}, opcode := {}, line := {}, textSha256 := {}, dtypes := {}, functionName := {}, regionId := {}, parentOpId := {}, callTarget := {} }}{}",
+                "    {{ opId := {}, kind := {}, opcode := {}, line := {}, text := {}, textSha256 := {}, resultNames := {}, operandNames := {}, dtypes := {}, functionName := {}, regionId := {}, parentOpId := {}, callTarget := {} }}{}",
                 lean_string(value_field(op, "op_id")),
                 lean_string(value_field(op, "kind")),
                 lean_string(value_field(op, "opcode")),
                 line_value,
+                lean_string(text),
                 lean_string(value_field(op, "text_sha256")),
+                render_inline_string_list(Some(&result_values)),
+                render_inline_string_list(Some(&operand_values)),
                 render_inline_string_list(op.get("dtypes").and_then(Value::as_array)),
                 lean_string(value_field(op, "function")),
                 lean_string(value_field(op, "region_id")),
@@ -669,6 +680,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         lines.extend(render_source_main_embedding(
             source_root,
             Some(public_interface),
+            Some(operational),
         ));
         lines.push(String::new());
     }
@@ -936,8 +948,10 @@ fn render_source_root(value: Option<&serde_json::Map<String, Value>>) -> String 
 fn render_source_main_embedding(
     value: Option<&serde_json::Map<String, Value>>,
     public_interface: Option<&serde_json::Map<String, Value>>,
+    operational: Option<&serde_json::Map<String, Value>>,
 ) -> Vec<String> {
     let pattern = source_pattern(value);
+    let return_operands = source_main_return_operands(operational);
     let public_argument_leaf_count = public_interface
         .and_then(|object| object.get("argument_leaves"))
         .and_then(Value::as_array)
@@ -1043,13 +1057,24 @@ fn render_source_main_embedding(
     lines.extend(render_source_kkt_solve_config(public_interface));
     lines.extend(render_source_return_structures(public_interface));
     lines.extend([
-        "structure SourceMainExpansionCoverage where".to_string(),
+        "structure SourceMainProjectionCoverage where".to_string(),
         "  sourceRootPattern : String".to_string(),
         "  publicArgumentLeafCount : Nat".to_string(),
         "  stablehloArgumentCount : Nat".to_string(),
-        "  sourceInitializeExpanded : Bool".to_string(),
-        "  algorithmRunExpanded : Bool".to_string(),
-        "  residualPredicateExpanded : Bool".to_string(),
+        "  sourceInitializeProjected : Bool".to_string(),
+        "  algorithmRunProjected : Bool".to_string(),
+        "  residualPredicateProjected : Bool".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceMainValueCoverage where".to_string(),
+        "  sourceInitializeValueExpanded : Bool".to_string(),
+        "  algorithmRunValueExpanded : Bool".to_string(),
+        "  residualPredicateValueExpanded : Bool".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceReturnOperandEquation where".to_string(),
+        "  leaf : StablehloPublicLeaf".to_string(),
+        "  operandName : String".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
         "structure SourceStoppingSolveConfig where".to_string(),
@@ -1091,6 +1116,10 @@ fn render_source_main_embedding(
         String::new(),
     ]);
     lines.extend(render_generated_source_return(public_interface));
+    lines.extend(render_source_return_operand_equations(
+        public_interface,
+        &return_operands,
+    ));
     lines.extend([
         "def sourceAlgorithmRun".to_string(),
         "    (_problem : SourceProblem)".to_string(),
@@ -1110,9 +1139,9 @@ fn render_source_main_embedding(
         "    && config.reference == sourceStoppingSolveConfig.reference".to_string(),
         "    && config.norm == sourceStoppingSolveConfig.norm".to_string(),
         String::new(),
-        "def sourceMainExpansionCoverage : SourceMainExpansionCoverage :=".to_string(),
+        "def sourceMainProjectionCoverage : SourceMainProjectionCoverage :=".to_string(),
         format!(
-            "  {{ sourceRootPattern := {}, publicArgumentLeafCount := {}, stablehloArgumentCount := {}, sourceInitializeExpanded := true, algorithmRunExpanded := true, residualPredicateExpanded := true }}",
+            "  {{ sourceRootPattern := {}, publicArgumentLeafCount := {}, stablehloArgumentCount := {}, sourceInitializeProjected := true, algorithmRunProjected := true, residualPredicateProjected := true }}",
             lean_string(
                 pattern
                     .and_then(|object| object.get("pattern"))
@@ -1123,10 +1152,18 @@ fn render_source_main_embedding(
             stablehlo_argument_count,
         ),
         String::new(),
+        "def sourceMainValueCoverage : SourceMainValueCoverage :=".to_string(),
+        "  { sourceInitializeValueExpanded := false, algorithmRunValueExpanded := false, residualPredicateValueExpanded := false }".to_string(),
+        String::new(),
+        "def sourceMainProjectionExpanded : Bool :=".to_string(),
+        "  sourceMainProjectionCoverage.sourceInitializeProjected".to_string(),
+        "    && sourceMainProjectionCoverage.algorithmRunProjected".to_string(),
+        "    && sourceMainProjectionCoverage.residualPredicateProjected".to_string(),
+        String::new(),
         "def sourceMainValueExpanded : Bool :=".to_string(),
-        "  sourceMainExpansionCoverage.sourceInitializeExpanded".to_string(),
-        "    && sourceMainExpansionCoverage.algorithmRunExpanded".to_string(),
-        "    && sourceMainExpansionCoverage.residualPredicateExpanded".to_string(),
+        "  sourceMainValueCoverage.sourceInitializeValueExpanded".to_string(),
+        "    && sourceMainValueCoverage.algorithmRunValueExpanded".to_string(),
+        "    && sourceMainValueCoverage.residualPredicateValueExpanded".to_string(),
         String::new(),
         "/-- Generated source-level Lean embedding of `main.py::main`. -/".to_string(),
         "def sourceMain".to_string(),
@@ -1142,25 +1179,29 @@ fn render_source_main_embedding(
         "    sourceRoot.pattern = \"initialize_then_algorithm_call_return_tuple\" := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_expansion_coverage_verified :".to_string(),
-        "    sourceMainValueExpanded = true := by".to_string(),
+        "theorem sourceMain_projection_coverage_verified :".to_string(),
+        "    sourceMainProjectionExpanded = true := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_initialize_value_expanded :".to_string(),
-        "    sourceMainExpansionCoverage.sourceInitializeExpanded = true := by".to_string(),
+        "theorem sourceMain_value_expansion_incomplete :".to_string(),
+        "    sourceMainValueExpanded = false := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_algorithm_run_value_expanded :".to_string(),
-        "    sourceMainExpansionCoverage.algorithmRunExpanded = true := by".to_string(),
+        "theorem sourceMain_initialize_value_not_expanded :".to_string(),
+        "    sourceMainValueCoverage.sourceInitializeValueExpanded = false := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_residual_predicate_value_expanded :".to_string(),
-        "    sourceMainExpansionCoverage.residualPredicateExpanded = true := by".to_string(),
+        "theorem sourceMain_algorithm_run_value_not_expanded :".to_string(),
+        "    sourceMainValueCoverage.algorithmRunValueExpanded = false := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem sourceMain_residual_predicate_value_not_expanded :".to_string(),
+        "    sourceMainValueCoverage.residualPredicateValueExpanded = false := by".to_string(),
         "  rfl".to_string(),
         String::new(),
         "theorem sourceMain_public_argument_lowering_counts :".to_string(),
-        "    sourceMainExpansionCoverage.publicArgumentLeafCount = publicArgumentLeaves.length".to_string(),
-        "      ∧ sourceMainExpansionCoverage.stablehloArgumentCount = publicStablehloArguments.length := by".to_string(),
+        "    sourceMainProjectionCoverage.publicArgumentLeafCount = publicArgumentLeaves.length".to_string(),
+        "      ∧ sourceMainProjectionCoverage.stablehloArgumentCount = publicStablehloArguments.length := by".to_string(),
         "  constructor".to_string(),
         "  · rfl".to_string(),
         "  · rfl".to_string(),
@@ -1278,6 +1319,160 @@ fn render_generated_source_return(
         String::new(),
     ]);
     lines
+}
+
+fn render_source_return_operand_equations(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    return_operands: &[String],
+) -> Vec<String> {
+    let stable_leaves = nested_array(public_interface, &["stablehlo_entry", "return_leaves"]);
+    let operand_values: Vec<Value> = return_operands
+        .iter()
+        .map(|operand| Value::String(operand.clone()))
+        .collect();
+    let mut lines = vec![
+        "def sourceMainReturnOperands : List String :=".to_string(),
+        render_string_list(&operand_values, "  "),
+        String::new(),
+        "def sourceReturnOperandEquations : List SourceReturnOperandEquation :=".to_string(),
+    ];
+    let Some(stable_leaves) = stable_leaves else {
+        lines.push("  []".to_string());
+        lines.push(String::new());
+        lines.extend([
+            "def sourceMainReturnOperandCoverageComplete : Bool :=".to_string(),
+            "  sourceMainReturnOperands.length == publicStablehloReturnLeaves.length".to_string(),
+            String::new(),
+            "theorem sourceMain_return_operand_coverage_definition :".to_string(),
+            "    sourceMainReturnOperandCoverageComplete =".to_string(),
+            "      (sourceMainReturnOperands.length == publicStablehloReturnLeaves.length) := by"
+                .to_string(),
+            "  rfl".to_string(),
+            String::new(),
+        ]);
+        return lines;
+    };
+    let equations: Vec<Value> = stable_leaves
+        .iter()
+        .enumerate()
+        .map(|(index, leaf)| {
+            let operand = return_operands.get(index).cloned().unwrap_or_default();
+            serde_json::json!({
+                "leaf_index": index,
+                "leaf": leaf,
+                "operand": operand,
+            })
+        })
+        .collect();
+    lines.push(render_multiline_list(
+        Some(&equations),
+        |index, equation| {
+            let leaf = equation.get("leaf").unwrap_or(&Value::Null);
+            format!(
+                "{{ leaf := {}, operandName := {} }}",
+                render_stablehlo_public_leaf_literal(index, leaf, true),
+                lean_string(value_field(equation, "operand")),
+            )
+        },
+    ));
+    lines.push(String::new());
+    lines.extend([
+        "def sourceMainReturnOperandCoverageComplete : Bool :=".to_string(),
+        "  sourceMainReturnOperands.length == publicStablehloReturnLeaves.length".to_string(),
+        String::new(),
+        "theorem sourceMain_return_operand_coverage_definition :".to_string(),
+        "    sourceMainReturnOperandCoverageComplete =".to_string(),
+        "      (sourceMainReturnOperands.length == publicStablehloReturnLeaves.length) := by"
+            .to_string(),
+        "  rfl".to_string(),
+        String::new(),
+    ]);
+    lines
+}
+
+fn source_main_return_operands(
+    operational: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let functions = operational
+        .and_then(|object| object.get("functions"))
+        .and_then(Value::as_array);
+    let entry_function = entry_function_name(functions);
+    let Some(ops) = operational
+        .and_then(|object| object.get("ops"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    for op in ops {
+        if value_field(op, "kind") != "Return" || value_field(op, "function") != entry_function {
+            continue;
+        }
+        let text = value_field(op, "text").trim();
+        if !text.starts_with("return ") {
+            continue;
+        }
+        return parse_return_operands(text);
+    }
+    Vec::new()
+}
+
+fn parse_return_operands(text: &str) -> Vec<String> {
+    let Some(rest) = text.strip_prefix("return ") else {
+        return Vec::new();
+    };
+    let operands = rest.split(" : ").next().unwrap_or(rest);
+    operands
+        .split(',')
+        .map(str::trim)
+        .filter(|operand| !operand.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn operation_result_names(text: &str) -> Vec<String> {
+    let Some((lhs, _rhs)) = text.split_once(" = ") else {
+        return Vec::new();
+    };
+    extract_percent_names(lhs)
+        .into_iter()
+        .map(|name| name.split(':').next().unwrap_or(&name).to_string())
+        .collect()
+}
+
+fn operation_operand_names(text: &str, result_names: &[String]) -> Vec<String> {
+    let mut names = if let Some((_lhs, rhs)) = text.split_once(" = ") {
+        extract_percent_names(rhs)
+    } else if text.trim_start().starts_with("return ") {
+        parse_return_operands(text.trim())
+    } else {
+        extract_percent_names(text)
+    };
+    names.retain(|name| !result_names.iter().any(|result| result == name));
+    names
+}
+
+fn extract_percent_names(text: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut index = 0usize;
+    while index < chars.len() {
+        if chars[index] != '%' {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        index += 1;
+        while index < chars.len() {
+            let ch = chars[index];
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '#' || ch == '.' {
+                index += 1;
+            } else {
+                break;
+            }
+        }
+        names.push(chars[start..index].iter().collect());
+    }
+    names
 }
 
 fn render_generated_source_structure(
@@ -1826,6 +2021,12 @@ fn render_operational_evaluator() -> Vec<String> {
         String::new(),
         "noncomputable def findOperationalOp (opId : String) : Option OperationalOp :=".to_string(),
         "  operationalOps.find? (fun op => op.opId == opId)".to_string(),
+        String::new(),
+        "def operationalOpDefinesResult (resultName : String) (op : OperationalOp) : Bool :=".to_string(),
+        "  op.resultNames.any (fun name => name == resultName)".to_string(),
+        String::new(),
+        "noncomputable def findOperationalResultDef (resultName : String) : Option OperationalOp :=".to_string(),
+        "  operationalOps.find? (operationalOpDefinesResult resultName)".to_string(),
         String::new(),
         "def findOperationalFunction (functionName : String) : Option OperationalFunction :=".to_string(),
         "  operationalFunctions.find? (fun fn => fn.name == functionName)".to_string(),
@@ -2514,7 +2715,8 @@ mod tests {
         assert!(rendered.contains("def sourceGeneratedReturn"));
         assert!(rendered.contains("def sourceAlgorithmRun"));
         assert!(rendered.contains("def sourceMain"));
-        assert!(rendered.contains("sourceMainValueExpanded = true"));
+        assert!(rendered.contains("sourceMainProjectionExpanded = true"));
+        assert!(rendered.contains("sourceMainValueExpanded = false"));
         assert!(rendered.contains("sourceSolveConfig initialize_config"));
         assert!(rendered.contains("def publicAnswerLeafPaths : List String"));
         assert!(rendered.contains("answer.objective_value"));
