@@ -29,8 +29,10 @@ evidence, not an AgentCanon product dependency.
 - Prompt-derived public skill selection goes through
   `agent-canon local-llm route-skill --prompt <text>` so candidate evidence,
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
-  by a deterministic harness. `route.py --prompt <text>` is a compatibility
-  mirror while area/name routing remains in `route.py`.
+  by a deterministic harness. Routing rules and stage policy live in
+  `agents/skills/catalog.yaml` under `skill_families[].routing`; `route.py
+  --prompt <text>` is the Python compatibility mirror while area/name routing
+  remains in `route.py`.
 - Japanese or English prompts about unnecessary numerical tests, heavy tests,
   brittle tests, tolerance-based tests, or test-design gaps route to
   `$test-design`; they are not handled by ad hoc worker judgment.
@@ -71,12 +73,14 @@ tokens.
 ## Ownership Layout
 
 - Deterministic prompt-to-skill routing lives in
-  `rust/agent-canon/src/local_llm.rs` as `agent-canon local-llm route-skill`.
+  `rust/agent-canon/src/local_llm.rs` as `agent-canon local-llm route-skill`
+  and reads `agents/skills/catalog.yaml`.
 - `tools/agent_tools/route.py` keeps area/name routing and mirrors prompt skill
-  routing only as a compatibility surface.
-- `agents/skills/catalog.yaml` remains the skill registry for id, purpose, and
-  doc/shim paths. Do not add per-skill TOML routing metadata until the Rust
-  reader, schema check, and migration test exist in the same change.
+  routing from the same catalog-backed data.
+- `agents/skills/catalog.yaml` remains the skill registry for id, purpose,
+  doc/shim paths, prompt trigger groups, and stage policy. Routing metadata
+  changes include the Rust reader, runtime-alignment schema check, and
+  Python/Rust parity fixtures in the same diff.
 - Codex CLI capabilities are not mirrored into AgentCanon routing docs. Runtime
   capability belongs in a probe or route output, and skill routing should name
   only the current task's core AgentCanon functions.

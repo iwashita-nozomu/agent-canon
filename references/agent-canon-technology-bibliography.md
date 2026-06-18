@@ -89,6 +89,7 @@ record.
 | rusqlite crate docs | <https://docs.rs/rusqlite/latest/rusqlite/> | Rust SQLite access | `rusqlite` is an ergonomic Rust wrapper around SQLite. | Crate version in AgentCanon is pinned separately in `Cargo.toml` and `Cargo.lock`. | Adopt for Rust SQLite API reference. |
 | serde_json crate docs | <https://docs.rs/serde_json/latest/serde_json/> | JSON and JSONL output from Rust tools | `serde_json` serializes/deserializes JSON and provides untyped `Value` support. | Docs describe latest crate; validate against locked version for API changes. | Adopt for JSON output implementation reference. |
 | sha2 crate docs | <https://docs.rs/sha2/latest/sha2/> | Rust SHA-256 implementation | `sha2` provides SHA-2 hash functions in Rust. | Cryptographic security depends on correct use and dependency version. | Adopt for implementation dependency reference. |
+| yaml-rust2 crate docs | <https://docs.rs/yaml-rust2/latest/yaml_rust2/> | Rust catalog-backed YAML parsing | `yaml-rust2` parses YAML into structured `Yaml` values used by the Rust skill router. | Docs describe latest crate; validate parser behavior against the locked version in `Cargo.lock`. | Adopt for `agents/skills/catalog.yaml` routing metadata parsing. |
 
 ## Discourse Relations, Connectives, And Structure Planning
 

@@ -55,6 +55,7 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
     "max_depth",
     "job_max_runtime_seconds",
 }
+SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial intake wave role: own user-request clauses",
     "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
@@ -440,9 +441,12 @@ def validate_public_skill_shims() -> None:
     families = data.get("skill_families", [])
     ensure(isinstance(families, list), "skill_families must be a list")
 
+    observed_skill_ids: set[str] = set()
     for entry in families:
         ensure(isinstance(entry, dict), "skill_families entries must be mappings")
         skill_id = str(entry["id"])
+        ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
+        observed_skill_ids.add(skill_id)
         canonical_doc = ROOT / str(entry["canonical_doc"])
         shim = ROOT / str(entry["shim"])
         ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
@@ -458,6 +462,36 @@ def validate_public_skill_shims() -> None:
             f"{skill_id} shim YAML frontmatter must close",
         )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
+        validate_skill_routing_entry(skill_id, entry.get("routing"))
+
+
+def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
+    """Check one optional catalog-backed prompt routing block."""
+    if routing is None:
+        return
+    ensure(isinstance(routing, dict), f"{skill_id} routing must be a mapping")
+    stage_policy = routing.get("stage_policy", "deferred")
+    ensure(
+        isinstance(stage_policy, str) and stage_policy in SKILL_ROUTING_STAGE_POLICIES,
+        f"{skill_id} routing.stage_policy must be one of {sorted(SKILL_ROUTING_STAGE_POLICIES)}",
+    )
+    reason = routing.get("reason")
+    ensure(
+        isinstance(reason, str) and bool(reason.strip()),
+        f"{skill_id} routing.reason must be a non-empty string",
+    )
+    triggers = routing.get("triggers", [])
+    ensure(isinstance(triggers, list), f"{skill_id} routing.triggers must be a list")
+    for group_index, group in enumerate(triggers):
+        ensure(
+            isinstance(group, list) and bool(group),
+            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
+        )
+        for term_index, term in enumerate(group):
+            ensure(
+                isinstance(term, str) and bool(term.strip()),
+                f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
+            )
 
 
 def validate_subagent_protocol_docs() -> None:
