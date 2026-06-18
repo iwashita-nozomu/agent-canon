@@ -170,6 +170,13 @@ language = "python"
 summary = "C++ source-only operational IR wrapper documentation."
 
 [[tool]]
+id = "operational-ir-to-lean"
+tool = "tools/agent_tools/operational_ir_to_lean.py"
+doc = "documents/tools/operational_ir_to_lean.md"
+language = "python"
+summary = "Shared thin operational IR to Lean evidence renderer documentation."
+
+[[tool]]
 id = "jit-ir-to-lean"
 tool = "rust/agent-canon/src/jit_ir_to_lean.rs"
 doc = "documents/tools/jit_ir_to_lean.md"

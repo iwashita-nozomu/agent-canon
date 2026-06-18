@@ -61,10 +61,21 @@ proof-oriented; this tool keeps only the source indexing and call-resolution
 idea and joins the current operational IR surface.
 
 Current `tools/bin/agent-canon jit-ir-to-lean` consumes JIT-canonical records
-with StableHLO and JAX public-interface coverage. A future generic
-operational-IR-to-Lean command should consume the nested thin operational IR
-from both Python/JIT and C++ wrappers after that Rust contract is split from
-StableHLO-specific evidence.
+with StableHLO and JAX public-interface coverage. For source-only C++ evidence,
+use the generic renderer:
+
+```bash
+python3 tools/agent_tools/operational_ir_to_lean.py \
+  --ir reports/cpp-source-ir/solve.json \
+  --namespace Generated.CppSolve \
+  --module-name SolveOperationalIr \
+  --out lean/cpp_solve/Generated/SolveOperationalIr.lean
+```
+
+That command consumes the nested thin operational IR and preserves the C++
+wrapper's provenance, public-interface metadata, source facts, and structural
+coverage as Lean evidence data. It does not emit StableHLO/backend evidence and
+does not claim semantic proof of the C++ algorithm.
 
 The parser is lightweight. It handles common record declarations, namespaces,
 function and method definitions, local constructor assignments, direct calls,
