@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
 # upstream design ../../documents/shared-runtime-surfaces.toml root surface ownership manifest
 # upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update checklist

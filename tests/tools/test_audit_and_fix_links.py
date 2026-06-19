@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests audit_and_fix_links forwarder behavior.
 # upstream implementation ../../tools/docs/audit_and_fix_links.py link audit compatibility forwarder
 # upstream implementation ../../rust/agent-canon/src/docs.rs Rust docs check link diagnostics

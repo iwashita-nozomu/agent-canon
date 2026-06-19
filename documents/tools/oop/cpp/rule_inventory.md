@@ -1,6 +1,7 @@
 # C++ OOP Rule Inventory
 <!--
 @dependency-start
+contract reference
 responsibility Documents C++ OOP rule inventory behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/rule_inventory.py C++ OOP inventory checker
 upstream design ../../../object-oriented-design.md OOP policy source

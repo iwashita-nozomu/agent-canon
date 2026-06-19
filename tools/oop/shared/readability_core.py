@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides shared OOP readability heuristics for language-specific tools.
 # upstream design ../../../documents/object-oriented-design.md OOP boundary policy
 # upstream design ../../../documents/coding-conventions-house-style.md shared readability rules

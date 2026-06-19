@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon memory persistence behavior.
 # upstream implementation ../../tools/agent_tools/persist_agent_memory.py persists memory notes.
 # @dependency-end

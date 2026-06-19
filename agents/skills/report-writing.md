@@ -1,6 +1,7 @@
 # report-writing
 <!--
 @dependency-start
+contract skill
 responsibility Documents reader-facing report writing workflow and quality criteria.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

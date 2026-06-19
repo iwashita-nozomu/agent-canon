@@ -1,6 +1,7 @@
 # P7-P8 Research, Audit, And Retirement Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Defines research, experiment, documentation, audit, metrics, and retirement checks for the completion-first review.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/01-priority-layers.md priority layer explanation

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks code edits before cause investigation evidence exists.
 # upstream implementation ../hooks.json invokes this hook for PreToolUse.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

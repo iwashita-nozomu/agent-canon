@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Renders semantic-index provider comparison JSON as a self-contained HTML report.
 # upstream design ../../documents/semantic_index.md defines provider comparison and candidate authority boundaries
 # upstream design ../../agents/skills/html-experiment-report.md defines the HTML experiment report workflow

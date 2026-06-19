@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Retires the former shell Git push implementation in favor of the gh-backed publish tool.
 # upstream implementation agent_tools/github_publish.py publishes GitHub branches and pull requests.
 # upstream design ../agents/workflows/agent-canon-pr-workflow.md defines the canonical publish route.

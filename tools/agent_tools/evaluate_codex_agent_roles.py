@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../evidence/agent-evals/README.md eval directory contract

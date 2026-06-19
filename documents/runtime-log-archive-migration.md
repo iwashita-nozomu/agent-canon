@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents how to move AgentCanon in-tree hook and eval logs into the external runtime log archive.
 upstream design runtime-log-archive.md runtime log archive ownership and branch policy
 upstream design coding-conventions-logging.md JSONL logging convention

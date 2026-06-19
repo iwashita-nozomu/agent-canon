@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract workflow
 responsibility Defines the ordered cleanup workflow for linked AgentCanon source PRs and dependent template PRs.
 upstream design agent-canon-pr-workflow.md defines AgentCanon source PR and template pin PR gates.
 upstream design codex-goals-workflow.md defines goal.md authority and loop-state handling.

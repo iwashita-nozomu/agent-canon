@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.

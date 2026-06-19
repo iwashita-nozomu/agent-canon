@@ -4,6 +4,7 @@ description: Use when the user asks to run the OOP readability checker, OOP chec
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents the OOP readability check and analysis skill for this repository.
 upstream design ../../../agents/skills/oop-readability-check.md human-readable skill canon
 upstream implementation ../../../tools/oop/python/readability.py OOP readability CLI with language selection

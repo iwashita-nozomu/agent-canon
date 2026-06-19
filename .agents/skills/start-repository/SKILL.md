@@ -4,6 +4,7 @@ description: Use when starting a new GitHub/submodule-first repository from this
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Start Repository for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

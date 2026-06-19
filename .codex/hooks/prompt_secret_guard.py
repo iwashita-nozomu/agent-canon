@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks user prompts that appear to contain high-confidence secrets.
 # upstream implementation ../hooks.json invokes this hook for UserPromptSubmit.
 # upstream design ../../documents/codex-configuration-reference.md documents Codex hook events.

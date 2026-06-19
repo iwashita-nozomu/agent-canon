@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the canonical full-expansion C++ template source to Lean evidence route.
 upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py expands C++ source roots into Lean.
 upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts the C++ source envelope.

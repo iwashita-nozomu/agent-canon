@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract tool
 responsibility Defines internal AgentCanon tool placement areas.
 upstream design ../catalog.yaml structured tool audience and placement catalog
 upstream design ../README.md shared tool family ownership and migration policy

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing

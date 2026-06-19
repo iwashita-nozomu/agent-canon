@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents lean_proof_env.py operator usage and environment boundary.
 upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../agents/skills/formal-proof-workflow.md routes Lean proofs through checked environments.

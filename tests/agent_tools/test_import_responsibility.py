@@ -1,6 +1,7 @@
 """Tests for import responsibility checks."""
 
 # @dependency-start
+# contract test
 # responsibility Tests import responsibility validation.
 # upstream implementation ../../tools/agent_tools/import_responsibility.py checks import boundaries
 # upstream design ../../responsibility-scope.toml declares scope import rules

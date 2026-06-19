@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests latest-result pointer update helper behavior.
 # upstream design ../../documents/result-log-retention-and-visualization.md result policy
 # upstream implementation ../../tools/experiments/update_latest_result.py helper under test

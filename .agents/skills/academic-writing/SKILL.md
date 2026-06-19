@@ -4,6 +4,7 @@ description: Use when drafting a paper, thesis chapter, scholarly note, or other
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Academic Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/academic-writing.md Academic Writing skill contract

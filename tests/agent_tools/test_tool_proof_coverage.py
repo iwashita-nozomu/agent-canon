@@ -1,6 +1,7 @@
 """Tests for tool proof coverage reporting."""
 
 # @dependency-start
+# contract test
 # responsibility Tests Lean proof-obligation coverage reporting for cataloged tools.
 # upstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof coverage
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof status policy

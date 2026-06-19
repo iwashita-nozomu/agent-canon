@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Finds exact duplicate design documents for consolidation review.
 # upstream design ../README.md shared tool index
 # downstream design ../../documents/design/README.md documents design placement

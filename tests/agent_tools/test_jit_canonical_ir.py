@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
 # upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived IR.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.

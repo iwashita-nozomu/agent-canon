@@ -5,6 +5,7 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 
 <!--
 @dependency-start
+contract skill
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow

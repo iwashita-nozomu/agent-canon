@@ -1,6 +1,7 @@
 """Tests for proof trace code/claim alignment checks."""
 
 # @dependency-start
+# contract test
 # responsibility Tests proof trace code path and proposition alignment checker.
 # upstream implementation ../../tools/agent_tools/check_proof_trace_alignment.py checks anchors.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines trace policy.

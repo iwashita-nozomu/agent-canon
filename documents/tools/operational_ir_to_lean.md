@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents tools/agent_tools/operational_ir_to_lean.py usage and output contract.
 upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean evidence definitions.
 upstream design cpp_source_canonical_ir.md defines the C++ source envelope.

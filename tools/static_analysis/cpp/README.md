@@ -1,6 +1,7 @@
 # C And C++ Static Analysis
 <!--
 @dependency-start
+contract tool
 responsibility Documents C and C++ static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
 upstream design ../../../documents/coding-conventions-cpp.md C++ coding conventions

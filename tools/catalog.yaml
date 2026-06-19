@@ -1,4 +1,5 @@
 # @dependency-start
+# contract registry
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
@@ -906,7 +907,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-header-format
-    summary: Validates dependency manifest syntax, paths, and edge fields.
+    summary: Validates dependency manifest syntax, paths, edge fields, and registered contract kind metadata.
     path: tools/agent_tools/check_dependency_header_format.sh
     family: agent_tools
     role: checker
@@ -919,11 +920,12 @@ entries:
     docs:
       - tools/README.md
       - documents/dependency-manifest-design.md
+      - documents/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks changed files for required dependency manifests.
+    summary: Checks changed files for required dependency manifests and registered contract kinds.
     path: tools/agent_tools/check_dependency_headers.py
     family: agent_tools
     role: checker
@@ -936,6 +938,7 @@ entries:
     docs:
       - tools/README.md
       - documents/dependency-manifest-design.md
+      - documents/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
 

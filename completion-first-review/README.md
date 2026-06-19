@@ -1,6 +1,7 @@
 # Completion-First AgentCanon Review
 <!--
 @dependency-start
+contract reference
 responsibility Indexes the completion-first AgentCanon improvement review.
 upstream design ../AGENTS.md AgentCanon runtime and closeout expectations
 upstream design ../agents/workflows/agent-learning-workflow.md agent self-growth workflow

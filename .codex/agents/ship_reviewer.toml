@@ -1,4 +1,5 @@
 # @dependency-start
+# contract agent-runtime
 # responsibility Defines ship reviewer TOML configuration.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../documents/REVIEW_PROCESS.md final review and closeout policy

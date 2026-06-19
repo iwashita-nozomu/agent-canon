@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Records imported repo-local tools and their canonical disposition.
 upstream design ../tools/README.md defines shared tool families
 upstream design result-log-retention-and-visualization.md defines result tooling policy

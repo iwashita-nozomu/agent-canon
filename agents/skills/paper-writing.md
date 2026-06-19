@@ -1,6 +1,7 @@
 # paper-writing
 <!--
 @dependency-start
+contract skill
 responsibility Documents paper-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable paper structure contract

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon latest command TODO routing in small focused fixtures.
 # upstream design ../../tools/README.md documents the high-level AgentCanon latest route.
 # upstream implementation ../../tools/update_agent_canon.sh routes pending parent-repo TODOs.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Builds machine-readable file surface inventories for repo review.
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface model
 # downstream implementation ./review_backlog_scan.sh includes inventory reports

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks design-document claims against implementation-backed evidence.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../documents/design/README.md design-document evidence policy

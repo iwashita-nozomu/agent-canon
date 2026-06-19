@@ -1,6 +1,7 @@
 # Goal Plan-Implementation Loop
 <!--
 @dependency-start
+contract workflow
 responsibility Defines the fast plan-to-implementation loop for goal-driven tasks.
 upstream design codex-goals-workflow.md defines durable goal state and MCP gates
 upstream design implementation-waterfall-workflow.md defines implementation and closeout gates

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Publishes GitHub branches and pull requests through a gh-verified remote route.
 # upstream design ../../ROOT_AGENTS.md defines PR mutation authority and non-blocking publish policy.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines the AgentCanon PR workflow.

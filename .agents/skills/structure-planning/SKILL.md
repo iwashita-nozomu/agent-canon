@@ -4,6 +4,7 @@ description: Use when a report, experiment plan, Eval output, presentation story
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Structure Planning runtime skill for this repository.
 upstream design ../../../agents/skills/structure-planning.md documents the human-facing structure planning workflow
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement

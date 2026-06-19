@@ -4,6 +4,7 @@ description: Legacy cleanup only. Use when inspecting or retiring stale WORKTREE
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Worktree Start for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

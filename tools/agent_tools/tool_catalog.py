@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates the structured AgentCanon tool catalog.
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # upstream design ../../tools/README.md shared tool family ownership

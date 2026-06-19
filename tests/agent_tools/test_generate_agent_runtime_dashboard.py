@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon runtime dashboard generation.
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
 # upstream design ../../documents/runtime-log-archive.md documents result families shown by dashboard

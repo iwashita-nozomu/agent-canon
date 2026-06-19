@@ -1,6 +1,7 @@
 # task-routing
 <!--
 @dependency-start
+contract skill
 responsibility Documents task-routing skill.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy

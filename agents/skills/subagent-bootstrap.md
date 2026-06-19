@@ -1,6 +1,7 @@
 # subagent-bootstrap
 <!--
 @dependency-start
+contract skill
 responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract skill
 responsibility Documents JIT-canonical algorithm Mermaid flowcharts for proof review.
 upstream design algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
 upstream design formal-proof-workflow.md checker-backed proof workflow.

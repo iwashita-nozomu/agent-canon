@@ -1,6 +1,7 @@
 """Tests for file surface inventory reports."""
 
 # @dependency-start
+# contract test
 # responsibility Tests file surface inventory scope classification.
 # upstream implementation ../../tools/agent_tools/file_surface_inventory.py builds inventory reports
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface model

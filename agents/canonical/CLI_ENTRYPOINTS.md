@@ -1,6 +1,7 @@
 # CLI Entrypoints
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents CLI Entrypoints for this repository.
 upstream design README.md canonical workflow index
 @dependency-end

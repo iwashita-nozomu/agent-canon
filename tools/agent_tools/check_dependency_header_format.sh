@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
-# responsibility Validates dependency manifest syntax and responsibility metadata.
+# contract tool
+# responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests
 # downstream implementation ./check_dependency_graph.sh consumes validated manifest lines
 # @dependency-end
@@ -12,6 +14,7 @@ REQUIRE_HEADER=0
 CHANGED=0
 ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
+CONTRACT_KIND_REGISTRY="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
 declare -a INPUT_PATHS=()
 
 usage() {
@@ -21,6 +24,7 @@ Usage:
 
 Validates @dependency-start / @dependency-end manifest syntax.
 Files without a manifest are skipped unless --require-header is set.
+Each manifest must include one registered `contract <kind>` line.
 --allow-frontmatter is accepted for policy-explicit callers; frontmatter is allowed by default.
 EOF
 }
@@ -55,6 +59,54 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$ROOT_DIR"
+
+contract_kind_registry_path() {
+  if [[ -n "$CONTRACT_KIND_REGISTRY" ]]; then
+    printf '%s\n' "$CONTRACT_KIND_REGISTRY"
+    return
+  fi
+  if [[ -f "$ROOT_DIR/documents/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/documents/dependency-contract-kinds.toml"
+    return
+  fi
+  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml"
+    return
+  fi
+  local script_path script_dir
+  script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+  script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+  printf '%s\n' "$(realpath -m "$script_dir/../../documents/dependency-contract-kinds.toml")"
+}
+
+load_contract_kinds() {
+  local registry="$1"
+  [[ -f "$registry" ]] || return 1
+  awk '
+    /^[[:space:]]*allowed_kinds[[:space:]]*=/ { in_allowed = 1; next }
+    in_allowed && /^[[:space:]]*\]/ { exit }
+    in_allowed {
+      line = $0
+      while (match(line, /"[a-z0-9][a-z0-9-]*"/)) {
+        value = substr(line, RSTART + 1, RLENGTH - 2)
+        print value
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+  ' "$registry"
+}
+
+CONTRACT_KIND_REGISTRY_PATH="$(contract_kind_registry_path)"
+mapfile -t ALLOWED_CONTRACT_KINDS < <(load_contract_kinds "$CONTRACT_KIND_REGISTRY_PATH" || true)
+
+contract_kind_allowed() {
+  local candidate="$1"
+  local allowed
+  for allowed in "${ALLOWED_CONTRACT_KINDS[@]}"; do
+    [[ "$candidate" == "$allowed" ]] && return 0
+  done
+  return 1
+}
 
 is_checkable_suffix() {
   case "$1" in
@@ -154,6 +206,7 @@ check_file() {
   local file="$1"
   local start_count end_count start_line end_line line_no line stripped
   local direction kind rel_path reason target
+  local contract_count contract_keyword contract_kind contract_extra
   local coverage_keyword coverage_id coverage_requires coverage_terms
   local responsibility_count responsibility_text
   [[ -f "$file" && ! -L "$file" ]] || return 0
@@ -204,6 +257,7 @@ check_file() {
 
   line_no=0
   responsibility_count=0
+  contract_count=0
   while IFS= read -r line; do
     line_no=$((line_no + 1))
     [[ "$line_no" -gt "$start_line" && "$line_no" -lt "$end_line" ]] || continue
@@ -221,6 +275,23 @@ check_file() {
         return 1
       fi
       responsibility_count=$((responsibility_count + 1))
+      continue
+    fi
+    if [[ "$stripped" == contract[[:space:]]* ]]; then
+      read -r contract_keyword contract_kind contract_extra <<< "$stripped"
+      if [[ -z "${contract_kind:-}" || -n "${contract_extra:-}" ]]; then
+        echo "$file:$line_no: contract line must be: contract <registered-kind>; fix: choose one allowed_kinds entry from $CONTRACT_KIND_REGISTRY_PATH"
+        return 1
+      fi
+      if [[ ! "$contract_kind" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "$file:$line_no: invalid contract kind token '$contract_kind'; fix: use lowercase kebab-case from $CONTRACT_KIND_REGISTRY_PATH"
+        return 1
+      fi
+      if ! contract_kind_allowed "$contract_kind"; then
+        echo "$file:$line_no: unregistered contract kind '$contract_kind'; fix: use an existing allowed_kinds entry from $CONTRACT_KIND_REGISTRY_PATH or update the registry with review"
+        return 1
+      fi
+      contract_count=$((contract_count + 1))
       continue
     fi
     if [[ "$stripped" == coverage[[:space:]]* ]]; then
@@ -263,7 +334,21 @@ check_file() {
     echo "$file: dependency manifest must contain exactly one responsibility line"
     return 1
   fi
+  if [[ "$contract_count" -gt 1 ]]; then
+    echo "$file: dependency manifest must contain exactly one contract line; fix: keep one 'contract <registered-kind>' line immediately after @dependency-start"
+    return 1
+  fi
+  if [[ "$contract_count" -ne 1 ]]; then
+    echo "$file: dependency manifest must contain exactly one contract line; fix: add 'contract <registered-kind>' after @dependency-start and choose the kind from $CONTRACT_KIND_REGISTRY_PATH"
+    return 1
+  fi
 }
+
+if [[ "${#ALLOWED_CONTRACT_KINDS[@]}" -eq 0 ]]; then
+  echo "missing dependency contract kind registry: $CONTRACT_KIND_REGISTRY_PATH; fix: restore documents/dependency-contract-kinds.toml or set DEPENDENCY_CONTRACT_KIND_REGISTRY to the canonical registry"
+  echo "DEPENDENCY_HEADER_FORMAT=fail"
+  exit 1
+fi
 
 failures=0
 while IFS= read -r raw_path; do

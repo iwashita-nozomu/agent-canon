@@ -4,6 +4,7 @@ description: Use when organizing repository documents, finding non-canonical doc
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Document Canon Cleanup for this repository.
 upstream design ../../../agents/skills/document-canon-cleanup.md human-facing skill canon
 upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs finds cleanup candidates

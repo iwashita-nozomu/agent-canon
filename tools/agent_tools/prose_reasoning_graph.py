@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Builds and reports SQLite-backed prose reasoning graphs.
 # upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract

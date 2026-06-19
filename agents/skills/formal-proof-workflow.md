@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents the natural-language to formal-proof workflow.
 upstream design ../canonical/skills.md skill canon registry.
 upstream design algorithm-proof-exploration.md proof-guided algorithm exploration workflow.

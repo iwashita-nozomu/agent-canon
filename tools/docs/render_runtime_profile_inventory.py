@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Renders the runtime profile and check matrix doc from a machine-readable inventory.
 # upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
 # downstream implementation ../../tools/agent_tools/check_runtime_profile_inventory.py drift checker compares rendered doc
@@ -20,6 +21,7 @@ DEFAULT_DOC = Path("documents/runtime-profiles-and-check-matrix.md")
 
 DEPENDENCY_HEADER = """<!--
 @dependency-start
+contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
@@ -218,4 +220,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

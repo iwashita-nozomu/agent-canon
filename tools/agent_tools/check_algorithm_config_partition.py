@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks algorithm InitializeConfig/SolveConfig ownership partition.
 # upstream design ../../documents/design/jax_util/algorithm_module_contract.md config contract
 # upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy

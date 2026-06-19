@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Warns when the AgentCanon log archive mount is absent without blocking hook execution.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive mount paths

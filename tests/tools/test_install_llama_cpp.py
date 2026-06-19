@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests llama.cpp installer behavior.
 # upstream implementation ../../tools/install_llama_cpp.sh builds llama.cpp under AGENT_CANON_TOOLS_HOME
 # upstream design ../../documents/local-llm-responsibility-analysis.md local LLM install boundary

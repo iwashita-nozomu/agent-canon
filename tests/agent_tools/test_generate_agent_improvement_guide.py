@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon improvement guide generation.
 # upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py generates guide reports
 # @dependency-end

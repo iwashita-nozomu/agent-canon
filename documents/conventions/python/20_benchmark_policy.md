@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents ベンチマーク方針 for this repository.
 upstream design ../README.md convention index
 @dependency-end

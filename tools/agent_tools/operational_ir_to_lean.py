@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Lowers shared thin operational IR records into Lean evidence definitions.
 # upstream design ../../documents/tools/operational_ir_to_lean.md documents the renderer contract.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md defines the C++ source envelope.

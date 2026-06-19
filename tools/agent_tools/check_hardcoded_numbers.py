@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Detects unexplained numeric literals in Python and C++ sources.
 # upstream design ../../documents/conventions/common/01_principles.md magic-number policy
 # upstream design ../../documents/coding-conventions-python.md Python convention entrypoint

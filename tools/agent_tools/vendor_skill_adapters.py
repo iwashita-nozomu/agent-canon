@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates and materializes vendored third-party skill adapters.
 # upstream design ../../vendor/README.md AgentCanon internal vendor ownership policy
 # upstream design ../../vendor/skills/README.md third-party skill vendor contract

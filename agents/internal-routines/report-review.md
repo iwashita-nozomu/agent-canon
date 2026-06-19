@@ -1,6 +1,7 @@
 # report-review
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents report-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

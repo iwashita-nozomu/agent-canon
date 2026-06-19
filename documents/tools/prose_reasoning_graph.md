@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents prose_reasoning_graph.py usage and contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed prose reasoning graphs

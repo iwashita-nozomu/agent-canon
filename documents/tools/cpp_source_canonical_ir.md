@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents tools/agent_tools/cpp_source_canonical_ir.py usage and output contract.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py defines the shared thin operational IR shape.
 downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py owns the canonical C++ to Lean route.

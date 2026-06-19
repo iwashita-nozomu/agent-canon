@@ -1,6 +1,7 @@
 # structure-refactor
 <!--
 @dependency-start
+contract skill
 responsibility Documents directory-structure refactor workflow for this repository.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

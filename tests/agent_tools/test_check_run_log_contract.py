@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests run-log contract checker behavior.
 # upstream implementation ../../tools/agent_tools/check_run_log_contract.py checker under test
 # @dependency-end

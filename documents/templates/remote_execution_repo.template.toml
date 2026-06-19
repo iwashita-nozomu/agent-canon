@@ -1,4 +1,5 @@
 # @dependency-start
+# contract reference
 # responsibility Provides the remote execution repo.template configuration template.
 # upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 # @dependency-end

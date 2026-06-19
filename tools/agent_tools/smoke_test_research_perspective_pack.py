@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides smoke test research perspective pack agent workflow automation.
 # @dependency-end
 

@@ -1,6 +1,7 @@
 """Tests for single-file local LLM responsibility review."""
 
 # @dependency-start
+# contract test
 # responsibility Tests single-file local LLM responsibility review.
 # upstream implementation ../../tools/agent_tools/file_responsibility_llm.py renders local LLM prompts
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file scope policy

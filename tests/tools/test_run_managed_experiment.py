@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests test run managed experiment behavior.
 # upstream design ../../tools/README.md validated automation surface
 # upstream implementation ../../tools/ci/check_experiment_registry.py checker under test

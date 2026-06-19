@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Logs and blocks unregistered external reference URLs.
 # upstream implementation ../hooks.json invokes this hook at prompt, tool, and stop boundaries.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

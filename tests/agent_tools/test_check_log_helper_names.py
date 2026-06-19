@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests log helper naming checker.
 # upstream implementation ../../tools/agent_tools/check_log_helper_names.py checker under test
 # @dependency-end

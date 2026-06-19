@@ -1,6 +1,7 @@
 """Tests for issue-derived eval manifest coverage."""
 
 # @dependency-start
+# contract test
 # responsibility Tests issue-derived eval manifest coverage for AgentCanon closeout issues.
 # upstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval rows.
 # upstream design ../../documents/prompt-skill-evaluation-checklist.md defines eval closeout expectations.

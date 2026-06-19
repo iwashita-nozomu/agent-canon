@@ -1,6 +1,7 @@
 """Tests for formal proof scaffold generation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests natural-language to formal-proof scaffold planning.
 # upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow requirements.

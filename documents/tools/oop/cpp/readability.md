@@ -1,6 +1,7 @@
 # C++ OOP Readability
 <!--
 @dependency-start
+contract reference
 responsibility Documents C++ OOP readability checker behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/readability.py C++ OOP readability checker
 upstream implementation ../../../../tools/oop/shared/readability_core.py shared readability heuristics

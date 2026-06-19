@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Provides Rust-native local LLM CLI routing, prose IR extraction, and responsibility review.
 // upstream design ../../../documents/local-llm-responsibility-analysis.md local LLM responsibility boundary
 // upstream design ../../../documents/search-coordination.md coordinated search provider contract

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides analyze refactor surface agent workflow automation.
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md analyzer gate
 # upstream design ../../documents/object-oriented-design.md OOP boundary policy

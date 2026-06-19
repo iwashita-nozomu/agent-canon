@@ -4,6 +4,7 @@ description: Use this skill to review current checkout authority, run-bundle dri
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Worktree Health for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

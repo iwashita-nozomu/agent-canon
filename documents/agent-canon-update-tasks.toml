@@ -1,4 +1,5 @@
 # @dependency-start
+# contract reference
 # responsibility Defines AgentCanon update TODOs for parent repository agents.
 # upstream design agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
 # downstream implementation ../tools/agent_tools/agent_canon_update_todos.py reads and routes these tasks

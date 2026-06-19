@@ -1,4 +1,5 @@
 # @dependency-start
+# contract data
 # responsibility Registers issue-derived AgentCanon behavior eval cases.
 # upstream design ../../documents/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
 # upstream design ../../issues/README.md defines durable operational issue storage.

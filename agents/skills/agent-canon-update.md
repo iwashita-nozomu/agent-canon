@@ -1,6 +1,7 @@
 # AgentCanon Update Skill
 <!--
 @dependency-start
+contract skill
 responsibility Documents AgentCanon Update Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/agent-canon-update-route.md canonical AgentCanon update route

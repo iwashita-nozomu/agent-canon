@@ -4,6 +4,7 @@ description: Use as the general explanatory-doc DSL-to-prose adapter for README,
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Long-Form Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts

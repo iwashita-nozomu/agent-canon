@@ -1,6 +1,7 @@
 """Tests for the AgentCanon tool catalog checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture

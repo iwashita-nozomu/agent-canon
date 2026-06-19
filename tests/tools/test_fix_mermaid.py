@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests Mermaid fenced-block formatter behavior.
 # upstream implementation ../../tools/docs/fix_mermaid.py Mermaid formatter under test
 # upstream implementation ../../tools/docs/format_markdown.py invokes Mermaid formatter

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Defines durable AgentCanon operational finding storage and issue-file conventions.
 upstream design ../ROOT_AGENTS.md requires durable learning and closeout evidence
 upstream design ../agents/workflows/agent-canon-pr-workflow.md requires issue checks in AgentCanon PR flow

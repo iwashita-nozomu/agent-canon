@@ -1,6 +1,7 @@
 # Goal
 <!--
 @dependency-start
+contract reference
 responsibility Defines the active convention-compliance goal loop contract.
 upstream design README.md repository entrypoint
 upstream design agents/workflows/adaptive-improvement-workflow.md loop workflow

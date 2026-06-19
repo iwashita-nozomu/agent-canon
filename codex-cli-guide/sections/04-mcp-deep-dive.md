@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Houses the split guide section: MCPの基礎から定義・運用・デバッグまで.
 upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end

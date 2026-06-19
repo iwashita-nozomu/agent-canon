@@ -1,6 +1,7 @@
 # agent-orchestration
 <!--
 @dependency-start
+contract skill
 responsibility Documents agent-orchestration for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioritized overlay routing

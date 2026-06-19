@@ -2,10 +2,12 @@
 
 <!--
 @dependency-start
+contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
+downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
-downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax
+downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../tools/agent_tools/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
@@ -73,12 +75,26 @@ between a design document and its upstream parent documents.
 
 ```text
 @dependency-start
+contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../agents/canonical/CODEX_WORKFLOW.md workflow contract
 upstream implementation ../tools/agent_tools/bootstrap_agent_run.py consumes workflow metadata
 downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies emitted output
 @dependency-end
 ```
+
+manifest block には file の契約種別を 1 line で書きます。
+文法は次です。
+
+```text
+contract <registered-kind>
+```
+
+- `contract` は file が持つ契約面の分類を表します
+- dependency edge ではないため graph edge にはなりません
+- すべての manifest block にちょうど 1 行だけ置きます
+- `<registered-kind>` は `documents/dependency-contract-kinds.toml` の `allowed_kinds` から選びます
+- 新しい contract kind は registry、checker、review route を同じ変更で更新します
 
 manifest block には file の責務を 1 line で書きます。
 文法は次です。
@@ -125,6 +141,16 @@ shared canon は派生 repo に配布されるため、environment edge はそ�
 最初はこの 3 種に限定します。
 新しい kind を増やす場合は、tool、docs、review gate、migration plan を同じ変更で更新します。
 
+## Contract Kinds
+
+contract kind は file 全体の契約面を表します。
+dependency kind は edge の意味を表すため、同じ manifest 内に複数現れます。
+この 2 つは別の enum です。
+
+登録済み contract kind の正本は `documents/dependency-contract-kinds.toml` です。
+checker は registry にない contract kind を reject します。
+agent は file を読む前に `contract` と `responsibility` を読み、設計、実装、tool、skill、workflow、test、environment などのどの契約面を扱うかを固定します。
+
 ## Comment Wrapping
 
 内部 marker と DSL は全 file type 共通です。
@@ -138,6 +164,7 @@ Markdown:
 ```markdown
 <!--
 @dependency-start
+contract design
 upstream design ../agents/canonical/CODEX_WORKFLOW.md workflow contract
 responsibility Provides a Python helper entrypoint for agent run bootstrap.
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py consumes workflow contract
@@ -149,6 +176,7 @@ Python / shell / TOML:
 
 ```python
 # @dependency-start
+# contract tool
 # responsibility Implements one repository tool or runtime helper.
 # upstream implementation ../tools/agent_tools/agent_team.py imports helper contract
 # downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies CLI behavior
@@ -160,6 +188,7 @@ C-like languages:
 ```c
 /*
 @dependency-start
+contract implementation
 responsibility Defines a C or C++ source/header surface and its edit context.
 upstream design ../include/public_api.h public API contract
 downstream implementation ../tests/test_public_api.cpp validates API behavior
@@ -333,6 +362,7 @@ Responsibilities:
 - validate marker count and marker order
 - validate placement near the top of the file
 - strip common comment prefixes
+- validate each manifest has exactly one registered `contract` line
 - validate each manifest has exactly one non-empty `responsibility` line
 - validate each dependency line has direction, kind, relative path, and reason
 - validate direction and kind enum values
@@ -390,7 +420,8 @@ Phase 2: implement Bash tools first:
 - `check_dependency_graph.sh`
 
 `scan_dependency_headers.sh` starts as full-repo report-only so it can list missing manifests without blocking unrelated work.
-`check_dependency_headers.py --changed` and `check_dependency_header_format.sh --changed` reject changed files that do not have valid `@dependency-start` blocks.
+`check_dependency_headers.py --changed` rejects changed files that do not have valid `@dependency-start` blocks or registered contract kinds.
+`check_dependency_header_format.sh --changed` rejects changed files that do not have valid `@dependency-start` blocks or registered contract kinds.
 `check_dependency_graph.sh` default mode rejects self references and cycles.
 `check_dependency_graph.sh --cycle-report-only` reports cycles without failing
 and is valid only when paired with a durable graph report artifact.

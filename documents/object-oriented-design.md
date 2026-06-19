@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Documents オブジェクト指向設計方針 for this repository.
 upstream design ./README.md documents index and discovery path
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy

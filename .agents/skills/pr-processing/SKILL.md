@@ -4,6 +4,7 @@ description: "Use when processing GitHub pull requests or issue queues: inventor
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents PR Processing runtime skill for this repository.
 upstream design ../../../agents/skills/pr-processing.md documents the human-facing workflow
 upstream design ../../../agents/workflows/pr-queue-cleanup-workflow.md defines AgentCanon source and parent pin queue cleanup

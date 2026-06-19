@@ -1,6 +1,7 @@
 # Violation Fixture Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Defines how false-negative cases become replayable fixtures for completion-first AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/04-violation-cases.md false-negative catalog

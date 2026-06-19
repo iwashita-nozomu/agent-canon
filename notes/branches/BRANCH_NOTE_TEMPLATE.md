@@ -1,6 +1,7 @@
 # <Branch Topic>
 <!--
 @dependency-start
+contract reference
 responsibility Documents <Branch Topic> for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

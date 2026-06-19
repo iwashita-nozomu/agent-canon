@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the GitHub canonical remote policy for AgentCanon.
 downstream design ../agents/workflows/agent-canon-pr-workflow.md consumes GitHub evidence.
 downstream implementation ../tools/sync_agent_canon.sh chooses the default remote.

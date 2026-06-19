@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Forwards legacy docs checks CI automation to the unified Rust docs tool.
 # upstream design ../README.md shared automation index
 # upstream implementation ../../rust/agent-canon/src/docs.rs unified Rust docs check implementation

@@ -4,6 +4,7 @@ description: Use this skill when preparing, running, or validating experiments.
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Experiment Lifecycle for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines experiment and report structure contracts

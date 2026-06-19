@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents tools/agent_tools/jit_canonical_ir.py usage and output contract.
 downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces.
 downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs consumes the generated JIT-canonical IR JSON.

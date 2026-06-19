@@ -1,6 +1,7 @@
 # 実験の標準手順
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 実験の標準手順 for this repository.
 upstream design README.md workflow catalog
 @dependency-end

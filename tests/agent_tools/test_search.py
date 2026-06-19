@@ -1,6 +1,7 @@
 """Tests for coordinated AgentCanon search."""
 
 # @dependency-start
+# contract test
 # responsibility Tests purpose-based search across tool, local LLM card, header dependency, and code dependency providers.
 # upstream implementation ../../tools/agent_tools/search.py coordinates search providers
 # upstream implementation ../../tools/agent_tools/search_index.py supplies local LLM semantic cards

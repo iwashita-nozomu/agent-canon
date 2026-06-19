@@ -4,6 +4,7 @@ description: Use when existing prose should be converted into a SQLite-backed st
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Prose Reasoning Graph runtime skill for this repository.
 upstream design ../../../agents/skills/prose-reasoning-graph.md documents the human-facing skill
 upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract

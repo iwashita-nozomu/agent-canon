@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides find similar documents documentation tooling.
 # upstream design ../README.md shared automation index
 # @dependency-end

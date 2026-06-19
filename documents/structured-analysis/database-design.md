@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Defines SQLite database design for structured prose, report, and dependency analysis.
 upstream design README.md structured analysis package index
 upstream design ../prose-reasoning-graph/dsl-spec.md prose graph DSL and projection contract

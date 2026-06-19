@@ -1,5 +1,6 @@
 version: 1
 # @dependency-start
+# contract registry
 # responsibility Catalogs canonical agent skills and their descriptions.
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # @dependency-end

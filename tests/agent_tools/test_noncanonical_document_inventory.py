@@ -1,6 +1,7 @@
 """Tests for non-canonical document inventory."""
 
 # @dependency-start
+# contract test
 # responsibility Tests non-canonical document inventory behavior.
 # upstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py forwards legacy calls to Rust document cleanup inventory
 # upstream design ../../agents/skills/document-canon-cleanup.md defines cleanup workflow

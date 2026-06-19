@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Implements structured prose/document analysis Rust CLI commands.
 // upstream design ../../../documents/structured-analysis/README.md structured analysis package boundary
 // upstream design ../../../documents/structured-analysis/database-design.md structured analysis DB contract

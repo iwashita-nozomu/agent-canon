@@ -4,6 +4,7 @@ description: Use when memory/USER_PREFERENCES.md should be distilled into stable
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents User Preference Sync for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

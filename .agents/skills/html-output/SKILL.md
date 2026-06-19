@@ -4,6 +4,7 @@ description: Use when the user explicitly asks for HTML output, a browser-readab
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents HTML Output runtime skill for this repository.
 upstream design ../../../agents/skills/html-output.md documents the canonical HTML output workflow
 upstream design ../../../agents/skills/structure-planning.md defines reusable page structure contracts

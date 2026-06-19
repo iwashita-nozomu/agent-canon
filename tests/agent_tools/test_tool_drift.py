@@ -1,6 +1,7 @@
 """Tests for tool/convention drift checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests tool/convention drift checker behavior.
 # upstream implementation ../../tools/agent_tools/tool_drift.py checker
 # upstream design ../../documents/dependency-manifest-design.md manifest trace map

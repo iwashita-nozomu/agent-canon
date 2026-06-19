@@ -1,6 +1,7 @@
 # python-review
 <!--
 @dependency-start
+contract skill
 responsibility Documents python-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

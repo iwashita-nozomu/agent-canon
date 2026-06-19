@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
 # upstream design ../../evidence/agent-evals/README.md prompt eval directory contract
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml default prompt eval manifest

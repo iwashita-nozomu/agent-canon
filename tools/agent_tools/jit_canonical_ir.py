@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Extracts JIT-canonical operational IR and backend witnesses from a lowered Python root.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines StableHLO/backend witness extraction.
 # downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.

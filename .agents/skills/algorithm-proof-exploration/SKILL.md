@@ -5,6 +5,7 @@ description: Use when exploring, refactoring, or choosing an algorithm under pro
 
 <!--
 @dependency-start
+contract skill
 responsibility Exposes theorem-driven algorithm exploration to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/algorithm-proof-exploration.md canonical skill document
 upstream design ../../../agents/skills/formal-proof-workflow.md checker-backed claim workflow.

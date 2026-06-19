@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides format markdown documentation tooling.
 # upstream design ../README.md shared automation index
 # upstream implementation ./fix_mermaid.py fixes Mermaid fenced blocks.

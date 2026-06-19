@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks direct rewrites of vendored or installed library implementations.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

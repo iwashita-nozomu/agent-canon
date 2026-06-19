@@ -4,6 +4,7 @@ description: Use when a task needs specialist delegation, run-bundle bootstrap, 
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Subagent Bootstrap for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields

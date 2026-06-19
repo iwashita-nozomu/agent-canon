@@ -4,6 +4,7 @@ description: Use when a task needs paper search, prior-art mapping, contradictor
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Literature Survey for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines claim/evidence graph handoffs

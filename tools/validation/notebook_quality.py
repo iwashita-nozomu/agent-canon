@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates notebooks as readable runnable demos instead of fine-grained tests.
 # upstream design ../../tools/README.md shared validation tool family ownership
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy

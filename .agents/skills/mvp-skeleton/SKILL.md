@@ -4,6 +4,7 @@ description: Use when creating, scaffolding, planning, or implementing an MVP, p
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents MVP Skeleton runtime skill for this repository.
 upstream design ../../../agents/skills/mvp-skeleton.md documents the human-facing MVP skeleton workflow
 downstream design ../../../agents/skills/catalog.yaml catalogs this public skill

@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Provides Rust-native test design resilience diagnostics.
 // upstream design ../../../documents/coding-conventions-testing.md shared testing policy
 // upstream design ../../../references/test-design-flexibility.md research basis for resilient test design

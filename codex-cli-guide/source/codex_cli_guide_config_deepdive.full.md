@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Preserves the complete single-file Markdown source for the split Codex CLI guide.
 downstream implementation ../tools/validate_split.py validates split guide reconstruction.
 @dependency-end

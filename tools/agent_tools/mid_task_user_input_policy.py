@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Defines mid-task user input policy tokens for workflow monitoring and closeout checks.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines mid-task subagent reuse and fresh-run policy
 # downstream implementation ./workflow_monitor.py emits mid-task checkpoint and evidence rows

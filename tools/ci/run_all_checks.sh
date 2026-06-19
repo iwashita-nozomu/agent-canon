@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Runs all checks CI automation.
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/scan_dependency_headers.sh scans changed-file manifest coverage

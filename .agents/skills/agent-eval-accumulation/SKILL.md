@@ -4,6 +4,7 @@ description: Use when accumulated AgentCanon eval evidence is missing, stale, or
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Eval Accumulation for this repository.
 upstream design ../../../agents/skills/agent-eval-accumulation.md documents the human-facing skill
 upstream design ../../../evidence/agent-evals/README.md defines eval family contracts

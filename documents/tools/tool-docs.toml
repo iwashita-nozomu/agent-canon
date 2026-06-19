@@ -1,4 +1,5 @@
 # @dependency-start
+# contract reference
 # responsibility Maps canonical tools to same-named explanatory documents.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog

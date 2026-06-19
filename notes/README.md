@@ -1,6 +1,7 @@
 # Notes Hub
 <!--
 @dependency-start
+contract reference
 responsibility Documents Notes Hub for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end

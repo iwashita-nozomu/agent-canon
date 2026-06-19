@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Inspects legacy worktree scope evidence for cleanup diagnostics.
 # upstream design ../README.md shared automation index
 # @dependency-end

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the recurring AgentCanon PR gate failure pattern and the required prevention surface.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines AgentCanon PR routing and gate expectations.
 upstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs branch and PR static gates.
@@ -17,6 +18,7 @@ status: resolved
 source: ci
 severity: S1
 evidence: GitHub Actions run 26450128761 failed dependency review after PR #143 moved runtime log evidence out of agents/evals/results.
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/258
 affected_surfaces: .github/workflows/agent-canon-static-gates.yml, tools/ci/check_agent_canon_pr.sh, tools/ci/check_github_workflows.py, tools/agent_tools/tool_drift.py, tools/agent_tools/evaluate_codex_agent_roles.py, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md
 edit_scope: .github/workflows/agent-canon-static-gates.yml, tools/ci/check_agent_canon_pr.sh, tools/ci/check_github_workflows.py, tools/agent_tools/tool_drift.py, tools/agent_tools/evaluate_codex_agent_roles.py, tests/tools/test_check_github_workflows.py, tests/agent_tools/test_tool_drift.py, tests/agent_tools/test_evaluate_codex_agent_roles.py, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, documents/tools/README.md
 required_action: Keep GitHub static gates, local AgentCanon PR checks, PR templates, and drift checkers aligned for dependency headers, Codex skill shims, runtime role alignment, prompt eval, and convention compliance.

@@ -5,6 +5,7 @@ description: Use when Codex needs a context-independent execution path for a rep
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Codex Task Workflow for this repository.
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit investigation and context capsule handoff packets

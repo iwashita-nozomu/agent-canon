@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the semantic-index candidate-generation tool and Eval harness.
 upstream design search-coordination.md coordinated search provider boundary
 upstream design local-llm-responsibility-analysis.md local model advisory boundary

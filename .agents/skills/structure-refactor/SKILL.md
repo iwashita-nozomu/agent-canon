@@ -4,6 +4,7 @@ description: Use when repository structure review, repo-refactor requests, expec
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Structure Refactor runtime skill for this repository.
 upstream design ../../../agents/skills/structure-refactor.md documents the human-facing skill canon
 upstream design ../../../agents/skills/refactor-loop.md defines behavior-preserving refactor gates

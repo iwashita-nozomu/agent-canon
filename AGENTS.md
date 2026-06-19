@@ -1,6 +1,7 @@
 # AgentCanon Repository Instructions
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map

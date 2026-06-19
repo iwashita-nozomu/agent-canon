@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Validates AgentCanon Rust migration boundaries.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // upstream environment ../../../.devcontainer/post-create.sh installs Rust tooling outside Dockerfile

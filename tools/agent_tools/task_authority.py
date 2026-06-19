@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Loads and validates request-local task authority for hooks and subagent handoffs.
 # upstream design ../../agents/agents_config.json defines role write policies.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md requires request clauses before repo edits.

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the workflow defect where the OOP readability hook blocked ordinary editing instead of warning and leaving enforcement to validation gates.
 upstream design ../README.md defines durable AgentCanon operational issue conventions.
 upstream implementation ../../.codex/hooks/oop_readability_guard.py runs changed-source OOP checks after editing tools.

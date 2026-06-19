@@ -1,6 +1,7 @@
 # Git Mirroring
 <!--
 @dependency-start
+contract reference
 responsibility Documents Git Mirroring for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

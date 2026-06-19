@@ -1,6 +1,7 @@
 # Agent Update Branch Skill
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Update Branch Skill for this repository.
 upstream design ../workflows/agent-update-branch-workflow.md defines update branch lifecycle
 upstream implementation ../../tools/agent_tools/agent_update_branch.sh validates update branch lanes

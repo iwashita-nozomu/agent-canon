@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
 # upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.

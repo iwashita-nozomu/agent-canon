@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Codex Project Setup for this repository.
 upstream implementation ./config.toml project-scoped Codex settings
 upstream design ../agents/task_catalog.yaml workflow family runtime budgets

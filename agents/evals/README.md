@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents legacy eval manifest path compatibility for this repository.
 upstream design ../../evidence/README.md evidence directory ownership
 upstream design ../../evidence/agent-evals/README.md canonical eval manifest source

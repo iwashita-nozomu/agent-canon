@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Persists AgentCanon memory notes into Git commits and optional pushes.
 # upstream design ../../agents/workflows/agent-learning-workflow.md defines memory closeout.
 # upstream implementation ./log_agent_learning.py appends agent-side memory observations.

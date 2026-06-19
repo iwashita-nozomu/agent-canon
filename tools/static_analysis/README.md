@@ -1,6 +1,7 @@
 # Static Analysis Tools
 <!--
 @dependency-start
+contract tool
 responsibility Documents language-organized static analysis tool entrypoints.
 upstream design ../README.md shared tool index
 downstream design python/README.md Python static analysis entrypoints

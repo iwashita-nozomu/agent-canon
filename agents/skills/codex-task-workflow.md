@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents codex-task-workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit investigation and context capsule handoff packets

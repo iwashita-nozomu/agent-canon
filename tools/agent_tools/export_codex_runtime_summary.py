@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Exports bounded Codex runtime summaries from local Codex raw logs to the AgentCanon log archive.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ./runtime_log_paths.py resolves codex-runtime archive paths

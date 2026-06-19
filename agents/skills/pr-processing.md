@@ -1,6 +1,7 @@
 # pr-processing
 <!--
 @dependency-start
+contract skill
 responsibility Documents PR Processing Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/pr-queue-cleanup-workflow.md AgentCanon source and parent pin PR cleanup workflow

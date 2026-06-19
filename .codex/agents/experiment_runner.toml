@@ -1,4 +1,5 @@
 # @dependency-start
+# contract agent-runtime
 # responsibility Defines experiment runner TOML configuration.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../documents/experiment_runner.md experiment runner responsibility boundary

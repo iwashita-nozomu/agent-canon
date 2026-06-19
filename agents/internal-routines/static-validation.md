@@ -1,6 +1,7 @@
 # static-validation
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents static-validation for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

@@ -1,6 +1,7 @@
 # computational-optimization
 <!--
 @dependency-start
+contract skill
 responsibility Documents computational optimization workflow for numerical algorithms.
 upstream design ../canonical/skills.md skill canon registry
 upstream design research-workflow.md research-backed change boundary

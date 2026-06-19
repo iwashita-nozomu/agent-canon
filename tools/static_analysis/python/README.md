@@ -1,6 +1,7 @@
 # Python Static Analysis
 <!--
 @dependency-start
+contract tool
 responsibility Documents Python static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
 upstream design ../../../documents/coding-conventions-python.md Python coding conventions

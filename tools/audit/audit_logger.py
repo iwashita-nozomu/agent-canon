@@ -1,4 +1,5 @@
 # @dependency-start
+# contract tool
 # responsibility Writes JSONL audit logs for agent and repository automation events.
 # upstream design ../README.md shared tool index
 # upstream implementation audit_log_schema.py defines the entry schema

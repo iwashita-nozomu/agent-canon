@@ -4,6 +4,7 @@ description: Use when touching Docker, CI, dependencies, runtime compatibility, 
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Environment Maintenance for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary

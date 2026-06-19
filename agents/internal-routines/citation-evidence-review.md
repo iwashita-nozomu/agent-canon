@@ -1,6 +1,7 @@
 # citation-evidence-review
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents citation-evidence-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../skills/prose-reasoning-graph.md prose graph citation/evidence diagnostic overlay

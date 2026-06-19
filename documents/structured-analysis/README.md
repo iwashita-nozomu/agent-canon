@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Collects structured prose, report, and dependency analysis contracts for future extraction from AgentCanon.
 upstream design ../README.md AgentCanon document index
 downstream design database-design.md defines SQLite-backed intermediate graph storage

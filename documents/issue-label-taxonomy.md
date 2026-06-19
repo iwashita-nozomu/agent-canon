@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines AgentCanon issue templates and label taxonomy.
 upstream design ../issues/README.md defines durable local issue storage.
 downstream implementation ../.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml captures maintenance issues.

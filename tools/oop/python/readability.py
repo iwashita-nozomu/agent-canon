@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: E402,I001
 # @dependency-start
+# contract tool
 # responsibility Runs Python-specific OOP readability checks.
 # upstream implementation ../shared/readability_core.py shared OOP readability heuristics
 # upstream design ../../../documents/object-oriented-design.md OOP policy source

@@ -4,6 +4,7 @@ description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Log Analysis for this repository.
 upstream design ../../../agents/skills/agent-log-analysis.md documents the human-facing skill
 upstream design ../../../agents/skills/agent-eval-accumulation.md repairs missing accumulated eval evidence
