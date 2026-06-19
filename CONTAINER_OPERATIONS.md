@@ -168,6 +168,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - The generated Docker Compose file must not pin subnet, gateway, or other
   IPAM values. Let Docker Compose allocate the default network automatically so
   multiple checkouts and host networks do not collide.
+- GPU discovery is best-effort and notification-only by default. The generated
+  Compose file may include `gpus: all` only when the host GPU and Docker NVIDIA
+  runtime are both visible, or when `DEVCONTAINER_GPU_REQUEST=enabled` can be
+  satisfied. Missing GPU access must not fail container creation in the default
+  path; it should be reported in the generated status and post-attach banner.
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and
