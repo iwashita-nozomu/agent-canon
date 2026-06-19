@@ -47,6 +47,9 @@ skill_families:
         - ["スキル", "走査"]
         - ["スキル", "動線"]
         - ["スキル", "ツール", "欠落"]
+        - ["スキル内", "起動コマンド"]
+        - ["スキル", "起動コマンド"]
+        - ["tool", "command", "skill"]
         - ["スキル", "一つずつ"]
         - ["スキル選択", "ルーティング"]
         - ["スキル", "ツール", "ルーティング"]
@@ -314,6 +317,8 @@ skill_families:
         - ["agents.md", "重複"]
         - ["skill", "重複"]
         - ["責務", "移行"]
+        - ["すべてのスキル", "修正"]
+        - ["全", "skill", "command"]
   - id: user-guided-debugging
     purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
     canonical_doc: agents/skills/user-guided-debugging.md
@@ -442,6 +447,8 @@ skill_families:
         - ["スキル", "動線", "ツール"]
         - ["エージェント", "成長"]
         - ["agent", "growth"]
+        - ["すべてのスキル", "修正"]
+        - ["all", "skills", "command"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -467,3 +474,5 @@ skill_families:
         - ["memory", "feedback"]
         - ["エージェント", "成長"]
         - ["agent", "growth"]
+        - ["起動コマンド", "ミス"]
+        - ["ミス", "多発"]

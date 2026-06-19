@@ -258,6 +258,39 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
         self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
+    def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
+        """All-skill command packet repair should not fall through."""
+        prompt = (
+            "スキル内で明示的にツールの起動コマンドが書いていないから，"
+            "ミスることが多発しています．すべてのスキルを修正してください"
+        )
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            rust_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        rust_decision = json.loads(rust_result.stdout)
+        for skill in ("task-routing", "structure-refactor", "comprehensive-development", "agent-learning"):
+            self.assertIn(skill, python_decision["matched_skills"])
+            self.assertIn(skill, python_decision["skills"])
+        self.assertIn("task-routing", python_decision["active_skills"])
+        self.assertIn("structure-refactor", python_decision["active_skills"])
+        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
+        self.assertIn("agent-learning", python_decision["deferred_skills"])
+        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertEqual(python_decision["skills"], rust_decision["skills"])
+        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
+        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
+
     def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(self) -> None:
         """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
         result = self.run_route(

@@ -12,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Python Review
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill python-review --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/python-review.md`.
 1. Fix the changed Python files and related tests before validating.
 1. Run or inspect `pyright`.

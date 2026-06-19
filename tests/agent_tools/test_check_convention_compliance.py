@@ -27,6 +27,20 @@ from tools.agent_tools.check_convention_compliance import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
 
+
+def skill_fixture(skill: str, body: str) -> str:
+    """Return a minimal runtime skill fixture with its tool command packet."""
+    return (
+        f"# {skill}\n\n"
+        "## Tool Commands\n\n"
+        "```bash\n"
+        "python3 tools/agent_tools/skill_tool_commands.py show "
+        f"--skill {skill} --format text\n"
+        "```\n\n"
+        f"{body}"
+    )
+
+
 MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
@@ -122,25 +136,32 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
-    ".agents/skills/agent-orchestration/SKILL.md": (
+    ".agents/skills/agent-orchestration/SKILL.md": skill_fixture(
+        "agent-orchestration",
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped\n"
     ),
-    ".agents/skills/codex-task-workflow/SKILL.md": (
+    ".agents/skills/codex-task-workflow/SKILL.md": skill_fixture(
+        "codex-task-workflow",
         "codex task workflow prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped\n"
     ),
-    ".agents/skills/md-style-check/SKILL.md": (
+    ".agents/skills/md-style-check/SKILL.md": skill_fixture(
+        "md-style-check",
         "$prose-reasoning-graph $structure-planning format-only "
         "structure_contract=skipped\n"
     ),
-    ".agents/skills/test-design/SKILL.md": (
+    ".agents/skills/test-design/SKILL.md": skill_fixture(
+        "test-design",
         "contract-only wrapper static contract validation canonical command evidence "
         "observable behavior validation repair scope\n"
     ),
-    ".agents/skills/mvp-skeleton/SKILL.md": "mvp core loop vertical slice\n",
+    ".agents/skills/mvp-skeleton/SKILL.md": skill_fixture(
+        "mvp-skeleton",
+        "mvp core loop vertical slice\n",
+    ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -163,14 +184,16 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "数学的 claim program contract proof obligation $formal-proof-workflow "
         "provisional wording\n"
     ),
-    ".agents/skills/long-form-writing/SKILL.md": (
+    ".agents/skills/long-form-writing/SKILL.md": skill_fixture(
+        "long-form-writing",
         "mathematical claim program contract proof obligation $formal-proof-workflow "
         "provisional wording\n"
     ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation\n"
     ),
-    ".agents/skills/formal-proof-workflow/SKILL.md": (
+    ".agents/skills/formal-proof-workflow/SKILL.md": skill_fixture(
+        "formal-proof-workflow",
         "program contract public entrypoint return projection validation command\n"
     ),
     "agents/skills/README.md": (
@@ -349,6 +372,20 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
         self.assertIn("CONVENTION_COMPLIANCE_FINDINGS=0", result.stdout)
+
+    def test_runtime_skill_requires_tool_command_packet(self) -> None:
+        """Runtime skills expose the command packet entrypoint."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "mvp-skeleton" / "SKILL.md"
+            skill.write_text("# mvp-skeleton\n\nmvp core loop\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_tool_commands", result.stdout)
+            self.assertIn("missing-tool-commands-section", result.stdout)
 
     def test_missing_workflow_hook_fails(self) -> None:
         """A workflow prompt without the verifier marker is rejected."""

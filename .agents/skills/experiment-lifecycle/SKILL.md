@@ -14,6 +14,19 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines experime
 
 # Experiment Lifecycle
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill experiment-lifecycle --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/experiment-lifecycle.md`.
 1. Keep execution steps, result paths, and report locations consistent with the canonical experiment workflow.
 1. For a new experiment topic, fix the topic name first, copy AgentCanon template path `vendor/agent-canon/experiments/_template/` to `experiments/<topic>/`, then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order.

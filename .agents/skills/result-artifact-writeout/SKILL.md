@@ -15,6 +15,19 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 
 # Result Artifact Writeout
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill result-artifact-writeout --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/result-artifact-writeout.md`.
 1. Classify the destination before writing: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, or `generated-triage`.
 1. Preserve the raw machine-readable source result first, then derive the Markdown/table summary from that same result.

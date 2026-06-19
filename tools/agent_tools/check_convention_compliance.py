@@ -18,6 +18,7 @@
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
+# upstream implementation ./skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
@@ -667,6 +668,11 @@ ENTRYPOINT_DELEGATED_SECTION_HEADINGS = (
     "## Required Before Implementation",
 )
 ENTRYPOINT_DELEGATION_PATHS = ("ROOT_AGENTS.md", "AGENTS.md")
+SKILL_TOOL_COMMANDS_HEADING = "## Tool Commands"
+SKILL_TOOL_COMMANDS_COMMAND_RE = re.compile(
+    r"python3\s+tools/agent_tools/skill_tool_commands\.py\s+show\s+"
+    r"--skill\s+([A-Za-z0-9_-]+)\s+--format\s+text"
+)
 
 
 @dataclass(frozen=True)
@@ -1155,6 +1161,39 @@ def check_entrypoint_delegated_sections(root: Path) -> list[Finding]:
     return findings
 
 
+def check_skill_tool_command_sections(root: Path) -> list[Finding]:
+    """Verify every runtime skill exposes its command packet entrypoint."""
+    findings: list[Finding] = []
+    skill_root = root / ".agents" / "skills"
+    if not skill_root.is_dir():
+        findings.append(Finding("skill_tool_commands", ".agents/skills", "missing-skill-root"))
+        return findings
+    for path in sorted(skill_root.glob("*/SKILL.md")):
+        skill = path.parent.name
+        relative = path.relative_to(root).as_posix()
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if SKILL_TOOL_COMMANDS_HEADING not in text:
+            findings.append(
+                Finding("skill_tool_commands", relative, "missing-tool-commands-section")
+            )
+            continue
+        match = SKILL_TOOL_COMMANDS_COMMAND_RE.search(text)
+        if match is None:
+            findings.append(
+                Finding("skill_tool_commands", relative, "missing-command-packet-entry")
+            )
+            continue
+        if match.group(1) != skill:
+            findings.append(
+                Finding(
+                    "skill_tool_commands",
+                    relative,
+                    f"wrong-skill-command:{match.group(1)}",
+                )
+            )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -1241,6 +1280,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_owner_map_entrypoints(root))
     findings.extend(check_entrypoint_delegated_sections(root))
+    findings.extend(check_skill_tool_command_sections(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

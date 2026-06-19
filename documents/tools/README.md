@@ -354,6 +354,8 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/check_convention_compliance.py`
   - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
+- `tools/agent_tools/skill_tool_commands.py`
+  - `.agents/skills/*/SKILL.md` の `## Tool Commands` 入口を同期・検査し、`show --skill <skill>` で runtime skill と human skill canon から command packet を表示します。
 - `tools/agent_tools/tool_catalog.py`
   - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
 - `tools/agent_tools/tool_drift.py`

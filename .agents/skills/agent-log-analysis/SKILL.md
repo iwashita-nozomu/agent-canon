@@ -16,6 +16,19 @@ upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py re
 
 # Agent Log Analysis
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill agent-log-analysis --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/agent-log-analysis.md`.
 1. Use the compact dashboard API / Markdown summary as the normal analysis input.
 1. Resolve or mount the external log archive before dashboard generation:

@@ -12,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Markdown Style Check
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/md-style-check.md`.
 1. Check `documents/coding-conventions-project.md` and
    `documents/conventions/common/05_docs.md`.
