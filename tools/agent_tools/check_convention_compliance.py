@@ -18,6 +18,7 @@
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
+# upstream implementation ./skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
@@ -504,6 +505,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "check_agent_runtime_alignment.py",
                 ),
                 (
+                    "task bootstrap and CLI entrypoints",
+                    "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
+                    "task_start.py",
+                    "bootstrap_agent_run.py",
+                ),
+                (
                     "subagent lifecycle, same-role instances, wave ledger",
                     "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
                     "workflow_monitor.py",
@@ -646,6 +653,25 @@ AGENTS_FORWARDER_POLICY_MARKERS = (
     "*_FORWARDER_SEVERITY=fix-now",
     "caller chain",
     "canonical command",
+)
+ENTRYPOINT_DELEGATED_SECTION_HEADINGS = (
+    "## Subagent Usage",
+    "## Plan Mode",
+    "## Read Packets",
+    "## Execution Priorities",
+    "## Mechanical Guardrail Policy",
+    "## Default Search And Routing",
+    "## Runtime Profiles And Risk",
+    "## Experiment And Log Diagnostics",
+    "## AgentCanon Submodule Update Flow",
+    "## PR Mutation Authority",
+    "## Required Before Implementation",
+)
+ENTRYPOINT_DELEGATION_PATHS = ("ROOT_AGENTS.md", "AGENTS.md")
+SKILL_TOOL_COMMANDS_HEADING = "## Tool Commands"
+SKILL_TOOL_COMMANDS_COMMAND_RE = re.compile(
+    r"python3\s+tools/agent_tools/skill_tool_commands\.py\s+show\s+"
+    r"--skill\s+([A-Za-z0-9_-]+)\s+--format\s+text"
 )
 
 
@@ -1112,6 +1138,62 @@ def check_owner_map_entrypoints(root: Path) -> list[Finding]:
     return findings
 
 
+def check_entrypoint_delegated_sections(root: Path) -> list[Finding]:
+    """Verify runtime entrypoints delegate detailed procedures to owner surfaces."""
+    findings: list[Finding] = []
+    for path in ENTRYPOINT_DELEGATION_PATHS:
+        resolved = readable_path(root, path)
+        if resolved is None:
+            findings.append(Finding("entrypoint_delegation", path, "missing-required-file"))
+            continue
+        if duplicate_root_view_entrypoint(root, path):
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for heading in ENTRYPOINT_DELEGATED_SECTION_HEADINGS:
+            if markdown_section_lines(text, heading) is not None:
+                findings.append(
+                    Finding(
+                        "entrypoint_delegation",
+                        path,
+                        f"delegated-section:{heading}",
+                    )
+                )
+    return findings
+
+
+def check_skill_tool_command_sections(root: Path) -> list[Finding]:
+    """Verify every runtime skill exposes its command packet entrypoint."""
+    findings: list[Finding] = []
+    skill_root = root / ".agents" / "skills"
+    if not skill_root.is_dir():
+        findings.append(Finding("skill_tool_commands", ".agents/skills", "missing-skill-root"))
+        return findings
+    for path in sorted(skill_root.glob("*/SKILL.md")):
+        skill = path.parent.name
+        relative = path.relative_to(root).as_posix()
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if SKILL_TOOL_COMMANDS_HEADING not in text:
+            findings.append(
+                Finding("skill_tool_commands", relative, "missing-tool-commands-section")
+            )
+            continue
+        match = SKILL_TOOL_COMMANDS_COMMAND_RE.search(text)
+        if match is None:
+            findings.append(
+                Finding("skill_tool_commands", relative, "missing-command-packet-entry")
+            )
+            continue
+        if match.group(1) != skill:
+            findings.append(
+                Finding(
+                    "skill_tool_commands",
+                    relative,
+                    f"wrong-skill-command:{match.group(1)}",
+                )
+            )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -1197,6 +1279,8 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_owner_map_entrypoints(root))
+    findings.extend(check_entrypoint_delegated_sections(root))
+    findings.extend(check_skill_tool_command_sections(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

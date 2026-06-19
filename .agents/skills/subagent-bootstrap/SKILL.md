@@ -13,6 +13,19 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 
 # Subagent Bootstrap
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill subagent-bootstrap --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
 1. For repo-changing tasks, create or inspect a run bundle before implementation.

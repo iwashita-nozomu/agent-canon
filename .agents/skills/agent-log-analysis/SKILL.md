@@ -16,9 +16,22 @@ upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py re
 
 # Agent Log Analysis
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill agent-log-analysis --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/agent-log-analysis.md`.
 1. Use the compact dashboard API / Markdown summary as the normal analysis input.
-1. Use the external log archive API first. Resolve or mount the archive:
+1. Resolve or mount the external log archive before dashboard generation:
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
@@ -44,8 +57,8 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
    aggregation, moving averages, and routing evidence cells.
 1. Confirm the API JSON includes the normal analysis fields `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, and `oop_applicability`.
 1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
-   route that finding to the dashboard API owner and rerun it after the source
-   tool is repaired.
+   record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
+   and rerun it after the source tool is repaired.
 1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
 1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
 1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.

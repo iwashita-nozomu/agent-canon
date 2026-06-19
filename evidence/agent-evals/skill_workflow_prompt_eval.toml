@@ -1912,7 +1912,7 @@ description = "Requires unique accumulated prompt eval report naming."
 required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
 
 [[evals]]
-id = "agent-log-analysis-archive-api-skill"
+id = "agent-log-analysis-canonical-dashboard-api-skill"
 target = ".agents/skills/agent-log-analysis/SKILL.md"
 kind = "skill"
 description = "The runtime agent-log-analysis skill must call the AgentCanon source dashboard API before reading evidence."
@@ -1927,7 +1927,7 @@ required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashbo
 id = "AGENT-LOG-API-SHIM-2"
 critical = true
 description = "Keeps event-file drilldown exceptional and routes missing compact fields to the dashboard API owner."
-required_regex = ["dashboard API owner", "Event-file drilldown", "schema debugging", "corruption audit"]
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "Event-file drilldown", "schema debugging", "corruption audit"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-SELECTION-ROUTE-SHIM-1"
@@ -1942,7 +1942,7 @@ description = "Routes eval family gaps to the accumulated eval producer/checker 
 required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "producer/checker/archive loop"]
 
 [[evals]]
-id = "agent-log-analysis-archive-api-doc"
+id = "agent-log-analysis-canonical-dashboard-api-doc"
 target = "agents/skills/agent-log-analysis.md"
 kind = "skill-doc"
 description = "The human agent-log-analysis skill must define AgentCanon as source dashboard owner over the mounted log archive evidence."
@@ -1951,13 +1951,13 @@ description = "The human agent-log-analysis skill must define AgentCanon as sour
 id = "AGENT-LOG-API-DOC-1"
 critical = true
 description = "Documents archive resolution and source dashboard API output."
-required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
+required_regex = ["external log archive", "runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-DOC-2"
 critical = true
 description = "Keeps raw JSONL inspection exceptional and routes missing compact fields to the dashboard API owner."
-required_regex = ["dashboard API owner", "event file drilldown", "schema debugging", "破損 audit"]
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "event file drilldown", "schema debugging", "破損 audit"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-SELECTION-ROUTE-DOC-1"

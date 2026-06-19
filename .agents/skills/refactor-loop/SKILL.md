@@ -16,6 +16,19 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
 
 # Refactor Loop
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill refactor-loop --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
    analysis for the requested object/file, plus validation commands and the

@@ -17,6 +17,19 @@ upstream implementation ../../../tools/agent_tools/github_publish.py publishes P
 
 # PR Processing
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/pr-processing.md`.
 1. If AgentCanon source PRs or parent pin PRs are involved, also read
    `agents/workflows/pr-queue-cleanup-workflow.md` and
