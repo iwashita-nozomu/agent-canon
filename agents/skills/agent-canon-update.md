@@ -21,9 +21,9 @@ TODO state up to date.
 - `make agent-canon-ensure-latest`, `make agent-canon-latest`,
   `tools/update_agent_canon.sh`, or `tools/sync_agent_canon.sh` is the likely
   entrypoint.
-- A parent repo has AgentCanon submodule pin drift, root-view drift, or pending
-  `.agent-canon/update-state.toml` TODOs.
-- `vendor/agent-canon/` contains local AgentCanon source commits that need an
+- A parent repo has AgentCanon submodule pin drift, root-view drift, safe
+  dirty checkout state, or pending `.agent-canon/update-state.toml` TODOs.
+- `vendor/agent-canon/` contains local AgentCanon source commits that need a
   standalone AgentCanon branch/PR before the parent pin can move.
 
 ## Core References
@@ -50,14 +50,27 @@ make agent-canon-update-plan
 make agent-canon-ensure-latest
 ```
 
-1. If `vendor/agent-canon/` has local source commits or source dirty state,
-   stop the parent pin update path and move that work through an AgentCanon
-   source branch/PR:
+1. Let `make agent-canon-ensure-latest` classify dirty submodule state. When the
+   dirty checkout can be preserved mechanically, it runs the preserve-dirty
+   route, restores the dirty state after merging AgentCanon `main`, repairs root
+   views, and checks shared-surface drift.
+   Do not replace that route with a manual stop-first rule.
+
+1. If `vendor/agent-canon/` has local source commits, or latest reports a
+   detached head, merge conflict, restore conflict, or other unsafe state, move
+   the work through an AgentCanon source branch/PR:
 
 ```bash
 bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
+
+   Reuse the current AgentCanon source branch / PR when it already owns the
+   shared-canon work. Do not create a fresh AgentCanon branch only because the
+   user added an instruction, the diff is a small follow-up, or the parent pin
+   has not moved yet. A new AgentCanon branch requires a recorded reason such as
+   a merged / closed / unpushable current PR, an unrelated ownership surface, a
+   required review-isolation boundary, or unsafe divergent state.
 
 1. After a safe update or PR merge, repair and verify root runtime views:
 
@@ -75,7 +88,9 @@ python3 tools/agent_tools/agent_canon_update_todos.py plan --write
 
 1. For parent-repo pin isolation, pair this skill with
    `$agent-update-branch` and use the `canon-pin` lane. Do not use
-   `$agent-update-branch` as the source AgentCanon PR route.
+   `$agent-update-branch` as the source AgentCanon PR route. Do not create a
+   separate parent `canon-pin` branch when the current parent branch already
+   carries the same pin/update lane.
 
 ## Closeout Evidence
 

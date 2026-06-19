@@ -9,6 +9,7 @@
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates repo-wide dependency graph
+# upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
 # downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
@@ -24,11 +25,13 @@ LIST_CHANGED_DEPENDENCIES=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 GRAPH_TSV_OUTPUT=""
 SEARCH_HITS_FILE=""
+CHECK_DESIGN_DOC_CLAIMS=0
+declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -42,6 +45,10 @@ expanded into dependency edit-scope candidates and saved beside the graph when
 receives changed-file dependency edit-scope evidence.
 With --cycle-report-only, dependency cycles stay visible but do not block the
 wrapper. Use this only with a durable graph report artifact.
+With --check-design-doc-claims, changed design documents are compared with
+dependency header evidence and implementation-backed claim tokens. Repeat
+--design-doc-claim-path to check explicit design documents instead of changed
+scope.
 EOF
 }
 
@@ -85,6 +92,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     --search-hits-file)
       SEARCH_HITS_FILE="$2"
+      shift 2
+      ;;
+    --check-design-doc-claims)
+      CHECK_DESIGN_DOC_CLAIMS=1
+      shift
+      ;;
+    --design-doc-claim-path)
+      CHECK_DESIGN_DOC_CLAIMS=1
+      DESIGN_DOC_CLAIM_PATHS+=("$2")
       shift 2
       ;;
     -h|--help)
@@ -160,6 +176,16 @@ if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
     related_args+=(--allow-frontmatter)
   fi
   bash "${related_args[@]}" "${checkable_paths[@]}"
+fi
+
+if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
+  design_claim_args=(tools/agent_tools/check_design_doc_claims.py --root "$ROOT_DIR")
+  if [[ ${#DESIGN_DOC_CLAIM_PATHS[@]} -gt 0 ]]; then
+    design_claim_args+=("${DESIGN_DOC_CLAIM_PATHS[@]}")
+  else
+    design_claim_args+=(--changed)
+  fi
+  python3 "${design_claim_args[@]}"
 fi
 
 if [[ -n "$SEARCH_HITS_FILE" ]]; then

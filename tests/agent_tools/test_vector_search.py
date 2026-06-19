@@ -89,6 +89,62 @@ class VectorSearchTest(unittest.TestCase):
             self.assertEqual(payload["hits"], [])
             self.assertEqual(payload["indexed_files"], 1)
 
+    def test_legacy_token_tool_file_is_not_indexed(self) -> None:
+        """Retired legacy-like implementation names must not enter search hits."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            tools = root / "tools"
+            tools.mkdir()
+            (tools / "current_search.py").write_text(
+                "def current_search():\n    return 'current'\n",
+                encoding="utf-8",
+            )
+            (tools / "search_legacy.py").write_text(
+                "def retired_search():\n    return 'legacyonlyneedle'\n",
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--surface",
+                "tools",
+                "--query",
+                "legacyonlyneedle",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["hits"], [])
+            self.assertEqual(payload["indexed_files"], 1)
+
+    def test_legacy_token_document_file_remains_indexed(self) -> None:
+        """Legacy terminology outside tools remains searchable documentation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            docs = root / "documents"
+            docs.mkdir()
+            (docs / "legacy-search-guide.md").write_text(
+                "legacydocsneedle explains the retired path for readers\n",
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--surface",
+                "documents",
+                "--query",
+                "legacydocsneedle",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["indexed_files"], 1)
+            self.assertEqual(payload["hits"][0]["path"], "documents/legacy-search-guide.md")
+
     def test_context_expands_dependency_headers(self) -> None:
         """Context mode should expand search hits through dependency manifests."""
         with tempfile.TemporaryDirectory() as tmp_dir:

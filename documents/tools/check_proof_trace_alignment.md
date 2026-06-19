@@ -19,7 +19,7 @@ Use it from a repository root:
 ```bash
 python3 tools/agent_tools/check_proof_trace_alignment.py \
   --root . \
-  --trace-module python/jax_util/proof_traces/pdipm_recursive_status_soundness_proof_trace.py
+  --trace-module python/<package>/proof_traces/<claim>_proof_trace.py
 ```
 
 The checker reads `FORMAL_PROOF_TRACE` from the trace module and validates:

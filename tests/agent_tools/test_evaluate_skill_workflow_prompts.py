@@ -102,8 +102,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 44)
-        self.assertEqual(globs["agents/skills/*.md"], 64)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 47)
+        self.assertEqual(globs["agents/skills/*.md"], 48)
+        self.assertEqual(globs["agents/internal-routines/*.md"], 20)
         self.assertEqual(globs["agents/workflows/*.md"], 21)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], EXPECTED_CODEX_AGENT_PROMPT_COUNT)

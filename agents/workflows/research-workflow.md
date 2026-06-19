@@ -323,8 +323,8 @@ agent が反復を自律実行する場合は、これに加えて iteration ご
 ## 7. 実験コードを書くときのコツ
 
 - 実験コードは「問いと比較」を表現する薄い層に保ちます。case 生成、metric 計算、集計、report 生成は実験コードの責務ですが、process 管理や GPU 割当は runner 側の責務です。
-- topic ディレクトリは、少なくとも `README.md`、`cases.py`、`experimentcode.py`、`result/` を意識した構成にします。
-- `experimentcode.py` は orchestrator であり、数式や benchmark の意味を隠した巨大 script にしません。比較対象、case range、metric、run_name を読み取れる形にします。
+- topic ディレクトリは、少なくとも `README.md`、`cases.py`、`config.yaml`、`run.py`、`visualize.ipynb`、`result/` を意識した構成にします。
+- `run.py` は orchestrator であり、数式や benchmark の意味を隠した巨大 script にしません。比較対象、case range、metric、run_name を読み取れる形にします。
 - `cases.py` には case 定義と resource estimate を寄せます。実験意味のある difficulty 設計はここで管理します。
 - ordered difficulty 軸は連続レンジを生成します。飛び飛びの点だけを返す helper の使用は debug / smoke 用に限って許可します。
 - 実験 README には、問い、比較対象、標準コマンド、`result/<run_name>/` の出力先、`experiments/report/` の入口を書きます。実験者の頭の中にしかない運用を残しません。

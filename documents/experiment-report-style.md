@@ -10,7 +10,7 @@ upstream design result-log-retention-and-visualization.md defines artifact reten
 
 この文書は、`experiments/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。
 対象は、`experiments/` 配下の比較実験、benchmark、アルゴリズム改造後の検証レポートです。
-human-readable な experiment report の正本は `experiments/report/` とし、render された HTML / SVG や JSON / JSONL / log は `experiments/<topic>/result/<run_name>/` に置きます。top-level の `reports/` は project-wide な review や automation report の置き場であり、topic ごとの experiment report の正本にはしません。
+human-readable な experiment report の正本は `experiments/report/` とし、render された HTML / SVG や JSON / JSONL / log は `experiments/<topic>/result/<run_name>/` に置きます。可視化の作業入口は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置き、notebook から run artifact を読みます。top-level の `reports/` は project-wide な review や automation report の置き場であり、topic ごとの experiment report の正本にはしません。
 raw log、summary、可視化 artifact の保持と closeout evidence は
 [result-log-retention-and-visualization.md](result-log-retention-and-visualization.md)
 を正本にします。
@@ -48,7 +48,9 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 
 - experiment report の Markdown 正本は `experiments/report/<run_name>.md` を既定にします。
 - 対応する機械生成物は `experiments/<topic>/result/<run_name>/` に置きます。
-- report 本文からは、少なくとも `eval_manifest.json`、`summary.json`、`cases.jsonl`、主要な図やログを辿れるようにします。
+- 追加ログは `experiments/<topic>/result/<run_name>/logs/` に置きます。
+- 可視化 notebook は `experiments/<topic>/visualize.ipynb` に置きます。Notebook は formal run の起動手順や設定正本ではなく、図表と reader-facing exploration の入口です。
+- report 本文からは、少なくとも `eval_manifest.json`、`summary.json`、`cases.jsonl`、`logs/`、可視化 notebook、主要な図を辿れるようにします。
 - 複数 run をまたぐ考察は `notes/experiments/` や `notes/themes/` に分けます。
 
 ## 2.1 Title
@@ -199,6 +201,8 @@ repo では、次のラベルで observation と interpretation を分けると�
 - seeds
 - timeout
 - output paths
+- log directory
+- visualization notebook
 
 ## 2.9 Artifacts and Carry-Over
 
@@ -206,7 +210,8 @@ repo では、次のラベルで observation と interpretation を分けると�
 - この section では次を分けます。
   - raw JSONL
   - `summary.json`
-  - plots / HTML report
+  - `logs/`
+  - plots / HTML report / Jupyter notebook
   - `main` に持ち帰るもの
 - HTML report は standalone で開ける artifact として扱い、CSS で page background を明示的に白に指定します。browser / OS の dark mode に依存した背景色にしません。
 - SSH 越しの HPC / container で生成された HTML report を手元 PC のブラウザで確認する場合は、`tools/experiments/html_artifact_access.py` で server command、SSH tunnel command、local URL を出し、report または closeout evidence から辿れるようにします。

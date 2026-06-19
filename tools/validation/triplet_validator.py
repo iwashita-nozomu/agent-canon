@@ -290,7 +290,10 @@ class TripletValidator:
                     "missing_count": stats.missing,
                     "affected_functions": affected_function_names(self.results, "MISSING"),
                 },
-                suggestion="すべての関数に Docstring + テストを追加してください",
+                suggestion=(
+                    "すべての関数に Docstring を追加し、observable behavior がある関数は "
+                    "test または validation evidence を追加してください"
+                ),
             )
 
         if stats.partial > 0:
@@ -301,7 +304,9 @@ class TripletValidator:
                     "partial_count": stats.partial,
                     "affected_functions": affected_function_names(self.results, "PARTIAL"),
                 },
-                suggestion="Docstring またはテストを追加してください",
+                suggestion=(
+                    "Docstring、observable behavior test、または validation evidence を追加してください"
+                ),
             )
 
         return result

@@ -3,6 +3,8 @@
 @dependency-start
 responsibility Documents Detailed Design Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../../documents/dependency-manifest-design.md dependency evidence contract
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 @dependency-end
 -->
 
@@ -33,9 +35,29 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Check whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces before narrowing to implementation files, helpers, or current findings. Return revise if file-by-file design or validation is not derived from this frame. -->
 
+## Evidence Coverage Review
+
+<!-- Check whether major design claims cite current code, dependency-header evidence, existing docs, or parent documents. For new or changed design docs, record `python3 tools/agent_tools/check_design_doc_claims.py --root . <design-doc>` and the artifact path. -->
+
+## Assumption Definition Review
+
+<!-- Check whether first-use DSL terms, problem standard forms, canonical forms, and normalization rules appear in the design's Evidence And Assumption Ledger before they drive implementation choices. -->
+
+## Parent-Doc Alignment Review
+
+<!-- Check whether differences from upstream parent documents are recorded with the governing source for the current choice. -->
+
+## Refactor Tool Alignment Review
+
+<!-- Check whether structure or responsibility shifts are handed to dependency-analysis and structure-refactor with dependency-expanded evidence. -->
+
 ## Implementation Source Packet Review
 
 <!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
+
+## Design Side-Effect Map Review
+
+<!-- Check whether the design maps each major design decision to affected implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces. Confirm every side-effect item is tied to the Abstract Design Frame, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. Return revise if implementation would need to discover secondary surfaces after design approval. -->
 
 ## Canonical Tree-Head Review
 

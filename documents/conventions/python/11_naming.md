@@ -20,6 +20,10 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - `snake_case.py` を使ってください。
 - 略語は一般的なもののみ許可します。
 - 役割が分かる語を置き、意味のない接尾辞（`_util` の乱用等）は避けます。
+- ファイル名は module が所有する概念を表します。実装手順や一時的な都合を
+  表す `new_*`、`tmp_*`、`*_wrapper`、`*_bridge`、`*_misc`、`*_helpers` を
+  安易に使いません。bridge や wrapper が本当に domain concept でない限り、
+  その file は既存 module に吸収するか、変換元と変換先が読める名前にします。
 
 ### 禁止/注意
 
@@ -30,6 +34,18 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 
 - `snake_case` を使ってください。
 - **動詞で始める**ことを推奨します（例: `load_*`, `build_*`, `run_*`, `update_*`, `check_*`）。
+- helper / local function では、推定 role に対応する action token を名前へ含めます。例: parser / loader は `parse_*` / `load_*`、collector は `collect_*` / `list_*`、validator は `check_*` / `validate_*`、writer は `write_*` / `persist_*`。
+- role/action token alignment は `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps` で確認します。
+- 関数名は、呼び出し側が読む契約です。`do_*`、`handle_*`、`process_*`、
+  `manage_*` のような総称動詞だけで始める名前は、対象 object と結果が続く場合だけ
+  許可します。
+- 変換関数は `source_to_target` または `build_<target>_from_<source>` の形を
+  優先します。判定関数は `is_*`、`has_*`、`check_*` のどれかに寄せ、
+  戻り値が bool なのか finding / report なのかを名前から読めるようにします。
+- 証明・IR・generated-code 周りの関数でも、proof workflow の都合ではなく
+  runtime の public root、projection、または artifact の責務で命名します。
+  例: `build_target_return_projection_tree` は許容できますが、
+  `make_proof_bridge` は避けます。
 
 ## クラス名・Protocol名
 

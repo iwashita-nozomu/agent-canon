@@ -5,6 +5,7 @@ responsibility Documents long-form-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
+upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
 @dependency-end
 -->
 
@@ -38,6 +39,14 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 - prose graph diagnostics / explanation / integration plan を section order、paragraph bridge、split / merge の evidence として使う
 - prose graph handoff に `selected_ordering.ordered_anchors` がある場合は、全文 sentence anchor の topological order を DSL-to-prose input sequence として使う
 - graph responsibility は肯定形の prose contract に射影する。section、tool、workflow、document が何を担い、どの evidence が支えるかを直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
+- 数学的 claim は、claim、assumptions、definitions、theorem target または
+  proof obligation、`proof_status`、checker evidence に分解し、必要なら
+  `$formal-proof-workflow` へ渡してから reader-facing prose に射影する。
+  実装由来 claim では `program contract` を先に固定し、public entrypoint、
+  入力 schema、runtime profile、return projection、observable effect、
+  assumptions / preconditions、validation command を source map に入れる。
+  provisional wording は run-local planning evidence として保持し、正本文書では
+  scope、受け入れ条件、limitation、または validation route へ置換する
 - reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。structure contract または graph-backed rewrite packet を直し、graph-backed unit の追加・削除・分割・統合・順序変更を行い、graph diagnostics を再実行し、selected profile の active finding がなくなってから draft する
 - DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は、通常の文書 finding ではなく `dsl_to_prose_prompt_defect` として prose-generation prompt を直す
 - process、dependency、ownership、routing、state transition、review gate、multi-step flow が読者理解の中心なら、`structure-planning` の `visual_plan` で Mermaid 図を既定候補にし、Markdown 内に fenced `mermaid` block として残す

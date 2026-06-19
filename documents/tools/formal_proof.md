@@ -39,22 +39,22 @@ The output directory contains:
 - an importable Python trace module such as
   `spd_quadratic_form_positive_proof_trace.py`
 
-For implementation-derived proof planning, pass a Python AST source reference:
+For implementation-derived proof planning, pass a Python source reference:
 
 ```bash
 python3 tools/agent_tools/formal_proof.py \
-  --python-symbol python/jax_util/optimizers/pdipm.py::_pdipm_accept_candidate \
+  --python-symbol path/to/algorithm.py::<implementation_symbol> \
   --target lean \
-  --domain "interior point method" \
-  --out-dir reports/formal-proof/pdipm-acceptance \
+  --domain "<mathematical domain>" \
+  --out-dir reports/formal-proof/<topic> \
   --format markdown
 ```
 
-The AST route reads the file as UTF-8 and parses it with `ast.parse`; it does
-not import or execute the module. The plan records `source_kind=python_ast`,
-`source_path`, `source_symbol`, a signature summary, and additional obligations
-for extracted branch and return-expression structure. These fields are
-provenance and planning evidence only, not proof evidence.
+With `--python-symbol`, the tool reads the file as UTF-8 and does not import or
+execute the module. The plan records source path, source symbol, a signature
+summary, and additional obligations for extracted branch and return-expression
+structure. These fields are provenance and planning evidence only, not proof
+evidence.
 
 To keep the trace when a project is distributed as a Python library, write the
 output directory inside the package tree or copy the generated
@@ -102,6 +102,15 @@ whose combined certified subgraph can close the target theorem. Adopt
 `refuted` or `unprovable_under_assumptions` only when checker-backed evidence
 rules out the target under the current theorem scope, not merely one generated
 proof route.
+
+When proof graph structural analysis finds a condition that closes only by
+unfolding into the target predicate itself, classify it as `projection_only` or
+`circularity_check`, not as a substantive necessary/sufficient condition. Such
+nodes are useful because they identify the public return projection or stopping
+scalar, but the graph must continue to a separate non-circular edge rooted in
+code facts, public `Problem` / config inputs, backend evidence, or a formal
+library theorem. A certified convergence or finite-stop subgraph must not rely
+on `Condition := Target` as its terminal problem-class witness.
 
 When a scaffold becomes a checked proof fragment, keep the package-retained
 trace current instead of leaving the evidence only in a work log. Add the

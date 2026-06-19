@@ -2,6 +2,8 @@
 # @dependency-start
 # responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
+# upstream design ../../agents/skills/README.md public skill surface contract
+# upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
@@ -11,19 +13,20 @@ from __future__ import annotations
 
 import json
 import tempfile
+import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
-import tomllib
-
 from agent_team import (
     ROOT,
     Role,
     RunBundleSpec,
     TaskCatalog,
     TeamConfig,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
@@ -43,6 +46,8 @@ PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
+INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 FRONTMATTER_OPEN_MARKER = "---\n"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
@@ -50,10 +55,16 @@ EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+ALLOWED_AGENT_RUNTIME_KEYS = {
+    "max_threads",
+    "max_depth",
+    "job_max_runtime_seconds",
+}
+SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 INITIAL_INTAKE_MARKERS = {
-    "requirements_organizer": "Initial three-agent intake role: own user-request clauses",
-    "explorer": "Initial three-agent intake role: own evidence, reuse, and stale-surface inventory",
-    "execution_planner": "Initial three-agent intake role: own stage order and artifact routing",
+    "requirements_organizer": "Initial intake wave role: own user-request clauses",
+    "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
+    "execution_planner": "Initial intake wave role: own stage order",
 }
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
@@ -147,6 +158,17 @@ def validate_project_config() -> None:
     ensure(
         agents.get("job_max_runtime_seconds") == EXPECTED_JOB_MAX_RUNTIME_SECONDS,
         f"agents.job_max_runtime_seconds must remain {EXPECTED_JOB_MAX_RUNTIME_SECONDS}",
+    )
+    unsupported_agent_scalars = sorted(
+        key
+        for key, value in agents.items()
+        if key not in ALLOWED_AGENT_RUNTIME_KEYS and not isinstance(value, dict)
+    )
+    ensure(
+        not unsupported_agent_scalars,
+        "unsupported scalar keys under .codex/config.toml [agents]: "
+        + ", ".join(unsupported_agent_scalars)
+        + "; keep task policy in agents/task_catalog.yaml or generated team_manifest.yaml",
     )
     codex_agents = parse_codex_agents()
     registry = {
@@ -258,7 +280,7 @@ def validate_codex_agent_settings() -> None:
 
     for role_id, marker in INITIAL_INTAKE_MARKERS.items():
         instructions = str(configs[role_id].get("developer_instructions", ""))
-        ensure(marker in instructions, f"{role_id} missing initial intake marker")
+        ensure(marker in instructions, f"{role_id} missing intake responsibility marker")
 
 
 def validate_team_config_references() -> None:
@@ -424,9 +446,12 @@ def validate_public_skill_shims() -> None:
     families = data.get("skill_families", [])
     ensure(isinstance(families, list), "skill_families must be a list")
 
+    observed_skill_ids: set[str] = set()
     for entry in families:
         ensure(isinstance(entry, dict), "skill_families entries must be mappings")
         skill_id = str(entry["id"])
+        ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
+        observed_skill_ids.add(skill_id)
         canonical_doc = ROOT / str(entry["canonical_doc"])
         shim = ROOT / str(entry["shim"])
         ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
@@ -442,19 +467,130 @@ def validate_public_skill_shims() -> None:
             f"{skill_id} shim YAML frontmatter must close",
         )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
+        validate_skill_routing_entry(skill_id, entry.get("routing"))
+    observed_shim_ids = {
+        path.parent.name
+        for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
+    }
+    extra_shims = sorted(observed_shim_ids - observed_skill_ids)
+    missing_shims = sorted(observed_skill_ids - observed_shim_ids)
+    ensure(
+        not extra_shims,
+        "public skill shims missing catalog entries: " + ", ".join(extra_shims),
+    )
+    ensure(
+        not missing_shims,
+        "skill catalog entries missing public shims: " + ", ".join(missing_shims),
+    )
+    validate_public_skill_document_contract(data)
+
+
+def validate_public_skill_document_contract(
+    data: Mapping[str, object], root: Path = ROOT
+) -> None:
+    """Check that agents/skills contains only catalog-backed public skills."""
+    public_doc_root = root / "agents" / "skills"
+    internal_routine_root = root / "agents" / "internal-routines"
+    ensure(public_doc_root.is_dir(), "public skill doc root missing: agents/skills")
+    ensure(
+        internal_routine_root.is_dir(),
+        "internal routine root missing: agents/internal-routines",
+    )
+    ensure(
+        (internal_routine_root / "README.md").is_file(),
+        "internal routine README missing: agents/internal-routines/README.md",
+    )
+    families = data.get("skill_families", [])
+    ensure(isinstance(families, list), "skill_families must be a list")
+    catalog_docs: set[str] = set()
+    for entry in families:
+        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
+        canonical_doc = str(entry.get("canonical_doc", "")).strip()
+        ensure(canonical_doc, "skill_families canonical_doc must be non-empty")
+        canonical_path = root / canonical_doc
+        ensure(
+            canonical_path.resolve().is_relative_to(public_doc_root.resolve()),
+            f"{entry.get('id')} canonical doc must live under agents/skills: {canonical_doc}",
+        )
+        catalog_docs.add(canonical_path.relative_to(root).as_posix())
+    public_docs = {
+        path.relative_to(root).as_posix()
+        for path in public_doc_root.rglob("*.md")
+        if path.name != "README.md"
+    }
+    extra_public_docs = sorted(public_docs - catalog_docs)
+    missing_public_docs = sorted(catalog_docs - public_docs)
+    ensure(
+        not extra_public_docs,
+        "agents/skills contains non-catalog public docs: "
+        + ", ".join(extra_public_docs),
+    )
+    ensure(
+        not missing_public_docs,
+        "skill catalog canonical docs missing from agents/skills: "
+        + ", ".join(missing_public_docs),
+    )
+
+
+def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
+    """Check one optional catalog-backed prompt routing block."""
+    if routing is None:
+        return
+    ensure(isinstance(routing, dict), f"{skill_id} routing must be a mapping")
+    stage_policy = routing.get("stage_policy", "deferred")
+    ensure(
+        isinstance(stage_policy, str) and stage_policy in SKILL_ROUTING_STAGE_POLICIES,
+        f"{skill_id} routing.stage_policy must be one of {sorted(SKILL_ROUTING_STAGE_POLICIES)}",
+    )
+    reason = routing.get("reason")
+    ensure(
+        isinstance(reason, str) and bool(reason.strip()),
+        f"{skill_id} routing.reason must be a non-empty string",
+    )
+    triggers = routing.get("triggers", [])
+    ensure(isinstance(triggers, list), f"{skill_id} routing.triggers must be a list")
+    for group_index, group in enumerate(triggers):
+        ensure(
+            isinstance(group, list) and bool(group),
+            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
+        )
+        for term_index, term in enumerate(group):
+            ensure(
+                isinstance(term, str) and bool(term.strip()),
+                f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
+            )
 
 
 def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
-        ensure("Initial Three-Agent Intake" in text, f"{path} missing initial intake contract")
-        for role_id in INITIAL_INTAKE_MARKERS:
-            ensure(role_id in text, f"{path} missing initial intake role {role_id}")
-        ensure(
-            "max_depth = 2" in text and "delegated_spawn_policy" in text,
-            f"{path} must state bounded nested spawn and delegated_spawn_policy",
-        )
+        if path.name == "TASK_WORKFLOWS.md":
+            for marker in (
+                "Workflow Contract Owners",
+                "agents/task_catalog.yaml",
+                "agents/agents_config.json",
+                ".codex/agents/*.toml",
+                "task_start.py",
+                "bootstrap_agent_run.py",
+                "workflow_monitor.py",
+                "agent-canon local-llm route-skill",
+                "Implementation Flow Graph",
+            ):
+                ensure(marker in text, f"{path} missing owner-map marker: {marker}")
+        else:
+            ensure(
+                "Intake Responsibility Wave" in text,
+                f"{path} missing intake responsibility contract",
+            )
+            ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
+            ensure("Agent Wave Ledger" in text, f"{path} missing Agent Wave Ledger contract")
+            for role_id in INITIAL_INTAKE_MARKERS:
+                ensure(role_id in text, f"{path} missing intake responsibility role {role_id}")
+            ensure(
+                "max_depth = 2" in text and "delegated_spawn_policy" in text,
+                f"{path} must state bounded nested spawn and delegated_spawn_policy",
+            )
         ensure(
             "subagents do not spawn subagents" not in text,
             f"{path} must not prohibit bounded nested subagent spawn",
@@ -625,6 +761,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         str(task["family"]),
     )
     expected_runtime_max_threads = codex_runtime_max_threads()
+    expected_runtime_max_depth = codex_runtime_max_depth()
     ensure(
         spawn_budget.get("active_subagents") == expected_active,
         f"task {task_id} manifest run.spawn_budget.active_subagents mismatch",
@@ -638,12 +775,144 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest run.spawn_budget.runtime_max_threads mismatch",
     )
     ensure(
+        spawn_budget.get("runtime_max_depth") == expected_runtime_max_depth,
+        f"task {task_id} manifest run.spawn_budget.runtime_max_depth mismatch",
+    )
+    ensure(
+        spawn_budget.get("initial_three_agent_intake_is_total_cap") is False,
+        f"task {task_id} manifest must state intake responsibility wave is not a total cap",
+    )
+    ensure(
         "workflow_families[].spawn_budget" in str(spawn_budget.get("source", "")),
         f"task {task_id} manifest run.spawn_budget source missing catalog reference",
     )
     ensure(
         spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
         f"task {task_id} manifest run.spawn_budget max_write scope unclear",
+    )
+    delegated_spawn_policy = run.get("delegated_spawn_policy")
+    ensure(
+        isinstance(delegated_spawn_policy, dict),
+        f"task {task_id} manifest missing run.delegated_spawn_policy",
+    )
+    ensure(
+        delegated_spawn_policy.get("dynamic_mid_task_spawn") == "allowed",
+        f"task {task_id} manifest must allow dynamic mid-task spawn",
+    )
+    ensure(
+        delegated_spawn_policy.get("delegated_child_spawn") == "allowed_with_bounded_packet",
+        f"task {task_id} manifest delegated child spawn policy mismatch",
+    )
+    wave_record_command = str(delegated_spawn_policy.get("wave_record_command", ""))
+    ensure(
+        "workflow_monitor.py" in wave_record_command
+        and "--subagent-wave" in wave_record_command,
+        f"task {task_id} manifest missing subagent wave record command",
+    )
+    required_fields = delegated_spawn_policy.get("handoff_required_fields")
+    expected_handoff_fields = {
+        "owner",
+        "child_role",
+        "child_instance_id",
+        "input_packet",
+        "allowed_paths",
+        "do_not_read",
+        "expected_output",
+        "write_scope",
+        "validation_route",
+        "review_gate",
+        "remaining_spawn_budget",
+    }
+    ensure(
+        isinstance(required_fields, list)
+        and expected_handoff_fields.issubset({str(item) for item in required_fields}),
+        f"task {task_id} manifest delegated spawn handoff fields incomplete",
+    )
+    same_role_policy = delegated_spawn_policy.get("same_role_instances")
+    ensure(
+        isinstance(same_role_policy, dict),
+        f"task {task_id} manifest missing delegated same-role instance policy",
+    )
+    ensure(
+        same_role_policy.get("status") == "allowed_with_distinct_packets",
+        f"task {task_id} manifest same-role instance policy status mismatch",
+    )
+    ensure(
+        same_role_policy.get("identity_key") == "role_type+instance_id",
+        f"task {task_id} manifest same-role identity key mismatch",
+    )
+    same_role_required_fields = same_role_policy.get("required_fields")
+    expected_same_role_fields = {
+        "role_type",
+        "instance_id",
+        "input_packet",
+        "allowed_paths",
+        "do_not_read",
+        "expected_output",
+        "write_scope",
+        "validation_route",
+        "review_gate",
+    }
+    ensure(
+        isinstance(same_role_required_fields, list)
+        and expected_same_role_fields.issubset(
+            {str(item) for item in same_role_required_fields}
+        ),
+        f"task {task_id} manifest same-role required fields incomplete",
+    )
+    spawn_wave_recommendation = run.get("spawn_wave_recommendation")
+    ensure(
+        isinstance(spawn_wave_recommendation, dict),
+        f"task {task_id} manifest missing run.spawn_wave_recommendation",
+    )
+    initial_wave = spawn_wave_recommendation.get("initial_wave_agent_types")
+    dynamic_expansion_waves = spawn_wave_recommendation.get("dynamic_expansion_waves")
+    manifest_roles = manifest.get("roles")
+    total_agent_candidates: list[str] = []
+    if isinstance(manifest_roles, list):
+        for role in manifest_roles:
+            if not isinstance(role, dict):
+                continue
+            codex_agents = role.get("codex_agents")
+            if not isinstance(codex_agents, list):
+                continue
+            for agent_type in codex_agents:
+                if isinstance(agent_type, str) and agent_type not in total_agent_candidates:
+                    total_agent_candidates.append(agent_type)
+    ensure(
+        isinstance(initial_wave, list) and len(initial_wave) >= 1,
+        f"task {task_id} manifest must recommend at least one initial agent type",
+    )
+    if expected_active > 4 and len(total_agent_candidates) > 3:
+        dynamic_agent_candidates: list[str] = []
+        if isinstance(dynamic_expansion_waves, list):
+            for wave in dynamic_expansion_waves:
+                if not isinstance(wave, dict):
+                    continue
+                agent_types = wave.get("agent_types")
+                if not isinstance(agent_types, list):
+                    continue
+                for agent_type in agent_types:
+                    if (
+                        isinstance(agent_type, str)
+                        and agent_type not in dynamic_agent_candidates
+                    ):
+                        dynamic_agent_candidates.append(agent_type)
+        ensure(
+            initial_wave == ["requirements_organizer", "explorer", "execution_planner"],
+            f"task {task_id} manifest must use the stage-ready Intake Responsibility Wave",
+        )
+        ensure(
+            len(dynamic_agent_candidates) >= 1,
+            f"task {task_id} manifest must expose dynamic expansion waves",
+        )
+        ensure(
+            len(set(initial_wave + dynamic_agent_candidates)) > 3,
+            f"task {task_id} manifest must not collapse multi-agent work to intake responsibility",
+        )
+    ensure(
+        len(initial_wave) <= expected_active,
+        f"task {task_id} manifest initial wave exceeds active spawn budget",
     )
     write_scope_policy = run.get("write_scope_policy")
     ensure(
@@ -675,6 +944,24 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "fresh_subagents_required: true" in manifest_text
         and "reuse_for_new_task: forbidden" in manifest_text,
         f"task {task_id} manifest missing fresh subagent lifecycle policy",
+    )
+    lifecycle_policy = run.get("subagent_lifecycle_policy")
+    ensure(
+        isinstance(lifecycle_policy, dict),
+        f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
+    )
+    ensure(
+        lifecycle_policy.get("mid_task_user_input_policy")
+        == "parent_checkpoint_then_route_delta",
+        f"task {task_id} manifest missing mid-task user input checkpoint policy",
+    )
+    ensure(
+        lifecycle_policy.get("same_task_delta_reuse") == "allowed_with_updated_packet",
+        f"task {task_id} manifest missing same-task delta reuse policy",
+    )
+    ensure(
+        lifecycle_policy.get("scope_change_reuse") == "forbidden_spawn_fresh_wave",
+        f"task {task_id} manifest missing scope-change fresh wave policy",
     )
     ensure(
         "prompt_contract:" in manifest_text,

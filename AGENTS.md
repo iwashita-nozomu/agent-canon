@@ -3,13 +3,13 @@
 @dependency-start
 responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design README.md shared canon overview must reflect runtime contract
+downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
+downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
 -->
 
-
-この tree は standalone AgentCanon repo の source of truth です。
-template / derived repo では `vendor/agent-canon/` submodule pin として参照されます。
-ここを単体で見ているときは、shared canon の整合を優先し、特定の派生 repo に閉じた Docker、implementation、experiment 前提を持ち込みません。
+This tree is the standalone AgentCanon source of truth. Template and derived
+repositories consume it through `vendor/agent-canon/` and root runtime views.
 
 ## Read First
 
@@ -18,46 +18,65 @@ template / derived repo では `vendor/agent-canon/` submodule pin として参�
 - `agents/README.md`
 - `agents/workflows/README.md`
 - `agents/canonical/README.md`
-- `agents/canonical/CODEX_WORKFLOW.md`
-- `documents/AGENTS_COORDINATION.md`
-- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
-- `documents/worktree-lifecycle.md`
 - `.codex/README.md`
 
 ## Scope
 
-- root AGENTS runtime wrapper
-- Codex runtime entrypoints
-- shared Codex config defaults
-- shared agent workflow
-- shared skill canon
-- Codex subagent inventory
-- agent review / coordination documents
-- shared runtime surface ownership document
-- submodule update and legacy migration operation canon
-- skill and worktree operation canon
-- carry-over note template
-- worktree note templates
-- agent-specific CI workflow
-- agent-specific regression tests
-- agent support scripts
+- root runtime entrypoint source: `ROOT_AGENTS.md`
+- Codex runtime defaults: `.codex/`
+- public skill registry and shims: `agents/skills/`, `.agents/skills/`
+- internal workflow routines: `agents/internal-routines/`
+- workflow, subagent, and review contracts: `agents/`
+- shared runtime surface ownership: `documents/`
+- agent support tools and validation: `tools/`
+- agent-specific regression tests: `tests/agent_tools/`
 
-## Non-Goals
+## Runtime Owner Map
 
-- `docker/`
-- shared canon の外にある repo-local `python/`
-- `experiments/`
-- repo-local README / bootstrap / server contract
+| Contract | Owner Surface | Validation |
+| -------- | ------------- | ---------- |
+| root runtime entrypoint | `ROOT_AGENTS.md`; `documents/shared-runtime-surfaces.toml` | `bash tools/sync_agent_canon.sh check` |
+| workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
+| role behavior and stage conditions | `.codex/agents/*.toml`; `agents/agents_config.json` | `check_agent_runtime_alignment.py` |
+| public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
+| internal routine placement | `agents/internal-routines/README.md`; `documents/repo-structure-contract.toml` | `repo_structure_contract.py` |
+| implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
+| runtime profile and validation routing | `documents/runtime-profiles-and-check-matrix.md` | profile-specific checks |
+| closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
+| shared-canon update | `tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; `agents/workflows/agent-canon-pr-workflow.md` | AgentCanon PR gate |
 
-## Working Rule
+Update the owner surface first, then adjust this entrypoint when reader routing
+changes. `AGENTS.md` is a repository-local map; it is not the policy source for
+workflow stages, skill routing, role behavior, or closeout gates.
 
-- AgentCanon tree changes は shared canon として成立するかを先に確認する
-- first-reader 向けの入口は `README.md` -> `documents/README.md` -> `agents/README.md` -> `agents/workflows/README.md` の順にたどれるよう保つ
-- 広い概念、長い user request、文書統合、薄い文書洗い出しでは、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text|jsonl` または `agent-canon semantic-index thin-docs --top-k <N> --format text` を試す
-- 設計では、実装対象 file、既存 helper、または直近 finding だけに scope を閉じない。先に抽象責務、概念モデル、非対象、将来 layer、評価軸、既存正本との関係を固定し、そこから実装 slice と validation を導く
-- skill、tool、workflow、HTML report、実験 script を追加または変更するときは、先に既存資産の調査、次に責務境界の解析、その後に実装へ入る。この順序と再利用しなかった候補は run bundle または work log に残す
-- ad hoc / 場当たりの修正実装は禁止する。局所的に失敗を隠す patch、未設計の alternate route / wrapper / helper、責務にない分岐、test / warning だけを黙らせる変更を入れて完了扱いにしない。修正は user request、責務、依存 graph、既存正本、検証 gate に結び付け、必要なら design / skill / workflow / tool の正本を先に直す
-- prompt、routing、subagent-config の shared canon を直す task では、親が policy prose を直接広く書き換える前に `prompt_config_reviewer` で prompt/config audit を切り、重複 surface と最小差分を先に確定する
-- AGENTS / ROOT_AGENTS に禁止事項を増やす前に、warning hook、checker、closeout artifact gate、role TOML、または workflow eval に逃がせるかを決める。hook は原則 fail-open の context / evidence 収集面とし、prompt secret など高確信の公開事故以外を runtime blocker にしない
-- legacy forwarder / migration wrapper が `*_FORWARDER=deprecated`、`*_FORWARDER_SEVERITY=fix-now`、または caller chain 付きの移行警告を出した場合は、元の作業を続ける前に呼び出し元を特定し、canonical command へ移行する。subagent handoff や workflow prompt には、警告の caller chain、移行先 command、「移行してから元 task へ戻る」指示を含める
-- root entrypoint wrapper の変更は、この tree ではなく template / 派生 repo 側の wrapper task として扱う
+## Task Entry
+
+For repo-changing work, create or reuse the run bundle and follow the
+machine-readable packet emitted by:
+
+```bash
+python3 tools/agent_tools/task_start.py \
+  --task "short task summary" \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
+For a new run directory:
+
+```bash
+python3 tools/agent_tools/bootstrap_agent_run.py \
+  --task "short task summary" \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
+The emitted workflow, skills, review roles, document packets, wave plan, and
+validation route are the task packet for downstream agents.
+
+## Validation
+
+- runtime alignment: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
+- structure contract: `python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/repo-structure-contract.toml`
+- responsibility scope: `python3 tools/agent_tools/responsibility_scope.py --root .`
+- shared runtime views: `bash tools/sync_agent_canon.sh check`
+- closeout: `python3 tools/agent_tools/task_close.py ...`

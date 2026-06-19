@@ -21,20 +21,29 @@ from agent_team import (
     TeamConfig,
     auto_language_specialists,
     codex_agent_model_matrix_for_roles,
+    codex_runtime_max_depth,
     codex_runtime_max_threads,
     create_run_bundle,
+    current_stage_skills,
     default_specialists_for_task,
+    deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
+    format_subagent_wave,
+    format_subagent_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
+    recommended_dynamic_expansion_waves,
+    recommended_initial_subagent_wave,
     resolve_cross_cutting_document_packet,
     resolve_report_root,
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    same_role_subagent_policy_output_lines,
     select_roles,
+    subagent_wave_record_command,
     task_ids,
     workflow_spawn_budget,
 )
@@ -275,7 +284,6 @@ def selected_review_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
         "verifier",
         "auditor",
         "docs_workflow_steward",
-        "critical_guardian",
     }
     return tuple(
         role.id
@@ -295,6 +303,8 @@ def emit_bootstrap_output(
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    active_skills = current_stage_skills(selected_skills)
+    deferred_skills = deferred_stage_skills(selected_skills)
     review_roles = selected_review_roles(runtime.roles)
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
@@ -307,11 +317,14 @@ def emit_bootstrap_output(
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
+    print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(f"ACTIVE_SKILLS={','.join(active_skills)}")
+    print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
     print(
         "START_DECLARATION="
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(selected_skills)}, "
+        f"skills={','.join(active_skills) or '-'}, "
         f"review={','.join(review_roles) or '-'}"
     )
     if args.task_id is not None:
@@ -320,6 +333,32 @@ def emit_bootstrap_output(
         print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
+        print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
+        print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
+        print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
+        print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
+        print(f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}")
+        active_budget = context.workflow_active_spawn_budget or 0
+        initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
+        if initial_wave:
+            print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
+            print("PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required")
+            print(
+                "PARENT_WAVE_EXECUTION_GATE_ARTIFACTS="
+                "schedule.md#Agent Wave Ledger,workflow_monitoring.md#Actual Wave Events"
+            )
+        else:
+            print("PARENT_WAVE_EXECUTION_GATE=not_applicable")
+            print("PARENT_WAVE_EXECUTION_GATE_STATUS=no_initial_wave")
+        expansion_waves = recommended_dynamic_expansion_waves(
+            runtime.roles,
+            active_budget,
+            initial_wave,
+        )
+        print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
+        print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        for line in same_role_subagent_policy_output_lines():
+            print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
         print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")
@@ -378,7 +417,7 @@ def record_bootstrap_monitoring(
         signals=[
             (
                 f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(selected_skills)}, "
+                f"skills={','.join(current_stage_skills(selected_skills)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
             "stage owner routing active_roles=" f"{','.join(role.id for role in roles)}",

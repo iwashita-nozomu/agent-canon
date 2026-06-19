@@ -21,11 +21,14 @@ upstream design README.md durable document index
 ## 2. ディレクトリ構成
 
 - 実験は `experiments/<topic>/` に置きます。
-- topic ごとに `README.md`、`cases.*`、`experiment.*`、`result/` を基準にします。
+- topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、`result/` を基準にします。
+- `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を持つ正本 entrypoint です。
+- 新規 topic は、実験名を固定してから AgentCanon template path `vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーし、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
+- 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
-- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`run.log` を残します。
+- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`run.log`、`logs/` を残します。追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
 
 ## 3. 実行原則
 
@@ -35,10 +38,12 @@ upstream design README.md durable document index
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置きます。
 - 実験設定は Python object の暗黙状態ではなく、YAML で管理し、run 開始時に再現可能な artifact として snapshot します。
 - formal run では `result/<run_name>/config.json` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に書き出します。
+- 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の互換ログとして残し、topic 固有の追加ログは `logs/` 配下へ分けます。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
 - formal / server-side run は必ず `tools/experiments/run_managed_experiment.py`、または同等に `run_manifest.json`、`config` snapshot、`run.log`、exit status を保存する wrapper から起動します。
+- 可視化 notebook は run 後に `summary.json`、`cases.jsonl`、必要な `logs/` artifact を読むだけにし、notebook の hidden state を正式 evidence にしません。
 - `experiment_runner` を使う実験で、process 管理、GPU 割当、timeout、signal cleanup を実験本体に実装しません。
 
 ## 3.1 設定 snapshot

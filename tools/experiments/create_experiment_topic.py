@@ -14,6 +14,8 @@ from pathlib import Path
 
 from registry_lib import find_topic, load_registry, write_registry
 
+AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/experiments/_template"
+
 
 def repo_root_from_script() -> Path:
     """Return the repository root from this script location."""
@@ -36,18 +38,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional registry path. Defaults to <repo-root>/experiments/registry.toml.",
     )
     parser.add_argument(
-        "--template-topic",
-        default="_template",
-        help="Template topic directory name under experiments/.",
-    )
-    parser.add_argument(
         "--status",
         default="draft",
         help="Initial topic status for the registry entry.",
     )
     parser.add_argument(
         "--default-variant",
-        default="formal",
+        default="default",
         help="Default variant label for this topic.",
     )
     parser.add_argument(
@@ -94,7 +91,7 @@ def main() -> int:
     defaults = registry.get("defaults", {})
     if not isinstance(defaults, dict):
         raise SystemExit("registry defaults must be a table")
-    template_dir_name = defaults.get("topic_template_dir", f"experiments/{args.template_topic}")
+    template_dir_name = defaults.get("topic_template_dir", AGENT_CANON_TEMPLATE_DIR)
     if not isinstance(template_dir_name, str):
         raise SystemExit("defaults.topic_template_dir must be a string when present")
 
@@ -120,14 +117,7 @@ def main() -> int:
         "result_root": f"experiments/{args.topic}/result",
         "report_root": "experiments/report",
         "default_variant": args.default_variant,
-        "smoke_inner_command": (
-            f"python3 experiments/{args.topic}/run.py --run-dir {{run_dir}} "
-            "--config {config_path} --mode smoke --limit 4"
-        ),
-        "formal_inner_command": (
-            f"python3 experiments/{args.topic}/run.py --run-dir {{run_dir}} "
-            "--config {config_path} --mode formal --limit 32"
-        ),
+        "default_inner_command": f"/usr/bin/python /workspace/experiments/{args.topic}/run.py",
     }
     if args.primary_note:
         new_entry["primary_note"] = args.primary_note

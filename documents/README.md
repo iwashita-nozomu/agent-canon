@@ -42,54 +42,32 @@ If a file is an AgentCanon-owned symlink, edit the source under
 `bash tools/sync_agent_canon.sh link-root`. If a file is a template-owned active
 contract, edit the root regular file.
 
-## Shared Policy References
+## Reader Routes
 
-These are shared policy documents that often support workflow or runtime tasks.
-For the broader agent routing path, return to `agents/README.md`.
+This file is an index, but it should not force a reader through every link.
+Choose the row that matches the current problem, then open only the listed
+entrypoint and its directly referenced source packet.
 
-- [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md): owner classes,
-  symlink/copy/regular behavior, and root-view repair rules.
-- [Shared Runtime Surface Manifest](./shared-runtime-surfaces.toml):
-  machine-readable surface ownership list.
-- [AgentCanon Parent Repository Latest-State Checklist](./agent-canon-parent-repo-latest-checklist.md):
-  task-start checklist for repos that vendor AgentCanon.
-- [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md):
-  active profile selection, risk classes, and validation routing.
-- [Runtime Profile Inventory](./runtime-profiles-and-check-matrix.json):
-  machine-readable source of truth for the runtime profile/check matrix doc.
-- [Template / AgentCanon Audit Resolution](./template-agent-canon-audit-resolution.md):
-  2026-05-16 500-item audit coverage and resolution ledger.
-- [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md): short
-  public tool/skill names, compatibility aliases, and routing policy.
-- [Rust Agent Tool Migration](./rust-agent-tool-migration.md): Rust CLI,
-  devcontainer toolchain, and Python-to-Rust migration boundaries.
-- [Structured Analysis](./structured-analysis/): extraction-oriented document
-  set for prose graph, report contract, dependency header graph, and SQLite
-  adapter boundaries.
-- [Prose Reasoning Graph](./prose-reasoning-graph/): DSL vocabulary,
-  graph-layer contract, projection rules, diagnostics, edit operations, and
-  future adapter boundaries.
-- [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
-  reusable module distribution, local Git compatibility, Dockerfile ownership,
-  and shared devcontainer ownership.
-- [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI
-  / config schema / hooks / MCP / skills / subagents reference.
-- [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical
-  remote and submodule update workflow.
-- [AgentCanon Update Route](./agent-canon-update-route.md): canonical update
-  command hierarchy, parent pin route, TODO route, and AgentCanon PR branch
-  separation.
-- [AgentCanon Submodule Rollback](./agent-canon-submodule-rollback.md):
-  copy-paste rollback route for parent repos that need to move back to a known
-  good AgentCanon SHA.
-- [Derived Repository Bootstrap Runbook](./derived-repo-bootstrap-runbook.md):
-  shortest safe onboarding and triage path for repos that vendor AgentCanon.
-- [Issue Label Taxonomy](./issue-label-taxonomy.md): AgentCanon maintenance
-  issue templates, label taxonomy, and issue backfill policy.
-- [Prompt And Skill Evaluation Checklist](./prompt-skill-evaluation-checklist.md):
-  prompt/skill behavior eval checklist, failure taxonomy, and manifest format.
-- [API Surface Traversal Policy](./api-surface-traversal-policy.md): public API
-  traversal evidence before negative capability claims.
+| Problem | Start Here | Why |
+| --- | --- | --- |
+| Root view, symlink, copy, or template ownership is unclear | [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md) | Defines owner classes and root-view repair rules; the TOML manifest is the machine-readable companion. |
+| A vendored AgentCanon checkout, parent pin, or update branch is stale | [AgentCanon Update Route](./agent-canon-update-route.md) | Routes latest, branch / PR, TODO, rollback, and parent pin flows without reading every update doc. |
+| Validation scope is unclear | [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md) | Maps changed path and risk class to the active checks. |
+| Tool / skill routing, tool placement, or Rust migration is unclear | [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md) | Leads to tool catalog, short command names, and Rust CLI migration boundaries. |
+| Structured prose, dependency graph, or document-canon analysis is needed | [Structured Analysis](./structured-analysis/) | Entry for document inventory, prose graph, report contracts, and SQLite-backed analysis. |
+| Codex CLI, hooks, MCP, skills, or subagents need runtime configuration context | [Codex Configuration Reference](./codex-configuration-reference.md) | Keeps runtime config detail in one place instead of spreading copies across README files. |
+| A derived repo is being bootstrapped or repaired | [Derived Repository Bootstrap Runbook](./derived-repo-bootstrap-runbook.md) | Shortest safe onboarding path for repos that vendor AgentCanon. |
+| Maintenance issue labels or prompt / skill eval policy are needed | [Issue Label Taxonomy](./issue-label-taxonomy.md), [Prompt And Skill Evaluation Checklist](./prompt-skill-evaluation-checklist.md) | Operational governance entrypoints, not general first-read docs. |
+| A negative public API or capability claim needs evidence | [API Surface Traversal Policy](./api-surface-traversal-policy.md) | Defines traversal evidence before saying a surface is absent. |
+
+Compatibility and evidence appendices remain available, but they are not part of
+the first-read path: `agent-canon-parent-repo-latest-checklist.md`,
+`agent-canon-submodule-rollback.md`,
+`template-agent-canon-audit-resolution.md`,
+`github-first-module-and-devcontainer-policy.md`,
+`agent-canon-github-remote.md`, `rust-agent-tool-migration.md`,
+`prose-reasoning-graph/`, and `runtime-profiles-and-check-matrix.json`.
+
 ## Coding Policy References
 
 - [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md):

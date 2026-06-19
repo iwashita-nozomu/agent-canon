@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import re
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from agent_team import resolve_report_root
@@ -22,6 +23,9 @@ from report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    report_artifact_placement_blockers,
+    token_fields,
+    wave_reconciliation_blockers,
 )
 
 
@@ -109,17 +113,6 @@ def markdown_section_text(path: Path, heading: str) -> str:
         if in_section:
             selected.append(line)
     return "\n".join(selected)
-
-
-def token_fields(line: str) -> dict[str, str]:
-    """Parse whitespace-separated key=value fields from one evidence line."""
-    data: dict[str, str] = {}
-    for token in line.split():
-        if "=" not in token:
-            continue
-        key, value = token.split("=", 1)
-        data[key.strip()] = value.strip("`'\"")
-    return data
 
 
 def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str, ...]:
@@ -222,6 +215,75 @@ def current_diff_ref(workspace: Path) -> str:
     return f"{head}-dirty-{diff_hash}"
 
 
+def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
+    """Return source-tree Markdown paths changed in the current checkout."""
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if not path.endswith(".md"):
+                continue
+            if path.startswith(("reports/", ".agent-canon/log-archive/")):
+                continue
+            paths.add(path)
+    return tuple(sorted(paths))
+
+
+def parse_document_structure_paths(value: str) -> set[str]:
+    """Parse a closeout document-structure path list."""
+    if value in {"", "missing", "none"}:
+        return set()
+    return {
+        Path(item.strip()).as_posix()
+        for item in re.split(r"[,\s]+", value)
+        if item.strip() and item.strip() not in {"missing", "none"}
+    }
+
+
+def document_structure_evidence_ready(
+    changed_markdown: Sequence[str], evidence: dict[str, str]
+) -> tuple[bool, bool]:
+    """Return path-record and route evidence readiness for Markdown changes."""
+    if not changed_markdown:
+        return True, True
+    recorded_paths = parse_document_structure_paths(
+        evidence.get("document_structure_paths", "")
+    )
+    normalized_changed = {Path(path).as_posix() for path in changed_markdown}
+    paths_recorded = normalized_changed.issubset(recorded_paths)
+    status = evidence.get("document_structure_status", "")
+    structure_contract = evidence.get("structure_contract", "")
+    complete_route = (
+        status == "complete"
+        and evidence.get("structure_planning") == "complete"
+        and evidence.get("prose_graph") == "complete"
+        and structure_contract
+        not in {"", "missing", "none", "not_applicable"}
+        and "skipped" not in structure_contract
+    )
+    skipped_route = (
+        status == "skipped"
+        and evidence.get("md_style_check") == "pass"
+        and "skipped" in evidence.get("structure_contract", "")
+        and evidence.get("format_only_reason", "") not in {"", "missing", "none"}
+    )
+    return paths_recorded, complete_route or skipped_route
+
+
 def active_run_name(report_dir: Path) -> str | None:
     """Return the active run marker for a report root, or None when absent."""
     active_run_path = report_dir.parent / ".active_run"
@@ -279,6 +341,9 @@ def main() -> int:
     tool_warning_evidence = parse_markdown_status_section(
         closeout_path, "Tool Warning Evidence"
     )
+    document_structure = parse_markdown_status_section(
+        closeout_path, "Document Structure Evidence"
+    )
     subagent_lifecycle = parse_markdown_status_section(
         closeout_path, "Subagent Lifecycle Evidence"
     )
@@ -298,17 +363,35 @@ def main() -> int:
         else {}
     )
     active_diff_ref = current_diff_ref(workspace)
+    changed_markdown = changed_markdown_paths(workspace)
+    document_structure_paths_ready, document_structure_route_ready = (
+        document_structure_evidence_ready(changed_markdown, document_structure)
+    )
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
     workflow_tool_warning_blockers = workflow_tool_warning_problems(
         workflow_monitoring_path
     )
     request_contract = parse_markdown_status(request_contract_path)
-    schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
+    schedule_text = schedule_path.read_text(encoding="utf-8")
+    workflow_monitoring_text = (
+        workflow_monitoring_path.read_text(encoding="utf-8")
+        if workflow_monitoring_path.is_file()
+        else ""
+    )
+    schedule_blockers = check_schedule_artifact(schedule_text)
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
     final_review_blockers = (
         check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
         if final_review_path.is_file()
         else ["final_review.md:missing"]
+    )
+    report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
+    wave_reconciliation = wave_reconciliation_blockers(
+        schedule_text,
+        workflow_monitoring_text,
+        subagent_lifecycle,
+        report_dir,
+        workspace,
     )
 
     checks = {
@@ -359,6 +442,8 @@ def main() -> int:
         )
         not in {"", "missing", "none"},
         "workflow_tool_warnings_closed": not workflow_tool_warning_blockers,
+        "document_structure_paths_recorded": document_structure_paths_ready,
+        "document_structure_evidence": document_structure_route_ready,
         "mechanical_completion_loop_complete": closeout.get(
             "mechanical_completion_loop_complete"
         )
@@ -410,6 +495,15 @@ def main() -> int:
             "previous_task_subagent_reuse"
         )
         == "none",
+        "agent_wave_ledger_status": subagent_lifecycle.get("agent_wave_ledger_status")
+        in {"complete", "not_applicable"},
+        "planned_vs_actual_wave_status": subagent_lifecycle.get(
+            "planned_vs_actual_wave_status"
+        )
+        in {"reconciled", "not_applicable"},
+        "subagent_wave_reconciliation_clean": not wave_reconciliation,
+        "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
+        in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
         == "closed",
         "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")
@@ -489,6 +583,7 @@ def main() -> int:
         "work_log_complete": not work_log_blockers,
         "final_review_artifact_complete": not final_review_blockers,
         "report_active_run_match": active_run_matches(active_run, report_dir),
+        "report_artifact_placement_clean": not report_artifact_blockers,
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -567,6 +662,26 @@ def main() -> int:
         f"{join_blockers(list(workflow_tool_warning_blockers))}"
     )
     print(
+        "DOCUMENT_STRUCTURE_REQUIRED="
+        f"{'yes' if changed_markdown else 'no'}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN="
+        f"{','.join(changed_markdown) if changed_markdown else 'none'}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_STATUS="
+        f"{document_structure.get('document_structure_status', '')}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_PATHS="
+        f"{document_structure.get('document_structure_paths', '')}"
+    )
+    print(
+        "DOCUMENT_STRUCTURE_EVIDENCE="
+        f"{'yes' if document_structure_route_ready else 'no'}"
+    )
+    print(
         "MECHANICAL_COMPLETION_LOOP_COMPLETE="
         f"{closeout.get('mechanical_completion_loop_complete', '')}"
     )
@@ -600,6 +715,10 @@ def main() -> int:
     print(
         "SUBAGENT_CLOSEOUT_STATUS="
         f"{subagent_lifecycle.get('subagent_closeout_status', '')}"
+    )
+    print(
+        "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS="
+        f"{join_blockers(wave_reconciliation)}"
     )
     print(
         "SUBAGENT_OPEN_INSTANCES="
@@ -662,6 +781,11 @@ def main() -> int:
     print(f"FINAL_REVIEW_ARTIFACT_BLOCKERS={join_blockers(final_review_blockers)}")
     print(f"REPORT_ACTIVE_RUN={active_run or ''}")
     print(f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}")
+    print(
+        "REPORT_ARTIFACT_PLACEMENT_CLEAN="
+        f"{'yes' if not report_artifact_blockers else 'no'}"
+    )
+    print(f"REPORT_ARTIFACT_PLACEMENT_BLOCKERS={join_blockers(report_artifact_blockers)}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

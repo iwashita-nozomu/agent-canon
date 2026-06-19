@@ -6,6 +6,7 @@
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream design ../../documents/repo-local-tool-imports.md legacy tool disposition policy
+# upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs catalog validation
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
 # @dependency-end
@@ -16,13 +17,14 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
 
 import yaml
+from tool_path_policy import is_retired_legacy_tool_path
 
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
@@ -70,6 +72,8 @@ class CatalogRow:
     family: str
     role: str
     status: str
+    audience: str
+    placement: str
     command: str | None
     writes: bool
     ci: bool
@@ -126,6 +130,24 @@ def bool_from_mapping(mapping: Mapping[str, object], key: str) -> bool:
     return mapping.get(key) is True
 
 
+def inherited_string(
+    entry: Mapping[str, object],
+    family_defaults: Mapping[str, object],
+    key: str,
+) -> str | None:
+    """Return an entry value, falling back to its family default."""
+    if key in entry:
+        value = entry[key]
+        return value if isinstance(value, str) else None
+    default = family_defaults.get(key)
+    return default if isinstance(default, str) else None
+
+
+def has_non_string_key(mapping: Mapping[str, object], key: str) -> bool:
+    """Return whether a present key has a non-string value."""
+    return key in mapping and not isinstance(mapping[key], str)
+
+
 def has_dependency_manifest(path: Path) -> bool:
     """Return whether one file has a dependency manifest near the top."""
     if not path.is_file():
@@ -177,7 +199,7 @@ def entry_summary(entry: Mapping[str, object]) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def catalog_row(entry: Mapping[str, object]) -> CatalogRow:
+def catalog_row(entry: Mapping[str, object], family_defaults: Mapping[str, object]) -> CatalogRow:
     """Convert one entry mapping into a report row."""
     wiring = as_mapping(entry.get("default_wiring")) or {}
     entry_id = entry.get("id")
@@ -192,6 +214,8 @@ def catalog_row(entry: Mapping[str, object]) -> CatalogRow:
         family=family if isinstance(family, str) else "<missing>",
         role=role if isinstance(role, str) else "<missing>",
         status=status if isinstance(status, str) else "<missing>",
+        audience=inherited_string(entry, family_defaults, "audience") or "<missing>",
+        placement=inherited_string(entry, family_defaults, "placement") or "<missing>",
         command=command if isinstance(command, str) else None,
         writes=entry.get("writes") is True,
         ci=bool_from_mapping(wiring, "ci"),
@@ -207,6 +231,9 @@ def check_entry(
     families: set[str],
     statuses: set[str],
     roles: set[str],
+    audiences: set[str],
+    placements: set[str],
+    family_defaults: Mapping[str, object],
 ) -> list[Finding]:
     """Validate one catalog entry."""
     findings: list[Finding] = []
@@ -215,6 +242,8 @@ def check_entry(
     family = entry.get("family")
     status = entry.get("status")
     role = entry.get("role")
+    audience = inherited_string(entry, family_defaults, "audience")
+    placement = inherited_string(entry, family_defaults, "placement")
     target = resolve_repo_path(root, path)
 
     if not isinstance(entry_id, str) or not ID_RE.fullmatch(entry_id):
@@ -225,12 +254,26 @@ def check_entry(
         findings.append(Finding("entry", path, "invalid-status"))
     if not isinstance(role, str) or role not in roles:
         findings.append(Finding("entry", path, "invalid-role"))
+    if has_non_string_key(entry, "audience"):
+        findings.append(Finding("entry", path, "invalid-audience"))
+    elif audience is None:
+        findings.append(Finding("entry", path, "missing-audience"))
+    elif audience not in audiences:
+        findings.append(Finding("entry", path, "invalid-audience"))
+    if has_non_string_key(entry, "placement"):
+        findings.append(Finding("entry", path, "invalid-placement"))
+    elif placement is None:
+        findings.append(Finding("entry", path, "missing-placement"))
+    elif placement not in placements:
+        findings.append(Finding("entry", path, "invalid-placement"))
+    if status == "compatibility_wrapper" and placement != "compatibility_wrapper":
+        findings.append(Finding("entry", path, "compatibility-wrapper-placement-required"))
     if not entry_summary(entry):
         findings.append(Finding("entry", path, "missing-summary"))
     if not target.exists():
         findings.append(Finding("entry", path, "missing-path"))
 
-    if path.startswith("tools/legacy/") or status == "legacy_provenance":
+    if is_retired_legacy_tool_path(path) or status == "legacy_provenance":
         findings.append(Finding("legacy", path, "legacy-tools-are-retired"))
 
     docs = string_list(entry.get("docs"))
@@ -390,9 +433,15 @@ def validate_catalog(root: Path) -> CatalogReport:
         return CatalogReport(tuple(findings), ())
 
     families_map = as_mapping(data.get("families")) or {}
+    family_defaults = {
+        name: as_mapping(raw_family) or {}
+        for name, raw_family in families_map.items()
+    }
     families = set(families_map)
     statuses = allowed_values(data, "status_values")
     roles = allowed_values(data, "role_values")
+    audiences = allowed_values(data, "audience_values")
+    placements = allowed_values(data, "placement_values")
     entries_raw = as_sequence(data.get("entries"))
     if data.get("version") != 1:
         findings.append(Finding("catalog", CATALOG_PATH, "unsupported-version"))
@@ -402,6 +451,25 @@ def validate_catalog(root: Path) -> CatalogReport:
         findings.append(Finding("catalog", CATALOG_PATH, "missing-status-values"))
     if not roles:
         findings.append(Finding("catalog", CATALOG_PATH, "missing-role-values"))
+    if not audiences:
+        findings.append(Finding("catalog", CATALOG_PATH, "missing-audience-values"))
+    if not placements:
+        findings.append(Finding("catalog", CATALOG_PATH, "missing-placement-values"))
+    for family_name, family_info in family_defaults.items():
+        audience = inherited_string(family_info, {}, "audience")
+        placement = inherited_string(family_info, {}, "placement")
+        if has_non_string_key(family_info, "audience"):
+            findings.append(Finding("family", family_name, "invalid-audience"))
+        elif audience is None:
+            findings.append(Finding("family", family_name, "missing-audience"))
+        elif audience not in audiences:
+            findings.append(Finding("family", family_name, "invalid-audience"))
+        if has_non_string_key(family_info, "placement"):
+            findings.append(Finding("family", family_name, "invalid-placement"))
+        elif placement is None:
+            findings.append(Finding("family", family_name, "missing-placement"))
+        elif placement not in placements:
+            findings.append(Finding("family", family_name, "invalid-placement"))
     if entries_raw is None:
         findings.append(Finding("catalog", CATALOG_PATH, "entries-must-be-list"))
         return CatalogReport(tuple(findings), ())
@@ -416,7 +484,9 @@ def validate_catalog(root: Path) -> CatalogReport:
             findings.append(Finding("entry", CATALOG_PATH, f"entry-{index}-not-mapping"))
             continue
         entries.append(entry)
-        rows.append(catalog_row(entry))
+        family = entry.get("family")
+        defaults = family_defaults.get(family, {}) if isinstance(family, str) else {}
+        rows.append(catalog_row(entry, defaults))
         entry_id = entry.get("id")
         path = entry_path(entry)
         if isinstance(entry_id, str):
@@ -426,7 +496,9 @@ def validate_catalog(root: Path) -> CatalogReport:
         if path in paths:
             findings.append(Finding("entry", path, "duplicate-path"))
         paths.add(path)
-        findings.extend(check_entry(root, entry, families, statuses, roles))
+        findings.extend(
+            check_entry(root, entry, families, statuses, roles, audiences, placements, defaults)
+        )
 
     findings.extend(check_default_wiring(root, entries))
     findings.extend(check_catalog_docs(root))
@@ -490,8 +562,8 @@ def render_markdown(report: CatalogReport) -> str:
         [
             "## Tool Crosswalk",
             "",
-            "| ID | Family | Status | Default | Path | Summary |",
-            "| -- | ------ | ------ | ------- | ---- | ------- |",
+            "| ID | Family | Audience | Placement | Status | Default | Path | Summary |",
+            "| -- | ------ | -------- | --------- | ------ | ------- | ---- | ------- |",
         ]
     )
     for entry in report.entries:
@@ -504,6 +576,8 @@ def render_markdown(report: CatalogReport) -> str:
             "| "
             f"`{markdown_cell(entry.tool_id)}` | "
             f"{markdown_cell(entry.family)} | "
+            f"{markdown_cell(entry.audience)} | "
+            f"{markdown_cell(entry.placement)} | "
             f"{markdown_cell(entry.status)} | "
             f"{markdown_cell(default)} | "
             f"`{markdown_cell(entry.path)}` | "

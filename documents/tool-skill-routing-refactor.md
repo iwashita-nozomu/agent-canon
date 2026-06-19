@@ -26,8 +26,16 @@ evidence, not an AgentCanon product dependency.
 - Public skill names describe the user action, not the implementation pattern.
 - Long candidate names are compatibility aliases, not new files.
 - Repeated routing decisions go through `route.py --area <area>`.
-- Prompt-derived public skill selection goes through `route.py --prompt <text>`
-  so candidate evidence and selected skill routing share one operator surface.
+- Prompt-derived public skill selection goes through
+  `agent-canon local-llm route-skill --prompt <text>` so candidate evidence,
+  current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
+  by a deterministic harness. Routing rules and stage policy live in
+  `agents/skills/catalog.yaml` under `skill_families[].routing`; `route.py
+  --prompt <text>` is the Python compatibility mirror while area/name routing
+  remains in `route.py`.
+- Japanese or English prompts about unnecessary numerical tests, heavy tests,
+  brittle tests, tolerance-based tests, or test-design gaps route to
+  `$test-design`; they are not handled by ad hoc worker judgment.
 - The public skill for this family is `$task-routing`.
 
 ## Canonical Short Surface
@@ -62,7 +70,23 @@ validation or repair. `route.py` only decides which specialized path to use and
 prints compact `ROUTE`, `AREA`, `NEXT_ACTION`, `COMMANDS`, and `EVIDENCE`
 tokens.
 
-For broad user prompts, `route.py --prompt "<request>"` prints `ROUTE=skill-selection`,
-`MODE`, `SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
-`SKILLS` keeps `$agent-orchestration` first, adds `$codex-task-workflow` for
-repo-changing prompts, and then appends matched public task-shape skills.
+## Ownership Layout
+
+- Deterministic prompt-to-skill routing lives in
+  `rust/agent-canon/src/local_llm.rs` as `agent-canon local-llm route-skill`
+  and reads `agents/skills/catalog.yaml`.
+- `tools/agent_tools/route.py` keeps area/name routing and mirrors prompt skill
+  routing from the same catalog-backed data.
+- `agents/skills/catalog.yaml` remains the skill registry for id, purpose,
+  doc/shim paths, prompt trigger groups, and stage policy. Routing metadata
+  changes include the Rust reader, runtime-alignment schema check, and
+  Python/Rust parity fixtures in the same diff.
+- Codex CLI capabilities are not mirrored into AgentCanon routing docs. Runtime
+  capability belongs in a probe or route output, and skill routing should name
+  only the current task's core AgentCanon functions.
+
+For broad user prompts, `agent-canon local-llm route-skill --prompt "<request>"`
+prints `ROUTE=skill-selection`, `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
+`DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
+`SKILLS` preserves compatibility, while `ACTIVE_SKILLS` is the current-stage
+skill declaration and `DEFERRED_SKILLS` is the dynamic wave trigger set.

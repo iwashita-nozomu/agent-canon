@@ -91,6 +91,8 @@ Keep the project `Dockerfile` focused on the project runtime.
   convenience.
 - Do not install rustup or run cargo solely for AgentCanon CLI or shared
   analysis-tool migration work.
+- Do not install `elan`, Lean, Lake, or proof-search tooling solely for
+  AgentCanon formal-proof workflows.
 - Do not install TeX / LaTeX tooling solely for Academic Writing agent output.
 - Do not bake host-specific mount paths such as `/mnt/git` into the image.
 - Do not install repository Python dependencies during image build when those
@@ -109,6 +111,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
   JSON inspection helpers such as `jq`, and post-create bootstrap belong in
   `.devcontainer/post-create.sh`.
+- Codex CLI setup validates `codex --version` before returning. Command absence
+  or a broken wrapper triggers the canonical `npm install -g @openai/codex`
+  install command during post-create.
 - Public-repository security scanners used by agents, including `gitleaks`,
   `trufflehog`, and `detect-secrets`, belong in `.devcontainer/post-create.sh`.
   They are audit tooling, not project runtime dependencies, and must not be
@@ -117,6 +122,12 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
+- Lean theorem-proving tooling used by formal-proof skills, including
+  `elan`, Lean, Lake, and the default `AGENT_CANON_LEAN_TOOLCHAIN`, belongs
+  in `.devcontainer/post-create.sh` when it is only needed for AgentCanon
+  proof tooling. Install `elan` from a pinned release asset with a recorded
+  SHA256 checksum, not by piping a moving installer script. It is agent-side
+  proof infrastructure, not a project runtime dependency.
 - Structured analysis cache rebuilds belong in `.devcontainer/post-create.sh`
   after the AgentCanon Rust CLI is installed. The rebuild uses
   `agent-canon structured-analysis build --root <workspace> --profile
@@ -132,7 +143,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   dependency.
 - llama.cpp and the default 3B-class local LLM model selector belong in
   `.devcontainer/post-create.sh` and `tools/install_llama_cpp.sh` when they are
-  used only for single-file AgentCanon responsibility analysis.
+  used only for AgentCanon local LLM analysis. This local LLM surface is
+  CPU-only even on GPU hosts; do not enable CUDA, HIP, Metal, Vulkan, or SYCL for
+  `agent-canon local-llm`, including through extra CMake flags.
 - Compiled agent convenience binaries belong under
   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}`. `/usr/local/bin` may contain
   symlinks for stable command discovery, but the compiled binary cache itself

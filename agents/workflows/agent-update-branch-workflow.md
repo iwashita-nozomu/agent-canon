@@ -11,6 +11,20 @@ downstream design ../skills/agent-update-branch.md exposes the workflow as a ski
 This workflow makes the template repository the update hub for AgentCanon pins,
 memory feedback, and eval feedback without mixing those updates into feature branches.
 
+## Branch Reuse Gate
+
+Do not create an `agent-updates/*` branch when the current branch / PR already
+owns the same lane. Continue the existing branch for added user instructions,
+small follow-ups, checklist evidence, and parent pin updates that belong to the
+same AgentCanon PR route. A new branch requires a recorded
+`branch_creation_reason=<reason>` and one of these conditions:
+
+- the current branch / PR is merged, closed, or unpushable
+- the update belongs to a different lane or ownership surface
+- explicit review isolation is required
+- continuing would mix incompatible pin, memory, eval, or protected-surface work
+- the user explicitly asks for a separate branch
+
 ## Branch Lanes
 
 - `agent-updates/memory-eval/<slug>`: memory and eval-only updates.
@@ -19,8 +33,8 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 ## Memory/Eval Branch
 
-1. Start from `template/main`.
-1. Create `agent-updates/memory-eval/<slug>`.
+1. Reuse the current branch if it already owns this memory/eval lane.
+1. Otherwise start from `template/main` and create `agent-updates/memory-eval/<slug>` only after recording `branch_creation_reason=<reason>`.
 1. Change only `memory/`, `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document feedback.
 1. Run `bash tools/agent_tools/agent_update_branch.sh validate memory-eval`.
 1. Commit with a message that states this is a memory/eval-only agent update branch.
@@ -28,8 +42,8 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 ## Canon Pin Branch
 
-1. Start from `template/main`.
-1. Create `agent-updates/canon-pin/<slug>`.
+1. Reuse the current branch if it already owns this canon-pin lane.
+1. Otherwise start from `template/main` and create `agent-updates/canon-pin/<slug>` only after recording `branch_creation_reason=<reason>`.
 1. Update the AgentCanon submodule pin, `.agent-canon/update-state.toml`, and root runtime links.
 1. Run `bash tools/sync_agent_canon.sh plan`, `bash tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
 1. Commit with the AgentCanon target commit in the message.
@@ -37,8 +51,8 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 ## Integration Branch
 
-1. Start from `template/main`.
-1. Create `agent-updates/integration/<slug>`.
+1. Reuse the current integration branch if it already owns this integration lane.
+1. Otherwise start from `template/main` and create `agent-updates/integration/<slug>` only after recording `branch_creation_reason=<reason>`.
 1. Fetch the update branches and merge them one by one.
 1. Resolve conflicts in the integration branch, not on `main`.
 1. Run:

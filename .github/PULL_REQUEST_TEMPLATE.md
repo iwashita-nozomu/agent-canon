@@ -80,7 +80,7 @@ Plan / exception:
 ## Agent Orchestration Evidence
 
 - [ ] First work update, run bundle, or linked PR comment recorded `workflow=<family>`, `skills=$agent-orchestration,...`, and `review=<...>` before implementation.
-- [ ] `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` was reviewed, or the no-repo-task / routing-only exception is recorded below.
+- [ ] `agent-canon local-llm route-skill --prompt "<user request>" --format json` was reviewed, or the no-repo-task / routing-only exception is recorded below.
 - [ ] If `$agent-orchestration` was not selected first, this PR is paused until the exception is explicit and reviewed.
 
 Orchestration evidence:
@@ -103,20 +103,22 @@ Issue / edit-scope evidence:
 
 ## Validation Evidence
 
-- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir reports/dependency-review/agent-canon-pr`
-- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot`
+- [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
+- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`
+- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_graph.tsv" --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
 - [ ] `python3 tools/agent_tools/tool_catalog.py`
 - [ ] `python3 tools/agent_tools/tool_drift.py`
+- [ ] `python3 tools/agent_tools/generated_artifact_guard.py`
 - [ ] `python3 tools/agent_tools/responsibility_scope.py`
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
 - [ ] `tools/bin/agent-canon local-llm eval`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] Path/risk smoke, when relevant: `python3 tools/agent_tools/classify_path_risk.py --paths-file <changed-paths>`
-- [ ] `bash tools/ci/run_docs_checks.sh`
+- [ ] `tools/bin/agent-canon docs check`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`
 - [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots, or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source, instead of automatic `actions/checkout` submodules.
 - [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or an equivalent documented GitHub App token covers private AgentCanon reads.

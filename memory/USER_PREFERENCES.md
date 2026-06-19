@@ -159,6 +159,30 @@ upstream design README.md memory surface index
 - 2026-06-01 | Reader-facing documents, reports, workflow guides, and plans should actively use Mermaid diagrams for nontrivial process, dependency, ownership, routing, state, or review-gate structure when the diagram adds reader value.
   - source: chat
 
+- 2026-06-12 | When improving AgentCanon workflow policy, prioritize removing stale or obsolete conventions and hard-stop assumptions over adding new style-like rules.
+  - source: chat
+
+- 2026-06-13 | コード編集では保守的すぎる最小差分に寄せず、問題の再発源が設計・構造・古い surface にある場合は、十分な大きさの cohesive edit と削除・置換まで踏み込んでほしい。
+  - source: chat
+
+- 2026-06-14 | Before starting work, declare the intended work once in chat, including the task focus and immediate action, then proceed.
+  - source: chat
+
+- 2026-06-14 | Do not add numerical tests unless the changed behavior, known regression, acceptance criterion, proof obligation, or experiment contract has a concrete numerical trigger; otherwise prefer static or lightweight deterministic non-numerical tests and record the omission reason.
+  - source: chat
+
+- 2026-06-15 | Reader-facing repository documents should use positive responsibility and contract phrasing.
+  - source: chat
+
+- 2026-06-15 | Temporary code should be explicitly marked as temporary when created, and removed before closeout once it has served its purpose.
+  - source: chat
+
+- 2026-06-15 | Use GitHub Issues as durable work tracking when appropriate, and include issue cleanup or explicit issue status confirmation in closeout.
+  - source: chat
+
+- 2026-06-18 | 証明や実装の説明では、エージェントが勝手に作った抽象名・ラベルで説明せず、実在するコード名・定理名・数式・入出力に基づいて説明する。新しい便宜名を使う場合は導入理由と非正本であることを明示する。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

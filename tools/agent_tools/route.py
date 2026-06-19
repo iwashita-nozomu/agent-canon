@@ -3,6 +3,7 @@
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
 # downstream design ../../documents/tools/route.md reader-facing route tool documentation
@@ -16,8 +17,11 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
+from pathlib import Path
+
+import yaml
 
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
@@ -27,7 +31,9 @@ FORMAT_VALUES = ("text", "json", "markdown")
 MODE_VALUES = ("routing-only", "repo-changing")
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
-SkillRuleData = tuple[str, str, tuple[tuple[str, ...], ...]]
+DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
+STAGE_POLICY_VALUES = ("active", "deferred")
 
 AREA_DATA: tuple[AreaData, ...] = (
     (
@@ -37,6 +43,35 @@ AREA_DATA: tuple[AreaData, ...] = (
         "classify_runtime_surface",
         ("python3 tools/agent_tools/route.py --area surface",),
         ("profile_surface_resolver.py", "runtime-surface-minimize", "tool_profile_visibility.py"),
+    ),
+    (
+        "structure",
+        "repository structure",
+        "Classify repo-root, shared-canon, project runtime view, and personal runtime surfaces before refactors.",
+        "classify_structure_refactor_surface",
+        (
+            "python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json",
+            "python3 tools/agent_tools/responsibility_scope.py --root <root> --format json",
+            "python3 tools/agent_tools/import_responsibility.py --root <root> --format json",
+        ),
+        (
+            "structure-refactor",
+            "repo-refactor",
+            "repo_refactor_skill",
+            "refactor",
+            "repository-refactor",
+            "repo-structure",
+            "repository-structure",
+            "structure-review",
+            "structure-review-skill",
+            "structural-review",
+            "responsibility-scope",
+            "personal-runtime-surface",
+            "codex-personal-runtime",
+            "codex-config-surface",
+            "dot-codex-surface",
+            "~/.codex",
+        ),
     ),
     (
         "profile",
@@ -245,149 +280,6 @@ AREA_DATA: tuple[AreaData, ...] = (
     ),
 )
 
-SKILL_RULES: tuple[SkillRuleData, ...] = (
-    (
-        "agent-orchestration",
-        "workflow, skill, subagent, or stage routing is part of the request",
-        (
-            ("どのスキル",),
-            ("どのskill",),
-            ("スキル選択",),
-            ("skill selection",),
-            ("routing", "skill"),
-            ("ルーティング", "スキル"),
-            ("マルチエージェント",),
-            ("サブエージェント", "起動"),
-            ("subagent", "routing"),
-            ("workflow=", "skills="),
-        ),
-    ),
-    (
-        "subagent-bootstrap",
-        "explicit subagent or multi-agent execution requires run-local specialist routing",
-        (
-            ("マルチエージェント",),
-            ("サブエージェント",),
-            ("subagent",),
-            ("multi-agent",),
-        ),
-    ),
-    (
-        "agent-learning",
-        "user feedback or recurrence prevention should become durable agent learning",
-        (
-            ("人間からのフィードバック",),
-            ("runtime feedback",),
-            ("再発防止",),
-            ("こういう止まり方",),
-            ("フィードバック", "修正"),
-            ("feedback", "repair"),
-            ("memory", "feedback"),
-        ),
-    ),
-    (
-        "agent-log-analysis",
-        "skill/tool/workflow routing misses or selection coverage require runtime log analysis",
-        (
-            ("routing miss",),
-            ("selection gap",),
-            ("routing", "coverage"),
-            ("toolcall", "skillcall", "coverage"),
-            ("toolcall", "skillcall", "routing"),
-            ("toolcall", "skillcall", "miss"),
-            ("toolcall", "skillcall", "50"),
-            ("toolcall", "skillcall", "されない"),
-            ("ルーティング", "ログ"),
-            ("ログ", "skill"),
-            ("ログ", "tool"),
-            ("toolcall", "skillcall", "ルーティング"),
-        ),
-    ),
-    (
-        "md-style-check",
-        "Markdown style, links, headings, or docs lint are in scope",
-        (
-            ("md-style",),
-            ("docs-check",),
-            ("agent-canon", "docs"),
-            ("docs", "format"),
-            ("docs", "check"),
-            ("markdownlint",),
-            ("markdown", "lint"),
-            ("markdown", "heading"),
-            ("markdown", "link"),
-            ("markdown", "formatter"),
-            ("format_markdown",),
-            ("formatter", "adjacent"),
-            ("フォーマッタ",),
-            ("フォーマット", "周辺"),
-            ("通してすらない",),
-            ("マークダウン", "体裁"),
-            ("マークダウン", "リンク"),
-        ),
-    ),
-    (
-        "oop-readability-check",
-        "OOP readability or readability guard evidence is in scope",
-        (
-            ("oop", "readability"),
-            ("oop", "可読"),
-            ("オブジェクト指向", "可読"),
-            ("readability", "guard"),
-            ("readability", "check"),
-            ("可読性", "class"),
-            ("可読性", "method"),
-        ),
-    ),
-    (
-        "result-artifact-writeout",
-        "raw results, reports, manifests, or accumulated evidence must be written out",
-        (
-            ("結果書き出し",),
-            ("結果を書き出",),
-            ("result writeout",),
-            ("artifact", "evidence"),
-            ("artifact", "report"),
-            ("run bundle", "evidence"),
-            ("蓄積分析", "レポート"),
-            ("ログ", "レポート", "残"),
-        ),
-    ),
-    (
-        "prose-reasoning-graph",
-        "prose structure graphing, diagnostics, or rewrite handoff is in scope",
-        (
-            ("文章構造", "graph"),
-            ("文章構造", "グラフ"),
-            ("段落", "接続"),
-            ("段落", "統合"),
-            ("dsl", "文章"),
-            ("prose", "graph"),
-            ("prose", "reasoning"),
-            ("rewrite", "packet"),
-            ("claim", "evidence", "graph"),
-        ),
-    ),
-    (
-        "pr-processing",
-        "pull request, merge queue, conflict repair, or issue triage processing is in scope",
-        (
-            ("pr", "処理"),
-            ("pr", "merge"),
-            ("pr", "マージ"),
-            ("pull request",),
-            ("pull request", "merge"),
-            ("merge queue",),
-            ("queue cleanup",),
-            ("conflict", "解消"),
-            ("コンフリクト", "解消"),
-            ("issue", "triage"),
-            ("issue", "処理"),
-            ("branch protection",),
-            ("required checks",),
-        ),
-    ),
-)
 REPO_CHANGING_TERMS = (
     "修正",
     "実装",
@@ -435,6 +327,16 @@ class RouteDecision:
 
 
 @dataclass(frozen=True)
+class SkillRoutingRule:
+    """One catalog-backed prompt routing rule for a public skill."""
+
+    skill: str
+    reason: str
+    stage_policy: str
+    triggers: tuple[tuple[str, ...], ...]
+
+
+@dataclass(frozen=True)
 class SkillRouteMatch:
     """One prompt-derived public skill route."""
 
@@ -449,6 +351,8 @@ class SkillRouteDecision:
     route: str
     mode: str
     skills: tuple[str, ...]
+    active_skills: tuple[str, ...]
+    deferred_skills: tuple[str, ...]
     matched_skills: tuple[str, ...]
     reasons: tuple[str, ...]
     evidence: str
@@ -526,6 +430,7 @@ def normalize_name(value: str) -> str:
 def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", default=str(DEFAULT_ROOT), help="repository root for catalog-backed routing")
     parser.add_argument("--area", choices=[area.key for area in catalog.areas()])
     parser.add_argument("--name", action="append", default=[], help="long tool or skill name")
     parser.add_argument("--prompt", default="", help="prompt text to route into public skills")
@@ -557,6 +462,81 @@ def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     return all(term.lower() in text for term in group)
 
 
+def load_skill_catalog(root: Path) -> dict[str, object]:
+    """Load the machine-readable public skill catalog."""
+    path = root / SKILL_CATALOG_PATH
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{SKILL_CATALOG_PATH} YAML parse failed: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"{SKILL_CATALOG_PATH} must be a mapping")
+    return raw
+
+
+def string_list(value: object, field: str) -> tuple[str, ...]:
+    """Return a tuple of non-empty strings from one YAML sequence."""
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{field} entries must be non-empty strings")
+        result.append(item)
+    return tuple(result)
+
+
+def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
+    """Return normalized trigger term groups from YAML."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list")
+    groups: list[tuple[str, ...]] = []
+    for index, group in enumerate(value):
+        groups.append(string_list(group, f"{field}[{index}]"))
+    return tuple(groups)
+
+
+def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
+    """Load prompt-routing rules from the public skill catalog."""
+    data = load_skill_catalog(root)
+    families = data.get("skill_families")
+    if not isinstance(families, list):
+        raise ValueError("skill_families must be a list")
+    rules: list[SkillRoutingRule] = []
+    observed_skill_ids: set[str] = set()
+    for index, entry in enumerate(families):
+        if not isinstance(entry, dict):
+            raise ValueError(f"skill_families[{index}] must be a mapping")
+        skill_id = entry.get("id")
+        if not isinstance(skill_id, str) or not skill_id.strip():
+            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        if skill_id in observed_skill_ids:
+            raise ValueError(f"duplicate skill catalog id: {skill_id}")
+        observed_skill_ids.add(skill_id)
+        routing = entry.get("routing", {})
+        if routing is None:
+            routing = {}
+        if not isinstance(routing, dict):
+            raise ValueError(f"{skill_id}.routing must be a mapping")
+        reason = routing.get("reason", "prompt explicitly names public skill")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"{skill_id}.routing.reason must be a non-empty string")
+        stage_policy = routing.get("stage_policy", "deferred")
+        if stage_policy not in STAGE_POLICY_VALUES:
+            raise ValueError(f"{skill_id}.routing.stage_policy must be one of {STAGE_POLICY_VALUES}")
+        rules.append(
+            SkillRoutingRule(
+                skill=skill_id,
+                reason=reason,
+                stage_policy=str(stage_policy),
+                triggers=trigger_groups(routing.get("triggers"), f"{skill_id}.routing.triggers"),
+            )
+        )
+    return tuple(rules)
+
+
 def public_skill_name_mentioned(text: str, skill: str) -> bool:
     """Return whether prompt text explicitly names one public skill id."""
     return (
@@ -568,15 +548,15 @@ def public_skill_name_mentioned(text: str, skill: str) -> bool:
     )
 
 
-def matched_skill_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+def matched_skill_routes(prompt: str, rules: Sequence[SkillRoutingRule]) -> tuple[SkillRouteMatch, ...]:
     """Return public skill matches for one prompt."""
     text = prompt.lower()
     matches: list[SkillRouteMatch] = []
-    for skill, reason, groups in SKILL_RULES:
-        explicit = public_skill_name_mentioned(text, skill)
-        if explicit or any(text_matches_group(text, group) for group in groups):
-            match_reason = "prompt explicitly names public skill" if explicit else reason
-            matches.append(SkillRouteMatch(skill, match_reason))
+    for rule in rules:
+        explicit = public_skill_name_mentioned(text, rule.skill)
+        if explicit or any(text_matches_group(text, group) for group in rule.triggers):
+            match_reason = "prompt explicitly names public skill" if explicit else rule.reason
+            matches.append(SkillRouteMatch(rule.skill, match_reason))
     return tuple(matches)
 
 
@@ -602,20 +582,45 @@ def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
-def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
+def is_current_stage_skill(skill: str, rules_by_skill: Mapping[str, SkillRoutingRule]) -> bool:
+    """Return whether one matched skill belongs in the initial routing wave."""
+    rule = rules_by_skill.get(skill)
+    return rule is not None and rule.stage_policy == "active"
+
+
+def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     active_mode = infer_mode(prompt, mode)
-    matches = matched_skill_routes(prompt)
+    rules_by_skill = {rule.skill: rule for rule in rules}
+    matches = matched_skill_routes(prompt, rules)
     matched_skills = tuple(match.skill for match in matches)
     base_skills = ["agent-orchestration"]
     if active_mode == "repo-changing":
         base_skills.append("codex-task-workflow")
     skills = ordered_unique((*base_skills, *matched_skills))
-    evidence = f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'}"
+    active_skills = ordered_unique(
+        (
+            "agent-orchestration",
+            *(
+                match.skill
+                for match in matches
+                if match.reason == "prompt explicitly names public skill"
+                or is_current_stage_skill(match.skill, rules_by_skill)
+            ),
+        )
+    )
+    deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
+    evidence = (
+        f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
+        f"active={','.join(active_skills)};"
+        f"deferred={','.join(deferred_skills) if deferred_skills else 'none'}"
+    )
     return SkillRouteDecision(
         route="skill-selection",
         mode=active_mode,
         skills=skills,
+        active_skills=active_skills,
+        deferred_skills=deferred_skills,
         matched_skills=matched_skills,
         reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
         evidence=evidence,
@@ -679,6 +684,14 @@ class RouteRenderer:
                     f"- Route: `{decision.route}`",
                     f"- Mode: `{decision.mode}`",
                     f"- Skills: {skills}",
+                    "- Active skills: "
+                    + ", ".join(f"`${skill}`" for skill in decision.active_skills),
+                    "- Deferred skills: "
+                    + (
+                        ", ".join(f"`${skill}`" for skill in decision.deferred_skills)
+                        if decision.deferred_skills
+                        else "`none`"
+                    ),
                     f"- Matched skills: `{','.join(decision.matched_skills) or 'none'}`",
                     f"- Reasons: {reasons}",
                     f"- Evidence: `{decision.evidence}`",
@@ -689,6 +702,13 @@ class RouteRenderer:
                 f"ROUTE={decision.route}",
                 f"MODE={decision.mode}",
                 f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
+                f"ACTIVE_SKILLS={','.join(f'${skill}' for skill in decision.active_skills)}",
+                "DEFERRED_SKILLS="
+                + (
+                    ",".join(f"${skill}" for skill in decision.deferred_skills)
+                    if decision.deferred_skills
+                    else "-"
+                ),
                 f"MATCHED_SKILLS={','.join(decision.matched_skills) or '-'}",
                 f"REASONS={';'.join(decision.reasons) or '-'}",
                 f"EVIDENCE={decision.evidence}",
@@ -753,7 +773,12 @@ def main() -> int:
     renderer = RouteRenderer(args.format)
 
     if args.prompt:
-        print(renderer.render_skill_decision(decide_skills(str(args.prompt), str(args.mode))))
+        try:
+            rules = load_skill_route_rules(Path(args.root).resolve())
+        except (OSError, ValueError) as exc:
+            print(f"SKILL_ROUTER_ERROR={exc}", file=sys.stderr)
+            return 2
+        print(renderer.render_skill_decision(decide_skills(str(args.prompt), str(args.mode), rules)))
         return 0
 
     if args.name:

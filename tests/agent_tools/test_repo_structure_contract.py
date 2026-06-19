@@ -122,6 +122,32 @@ class RepoStructureContractTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_standalone_profile_allows_runtime_and_evidence_support_dirs(self) -> None:
+        """Standalone AgentCanon should classify shared runtime support dirs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_standalone_fixture(root)
+            (root / ".vscode").mkdir()
+            (root / "evidence").mkdir()
+
+            result = self.run_checker(root, "--profile", "agent_canon_standalone")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("unexpected_top_level:.vscode", result.stdout)
+            self.assertNotIn("unexpected_top_level:evidence", result.stdout)
+
+    def test_template_profile_allows_evidence_root_view(self) -> None:
+        """Template roots should classify the shared evidence symlink view."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_template_fixture(root)
+            (root / "evidence").mkdir()
+
+            result = self.run_checker(root, "--profile", "template_or_derived_repo")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("unexpected_top_level:evidence", result.stdout)
+
     def write_standalone_fixture(self, root: Path) -> None:
         """Create the minimal standalone structure required by the contract."""
         for file_path in [
@@ -137,15 +163,39 @@ class RepoStructureContractTest(unittest.TestCase):
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [
             "agents/skills",
+            "agents/internal-routines",
             "agents/workflows",
             "agents/canonical",
             "documents/tools",
             "tools/agent_tools",
+            "tools/user",
+            "tools/internal",
             "tools/ci",
             "tests/agent_tools",
             "memory",
             "notes",
             "issues",
+        ]:
+            (root / dir_path).mkdir(parents=True, exist_ok=True)
+
+    def write_template_fixture(self, root: Path) -> None:
+        """Create the minimal template structure required by the contract."""
+        for file_path in [
+            "README.md",
+            "AGENTS.md",
+            ".gitmodules",
+            "documents/README.md",
+            "goal.md",
+            "responsibility-scope.toml",
+        ]:
+            self.write_file(root, file_path, f"{file_path}\n")
+        for dir_path in [
+            "vendor/agent-canon",
+            "tools",
+            "agents",
+            ".codex",
+            ".devcontainer",
+            ".vscode",
         ]:
             (root / dir_path).mkdir(parents=True, exist_ok=True)
 
@@ -170,6 +220,7 @@ class RepoStructureContractTest(unittest.TestCase):
                     "contents": [
                         {"type": "file", "name": "TASK_WORKFLOWS.md"},
                         {"type": "directory", "name": "skills"},
+                        {"type": "directory", "name": "internal-routines"},
                         {"type": "directory", "name": "workflows"},
                         {"type": "directory", "name": "canonical"},
                     ],
@@ -189,6 +240,8 @@ class RepoStructureContractTest(unittest.TestCase):
                     "contents": [
                         {"type": "file", "name": "catalog.yaml"},
                         {"type": "directory", "name": "agent_tools"},
+                        {"type": "directory", "name": "user"},
+                        {"type": "directory", "name": "internal"},
                         {"type": "directory", "name": "ci"},
                     ],
                 },

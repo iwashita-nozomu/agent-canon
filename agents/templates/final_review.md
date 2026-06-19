@@ -21,6 +21,10 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items. Return revise if a changed slice is only justified by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Record blockers or escalation points. -->
 
+## Design Side-Effect Trace Acceptance
+
+<!-- Confirm that implemented side effects match the approved Design Side-Effect Map, including documents, workflows, prompt/config, validation output, dependency manifests, and user-facing surfaces. Record any side-effect item that moved to a later stage, was escalated, or received explicit reviewer acceptance. -->
+
 ## Planned Work Completion Review
 
 <!-- Confirm that all planned work units and active clauses are complete, that schedule.md still reflects the full TODO surface, and that work_log.md shows the meaningful execution trail. Return required_change if only a chunk, slice, checkpoint, or subpass is complete. -->

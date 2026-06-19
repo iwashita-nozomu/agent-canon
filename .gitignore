@@ -11,6 +11,7 @@ __pycache__/
 # Test/tool cache
 .pytest_cache/
 .ruff_cache/
+.state/agent-eval-runs/
 .agent-canon/search-index/
 .agent-canon/semantic-index/
 .agent-canon/log-archive/
@@ -20,7 +21,9 @@ rust/agent-canon/target/
 reports/agents/
 reports/agent-eval-runs/
 reports/agent-improvement-guide/
+reports/agent-runtime-dashboard/
 reports/dependency-review/
+reports/review/
 reports/hooks/
 reports/.cache/
 reports/*.json

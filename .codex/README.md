@@ -97,16 +97,23 @@ or high-risk review. Profiles do not waive workflow gates.
   - runtime hard ceiling として使います
 - `job_max_runtime_seconds = 3600`
   - 長めの review / repo scan / validation を含む subagent job を 1 時間まで許容します
-- `max_depth = 1`
-  - recursive fan-out は既定で止めます
+- `max_depth = 2`
+  - one bounded child-subagent layer を許可します
 - 同時 spawn の既定 budget は workflow family 側で決めます
   - `Scoped Change Lite`: 4
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
 - `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
-- write-capable subagent は既定 1 体です。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、spawn budget 内で複数 writer を並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
+- same-role instance policy は `agents/task_catalog.yaml` と generated
+  `team_manifest.yaml` の `run.delegated_spawn_policy` が正本です。
+  `.codex/config.toml` の `[agents]` には Codex runtime が読む runtime
+  limit と `[agents.<role>]` registry だけを置き、policy 文字列を置きません。
+  `role_type+instance_id` が instance key で、`max_threads` は runtime cap であり
+  role cardinality の source ではありません。
+- write-capable subagent instance は既定 1 体から始めます。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、同じ role type を含む複数 writer instance を spawn budget 内で並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
+- active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
@@ -128,6 +135,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
 - `PostToolUse` は `hooks/library_implementation_guard.py` で、`vendor/**`、`site-packages`、`node_modules`、`responsibility-scope.toml` の `external_dependency` scope などの library implementation 既存ファイルを直接書き換えた場合に finding を出します。dependency の変更は wrapper / adapter、fork / upstream patch、または manifest-backed vendor import として扱い、library 内部をその場で直しません。
 - `PostToolUse` は `hooks/helper_first_guard.py` で、changed Python file に helper-like function 追加があり、test / docs / issue / responsibility-scope などの ownership evidence が無い場合を finding として記録します。hook log には accepted / flagged の両方を分析できるように `helper_candidate_records` と flagged subset の `helper_first_records`、role、candidate / judgment rule、incoming count、specialization を残し、後続の prompt / skill 改善 eval に使います。
+- `PostToolUse` は `hooks/helper_inventory_guard.py` で、repo-local `helper_inventory_guard_policy.json` に従い、`needs_user_judgment`、tool rule gap、role/action name gap を domain 別 count として記録します。`name_gap` は `helper_function_inventory.py` の `searchable_name` / `name_search_rule` から集計します。
 - `PostToolUse` は `hooks/style_checker_guard.py` で、changed Python / C++ / notebook / Markdown file に対応する体裁 checker を自動選択します。Python は `ruff check`、C++ は C++ readability、notebook は notebook quality、Markdown は lint / math notation を実行し、checker が選択されなかった changed file も `unchecked_files` として hook log に残します。
 - `PostToolUse` は `hooks/notebook_quality_guard.py` でも changed notebook を確認し、細かい assertion / pytest / unittest / `test_` helper / stored error output を含む notebook、または visualization を持たない notebook を finding として記録します。notebook は部分実行できる実用 demo として保ち、細かい検証は `tests/` へ置きます。
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を continuation context として返します。

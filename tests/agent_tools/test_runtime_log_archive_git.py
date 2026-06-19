@@ -17,7 +17,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.runtime_log_paths import mounted_log_archive_root, repo_log_key
+from tools.agent_tools.runtime_log_paths import (
+    mounted_log_archive_root,
+    repo_log_key,
+    safe_slug,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
@@ -32,10 +36,16 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         source_root: Path,
         canon_root: Path,
         remote: Path,
+        extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run the archive helper with explicit temp paths."""
         env = os.environ.copy()
         env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["AGENT_CANON_LOG_ENV"] = "test-env"
+        for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
+            env.pop(env_name, None)
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(
             [
                 sys.executable,
@@ -54,6 +64,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             text=True,
         )
 
+    def expected_branch(self, source: Path, chat_key: str | None = None) -> str:
+        """Return the deterministic branch expected by run_tool."""
+        chat_segment = safe_slug(chat_key) if chat_key else f"no-chat-{repo_log_key(source)}"
+        return f"logs/test-env-{chat_segment}"
+
     def make_remote(self, root: Path) -> Path:
         """Create a temporary Git remote with a main branch."""
         seed = root / "seed"
@@ -69,8 +84,17 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         subprocess.run(["git", "clone", "--bare", str(seed), str(remote)], check=True, capture_output=True)
         return remote
 
+    def archive_branch(self, archive: Path) -> str:
+        """Return the currently checked out archive branch."""
+        return subprocess.run(
+            ["git", "-C", str(archive), "branch", "--show-current"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
     def test_repo_key_prints_branch_context(self) -> None:
-        """repo-key should show the source-root derived log branch."""
+        """repo-key should show the environment-plus-chat derived log branch."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -78,15 +102,24 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source.mkdir()
             canon.mkdir()
             remote = self.make_remote(root)
+            chat_key = "Chat UUID 1"
 
-            result = self.run_tool("repo-key", source_root=source, canon_root=canon, remote=remote)
+            result = self.run_tool(
+                "repo-key",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                extra_env={"CODEX_THREAD_ID": chat_key},
+            )
 
         key = repo_log_key(source)
+        expected_branch = self.expected_branch(source, chat_key)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={key}", result.stdout)
-        self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn("RUNTIME_LOG_ARCHIVE_BRANCH_KEY=test-env-chat-uuid-1", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
-        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(
             f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon) / 'agent-reports' / key}",
             result.stdout,
@@ -117,10 +150,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     capture_output=True,
                     text=True,
                 ).stdout.strip(),
-                f"logs/{key}",
+                self.expected_branch(source),
             )
 
-            log_path = archive / "hook-runs" / key / "test" / "skill_usage.jsonl"
+            log_path = archive / "hook-runs" / key / "test" / "skill_usage-no-git-head.jsonl"
             log_path.parent.mkdir(parents=True)
             log_path.write_text(
                 json.dumps(
@@ -184,12 +217,331 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
 
             remote_ref = subprocess.run(
-                ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/logs/{key}"],
+                ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/{self.expected_branch(source)}"],
                 check=False,
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(remote_ref.returncode, 0, remote_ref.stderr)
+
+    def test_ensure_moves_current_key_dirty_logs_to_expected_branch(self) -> None:
+        """Ensure should preserve current repo-key dirt when switching from another log branch."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            source_ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(source_ensure.returncode, 0, source_ensure.stdout + source_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            log_path = archive / "hook-runs" / key / "runtime" / "skill_usage.jsonl"
+            context_path = archive / "hook-runs" / key / "runtime" / "skill_usage_context.json"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-existing",
+                        "timestamp": "2026-05-24T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change Lite"],
+                        "report_dir": str(source / "reports" / "agents" / "run-old"),
+                        "timestamp": "2026-05-24T00:00:00Z",
+                        "source_event": "PromptSubmit",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            initial_push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(initial_push.returncode, 0, initial_push.stdout + initial_push.stderr)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
+
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-current-key",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change", "python-review"],
+                        "report_dir": str(source / "reports" / "agents" / "run-new"),
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "source_event": "PostToolUse",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(source))
+            self.assertTrue(log_path.exists())
+            log_text = log_path.read_text(encoding="utf-8")
+            self.assertIn("hook-existing", log_text)
+            self.assertIn("hook-current-key", log_text)
+            merged_context = json.loads(context_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                merged_context,
+                {
+                    "workflows": ["Scoped Change Lite", "Scoped Change", "python-review"],
+                    "report_dir": str(source / "reports" / "agents" / "run-new"),
+                    "timestamp": "2026-05-25T00:00:00Z",
+                    "source_event": "PostToolUse",
+                },
+            )
+
+            status = self.run_tool(
+                "status",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_BRANCH_MATCH=yes", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=yes", status.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={key}", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY=yes", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY=no", status.stdout)
+
+            pushed = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            remote_tree = subprocess.run(
+                [
+                    "git",
+                    "--git-dir",
+                    str(remote),
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    self.expected_branch(source),
+                    "--",
+                    "hook-runs",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn(f"hook-runs/{key}/runtime/skill_usage.jsonl", remote_tree.stdout)
+            self.assertIn(f"hook-runs/{key}/runtime/skill_usage_context.json", remote_tree.stdout)
+
+    def test_ensure_rejects_same_key_unmergeable_json_conflict(self) -> None:
+        """Ensure should keep unsafe same-key JSON conflicts as blockers without partial restore."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            source_ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(source_ensure.returncode, 0, source_ensure.stdout + source_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            log_path = archive / "hook-runs" / key / "runtime" / "skill_usage.jsonl"
+            unsafe_path = archive / "hook-runs" / key / "runtime" / "tool_context.json"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text('{"hook_run_id": "target"}\n', encoding="utf-8")
+            unsafe_path.parent.mkdir(parents=True, exist_ok=True)
+            unsafe_path.write_text('{"value": "target"}\n', encoding="utf-8")
+            initial_push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(initial_push.returncode, 0, initial_push.stdout + initial_push.stderr)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text('{"hook_run_id": "dirty"}\n', encoding="utf-8")
+            unsafe_path.parent.mkdir(parents=True, exist_ok=True)
+            unsafe_path.write_text('{"value": "dirty"}\n', encoding="utf-8")
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertNotEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertIn(
+                "RUNTIME_LOG_ARCHIVE_ERROR=archive current repo-key changes were preserved in stash@{0}",
+                ensure.stdout,
+            )
+            self.assertIn("but restoring them on", ensure.stdout)
+            self.assertIn("archive destination already exists with different content", ensure.stdout)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(source))
+            self.assertEqual(log_path.read_text(encoding="utf-8"), '{"hook_run_id": "target"}\n')
+            self.assertEqual(unsafe_path.read_text(encoding="utf-8"), '{"value": "target"}\n')
+
+    def test_ensure_rejects_malformed_context_timestamp_before_restore(self) -> None:
+        """Ensure should not auto-merge workflow context JSON with malformed timestamps."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            source_ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(source_ensure.returncode, 0, source_ensure.stdout + source_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            context_path = archive / "hook-runs" / key / "runtime" / "skill_usage_context.json"
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change Lite"],
+                        "report_dir": str(source / "reports" / "agents" / "run-old"),
+                        "timestamp": "2026-05-24T00:00:00Z",
+                        "source_event": "PromptSubmit",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            initial_push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(initial_push.returncode, 0, initial_push.stdout + initial_push.stderr)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "workflows": ["Scoped Change"],
+                        "report_dir": str(source / "reports" / "agents" / "run-new"),
+                        "timestamp": "2026-05-25 00:00:00Z",
+                        "source_event": "PostToolUse",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertNotEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertIn("archive context JSON has malformed timestamp", ensure.stdout)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(source))
+            self.assertEqual(
+                json.loads(context_path.read_text(encoding="utf-8")),
+                {
+                    "workflows": ["Scoped Change Lite"],
+                    "report_dir": str(source / "reports" / "agents" / "run-old"),
+                    "timestamp": "2026-05-24T00:00:00Z",
+                    "source_event": "PromptSubmit",
+                },
+            )
+
+    def test_ensure_rejects_foreign_dirty_logs_before_branch_switch(self) -> None:
+        """Ensure should not switch branches when dirty paths belong to another repo key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            other_key = repo_log_key(other_source)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
+            foreign_log.parent.mkdir(parents=True)
+            foreign_log.write_text('{"hook_run_id": "foreign-dirty"}\n', encoding="utf-8")
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertNotEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_ERROR=archive has local changes", ensure.stdout)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
+            self.assertTrue(foreign_log.exists())
+
+    def test_ensure_rejects_archive_level_dirty_paths_before_branch_switch(self) -> None:
+        """Ensure should not auto-preserve archive-level policy/tool dirt."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+
+            other_ensure = self.run_tool(
+                "ensure",
+                source_root=other_source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            tool_path = archive / "tools" / "runtime_log_dashboard.py"
+            tool_path.parent.mkdir(parents=True)
+            tool_path.write_text("# dashboard change\n", encoding="utf-8")
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertNotEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_ERROR=archive has local changes", ensure.stdout)
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
+            self.assertTrue(tool_path.exists())
 
     def test_status_reports_foreign_repo_key_dirty_paths(self) -> None:
         """status/check-clean should expose dirty paths for another repo key."""
@@ -208,7 +560,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon)
-            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard.jsonl"
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
                 json.dumps(
@@ -244,6 +596,60 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertNotEqual(clean_check.returncode, 0, clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
+
+    def test_check_clean_rejects_committed_foreign_repo_key_tree(self) -> None:
+        """check-clean should fail when a clean branch already contains another repo key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            other_source = root / "agent-canon-standalone"
+            source.mkdir()
+            canon.mkdir()
+            other_source.mkdir()
+            remote = self.make_remote(root)
+            other_key = repo_log_key(other_source)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage-no-git-head.jsonl"
+            foreign_log.parent.mkdir(parents=True)
+            foreign_log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-committed-foreign",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": other_key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "-C", str(archive), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(archive), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(archive), "add", "hook-runs"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "-C", str(archive), "commit", "-m", "Commit foreign tree"],
+                check=True,
+                capture_output=True,
+            )
+
+            clean_check = self.run_tool(
+                "check-clean",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(clean_check.returncode, 0, clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", clean_check.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={other_key}", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=yes", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
 
@@ -337,11 +743,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
             archive = mounted_log_archive_root(canon)
-            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl"
+            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl"
             runtime_summary.parent.mkdir(parents=True)
             runtime_summary.write_text('{"conversation_id": "thread-1", "thread_id": "thread-1"}\n', encoding="utf-8")
             runtime_index = archive / "codex-runtime" / key / "index.jsonl"
-            runtime_index.write_text('{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary.jsonl"}\n', encoding="utf-8")
+            runtime_index.write_text(
+                '{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary-no-git-head.jsonl"}\n',
+                encoding="utf-8",
+            )
             run_dir = source / "reports" / "agents" / "run-2"
             run_dir.mkdir(parents=True)
             (run_dir / "closeout_gate.md").write_text("closeout=yes\n", encoding="utf-8")
@@ -353,8 +762,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             clone = root / "verification"
             subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
-            subprocess.run(["git", "-C", str(clone), "switch", f"logs/{key}"], check=True, capture_output=True)
-            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl").exists())
+            subprocess.run(["git", "-C", str(clone), "switch", self.expected_branch(source)], check=True, capture_output=True)
+            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl").exists())
             self.assertTrue((clone / "codex-runtime" / key / "index.jsonl").exists())
             self.assertTrue((clone / "agent-reports" / key / "run-2" / "closeout_gate.md").exists())
 
@@ -505,6 +914,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             archive = mounted_log_archive_root(canon) / "agent-reports" / key / "run-1" / snapshot
             self.assertTrue((archive / "verification.txt").exists())
             self.assertTrue((archive / "archive_manifest.json").exists())
+            manifest = json.loads((archive / "archive_manifest.json").read_text(encoding="utf-8"))
+            self.assertIn("codex_trace_key", manifest)
+            self.assertIn("source_git_head", manifest)
             index_path = mounted_log_archive_root(canon) / "agent-reports" / key / "index.jsonl"
             first_index = index_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(first_index), 1)
@@ -539,7 +951,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     "ls-tree",
                     "-r",
                     "--name-only",
-                    f"logs/{key}",
+                    self.expected_branch(source),
                     "--",
                     "agent-reports",
                 ],

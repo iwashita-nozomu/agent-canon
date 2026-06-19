@@ -16,7 +16,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "tools/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow scaled by workflow family: lite scoped fixes use cheap-first triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks use evidence-driven perspective review instead of always enabling every frontier reviewer. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated. Every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate for non-lite work. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves instead of moved to separate worktrees; review roles remain artifact-only."
+    "summary": "The manager owns intake coordination, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability, but subagent execution is modeled as repeatable role instances identified by role_type+instance_id. Repo-changing tasks use an explicit staged flow scaled by workflow family: lite scoped fixes use cheap-first triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks use evidence-driven perspective review instead of always enabling every frontier reviewer. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated; the same role may have multiple instances when each instance has a distinct input packet, expected output, and review or write scope. Every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate for non-lite work. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently, including same-role instances, only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves instead of moved to separate worktrees; review roles remain artifact-only."
   },
   "always_on_roles": [
     {
@@ -98,6 +98,7 @@
         "detailed_design_documentation",
         "existing_code_reuse_plan",
         "style_continuity_plan",
+        "design_side_effect_map",
         "identifier_naming_plan"
       ],
       "required_outputs": [
@@ -108,7 +109,7 @@
         "allowed_artifacts": [
           "design_brief"
         ],
-        "notes": "The designer produces the detailed design document before coding begins, including reuse-first choices, identifier naming plan, and the existing writing/style conventions to follow."
+        "notes": "The designer produces the detailed design document before coding begins, including reuse-first choices, a Design Side-Effect Map, identifier naming plan, and the existing writing/style conventions to follow."
       }
     },
     {
@@ -122,6 +123,7 @@
         "simplicity_review",
         "implementation_readiness_review",
         "reuse_conformity_review",
+        "design_side_effect_review",
         "identifier_naming_review"
       ],
       "required_outputs": [
@@ -132,7 +134,7 @@
         "allowed_artifacts": [
           "design_review"
         ],
-        "notes": "The design reviewer independently checks the detailed design document, implementation readiness, identifier naming plan, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
+        "notes": "The design reviewer independently checks the detailed design document, implementation readiness, Design Side-Effect Map, identifier naming plan, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
       }
     },
     {
@@ -144,6 +146,7 @@
         "top_down_readability_review",
         "section_order_review",
         "term_introduction_review",
+        "reader_visible_side_effect_review",
         "reader_path_review",
         "document_coherence_review"
       ],
@@ -155,7 +158,7 @@
         "allowed_artifacts": [
           "document_flow_review"
         ],
-        "notes": "The document-flow reviewer reads the document linearly from the top and checks whether a first reader can follow the meaning without backtracking. It stays separate from the design reviewer."
+        "notes": "The document-flow reviewer reads the document linearly from the top and checks whether a first reader can follow the meaning and reader-visible side effects without backtracking. It stays separate from the design reviewer."
       }
     },
     {
@@ -222,6 +225,7 @@
       "owns": [
         "implementation_review",
         "regression_review",
+        "design_side_effect_trace_review",
         "design_guardrails"
       ],
       "required_outputs": [
@@ -232,7 +236,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause coverage for that chunk, records fix-now findings, and may only update review artifacts."
+        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts."
       }
     },
     {
@@ -244,6 +248,7 @@
       ],
       "owns": [
         "final_independent_review",
+        "design_side_effect_acceptance",
         "ship_blockers",
         "risk_summary"
       ],
@@ -255,7 +260,7 @@
         "allowed_artifacts": [
           "final_review"
         ],
-        "notes": "The final reviewer performs an independent ship decision, must reject partial spec-to-product coverage or unapplied fix-now review findings, and remains artifact-only."
+        "notes": "The final reviewer performs an independent ship decision, requires complete spec-to-product and Design Side-Effect Map coverage, checks fix-now review finding incorporation, and remains artifact-only."
       }
     },
     {
@@ -838,44 +843,6 @@
         ],
         "notes": "The report reviewer records report-structure and evidence-traceability findings only in the report review artifact."
       }
-    },
-    {
-      "id": "critical_guardian",
-      "codex_agents": [
-        "project_reviewer"
-      ],
-      "tier": "governance",
-      "activation": "always_on",
-      "always_evaluates": [
-        "pull_requests",
-        "skill_executions",
-        "releases",
-        "scheduled_reviews"
-      ],
-      "owns": [
-        "critical_risk_assessment",
-        "security_threat_detection",
-        "architecture_validation",
-        "testing_completeness_check",
-        "dependency_conflict_analysis",
-        "implementation_gap_detection"
-      ],
-      "required_outputs": [
-        "critical_review.md"
-      ],
-      "authority": {
-        "can_block_merge": true,
-        "can_request_changes": true,
-        "can_downvote_health_score": true,
-        "escalation_capable": true
-      },
-      "write_policy": {
-        "mode": "artifacts_only",
-        "allowed_artifacts": [
-          "critical_review"
-        ],
-        "notes": "The critical guardian provides always-on critical assessment of risks, security threats, and implementation completeness. Can block merge on critical issues only. Provides alternative suggestions and gap analysis."
-      }
     }
   ],
   "handoffs": [
@@ -1196,23 +1163,18 @@
     },
     {
       "from": "implementer",
-      "to": "critical_guardian",
-      "gate": "implementation is complete and ready for critical assessment"
+      "to": "project_reviewer",
+      "gate": "implementation is complete and ready for project review"
     },
     {
       "from": "final_reviewer",
-      "to": "critical_guardian",
-      "gate": "implementation ready for critical risk and security assessment"
+      "to": "project_reviewer",
+      "gate": "implementation ready for project integration assessment"
     },
     {
       "from": "experimenter",
-      "to": "critical_guardian",
-      "gate": "experimental results ready for critical validation"
-    },
-    {
-      "from": "critical_guardian",
-      "to": "manager_reviewer",
-      "gate": "critical assessment complete, escalation required or merge approval given"
+      "to": "project_reviewer",
+      "gate": "experimental results ready for project integration assessment"
     }
   ],
   "context_policies": [
@@ -1548,29 +1510,6 @@
         "hidden_chain_of_thought",
         "direct_session_memory"
       ]
-    },
-    {
-      "roles": [
-        "critical_guardian"
-      ],
-      "mode": "assessment_view",
-      "share_only": [
-        "intent_brief.md",
-        "design_brief.md",
-        "design_review.md",
-        "document_flow_review.md",
-        "change_review.md",
-        "final_review.md",
-        "experiment_log.md",
-        "experiment_review.md",
-        "research_notes.md",
-        "research_review.md"
-      ],
-      "do_not_share": [
-        "hidden_chain_of_thought",
-        "private_debugging_notes"
-      ],
-      "notes": "Critical guardian has read-only access to all significant artifacts to perform comprehensive risk, security, and completeness assessment."
     }
   ],
   "activation_rules": [
@@ -1620,7 +1559,7 @@
     },
     {
       "role": "project_reviewer",
-      "when": "task is comprehensive, repo-wide, workflow-heavy, or has integration risk across code, docs, tools, and runtime"
+      "when": "task is comprehensive, repo-wide, workflow-heavy, has integration risk across code, docs, tools, and runtime, creates a pull request, completes a skill execution, initiates a release, or enters scheduled review"
     },
     {
       "role": "docs_workflow_steward",
@@ -1665,10 +1604,6 @@
     {
       "role": "ml_science_reviewer",
       "when": "research perspective review pack is requested for assumptions, limitations, uncertainty, or reader-facing reporting"
-    },
-    {
-      "role": "critical_guardian",
-      "when": "pull request created, skill execution completed, release initiated, or scheduled daily review at 02:00 UTC"
     }
   ],
   "quality_gates": [
@@ -1718,7 +1653,6 @@
     "benchmark_review": "benchmark_review.md",
     "artifact_review": "artifact_review.md",
     "fair_data_review": "fair_data_review.md",
-    "ml_science_review": "ml_science_review.md",
-    "critical_review": "critical_review.md"
+    "ml_science_review": "ml_science_review.md"
   }
 }

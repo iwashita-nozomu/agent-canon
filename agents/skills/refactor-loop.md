@@ -6,6 +6,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
+upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 @dependency-end
 -->
 
@@ -33,7 +34,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 
 1. refactor-loop の対象 file は、最初に user が指した file だけで固定しません。
    まず依存解析で requested object / file から到達する依存 file、依存元 file、
-   関連 test / docs を展開し、その dependency-expanded scope 全体を候補集合に
+   関連 test / docs / validation command を展開し、その dependency-expanded scope 全体を候補集合に
    します。実装対象は、その展開済み scope 内で関数、method、class 単位に
    絞り込んでから決めます。
 1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff
@@ -62,11 +63,15 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 1. old path と new path の対応を `Path Mapping:` として残します。
 1. 大規模 repo では `Current Responsibility Map:` と `Target Responsibility Map:` を先に作り、OOP 的に責務、状態、契約、adapter を最小境界へ分けます。
 1. full tool finding、mechanical priority order、baseline packet、任意の impact、repair packet は `tool-finding-report` を使って固定し、その後 `dependency-analysis` の `Change Impact Packet` に統合します。
+   design document が refactor rationale を持つ場合は、`check_design_doc_claims.py` の finding も同じ packet に入れ、implementation-backed claim、parent-doc alignment、assumption ledger の evidence gap を repair slice の入力にします。
 1. implementation subagent を起動する前に、親 agent が dependency graph から
    `Refactor Orchestration Plan:` を作ります。依存の根本に近い sequential root
    slice と、root 修正後に並列化できる independent downstream slice を分け、
    各 target object に owner wave、`blocked_by`、allowed files、validation
    signal、single-agent / parallel-safe の判定を付けます。
+   `structure-refactor` が構造 surface 分類、root/scope contract、path mapping、
+   runtime boundary を所有し、この skill が repair batch sizing、`blocked_by`、
+   sequential / parallel wave choice、write-capable subagent orchestration を所有します。
 1. repair scope の粒度は、file / function / class に固定しません。
    `Change Impact Packet` の `scope_candidates` から、wave 数、tool rerun 数、
    write conflict risk、token budget、validation cost、semantic risk を見て

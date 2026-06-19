@@ -7,6 +7,7 @@ upstream design ../documents/semantic_index.md semantic-index tool design and ge
 upstream design ../documents/search-coordination.md coordinated search and bounded context-pack policy.
 upstream design ../documents/dependency-manifest-design.md dependency header and dependency graph policy.
 downstream design ../documents/tools/README.md documents operator-facing tool entrypoints.
+downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.
 downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the semantic vector cache.
 downstream implementation ../rust/agent-canon/src/local_llm.rs routes local LLM and llama.cpp tools.
@@ -41,6 +42,8 @@ record.
   SHA-256, Rust crates used by the Rust CLI.
 - Formal proof support: Lean 4, mathlib theorem search, LeanSearch,
   Isabelle/Sledgehammer, CoqHammer, and informal-to-formal proof sketching.
+- Compiler and proof graph tooling: LLVM Kaleidoscope, MLIR, CompCert,
+  CakeML, Lean metaprogramming, and code property graphs.
 - Static/dependency analysis: Python AST, Pyright, Ruff, pytest, program
   dependence graphs, code property graphs.
 - Runtime and operations: Rust/Cargo, Dev Containers, GitHub Actions, Git
@@ -86,10 +89,11 @@ record.
 | rusqlite crate docs | <https://docs.rs/rusqlite/latest/rusqlite/> | Rust SQLite access | `rusqlite` is an ergonomic Rust wrapper around SQLite. | Crate version in AgentCanon is pinned separately in `Cargo.toml` and `Cargo.lock`. | Adopt for Rust SQLite API reference. |
 | serde_json crate docs | <https://docs.rs/serde_json/latest/serde_json/> | JSON and JSONL output from Rust tools | `serde_json` serializes/deserializes JSON and provides untyped `Value` support. | Docs describe latest crate; validate against locked version for API changes. | Adopt for JSON output implementation reference. |
 | sha2 crate docs | <https://docs.rs/sha2/latest/sha2/> | Rust SHA-256 implementation | `sha2` provides SHA-2 hash functions in Rust. | Cryptographic security depends on correct use and dependency version. | Adopt for implementation dependency reference. |
+| yaml-rust2 crate docs | <https://docs.rs/yaml-rust2/latest/yaml_rust2/> | Rust catalog-backed YAML parsing | `yaml-rust2` parses YAML into structured `Yaml` values used by the Rust skill router. | Docs describe latest crate; validate parser behavior against the locked version in `Cargo.lock`. | Adopt for `agents/skills/catalog.yaml` routing metadata parsing. |
 
 ## Discourse Relations, Connectives, And Structure Planning
 
-Access date for this section: 2026-06-01.
+Access date for this section: 2026-06-10.
 
 | Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
 | --- | --- | --- | --- | --- | --- |
@@ -112,12 +116,32 @@ Access date for this section: 2026-06-01.
 
 | Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
 | --- | --- | --- | --- | --- | --- |
+| Lean Language Reference | <https://lean-lang.org/doc/reference/latest/> | `documents/tools/lean_capability_matrix.md`, `$formal-proof-workflow` | Lean has a reference manual for tactics, simplification, `grind`, Lake, and the kernel-oriented proof-checking model. | The latest manual can describe features newer than a pinned proof package; verify with the local `lean-toolchain`. | Use as the primary route for Lean feature availability and tactic semantics. |
 | Theorem Proving in Lean 4 | <https://lean-lang.org/theorem_proving_in_lean4/> | `$formal-proof-workflow`, `formal_proof.py` Lean target scaffolds | Lean 4 has a documented theorem-proving workflow covering propositions, tactics, interaction, induction, structures, and type classes. | Tutorial material does not imply that a user claim is already formalized or easy to prove. | Use Lean 4 as the default target stub language when no project-specific prover is mandated. |
+| Mathlib documentation | <https://leanprover-community.github.io/mathlib4_docs/Mathlib> | `documents/tools/lean_capability_matrix.md`, Mathlib-backed proof attempts | Mathlib exposes a broad module and tactic surface including algebra, order, tactic, and theorem-search-adjacent modules. | Documentation volume is large and search-sensitive; import availability depends on the pinned Mathlib revision. | Use for existing theorem/tactic discovery before hand-rolling lemmas. |
 | Searching for Theorems in Mathlib | <https://leanprover-community.github.io/blog/posts/searching-for-theorems-in-mathlib/> | Existing proof search stage and query packet | Mathlib theorem search should combine documentation search, natural-language search tools, type/signature search, community archive search, and in-editor tactics such as `exact?`. | Search tools are heuristic and can miss a theorem if names, statement shape, or imports differ. | Require existing proof search before new formalization for likely-library claims. |
+| Loogle | <https://loogle.lean-lang.org/> | Existing proof search stage and `lean_capability_matrix.md` theorem-search route | Loogle searches Lean and Mathlib definitions and theorems by name/type/pattern and can be used from editor integrations. | Requires accurate symbols or patterns; it is a search aid, not a checker. | Use for type/signature-driven theorem discovery. |
 | LeanSearch | <https://leansearch.net/> | Optional mathlib natural-language search target | LeanSearch provides natural-language query over Mathlib4 theorem/definition content. | The service may collect search terms and feedback; it is not a checker. | Include as an optional web target with privacy caveat. |
+| Aesop tactic docs | <https://leanprover-community.github.io/mathlib4_docs/Aesop/Frontend/Tactic.html> | `$formal-proof-workflow`, `documents/tools/lean_capability_matrix.md` | `aesop` searches using registered rules, and `aesop?` can print a suggested proof script. | The found proof still has to check; broad goals can search too much or fail. | Use Aesop as bounded automation for structural and routine proof obligations. |
+| Aesop repository | <https://github.com/leanprover-community/aesop> | `$formal-proof-workflow`, proof-environment setup | Aesop is a Lean 4 white-box proof-search tactic. | It is not a substitute for domain-specific hypotheses or analytic estimates. | Keep as the automation source for routine proof search. |
+| Lake reference | <https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/> | `lean_proof_env.py`, topic-local Lean packages | Lake configures/builds Lean code and manages dependencies. | Lake behavior still depends on the pinned Lean version and package manifest. | Use Lake as the standard build/dependency route for proof packages. |
 | Hammering Away: A User's Guide to Sledgehammer for Isabelle/HOL | <https://isabelle.in.tum.de/dist/Isabelle2025-2/doc/sledgehammer.pdf> | Isabelle target route and automation boundary | Sledgehammer applies ATPs, SMT solvers, and Isabelle proof methods to current goals and can return Isabelle proof text that reconstructs in Isabelle. | Works on loaded context and selected facts; generated proof text may need reconstruction/minimization and can fail. | Use as source for assistant-backed search/reconstruction, with checker log as authority. |
 | CoqHammer | <https://coqhammer.github.io/> | Coq/Rocq target route and automation caveats | CoqHammer integrates external automated theorem provers and reconstruction tactics for Coq/Rocq. | It is limited on some fragments and does not try induction by design; SMT-heavy goals may need SMTCoq instead. | Include Coq/Rocq route when project context selects it, not as universal default. |
 | Draft, sketch, and prove: Guiding formal theorem provers with informal proofs | <https://doi.org/10.17863/CAM.94959> | Natural-language proof sketch to formal obligation workflow | Informal proofs can guide formal proof sketches and automated prover search, but success is measured by checked formal proof. | Research setting does not guarantee arbitrary natural-language formalization. | Shape workflow as sketch -> obligations -> checker, never direct proof assertion. |
+
+## Compiler, IR, And Proof-Graph Tooling
+
+Access date for this section: 2026-06-12.
+
+| Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
+| --- | --- | --- | --- | --- | --- |
+| LLVM Kaleidoscope: Code generation to LLVM IR | <https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl03.html> | `jit_canonical_ir.py` backend trace design | A compiler pipeline can lower a source-root representation toward backend IR and preserve inspectable intermediate artifacts. | Tutorial language and not a verified compiler. | Keep the proof entrypoint on the JIT root and record StableHLO/backend artifacts. |
+| MLIR Toy Tutorial | <https://mlir.llvm.org/docs/Tutorials/Toy/> | `jit_canonical_ir.py` thin operational IR | MLIR uses dialects to preserve operation structure while enabling analysis, verification, transforms, and later lowering. | MLIR is an SSA compiler framework; AgentCanon should not import MLIR machinery or TableGen complexity. | Treat StableHLO-derived records as thin operational evidence and keep mathematical labels in the theorem graph. |
+| CompCert verified compiler documentation | <https://compcert.org/doc/> | Future compiler-correctness validation for JIT-canonical lowering | CompCert's correctness claim is semantic equivalence between source and generated assembly, proved in Coq. | AgentCanon's current lowering emits evidence catalogs only; it is not yet a verified compiler theorem. | Do not claim semantic preservation for `jit-ir-to-lean` until a pass-correctness proof or validator exists. |
+| CakeML publications | <https://cakeml.org/publications.html> | Future multi-pass proof layering for JIT-canonical IR | CakeML records verified compiler work through multiple intermediate languages and proof stages. | Source counts and pass structure are version-sensitive; project and paper versions can differ. | Leave room for multiple JIT/IR/backend evidence layers and per-layer invariants instead of one permanent graph schema. |
+| The verified CakeML compiler backend | <https://www.cambridge.org/core/journals/journal-of-functional-programming/article/verified-cakeml-compiler-backend/E43ED3EA740D2DF970067F4E2BB9EF7D> | Future compiler-correctness and backend proof design | The CakeML backend explains how intermediate languages, semantics, and proofs fit across compiler phases. | HOL4/CakeML organization is not a Lean template. | Keep generated code graph files separate from theorem/proof graph modules, with stable references between them. |
+| Lean Language Reference: Syntax, macros, elaborators, and terms | <https://lean-lang.org/doc/reference/latest/> | Generated Lean artifact design | Lean parses syntax, expands macros, elaborates terms, and checks core terms in the kernel. | Metaprogramming APIs and generated syntax are Lean-version-sensitive. | Emit ordinary exposed Lean definitions/records before adding custom syntax or elaborators. |
+| Modeling and Discovering Vulnerabilities with Code Property Graphs | <https://www.ieee-security.org/TC/SP2014/papers/ModelingandDiscoveringVulnerabilitieswithCodePropertyGraphs.pdf> | Theorem graph traversal validation | Code property graphs unify AST, control flow, and dependence information into a graph that can be traversed. | CPG is analysis evidence, not a theorem or semantic-preservation proof. | Keep operational evidence and theorem dependency edges distinct; reachability evidence is not a mathematical equation by itself. |
 
 ## Static Analysis, Dependency, And Code Intelligence
 

@@ -44,7 +44,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 - SSH agent を使う場合は `SSH_AUTH_SOCK` が現在の shell で有効な socket を指す
 - `git config user.name` と `git config user.email` を設定する
 - `rg` を入れる
-- VS Code を使う場合は `.vscode/extensions.json` の推奨拡張を入れる
+- VS Code を使う場合は AgentCanon-managed `.vscode/extensions.json` の推奨拡張を入れる
 
 ## 4. WSL2 Rule
 
@@ -75,7 +75,7 @@ VS Code を使う場合の既定は次です。
 - C/C++ extension
 - CMake Tools extension
 
-正本は `.vscode/extensions.json` です。
+正本は AgentCanon-managed root view の `.vscode/extensions.json` です。
 
 dev container は `.devcontainer/` を使います。起動時に generated compose を作り、
 

@@ -23,6 +23,14 @@ Local LLM は advisory な抽出器です。repo policy、依存 closure、CI、
 PR readiness、citation approval、document acceptance を決める authority
 ではありません。
 
+Local LLM は CPU-only runtime です。AgentCanon の一般的な実験 / 数値計算
+profile は GPU を使えますが、`agent-canon local-llm` と互換 Python helper は
+llama.cpp を CPU-only build にし、subprocess 実行時にも CUDA / NVIDIA container /
+HIP / ROCr device を隠します。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は
+互換入力として受け付けますが、GPU build や GPU 実行を有効化しません。
+`AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` から GPU accelerator を有効化する CMake
+flags を渡した場合も、installer は失敗させます。
+
 ## 読者
 
 - 実装者:
@@ -129,6 +137,7 @@ protecting tool / issue evidence の不足候補、deterministic follow-up check
 agent-canon local-llm extract-prose-ir \
   --root vendor/agent-canon \
   --json-out /tmp/local_llm_prose_ir.json \
+  --llm-jobs 4 \
   --term DSL \
   --term corpus \
   documents/tools/prose_reasoning_graph.md \
@@ -137,6 +146,10 @@ agent-canon local-llm extract-prose-ir \
 
 この command は複数 document と複数 term を受けます。単語 list ではなく、
 後続 tool が扱える intermediate representation を返します。
+document / term batch から作った part prompt は、`llama-cli` が見つかる場合に
+`--llm-jobs` 個まで bounded parallel に model invocation されます。
+`llama-cli` が見つからない場合は part ごとに
+`skipped_llama_cli_not_found` を記録し、deterministic IR artifact の生成を続けます。
 
 ### search / build-index / eval
 
@@ -188,6 +201,28 @@ REQUIRED_PRE_EDIT_CHECKS=...
 prompt 生成、model invocation、または advisory parsing 自体の失敗は error surface
 のままです。
 
+#### Numerical iterative algorithm route
+
+`route-implementation-surface` は、反復法、solver、optimizer、収束、残差、
+停止条件、KKT、preconditioner、`lax.while_loop` などを含む実装 request を
+`numerical_iterative_algorithm_contract` へ寄せます。この surface の責務は、
+実装候補を選ぶ段階で、`$computational-optimization` の optimization contract と
+`documents/algorithm-implementation-boundary.md` の Boundary Map を source packet
+にすることです。
+
+この route の `PRIMARY_PATHS` は、少なくとも次を含みます。
+
+- `agents/skills/computational-optimization.md`
+- `.agents/skills/computational-optimization/SKILL.md`
+- `documents/algorithm-implementation-boundary.md`
+- `documents/conventions/python/15_jax_rules.md`
+- `documents/coding-conventions-testing.md`
+
+`REQUIRED_PRE_EDIT_CHECKS` は、algorithm contract checker、test-design
+checker、convention compliance を候補にします。これにより、tool-side の
+反復法実装は、`Step_impl`、`R_impl`、state、stopping policy、failure semantics、
+既存 solver / library reuse を固定してから実装へ進みます。
+
 ## Prose IR Contract
 
 `extract-prose-ir` の JSON artifact は
@@ -203,8 +238,9 @@ prompt 生成、model invocation、または advisory parsing 自体の失敗は
 | `document_count` | Number of input documents. |
 | `term_count` | Number of input terms. |
 | `part_count` | Number of partitioned prompt parts. |
+| `llm_execution` | Per-part model invocation status, job count, and pass/fail/skip counts. |
 | `partition` | Document and term batch settings. |
-| `parts[]` | Per-part extraction summaries and unresolved items. |
+| `parts[]` | Per-part extraction summaries, prompt hash, model output, and unresolved items. |
 | `documents[]` | Per-document responsibility, section role, and coverage cues. |
 | `terms[]` | Term contexts grounded in document spans. |
 | `corpus_hints[]` | Domain calibration hints with evidence. |
@@ -221,12 +257,19 @@ confidence、basis を持ち、retrieval や writing norm の calibration に使
 ```bash
 --document-batch-size <N>
 --term-batch-size <N>
+--llm-jobs <N>
 ```
 
 各 part は `part:d<document-batch>:t<term-batch>` という id を持ちます。
 part prompt は、その part に入っていない document や term を推測してはいけません。
 未解決の関係は unresolved item として残し、merge stage が `parts[]` と
 `dsl_seed` を統合します。
+
+Local LLM 実行は part 単位です。tool は part prompt を元順に保持しながら
+bounded parallel に実行し、JSON artifact の `parts[]` は常に元の part order に戻します。
+`parts[].llm_output` は LLM stdout が JSON として parse できる場合は JSON value、
+parse できない場合は `{ "raw": "..." }` として保持します。model output は
+graph seed であり、source-truth record や reviewer decision ではありません。
 
 この分割は tool responsibility です。agent が chat 上で document chunk や
 term chunk を手作業で管理してはいけません。

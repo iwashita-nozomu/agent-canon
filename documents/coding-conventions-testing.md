@@ -36,6 +36,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 |---|---|---|
 | **最初の pytest 実行** | `pytest tests/<subdir>/test_*.py -v` | → [実行方法](#4-実行方法) |
 | **ユニットテスト作成** | 小さい behavior example + 明示 expected | → [Unit Test Contract](#3-unit-test-contract) |
+| **契約だけの wrapper** | static contract validation + canonical command evidence | → [Contract-Only Wrapper Gate](#32-contract-only-wrapper-gate) |
 | **統合テスト設計** | 異なるレイヤー・複数ケース | → [分類](#2-配置と分類) |
 | **エッジケーステスト** | 乱数 seed 固定 + 悪条件 | → [乱数](#7-乱数大規模テスト) |
 | **テスト失敗の診断** | JSON ログを `tests/logs/` 確認 | → [実行方法](#4-実行方法) |
@@ -68,6 +69,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 unit test は「1 つの観測可能 behavior に対する concrete example」です。
 実装内部の call sequence や private helper の存在を固定するものではありません。
+単に script、CLI、checker、import、compile、type check、format check が
+exit code 0 で終わることだけを見る test は unit test ではありません。
+その性質を static analysis / checker / CI gate が所有している場合は、
+pytest wrapper を作らず、その checker を validation route に入れます。
 
 変更耐性のある test design は、次の 5 軸を先に固定します。
 
@@ -76,6 +81,63 @@ unit test は「1 つの観測可能 behavior に対する concrete example」�
 - `Oracle`: literal expected、known reference、exception type、state change、property、metamorphic relation のどれか。
 - `Input Space`: concrete regression、boundary table、random/property generator、metamorphic follow-up input のどれか。
 - `Adequacy Evidence`: branch/edge coverage、mutation score、regression replay、manual review のどれで assertion の強さを確認するか。
+
+### 3.1 数値テスト採用ゲート
+
+数値テストは、変更の behavior contract が数値的な性質を持つ場合だけ追加します。
+solver、optimizer、floating-point approximation、residual、tolerance、random sampling、
+convergence、reference comparison、scientific experiment contract のどれにも関係しない
+docs、routing、metadata、string parsing、configuration、structure refactor では、
+数値 smoke、large random case、benchmark 風 test を追加しません。
+
+数値テストを提案する前に、test plan で次を固定します。
+
+- `Numerical Trigger`: 数値テストが必要な具体的契約、既知 regression、acceptance
+  criterion、または proof / experiment requirement。
+- `Non-Numerical Alternative`: static contract、parser example、diagnostic key、
+  property、metamorphic relation、snapshot で同じリスクをより小さく検証できない理由。
+- `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
+  flag など、production path と同じ bug を複製しない expected。
+- `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
+- `Execution Target`: 数値計算、solver、optimizer、JAX / XLA / IREE lowering、
+  convergence、residual、benchmark、experiment validation を実行する GPU target。
+  CPU は計算テストの代替 target にしません。
+
+`Numerical Trigger` がない場合は、数値テストを省きます。その場合も test plan には
+「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
+数値 validation が必要でも、既定は GPU 上の最小 deterministic case です。
+long-running、broad benchmark、large random sweep は unit test ではなく experiment
+validation として profile、理由、ログ保存先を記録します。GPU backend で起動する
+child は先に空き GPU slot を探索します。slot が得られない場合は
+`gpu_validation_blocker=<reason>` と slot evidence を残します。CPU backend は
+user request、runtime profile、または明示 env で固定された validation target として扱います。
+
+### 3.2 Contract-Only Wrapper Gate
+
+`contract-only wrapper` は、既存の public contract を名前付け、型付け、設定化、
+薄い adapter 化、または canonical command へ接続するだけの変更です。入力 schema、
+型境界、設定 key、documented entrypoint、dependency header、routing marker、
+checker command のような static contract validation が主な evidence になります。
+
+実行テストの admission 条件は、新しい observable behavior、branch、parser error path、
+state mutation、diagnostic key、serialization shape、external process contract のいずれかです。
+該当する条件がある場合は、Behavior Contract、Observation Level、Oracle、Input Space、
+Adequacy Evidence を test plan に固定してから最小の behavior example を作ります。
+
+contract-only wrapper の validation evidence は次のように固定します。
+
+- type checker、lint、formatter、docs check、dependency review、convention checker、
+  tool catalog、route-surface check の canonical command。
+- `static-analysis-duplicate-test` や `meaningless-generated-execution-test` の
+  finding がある既存 test は、削除、behavior regression への置換、
+  canonical checker validation への移行を repair route として扱います。
+- pytest smoke、execution-only test、no-crash test、exit-code wrapper、数値 smoke は
+  該当 checker command の直接実行を validation route に置きます。
+
+Validation repair scope は、changed contract、changed lines、または task plan が名指しした
+checker-owned property に結び付く finding です。formatter、lint、test-design checker、
+convention checker が既存 style debt や周辺 debt を表出した場合、その finding は residual
+evidence として記録し、現在の diff は requested contract に沿った semantic change に保ちます。
 
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
@@ -87,6 +149,10 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 必須方針:
 
+- 新規 test を作る前に、その test が検証する性質を既存の static analysis、
+  checker、formatter、dependency review、type checker、lint、docs check が
+  既に所有していないか確認します。所有している場合は、test を生成せず、
+  canonical command と evidence を validation に残します。
 - 1 test は 1 behavior / 1 failure reason を主語にします。
 - test 名は、対象 behavior と期待結果が読める名前にします。
 - Arrange / Act / Assert を読み分けられる構造にします。
@@ -165,9 +231,20 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 - 悪条件・大規模ケースは **明示的に区別**し、ログに条件を出力します。
 - unit test の既定 dimension は、failure を局所化できる最小サイズにします。
 - GPU / long-running numerical validation は、unit test とは分けて profile と実行理由を記録します。
+- 数値計算、solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、
+  benchmark、experiment validation の計算テストは GPU backend と slot evidence を
+  validation record に残します。slot が得られない場合は `gpu_validation_blocker`
+  を残します。CPU backend は明示 env / profile の時だけ validation target にします。
 
 ## 8. 禁止事項
 
+- `test_runs`、`test_smoke`、`test_generated_*`、`test_can_run` などの名前で、
+  process success、import success、no-crash、exit code 0 だけを見る generated
+  placeholder test を追加しません。
+- `py_compile`、`compileall`、`ruff`、`pyright`、`mypy`、`cargo check`、
+  `cargo clippy`、`shellcheck`、AgentCanon checker、dependency/header check、
+  docs check の成功を pytest で包むだけの static-analysis duplicate test を
+  追加しません。必要な場合は該当 checker を validation route に直接入れます。
 - 本体モジュール内の `if __name__ == "__main__":` にテストを書きません。
 - 例外のみを根拠にせず、**既知解・残差・反復回数**で検証します。
 - repo 固有の directory 例を正本扱いせず、実在する `tests/` 配下だけを案内します。

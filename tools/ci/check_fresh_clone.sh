@@ -74,7 +74,7 @@ else
   git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
 fi
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
-git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
+git clone --no-local "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
 git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"

@@ -3,6 +3,7 @@
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
 # upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.
+# upstream design ../../agents/skills/codex-task-workflow.md Codex task workflow routing boundary.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook logging.
 # @dependency-end
@@ -206,20 +207,29 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("実装", "修正"),
         ("コード", "直して"),
         ("implementation", "fix"),
+        ("agent-canon", "docs"),
+        ("run_docs_checks.sh",),
         ("patch", "repo"),
-        ("修正",),
-        ("修正して",),
-        ("直して",),
         ("small fix",),
         ("patch",),
-        ("実装して",),
+        ("typo", "修正"),
+        ("軽微", "修正"),
+        ("flaky test", "直して"),
+        ("単一 file", "直して"),
+        ("scoped-change",),
+        ("実装して", "repo"),
+        ("修正して", "repo"),
+        ("直して", "repo"),
         ("public behavior",),
         ("narrow behavior",),
         ("regression case",),
         ("小規模",),
-        ("チェック",),
-        ("報告",),
-        ("更新",),
+        ("仕様解釈", "修正"),
+        ("optimizer", "修正"),
+        ("solver", "直して"),
+        ("repo-changing optimization patch",),
+        ("収束しない",),
+        ("tolerance", "直して"),
     ),
     "change-review": (
         ("change-review",),
@@ -397,18 +407,26 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "codex-task-workflow",
         "repo-changing",
         "patch",
+        "修正して",
+        "直して",
+        "実装して",
         "small fix",
         "narrow behavior",
         "regression case",
+        "agent-canon docs",
+        "docs check",
+        "docs format",
+        "run_docs_checks.sh",
         "generate_agent_runtime_dashboard.py",
         "run_repo_dependency_review.sh",
         "runtime_log_archive_git.py",
         "oop-readability-check",
         "mechanical verdict",
-        "実装して",
-        "修正して",
-        "直して",
         "デバッグ",
+        "optimizer convergence",
+        "solver regression",
+        "収束しない",
+        "tolerance 緩和せず",
     ),
     "comprehensive-development": ("comprehensive development", "repo-wide", "包括的", "500", "tooling rearchitecture"),
     "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci", "lockfile"),
@@ -1105,7 +1123,7 @@ def workflow_monitor_report_dir(root: Path | None = None) -> str:
     if root is None:
         return ""
     pointer = os.environ.get(ACTIVE_RUN_POINTER_ENV, "").strip()
-    pointer_path = Path(pointer) if pointer else root / "reports" / "agents" / ".active_run"
+    pointer_path = Path(pointer) if pointer else default_active_run_pointer(root)
     try:
         value = pointer_path.read_text(encoding="utf-8").strip()
     except OSError:
@@ -1118,6 +1136,23 @@ def workflow_monitor_report_dir(root: Path | None = None) -> str:
     if (report_dir / "workflow_monitoring.md").is_file():
         return str(report_dir)
     return ""
+
+
+def default_active_run_pointer(root: Path) -> Path:
+    """Return the run pointer that should own hook workflow evidence."""
+    parent_pointer = vendored_agent_canon_parent_pointer(root)
+    if parent_pointer is not None:
+        return parent_pointer
+    return root / "reports" / "agents" / ".active_run"
+
+
+def vendored_agent_canon_parent_pointer(root: Path) -> Path | None:
+    """Return the parent repo active-run pointer for vendored AgentCanon checkouts."""
+    resolved = root.resolve()
+    if resolved.name != "agent-canon" or resolved.parent.name != "vendor":
+        return None
+    pointer = resolved.parent.parent / "reports" / "agents" / ".active_run"
+    return pointer if pointer.is_file() else None
 
 
 def workflow_monitor_behavior_event(root: Path, report_dir: str, event: str) -> bool:

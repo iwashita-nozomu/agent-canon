@@ -45,6 +45,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - docs consistency review
 - Markdown / 文書差分の review
   - `md-style-check`
+  - substantive な文書変更では `structure-planning` と `prose-reasoning-graph` の evidence を確認する
+  - typo / link / format-only route では `structure_contract=skipped:<reason>` と `md-style-check` evidence を確認する
   - 長文なら docs completeness review
   - 必要なら docs consistency review
   - 文書が completion gate の一部なら `document_flow_reviewer`
@@ -95,8 +97,9 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. plan review で execution order、担当 subagent、rollback point を確認し、decision が `approve` でなければ planner に戻します。
 1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、decision が `approve` でなければ designer に戻します。
 1. detailed design review で、`Installed Libraries And Existing Implementation Survey` が dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙していることを確認します。
-1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。
+1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、`documents/conventions/common/02_naming.md` と言語別規約に合っている必要があります。
 1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
+1. detailed design review で、`Design Side-Effect Map` が主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、validation / test-plan item に接続していることを確認します。
 1. 数式、擬似コード、仕様記述、method contract を伴う task では detailed design review か checkpoint review で、[algorithm-implementation-boundary.md](algorithm-implementation-boundary.md) の Boundary Map を artifact に固定し、implementation がどの式・仕様項目・state boundary に対応するか、runtime success だけを acceptance 根拠にしないことを確認します。
 1. 大規模 refactor では project review で stale path、delete 漏れ、cross-module drift、semantic delta 混入を確認します。
 1. 大規模改修、統合、rename、構成変更では review 中に、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書 path への参照 sweep を行い、reader が削除済み・置換済み surface へ誘導されないことを確認します。残っていれば `fix now` です。
@@ -108,8 +111,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary alternate route、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書が最新実装と一致し、削除済み・置換済みの挙動や手順を reader に案内していないことを確認します。文書が現行実装を説明できていなければ `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
+1. checkpoint review と final acceptance review では、実装済み side effect が approved `Design Side-Effect Map` と一致し、後続 stage へ送った item は owner、review gate、validation evidence とともに artifact に残っていることを確認します。
 1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation boundary が Boundary Map と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
 1. checkpoint review と final acceptance review では、文書や prompt の readability / reader flow を tool 結果だけで accept せず、`document_flow_reviewer` や別 reviewer の judgement が artifact に残っていることを確認します。
+1. checkpoint review と final acceptance review では、implementation が設計上の問題を勝手に吸収していないことを確認します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾が local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで処理されていれば `fix now` です。正しい処理は `design_issue_blocker` と evidence を残して design gate へ戻すことです。
 1. checkpoint review と final acceptance review では、`bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
 1. checkpoint review 後から closeout までに、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目がある限り closeout へ進みません。
 1. final acceptance review 前に read-only diff-check agent が最新 diff を確認し、decision、findings disposition、再実行 evidence を artifact に残します。指摘に応じて修正した場合は loop を先頭へ戻し、最新 diff で再度 diff-check agent を通します。
@@ -171,6 +176,7 @@ findings は少なくとも次に分けます。
   - 修正後は、どんなに小さい差分でも full required review set を再実行する
   - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
   - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
+  - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの
 - `follow-up`
   - 今回の受け入れを阻害しないが、後続で管理すべきもの
 - `delete-ok`

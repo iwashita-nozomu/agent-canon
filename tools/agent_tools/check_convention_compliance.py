@@ -2,7 +2,13 @@
 # @dependency-start
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
+# upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
+# upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
+# upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
@@ -202,7 +208,6 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
 SKILL_ROUTING_PROMPTS = (
     ".agents/skills/agent-orchestration/SKILL.md",
     "agents/skills/agent-orchestration.md",
-    "agents/TASK_WORKFLOWS.md",
 )
 
 SKILL_ROUTING_MARKERS = (
@@ -212,6 +217,92 @@ SKILL_ROUTING_MARKERS = (
     "task-shape skill",
     "check_convention_compliance.py",
 )
+DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "prose-reasoning-graph",
+        "$structure-planning",
+        "$md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    ".agents/skills/md-style-check/SKILL.md": (
+        "$prose-reasoning-graph",
+        "$structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/md-style-check.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "format-only",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/README.md": (
+        "prose-reasoning-graph",
+        "structure-planning",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/skills/catalog.yaml": (
+        "format-only docs work",
+        "prose-reasoning-graph",
+        "structure-planning",
+    ),
+    "agents/workflows/long-form-writing-workflow.md": (
+        "$structure-planning",
+        "$prose-reasoning-graph",
+        "$md-style-check",
+        "structure_contract=skipped",
+    ),
+    "documents/REVIEW_PROCESS.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "structure_contract=skipped",
+    ),
+    "agents/USER_GUIDE_JA.md": (
+        "structure-planning",
+        "prose-reasoning-graph",
+        "md-style-check",
+        "Document Structure Evidence",
+        "structure_contract=skipped",
+    ),
+    "agents/templates/closeout_gate.md": (
+        "Document Structure Evidence",
+        "document_structure_status",
+        "structure_planning",
+        "prose_graph",
+        "md_style_check",
+        "format_only_reason",
+    ),
+    "tools/agent_tools/task_close.py": (
+        "changed_markdown_paths",
+        "Document Structure Evidence",
+        "document_structure_evidence",
+        "DOCUMENT_STRUCTURE_REQUIRED",
+    ),
+}
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -223,11 +314,111 @@ WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"check_convention_compliance\.py|check_convention_compliance\.py"
     r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
 )
-CLOSEOUT_PROHIBITION_MARKERS = (
-    "Close-Out Prohibitions",
+CLOSEOUT_READINESS_MARKERS = (
+    "Completion Readiness",
     "user-facing completion",
     "repo_wide_static_analysis_complete",
     "repo_wide_dependency_tools_complete",
+)
+POSITIVE_RUNTIME_WORDING_SURFACES = (
+    "ROOT_AGENTS.md",
+    ".agents/skills/agent-orchestration/SKILL.md",
+    ".agents/skills/codex-task-workflow/SKILL.md",
+    ".agents/skills/mvp-skeleton/SKILL.md",
+    "agents/TASK_WORKFLOWS.md",
+    "agents/canonical/CODEX_SUBAGENTS.md",
+    "agents/canonical/CODEX_WORKFLOW.md",
+    "agents/skills/catalog.yaml",
+    "agents/skills/mvp-skeleton.md",
+    "documents/conventions/common/05_docs.md",
+    "documents/coding-conventions-project.md",
+)
+DOCUMENT_CLAIM_GROUNDING_MARKERS = {
+    "documents/conventions/common/05_docs.md": (
+        "claim grounding",
+        "program contract",
+        "public entrypoint",
+        "return projection",
+        "proof obligation",
+        "provisional wording",
+        "check_convention_compliance.py",
+    ),
+    "documents/coding-conventions-project.md": (
+        "claim grounding",
+        "program contract",
+        "proof obligation",
+        "run-local planning evidence",
+    ),
+    "agents/skills/long-form-writing.md": (
+        "数学的 claim",
+        "program contract",
+        "proof obligation",
+        "$formal-proof-workflow",
+        "provisional wording",
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "mathematical claim",
+        "program contract",
+        "proof obligation",
+        "$formal-proof-workflow",
+        "provisional wording",
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "program contract",
+        "public entrypoint",
+        "return projection",
+        "proof obligation",
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "program contract",
+        "public entrypoint",
+        "return projection",
+        "validation command",
+    ),
+}
+TEST_CONTRACT_ROUTING_MARKERS = {
+    "documents/coding-conventions-testing.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "static-analysis-duplicate-test",
+        "canonical command",
+        "Validation repair scope",
+    ),
+    "agents/skills/test-design.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "observable behavior",
+        "validation repair scope",
+    ),
+    ".agents/skills/test-design/SKILL.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "observable behavior",
+        "validation repair scope",
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "contract-only wrapper",
+        "static contract validation",
+        "canonical command evidence",
+        "validation tool",
+    ),
+    "agents/templates/test_plan.md": (
+        "validation route",
+        "behavior-owned cases",
+    ),
+}
+PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
+    r"temporary policy|temporary rule|ad hoc|adhoc)"
+)
+PROVISIONAL_GROUNDING_RE = re.compile(
+    r"(?i)(?:"
+    r"run-local|planning evidence|evidence gap|verification route|"
+    r"prompt-defect|acceptance condition|limitation|"
+    r"受け入れ条件|validation route|責務名|proof_status)"
 )
 PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
@@ -301,27 +492,147 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "CRITICAL_BLOCKING_CHILD_HOOKS",
         "warning/evidence",
     ),
+}
+OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
     "ROOT_AGENTS.md": (
-        "Mechanical Guardrail Policy",
-        "原則 block しません",
-        "hook 設定の退避や無効化ではなく",
-        "strict block mode",
+        (
+            "## Runtime Owner Map",
+            (
+                (
+                    "workflow family, spawn budget, role topology",
+                    "vendor/agent-canon/agents/task_catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "subagent lifecycle, same-role instances, wave ledger",
+                    "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
+                    "workflow_monitor.py",
+                ),
+                (
+                    "role behavior and stage conditions",
+                    "vendor/agent-canon/.codex/agents/*.toml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "skill routing and public skill surface",
+                    "vendor/agent-canon/agents/skills/catalog.yaml",
+                    "agent-canon local-llm route-skill",
+                ),
+                (
+                    "report and closeout structure",
+                    "task_close.py",
+                    "closeout gate",
+                ),
+            ),
+        ),
     ),
+    "AGENTS.md": (
+        (
+            "## Runtime Owner Map",
+            (
+                (
+                    "root runtime entrypoint",
+                    "ROOT_AGENTS.md",
+                    "bash tools/sync_agent_canon.sh check",
+                ),
+                (
+                    "workflow family, spawn budget, role topology",
+                    "agents/task_catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "public skill registry",
+                    "agents/skills/catalog.yaml",
+                    "check_agent_runtime_alignment.py",
+                ),
+                (
+                    "shared-canon update",
+                    "tools/update_agent_canon.sh",
+                    "AgentCanon PR gate",
+                ),
+            ),
+        ),
+    ),
+    "agents/TASK_WORKFLOWS.md": (
+        (
+            "## Workflow Contract Owners",
+            (
+                (
+                    "workflow family and spawn budget",
+                    "agents/task_catalog.yaml",
+                ),
+                (
+                    "role topology and same-role instance schema",
+                    "agents/task_catalog.yaml",
+                ),
+                (
+                    "default specialists and review packs",
+                    "agents/task_catalog.yaml",
+                    "agents/agents_config.json",
+                ),
+                (
+                    "run bundle, declared workflow / skills / review, and dynamic wave ledger",
+                    "task_start.py",
+                    "bootstrap_agent_run.py",
+                    "workflow_monitor.py",
+                ),
+                (
+                    "skill selection",
+                    "agents/skills/catalog.yaml",
+                    "agent-canon local-llm route-skill",
+                ),
+                (
+                    "implementation stage gate",
+                    "agents/workflows/implementation-waterfall-workflow.md",
+                ),
+                (
+                    "implementation packet schema",
+                    "agents/COMMUNICATION_PROTOCOL.md",
+                ),
+                (
+                    "closeout authority",
+                    "task_close.py",
+                    "report_artifact_checks.py",
+                ),
+            ),
+        ),
+    ),
+}
+OWNER_MAP_ENTRYPOINT_MARKERS = {
+    path: tuple(
+        dict.fromkeys(
+            marker
+            for heading, rows in section_rows
+            for row in ((heading,), *rows)
+            for marker in row
+        )
+    )
+    for path, section_rows in OWNER_MAP_ENTRYPOINT_TABLE_ROWS.items()
 }
 NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
     r"must|must not|required|forbidden)",
     flags=re.IGNORECASE,
 )
-PROHIBITION_RE = re.compile(
-    r"(?m)^\s*[-*]\s+.*(?:を禁止|禁止します|してはいけません|must not|forbidden)",
-    flags=re.IGNORECASE,
+LEGACY_NEGATIVE_RUNTIME_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"禁止|してはいけ|出さない|返さない|完了扱いにしない|"
+    r"Prohibitions|Close-Out Prohibitions|しなければ|must\s+not|"
+    r"do\s+not|don't|never|cannot|can't|せず|ではありません|"
+    r"しません|しない|置かず|戻さず)"
+)
+LEGACY_SEQUENCE_DESIGN_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
+    r"最初の|最初に|初期\s*(?:wave|責務)|Initial Intake Wave|"
+    r"mandatory first skill|first-wave|first-pass|first working version|needs the first version|"
+    r"first runnable path|first screen|first responsibilities wave|"
+    r"first implementation candidate|first cohesive slice|first slice|"
+    r"first candidate|first reviewer|first figure|first routing declaration)"
 )
 VERIFICATION_RE = re.compile(
     r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
     r"CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)"
 )
-PROHIBITION_SECTION_RE = re.compile(r"(?m)^#{2,6}\s+(?:.*禁止事項|Close-Out Prohibitions)")
 FORWARDER_WARNING_REQUIRED_MARKER = "LEGACY_FORWARDER_WARNING_REQUIRED"
 FORWARDER_WARNING_MARKERS = (
     "FORWARDER_CALLER",
@@ -378,6 +689,71 @@ def read_text(root: Path, relative_path: str) -> str:
     if resolved is None:
         return (root / relative_path).read_text(encoding="utf-8")
     return resolved.read_text(encoding="utf-8")
+
+
+def markdown_section_lines(text: str, heading: str) -> list[str] | None:
+    """Return lines under a Markdown heading until the next peer heading."""
+    lines = text.splitlines()
+    heading_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == heading),
+        None,
+    )
+    if heading_index is None:
+        return None
+    heading_level = len(heading) - len(heading.lstrip("#"))
+    section: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            next_level = len(stripped) - len(stripped.lstrip("#"))
+            if next_level <= heading_level:
+                break
+        section.append(line)
+    return section
+
+
+def markdown_table_rows(lines: Sequence[str]) -> list[str]:
+    """Return Markdown table data rows from a section."""
+    rows: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not (stripped.startswith("|") and stripped.endswith("|")):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if all(cell and set(cell) <= set("-: ") for cell in cells):
+            continue
+        rows.append(stripped)
+    return rows
+
+
+def same_resolved_file(left: Path | None, right: Path | None) -> bool:
+    """Return whether two optional paths point to the same filesystem entry."""
+    if left is None or right is None:
+        return False
+    try:
+        return left.resolve(strict=True) == right.resolve(strict=True)
+    except OSError:
+        return False
+
+
+def owner_map_entrypoint_rows(
+    root: Path, path: str
+) -> Sequence[tuple[str, Sequence[tuple[str, ...]]]]:
+    """Return owner-map rows for the entrypoint role active at ``path``."""
+    if path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    ):
+        return OWNER_MAP_ENTRYPOINT_TABLE_ROWS["ROOT_AGENTS.md"]
+    return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
+
+
+def duplicate_root_view_entrypoint(root: Path, path: str) -> bool:
+    """Return whether ``path`` is already covered by the root entrypoint view."""
+    return path == "AGENTS.md" and same_resolved_file(
+        readable_path(root, "AGENTS.md"),
+        readable_path(root, "ROOT_AGENTS.md"),
+    )
 
 
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
@@ -472,18 +848,123 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def check_closeout_prohibitions(root: Path) -> list[Finding]:
-    """Verify workflow prohibition sources remain wired into the canonical workflow."""
+def check_document_structure_routing(root: Path) -> list[Finding]:
+    """Verify docs edit routing keeps structure analysis mechanically visible."""
+    paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "document_structure_routing")
+    for path, markers in DOCUMENT_STRUCTURE_ROUTING_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "document_structure_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_closeout_readiness(root: Path) -> list[Finding]:
+    """Verify workflow completion readiness remains wired into the workflow."""
     path = "agents/canonical/CODEX_WORKFLOW.md"
-    findings = check_required_files(root, (path,), "workflow_prohibitions")
+    findings = check_required_files(root, (path,), "workflow_readiness")
     if findings:
         return findings
     text = read_text(root, path)
-    for marker in CLOSEOUT_PROHIBITION_MARKERS:
+    for marker in CLOSEOUT_READINESS_MARKERS:
         if marker not in text:
             findings.append(
-                Finding("workflow_prohibitions", path, f"missing-marker:{marker}")
+                Finding("workflow_readiness", path, f"missing-marker:{marker}")
             )
+    return findings
+
+
+def check_positive_runtime_wording(root: Path) -> list[Finding]:
+    """Verify central runtime docs use positive operational wording."""
+    findings = check_required_files(
+        root, POSITIVE_RUNTIME_WORDING_SURFACES, "positive_runtime_wording"
+    )
+    for path in POSITIVE_RUNTIME_WORDING_SURFACES:
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for label, pattern in (
+            ("legacy-negative-runtime-wording", LEGACY_NEGATIVE_RUNTIME_RE),
+            ("legacy-sequence-design-wording", LEGACY_SEQUENCE_DESIGN_RE),
+        ):
+            for match in pattern.finditer(text):
+                line_no = text.count("\n", 0, match.start()) + 1
+                findings.append(
+                    Finding(
+                        "positive_runtime_wording",
+                        path,
+                        f"{label}:{line_no}",
+                    )
+                )
+    return findings
+
+
+def check_document_claim_grounding(root: Path) -> list[Finding]:
+    """Verify canonical docs route prose claims through evidence and proof status."""
+    paths = tuple(DOCUMENT_CLAIM_GROUNDING_MARKERS)
+    findings = check_required_files(root, paths, "document_claim_grounding")
+    for path, markers in DOCUMENT_CLAIM_GROUNDING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "document_claim_grounding",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+        for match in PROVISIONAL_CANONICAL_WORDING_RE.finditer(text):
+            line_start = text.rfind("\n", 0, match.start()) + 1
+            line_end = text.find("\n", match.start())
+            if line_end == -1:
+                line_end = len(text)
+            line = text[line_start:line_end]
+            if PROVISIONAL_GROUNDING_RE.search(line):
+                continue
+            line_no = text.count("\n", 0, match.start()) + 1
+            findings.append(
+                Finding(
+                    "document_claim_grounding",
+                    path,
+                    f"provisional-wording-without-grounding:{line_no}",
+                )
+            )
+    return findings
+
+
+def check_test_contract_routing(root: Path) -> list[Finding]:
+    """Verify contract-only wrappers route to static validation before tests."""
+    paths = tuple(TEST_CONTRACT_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "test_contract_routing")
+    for path, markers in TEST_CONTRACT_ROUTING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "test_contract_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
     return findings
 
 
@@ -579,6 +1060,58 @@ def check_hook_guardrail_policy(root: Path) -> list[Finding]:
     return findings
 
 
+def check_owner_map_entrypoints(root: Path) -> list[Finding]:
+    """Verify thin entrypoint docs keep required owner-map anchors."""
+    findings = check_required_files(
+        root,
+        tuple(OWNER_MAP_ENTRYPOINT_TABLE_ROWS),
+        "owner_map_entrypoints",
+    )
+    for path in OWNER_MAP_ENTRYPOINT_TABLE_ROWS:
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        if duplicate_root_view_entrypoint(root, path):
+            continue
+        section_rows = owner_map_entrypoint_rows(root, path)
+        text = resolved.read_text(encoding="utf-8")
+        for heading, expected_rows in section_rows:
+            section = markdown_section_lines(text, heading)
+            if section is None:
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-heading:{heading}",
+                    )
+                )
+                continue
+            table_rows = markdown_table_rows(section)
+            if not table_rows:
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-owner-table:{heading}",
+                    )
+                )
+                continue
+            for row_markers in expected_rows:
+                if any(
+                    all(marker in row for marker in row_markers)
+                    for row in table_rows
+                ):
+                    continue
+                findings.append(
+                    Finding(
+                        "owner_map_entrypoints",
+                        path,
+                        f"missing-owner-row:{row_markers[0]}",
+                    )
+                )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -594,14 +1127,6 @@ def check_convention_assertions(root: Path) -> list[Finding]:
                     "convention_assertions",
                     path,
                     "normative-lines-without-verification-route",
-                )
-            )
-        if PROHIBITION_RE.search(text) and not PROHIBITION_SECTION_RE.search(text):
-            findings.append(
-                Finding(
-                    "convention_assertions",
-                    path,
-                    "prohibition-lines-without-prohibition-section",
                 )
             )
     return findings
@@ -634,7 +1159,10 @@ def check_legacy_forwarder_warning_policy(root: Path) -> list[Finding]:
 
     policy_text = "\n".join(
         resolved.read_text(encoding="utf-8", errors="replace")
-        for path in ("ROOT_AGENTS.md", "AGENTS.md")
+        for path in (
+            "documents/codex-configuration-reference.md",
+            ".codex/README.md",
+        )
         if (resolved := readable_path(root, path)) is not None
     )
     if policy_text:
@@ -659,11 +1187,16 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
-    findings.extend(check_closeout_prohibitions(root))
+    findings.extend(check_document_structure_routing(root))
+    findings.extend(check_closeout_readiness(root))
+    findings.extend(check_positive_runtime_wording(root))
+    findings.extend(check_document_claim_grounding(root))
+    findings.extend(check_test_contract_routing(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
+    findings.extend(check_owner_map_entrypoints(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

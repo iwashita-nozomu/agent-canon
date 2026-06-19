@@ -98,14 +98,16 @@ upstream design README.md durable document index
   - case 列の展開
   - difficulty range
   - `resource_estimate(case)`
-- `experimentcode.py`
+- `run.py`
   - `task(case, context)`
   - `context_builder(case)`
   - 必要なら `initializer(context)`
   - 必要なら `SkipController`
   - runner 起動と final summary 生成
 
-実験ごとに worker class や scheduler class を増やすことを既定にしません。まずは `StandardWorker` と `StandardFullResourceScheduler` を使います。
+実験ごとの既定構成は `StandardWorker` と `StandardFullResourceScheduler` です。
+worker class や scheduler class を増やす場合は、topic 固有の resource model と
+validation route を README または run plan に書きます。
 
 ## 3.1 topic の公開入口
 
@@ -113,7 +115,7 @@ upstream design README.md durable document index
 Make target の両方を持ちます。
 
 - Python entrypoint
-  - `experiments/<topic>/experimentcode.py`
+  - `experiments/<topic>/run.py`
   - `--config experiments/<topic>/config.yaml`
   - `--run-dir experiments/<topic>/result/<run_name>`
   - 必要なら `--limit`、`--site`、`--day` などの入力範囲指定

@@ -3,6 +3,7 @@
 // upstream design ../../../documents/local-llm-responsibility-analysis.md local LLM responsibility boundary
 // upstream design ../../../documents/search-coordination.md coordinated search provider contract
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
+// upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 // upstream design ../../../agent-canon-environment.toml records local LLM CLI environment commands
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
 // downstream design ../../../tools/README.md documents root tool entrypoints
@@ -17,26 +18,38 @@
 // downstream implementation ../../../.github/workflows/agent-canon-static-gates.yml runs this CLI in GitHub static gates
 // @dependency-end
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use yaml_rust2::{Yaml, YamlLoader};
 
 const DEFAULT_MODEL: &str = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M";
 const DEFAULT_MAX_BYTES: usize = 24_000;
 const DEFAULT_PREDICT_TOKENS: usize = 768;
 const DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE: usize = 4;
 const DEFAULT_PROSE_IR_TERM_BATCH_SIZE: usize = 32;
+const DEFAULT_PROSE_IR_LLM_JOBS: usize = 4;
 const PROMPT_DIGEST_LENGTH: usize = 12;
+const SKILL_CATALOG_PATH: &str = "agents/skills/catalog.yaml";
+const LOCAL_LLM_CPU_ENV: [(&str, &str); 4] = [
+    ("CUDA_VISIBLE_DEVICES", ""),
+    ("NVIDIA_VISIBLE_DEVICES", "void"),
+    ("HIP_VISIBLE_DEVICES", ""),
+    ("ROCR_VISIBLE_DEVICES", ""),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum LocalLlmCommand {
     ClassifyResponsibility,
     ExtractProseIr,
     RouteImplementationSurface,
+    RouteSkill,
     Search,
     BuildIndex,
     Eval,
@@ -96,6 +109,7 @@ impl LocalLlmArgs {
             "route-implementation-surface" | "implementation-surface" => {
                 LocalLlmCommand::RouteImplementationSurface
             }
+            "route-skill" | "skill-route" => LocalLlmCommand::RouteSkill,
             "search" => LocalLlmCommand::Search,
             "build-index" | "index" => LocalLlmCommand::BuildIndex,
             "eval" => LocalLlmCommand::Eval,
@@ -124,6 +138,9 @@ fn run_invocation(args: &LocalLlmArgs) -> i32 {
     }
     if args.command == LocalLlmCommand::RouteImplementationSurface {
         return run_route_implementation_surface(args);
+    }
+    if args.command == LocalLlmCommand::RouteSkill {
+        return run_route_skill(args);
     }
     let Ok(invocation) = build_invocation(args) else {
         eprintln!("LOCAL_LLM_CLI=fail");
@@ -181,9 +198,12 @@ struct ProseIrArgs {
     prompt: String,
     prompt_files: Vec<PathBuf>,
     model: String,
+    llama_cli: String,
     max_bytes: usize,
+    predict_tokens: usize,
     document_batch_size: usize,
     term_batch_size: usize,
+    llm_jobs: usize,
     json_out: Option<PathBuf>,
     print_prompt: bool,
 }
@@ -218,6 +238,16 @@ struct RouteImplementationSurfaceArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct RouteSkillArgs {
+    root: PathBuf,
+    prompt_parts: Vec<String>,
+    prompt_files: Vec<PathBuf>,
+    prompt_stdin: bool,
+    mode: String,
+    format: RouteOutputFormat,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SurfaceCandidate {
     surface: String,
     owner: String,
@@ -236,6 +266,33 @@ struct SurfaceRouteDecision {
     llm_status: String,
     llm_output: String,
     candidates: Vec<SurfaceCandidate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteMatch {
+    skill: String,
+    reason: String,
+    explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRoutingRule {
+    skill: String,
+    reason: String,
+    stage_policy: String,
+    triggers: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillRouteDecision {
+    route: &'static str,
+    mode: String,
+    skills: Vec<String>,
+    active_skills: Vec<String>,
+    deferred_skills: Vec<String>,
+    matched_skills: Vec<String>,
+    reasons: Vec<String>,
+    evidence: String,
 }
 
 impl ClassifyArgs {
@@ -307,9 +364,12 @@ impl ProseIrArgs {
             prompt_files: Vec::new(),
             model: env::var("AGENT_CANON_LOCAL_LLM_MODEL")
                 .unwrap_or_else(|_| DEFAULT_MODEL.to_string()),
+            llama_cli: env::var("AGENT_CANON_LLAMA_CLI").unwrap_or_default(),
             max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: DEFAULT_PREDICT_TOKENS,
             document_batch_size: DEFAULT_PROSE_IR_DOCUMENT_BATCH_SIZE,
             term_batch_size: DEFAULT_PROSE_IR_TERM_BATCH_SIZE,
+            llm_jobs: default_prose_ir_llm_jobs(),
             json_out: None,
             print_prompt: false,
         };
@@ -324,8 +384,16 @@ impl ProseIrArgs {
                     parsed.model = value_string(args, index, "--model")?;
                     index += 2;
                 }
+                "--llama-cli" => {
+                    parsed.llama_cli = value_string(args, index, "--llama-cli")?;
+                    index += 2;
+                }
                 "--max-bytes" => {
                     parsed.max_bytes = parse_usize(args, index, "--max-bytes")?;
+                    index += 2;
+                }
+                "--predict-tokens" => {
+                    parsed.predict_tokens = parse_usize(args, index, "--predict-tokens")?;
                     index += 2;
                 }
                 "--document-batch-size" => {
@@ -334,6 +402,10 @@ impl ProseIrArgs {
                 }
                 "--term-batch-size" => {
                     parsed.term_batch_size = parse_usize(args, index, "--term-batch-size")?;
+                    index += 2;
+                }
+                "--llm-jobs" | "--jobs" => {
+                    parsed.llm_jobs = parse_usize(args, index, args[index].as_str())?;
                     index += 2;
                 }
                 "--prompt" => {
@@ -526,6 +598,101 @@ impl RouteImplementationSurfaceArgs {
     }
 }
 
+impl RouteSkillArgs {
+    fn parse(root: PathBuf, args: &[String]) -> Result<Self, String> {
+        let mut parsed = Self {
+            root,
+            prompt_parts: Vec::new(),
+            prompt_files: Vec::new(),
+            prompt_stdin: false,
+            mode: "repo-changing".to_string(),
+            format: RouteOutputFormat::Text,
+        };
+        let mut index = 0;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--root" => {
+                    parsed.root = value_path(args, index, "--root")?;
+                    index += 2;
+                }
+                "--prompt" | "--request" | "--purpose" | "--task" => {
+                    parsed
+                        .prompt_parts
+                        .push(value_string(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-file" | "--request-file" | "--query-file" => {
+                    parsed
+                        .prompt_files
+                        .push(value_path(args, index, args[index].as_str())?);
+                    index += 2;
+                }
+                "--prompt-stdin" | "--request-stdin" | "--query-stdin" => {
+                    parsed.prompt_stdin = true;
+                    index += 1;
+                }
+                "--mode" => {
+                    let mode = value_string(args, index, "--mode")?;
+                    match mode.as_str() {
+                        "repo-changing" | "routing-only" => parsed.mode = mode,
+                        value => {
+                            return Err(format!(
+                                "--mode must be repo-changing or routing-only, got {value}"
+                            ))
+                        }
+                    }
+                    index += 2;
+                }
+                "--format" => {
+                    parsed.format = match value_string(args, index, "--format")?.as_str() {
+                        "text" => RouteOutputFormat::Text,
+                        "json" => RouteOutputFormat::Json,
+                        value => return Err(format!("--format must be text or json, got {value}")),
+                    };
+                    index += 2;
+                }
+                unknown if unknown.starts_with('-') => {
+                    return Err(format!("unknown argument {unknown}"))
+                }
+                text => {
+                    parsed.prompt_parts.push(text.to_string());
+                    index += 1;
+                }
+            }
+        }
+        Ok(parsed)
+    }
+
+    fn prompt_text(&self) -> Result<String, String> {
+        let mut parts = self.prompt_parts.clone();
+        for prompt_file in &self.prompt_files {
+            let path = rooted_path(&self.root, prompt_file);
+            if !path.is_file() {
+                return Err(format!("prompt-file-not-found:{}", prompt_file.display()));
+            }
+            parts.push(fs::read_to_string(&path).map_err(|error| {
+                format!("prompt-file-read-failed:{}:{error}", prompt_file.display())
+            })?);
+        }
+        if self.prompt_stdin {
+            let mut stdin_text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin_text)
+                .map_err(|error| format!("prompt-stdin-read-failed:{error}"))?;
+            parts.push(stdin_text);
+        }
+        let prompt = parts
+            .iter()
+            .map(|part| part.trim())
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if prompt.is_empty() {
+            return Err("prompt-required".to_string());
+        }
+        Ok(prompt)
+    }
+}
+
 impl LlamaCommand {
     fn args(&self) -> Vec<String> {
         vec![
@@ -634,7 +801,15 @@ fn run_extract_prose_ir(args: &LocalLlmArgs) -> i32 {
         return 0;
     }
 
-    let payload = prose_ir_payload(&parsed, &documents, &terms, &prompt_context, &digest);
+    let part_llm_results = prose_ir_part_llm_results(&part_prompts, &parsed);
+    let payload = prose_ir_payload(
+        &parsed,
+        &documents,
+        &terms,
+        &prompt_context,
+        &digest,
+        &part_llm_results,
+    );
     let rendered = match serde_json::to_string_pretty(&payload) {
         Ok(rendered) => rendered + "\n",
         Err(error) => {
@@ -747,6 +922,387 @@ fn run_route_implementation_surface(args: &LocalLlmArgs) -> i32 {
     0
 }
 
+fn run_route_skill(args: &LocalLlmArgs) -> i32 {
+    let parsed = match RouteSkillArgs::parse(args.root.clone(), &args.passthrough) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let prompt = match parsed.prompt_text() {
+        Ok(prompt) => prompt,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let source_root = match source_root_for(&parsed.root) {
+        Ok(root) => root,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let rules = match load_skill_route_rules(&source_root) {
+        Ok(rules) => rules,
+        Err(message) => {
+            eprintln!("SKILL_ROUTER_ERROR={message}");
+            return 2;
+        }
+    };
+    let decision = decide_skill_route_with_rules(&prompt, &parsed.mode, &rules);
+    match parsed.format {
+        RouteOutputFormat::Json => print_skill_route_json(&decision),
+        RouteOutputFormat::Text => print_skill_route_text(&decision),
+    }
+    0
+}
+
+#[cfg(test)]
+fn decide_skill_route(prompt: &str, requested_mode: &str) -> SkillRouteDecision {
+    let source_root =
+        default_source_root().expect("AgentCanon source root exists for skill routing");
+    let rules = load_skill_route_rules(&source_root).expect("skill routing catalog loads");
+    decide_skill_route_with_rules(prompt, requested_mode, &rules)
+}
+
+fn decide_skill_route_with_rules(
+    prompt: &str,
+    requested_mode: &str,
+    rules: &[SkillRoutingRule],
+) -> SkillRouteDecision {
+    let active_mode = infer_skill_route_mode(prompt, requested_mode);
+    let matches = matched_skill_routes(prompt, rules);
+    let matched_skills = matches
+        .iter()
+        .map(|item| item.skill.to_string())
+        .collect::<Vec<_>>();
+    let mut skills = vec!["agent-orchestration".to_string()];
+    if active_mode == "repo-changing" {
+        skills.push("codex-task-workflow".to_string());
+    }
+    skills.extend(matched_skills.iter().cloned());
+    let skills = ordered_unique_strings(skills);
+
+    let mut active_skills = vec!["agent-orchestration".to_string()];
+    for item in &matches {
+        if item.explicit || is_current_stage_skill(&item.skill, rules) {
+            active_skills.push(item.skill.to_string());
+        }
+    }
+    let active_skills = ordered_unique_strings(active_skills);
+    let deferred_skills = skills
+        .iter()
+        .filter(|skill| !active_skills.contains(skill))
+        .cloned()
+        .collect::<Vec<_>>();
+    let reasons = matches
+        .iter()
+        .map(|item| format!("{}:{}", item.skill, item.reason))
+        .collect::<Vec<_>>();
+    let evidence = format!(
+        "mode={};matched={};active={};deferred={}",
+        active_mode,
+        if matched_skills.is_empty() {
+            "none".to_string()
+        } else {
+            matched_skills.join(",")
+        },
+        active_skills.join(","),
+        if deferred_skills.is_empty() {
+            "none".to_string()
+        } else {
+            deferred_skills.join(",")
+        }
+    );
+    SkillRouteDecision {
+        route: "skill-selection",
+        mode: active_mode,
+        skills,
+        active_skills,
+        deferred_skills,
+        matched_skills,
+        reasons,
+        evidence,
+    }
+}
+
+fn matched_skill_routes(prompt: &str, rules: &[SkillRoutingRule]) -> Vec<SkillRouteMatch> {
+    let text = prompt.to_lowercase();
+    let mut matches = Vec::new();
+    for rule in rules {
+        let explicit = public_skill_name_mentioned(&text, &rule.skill);
+        if explicit
+            || rule
+                .triggers
+                .iter()
+                .any(|group| text_matches_group(&text, group))
+        {
+            matches.push(SkillRouteMatch {
+                skill: rule.skill.clone(),
+                reason: if explicit {
+                    "prompt explicitly names public skill".to_string()
+                } else {
+                    rule.reason.clone()
+                },
+                explicit,
+            });
+        }
+    }
+    matches
+}
+
+fn default_skill_route_reason() -> String {
+    "prompt explicitly names public skill".to_string()
+}
+
+fn default_skill_stage_policy() -> String {
+    "deferred".to_string()
+}
+
+#[cfg(test)]
+fn default_source_root() -> Result<PathBuf, String> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if let Some(root) = manifest_dir.parent().and_then(|path| path.parent()) {
+        if root.join(SKILL_CATALOG_PATH).is_file() {
+            return Ok(root.to_path_buf());
+        }
+    }
+    source_root_for(Path::new("."))
+}
+
+fn load_skill_route_rules(root: &Path) -> Result<Vec<SkillRoutingRule>, String> {
+    let path = root.join(SKILL_CATALOG_PATH);
+    let raw = fs::read_to_string(&path)
+        .map_err(|error| format!("skill-catalog-read-failed:{}:{error}", path.display()))?;
+    let documents = YamlLoader::load_from_str(&raw)
+        .map_err(|error| format!("skill-catalog-yaml-failed:{}:{error}", path.display()))?;
+    let catalog = documents
+        .first()
+        .ok_or_else(|| format!("skill-catalog-empty:{}", path.display()))?;
+    let families = catalog["skill_families"]
+        .as_vec()
+        .ok_or_else(|| "skill-catalog-missing-skill-families".to_string())?;
+    let mut rules = Vec::with_capacity(families.len());
+    for entry in families {
+        let skill_id = yaml_required_string(entry, "id", "skill_families")?;
+        let routing = &entry["routing"];
+        let reason = yaml_optional_string(routing, "reason", &skill_id)?
+            .unwrap_or_else(default_skill_route_reason);
+        let stage_policy = yaml_optional_string(routing, "stage_policy", &skill_id)?
+            .unwrap_or_else(default_skill_stage_policy);
+        let triggers = yaml_trigger_groups(routing, "triggers", &skill_id)?;
+        if !matches!(stage_policy.as_str(), "active" | "deferred") {
+            return Err(format!(
+                "skill-catalog-invalid-stage-policy:{}:{}",
+                skill_id, stage_policy
+            ));
+        }
+        if reason.trim().is_empty() {
+            return Err(format!("skill-catalog-empty-routing-reason:{}", skill_id));
+        }
+        rules.push(SkillRoutingRule {
+            skill: skill_id,
+            reason,
+            stage_policy,
+            triggers,
+        });
+    }
+    Ok(rules)
+}
+
+fn yaml_required_string(node: &Yaml, key: &str, context: &str) -> Result<String, String> {
+    yaml_optional_string(node, key, context)?
+        .ok_or_else(|| format!("skill-catalog-missing-string:{context}.{key}"))
+}
+
+fn yaml_optional_string(node: &Yaml, key: &str, context: &str) -> Result<Option<String>, String> {
+    if node.is_badvalue() || node.is_null() {
+        return Ok(None);
+    }
+    let value = &node[key];
+    if value.is_badvalue() || value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_str()
+        .map(|raw| Some(raw.to_string()))
+        .ok_or_else(|| format!("skill-catalog-field-not-string:{context}.{key}"))
+}
+
+fn yaml_trigger_groups(node: &Yaml, key: &str, skill_id: &str) -> Result<Vec<Vec<String>>, String> {
+    if node.is_badvalue() || node.is_null() || node[key].is_badvalue() || node[key].is_null() {
+        return Ok(Vec::new());
+    }
+    let groups = node[key]
+        .as_vec()
+        .ok_or_else(|| format!("skill-catalog-routing-triggers-not-list:{skill_id}"))?;
+    let mut result = Vec::with_capacity(groups.len());
+    for group in groups {
+        let terms = group
+            .as_vec()
+            .ok_or_else(|| format!("skill-catalog-routing-trigger-not-list:{skill_id}"))?;
+        if terms.is_empty() {
+            return Err(format!("skill-catalog-empty-routing-trigger:{skill_id}"));
+        }
+        let mut normalized_terms = Vec::with_capacity(terms.len());
+        for term in terms {
+            let Some(raw_term) = term.as_str() else {
+                return Err(format!(
+                    "skill-catalog-routing-trigger-term-not-string:{skill_id}"
+                ));
+            };
+            if raw_term.trim().is_empty() {
+                return Err(format!("skill-catalog-empty-routing-trigger:{skill_id}"));
+            }
+            normalized_terms.push(raw_term.to_string());
+        }
+        result.push(normalized_terms);
+    }
+    Ok(result)
+}
+
+fn text_matches_group(text: &str, group: &[String]) -> bool {
+    group.iter().all(|term| text.contains(&term.to_lowercase()))
+}
+
+fn public_skill_name_mentioned(text: &str, skill: &str) -> bool {
+    for (index, _) in text.match_indices(skill) {
+        let before = if index == 0 {
+            None
+        } else {
+            text[..index].chars().next_back()
+        };
+        let after = text[index + skill.len()..].chars().next();
+        let before_ok = before.is_none_or(|value| value == '$' || !is_skill_word_char(value));
+        let after_ok = after.is_none_or(|value| !is_skill_word_char(value));
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_skill_word_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || value == '_' || value == '-'
+}
+
+fn infer_skill_route_mode(prompt: &str, requested_mode: &str) -> String {
+    if requested_mode == "repo-changing" {
+        return requested_mode.to_string();
+    }
+    let text = prompt.to_lowercase();
+    let repo_changing_terms = [
+        "修正",
+        "実装",
+        "リファクタ",
+        "変更",
+        "直して",
+        "見直",
+        "fix",
+        "implement",
+        "refactor",
+        "repo-changing",
+    ];
+    if repo_changing_terms.iter().any(|term| text.contains(term)) {
+        "repo-changing".to_string()
+    } else {
+        requested_mode.to_string()
+    }
+}
+
+fn is_current_stage_skill(skill: &str, rules: &[SkillRoutingRule]) -> bool {
+    rules
+        .iter()
+        .any(|rule| rule.skill == skill && rule.stage_policy == "active")
+}
+
+fn ordered_unique_strings(values: Vec<String>) -> Vec<String> {
+    let mut result = Vec::new();
+    for value in values {
+        if !result.contains(&value) {
+            result.push(value);
+        }
+    }
+    result
+}
+
+fn skill_route_payload(decision: &SkillRouteDecision) -> Value {
+    json!({
+        "schema": "agent_canon.local_llm.skill_route.v1",
+        "route": decision.route,
+        "mode": decision.mode,
+        "skills": decision.skills,
+        "active_skills": decision.active_skills,
+        "deferred_skills": decision.deferred_skills,
+        "matched_skills": decision.matched_skills,
+        "reasons": decision.reasons,
+        "evidence": decision.evidence,
+    })
+}
+
+fn print_skill_route_json(decision: &SkillRouteDecision) {
+    match serde_json::to_string_pretty(&skill_route_payload(decision)) {
+        Ok(rendered) => println!("{rendered}"),
+        Err(error) => eprintln!("SKILL_ROUTER_ERROR=json-render-failed:{error}"),
+    }
+}
+
+fn print_skill_route_text(decision: &SkillRouteDecision) {
+    println!("ROUTE={}", decision.route);
+    println!("SCHEMA=agent_canon.local_llm.skill_route.v1");
+    println!("MODE={}", decision.mode);
+    println!(
+        "SKILLS={}",
+        decision
+            .skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "ACTIVE_SKILLS={}",
+        decision
+            .active_skills
+            .iter()
+            .map(|skill| format!("${skill}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "DEFERRED_SKILLS={}",
+        if decision.deferred_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision
+                .deferred_skills
+                .iter()
+                .map(|skill| format!("${skill}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+    );
+    println!(
+        "MATCHED_SKILLS={}",
+        if decision.matched_skills.is_empty() {
+            "-".to_string()
+        } else {
+            decision.matched_skills.join(",")
+        }
+    );
+    println!(
+        "REASONS={}",
+        if decision.reasons.is_empty() {
+            "-".to_string()
+        } else {
+            decision.reasons.join(";")
+        }
+    );
+    println!("EVIDENCE={}", decision.evidence);
+}
+
 fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
     let lower = request.to_lowercase();
     let mut candidates = vec![
@@ -848,6 +1404,101 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
         ),
         surface_candidate(
             &lower,
+            "contract_only_test_policy",
+            "Contract-only wrapper and checker-owned test admission policy",
+            &[
+                "documents/coding-conventions-testing.md",
+                "agents/skills/test-design.md",
+                ".agents/skills/test-design/SKILL.md",
+                "agents/TASK_WORKFLOWS.md",
+                "agents/canonical/CODEX_WORKFLOW.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "pytest smoke added for static contract validation",
+                "execution-only no-crash test for a thin adapter",
+                "numerical smoke for non-numerical routing, metadata, docs, or wrapper changes",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("contract-only wrapper", 18),
+                ("contract only wrapper", 18),
+                ("contract-only adapter", 16),
+                ("thin adapter", 14),
+                ("契約だけ", 18),
+                ("契約だけの wrapper", 20),
+                ("契約だけのラッパー", 20),
+                ("テストを強制", 16),
+                ("testを強制", 16),
+                ("余計なテスト", 14),
+                ("不要なテスト", 14),
+                ("pytest smoke", 14),
+                ("execution-only test", 14),
+                ("no-crash test", 14),
+                ("static-analysis duplicate", 14),
+                ("static-analysis-duplicate-test", 14),
+                ("static contract validation", 14),
+                ("checker-owned validation", 12),
+                ("canonical command evidence", 12),
+                ("runtime behavior", 10),
+                ("observable behavior", 10),
+                ("数値テスト", 9),
+                ("数値 smoke", 9),
+                ("unnecessary test", 10),
+                ("heavy test", 8),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "numerical_iterative_algorithm_contract",
+            "Computational optimization and iterative algorithm contract",
+            &[
+                "agents/skills/computational-optimization.md",
+                ".agents/skills/computational-optimization/SKILL.md",
+                "documents/algorithm-implementation-boundary.md",
+                "documents/conventions/python/15_jax_rules.md",
+                "documents/coding-conventions-testing.md",
+            ],
+            &[
+                "new solver helper before objective/residual, Step_impl, R_impl, state, and stopping policy are fixed",
+                "proof-only Info fields, diagnostic gates, or runtime checks without iteration-map effect",
+                "large numerical tests before static contract and smallest deterministic cases are defined",
+            ],
+            &[
+                "tools/bin/agent-canon python-algorithm-contract-check --root . <paths>",
+                "tools/bin/agent-canon test-design check <test-plan-or-doc>",
+                "python3 tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                ("iterative method", 9),
+                ("iteration map", 9),
+                ("fixed point", 7),
+                ("solver", 8),
+                ("convergence", 8),
+                ("stopping", 7),
+                ("residual", 7),
+                ("preconditioner", 7),
+                ("kkt", 7),
+                ("newton", 6),
+                ("mehrotra", 6),
+                ("optimizer", 5),
+                ("optimization", 5),
+                ("lax.while_loop", 6),
+                ("while_loop", 5),
+                ("反復法", 9),
+                ("反復", 6),
+                ("収束", 8),
+                ("停止条件", 7),
+                ("残差", 7),
+                ("数値", 5),
+            ],
+        ),
+        surface_candidate(
+            &lower,
             "directory_repository_responsibility",
             "Repository and directory responsibility contract",
             &[
@@ -876,6 +1527,107 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
                 ("責務", 2),
                 ("responsibility-scope", 5),
                 ("root view", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "document_claim_grounding",
+            "Canonical document claim, program-contract, proof-status, and evidence-grounding policy",
+            &[
+                "documents/conventions/common/05_docs.md",
+                "documents/coding-conventions-project.md",
+                "agents/skills/long-form-writing.md",
+                ".agents/skills/long-form-writing/SKILL.md",
+                "agents/skills/formal-proof-workflow.md",
+                ".agents/skills/formal-proof-workflow/SKILL.md",
+                "tools/agent_tools/check_convention_compliance.py",
+            ],
+            &[
+                "run-local planning language promoted to canonical policy",
+                "manual prose-only claim validation when checker or proof status is required",
+                "new policy prose without convention-compliance coverage",
+            ],
+            &[
+                "python3 tools/agent_tools/check_convention_compliance.py",
+                "tools/bin/agent-canon docs check <changed-docs>",
+                "cargo test --manifest-path rust/agent-canon/Cargo.toml implementation_surface_route",
+            ],
+            &[
+                ("program contract", 12),
+                ("program contracts", 12),
+                ("プログラム契約", 12),
+                ("プログラムの契約", 12),
+                ("claim grounding", 10),
+                ("canonical document", 9),
+                ("canonical documents", 9),
+                ("public entrypoint", 9),
+                ("input schema", 9),
+                ("return projection", 9),
+                ("mathematical claim", 9),
+                ("mathematical statement", 9),
+                ("mathematical statements", 9),
+                ("observable effect", 8),
+                ("observable state", 8),
+                ("proof obligation", 9),
+                ("proof_status", 9),
+                ("proof status", 8),
+                ("theorem target", 8),
+                ("checker evidence", 8),
+                ("provisional wording", 8),
+                ("validation command", 8),
+                ("preconditions", 7),
+                ("正本文書", 8),
+                ("文書を正", 8),
+                ("まずは", 8),
+                ("誇張", 7),
+                ("overclaim", 7),
+                ("source authority", 6),
+                ("evidence class", 6),
+                ("assumptions", 5),
+                ("definitions", 5),
+                ("for now", 5),
+                ("first pass", 5),
+                ("first draft", 5),
+                ("proof-like", 5),
+                ("数理", 5),
+                ("数学", 5),
+                ("証明", 5),
+                ("定理", 5),
+                ("ad hoc", 4),
+                ("adhoc", 4),
+                ("checker", 4),
+                ("文書", 4),
+            ],
+        ),
+        surface_candidate(
+            &lower,
+            "personal_codex_runtime",
+            "User-level Codex configuration, skills, rules, and hook trust state",
+            &[
+                "$HOME/.codex/config.toml",
+                "$HOME/.codex/skills/",
+                "$HOME/.codex/rules/",
+                "project .codex symlink targets for comparison only",
+            ],
+            &[
+                "repo-local mirror of personal Codex state",
+                "auth, history, sessions, logs, or caches unless explicitly required",
+                "shared AgentCanon policy for a user-only runtime setting",
+            ],
+            &[
+                "inspect non-secret ~/.codex config keys and skill IDs",
+                "readlink -f .codex/config.toml .agents/skills",
+                "agent-canon local-llm route-skill --prompt <request> --format json",
+            ],
+            &[
+                ("~/.codex", 9),
+                ("$home/.codex", 9),
+                ("home/.codex", 9),
+                ("personal codex", 6),
+                ("personal runtime", 6),
+                ("user codex", 5),
+                ("user-level codex", 5),
+                ("個人", 4),
             ],
         ),
         surface_candidate(
@@ -1258,9 +2010,19 @@ fn rooted_path(root: &Path, path: &Path) -> PathBuf {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ProseIrPromptPart {
     part_id: String,
     prompt: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProseIrPartLlmResult {
+    part_id: String,
+    prompt_sha: String,
+    status: String,
+    stdout: String,
+    stderr: String,
 }
 
 fn prompt_parts_for_prose_ir(
@@ -1360,12 +2122,81 @@ fn prompt_for_prose_ir_part(
     lines.join("\n")
 }
 
+fn prose_ir_part_llm_results(
+    part_prompts: &[ProseIrPromptPart],
+    args: &ProseIrArgs,
+) -> Vec<ProseIrPartLlmResult> {
+    if part_prompts.is_empty() {
+        return Vec::new();
+    }
+    let executable = find_llama_cli(&args.llama_cli);
+    if executable.is_empty() {
+        return part_prompts
+            .iter()
+            .map(|part| ProseIrPartLlmResult {
+                part_id: part.part_id.clone(),
+                prompt_sha: prompt_digest(&part.prompt),
+                status: "skipped_llama_cli_not_found".to_string(),
+                stdout: String::new(),
+                stderr: String::new(),
+            })
+            .collect();
+    }
+
+    let jobs = args.llm_jobs.max(1).min(part_prompts.len());
+    let mut results = Vec::with_capacity(part_prompts.len());
+    for chunk in part_prompts.chunks(jobs) {
+        let mut handles = Vec::with_capacity(chunk.len());
+        for part in chunk {
+            let part_id = part.part_id.clone();
+            let prompt_sha = prompt_digest(&part.prompt);
+            let command = LlamaCommand {
+                executable: executable.clone(),
+                model: args.model.clone(),
+                prompt: part.prompt.clone(),
+                predict_tokens: args.predict_tokens,
+            };
+            let handle = thread::spawn(move || match run_llama_prompt(&command) {
+                Ok((stdout, stderr)) => ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "pass".to_string(),
+                    stdout,
+                    stderr,
+                },
+                Err(error) => ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "fail".to_string(),
+                    stdout: String::new(),
+                    stderr: error,
+                },
+            });
+            handles.push((part.part_id.clone(), prompt_digest(&part.prompt), handle));
+        }
+        for (part_id, prompt_sha, handle) in handles {
+            match handle.join() {
+                Ok(result) => results.push(result),
+                Err(_) => results.push(ProseIrPartLlmResult {
+                    part_id,
+                    prompt_sha,
+                    status: "panic".to_string(),
+                    stdout: String::new(),
+                    stderr: "llama-thread-panicked".to_string(),
+                }),
+            }
+        }
+    }
+    results
+}
+
 fn prose_ir_payload(
     args: &ProseIrArgs,
     documents: &[ProseIrDocument],
     terms: &[String],
     prompt_context: &str,
     prompt_digest: &str,
+    part_llm_results: &[ProseIrPartLlmResult],
 ) -> Value {
     let derived_terms = if terms.is_empty() {
         extract_salient_terms(documents)
@@ -1408,7 +2239,7 @@ fn prose_ir_payload(
         })
         .collect();
     let corpus_hints = corpus_hints_for_ir(documents, &derived_terms, prompt_context);
-    let parts = prose_ir_part_records(documents, &derived_terms, args);
+    let parts = prose_ir_part_records(documents, &derived_terms, args, part_llm_results);
     let analysis_intents = analysis_intents_for_ir(documents);
     json!({
         "schema": "agent_canon.local_llm.prose_ir.v1",
@@ -1420,6 +2251,7 @@ fn prose_ir_payload(
         "document_count": documents.len(),
         "term_count": derived_terms.len(),
         "part_count": parts.len(),
+        "llm_execution": prose_ir_llm_execution_summary(args, part_llm_results),
         "partition": {
             "document_batch_size": args.document_batch_size.max(1),
             "term_batch_size": args.term_batch_size.max(1),
@@ -1437,9 +2269,14 @@ fn prose_ir_part_records(
     documents: &[ProseIrDocument],
     terms: &[String],
     args: &ProseIrArgs,
+    part_llm_results: &[ProseIrPartLlmResult],
 ) -> Vec<Value> {
     let document_batch_size = args.document_batch_size.max(1);
     let term_batch_size = args.term_batch_size.max(1);
+    let llm_by_part = part_llm_results
+        .iter()
+        .map(|result| (result.part_id.as_str(), result))
+        .collect::<BTreeMap<_, _>>();
     let term_chunks: Vec<&[String]> = if terms.is_empty() {
         vec![&[]]
     } else {
@@ -1453,15 +2290,78 @@ fn prose_ir_part_records(
                 .iter()
                 .map(|document| document.relative_path.clone())
                 .collect::<Vec<_>>();
-            parts.push(json!({
-                "part_id": format!("part:d{}:t{}", document_batch_index + 1, term_batch_index + 1),
+            let part_id = format!(
+                "part:d{}:t{}",
+                document_batch_index + 1,
+                term_batch_index + 1
+            );
+            let mut record = json!({
+                "part_id": part_id.clone(),
                 "document_paths": document_paths,
                 "terms": term_batch.to_vec(),
                 "status": "extracted_and_merged",
-            }));
+            });
+            if let Some(result) = llm_by_part.get(part_id.as_str()) {
+                if let Some(object) = record.as_object_mut() {
+                    object.insert("llm_status".to_string(), json!(result.status));
+                    object.insert("llm_prompt_sha".to_string(), json!(result.prompt_sha));
+                    if let Some(output) = prose_ir_part_llm_output(result) {
+                        object.insert("llm_output".to_string(), output);
+                    }
+                    if !result.stderr.trim().is_empty() {
+                        object.insert("llm_stderr".to_string(), json!(result.stderr.trim()));
+                    }
+                }
+            }
+            parts.push(record);
         }
     }
     parts
+}
+
+fn prose_ir_part_llm_output(result: &ProseIrPartLlmResult) -> Option<Value> {
+    let trimmed = result.stdout.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    serde_json::from_str::<Value>(trimmed)
+        .map(Some)
+        .unwrap_or_else(|_| Some(json!({ "raw": trimmed })))
+}
+
+fn prose_ir_llm_execution_summary(args: &ProseIrArgs, results: &[ProseIrPartLlmResult]) -> Value {
+    let pass_count = results
+        .iter()
+        .filter(|result| result.status == "pass")
+        .count();
+    let skipped_count = results
+        .iter()
+        .filter(|result| result.status == "skipped_llama_cli_not_found")
+        .count();
+    let failed_count = results.len().saturating_sub(pass_count + skipped_count);
+    let status = if results.is_empty() {
+        "not_applicable"
+    } else if skipped_count == results.len() {
+        "skipped_llama_cli_not_found"
+    } else if pass_count == results.len() {
+        "completed"
+    } else if pass_count > 0 {
+        "partial_failure"
+    } else {
+        "failed"
+    };
+    json!({
+        "status": status,
+        "strategy": "per_part_bounded_parallel",
+        "jobs": args.llm_jobs.max(1).min(results.len().max(1)),
+        "configured_jobs": args.llm_jobs.max(1),
+        "predict_tokens": args.predict_tokens,
+        "part_count": results.len(),
+        "attempted": pass_count + failed_count > 0,
+        "passed": pass_count,
+        "failed": failed_count,
+        "skipped": skipped_count,
+    })
 }
 
 fn infer_markdown_title(text: &str, path: &Path) -> String {
@@ -2074,9 +2974,9 @@ fn find_on_path(name: &str) -> String {
 }
 
 fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCommand) -> i32 {
-    let output = Command::new(&command.executable)
-        .args(command.args())
-        .output();
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process.args(command.args()).output();
     match output {
         Ok(result) => {
             let status = if result.status.success() {
@@ -2102,7 +3002,9 @@ fn run_llama(target: &ReviewTarget, model: &str, digest: &str, command: &LlamaCo
 }
 
 fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> {
-    let output = Command::new(&command.executable)
+    let mut process = Command::new(&command.executable);
+    apply_local_llm_cpu_env(&mut process);
+    let output = process
         .args(command.args())
         .output()
         .map_err(|error| format!("llama-launch-failed:{error}"))?;
@@ -2116,6 +3018,12 @@ fn run_llama_prompt(command: &LlamaCommand) -> Result<(String, String), String> 
             output.status.code().unwrap_or(1),
             stderr.trim()
         ))
+    }
+}
+
+fn apply_local_llm_cpu_env(command: &mut Command) {
+    for (key, value) in LOCAL_LLM_CPU_ENV {
+        command.env(key, value);
     }
 }
 
@@ -2143,6 +3051,15 @@ fn parse_usize(args: &[String], index: usize, name: &str) -> Result<usize, Strin
         .map_err(|_| format!("{name} must be a positive integer, got {value}"))
 }
 
+fn default_prose_ir_llm_jobs() -> usize {
+    env::var("AGENT_CANON_LOCAL_LLM_PROSE_IR_JOBS")
+        .or_else(|_| env::var("AGENT_CANON_LOCAL_LLM_JOBS"))
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_PROSE_IR_LLM_JOBS)
+}
+
 fn build_invocation(args: &LocalLlmArgs) -> Result<PythonInvocation, String> {
     let source_root = source_root_for(&args.root)?;
     let (script, prefix_args) = match args.command {
@@ -2151,6 +3068,7 @@ fn build_invocation(args: &LocalLlmArgs) -> Result<PythonInvocation, String> {
         LocalLlmCommand::RouteImplementationSurface => {
             return Err("native-rust-command".to_string())
         }
+        LocalLlmCommand::RouteSkill => return Err("native-rust-command".to_string()),
         LocalLlmCommand::Search => (source_root.join("tools/agent_tools/search.py"), Vec::new()),
         LocalLlmCommand::BuildIndex => (
             source_root.join("tools/agent_tools/search_index.py"),
@@ -2223,7 +3141,7 @@ fn has_option_value(args: &[String], name: &str) -> bool {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|route-implementation-surface|search|build-index|eval> [--root <repo-root>] [tool args...]"
+        "usage: agent-canon local-llm <classify-responsibility|review-file|extract-prose-ir|prose-ir|route-implementation-surface|route-skill|search|build-index|eval> [--root <repo-root>] [tool args...]"
     );
     eprintln!(
         "examples: agent-canon local-llm classify-responsibility --print-prompt tools/agent_tools/search.py"
@@ -2236,6 +3154,9 @@ fn print_usage() {
     );
     eprintln!(
         "          agent-canon local-llm route-implementation-surface --request-file reports/task.txt --format text"
+    );
+    eprintln!(
+        "          agent-canon local-llm route-skill --prompt \"fix skill routing\" --format json"
     );
 }
 
@@ -2282,6 +3203,30 @@ mod tests {
     }
 
     #[test]
+    fn local_llm_command_envelope_hides_accelerator_devices() {
+        let mut command = Command::new("llama-cli");
+        apply_local_llm_cpu_env(&mut command);
+
+        let envs = command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.map(|item| item.to_string_lossy().to_string()),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(envs.get("CUDA_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(
+            envs.get("NVIDIA_VISIBLE_DEVICES"),
+            Some(&Some("void".to_string()))
+        );
+        assert_eq!(envs.get("HIP_VISIBLE_DEVICES"), Some(&Some(String::new())));
+        assert_eq!(envs.get("ROCR_VISIBLE_DEVICES"), Some(&Some(String::new())));
+    }
+
+    #[test]
     fn parses_implementation_surface_route_request_file() {
         let args = vec![
             "route-implementation-surface".to_string(),
@@ -2307,6 +3252,137 @@ mod tests {
     }
 
     #[test]
+    fn parses_skill_route_prompt() {
+        let args = vec![
+            "route-skill".to_string(),
+            "--root".to_string(),
+            "fixture".to_string(),
+            "--prompt".to_string(),
+            "スキルとツールのルーティングを根本から見直す".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
+        ];
+        let parsed = LocalLlmArgs::parse(&args).expect("parse local llm args");
+
+        assert_eq!(parsed.command, LocalLlmCommand::RouteSkill);
+        assert_eq!(parsed.root, PathBuf::from("fixture"));
+        let route_args =
+            RouteSkillArgs::parse(parsed.root.clone(), &parsed.passthrough).expect("parse route");
+        assert_eq!(route_args.format, RouteOutputFormat::Json);
+        assert_eq!(
+            route_args.prompt_parts,
+            vec!["スキルとツールのルーティングを根本から見直す".to_string()]
+        );
+    }
+
+    #[test]
+    fn skill_route_splits_active_and_deferred_skill_waves() {
+        let prompt = "スキルとツールのルーティングを根本の設計から見直し、マルチエージェントでログのレポートを残す";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert_eq!(decision.route, "skill-selection");
+        assert!(decision.skills.contains(&"codex-task-workflow".to_string()));
+        assert!(decision.skills.contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"agent-orchestration".to_string()));
+        assert!(decision.active_skills.contains(&"task-routing".to_string()));
+        assert!(!decision
+            .active_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"subagent-bootstrap".to_string()));
+        assert!(decision
+            .deferred_skills
+            .contains(&"codex-task-workflow".to_string()));
+        assert!(decision.evidence.contains("active=agent-orchestration"));
+    }
+
+    #[test]
+    fn skill_route_matches_repo_refactor_and_personal_codex_boundary() {
+        let prompt = "レポのリファクタスキルを定義して ~/.codex も見て修正して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_structure_review_weakness() {
+        let prompt = "構造のレビュースキルが弱いので見直して";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision
+            .matched_skills
+            .contains(&"structure-refactor".to_string()));
+        assert!(decision
+            .active_skills
+            .contains(&"structure-refactor".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_unneeded_numerical_tests() {
+        let prompt = "不要な数値テストを入れるのをやめさせてください";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_contract_only_wrapper_tests() {
+        let prompt = "契約だけの wrapper に pytest smoke や execution-only test を足すのをやめたい";
+        let decision = decide_skill_route(prompt, "repo-changing");
+
+        assert!(decision.matched_skills.contains(&"test-design".to_string()));
+        assert!(decision.active_skills.contains(&"test-design".to_string()));
+    }
+
+    #[test]
+    fn skill_route_matches_adaptive_improvement_loop() {
+        let prompts = [
+            "反復実行系のスキルがうまく作動してない。原因を探して",
+            "experiments research tuning iterative code improvement managed as one backlog-driven agile outer loop",
+        ];
+
+        for prompt in prompts {
+            let decision = decide_skill_route(prompt, "repo-changing");
+
+            assert!(decision
+                .matched_skills
+                .contains(&"adaptive-improvement-loop".to_string()));
+            assert!(decision
+                .active_skills
+                .contains(&"adaptive-improvement-loop".to_string()));
+            assert!(!decision.evidence.contains("matched=none"));
+        }
+    }
+
+    #[test]
+    fn skill_route_json_schema_includes_wave_fields() {
+        let decision = decide_skill_route(
+            "md-style-check と agent-learning の routing gap を直して",
+            "routing-only",
+        );
+        let payload = skill_route_payload(&decision);
+
+        assert_eq!(payload["schema"], "agent_canon.local_llm.skill_route.v1");
+        assert_eq!(payload["route"], "skill-selection");
+        assert!(payload["active_skills"].is_array());
+        assert!(payload["deferred_skills"].is_array());
+        assert!(payload["matched_skills"]
+            .as_array()
+            .expect("matched skills array")
+            .iter()
+            .any(|value| value == "md-style-check"));
+    }
+
+    #[test]
     fn implementation_surface_route_prioritizes_local_llm_tool() {
         let request = "実装前に責務判定するルーターを local LLM で作り、AGENTS.md にも書く";
         let candidates = implementation_surface_candidates(request);
@@ -2318,6 +3394,106 @@ mod tests {
         let prompt = prompt_for_implementation_surface_route(request, &candidates);
         assert!(prompt.contains("implementation-surface router"));
         assert!(prompt.contains("Return JSON only"));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_personal_codex_runtime() {
+        let request =
+            "~/.codex の config と user skill が repo routing と衝突していないか見て修正する";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "personal_codex_runtime");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("$HOME/.codex/config.toml")));
+        assert!(candidates[0]
+            .forbidden_paths
+            .iter()
+            .any(|path| path.contains("auth")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_iterative_algorithm_contract() {
+        let request =
+            "反復法の solver 実装で convergence と residual の stopping policy を直したい";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(
+            candidates[0].surface,
+            "numerical_iterative_algorithm_contract"
+        );
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("computational-optimization")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("algorithm-implementation-boundary")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("python-algorithm-contract-check")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_contract_only_test_policy() {
+        let request = "契約だけの wrapper で runtime behavior を増やしていないので pytest smoke, execution-only test, no-crash test, 数値テストを足さず static contract validation と canonical command evidence に戻したい";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "contract_only_test_policy");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("coding-conventions-testing")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("test-design")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_document_claim_grounding() {
+        let request = "Canonical documents are treated as source authority, but mathematical statements and provisional wording such as まずは become ad hoc policy; route to checker evidence and proof obligation.";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("05_docs.md")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .required_checks
+            .iter()
+            .any(|command| command.contains("check_convention_compliance.py")));
+    }
+
+    #[test]
+    fn implementation_surface_route_detects_program_contract() {
+        let request = "プログラムの契約を public entrypoint, input schema, return projection, observable effect, preconditions, validation command として明示したい。";
+        let candidates = implementation_surface_candidates(request);
+
+        assert_eq!(candidates[0].surface, "document_claim_grounding");
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("formal-proof-workflow")));
+        assert!(candidates[0]
+            .canonical_paths
+            .iter()
+            .any(|path| path.contains("long-form-writing")));
+        assert!(candidates[0].rationale.iter().any(
+            |reason| reason.contains("program contract") || reason.contains("プログラムの契約")
+        ));
     }
 
     #[test]
@@ -2385,6 +3561,12 @@ mod tests {
             "fixture".to_string(),
             "--term".to_string(),
             "DSL".to_string(),
+            "--llama-cli".to_string(),
+            "fake-llama-cli".to_string(),
+            "--predict-tokens".to_string(),
+            "64".to_string(),
+            "--llm-jobs".to_string(),
+            "3".to_string(),
             "--json-out".to_string(),
             "out.json".to_string(),
             "docs/one.md".to_string(),
@@ -2399,6 +3581,9 @@ mod tests {
             ProseIrArgs::parse(parsed.root, &parsed.passthrough).expect("parse prose ir args");
         assert_eq!(prose_args.files, vec!["docs/one.md", "docs/two.md"]);
         assert_eq!(prose_args.terms, vec!["DSL"]);
+        assert_eq!(prose_args.llama_cli, "fake-llama-cli");
+        assert_eq!(prose_args.predict_tokens, 64);
+        assert_eq!(prose_args.llm_jobs, 3);
         assert_eq!(prose_args.json_out, Some(PathBuf::from("out.json")));
     }
 
@@ -2422,9 +3607,12 @@ mod tests {
             prompt: "academic Python/Rust paper".to_string(),
             prompt_files: Vec::new(),
             model: DEFAULT_MODEL.to_string(),
+            llama_cli: String::new(),
             max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: DEFAULT_PREDICT_TOKENS,
             document_batch_size: 1,
             term_batch_size: 1,
+            llm_jobs: 2,
             json_out: None,
             print_prompt: false,
         };
@@ -2433,12 +3621,45 @@ mod tests {
             .iter()
             .map(|file| read_prose_ir_document(&args.root, file, args.max_bytes).expect("read doc"))
             .collect::<Vec<_>>();
-        let payload = prose_ir_payload(&args, &documents, &args.terms, &args.prompt, "abc123");
+        let prompt_parts = prompt_parts_for_prose_ir(&documents, &args.terms, &args.prompt, &args);
+        let part_llm_results = vec![
+            ProseIrPartLlmResult {
+                part_id: "part:d2:t1".to_string(),
+                prompt_sha: "second".to_string(),
+                status: "pass".to_string(),
+                stdout: "{\"part\":\"second\"}".to_string(),
+                stderr: String::new(),
+            },
+            ProseIrPartLlmResult {
+                part_id: "part:d1:t1".to_string(),
+                prompt_sha: "first".to_string(),
+                status: "pass".to_string(),
+                stdout: "{\"part\":\"first\"}".to_string(),
+                stderr: String::new(),
+            },
+        ];
+        assert_eq!(prompt_parts.len(), 2);
+        let payload = prose_ir_payload(
+            &args,
+            &documents,
+            &args.terms,
+            &args.prompt,
+            "abc123",
+            &part_llm_results,
+        );
 
         assert_eq!(payload["schema"], "agent_canon.local_llm.prose_ir.v1");
         assert_eq!(payload["document_count"], 2);
         assert_eq!(payload["term_count"], 1);
         assert_eq!(payload["part_count"], 2);
+        assert_eq!(payload["llm_execution"]["status"], "completed");
+        assert_eq!(payload["llm_execution"]["jobs"], 2);
+        let parts = payload["parts"].as_array().expect("parts");
+        assert_eq!(parts[0]["part_id"], "part:d1:t1");
+        assert_eq!(parts[0]["llm_prompt_sha"], "first");
+        assert_eq!(parts[0]["llm_output"]["part"], "first");
+        assert_eq!(parts[1]["part_id"], "part:d2:t1");
+        assert_eq!(parts[1]["llm_prompt_sha"], "second");
         assert!(payload["documents"].as_array().expect("documents").len() == 2);
         assert!(
             payload["dsl_seed"]["nodes"]
@@ -2461,6 +3682,110 @@ mod tests {
         assert!(analysis_intents
             .iter()
             .all(|item| item["intent"].as_str() == Some("experiment_plan")));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prose_ir_part_llm_results_skip_when_llama_cli_is_missing() {
+        let root = make_fixture_root();
+        let args = ProseIrArgs {
+            root: root.clone(),
+            files: vec!["docs/one.md".to_string()],
+            terms: Vec::new(),
+            terms_files: Vec::new(),
+            prompt: String::new(),
+            prompt_files: Vec::new(),
+            model: DEFAULT_MODEL.to_string(),
+            llama_cli: root.join("missing-llama-cli").to_string_lossy().to_string(),
+            max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: 16,
+            document_batch_size: 1,
+            term_batch_size: 1,
+            llm_jobs: 2,
+            json_out: None,
+            print_prompt: false,
+        };
+        let parts = vec![
+            ProseIrPromptPart {
+                part_id: "part:d1:t1".to_string(),
+                prompt: "first".to_string(),
+            },
+            ProseIrPromptPart {
+                part_id: "part:d2:t1".to_string(),
+                prompt: "second".to_string(),
+            },
+        ];
+
+        let results = prose_ir_part_llm_results(&parts, &args);
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].part_id, "part:d1:t1");
+        assert_eq!(results[1].part_id, "part:d2:t1");
+        assert!(results
+            .iter()
+            .all(|result| result.status == "skipped_llama_cli_not_found"));
+        assert!(results.iter().all(|result| !result.prompt_sha.is_empty()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prose_ir_part_llm_results_run_fake_llama_per_part_in_input_order() {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_fixture_root();
+        fs::create_dir_all(&root).expect("mkdir root");
+        let fake_llama = root.join("llama-cli");
+        fs::write(
+            &fake_llama,
+            "#!/bin/sh\nprintf '{\"schema\":\"agent_canon.local_llm.prose_ir.v1\",\"ok\":true}\\n'\n",
+        )
+        .expect("write fake llama");
+        #[cfg(unix)]
+        {
+            let mut permissions = fs::metadata(&fake_llama)
+                .expect("fake llama metadata")
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&fake_llama, permissions).expect("chmod fake llama");
+        }
+        let args = ProseIrArgs {
+            root: root.clone(),
+            files: vec!["docs/one.md".to_string()],
+            terms: Vec::new(),
+            terms_files: Vec::new(),
+            prompt: String::new(),
+            prompt_files: Vec::new(),
+            model: DEFAULT_MODEL.to_string(),
+            llama_cli: fake_llama.to_string_lossy().to_string(),
+            max_bytes: DEFAULT_MAX_BYTES,
+            predict_tokens: 16,
+            document_batch_size: 1,
+            term_batch_size: 1,
+            llm_jobs: 2,
+            json_out: None,
+            print_prompt: false,
+        };
+        let parts = vec![
+            ProseIrPromptPart {
+                part_id: "part:d1:t1".to_string(),
+                prompt: "first".to_string(),
+            },
+            ProseIrPromptPart {
+                part_id: "part:d2:t1".to_string(),
+                prompt: "second".to_string(),
+            },
+        ];
+
+        let results = prose_ir_part_llm_results(&parts, &args);
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].part_id, "part:d1:t1");
+        assert_eq!(results[1].part_id, "part:d2:t1");
+        assert!(results.iter().all(|result| result.status == "pass"));
+        assert!(results
+            .iter()
+            .all(|result| result.stdout.contains("\"ok\":true")));
         let _ = fs::remove_dir_all(root);
     }
 

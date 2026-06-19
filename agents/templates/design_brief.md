@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents Detailed Design Brief for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../../documents/dependency-manifest-design.md dependency evidence contract
 @dependency-end
 -->
 
@@ -26,6 +27,15 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Evaluation axes:
 - Canonical-surface relationships:
 
+## Evidence And Assumption Ledger
+
+<!-- Tie design claims to current code, dependency headers, existing docs, and parent documents. Record first-use DSL terms, problem standard forms, normalization rules, and governing parent-doc differences before file-by-file implementation design. For design-doc claim checking, cite code paths, tool paths, dependency-header evidence, or parent documents with stable paths. -->
+
+- Evidence sources:
+- Assumptions:
+- Parent-doc alignment:
+- Refactor handoff:
+
 ## Existing Code And Docs To Reuse
 
 <!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->
@@ -41,6 +51,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 ## Implementation Source Packet
 
 <!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+
+## Design Side-Effect Map
+
+<!-- For each major design decision, list downstream implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces it affects. Connect each item to the Abstract Design Frame responsibility, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. -->
 
 ## Canonical Tree-Head Plan
 

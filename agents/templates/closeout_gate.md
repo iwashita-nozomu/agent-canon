@@ -110,6 +110,18 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
 
+## Document Structure Evidence
+
+<!-- For changed Markdown source files, classify the document route before closeout and list every changed Markdown source path in `document_structure_paths`. For substantive document edits, record `document_structure_status: complete`, `structure_planning: complete`, `prose_graph: complete`, and the structure contract artifact. For typo / link / format-only edits, record `document_structure_status: skipped`, `structure_contract: skipped:<reason>`, `md_style_check: pass`, and `format_only_reason`. Generated run-bundle Markdown under reports/ is outside this source-document gate. -->
+
+- document_structure_paths:
+- document_structure_status:
+- structure_planning:
+- prose_graph:
+- structure_contract:
+- md_style_check:
+- format_only_reason:
+
 ## Tool Warning Evidence
 
 <!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->
@@ -136,11 +148,16 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Subagent Lifecycle Evidence
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. -->
+<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Mid-task user instructions must be classified as same_active_task_delta, scope_or_contract_change, or new_task; same-task deltas need a run-bundle checkpoint and updated packet path before any run-local send_input, while scope changes need a fresh follow-up wave. Stage-wave agents that are no longer needed must be closed before closeout. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. For dynamic fanout, reconcile every schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and closed run-local agent ids. -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
 - previous_task_subagent_reuse:
+- mid_task_user_input_status:
+- same_task_delta_packet_evidence:
+- agent_wave_ledger_status:
+- planned_vs_actual_wave_status:
+- dynamic_spawn_policy_status:
 - subagent_closeout_status:
 - open_subagent_instances:
 - close_agent_evidence:
@@ -160,13 +177,23 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
 
+## Report Artifact Placement Evidence
+
+<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify report placement. Also run generated_artifact_guard.py to reject mechanically regenerated roots left in the source tree. Tracked durable reports are allowed only when they are not regenerated tool output. Untracked or ignored report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles are archive/cleanup blockers, and regenerated roots such as `reports/dependency-review/` or `reports/agent-eval-runs/` must be deleted and rerun rather than recovered into another report. -->
+
+- report_artifact_placement_status:
+- report_artifact_outside_current_run_bundle:
+- generated_artifact_guard_status:
+- generated_artifact_guard_blockers:
+- report_artifact_recovery_evidence:
+
 ## Agent Evaluation Evidence
 
 <!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
 
 ## Runtime Log Archive Evidence
 
-<!-- Run `python3 tools/agent_tools/runtime_log_archive_git.py sync`, then `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Do not unlock closeout while the archive is dirty, on the wrong `logs/<repo-key>` branch, or contains foreign repo-key dirty paths. Record whether sync committed/pushed or was a no-op, and include the archive branch and repo key. -->
+<!-- Archive the active run with `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`, then `python3 tools/agent_tools/runtime_log_archive_git.py push`, and run `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Use broad `sync` only when intentionally collecting accumulated runtime families. Do not unlock closeout while the archive is dirty, on the wrong `logs/<environment-key>-<chat-key>` branch, or contains foreign repo-key dirty paths or committed foreign repo-key trees. Record whether archive/push committed or was a no-op, and include the archive branch and repo key. -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:
@@ -177,6 +204,9 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - runtime_log_archive_branch_match:
 - runtime_log_archive_dirty:
 - runtime_log_archive_foreign_dirty:
+- runtime_log_archive_foreign_dirty_keys:
+- runtime_log_archive_foreign_tree:
+- runtime_log_archive_foreign_tree_keys:
 - runtime_log_archive_commit:
 - runtime_log_archive_push:
 

@@ -258,6 +258,69 @@ class WaterfallGateCheckTest(unittest.TestCase):
             expected_blocker = "user_request_contract.md:active_unknown_clause:must_do_clauses"
             self.assertIn(expected_blocker, result.stdout)
 
+    def test_requirements_gate_allows_dependency_header_comment(self) -> None:
+        """Dependency headers should not make a filled artifact look like a template."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "dependency-header"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_markdown(
+                report_dir / "user_request_contract.md",
+                [
+                    "# User Request Contract",
+                    "<!--",
+                    "@dependency-start",
+                    "responsibility Documents run requirements.",
+                    "@dependency-end",
+                    "-->",
+                    "",
+                    "## Requirements Resolution Sweep",
+                    "Checked repo docs, source packet, and local tests.",
+                    "## Resolved From Accumulated Context",
+                    "| Clause ID | Resolved From | Evidence Path | Resolution | Remaining Risk |",
+                    "| --------- | ------------- | ------------- | ---------- | -------------- |",
+                    "| T1-C0 | repo_or_code_precedent | documents/ | Existing workflow applies. | none |",
+                    "## Must-Do Clauses",
+                    (
+                        "| Clause ID | Source Bucket | User Wording Or Evidence | "
+                        "Operational Interpretation | Owner Stage | Evidence Path | Status |"
+                    ),
+                    (
+                        "| --------- | ------------- | ------------------------- | "
+                        "-------------------------- | ----------- | ------------- | ------ |"
+                    ),
+                    "| T1-C1 | current_request | fix gate | enforce requirements | requirements | user_request_contract.md | active |",
+                    "## Must-Not-Do Clauses",
+                    "| Clause ID | Source Bucket | Forbidden Drift | Why It Is Forbidden | Guard Stage | Evidence Path | Status |",
+                    "| --------- | ------------- | --------------- | ------------------- | ----------- | ------------- | ------ |",
+                    "| T1-N1 | repo_or_code_precedent | skip gate | unsafe | requirements | management_review.md | active |",
+                    "## Completion Evidence Clauses",
+                    "| Clause ID | Source Bucket | Required Evidence | Where It Must Appear | Owner Stage | Status |",
+                    "| --------- | ------------- | ----------------- | -------------------- | ----------- | ------ |",
+                    "| T1-E1 | current_request | requirements review | management_review.md | requirements | active |",
+                ],
+            )
+            write_markdown(
+                report_dir / "management_review.md",
+                [
+                    "# Management Review",
+                    "",
+                    "## Scope Review",
+                    "Scope is concrete.",
+                    "## Accumulated Context Resolution Review",
+                    "Resolution sweep is recorded.",
+                    "## Unknown Handling Review",
+                    "No unknowns remain active.",
+                    "## Decision",
+                    "approve",
+                ],
+            )
+
+            result = run_gate(report_dir, "requirements")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("WATERFALL_GATE_READY=yes", result.stdout)
+            self.assertNotIn("template_or_placeholder_remaining", result.stdout)
+
     def test_design_gate_rejects_fresh_template_bundle(self) -> None:
         """A fresh bundle should not pass design gate without filled reviews."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -289,6 +352,38 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("WATERFALL_GATE_READY=no", result.stdout)
             self.assertIn("design_review.md:decision_not_approve", result.stdout)
+
+    def test_test_gate_rejects_dependency_header_only_plan(self) -> None:
+        """Dependency headers alone should not satisfy the test-plan gate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "dependency-header-only-test"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_markdown(
+                report_dir / "test_plan.md",
+                [
+                    "# Test Plan",
+                    "<!--",
+                    "@dependency-start",
+                    "responsibility Documents test plan.",
+                    "@dependency-end",
+                    "-->",
+                    "",
+                    "## Static Path Survey",
+                    "<!-- Record static paths. -->",
+                    "## Nasty Cases",
+                    "| Target | Case | Why It Is Nasty | Expected Outcome | Status |",
+                    "| ------ | ---- | --------------- | ---------------- | ------ |",
+                    "## Regression Cases To Keep",
+                    "<!-- Record regressions. -->",
+                    "## Implementation Notes",
+                    "<!-- Record implementation notes. -->",
+                ],
+            )
+
+            result = run_gate(report_dir, "test")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("test_plan.md:template_or_placeholder_remaining", result.stdout)
 
     def test_plan_gate_rejects_empty_todo_surface(self) -> None:
         """Plan gate should fail when schedule.md does not contain concrete TODO rows."""

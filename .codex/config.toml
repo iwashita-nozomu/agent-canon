@@ -40,6 +40,10 @@ path = "../.agents/skills/agent-canon-update/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/agent-eval-accumulation/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/agent-log-analysis/SKILL.md"
 enabled = true
 
@@ -229,11 +233,11 @@ description = "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-
 config_file = "agents/cpp_reviewer.toml"
 
 [agents.detailed_design_reviewer]
-description = "Read-only reviewer for detailed design docs, implementation readiness, reuse-first discipline, and style continuity."
+description = "Read-only reviewer for detailed design docs, implementation readiness, side-effect mapping, reuse-first discipline, and style continuity."
 config_file = "agents/detailed_design_reviewer.toml"
 
 [agents.detailed_designer]
-description = "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first and style-continuity guidance."
+description = "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance."
 config_file = "agents/detailed_designer.toml"
 
 [agents.diff_triage_reviewer]

@@ -24,7 +24,7 @@ import re
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
@@ -33,12 +33,16 @@ if TOOLS_DIR.is_dir():
 
 from runtime_log_paths import (  # noqa: E402
     agent_canon_root,
+    codex_trace_key,
+    hook_log_file_name,
     hook_results_dir,
     repo_log_key,
+    source_git_head,
 )
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
 HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
+HOOK_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
 FINGERPRINT_HEX_LENGTH = 12
 RUN_ID_DIGEST_LENGTH = 10
 RUN_ID_NONCE_LENGTH = 10
@@ -54,7 +58,7 @@ def safe_slug(value: str) -> str:
 
 def utc_now() -> str:
     """Return one UTC timestamp for hook log entries."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def compact_timestamp(timestamp: str) -> str:
@@ -86,13 +90,20 @@ class HookLogContext:
     hook_name: str
     override_path: str = ""
 
+    def source_root(self) -> Path:
+        """Return the repository whose hook evidence should be keyed."""
+        override = os.environ.get(HOOK_SOURCE_ROOT_ENV, "").strip()
+        if override:
+            return Path(override).resolve()
+        return self.active_root.resolve()
+
     def canon_root(self) -> Path:
         """Return the AgentCanon checkout that owns durable hook evidence."""
-        return agent_canon_root(self.active_root)
+        return agent_canon_root(self.source_root())
 
     def durable_results_dir(self) -> Path:
         """Return the durable hook-result archive directory."""
-        return hook_results_dir(self.active_root, self.canon_root())
+        return hook_results_dir(self.source_root(), self.canon_root())
 
     def results_dir(self) -> Path:
         """Return the hook-result directory."""
@@ -105,7 +116,10 @@ class HookLogContext:
         """Return this hook's JSONL log path."""
         if self.override_path:
             return Path(self.override_path)
-        return self.results_dir() / self.runtime_namespace() / f"{self.hook_name}.jsonl"
+        return self.results_dir() / self.runtime_namespace() / hook_log_file_name(
+            self.hook_name,
+            self.canon_root(),
+        )
 
     def runtime_namespace(self) -> str:
         """Return the runtime shard name for append-only hook logs."""
@@ -128,7 +142,7 @@ class HookLogContext:
 
     def compose_project_name(self) -> str:
         """Return the generated devcontainer Compose project name when available."""
-        compose = self.active_root.resolve() / ".devcontainer" / "docker-compose.generated.yml"
+        compose = self.source_root() / ".devcontainer" / "docker-compose.generated.yml"
         if not compose.is_file():
             return ""
         try:
@@ -156,7 +170,18 @@ class HookLogContext:
         """Append one JSONL entry."""
         path = self.result_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        entry.setdefault("source_repo_key", repo_log_key(self.active_root))
+        source_root = self.source_root()
+        entry.setdefault("source_repo_key", repo_log_key(source_root))
+        trace_key = codex_trace_key()
+        if trace_key:
+            entry.setdefault("codex_trace_key", trace_key)
+            entry.setdefault("codex_thread_id", trace_key)
+        canon_head = source_git_head(self.canon_root())
+        if canon_head:
+            entry.setdefault("agent_canon_git_head", canon_head)
+        git_head = source_git_head(source_root)
+        if git_head:
+            entry.setdefault("source_git_head", git_head)
         with path.open("a", encoding="utf-8") as stream:
             json.dump(entry, stream, sort_keys=True, default=str)
             stream.write("\n")

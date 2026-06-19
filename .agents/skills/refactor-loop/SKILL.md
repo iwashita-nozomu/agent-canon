@@ -9,6 +9,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable refactor structure contracts
 upstream design ../../../agents/skills/dependency-analysis.md defines change-impact and repair-planning packets
 upstream design ../../../agents/skills/tool-finding-report.md tool-based finding packet workflow
+upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 @dependency-end
 -->
 
@@ -17,21 +18,29 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
 
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
-   analysis for the requested object/file, plus tests and docs required by
-   those dependencies. Narrow implementation only after mapping exact target
-   functions, methods, and classes inside that expanded scope.
+   analysis for the requested object/file, plus validation commands and the
+   tests/docs that own observable behavior or reader-facing contracts. Narrow
+   implementation only after mapping exact target functions, methods, and
+   classes inside that expanded scope.
 1. Use `$dependency-analysis` to create a token-light `Change Impact Packet`
    manifest before choosing targets, writing the refactor orchestration plan,
    or launching a write-capable subagent. The packet is the unified
    repair-planning input; raw findings, raw search hits, and single filenames
    are not enough. Full dependency artifacts stay on disk and are read only for
    the current repair batch or disputed edges.
+   Include `check_design_doc_claims.py` output when a design document provides
+   the refactor rationale, so implementation-backed claims and parent-doc
+   alignment enter the same repair packet.
 1. Before launching implementation subagents, the parent must write a refactor
    orchestration plan from that dependency graph. Separate sequential root
    slices that must be fixed first from independent downstream slices that can
    run in parallel, assign each target object to an owner/wave, and record
    `blocked_by`, allowed files, validation, and whether the slice is single-agent
    or parallel-safe.
+   `$structure-refactor` owns structure surface classification, root/scope
+   contract, path mapping, and runtime boundary; this skill owns repair batch
+   sizing, `blocked_by`, sequential / parallel wave choice, and write-capable
+   subagent orchestration.
 1. Choose repair scope granularity from tool-generated `scope_candidates`, not
    from a fixed file/function rule. Optimize for the fewest coherent writer
    waves and tool reruns while preserving behavior contract clarity, write-scope
@@ -76,7 +85,8 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
    wave-scoped write-capable `worker`/`spark_worker` agents implement,
-   `test_designer` defines regression coverage before code changes, and a
+   `test_designer` defines regression coverage before behavior-changing or
+   regression-prone code changes, and a
    separate read-only reviewer
    (`python_reviewer`, `cpp_reviewer`, or `reviewer`) reviews the latest diff
    with before/after scan, impact evidence, and `diff_linked_findings`.
@@ -112,5 +122,5 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
    write-scope conflict, or validation isolation. If no such reason exists,
    classify the narrow handoff as `handoff_prompt_gap`, batch the related
    targets, and repair this skill/handoff before launching the next writer.
-1. Run `test_designer` before implementation and keep regression coverage in the same pass.
+1. Run `test_designer` before behavior-changing or regression-prone implementation and keep regression coverage in the same pass. For contract-only wrapper refactors, use static contract validation and canonical command evidence.
 1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.

@@ -118,7 +118,14 @@ id = "render-dependency-manifest-graph"
 tool = "tools/agent_tools/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"
 language = "python"
-summary = "Dependency manifest graph Markdown and DOT renderer documentation."
+summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
+
+[[tool]]
+id = "check-design-doc-claims"
+tool = "tools/agent_tools/check_design_doc_claims.py"
+doc = "documents/tools/check_design_doc_claims.md"
+language = "python"
+summary = "Design-document claim evidence checker documentation."
 
 [[tool]]
 id = "classify-path-risk"
@@ -142,46 +149,46 @@ language = "python"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
 
 [[tool]]
-id = "algorithm-expansion-ir"
-tool = "tools/agent_tools/algorithm_expansion_ir.py"
-doc = "documents/tools/algorithm_expansion_ir.md"
+id = "tool-proof-coverage"
+tool = "tools/agent_tools/tool_proof_coverage.py"
+doc = "documents/tools/tool_proof_coverage.md"
 language = "python"
-summary = "Algorithm Expansion IR extractor documentation, including AST-only recursion, instance interactions, and local proof-obligation grain."
+summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
 
 [[tool]]
-id = "algorithm-lemma-graph"
-tool = "tools/agent_tools/algorithm_lemma_graph.py"
-doc = "documents/tools/algorithm_lemma_graph.md"
+id = "jit-canonical-ir"
+tool = "tools/agent_tools/jit_canonical_ir.py"
+doc = "documents/tools/jit_canonical_ir.md"
 language = "python"
-summary = "Lemma dependency graph builder documentation, including theorem profiles, graph validation, and Algorithm IR traceability."
+summary = "JIT root to StableHLO-derived operational IR and backend trace documentation."
 
 [[tool]]
-id = "algorithm-flowchart"
-tool = "tools/agent_tools/algorithm_flowchart.py"
-doc = "documents/tools/algorithm_flowchart.md"
+id = "cpp-source-canonical-ir"
+tool = "tools/agent_tools/cpp_source_canonical_ir.py"
+doc = "documents/tools/cpp_source_canonical_ir.md"
 language = "python"
-summary = "Algorithm flowchart renderer documentation, including AST/IR Mermaid diagrams and proof-status overlays."
+summary = "C++ source-only operational IR wrapper documentation."
 
 [[tool]]
-id = "ir-graph-correspondence"
-tool = "tools/agent_tools/ir_graph_correspondence.py"
-doc = "documents/tools/ir_graph_correspondence.md"
+id = "cpp-template-to-lean"
+tool = "tools/agent_tools/cpp_template_to_lean.py"
+doc = "documents/tools/cpp_template_to_lean.md"
 language = "python"
-summary = "IR equation fact to lemma graph correspondence checker documentation, including assignment coverage and proof-status adoption."
+summary = "Full C++ template source root to complete Lean evidence route documentation."
 
 [[tool]]
-id = "kkt-equation-section"
-tool = "tools/agent_tools/kkt_equation_section.py"
-doc = "documents/tools/kkt_equation_section.md"
+id = "operational-ir-to-lean"
+tool = "tools/agent_tools/operational_ir_to_lean.py"
+doc = "documents/tools/operational_ir_to_lean.md"
 language = "python"
-summary = "KKT solver-chain equation-section generator documentation, including fail-closed IR code-fact evidence checks."
+summary = "Shared thin operational IR to Lean evidence renderer documentation."
 
 [[tool]]
-id = "proof-path-analyzer"
-tool = "tools/agent_tools/proof_path_analyzer.py"
-doc = "documents/tools/proof_path_analyzer.md"
-language = "python"
-summary = "Proof path analyzer documentation, including proof-status adoption and connected proof-hole checks."
+id = "jit-ir-to-lean"
+tool = "rust/agent-canon/src/jit_ir_to_lean.rs"
+doc = "documents/tools/jit_ir_to_lean.md"
+language = "rust"
+summary = "JIT-canonical IR to Lean evidence-catalog documentation."
 
 [[tool]]
 id = "check-proof-trace-alignment"

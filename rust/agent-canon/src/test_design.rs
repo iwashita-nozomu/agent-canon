@@ -500,6 +500,36 @@ fn analyze_python_test_functions(file: &ScannedFile) -> Vec<Finding> {
                         .to_string(),
             });
         }
+        if is_static_analysis_duplicate_test(&block_text) {
+            findings.push(Finding {
+                severity: "fix-now",
+                check: "static-analysis-duplicate-test",
+                path: file.path.clone(),
+                line: Some(block.start_line),
+                message: format!(
+                    "test function `{}` only reruns static-analysis or checker success",
+                    block.name
+                ),
+                recommendation:
+                    "Delete the pytest wrapper and run the canonical checker in the validation route, or replace it with a behavior regression that observes product output, diagnostics, or state."
+                        .to_string(),
+            });
+        }
+        if is_generated_execution_placeholder(&block.name, &block_text) {
+            findings.push(Finding {
+                severity: "fix-now",
+                check: "meaningless-generated-execution-test",
+                path: file.path.clone(),
+                line: Some(block.start_line),
+                message: format!(
+                    "test function `{}` looks like a generated execution-only placeholder",
+                    block.name
+                ),
+                recommendation:
+                    "Remove the placeholder or add a concrete behavior contract, input, expected outcome, and oracle beyond process success."
+                        .to_string(),
+            });
+        }
         for (line_no, line) in block.lines {
             let trimmed = line.trim_start();
             if starts_with_test_logic(trimmed) {
@@ -528,6 +558,12 @@ fn python_test_blocks(text: &str) -> Vec<TestBlock> {
         let trimmed = line.trim_start();
         let indent = line.len() - trimmed.len();
         if let Some(open_block) = current.take() {
+            if !python_test_header_complete(&open_block.lines) {
+                let mut next_block = open_block;
+                next_block.lines.push((line_no, line.to_string()));
+                current = Some(next_block);
+                continue;
+            }
             if !trimmed.is_empty() && indent <= open_block.def_indent && is_python_test_def(trimmed)
             {
                 blocks.push(open_block.close());
@@ -566,6 +602,10 @@ fn python_test_blocks(text: &str) -> Vec<TestBlock> {
     blocks
 }
 
+fn python_test_header_complete(lines: &[(usize, String)]) -> bool {
+    lines.iter().any(|(_, line)| line.trim_end().ends_with(':'))
+}
+
 fn is_python_test_def(trimmed: &str) -> bool {
     trimmed.starts_with("def test_") || trimmed.starts_with("async def test_")
 }
@@ -583,6 +623,113 @@ fn starts_with_test_logic(trimmed: &str) -> bool {
         || trimmed.starts_with("for ")
         || trimmed.starts_with("while ")
         || trimmed.starts_with("match ")
+}
+
+fn is_static_analysis_duplicate_test(text_lower: &str) -> bool {
+    contains_static_analysis_command(text_lower)
+        && has_process_success_only_oracle(text_lower)
+        && !has_behavior_oracle_signal(text_lower)
+}
+
+fn is_generated_execution_placeholder(name: &str, text_lower: &str) -> bool {
+    let name_lower = name.to_ascii_lowercase();
+    let placeholder_name = [
+        "test_generated",
+        "test_smoke",
+        "test_runs",
+        "test_can_run",
+        "test_executes",
+        "test_no_crash",
+    ]
+    .iter()
+    .any(|token| name_lower.contains(token));
+    placeholder_name
+        && contains_execution_command(text_lower)
+        && has_process_success_only_oracle(text_lower)
+        && !has_behavior_oracle_signal(text_lower)
+}
+
+fn contains_static_analysis_command(text_lower: &str) -> bool {
+    [
+        "py_compile",
+        "compileall",
+        "python -m compileall",
+        "python -m py_compile",
+        "ruff",
+        "pyright",
+        "mypy",
+        "deptry",
+        "shellcheck",
+        "cargo check",
+        "cargo clippy",
+        "check_static_any.py",
+        "check_dependency_headers.py",
+        "scan_dependency_headers.sh",
+        "check_dependency_header_format.sh",
+        "check_convention_compliance.py",
+        "repo_structure_contract.py",
+        "responsibility_scope.py",
+        "import_responsibility.py",
+        "agent-canon docs check",
+        "agent-canon test-design check",
+    ]
+    .iter()
+    .any(|token| text_lower.contains(token))
+}
+
+fn contains_execution_command(text_lower: &str) -> bool {
+    [
+        "subprocess.run",
+        "subprocess.call",
+        "command::new",
+        ".status()",
+        "python ",
+        "cargo run",
+        "bash ",
+        "sh ",
+    ]
+    .iter()
+    .any(|token| text_lower.contains(token))
+}
+
+fn has_process_success_only_oracle(text_lower: &str) -> bool {
+    [
+        "returncode == 0",
+        "returncode, 0",
+        "exit_code == 0",
+        "status.success",
+        ".success()",
+        "check=true",
+        "check = true",
+    ]
+    .iter()
+    .any(|token| text_lower.contains(token))
+}
+
+fn has_behavior_oracle_signal(text_lower: &str) -> bool {
+    [
+        " in result.stdout",
+        " in result.stderr",
+        " in stdout",
+        " in stderr",
+        "json.loads",
+        "assert result.stdout",
+        "assert result.stderr",
+        "assert output",
+        "assert data",
+        "pytest.raises",
+        "write_text",
+        "fs::write",
+        "tmp_path",
+        "tempfile",
+        "expected",
+        "diagnostic",
+        "finding",
+        "snapshot",
+        "state",
+    ]
+    .iter()
+    .any(|token| text_lower.contains(token))
 }
 
 fn has_assertion(text_lower: &str) -> bool {
@@ -821,6 +968,21 @@ mod tests {
     }
 
     #[test]
+    fn accepts_multiline_python_test_function_header_with_unittest_assertion() {
+        let file = ScannedFile {
+            path: PathBuf::from("/repo/tests/test_multiline.py"),
+            text: "def test_runs(\n    self,\n) -> None:\n    self.assertEqual(result, 0)\n"
+                .to_string(),
+        };
+
+        let findings = analyze_test_file(Path::new("/repo"), &file);
+
+        assert!(!findings
+            .iter()
+            .any(|finding| finding.check == "missing-oracle"));
+    }
+
+    #[test]
     fn detects_overspecified_mock_and_private_access() {
         let file = ScannedFile {
             path: PathBuf::from("/repo/tests/test_mock.py"),
@@ -849,6 +1011,48 @@ mod tests {
         assert!(findings
             .iter()
             .any(|finding| finding.check == "property-or-metamorphic-candidate"));
+    }
+
+    #[test]
+    fn flags_static_analysis_duplicate_success_test() {
+        let file = ScannedFile {
+            path: PathBuf::from("/repo/tests/test_static_wrapper.py"),
+            text: "def test_py_compile_passes():\n    result = subprocess.run(['python', '-m', 'py_compile', 'src/app.py'], capture_output=True)\n    assert result.returncode == 0\n".to_string(),
+        };
+
+        let findings = analyze_test_file(Path::new("/repo"), &file);
+
+        assert!(findings.iter().any(|finding| {
+            finding.check == "static-analysis-duplicate-test" && finding.severity == "fix-now"
+        }));
+    }
+
+    #[test]
+    fn flags_generated_execution_only_placeholder() {
+        let file = ScannedFile {
+            path: PathBuf::from("/repo/tests/test_generated_cli.py"),
+            text: "def test_generated_cli_runs():\n    result = subprocess.run(['python', 'tools/example.py'])\n    assert result.returncode == 0\n".to_string(),
+        };
+
+        let findings = analyze_test_file(Path::new("/repo"), &file);
+
+        assert!(findings.iter().any(|finding| {
+            finding.check == "meaningless-generated-execution-test" && finding.severity == "fix-now"
+        }));
+    }
+
+    #[test]
+    fn allows_static_checker_behavior_contract_tests() {
+        let file = ScannedFile {
+            path: PathBuf::from("/repo/tests/test_static_checker.py"),
+            text: "def test_static_checker_reports_bad_input(tmp_path):\n    source = tmp_path / 'bad.py'\n    source.write_text('x: Any = 1')\n    result = subprocess.run(['python3', 'tools/agent_tools/check_static_any.py', str(source)], capture_output=True, text=True)\n    assert 'STATIC_ANY=fail' in result.stdout\n".to_string(),
+        };
+
+        let findings = analyze_test_file(Path::new("/repo"), &file);
+
+        assert!(!findings
+            .iter()
+            .any(|finding| finding.check == "static-analysis-duplicate-test"));
     }
 
     #[test]

@@ -53,6 +53,43 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 1. Failure Semantics
    - infeasible、singular、non-finite、max-iter、not-converged を success と分ける
 
+For iterative solvers, convergence evidence is a theorem about the implemented
+iteration map and stopping scalar, not a runtime proof check. State the map as
+`z_next = Step_impl(Problem, Config, z)` and the stopping quantity as
+`R_impl(Problem, Config, z)` before changing code. If the map cannot be proved
+to satisfy the target theorem under the accepted problem/config/backend
+assumptions, change the algorithmic mechanism itself; do not add proof-only
+`Info` fields, diagnostic gates, or extra runtime checks merely to satisfy the
+proof.
+Do not make the theorem pass by fixing the backend, device, compiler route,
+runtime target, or dtype unless the user request, approved design, runtime
+profile, public API, or config explicitly fixes that backend. Backend-specific
+data is evidence for the active profile, not a replacement for the optimization
+contract. Missing backend evidence is `backend_evidence_blocker`.
+
+### Tool-Side Iterative Method Handoff
+
+When a tool or subagent is asked to implement an iterative method, treat the
+tool output as a route packet that selects an existing primitive or an explicit
+local loop contract. The packet must contain:
+
+- `iteration_map`: the concrete `Step_impl(Problem, Config, z)`.
+- `stopping_scalar`: the concrete `R_impl(Problem, Config, z)`.
+- `state_tuple`: all loop-carried state, with owner and dtype / device boundary.
+- `reuse_surface`: existing solver, library, framework primitive, or repo helper
+  selected as the first implementation surface.
+- `failure_semantics`: max-iteration, breakdown, singular, non-finite,
+  infeasible, and nonconvergence statuses.
+- `validation_surface`: static checker, smallest deterministic numerical case,
+  and any experiment or benchmark path kept separate from correctness evidence.
+
+If `agent-canon local-llm route-implementation-surface` returns
+`numerical_iterative_algorithm_contract`, use this skill, the algorithm boundary
+document, and the JAX loop rules as the implementation source packet before
+writing code. The preferred fix is an algorithm or contract correction.
+Diagnostic fields, proof `Info`, and broader numerical tests become follow-on
+surfaces when the route packet makes them part of the product contract.
+
 ## Workflow
 
 1. Classify the algorithm surface: unconstrained optimization, constrained optimization, least squares, root finding, linear solve, preconditioning, or benchmark-only.
@@ -61,13 +98,19 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 1. Identify the first bad iteration for failures; do not diagnose only from the final NaN, Inf, or residual.
 1. Create an adversarial numeric test plan before implementation: exact small case, ill-conditioned case, constraint-boundary case, non-finite guard, not-converged status, derivative check, and device / dtype case when relevant.
 1. Implement the smallest responsibility-preserving change that matches the contract.
-1. Validate with targeted tests and one protocol-consistent run; record skipped GPU, benchmark, or formal run evidence with reason.
+1. Validate with targeted tests and one protocol-consistent GPU run; record
+   skipped GPU, benchmark, or formal run evidence as a blocker with reason
+   instead of replacing it with CPU computation.
 1. Review numerical claims separately from code style: convergence evidence, stopping status, failure mode, tolerance rationale, and documentation alignment.
 
 ## Validation Rules
 
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route をしません。
+- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route、CPU smoke、CPU-only regression をしません。
+- solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment validation などの計算テストは CPU で実行しません。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残します。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
+- runtime proof-only fields or diagnostic gates are not convergence evidence;
+  use them only when they are genuine execution outputs needed by the user-facing
+  algorithm contract.
 - Final value だけでなく、first bad iteration、finite state、residual components、reference norm、tolerance、status flag を確認します。
 - Constraint つき問題では objective だけでなく feasibility と KKT / complementarity を分けます。
 - Linear solver / preconditioner では residual norm、reference norm、preconditioner summary、breakdown status を分けます。

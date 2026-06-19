@@ -12,8 +12,9 @@ downstream implementation ../../tools/agent_tools/route.py selects short routing
 
 短い tool / skill 名で、task に必要な profile、check、runtime、closeout、
 AgentCanon update、docs、log/eval の経路を選びます。
-prompt から public skill set を選ぶときも、この tool で
-`$agent-orchestration` first の routing を機械的に確認します。
+prompt から public skill set を選ぶときは Rust harness
+`agent-canon local-llm route-skill` で `$agent-orchestration` first の
+`ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
 
 ## Use When
 
@@ -27,7 +28,7 @@ prompt から public skill set を選ぶときも、この tool で
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
-python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+agent-canon local-llm route-skill --prompt "<user request>" --format json
 ```
 
 ## Outputs
@@ -37,7 +38,8 @@ python3 tools/agent_tools/route.py --prompt "<user request>" --format json
 - `NEXT_ACTION`
 - `COMMANDS`
 - `EVIDENCE`
-- prompt routing の場合は `MODE`, `SKILLS`, `MATCHED_SKILLS`, `REASONS`
+- prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
+  `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`
 
 Long candidate names are aliases. Do not create a new public tool or skill
 until `route.py --name <candidate>` returns `STATUS=unknown` and the missing

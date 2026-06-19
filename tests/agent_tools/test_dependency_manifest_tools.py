@@ -25,6 +25,7 @@ FORMAT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_header_forma
 GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
 REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
 CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
+DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
 WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
@@ -257,6 +258,229 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
+
+    def test_repo_review_can_run_design_claim_checker_for_explicit_path(self) -> None:
+        """The dependency review wrapper can invoke design claim evidence checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "check_design_doc_claims.py").symlink_to(DESIGN_CLAIMS)
+            design = root / "documents" / "design" / "feature.md"
+            implementation = root / "tools" / "feature_runner.py"
+            design.parent.mkdir(parents=True)
+            implementation.parent.mkdir(parents=True, exist_ok=True)
+            design.write_text(
+                "\n".join(
+                    [
+                        "# Feature",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Documents feature fixture.",
+                        "downstream implementation ../../tools/feature_runner.py runner",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                        "## Evidence And Assumption Ledger",
+                        "",
+                        "- Evidence sources: `tools/feature_runner.py`.",
+                        "- Assumptions: direct implementation evidence.",
+                        "",
+                        "## Claims",
+                        "",
+                        "- The design must use `run_feature`.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Implements feature fixture.",
+                        "# upstream design ../documents/design/feature.md feature design",
+                        "# @dependency-end",
+                        "",
+                        "def run_feature() -> None:",
+                        "    pass",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--check-design-doc-claims",
+                "--design-doc-claim-path",
+                "documents/design/feature.md",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
+
+    def test_repo_review_design_claim_checker_defaults_to_changed_design_docs(self) -> None:
+        """Wrapper claim checks stay migration-safe for legacy design backlog."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "check_design_doc_claims.py").symlink_to(DESIGN_CLAIMS)
+            readme = root / "README.md"
+            legacy = root / "documents" / "design" / "legacy.md"
+            legacy.parent.mkdir(parents=True)
+            readme.write_text(
+                "\n".join(
+                    [
+                        "# Readme",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines fixture readme.",
+                        "downstream design documents/design/legacy.md legacy design",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            legacy.write_text(
+                "\n".join(
+                    [
+                        "# Legacy",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Documents legacy design fixture.",
+                        "upstream design ../../README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                        "## Claims",
+                        "",
+                        "- The legacy design must preserve behavior.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "README.md", "documents/design/legacy.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.email=test@example.com",
+                    "-c",
+                    "user.name=Test User",
+                    "commit",
+                    "-m",
+                    "baseline",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            design = root / "documents" / "design" / "feature.md"
+            implementation = root / "tools" / "feature_runner.py"
+            design.write_text(
+                "\n".join(
+                    [
+                        "# Feature",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Documents feature fixture.",
+                        "downstream implementation ../../tools/feature_runner.py runner",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                        "## Evidence And Assumption Ledger",
+                        "",
+                        "- Evidence sources: `tools/feature_runner.py`.",
+                        "- Assumptions: direct implementation evidence.",
+                        "",
+                        "## Claims",
+                        "",
+                        "- The design must use `run_feature`.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Implements feature fixture.",
+                        "# upstream design ../documents/design/feature.md feature design",
+                        "# @dependency-end",
+                        "",
+                        "def run_feature() -> None:",
+                        "    pass",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--check-design-doc-claims",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_code_scan_extracts_python_import_edges(self) -> None:
