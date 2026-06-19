@@ -268,7 +268,10 @@ park_eval_log_dirty_state_if_safe() {
     remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
     return 0
   fi
-  git -C "$tmp_worktree" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  git -C "$tmp_worktree" \
+    -c user.name="${GIT_AUTHOR_NAME:-AgentCanon Log Park}" \
+    -c user.email="${GIT_AUTHOR_EMAIL:-agent-canon-log@example.invalid}" \
+    commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
   commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
   git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
   drop_stash_sha_if_present "$stash_sha"

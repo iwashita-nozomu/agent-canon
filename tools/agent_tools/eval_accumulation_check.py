@@ -422,6 +422,7 @@ def render_json(report: EvalAccumulationReport) -> str:
             "hook_files": report.hook_files,
             "hook_entries": report.hook_entries,
             "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
+            "hook_namespace_debt": report.hook_legacy_missing_namespace,
             "eval_report_counts": report.eval_report_counts,
             "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
             "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
@@ -466,6 +467,7 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
         "hook_files": report.hook_files,
         "hook_entries": report.hook_entries,
         "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
+        "hook_namespace_debt": report.hook_legacy_missing_namespace,
         "eval_report_counts": report.eval_report_counts,
         "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
         "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
@@ -511,6 +513,7 @@ def render_text(
             f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}",
             "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
             f"{report.hook_legacy_missing_namespace}",
+            f"EVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT={report.hook_legacy_missing_namespace}",
             f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
             "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS="
             f"{eval_report_count(report, 'local-llm-responsibility')}",

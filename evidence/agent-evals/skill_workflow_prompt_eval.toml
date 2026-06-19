@@ -5,6 +5,7 @@
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
 # upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
 # upstream design ../../agents/skills/html-output.md explicit HTML output and browser publication skill contract
+# upstream design ../../agents/internal-routines/README.md internal routine document owner surface
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
 
@@ -38,7 +39,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 67
+expected_count = 48
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -50,6 +51,25 @@ required_regex = ["@dependency-start", "@dependency-end"]
 
 [[evals.checklist]]
 id = "SKILL-DOC-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-internal-routine-docs"
+target_glob = "agents/internal-routines/*.md"
+expected_count = 20
+kind = "skill"
+description = "Every workflow-owned internal routine document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "INTERNAL-ROUTINE-DOC-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "INTERNAL-ROUTINE-DOC-GENERIC-2"
 critical = true
 description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
@@ -973,14 +993,14 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
-description = "Builds a missing semantic-index cache before exact-search comparison."
-required_regex = ["semantic-index build --root \\.", "bounded `rg -l`"]
+description = "Routes search, read scope, and reuse survey to deterministic owner surfaces."
+required_regex = ["search, read scope, and reuse survey", "semantic-index", "local-llm search", "dependency review artifacts"]
 
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-PUBLISH-1"
 critical = true
-description = "Keeps GitHub publish and PR evidence work out of non-critical hook blocking."
-required_regex = ["GitPush", "github_publish\\.py", "PR evidence", "hook / checker finding"]
+description = "Routes shared AgentCanon update and PR evidence through update/sync owner surfaces."
+required_regex = ["shared AgentCanon update", "update_agent_canon\\.sh", "sync_agent_canon\\.sh", "AgentCanon PR workflow"]
 
 [[evals]]
 id = "agent-canon-pr-gh-publish-workflow"
@@ -1027,26 +1047,26 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 [[evals.checklist]]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
-description = "Routes skill selection through agent-orchestration first and keeps convention compliance as a tool gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff"]
+description = "Routes skill selection through the catalog, runtime shims, and deterministic router owner row."
+required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "agent-canon local-llm route-skill"]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-1"
 critical = true
-description = "Keeps independent workstreams as stage-owner vertical dynamic waves with delegated spawn policy."
-required_regex = ["Intake Responsibility Wave", "vertical dynamic wave", "run\\.delegated_spawn_policy", "stage owner"]
+description = "Routes dynamic wave evidence to generated run-bundle and lifecycle owner surfaces."
+required_regex = ["Dynamic Wave Evidence", "schedule\\.md", "workflow_monitoring\\.md", "run\\.delegated_spawn_policy", "run\\.subagent_lifecycle_policy"]
 
 [[evals.checklist]]
 id = "TASK-WF-PRE-EDIT-PACKET-1"
 critical = true
-description = "Requires pre-edit repository investigation before parent edits or write-capable handoff."
-required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "responsibility search", "reuse survey", "stale surface scan", "dependency scope"]
+description = "Keeps pre-edit investigation in the generated common evidence packet and source-packet owner surfaces."
+required_regex = ["Common Evidence Packet", "document packets", "validation route", "Design Artifact Shape", "run bundle paths"]
 
 [[evals.checklist]]
 id = "TASK-WF-FRESH-CAPSULE-1"
 critical = true
-description = "Requires context capsule packing for fresh subagents."
-required_regex = ["Fresh Subagent Context Capsule", "objective", "compact artifacts", "return contract"]
+description = "Routes fresh subagent context through run-bundle packets and dynamic wave evidence."
+required_regex = ["Common Evidence Packet", "Subagent handoffs", "run bundle paths", "Dynamic Wave Evidence"]
 
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
@@ -1906,8 +1926,8 @@ required_regex = ["runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-2"
 critical = true
-description = "Forbids raw JSONL use when the archive API is missing."
-required_regex = ["log_archive_api_missing", "do not use raw JSONL"]
+description = "Keeps event-file drilldown exceptional and API-owned when the archive API is missing."
+required_regex = ["log_archive_api_missing", "Event-file drilldown", "schema debugging", "corruption audit"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-SHIM-1"
@@ -1931,7 +1951,7 @@ required_regex = ["external log archive", "runtime_log_archive_git\\.py", "runti
 id = "AGENT-LOG-API-DOC-2"
 critical = true
 description = "Keeps raw JSONL inspection exceptional."
-required_regex = ["log_archive_api_missing", "raw JSONL", "schema debugging", "破損 audit"]
+required_regex = ["log_archive_api_missing", "event file drilldown", "schema debugging", "破損 audit"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"

@@ -1831,6 +1831,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 text=True,
             )
             subprocess.run(
+                ["git", "config", "user.name", "Task Close Test"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "task-close@example.invalid"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
                 ["git", "commit", "--allow-empty", "-m", "init"],
                 cwd=workspace_root,
                 check=True,

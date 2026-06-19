@@ -1,7 +1,8 @@
 # @dependency-start
 # responsibility Provides the template managed experiment entrypoint.
 # upstream design ../../documents/experiment-registry.md defines managed experiment command protocol.
-# upstream implementation ../../../../experiments/registry.toml registers managed commands for this entrypoint.
+# upstream implementation ../../tools/experiments/create_experiment_topic.py copies this entrypoint into project topics.
+# upstream implementation ../../tools/experiments/run_managed_experiment.py runs project-owned registry commands for copied topics.
 # upstream implementation visualize.ipynb is executed into each run directory as the reader notebook artifact.
 # downstream implementation result stores per-run outputs after a copied topic implements this entrypoint.
 # @dependency-end

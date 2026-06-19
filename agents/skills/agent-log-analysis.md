@@ -6,6 +6,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
+upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns compact dashboard API fields
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
@@ -15,13 +16,13 @@ downstream design agent-eval-accumulation.md repairs missing accumulated eval fa
 ## Purpose
 
 skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tree
-ではなく外部 log archive repository 側の API / compact summary に変換してから
+ではなく dashboard API / compact summary に変換してから
 分析するための skill です。
 
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
-- `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
+- `.agent-canon/log-archive/**`、`reports/**`、event file を読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
 - accumulated eval family の missing / stale / fail を見つけ、producer / checker loop
@@ -29,7 +30,7 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 
 ## Required Flow
 
-1. Raw log を `rg -n` で直接広域検索しません。
+1. 通常分析の入力を compact API / Markdown summary に固定します。
 1. AgentCanon 側では archive の mount / branch 状態だけを確認します。
 
 ```bash
@@ -50,14 +51,15 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
   --api-output reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
 
-1. 原則として `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` だけを読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
-1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止めます。AgentCanon 側で raw JSONL 広域検索に戻ってはいけません。
-1. compact summary で足りない観点がある場合は、raw JSONL を開く前に log archive repo の API / report profile を拡張します。
+1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を既定入力として読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
+1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止め、dashboard API owner に戻します。
+1. compact summary で足りない観点がある場合は、log archive repo の API / report profile を拡張します。
+1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。
 1. eval family gap を見るときは、dashboard の推測ではなく
    `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
    があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
    再 check、archive sync の順で閉じます。
-1. Raw JSONL は tool 実装、schema debugging、破損 audit の例外入力としてだけ読みます。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `rg -n` を使い、全ログ横断の一致行 dump を避けます。
+1. event file drilldown は tool 実装、schema debugging、破損 audit、または API が明示した drilldown path に限定します。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `rg -n` を使います。
 1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
 
 ## Boundaries
@@ -68,6 +70,7 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
   skill / role へ渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
+- Normal analysis reads compact API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 
 ## Finding Route Packet
 

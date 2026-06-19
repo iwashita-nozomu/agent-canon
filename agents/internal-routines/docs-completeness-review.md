@@ -21,7 +21,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `documents/coding-conventions-project.md`
 - `documents/README.md`
-- `agents/skills/docs-consistency-review.md`
+- `agents/internal-routines/docs-consistency-review.md`
 - `agents/skills/md-style-check.md`
 
 ## Expected Outcome

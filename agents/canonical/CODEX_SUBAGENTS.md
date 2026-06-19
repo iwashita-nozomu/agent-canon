@@ -264,7 +264,7 @@ Activation Conditions:
 | `python_reviewer` | `python_reviewer` |
 | `cpp_reviewer` | `cpp_reviewer` |
 | `report_reviewer` | `report_reviewer` |
-| `critical_guardian` | `project_reviewer` |
+| Legacy label `critical_guardian` | Historical lookup label; active routing and inventory use `project_reviewer` |
 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`

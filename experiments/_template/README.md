@@ -4,7 +4,8 @@
 @dependency-start
 responsibility Documents the managed experiment topic scaffold.
 upstream design ../../documents/experiment-registry.md defines managed experiment command protocol.
-upstream implementation ../../../../experiments/registry.toml registers the template topic.
+upstream implementation ../../tools/experiments/create_experiment_topic.py copies this template into project topics.
+upstream implementation ../../tools/ci/check_experiment_registry.py validates project-owned registry entries that reference copied topics.
 downstream implementation run.py provides the topic entrypoint.
 downstream implementation cases.py defines the template case set.
 downstream environment config.yaml stores template case and metric settings.

@@ -8,11 +8,14 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
-upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces
+upstream implementation ../../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
+upstream implementation ../../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
+upstream implementation ../../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
+upstream implementation ../../../tools/agent_tools/theorem_graph_circularity_check.py checks proposition-graph circularity for theorem routes
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
 -->
@@ -24,13 +27,14 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. For algorithm-derived claims that require proof-path search, algorithm
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
-1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, use the JIT-canonical public root consumed by the theorem.
+1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, first choose the machine evidence route that matches the implementation source: JIT-canonical public root for JIT-capable Python roots, or the single C++ full-expansion route for C++ template algorithm roots.
 1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan,
    target-language scaffold, existing formal proofs search packet, and
    literature queries before adopting theorem text or proof obligations.
 1. For implementation-derived algorithm proofs, always start from the whole
-   target theorem over the JIT-canonical public entrypoint, normally the
-   `main(problem, InitializeConfig, ...)` or equivalent run function and its
+   target theorem over the public entrypoint, normally the JIT-canonical
+   `main(problem, InitializeConfig, ...)`, the C++ template root selected by
+   `cpp_template_to_lean.py --cpp-symbol`, or an equivalent run function and its
    returned `Answer` / `State` / `Info` specification. Do not begin from a
    helper lemma, inner solver claim, loop-control fact, residual component, or
    hand-selected local theorem unless it is selected by recursively decomposing
@@ -47,7 +51,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    of `generatedMainFuel` the theorem surface. Low-level generated evidence is
    used only to prove that those public projections follow the implementation
    path.
-1. Keep proof-relevant public inputs in the JIT root signature. A proof root may
+1. Keep proof-relevant public inputs in the public root signature. A proof root may
    take real runtime inputs such as `Problem`, `InitializeConfig`, and an
    actual runtime solve config when the API has one, but it must not add
    proof-only arguments, trace handles, op ids, binding ids, or proof-only
@@ -68,10 +72,10 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    states, not completion.
 1. For algorithm-derived claims, consume the
    `$algorithm-proof-exploration` artifact when available. If it does not
-   exist yet, lower the public root into JIT-canonical IR before selecting
-   local proof obligations. The IR is not a proof; it records what the JIT root
-   computes.
-1. Build that IR with
+   exist yet, lower the public root into the matching implementation evidence
+   route before selecting local proof obligations. The IR is not a proof; it
+   records the implementation shape.
+1. Build JIT-canonical IR with
    `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`.
    Retain the StableHLO hash, thin operational ops, backend phase trace, and
    coverage status in the proof artifact. Do not add recursion-depth knobs or
@@ -81,11 +85,22 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    can collect XLA-emitted `.ll` / `.ptx` artifacts when IREE phase tracing
    stops before LLVM. Treat missing LLVM rows as a backend coverage frontier,
    not as permission to introduce external FP axioms.
+   Build C++ source evidence and Lean evidence with
+   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>`.
+   The tool fully expands the selected C++ source route and rejects unresolved
+   calls and unassigned operations before Lean output; repair coverage gaps in
+   the extractor or selected C++ root before treating the generated evidence as
+   accepted proof input.
 1. Generate checker-facing Lean evidence definitions from the current
-   JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`. Keep this
-   generated evidence layer separate from the theorem graph. The
-   generated layer owns root identity, StableHLO hash, operational op kinds,
-   dtype coverage, and backend trace coverage. Mathematical propositions such
+   JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`, or from the
+   C++ template source route with
+   `python3 tools/agent_tools/cpp_template_to_lean.py`. Keep this
+   generated evidence layer separate from the theorem graph. The JIT-generated
+   layer owns root identity, StableHLO hash, operational op kinds, dtype
+   coverage, and backend trace coverage; the C++ full-expansion route owns
+   source provenance, public-interface metadata, source facts, operational
+   rows, expansion edges, static code-path rows, path decisions, and coverage facts.
+   Mathematical propositions such
    as residual decrease, KKT regularity, direction quality, and finite
    termination belong only in the theorem graph.
    Require the generated layer or theorem-graph projection layer to expose the
@@ -109,7 +124,8 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    instead of narrowing the theorem to IREE, XLA, CUDA, CPU, GPU, VMFB,
    StableHLO, LLVM, FP32, or another backend surface.
    For target-critical code shape, do not leave implementation-local functions
-   as arbitrary proof axioms merely because the first trace generator is shallow.
+   as arbitrary proof axioms merely because the current trace generator does not
+   yet expose the required function body.
    Residual bundles, next-state construction, step-length formulas, KKT
    reconstruction, stopping residual aggregation, and other target-facing code
    path functions must be implemented as Lean functions whose fields correspond
@@ -146,11 +162,12 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    Phase I, or globalization route with a provable numerical mechanism, then
    regenerate IR and retry the theorem.
    For target-critical equations, start from the theorem proposition and trace
-   to the generated JIT-canonical Lean evidence definitions and StableHLO/backend trace
-   records it actually consumes. Do not hand-maintain parallel runtime
-   equations in proof notes. If the theorem needs a formula not present in the
-   generated implementation layer, improve the extractor or change the
-   implementation shape before adopting the theorem.
+   to the generated implementation evidence it actually consumes: JIT-canonical
+   Lean evidence and StableHLO/backend trace records for JIT roots, or C++ source
+   facts and thin operational IR evidence for C++ source roots. Do not
+   hand-maintain parallel runtime equations in proof notes. If the theorem needs
+   a formula not present in the generated implementation layer, improve the
+   extractor or change the implementation shape before adopting the theorem.
    After extraction, propositionize theorem-critical equations from the target
    proposition, not from a flat op list. First select the target theorem/profile
    in the theorem graph to bound the search surface. The proposition must be
@@ -176,9 +193,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    proposition `P`, run the appropriate proof search (`aesop?`, `aesop`,
    `simp?`, `exact?`, or the Lean capability route), inspect the unsolved goals
    and missing hypotheses, generate bridge candidates for those exact gaps,
-   prove/refute them from generated Lean functions and IR facts, then rerun the
-   proof of `P`. A flat candidate inventory is only input to this loop, not the
-   proof workflow outcome.
+   prove/refute them from generated Lean evidence, checker-facing Lean functions,
+   and IR/source facts, then rerun the proof of `P`. A flat candidate inventory
+   is only input to this loop, not the proof workflow outcome.
    Treat the theorem graph as a directed proposition graph:
    proposition nodes point to the propositions they consume.  For
    implementation-derived proofs, every terminal leaf on the target chain must
@@ -189,10 +206,30 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    code-aligned proof. If a leaf is free prose, an unrooted helper theorem, or a
    proof-only assumption, remove that path or reconnect it to code/argument/
    backend evidence.
+   Classify definition-only proof routes before adopting them. If a candidate
+   "necessary and sufficient condition" closes by `Iff.rfl`, pure `rfl`, or only
+   unfolding the target predicate into the same stop/reachability predicate,
+   mark the graph node as `circularity_check` or `projection_only`. Such a node
+   is valid structural evidence about the theorem surface, but it is not a
+   substantive `Problem` / config condition and must not close a convergence or
+   finite-stop proof. The next frontier is the non-circular obligation exposed
+   by that projection, usually residual reachability, a ranking/contraction
+   lemma for the implemented recurrence, or a problem-class witness that implies
+   the projected stop predicate.
+   Circularity must be checked on the proposition graph, not by vocabulary,
+   theorem names, or local proof style. A route is circular when the conclusion
+   node, certified-convergence node, or proposed iff side reaches the candidate
+   problem class, stop predicate, certificate, or quantitative bound through
+   definition, projection, equivalence, existential-lift, or
+   certificate-inclusion edges. Run the theorem graph circularity checker before
+   adopting a necessary/sufficient convergence or finite-stop claim; if the
+   graph reaches the proposed condition from the conclusion side, keep the row as
+   `circularity_check` even when the names differ and the Lean proof is not a
+   single `rfl`.
 1. After any algorithm update that changes initialization, cold-start,
-   Phase-I, basin-entry, or selected-scope-entry logic, regenerate the
-   JIT-canonical IR, generated Lean operational-program evidence, theorem
-   graphs, and proof-status overlay before reporting back.
+   Phase-I, basin-entry, or selected-scope-entry logic, regenerate the selected
+   route's IR/source-envelope evidence, generated Lean operational evidence,
+   theorem graphs, and proof-status overlay before reporting back.
    Discharge every initialization fact that the code now exposes as
    `generated implementation leaves` first: selected base point, epigraph point, slack/multiplier
    floors, initial residuals, and initial child-solver state. Do not return
@@ -218,8 +255,9 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    Bridge, connection, profile binding, and witness instantiation rows are
    recursive proof frontier, not user-facing stopping points. If such a row
    blocks a caller-side lemma or target theorem edge, continue by expanding the
-   code fact, generated Lean function, theorem graph, `lean/lib` profile, or
-   backend/source packet that could bind it. Return only after the remaining
+   code fact, generated Lean evidence, checker-facing Lean function, theorem
+   graph, `lean/lib` profile, or backend/source packet that could bind it.
+   Return only after the remaining
    gap is checked as a production code / algorithm issue, a top-level
    `Problem` / config / solve-input issue, or a backend/runtime architecture
    boundary that the current repository and tools cannot advance.
@@ -256,13 +294,16 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
 1. Store checker-facing IR, theorem graphs, profile libraries, and generated Lean files under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
-1. Build the implementation layer with
+1. Build the implementation evidence layer through the route chosen for the
+   public root. For JIT-canonical roots, run
    `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
    and then
    `tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean>`.
-   Convert the generated implementation layer into theorem graph overlays with
+   For C++ template source roots, run
+   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out <record.json>`.
+   Convert the generated implementation evidence layer into theorem graph overlays with
    the current theorem-graph tool, not by passing theorem-profile options to
-   `jit_canonical_ir.py`. Retain `proof_lemma_graph`,
+   IR extraction tools. Retain `proof_lemma_graph`,
    `proof_target_chains`, and graph validation evidence before writing proof
    text. After algorithm changes, regenerate IR, generated Lean evidence,
    theorem graphs, and proof-status overlays from the current root; do not carry
@@ -274,7 +315,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. After a proof-status overlay exists, run the theorem-graph correspondence
    checker for the theorem-critical equation slice, especially `step_update`,
    `reduced_kkt`, `minres_defaults`, and initialization tags. This checker
-   consumes the generated JIT-canonical IR / Lean operational-program evidence
+   consumes the selected route's generated IR / Lean operational evidence
    and validates variable-assignment and return-equation correspondence; it is
    distinct from mathematical proof completion. Do not call
    `jit_canonical_ir.py` with non-existent graph-checking options.
@@ -341,6 +382,15 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    checker-backed necessity/refutation/minimality result establishes that
    status. Label them as `necessary_proven`, `route_sufficient`, `candidate`,
    `unknown`, or `algorithmic_blocker_proven`.
+   Definitionally equivalent wrappers are never `necessary_proven` by
+   themselves. If a theorem only states `Condition ↔ Target` because
+   `Condition` was defined as `Target`, record it as `circularity_check` and
+   continue proof search on the smallest non-circular proposition needed to
+   imply `Target` from the public inputs.
+   Do not implement this as a vocabulary scan over theorem names or predicate
+   names. The check is a graph reachability question: from the target/conclusion
+   side, follow only proof-consumption edges and fail the route if it reaches a
+   node that is supposed to be the independent `Problem` / config condition.
 1. Recursively re-enter the frontier loop on every named
    `unverified_with_next_witness` item until it is verified, refuted, proved
    unprovable under the current assumptions, or explicitly remains open with a

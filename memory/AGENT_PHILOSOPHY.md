@@ -295,6 +295,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User reported agents forcing tests around contract-only wrappers and creating unnecessary work.
 
+- 2026-06-18 | interaction-observation | When explaining formal proof or implementation status, avoid invented labels that are not code/theorem artifacts. Use exact file symbols, theorem names, equations, and public input/output terms; if a temporary label is unavoidable, mark it as non-canonical.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User said: 勝手に定義した名前で解説するのをやめて
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.

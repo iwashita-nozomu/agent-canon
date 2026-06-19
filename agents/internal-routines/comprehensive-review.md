@@ -22,7 +22,7 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 
 - `tools/run_comprehensive_review.sh`
 - `documents/tools/README.md`
-- `agents/skills/project-review.md`
+- `agents/internal-routines/project-review.md`
 
 ## Expected Outcome
 

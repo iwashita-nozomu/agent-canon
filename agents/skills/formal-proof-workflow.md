@@ -10,6 +10,9 @@ upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
+upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
+upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions.
+upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
@@ -36,6 +39,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 - proof assistant を使う前に proof obligation、前提、定義不足を棚卸ししたい
 - 論文、scholarly note、optimization / numerical method design の理論 claim を検査可能な形に落としたい
 - JIT 可能な Python 実装 root から StableHLO/backend trace 由来の generated Lean evidence と theorem graph を作りたい
+- C++ template algorithm root から full-expansion route で generated Lean evidence を作りたい
 
 ## Core References
 
@@ -53,11 +57,14 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 ## Mandatory Checklist
 
 - 形式化前に、claim、assumptions、definitions、target theorem、proof sketch を分けます。
-- 実装由来のアルゴリズム claim は、必ず JIT 可能な public entrypoint
-  `main(problem, InitializeConfig, ...)` または同等の run 関数に対する
-  全体命題から始めます。戻り値 `Answer` / `State` / `Info` の仕様を
-  target theorem にし、補助定理、内側 solver、loop-control、残差成分、
-  局所収束命題は、その全体命題を再帰分解して必要になった場合だけ選びます。
+- 実装由来のアルゴリズム claim は、必ず実装正本の public entrypoint に対する
+  全体命題から始めます。JIT route では
+  `main(problem, InitializeConfig, ...)` または同等の run 関数、C++ source route では
+  `cpp_template_to_lean.py --cpp-symbol` で選んだ C++ template root を public root
+  として扱います。戻り値 `Answer` / `State` / `Info` の仕様、または C++ root から
+  生成した public-interface / source-fact projection を target theorem にし、
+  補助定理、内側 solver、loop-control、残差成分、局所収束命題は、その全体命題を
+  再帰分解して必要になった場合だけ選びます。
 - 実装由来 claim の `program contract` は、public entrypoint、入力 schema、
   runtime profile、return projection、observable effect、assumptions /
   preconditions、checker / validation command を束ねた入口です。theorem target、
@@ -91,10 +98,15 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   参照します。projection から低レベル evaluator への接続が欠けている場合は、
   低レベル binding を目的定理へ持ち込まず、extractor、projection 生成、または
   `main` の返却 schema を直します。
-- 実装由来の claim は JIT 可能な public root を
+- 実装由来の claim は、実装正本に合う機械抽出 route を先に固定します。
+  JIT 可能な Python public root は
   `jit_canonical_ir.py --python-symbol path.py::qualname --input-factory path.py::factory`
-  で StableHLO と backend trace へ lower します。この lowering 結果を
-  proof artifact の入口として扱います。
+  で StableHLO と backend trace へ lower します。C++ template algorithm を
+  source of truth にする場合は、
+  `cpp_template_to_lean.py --cpp-symbol path.hpp::qualname --namespace <Lean.Namespace>`
+  で C++ source envelope、完全展開済み `agent-canon.thin-operational-ir.v2`、
+  Lean evidence definitions を一つの tool route で生成します。どちらの lowering 結果も
+  proof artifact の入口ですが、それ自体は semantic proof ではありません。
 - backend、runtime target、compiler route、device、dtype を theorem や validation
   claim を通すために固定してはいけません。backend 固有 theorem は、user request、
   approved design、runtime profile、public API、または config がその backend を
@@ -108,9 +120,11 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   theorem statement、checked fragment、counterexample、unprovable-under-assumptions
   witness として採用する段階を担当します。
 - アルゴリズム由来の claim では、局所証明を選ぶ前に root algorithm を
-  StableHLO function/control/backend-trace edge から機械的に再帰展開し、
-  JIT-canonical IR として保持します。IR は proof ではなく、
-  最終命題に必要な局所 theorem / lemma だけを選ぶための中間表現です。
+  選択済み route の機械抽出 evidence として保持します。JIT route では
+  StableHLO function/control/backend-trace edge から JIT-canonical IR を作り、
+  C++ source route では source envelope、source facts、thin operational IR の
+  function/region/op/edge を作ります。IR は proof ではなく、最終命題に必要な
+  局所 theorem / lemma だけを選ぶための中間表現です。
 - algorithm update が初期値選択、cold start、Phase I、basin entry、selected-scope entry を
   変更した場合は、ユーザーへ返す前に IR / lemma graph / proof-status overlay を
   再生成し、初期化経路から機械抽出できる code fact をすべて採用候補へ接続します。
@@ -124,28 +138,37 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   示す場合だけその特殊化を使います。zero が単なる現在の実装選択であり theorem を
   狭めているなら、problem-class witness または algorithmic choice として
   `$algorithm-proof-exploration` に戻します。
-- JIT-canonical IR は `python3 tools/agent_tools/jit_canonical_ir.py`
-  で作成し、`proof_algorithm_ir`、`proof_goal_directed_slice`、
+- 実装由来 IR は、JIT route では `python3 tools/agent_tools/jit_canonical_ir.py`、
+  C++ source route では `python3 tools/agent_tools/cpp_template_to_lean.py`
+  で full-expansion record と generated Lean evidence を作成し、
+  `proof_algorithm_ir`、`proof_goal_directed_slice`、
   `proof_selected_local_obligations` として proof note または run artifact に残します。
-- checker 向けの実装 path model は、現在の JIT-canonical IR から
-  `tools/bin/agent-canon jit-ir-to-lean` で Lean code graph artifact として
-  生成します。IR の operation tree と `control_facts` で evaluation order と
-  branch / loop 形状が得られる場合、手書きの algorithm-specific operation record を
-  新しい proof entrypoint にしてはいけません。構造体アクセスは IR 後段の Rust
-  projection pass で正規化し、proof theme 側は生成 code graph を消費して型付き補題を
-  別に与えます。生成 code graph と proof graph は別物です。code graph は
-  `ImplementationFunction`、`FunctionTrace`、`CodeEquation`、`ControlFact`、
-  `CallEdge` を持ちます。lowering checker は、implementation function が同じ
-  source node の fact / control / edge だけを参照していることと、生成 Lean
-  definition 名が衝突しないことを検査します。code path が Lean 関数へ完全に
-  lower されたと主張する前に、生成 Lean module の
-  `generated_function_lowering_coverage_verified` を checker で通します。生成名の
+- checker 向けの実装 path evidence は、JIT-canonical IR では
+  `tools/bin/agent-canon jit-ir-to-lean` で Lean evaluator / code graph artifact を
+  生成し、C++ source route では
+  `python3 tools/agent_tools/cpp_template_to_lean.py` で
+  `OperationalFunction`、`OperationalRegion`、`OperationalOp`、
+  `ExpansionEdge`、`CodePath`、`CodePathDecision`、`OperationalCoverage`
+  などの Lean evidence definitions を生成します。
+  C++ route は unresolved call target、unassigned op、または code-path row を持たない
+  reachable function を Lean 出力前に拒否します。
+  Generic operational IR renderer は Lean 関数 lowering や
+  `ImplementationFunction` / `FunctionTrace` / `CodeEquation` schema を主張しません。
+  IR の operation tree と source facts で evaluation order と branch / loop 形状が
+  得られる場合でも、手書きの algorithm-specific operation record を新しい proof
+  entrypoint にしてはいけません。
+  構造体アクセスは IR 後段の projection pass で正規化し、proof theme 側は生成
+  evidence を provenance として消費して型付き補題を別に与えます。生成 evidence と
+  proof graph は別物です。code path が Lean 関数へ完全に lower されたと主張する前に、
+  JIT-specific generator では生成 Lean module の
+  `generated_function_lowering_coverage_verified` を checker で通し、generic
+  operational IR renderer では generator が complete coverage を既定で要求し、
+  `coverageComplete = true` の generated evidence を出したことを evidence に含めます。生成名の
   `rg` 確認や prose inspection だけを coverage evidence として採用してはいけません。
-  proof graph は proposition と
-  theorem dependency edge を持ちます。`theorem X by A, B, f` のような route は、
-  `A` と `B` が proof premise、
-  `f` が現行生成 code graph 上の implementation function / trace に埋め込める場合だけ
-  採用できます。
+  proof graph は proposition と theorem dependency edge を持ちます。`theorem X by A, B, f`
+  のような route は、`A` と `B` が proof premise、`f` が JIT-generated code graph
+  上の implementation function / trace、または generic operational evidence から
+  明示的に構成された projection lemma に埋め込める場合だけ採用できます。
 - 実装由来の theorem は、実装 path が使っているデータ型、またはそのデータ型からの
   明示的な decoded view の上で述べます。implementation residual、status、solver
   answer、finite-precision value、certificate を、証明しやすい `Nat`、`Real`、
@@ -179,6 +202,21 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   一律に除外しません。`P` がそれらの妥当性なら tree root として採用し、`P` が solver
   return / residual decrease なら、その戻り値に代入されない観測 path は substitution
   tree 外の execution evidence として扱います。
+- 定義だけで閉じる proof route は、採用前に循環性として分類します。候補となる
+  "必要十分条件" が `Iff.rfl`、`rfl`、または target predicate を同じ
+  stop / reachability predicate へ unfold するだけで閉じる場合、その theorem graph node は
+  `circularity_check` または `projection_only` です。これは theorem surface を
+  正しく投影できた構造証拠ですが、substantive な `Problem` / config 条件でも
+  finite-stop / convergence proof の完了でもありません。次 frontier は、その投影が
+  露出した非循環命題、典型的には実装 recurrence の residual reachability、
+  ranking / contraction、またはそれを導く problem-class witness です。
+  循環性は theorem 名、predicate 名、`certified` などの語彙ではなく、命題グラフの
+  到達可能性で判定します。conclusion node、certified-convergence node、または proposed
+  iff side から、definition / projection / equivalence / existential-lift /
+  certificate-inclusion edge を辿って、独立条件として採用したい problem class、
+  stop predicate、certificate、quantitative bound に到達するなら、その route は
+  `circularity_check` です。名前が違う場合や Lean proof が単一の `rfl` でない場合も、
+  graph が到達すれば convergence / finite-stop の必要十分条件として採用してはいけません。
 - backend / dtype / IREE / finite-precision semantics は production code や
   `InitializeConfig` へ proof-only field として足さず、JIT-canonical IR の
   `backend_assumptions` と Lemma Dependency Graph overlay に theorem variable /
@@ -186,8 +224,9 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 - bridge、connection、profile binding、witness instantiation は frontier そのものとして
   再帰展開します。caller-side lemma や target theorem edge を止めている
   接続行を、単なる「未接続」「今後接続」として user-facing に返してはいけません。
-  その接続が code fact、generated Lean 関数、lemma graph、`lean/lib` profile、
-  backend/source packet から導けるなら、証明または反証まで進めます。返せるのは、
+  その接続が code fact、generated Lean evidence、checker-facing Lean 関数、
+  lemma graph、`lean/lib` profile、backend/source packet から導けるなら、
+  証明または反証まで進めます。返せるのは、
   残りが production code / algorithm choice の問題、`Problem` / config / solve input の
   不足、または現在の repository / tool 環境では進められない backend/runtime
   architecture boundary であることを checker-backed に示した場合だけです。
@@ -259,14 +298,15 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
 - 候補選択は再帰的かつ target-driven に進めます。現在の最終命題 `P` を立て、
   `aesop?`、`aesop`、`simp?`、`exact?`、または Lean capability route を実行し、
   未解決 goal / missing hypothesis を読みます。その gap を bridge candidate に翻訳し、
-  生成 Lean 関数と IR fact から証明または反証できるか確認し、再び `P` の証明を走らせます。
+  generated Lean evidence、checker-facing Lean 関数、IR/source fact から
+  証明または反証できるか確認し、再び `P` の証明を走らせます。
   `P` が証明・反証・現仮定下での非導出証明・より小さい witness への縮約のいずれかに達するまで
   ループします。平坦な候補一覧はこのループの入力であり、最終成果ではありません。
 - 実装されている反復法と証明状態を人間が一目で確認する必要がある場合は、
   `$algorithm-flowchart` で IR、theorem graph、
   `proof_status.json` から Mermaid chart を生成します。図は proof path の
   navigation evidence であり、`verified` claim の authority ではありません。
-- 生成された補題群は JIT-canonical IR と generated Lean operational-program
+- 生成された補題群は selected route の IR/source envelope と generated Lean
   evidence から出てくるものとして扱います。
   アルゴリズム変更後は fingerprint で旧補題を識別せず、IR、graph、
   proof-status overlay を現行 root から再生成します。旧root由来のIR-backed
@@ -376,6 +416,14 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   ある場合だけ `necessary_proven` とし、それ以外は `route_sufficient`、
   `candidate`、または `unknown` と明示します。必要性が未証明なら、命題を
   消さずに必要性主張だけを落とすのが proof-status 上の最小修正です。
+- `Condition ↔ Target` が `Condition := Target` の定義展開としてだけ成立する場合、
+  その route は `necessary_proven` ではなく `circularity_check` です。
+  これは語彙検査ではなく graph 検査で行います。target / conclusion 側から
+  proof-consumption edge を辿って、独立な `Problem` / config 条件として採用したい
+  node に戻るかを確認し、戻る path があれば route-certificate evidence としてだけ扱います。
+  proof graph 構造解析では、この node を採用済み target-chain 証明から外し、
+  `Target` を public inputs から導くための非循環 next witness を必ず別 node として
+  作ります。
 - JIT-canonical evidence、theorem graph slice、proof search query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
@@ -527,7 +575,10 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
      missing frontier を示す。`verified` と言えるのは checker 済み theorem /
      lemma と、それらだけで接続された target chain に限る
 1. Evidence generation:
-   - JIT-canonical root から StableHLO、backend trace、JIT IR、generated Lean evidence を生成する
+   - 実装正本に合う selected route から generated Lean evidence を生成する。
+     JIT route では StableHLO、backend trace、JIT IR、generated Lean evidence、
+     C++ source route では `cpp_template_to_lean.py` で source envelope、
+     source facts、thin operational IR、generated Lean evidence を生成する
    - output は run bundle、report、または project-local proof artifact directory に置く
    - reader-facing proof text は topic ごとに一つの canonical proof note へ統合し、
      theorem statement、assumption ledger、checked fragment status、remaining gap を
