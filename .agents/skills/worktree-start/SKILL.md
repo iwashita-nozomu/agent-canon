@@ -13,6 +13,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Worktree Start
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill worktree-start --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/worktree-start.md`.
 1. Do not create a new `git worktree`, do not resume a stale worktree as the task workspace, and do not treat `WORKTREE_SCOPE.md` as scope authority for new work.
 1. Read `notes/guardrails/README.md` and `notes/failures/README.md` before cleanup so known avoid patterns and recent failures are in scope.

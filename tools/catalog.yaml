@@ -1247,6 +1247,24 @@ entries:
     tests:
       - tests/agent_tools/test_check_skill_frontmatter.py
 
+  - id: skill-tool-commands
+    summary: Materializes and checks runtime skill Tool Commands packets.
+    path: tools/agent_tools/skill_tool_commands.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/skill_tool_commands.py check
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/task-routing.md
+    tests:
+      - tests/agent_tools/test_skill_tool_commands.py
+
   - id: vendor-skill-adapters
     summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
     path: tools/agent_tools/vendor_skill_adapters.py
@@ -2053,6 +2071,25 @@ entries:
       - documents/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_update_latest_result.py
+
+  - id: publish-result-branch
+    summary: Publishes experiment result artifacts to a dedicated Git branch.
+    path: tools/experiments/publish_result_branch.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 tools/experiments/publish_result_branch.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/result-log-retention-and-visualization.md
+      - agents/workflows/experiment-workflow.md
+    tests:
+      - tests/tools/test_publish_result_branch.py
 
   - id: check-doc-test-triplet
     summary: Compatibility wrapper for doc and test triplet validation.

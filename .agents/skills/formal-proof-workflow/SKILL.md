@@ -23,6 +23,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 
 # Formal Proof Workflow
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill formal-proof-workflow --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/formal-proof-workflow.md`.
 1. Read `agents/skills/literature-survey.md` before web or paper search.
 1. For algorithm-derived claims that require proof-path search, algorithm

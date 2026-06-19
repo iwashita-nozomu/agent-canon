@@ -17,6 +17,19 @@ upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodu
 
 # AgentCanon Update
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill agent-canon-update --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/agent-canon-update.md`.
 1. Read `documents/agent-canon-update-route.md` and
    `documents/agent-canon-parent-repo-latest-checklist.md`.

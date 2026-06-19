@@ -13,6 +13,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Adaptive Improvement Loop
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill adaptive-improvement-loop --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/adaptive-improvement-loop.md`.
 1. Read `agents/workflows/adaptive-improvement-workflow.md`.
 1. Read `agents/workflows/goal-plan-implementation-loop.md`.

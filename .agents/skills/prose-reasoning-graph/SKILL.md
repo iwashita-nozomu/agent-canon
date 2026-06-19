@@ -16,6 +16,19 @@ upstream design ../../../documents/tools/prose_reasoning_graph.md documents CLI 
 
 # Prose Reasoning Graph
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill prose-reasoning-graph --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/prose-reasoning-graph.md`.
 1. Read `documents/prose-reasoning-graph/dsl-spec.md` before interpreting,
    changing, or extending graph layers, ids, relation kinds, diagnostics,

@@ -32,6 +32,7 @@ template-owned active contract.
 | Contract | Owner Surface | Evidence / Checker |
 | -------- | ------------- | ------------------ |
 | workflow family, spawn budget, role topology | `vendor/agent-canon/agents/task_catalog.yaml` | `task_start.py`; `bootstrap_agent_run.py`; `check_agent_runtime_alignment.py` |
+| task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`; `task_start.py`; `bootstrap_agent_run.py` | generated task packet |
 | subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`; `team_manifest.yaml`; `schedule.md`; `workflow_monitoring.md` | `workflow_monitor.py`; closeout lifecycle evidence |
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `agent-canon local-llm route-skill`; `check_agent_runtime_alignment.py` |
@@ -49,28 +50,13 @@ their owner surfaces first.
 
 ## Task Entry
 
-For repo-changing work, start from the generated task packet:
+Task bootstrap commands and CLI-specific entry behavior are owned by
+`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`. Generated task packets
+from `task_start.py` or `bootstrap_agent_run.py` provide the active
+`workflow=...`, `skills=...`, `review=...`, source packet, wave plan, and
+validation route.
 
-```bash
-python3 vendor/agent-canon/tools/agent_tools/task_start.py \
-  --task "short task summary" \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-For a new run bundle:
-
-```bash
-python3 vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py \
-  --task "short task summary" \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-Use the emitted `workflow=...`, `skills=...`, `review=...`,
-document-packet paths, wave plan, and validation route as the task contract.
-
-## Base Runtime Packet
+## Base Runtime Packet Owner
 
 - `README.md`
 - `vendor/agent-canon/agents/README.md`
@@ -80,9 +66,8 @@ document-packet paths, wave plan, and validation route as the task contract.
 - `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md`
 - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
 
-Task-specific packet expansion is owned by `task_start.py`,
-`bootstrap_agent_run.py`, semantic-index/local-llm search, and dependency review
-artifacts.
+Task-specific packet expansion is owned by the generated task packet,
+semantic-index/local-llm search, and dependency review artifacts.
 
 ## Template Context
 

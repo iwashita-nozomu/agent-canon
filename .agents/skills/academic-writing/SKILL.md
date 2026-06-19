@@ -17,6 +17,19 @@ upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling b
 
 # Academic Writing
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill academic-writing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/academic-writing.md`.
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.

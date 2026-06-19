@@ -355,6 +355,8 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/check_convention_compliance.py`
   - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
+- `tools/agent_tools/skill_tool_commands.py`
+  - `.agents/skills/*/SKILL.md` の `## Tool Commands` 入口を同期・検査し、`show --skill <skill>` で runtime skill と human skill canon から command packet を表示します。
 - `tools/agent_tools/tool_catalog.py`
   - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
 - `tools/agent_tools/tool_drift.py`
@@ -375,6 +377,9 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - Python AST を JSON として抽出し、Rust 側で `algorithm_module_protocol` module の standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema を検査します。親 algorithm 側の nested field は特定 module 名に固定せず、import された amp module alias と `*.Algorithm` / `*.SolveConfig` / `*.Info` / `*.initialize` の AST usage から自動推定します。
 - `tools/experiments/update_latest_result.py`
   - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
+- `tools/experiments/publish_result_branch.py`
+  - `main` などの source checkout で作成した `experiments/<topic>/result/<run_name>/` と `experiments/report/<run_name>.md` を、checkout を切り替えず `experiment-results/<topic>` などの result branch へ保存します。
+  - 標準形は `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` です。remote へ保存する場合だけ `--push` を足します。
 - `tools/push_origin.sh`
   - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
 

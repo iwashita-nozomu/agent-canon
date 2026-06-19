@@ -19,6 +19,19 @@ downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py 
 
 # Report Writing
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill report-writing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/report-writing.md`.
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is evidence-backed status, audit, evaluation, review, decision, recommendation, or operational report; do not select it by length.
 1. Classify the report before writing: `status-report`, `evaluation-report`, `experiment-report`, `review-report`, `audit-report`, `decision-brief`, `presentation-narrative`, `ppt-storyboard`, or `improvement-guide`.

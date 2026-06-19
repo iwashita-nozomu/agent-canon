@@ -14,6 +14,7 @@
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
+# upstream implementation ../agent_tools/skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
@@ -227,6 +228,12 @@ if "$PYTHON_BIN" tools/agent_tools/check_skill_frontmatter.py 2>&1; then
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/skill_tool_commands.py check 2>&1; then
+  echo "✅ runtime skill tool command checks 成功"
+else
+  echo "❌ runtime skill tool command checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/agent_tools/tool_catalog.py 2>&1; then

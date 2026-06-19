@@ -13,6 +13,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Test Design
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill test-design --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/test-design.md`.
 1. Fix the target code paths and related test paths.
 1. If related tests exist, run `tools/bin/agent-canon test-design check <related-test-paths...>` before reading whole files. Use `fix-now`, `review`, and `design-hint` findings as the first test-plan inputs.

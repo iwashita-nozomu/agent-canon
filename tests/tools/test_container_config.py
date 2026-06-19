@@ -535,6 +535,113 @@ def test_shared_generator_mounts_configured_secret_directory(tmp_path: Path) -> 
     assert 'AGENT_CANON_SECRET_DIR_MODE: "rw"' in compose
 
 
+def test_shared_generator_warns_instead_of_requiring_missing_gpu_runtime(
+    tmp_path: Path,
+) -> None:
+    """A host GPU without Docker NVIDIA runtime should not make compose require GPUs."""
+    write_valid_runtime_pack(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        (PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    nvidia_smi = fake_bin / "nvidia-smi"
+    nvidia_smi.write_text("#!/usr/bin/env bash\nprintf 'GPU 0: fixture\\n'\n", encoding="utf-8")
+    nvidia_smi.chmod(0o755)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [ \"$1\" = info ]; then printf '%s\\n' '{\"runc\":{}}'; exit 0; fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(tmp_path / "home"),
+    }
+    env.pop("SSH_AUTH_SOCK", None)
+    Path(env["HOME"]).mkdir()
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (tmp_path / ".devcontainer" / "docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "gpus: all" not in compose
+    assert 'DEVCONTAINER_GPU_MODE: "unavailable"' in compose
+    assert 'DEVCONTAINER_GPU_NOTICE: "docker-nvidia-runtime-unavailable"' in compose
+    assert "devcontainer gpu unavailable: docker-nvidia-runtime-unavailable" in result.stderr
+
+
+def test_shared_generator_requires_gpu_only_when_runtime_is_available(
+    tmp_path: Path,
+) -> None:
+    """Generated compose should request GPUs only when Docker can satisfy it."""
+    write_valid_runtime_pack(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        (PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    nvidia_smi = fake_bin / "nvidia-smi"
+    nvidia_smi.write_text("#!/usr/bin/env bash\nprintf 'GPU 0: fixture\\n'\n", encoding="utf-8")
+    nvidia_smi.chmod(0o755)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [ \"$1\" = info ]; then printf '%s\\n' '{\"nvidia\":{}}'; exit 0; fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(tmp_path / "home"),
+    }
+    env.pop("SSH_AUTH_SOCK", None)
+    Path(env["HOME"]).mkdir()
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (tmp_path / ".devcontainer" / "docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "gpus: all" in compose
+    assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
+    assert 'DEVCONTAINER_GPU_NOTICE: "docker-nvidia-runtime-available"' in compose
+
+
 def test_valid_runtime_config_passes(tmp_path: Path) -> None:
     """A coherent Dockerfile, pack, and devcontainer entrypoint should pass."""
     write_valid_runtime(tmp_path)

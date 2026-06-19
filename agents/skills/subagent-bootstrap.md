@@ -126,4 +126,19 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 active task の途中追加指示は別扱いです。parent は追加指示を `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類し、`python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で run bundle、Agent Wave Ledger、workflow monitoring に checkpoint と updated packet path を残してから配送します。same-task delta だけ run-local active subagent へ再配送でき、scope、allowed paths、owner、review gate が変わるなら既存 agent へ継ぎ足さず fresh follow-up wave を起こします。
 subagent handoff prompt には `team_manifest.yaml` の `run.subagent_lifecycle_policy` を含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 subagent context は chat 要約を蓄積するのではなく、run bundle 内の capsule artifact を更新して渡します。途中追加指示で scope が変わる場合は `workflow_monitor.py --mid-task-user-input` の updated packet path を capsule に入れ、古い handoff prompt へ追記し続けません。
+
+## Subagent Return Investigation
+
+`wait_agent` の timeout、empty status、または wave decision point での final
+response 未着は `subagent_no_return_investigation` として扱います。parent は
+close、replacement、escalation の前に、agent id、wave id、wait command と timeout、
+last known status、last workflow-monitor event、runtime / tool error、log / dashboard
+pointer、cause hypothesis を `workflow_monitoring.md` と closeout evidence に残します。
+
+調査後の action は `continue_wait`、`status_probe_same_task`、
+`close_and_replace_fresh_wave`、`escalate_runtime_issue` のいずれかにします。
+`status_probe_same_task` は同じ active task の bounded status 確認だけに使い、
+scope、allowed paths、owner、review gate が変わる場合は fresh follow-up wave へ
+切り替えます。
+
 closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` に close evidence を残します。

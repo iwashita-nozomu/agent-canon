@@ -13,6 +13,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Start Repository
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill start-repository --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Use this skill after `git clone <template> <new-project>` when the user is turning the clone into a new repository.
 1. Read `documents/template-bootstrap.md`, `documents/agent-canon-github-remote.md`, `documents/runtime-profiles-and-check-matrix.md`, and `scripts/README.md`.
 1. Prefer `bash scripts/start_repository.sh --project-slug <slug> --display-name "<name>"` for clone-time setup.

@@ -16,6 +16,19 @@ upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent inve
 
 # Comprehensive Development
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/comprehensive-development.md`.
 1. Set `workflow=Comprehensive Development` and declare `skills=<...>`, `review=<...>`.
 1. Read `agents/task_catalog.yaml` for the `comprehensive_development` family `spawn_budget`, `role_topology`, `roles`, and `subagent_prompt`.

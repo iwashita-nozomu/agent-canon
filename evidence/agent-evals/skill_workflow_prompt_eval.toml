@@ -1913,22 +1913,28 @@ description = "Requires unique accumulated prompt eval report naming."
 required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
 
 [[evals]]
-id = "agent-log-analysis-archive-api-skill"
+id = "agent-log-analysis-canonical-dashboard-api-skill"
 target = ".agents/skills/agent-log-analysis/SKILL.md"
 kind = "skill"
-description = "The runtime agent-log-analysis skill must call the external log archive API before reading evidence."
+description = "The runtime agent-log-analysis skill must call the AgentCanon source dashboard API before reading evidence."
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-1"
 critical = true
-description = "Requires archive resolution plus the log archive dashboard API command."
-required_regex = ["runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", "--profile log-analysis", "--api-output"]
+description = "Requires archive resolution plus the source dashboard API command."
+required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-2"
 critical = true
-description = "Keeps event-file drilldown exceptional and API-owned when the archive API is missing."
-required_regex = ["log_archive_api_missing", "Event-file drilldown", "schema debugging", "corruption audit"]
+description = "Keeps event-file drilldown exceptional and routes missing compact fields to the dashboard API owner."
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "Event-file drilldown", "schema debugging", "corruption audit"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-SELECTION-ROUTE-SHIM-1"
+critical = true
+description = "Routes selection evidence by skill, tool, and workflow responsibility."
+required_regex = ["skill selection findings", "tool selection findings", "workflow selection findings", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-SHIM-1"
@@ -1937,22 +1943,28 @@ description = "Routes eval family gaps to the accumulated eval producer/checker 
 required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "producer/checker/archive loop"]
 
 [[evals]]
-id = "agent-log-analysis-archive-api-doc"
+id = "agent-log-analysis-canonical-dashboard-api-doc"
 target = "agents/skills/agent-log-analysis.md"
 kind = "skill-doc"
-description = "The human agent-log-analysis skill must define AgentCanon as a thin client over the log archive repository API."
+description = "The human agent-log-analysis skill must define AgentCanon as source dashboard owner over the mounted log archive evidence."
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-DOC-1"
 critical = true
-description = "Documents archive resolution and log archive API output."
-required_regex = ["external log archive", "runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", "--profile log-analysis", "--api-output"]
+description = "Documents archive resolution and source dashboard API output."
+required_regex = ["external log archive", "runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-DOC-2"
 critical = true
-description = "Keeps raw JSONL inspection exceptional."
-required_regex = ["log_archive_api_missing", "event file drilldown", "schema debugging", "破損 audit"]
+description = "Keeps raw JSONL inspection exceptional and routes missing compact fields to the dashboard API owner."
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "event file drilldown", "schema debugging", "破損 audit"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-SELECTION-ROUTE-DOC-1"
+critical = true
+description = "Documents skill, tool, and workflow selection route classes."
+required_regex = ["skill_selection", "tool_selection", "workflow_selection", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"

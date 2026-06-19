@@ -14,6 +14,19 @@ upstream design ../../../CONTAINER_OPERATIONS.md canonical container and devcont
 
 # Environment Maintenance
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile, `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This skill is only the routing checklist.
 1. Update `docker/packs/*.toml`, `docker/codex-container-profiles.toml`, and `docker/python-execution-rules.toml` when runtime selection behavior changes.
 1. When the main server host assumptions change, update `documents/server-host-contract.md` and the server layout templates in the same change.

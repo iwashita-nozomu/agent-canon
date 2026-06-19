@@ -32,7 +32,7 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ## Required Flow
 
 1. 通常分析の入力を compact API / Markdown summary に固定します。
-1. AgentCanon 側では archive の mount / branch 状態だけを確認します。
+1. AgentCanon 側では external log archive の mount / branch 状態だけを確認します。
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
@@ -42,19 +42,24 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 1. `check-clean` が `RUNTIME_LOG_ARCHIVE_CLEAN=yes` を返すまで、分析や closeout を完了扱いにしません。`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes` の場合は、別 repo_key の log が現在 branch に混入しているので、該当 repo_key の sync / migration を先に解消します。
-1. `status --porcelain` または `check-clean --porcelain` の `RUNTIME_LOG_ARCHIVE_ROOT` を `<archive-root>` として、log archive repo 側の API / compact profile を呼びます。
+1. source repo root から AgentCanon source dashboard tool を呼びます。tool が
+   AgentCanon root と mounted log archive を解決するため、`<source-root>` は
+   解析対象 repo の root とします。
 
 ```bash
-python3 <archive-root>/tools/runtime_log_dashboard.py \
-  --root <archive-root> \
-  --profile log-analysis \
-  --output reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
-  --api-output reports/agent-runtime-dashboard/agent-log-analysis-api.json
+python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+  --root <source-root> \
+  --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
+  --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
 
-1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を既定入力として読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
-1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止め、dashboard API owner に戻します。
-1. compact summary で足りない観点がある場合は、log archive repo の API / report profile を拡張します。
+1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を
+   既定入力として読みます。log archive repo は append-only evidence を所有し、
+   AgentCanon source dashboard が集計、移動平均、routing evidence cell を
+   所有します。
+1. compact summary で足りない観点がある場合は、AgentCanon source
+   dashboard API owner に `dashboard_api_contract_gap` として修復を route してから
+   API / report profile を拡張します。
 1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。
 1. eval family gap を見るときは、dashboard の推測ではなく
    `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
@@ -70,7 +75,9 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
-- Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
+- Full dashboard は human review 用です。agent の通常分析入力は
+  `generate_agent_runtime_dashboard.py --api-out` の JSON、compact summary、
+  generated evidence cell を既定にします。
 - Normal analysis reads compact API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 
 ## Finding Route Packet
@@ -79,7 +86,7 @@ Log analysis から修復 wave へ進むときは、次の deterministic packet 
 bundle に残します。
 
 ```text
-finding_class=<wave_execution|skill_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
+finding_class=<wave_execution|skill_selection|tool_selection|workflow_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
 evidence_cells=<compact dashboard section or API field paths>
 route_target=<skill-or-role>
 instance_partition=<repo_key|hook_family|skill_name|workflow_name|issue_id|path_scope>
@@ -91,6 +98,8 @@ closeout_gate=<command or evidence field>
 | --- | --- | --- | --- |
 | `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, affected run bundle paths, planned-vs-actual wave ids | `workflow_monitoring.md` actual wave rows reconciled or issue updated |
 | `skill_selection` | affected skill + `prompt_config_reviewer` | Selection Evidence drilldown row, skill source path, reset basis | skill prompt eval or dashboard miss rate after reset window |
+| `tool_selection` | `tools/catalog.yaml`, owning tool docs, and invocation guidance | Selection Evidence drilldown row, tool catalog entry, owning tool doc path | tool catalog validation and dashboard miss rate after reset window |
+| `workflow_selection` | `agents/TASK_WORKFLOWS.md` and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
 | `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
 | `eval_gap` | `agent-eval-accumulation` | eval accumulation compact output, missing / stale / fail families | `eval_accumulation_check.py` pass or issue updated |
 | `token_coverage` | `agent-learning` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |

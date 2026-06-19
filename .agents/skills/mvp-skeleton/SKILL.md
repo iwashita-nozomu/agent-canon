@@ -13,6 +13,19 @@ downstream design ../../../agents/skills/catalog.yaml catalogs this public skill
 
 # MVP Skeleton
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/mvp-skeleton.md`.
 1. Before editing, write a compact MVP contract in working notes, a run bundle, or the user-facing plan:
    - `core_user`: who uses the skeletal slice

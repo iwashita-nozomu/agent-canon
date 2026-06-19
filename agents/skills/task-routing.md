@@ -30,6 +30,7 @@ prompt から public skill set を選ぶときは Rust harness
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
 agent-canon local-llm route-skill --prompt "<user request>" --format json
+python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text
 ```
 
 ## Outputs
@@ -45,3 +46,7 @@ agent-canon local-llm route-skill --prompt "<user request>" --format json
 Long candidate names are aliases. Do not create a new public tool or skill
 until `route.py --name <candidate>` returns `STATUS=unknown` and the missing
 route is genuinely reusable.
+
+Runtime skill command packets are owned by `skill_tool_commands.py`. Use
+`python3 tools/agent_tools/skill_tool_commands.py check` when changing
+`.agents/skills/*/SKILL.md` files.
