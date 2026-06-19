@@ -4,7 +4,7 @@
 # upstream design ../../agents/canonical/skills.md skill canon registry
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
 # upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
-# downstream implementation ../../.agents/skills/*/SKILL.md materialized runtime skill command entries
+# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
 # downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and sync
 # @dependency-end
