@@ -31,7 +31,7 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ## Required Flow
 
 1. 通常分析の入力を compact API / Markdown summary に固定します。
-1. AgentCanon 側では archive の mount / branch 状態だけを確認します。
+1. AgentCanon 側では external log archive の mount / branch 状態だけを確認します。
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
@@ -41,18 +41,19 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 1. `check-clean` が `RUNTIME_LOG_ARCHIVE_CLEAN=yes` を返すまで、分析や closeout を完了扱いにしません。`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes` の場合は、別 repo_key の log が現在 branch に混入しているので、該当 repo_key の sync / migration を先に解消します。
-1. `status --porcelain` または `check-clean --porcelain` の `RUNTIME_LOG_ARCHIVE_ROOT` を `<archive-root>` として、log archive repo 側の API / compact profile を呼びます。
+1. AgentCanon source tree の canonical dashboard tool で API / compact
+   profile を作ります。`--root` は現在の source repo root を渡します。
 
 ```bash
-python3 <archive-root>/tools/runtime_log_dashboard.py \
-  --root <archive-root> \
-  --profile log-analysis \
-  --output reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
-  --api-output reports/agent-runtime-dashboard/agent-log-analysis-api.json
+python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+  --root . \
+  --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
+  --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
 
-1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を既定入力として読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
-1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止め、dashboard API owner に戻します。
+1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を既定入力として読みます。`generate_agent_runtime_dashboard.py` が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
+1. `generate_agent_runtime_dashboard.py` が API field を欠く場合は
+   `dashboard_api_contract_gap` として止め、dashboard API owner に戻します。
 1. compact summary で足りない観点がある場合は、log archive repo の API / report profile を拡張します。
 1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。
 1. eval family gap を見るときは、dashboard の推測ではなく
@@ -69,7 +70,9 @@ python3 <archive-root>/tools/runtime_log_dashboard.py \
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
-- Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
+- Full dashboard は human review 用です。agent の通常分析入力は
+  `generate_agent_runtime_dashboard.py --api-out` の JSON、compact summary、
+  generated evidence cell を既定にします。
 - Normal analysis reads compact API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 
 ## Finding Route Packet

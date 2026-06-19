@@ -12,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Change Review
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/change-review.md`.
 1. Review the actual diff first.
 1. Report findings before summaries.
