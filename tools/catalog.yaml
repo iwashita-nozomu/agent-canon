@@ -2069,6 +2069,25 @@ entries:
     tests:
       - tests/tools/test_update_latest_result.py
 
+  - id: publish-result-branch
+    summary: Publishes experiment result artifacts to a dedicated Git branch.
+    path: tools/experiments/publish_result_branch.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 tools/experiments/publish_result_branch.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/result-log-retention-and-visualization.md
+      - agents/workflows/experiment-workflow.md
+    tests:
+      - tests/tools/test_publish_result_branch.py
+
   - id: check-doc-test-triplet
     summary: Compatibility wrapper for doc and test triplet validation.
     path: tools/check_doc_test_triplet.py
