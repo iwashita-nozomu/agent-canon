@@ -6,10 +6,30 @@
 # @dependency-end
 set -euo pipefail
 
-gpu_status="disabled"
-if [ "${DEVCONTAINER_GPU_MODE:-disabled}" = "enabled" ]; then
-  gpu_status="enabled"
-fi
+gpu_device_visible() {
+  [ -e /dev/nvidia0 ] && return 0
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
+}
+
+gpu_status="unavailable (notice only)"
+case "${DEVCONTAINER_GPU_MODE:-unavailable}" in
+  enabled)
+    if gpu_device_visible; then
+      gpu_status="enabled"
+    else
+      gpu_status="unavailable (requested, not visible)"
+    fi
+    ;;
+  disabled)
+    gpu_status="disabled"
+    ;;
+  unavailable)
+    gpu_status="unavailable (notice only)"
+    ;;
+  *)
+    gpu_status="${DEVCONTAINER_GPU_MODE}"
+    ;;
+esac
 
 mnt_git_status="not-mounted"
 if [ -d /mnt/git ]; then
@@ -78,6 +98,7 @@ echo "AgentCanon devcontainer"
 echo "----------------------------------------"
 echo "workspace: ${repo_root}"
 echo "gpu: ${gpu_status}"
+echo "gpu-notice: ${DEVCONTAINER_GPU_NOTICE:-<unset>}"
 echo "/mnt/git: ${mnt_git_status}"
 echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT_CANON_SECRET_DIR_MODE:-ro})"
 echo "docker-socket: ${docker_socket_status}"
