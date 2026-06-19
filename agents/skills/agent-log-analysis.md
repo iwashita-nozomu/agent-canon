@@ -1,6 +1,7 @@
 # agent-log-analysis
 <!--
 @dependency-start
+contract skill
 responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage

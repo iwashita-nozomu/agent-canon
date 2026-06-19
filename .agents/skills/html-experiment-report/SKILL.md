@@ -4,6 +4,7 @@ description: Use when producing a browser-readable HTML experiment or Eval repor
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents HTML Experiment Report runtime skill for this repository.
 upstream design ../../../agents/skills/html-experiment-report.md documents the canonical HTML experiment report workflow
 upstream design ../../../agents/skills/structure-planning.md defines reusable structure contracts

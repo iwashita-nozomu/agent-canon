@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents dependency-analysis for this repository.
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest format and tools
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage

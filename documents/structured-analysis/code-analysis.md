@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines code dependency analysis scope for the structured analysis package.
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement

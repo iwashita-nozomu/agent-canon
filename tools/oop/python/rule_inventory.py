@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: E402,I001
 # @dependency-start
+# contract tool
 # responsibility Inventories Python OOP policy, tool, document, and test surfaces.
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
 # upstream design ../../../documents/object-oriented-design.md OOP policy source

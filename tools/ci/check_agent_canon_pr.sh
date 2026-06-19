@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Checks agent canon pr CI readiness.
 # upstream design ../../tools/README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow

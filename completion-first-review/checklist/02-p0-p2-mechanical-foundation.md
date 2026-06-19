@@ -1,6 +1,7 @@
 # P0-P2 Mechanical Foundation Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Defines the mechanical-foundation checklist after completion judgment is defined.
 upstream design ../README.md completion-first review index
 upstream design 01-p-minus-one-completion-gate.md completion gate checklist

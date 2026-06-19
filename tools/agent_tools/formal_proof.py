@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Builds formal-proof planning scaffolds from natural-language mathematical claims.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow boundaries.
 # upstream design ../../references/agent-canon-technology-bibliography.md records proof sources.

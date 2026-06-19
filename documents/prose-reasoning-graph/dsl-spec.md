@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines the Prose Reasoning Graph DSL and graph contract.
 upstream design README.md Prose Reasoning Graph canon directory index
 upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art

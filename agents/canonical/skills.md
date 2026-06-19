@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Points readers to the public skill registry and internal routine registry.
 upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract

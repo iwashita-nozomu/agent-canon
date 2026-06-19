@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Reports Lean proof-obligation coverage for cataloged AgentCanon tools.
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # upstream design ../../agents/skills/formal-proof-workflow.md formal proof status policy

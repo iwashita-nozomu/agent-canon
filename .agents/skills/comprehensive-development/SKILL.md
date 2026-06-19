@@ -4,6 +4,7 @@ description: Use when a repo-wide task spans code, docs, tools, workflows, and r
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Comprehensive Development for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/task_catalog.yaml workflow family spawn budget and role topology owner

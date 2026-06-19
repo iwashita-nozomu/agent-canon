@@ -1,6 +1,7 @@
 # Decision Log
 <!--
 @dependency-start
+contract template
 responsibility Documents Decision Log for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end

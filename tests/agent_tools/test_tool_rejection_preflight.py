@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests tool rejection preflight gate prediction.
 # upstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts hook/tool rejection gates
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields

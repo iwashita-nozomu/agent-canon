@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Tracks the backlog to turn tool proof coverage into full Lean verification.
 upstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports per-tool proof coverage.
 upstream design ../../documents/tools/tool_proof_coverage.md documents strict Lean verification mode.
@@ -14,6 +15,7 @@ status: in_progress
 source: user
 severity: S1
 evidence: User requested Lean proof of performance and intended behavior for all tools on 2026-06-12; strict tool proof coverage reports zero checked Lean proofs.
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/244
 affected_surfaces: tools/catalog.yaml, tools/agent_tools/tool_proof_coverage.py, documents/tools/tool_proof_coverage.md, tests/agent_tools/test_tool_proof_coverage.py
 edit_scope: per-tool Lean proof artifacts, tools/catalog.yaml proof metadata, tool_proof_coverage strict mode evidence
 required_action: Add checked Lean behavior and performance proof metadata for every cataloged AgentCanon tool.

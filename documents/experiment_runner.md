@@ -1,6 +1,7 @@
 # `experiment_runner` 設計方針
 <!--
 @dependency-start
+contract reference
 responsibility Documents `experiment_runner` 設計方針 for this repository.
 upstream design README.md durable document index
 @dependency-end

@@ -1,6 +1,7 @@
 # AgentCanon Pull Request Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow

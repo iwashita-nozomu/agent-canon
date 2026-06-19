@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Defines issue form for converting agent failures into eval cases.
 # upstream design ../../documents/prompt-skill-evaluation-checklist.md eval capture checklist.
 # upstream design ../../agents/evals/README.md eval evidence storage contract.

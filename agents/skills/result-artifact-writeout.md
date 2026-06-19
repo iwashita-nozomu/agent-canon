@@ -1,6 +1,7 @@
 # result-artifact-writeout
 <!--
 @dependency-start
+contract skill
 responsibility Documents result-artifact-writeout for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement

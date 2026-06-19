@@ -1,6 +1,7 @@
 # Evidence And Closeout
 <!--
 @dependency-start
+contract reference
 responsibility Explains evidence quality and closeout verifier requirements for completion-first AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design 00-completion-first-principle.md completion-first rationale

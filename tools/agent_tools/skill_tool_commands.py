@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Maintains explicit tool-command entry sections in runtime skills.
 # upstream design ../../agents/canonical/skills.md skill canon registry
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract

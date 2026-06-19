@@ -1,6 +1,7 @@
 # Experiment Operations
 <!--
 @dependency-start
+contract reference
 responsibility Documents Experiment Operations for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

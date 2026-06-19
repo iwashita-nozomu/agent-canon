@@ -1,6 +1,7 @@
 # Self-Growth State Machine
 <!--
 @dependency-start
+contract reference
 responsibility Defines the self-growth state machine for completion-first AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design 00-completion-first-principle.md completion-first rationale

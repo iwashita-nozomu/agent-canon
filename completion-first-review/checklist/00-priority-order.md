@@ -1,6 +1,7 @@
 # Priority Order Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Lists the corrected completion-first priority order for AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/00-completion-first-principle.md completion-first rationale

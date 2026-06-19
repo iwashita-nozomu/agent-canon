@@ -1,6 +1,7 @@
 # Implementation Waterfall Literature Note
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Implementation Waterfall Literature Note for agent workflow canon.
 upstream design ../../agents/workflows/workflow-references.md workflow reference index
 downstream design ../../agents/workflows/implementation-waterfall-workflow.md implemented workflow

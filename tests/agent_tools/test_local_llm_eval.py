@@ -1,6 +1,7 @@
 """Tests for local LLM responsibility eval harness."""
 
 # @dependency-start
+# contract test
 # responsibility Tests local LLM single-file responsibility eval harness.
 # upstream implementation ../../tools/agent_tools/local_llm_eval.py runs configured eval cases
 # upstream design ../../evidence/agent-evals/local_llm_responsibility_eval.toml defines canonical eval cases

@@ -1,6 +1,7 @@
 # Workflow Guide
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Workflow Guide for this repository.
 upstream design ../TASK_WORKFLOWS.md workflow routing contract
 @dependency-end

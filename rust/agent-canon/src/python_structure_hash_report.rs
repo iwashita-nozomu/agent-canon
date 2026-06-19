@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Structures text output from python-structure-hash without dropping raw finding data.
 // upstream implementation python_structure_hash.rs emits PY_STRUCTURE_HASH_FINDING lines
 // downstream implementation main.rs exposes this parser through the AgentCanon Rust CLI

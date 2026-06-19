@@ -1,6 +1,7 @@
 """Tests for convention compliance wiring verifier."""
 
 # @dependency-start
+# contract test
 # responsibility Tests convention compliance verifier behavior.
 # upstream implementation ../../tools/agent_tools/check_convention_compliance.py verifier  # noqa: E501
 # upstream design ../../documents/conventions/README.md convention index

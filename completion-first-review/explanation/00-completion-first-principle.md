@@ -1,6 +1,7 @@
 # Completion-First Principle
 <!--
 @dependency-start
+contract reference
 responsibility Explains why completion judgment rules must precede agent settings and workflow changes.
 upstream design ../README.md completion-first review index
 upstream design ../../AGENTS.md AgentCanon repository instructions

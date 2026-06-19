@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Builds and validates dependency manifest graph semantics.
 # upstream design ../../documents/dependency-manifest-design.md dependency graph semantics
+# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./check_dependency_header_format.sh validates source manifests
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies graph behavior
 # @dependency-end
@@ -280,6 +282,7 @@ extract_edges() {
       "/*"|"*/"|"<!--"|"-->"|'"""'|"'''" ) continue ;;
     esac
     [[ "$stripped" == responsibility[[:space:]]* ]] && continue
+    [[ "$stripped" == contract[[:space:]]* ]] && continue
     read -r direction kind rel_path reason <<< "$stripped"
     [[ "$direction" == "upstream" || "$direction" == "downstream" ]] || continue
     target="$(normalize_path "$file" "$rel_path")"

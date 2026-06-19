@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents tool-finding-report for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design result-artifact-writeout.md raw result and summary artifact policy

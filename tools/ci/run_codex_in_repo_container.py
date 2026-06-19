@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Runs codex in repo container CI automation.
 # upstream design ../README.md shared automation index
 # @dependency-end

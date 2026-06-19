@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Fixes Mermaid fenced code blocks in Markdown documents.
 # upstream design ../README.md shared automation index
 # downstream implementation ../../tests/tools/test_fix_mermaid.py validates Mermaid rewrites.

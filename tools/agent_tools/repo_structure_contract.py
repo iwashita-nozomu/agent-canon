@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Compares observed repository trees with the AgentCanon structure contract.
 # upstream design ../../documents/repo-structure-contract.toml expected repository structure profiles
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root surface policy

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Records source basis for resilient test design skill and tool policy.
 upstream design README.md AgentCanon reference index
 downstream design ../documents/coding-conventions-testing.md translates testing guidance into repo policy

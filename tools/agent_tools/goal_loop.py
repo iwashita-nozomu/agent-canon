@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Runs goal.md-driven repository improvement loops to completion.
 # upstream design ../../goal.md top-level goal contract
 # upstream design ../../agents/workflows/adaptive-improvement-workflow.md loop rules  # noqa: E501

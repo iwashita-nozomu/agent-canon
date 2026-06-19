@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream environment devcontainer.json initializeCommand entrypoint

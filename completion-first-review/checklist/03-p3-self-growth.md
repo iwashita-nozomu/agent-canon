@@ -1,6 +1,7 @@
 # P3 Self-Growth Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Defines the self-growth checklist for completion-first AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/02-self-growth-state-machine.md self-growth state machine

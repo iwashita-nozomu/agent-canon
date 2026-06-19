@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Provides Canon-owned append-only hook event log paths and IDs.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive contract
 # upstream design ../../documents/runtime-log-archive.md hook result accumulation contract

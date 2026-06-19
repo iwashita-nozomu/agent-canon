@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Provides a slide-style overview of the project template repository.
 upstream design ../README.md repository overview
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface policy

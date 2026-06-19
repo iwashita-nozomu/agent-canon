@@ -1,6 +1,7 @@
 """Tests for workflow monitoring accumulation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests workflow monitor accumulation behavior.
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence

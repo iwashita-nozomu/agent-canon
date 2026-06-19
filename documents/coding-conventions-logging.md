@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents ログ/デバッグ出力の規約（共通） for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 downstream design ./result-log-retention-and-visualization.md defines retention and visualization

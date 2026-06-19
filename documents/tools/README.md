@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents ツール入口 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy

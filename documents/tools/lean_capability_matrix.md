@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Summarizes Lean/Mathlib/Aesop/Plausible/LeanSearch capabilities for AgentCanon proof workflows.
 upstream design README.md lists proof-tool documentation entrypoints.
 upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.

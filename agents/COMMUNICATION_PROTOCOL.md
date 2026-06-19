@@ -1,6 +1,7 @@
 # Agent Communication Protocol
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Agent Communication Protocol for this repository.
 upstream design README.md agent canon overview
 downstream design skills/agent-orchestration.md routes pre-edit investigation before path selection

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates AgentCanon responsibility scopes and their protecting tools.
 # upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
 # upstream design ../../documents/templates/responsibility-scope.template.toml starter manifest for template-derived repositories

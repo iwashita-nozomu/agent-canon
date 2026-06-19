@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests test smoke test research perspective pack behavior.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end

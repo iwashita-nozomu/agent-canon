@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the resolved regression where retired tools/legacy paths returned to AgentCanon main.
 upstream design ../README.md defines durable AgentCanon operational issue storage.
 upstream design ../../documents/repo-local-tool-imports.md retires tools/legacy provenance paths.
@@ -15,6 +16,7 @@ status: resolved
 source: reviewer
 severity: S1
 evidence: `python3 tools/agent_tools/tool_drift.py` reported `retired-legacy-tool:tool_catalog:tools/legacy:legacy-directory-present` on latest main after PR #72.
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/255
 affected_surfaces: tools/legacy/jax_solver_util/oop_check_support, documents/repo-local-tool-imports.md, tools/README.md, tools/agent_tools/tool_drift.py, .github/workflows/agent-canon-static-gates.yml
 edit_scope: tools/legacy/jax_solver_util/oop_check_support, issues/closed/AC-20260517-legacy-tool-directory-regression.md, documents/repo-local-tool-imports.md, tools/README.md, tools/agent_tools/tool_drift.py, .github/workflows/agent-canon-static-gates.yml, tools/ci/check_github_workflows.py, .github/PULL_REQUEST_TEMPLATE.md, agents/workflows/agent-canon-pr-workflow.md
 required_action: Remove the restored legacy provenance directory and keep OOP convention support represented by canonical `tools/oop/*` entrypoints.

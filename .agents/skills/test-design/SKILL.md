@@ -4,6 +4,7 @@ description: Use when code changes need resilient, adversarial static test desig
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Test Design for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

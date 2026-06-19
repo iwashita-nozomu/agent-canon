@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract data
 responsibility Documents Agent Philosophy for this repository.
 upstream design README.md memory surface index
 @dependency-end

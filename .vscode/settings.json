@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "contract reference",
     "responsibility Configures shared VS Code workspace defaults for AgentCanon and template roots.",
     "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
     "upstream design ../documents/github-first-module-and-devcontainer-policy.md VS Code and devcontainer boundary policy",

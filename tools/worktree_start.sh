@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Provides legacy worktree cleanup diagnostic repository automation.
 # upstream design README.md shared automation index
 # @dependency-end

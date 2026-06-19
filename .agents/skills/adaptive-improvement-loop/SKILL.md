@@ -4,6 +4,7 @@ description: Use when experiments, research, tuning, and iterative code improvem
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Adaptive Improvement Loop for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

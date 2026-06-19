@@ -1,6 +1,7 @@
 # AgentCanon Parent Repository Latest-State Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Documents latest-state checklist for parent repositories that vendor AgentCanon.
 upstream design ./agent-canon-subtree-migration.md submodule and legacy subtree update policy
 upstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy

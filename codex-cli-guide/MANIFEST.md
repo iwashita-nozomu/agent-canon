@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the split-file manifest, source ranges, and integrity checks for the Codex CLI guide.
 upstream design source/codex_cli_guide_config_deepdive.full.md preserved generated guide body with runtime hook flag normalization.
 @dependency-end

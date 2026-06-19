@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks helper-function-first edits before ownership or boundary evidence exists.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

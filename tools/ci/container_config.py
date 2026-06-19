@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Validates Dockerfile, runtime pack, and devcontainer configuration.
+# contract tool
+# responsibility Validates Dockerfile, runtime pack, devcontainer, and VS Code workspace configuration.
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
+# upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
+# upstream implementation ../agent_tools/surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
 # @dependency-end
-"""Validate Dockerfile, runtime pack, and devcontainer configuration."""
+"""Validate Dockerfile, runtime pack, devcontainer, and VS Code workspace configuration."""
 
 from __future__ import annotations
 
@@ -27,6 +30,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
+
+AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
+if str(AGENT_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENT_TOOLS_DIR))
+
+from surface_manifest import SurfaceEntry, SurfaceManifest, load_manifest, target_for_entry  # noqa: E402,I001
 
 REQUIRED_APT_PACKAGES = (
     "rsync",
@@ -603,12 +612,122 @@ def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig) -> list[F
     ]
 
 
+def has_vscode_contract(root: Path) -> bool:
+    """Return whether this root declares an AgentCanon VS Code surface."""
+    vscode_dir = root / ".vscode"
+    vendor_manifest = root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
+    return (
+        (root / "documents" / "shared-runtime-surfaces.toml").is_file()
+        or vendor_manifest.is_file()
+        or vscode_dir.exists()
+        or vscode_dir.is_symlink()
+    )
+
+
+def load_shared_surface_manifest(root: Path) -> tuple[SurfaceManifest | None, list[Finding]]:
+    """Load the shared runtime surface manifest through its canonical parser."""
+    try:
+        return load_manifest(root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml"), []
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        return None, [
+            Finding(
+                "invalid_manifest",
+                "documents/shared-runtime-surfaces.toml",
+                f"load-failed:{exc}",
+            )
+        ]
+
+
+def load_vscode_surface(root: Path) -> tuple[SurfaceEntry | None, SurfaceManifest | None, list[Finding]]:
+    """Load the .vscode entry from the shared runtime surface manifest."""
+    manifest, findings = load_shared_surface_manifest(root)
+    if manifest is None:
+        return None, None, findings
+    entry = next((candidate for candidate in manifest.entries if candidate.path == ".vscode"), None)
+    if entry is None:
+        return (
+            None,
+            manifest,
+            [
+                Finding(
+                    "dependency_contract_violation",
+                    "documents/shared-runtime-surfaces.toml",
+                    "missing-surface:.vscode",
+                )
+            ],
+        )
+    return entry, manifest, []
+
+
+def validate_vscode_manifest(entry: SurfaceEntry) -> list[Finding]:
+    """Validate the .vscode manifest entry keeps AgentCanon symlink ownership."""
+    findings: list[Finding] = []
+    expected = {
+        "mode": "symlink",
+        "owner": "agent-canon",
+        "surface_class": "runtime_surface",
+    }
+    actual = {
+        "mode": entry.mode,
+        "owner": entry.owner,
+        "surface_class": entry.surface_class,
+    }
+    for field, expected_value in expected.items():
+        if actual[field] != expected_value:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    "documents/shared-runtime-surfaces.toml",
+                    f".vscode-{field}-expected:{expected_value}",
+                )
+            )
+    return findings
+
+
+def validate_vscode(root: Path) -> list[Finding]:
+    """Validate shared VS Code workspace surface ownership."""
+    entry, manifest, findings = load_vscode_surface(root)
+    if entry is None or manifest is None:
+        return findings
+    findings.extend(validate_vscode_manifest(entry))
+    source_checkout = not (root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml").is_file()
+    source = entry.source_or_default()
+    source_relative = source if source_checkout else f"{manifest.prefix}/{source}"
+    source_dir = root / source_relative
+    if not source_dir.is_dir():
+        findings.append(Finding("missing_file", source_relative, "missing"))
+    if source_checkout:
+        return findings
+    vscode_dir = root / ".vscode"
+    expected_target = target_for_entry(root, manifest.prefix, entry)
+    if not vscode_dir.is_symlink():
+        findings.append(
+            Finding("inconsistency", ".vscode", f"expected-shared-view:{expected_target}")
+        )
+        return findings
+    target = vscode_dir.readlink()
+    target_path = target if target.is_absolute() else (vscode_dir.parent / target)
+    try:
+        target_matches = target_path.resolve(strict=True) == source_dir.resolve(strict=True)
+    except FileNotFoundError:
+        target_matches = False
+    if target.as_posix() != expected_target and not target_matches:
+        findings.append(
+            Finding(
+                "inconsistency",
+                ".vscode",
+                f"unexpected-shared-view-target:{target.as_posix()}",
+            )
+        )
+    return findings
+
 def validate(root: Path) -> ValidationReport:
     """Run all container configuration checks."""
     root = root.resolve()
     docker_dir = root / "docker"
     devcontainer_dir = root / ".devcontainer"
-    if not docker_dir.exists() and not devcontainer_dir.exists():
+    vscode_configured = has_vscode_contract(root)
+    if not docker_dir.exists() and not devcontainer_dir.exists() and not vscode_configured:
         return ValidationReport("skip", (), (), ())
 
     findings: list[Finding] = []
@@ -639,6 +758,9 @@ def validate(root: Path) -> ValidationReport:
         findings.extend(validate_devcontainer(root))
         if default_pack is not None:
             findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
+    if vscode_configured:
+        checked.append(".vscode")
+        findings.extend(validate_vscode(root))
 
     sorted_findings = tuple(
         sorted(findings, key=lambda finding: (finding.kind, finding.path, finding.detail))

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates local AgentCanon issue files and mirrors them to GitHub Issues.
 # upstream design ../../issues/README.md durable local issue convention
 # upstream design ../../documents/responsibility-scope-management.md local/GitHub issue sync policy

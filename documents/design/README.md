@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../dependency-manifest-design.md dependency evidence contract

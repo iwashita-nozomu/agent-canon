@@ -1,6 +1,7 @@
 """Tests for the short task routing helper."""
 
 # @dependency-start
+# contract test
 # responsibility Tests short task routing helper behavior.
 # upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 # upstream design ../../documents/tool-skill-routing-refactor.md defines naming policy

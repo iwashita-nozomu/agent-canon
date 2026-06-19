@@ -1,6 +1,7 @@
 """Tests for Codex project-local hook wiring."""
 
 # @dependency-start
+# contract test
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares active guardrail hooks

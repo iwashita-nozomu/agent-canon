@@ -4,6 +4,7 @@ description: Use when designing, implementing, reviewing, or diagnosing numerica
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Computational Optimization for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/computational-optimization.md human-facing skill contract

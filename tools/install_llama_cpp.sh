@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Builds and exposes llama.cpp for AgentCanon local LLM tools.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/local-llm-responsibility-analysis.md local LLM single-file policy.

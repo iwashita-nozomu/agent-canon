@@ -1,6 +1,7 @@
 """Tests for runtime profile inventory drift checks."""
 
 # @dependency-start
+# contract test
 # responsibility Tests runtime profile inventory drift detection.
 # upstream implementation ../../tools/agent_tools/check_runtime_profile_inventory.py checks runtime profile inventory drift
 # upstream implementation ../../tools/docs/render_runtime_profile_inventory.py renders runtime profile doc from inventory

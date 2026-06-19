@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract

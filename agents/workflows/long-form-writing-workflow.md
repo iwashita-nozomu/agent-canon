@@ -1,6 +1,7 @@
 # 一般説明 Prose Projection Workflow
 <!--
 @dependency-start
+contract workflow
 responsibility Documents general explanatory prose projection workflow for this repository.
 upstream design README.md workflow catalog
 @dependency-end

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines checklist and manifest format for skill, prompt, and workflow behavior evals.
 upstream design ../agents/canonical/skills.md defines skill registry.
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md defines subagent routing.

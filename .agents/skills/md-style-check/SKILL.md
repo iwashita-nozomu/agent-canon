@@ -5,6 +5,7 @@ description: Use when Markdown files changed, docs formatter/fixer output must b
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Markdown Style Check for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end

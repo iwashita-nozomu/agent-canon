@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Builds local-browser access commands for remote HTML artifacts.
 # upstream design ../../documents/result-log-retention-and-visualization.md defines visual artifact retention.
 # upstream design ../../documents/experiment-report-style.md defines experiment report artifact layout.

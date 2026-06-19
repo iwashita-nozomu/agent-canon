@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "contract configuration",
     "responsibility Configures Codex hook entrypoints for repo guardrails.",
     "upstream implementation config.toml enables project-local Codex hooks",
     "upstream design README.md documents hook wiring and optional MCP checks",

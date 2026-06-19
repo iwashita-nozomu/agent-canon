@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract

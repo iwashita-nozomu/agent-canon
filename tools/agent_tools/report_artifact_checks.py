@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides report artifact checks agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy

@@ -1,6 +1,7 @@
 """Tests for local issue and GitHub sync planning."""
 
 # @dependency-start
+# contract test
 # responsibility Tests local issue validation and sync planning.
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates issue files
 # upstream design ../../issues/README.md durable issue convention

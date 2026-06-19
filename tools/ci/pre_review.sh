@@ -1,5 +1,6 @@
 #!/bin/bash
 # @dependency-start
+# contract tool
 # responsibility Provides pre review CI automation.
 # upstream design ../README.md shared automation index
 # @dependency-end

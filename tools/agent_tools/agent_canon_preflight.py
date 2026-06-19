@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides agent canon preflight agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines task-entry freshness routing

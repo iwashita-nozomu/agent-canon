@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Checks dependency headers agent workflow state.
+# contract tool
+# responsibility Checks changed-file dependency headers and registered contract kind metadata.
 # upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
 # downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
 # @dependency-end
@@ -11,6 +13,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 from pathlib import Path
 
@@ -37,6 +40,9 @@ SKIP_PREFIXES = (
 )
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096
+CONTRACT_REGISTRY = Path("documents/dependency-contract-kinds.toml")
+CONTRACT_LINE_RE = re.compile(r"^contract\s+(?P<kind>[a-z0-9][a-z0-9-]*)$")
+TOML_STRING_RE = re.compile(r'"(?P<value>[a-z0-9][a-z0-9-]*)"')
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -130,6 +136,105 @@ def has_dependency_header(path: Path) -> bool:
     return has_dependency_manifest(path)
 
 
+def strip_manifest_line(line: str) -> str:
+    """Return a dependency manifest line without common comment wrappers."""
+    stripped = line.rstrip("\r").strip()
+    for prefix in ("# ", "#", "// ", "//", "* ", "*"):
+        if stripped.startswith(prefix):
+            stripped = stripped.removeprefix(prefix).strip()
+            break
+    if stripped.endswith(","):
+        stripped = stripped[:-1].strip()
+    if len(stripped) >= 2 and stripped.startswith('"') and stripped.endswith('"'):
+        stripped = stripped[1:-1].strip()
+    return stripped
+
+
+def manifest_lines(path: Path) -> list[str]:
+    """Return normalized manifest lines from the first dependency block."""
+    lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
+    inside = False
+    manifest: list[str] = []
+    for line in lines:
+        stripped = strip_manifest_line(line)
+        if stripped == "@dependency-start":
+            inside = True
+            continue
+        if stripped == "@dependency-end":
+            break
+        if inside:
+            manifest.append(stripped)
+    return manifest
+
+
+def registry_candidates(root: Path) -> tuple[Path, ...]:
+    """Return registry candidates for standalone and vendored AgentCanon roots."""
+    script_root = Path(__file__).resolve().parents[2]
+    return (
+        root / CONTRACT_REGISTRY,
+        root / "vendor" / "agent-canon" / CONTRACT_REGISTRY,
+        script_root / CONTRACT_REGISTRY,
+    )
+
+
+def contract_registry_path(root: Path) -> Path:
+    """Return the dependency contract kind registry path."""
+    for candidate in registry_candidates(root):
+        if candidate.is_file():
+            return candidate
+    return root / CONTRACT_REGISTRY
+
+
+def allowed_contract_kinds(root: Path) -> set[str]:
+    """Return registered dependency header contract kinds."""
+    registry = contract_registry_path(root)
+    try:
+        text = registry.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    kinds: set[str] = set()
+    in_allowed = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("allowed_kinds"):
+            in_allowed = True
+            continue
+        if not in_allowed:
+            continue
+        if line.startswith("]"):
+            break
+        kinds.update(match.group("value") for match in TOML_STRING_RE.finditer(line))
+    return kinds
+
+
+def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> list[str]:
+    """Return contract-kind findings for one manifest-bearing file."""
+    relative = repo_relative(root, path)
+    contract_lines = [
+        line for line in manifest_lines(path) if line.startswith("contract ")
+    ]
+    if len(contract_lines) != 1:
+        return [
+            f"{relative}: dependency manifest must contain exactly one contract line; "
+            f"fix: add 'contract <registered-kind>' after @dependency-start and choose the kind "
+            f"from {contract_registry_path(root).as_posix()}"
+        ]
+    match = CONTRACT_LINE_RE.fullmatch(contract_lines[0])
+    if match is None:
+        return [
+            f"{relative}: contract line must be: contract <registered-kind>; "
+            f"fix: use lowercase kebab-case from {contract_registry_path(root).as_posix()}"
+        ]
+    contract_kind = match.group("kind")
+    if contract_kind not in allowed_kinds:
+        return [
+            f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
+            f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
+            "or update the registry with review"
+        ]
+    return []
+
+
 def main() -> int:
     """Run dependency header validation."""
     args = build_parser().parse_args()
@@ -140,6 +245,15 @@ def main() -> int:
         else [Path(path) for path in args.paths]
     )
     findings: list[str] = []
+    allowed_kinds = allowed_contract_kinds(root)
+    if not allowed_kinds:
+        print("DEPENDENCY_HEADERS=fail")
+        print(
+            f"- missing dependency contract kind registry: "
+            f"{contract_registry_path(root).as_posix()}; "
+            "fix: restore documents/dependency-contract-kinds.toml"
+        )
+        return 1
 
     for path in paths:
         resolved = path if path.is_absolute() else root / path
@@ -149,6 +263,8 @@ def main() -> int:
             findings.append(
                 f"{repo_relative(root, resolved)}: missing top dependency manifest block"
             )
+            continue
+        findings.extend(contract_kind_findings(root, resolved, allowed_kinds))
 
     if findings:
         print("DEPENDENCY_HEADERS=fail")

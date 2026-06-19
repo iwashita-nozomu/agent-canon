@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon update TODO state routing for parent repositories.
 # upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update TODO workflow
 # upstream design ../../documents/agent-canon-update-tasks.toml shared update TODO manifest

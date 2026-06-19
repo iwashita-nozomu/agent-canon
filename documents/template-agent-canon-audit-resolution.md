@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Records resolution policy for the 2026-05-16 Template / AgentCanon 500 item audit.
 upstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy

@@ -1,7 +1,9 @@
 """Tests for dependency header validation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests changed-file dependency header detection.
+# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
 # @dependency-end
 
@@ -31,6 +33,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                         "",
                         "<!--",
                         "@dependency-start",
+                        "contract design",
                         "responsibility Documents a markdown file under test.",
                         "upstream design README.md repo overview",
                         "@dependency-end",
@@ -66,6 +69,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                         "---",
                         "<!--",
                         "@dependency-start",
+                        "contract skill",
                         "responsibility Documents a skill under test.",
                         "upstream design README.md repo overview",
                         "@dependency-end",
@@ -86,6 +90,75 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+    def test_rejects_missing_contract_kind(self) -> None:
+        """Manifest-bearing files declare exactly one registered contract kind."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            doc = Path(tmp_dir) / "doc.md"
+            doc.write_text(
+                "\n".join(
+                    [
+                        "# Doc",
+                        "",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Documents a markdown file under test.",
+                        "upstream design README.md repo overview",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(doc)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("exactly one contract line", result.stdout)
+            self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
+            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
+
+    def test_rejects_unregistered_contract_kind(self) -> None:
+        """Contract kinds come from the registry rather than per-file invention."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            doc = Path(tmp_dir) / "doc.md"
+            doc.write_text(
+                "\n".join(
+                    [
+                        "# Doc",
+                        "",
+                        "<!--",
+                        "@dependency-start",
+                        "contract invented-kind",
+                        "responsibility Documents a markdown file under test.",
+                        "upstream design README.md repo overview",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(doc)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unregistered dependency contract kind", result.stdout)
+            self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
+            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_missing_dependency_manifest(self) -> None:
         """Checkable text files must declare dependency manifest markers near the top."""

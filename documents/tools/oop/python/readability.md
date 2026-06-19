@@ -1,6 +1,7 @@
 # Python OOP Readability
 <!--
 @dependency-start
+contract reference
 responsibility Documents Python OOP readability checker behavior in Japanese.
 upstream implementation ../../../../tools/oop/python/readability.py Python OOP readability checker
 upstream implementation ../../../../tools/oop/shared/readability_core.py shared readability heuristics

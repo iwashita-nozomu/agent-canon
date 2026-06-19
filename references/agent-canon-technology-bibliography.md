@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Catalogs external technical references for AgentCanon implementation and runtime surfaces.
 upstream design README.md reference capture and source-record requirements.
 upstream design ../agents/workflows/workflow-references.md workflow-level bibliography index.

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract data
 # responsibility Defines deterministic evals for skill and workflow prompt drift.
 # upstream design README.md prompt eval directory contract
 # upstream design ../../agents/skills/adaptive-improvement-loop.md adaptive improvement skill contract

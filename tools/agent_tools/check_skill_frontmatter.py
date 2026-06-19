@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates runtime skill frontmatter for Codex skill loading.
 # upstream design ../../agents/canonical/skills.md skill runtime registry contract
 # upstream design ../../agents/skills/README.md human-facing skill index

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Runs dedicated secret scanners against current tree and git history.
 # upstream design ../../CONTAINER_OPERATIONS.md shared devcontainer security tooling policy
 # downstream environment ../../.devcontainer/post-create.sh installs scanner commands

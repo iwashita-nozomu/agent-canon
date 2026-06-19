@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy

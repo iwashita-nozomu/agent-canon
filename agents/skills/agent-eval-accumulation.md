@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents accumulated AgentCanon eval evidence repair and validation.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../evidence/agent-evals/README.md accumulated eval family contract

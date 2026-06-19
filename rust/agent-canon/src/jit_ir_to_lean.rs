@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Lowers JIT-canonical operational IR JSON into Lean evidence definitions.
 // upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py emits StableHLO-derived thin IR.
 // upstream design ../../../documents/tools/jit_ir_to_lean.md defines the JSON-to-Lean evidence boundary.

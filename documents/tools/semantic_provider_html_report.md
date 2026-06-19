@@ -1,6 +1,7 @@
 # semantic_provider_html_report.py
 <!--
 @dependency-start
+contract reference
 responsibility Documents the semantic provider HTML report renderer.
 upstream design ../semantic_index.md defines semantic provider comparison and candidate authority boundaries
 upstream design ../../agents/skills/html-experiment-report.md defines HTML experiment report workflow

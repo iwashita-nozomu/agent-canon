@@ -1,6 +1,7 @@
 """Tests for Codex runtime summary export."""
 
 # @dependency-start
+# contract test
 # responsibility Tests Codex runtime summary export into the AgentCanon log archive.
 # upstream implementation ../../tools/agent_tools/export_codex_runtime_summary.py exports bounded Codex runtime summaries
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves codex-runtime archive paths

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Runs configurable local LLM single-file responsibility evals.
 # upstream design ../../evidence/agent-evals/README.md eval directory contract
 # upstream design ../../documents/runtime-log-archive.md eval result archive contract

@@ -1,6 +1,7 @@
 """Tests for dependency-free vector search."""
 
 # @dependency-start
+# contract test
 # responsibility Tests vector search indexing exclusions and context expansion.
 # upstream implementation ../../tools/agent_tools/vector_search.py searches text surfaces
 # upstream design ../../tools/README.md documents vector search usage

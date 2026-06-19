@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the operational finding that PR mutation authority needs visible Copilot evidence.
 upstream design ../README.md defines durable AgentCanon issue conventions.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority policy.
@@ -17,6 +18,7 @@ status: resolved
 source: user
 severity: S1
 evidence: agents/workflows/agent-canon-pr-workflow.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/249
 affected_surfaces: ROOT_AGENTS.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, tools/agent_tools/goal_loop.py, tools/ci/check_github_workflows.py
 edit_scope: .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, agents/workflows/goal-plan-implementation-loop.md, tools/README.md, tools/agent_tools/goal_loop.py, tests/agent_tools/test_goal_loop.py, tools/ci/check_github_workflows.py
 required_action: Define goal-level PR mutation authority and require GitHub-hosted Copilot / PR automation to publish machine-readable PR-visible output before readiness or merge actions.

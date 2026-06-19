@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Runs best-effort unattended runtime log archive sync at Stop.
 # upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py owns archive sync, report copy, commit, and push behavior
 # upstream implementation ./hook_dispatcher.py invokes this hook from Stop

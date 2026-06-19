@@ -1,6 +1,7 @@
 """Tests for the hardcoded numeric literal checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests hardcoded numeric literal checker behavior.
 # upstream implementation ../../tools/agent_tools/check_hardcoded_numbers.py checker
 # upstream design ../../documents/conventions/common/01_principles.md magic-number policy

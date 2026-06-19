@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Rebuilds local compiled AgentCanon tools after AgentCanon source updates.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/rust-agent-tool-migration.md Rust CLI migration and rebuild policy.

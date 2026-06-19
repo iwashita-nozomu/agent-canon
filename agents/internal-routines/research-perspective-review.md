@@ -1,6 +1,7 @@
 # research-perspective-review
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents research-perspective-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

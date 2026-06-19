@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Prints sequential Rust migration candidates for AgentCanon tools.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../documents/runtime-log-archive.md hook and skill usage log archive policy

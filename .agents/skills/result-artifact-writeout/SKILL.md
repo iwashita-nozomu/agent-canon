@@ -4,6 +4,7 @@ description: Use when writing, exporting, saving, accumulating, or reporting too
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Result Artifact Writeout for this repository.
 upstream design ../../../agents/skills/result-artifact-writeout.md documents the human-facing skill
 upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md defines run-local and durable artifact placement

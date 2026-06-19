@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract

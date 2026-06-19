@@ -5,6 +5,7 @@ description: Use when rendering JIT-canonical IR records, generated Lean evidenc
 
 <!--
 @dependency-start
+contract skill
 responsibility Exposes JIT-canonical algorithm Mermaid flowcharts to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/algorithm-flowchart.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.

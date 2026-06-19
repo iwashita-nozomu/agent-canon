@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the workflow defect where run-bundle findings were not promoted into durable AgentCanon issue or memory surfaces.
 upstream design ../README.md defines AgentCanon operational issue conventions
 upstream design ../../agents/workflows/agent-learning-workflow.md defines durable learning capture
@@ -16,6 +17,7 @@ status: resolved
 source: user
 severity: S0
 evidence: reports/agents/20260513-071352-fix-duplicated-agentcanon-freshness-skil/
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/247
 affected_surfaces: ROOT_AGENTS.md, issues/README.md, agents/canonical/CODEX_WORKFLOW.md, agents/workflows/agent-learning-workflow.md, agents/workflows/agent-canon-pr-workflow.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, documents/dependency-manifest-design.md
 edit_scope: reports/agents/20260513-093806-detail-agentcanon-pr-template-workflow-a/dependency_edit_scope.txt
 required_action: Make AgentCanon workflow and PR gates require durable operational finding capture instead of leaving defects only in run bundles.

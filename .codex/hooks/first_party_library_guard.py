@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks first-party library and public API edits without task authority.
 # upstream implementation ../../tools/agent_tools/task_authority.py defines first-party library authority matching.
 # upstream design ../../responsibility-scope.toml defines reusable first-party surfaces.

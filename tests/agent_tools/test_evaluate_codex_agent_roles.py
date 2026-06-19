@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests Codex agent role eval automation.
 # upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py helper
 # upstream design ../../evidence/agent-evals/README.md role eval contract

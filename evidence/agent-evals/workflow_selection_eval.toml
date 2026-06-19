@@ -1,4 +1,5 @@
 # @dependency-start
+# contract data
 # responsibility Defines deterministic prompt-to-workflow routing eval cases.
 # upstream design README.md workflow selection eval contract
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py owns prompt-intake workflow classification

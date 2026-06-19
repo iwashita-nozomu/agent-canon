@@ -1,6 +1,7 @@
 """Tests for coordinated search index generation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests repo-local search-card index generation and local LLM preflight behavior.
 # upstream implementation ../../tools/agent_tools/search_index.py builds local LLM semantic cards
 # upstream design ../../documents/search-coordination.md coordinated search provider contract

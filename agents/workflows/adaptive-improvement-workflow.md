@@ -1,6 +1,7 @@
 # 反復改善ワークフロー
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 反復改善ワークフロー for this repository.
 upstream design README.md workflow catalog
 @dependency-end

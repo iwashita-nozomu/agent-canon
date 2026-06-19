@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract reference
 responsibility Documents AgentCanon internal vendor ownership policy.
 upstream design ../README.md AgentCanon source tree overview
 downstream design skills/README.md third-party skill vendor contract

@@ -1,6 +1,7 @@
 """Tests for design-document claim evidence checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests design-document claim evidence checker behavior.
 # upstream design ../../documents/design/README.md design-document evidence policy
 # upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims

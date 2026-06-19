@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Parses and validates AgentCanon shared runtime surface ownership.
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/shared-runtime-surfaces.toml machine-readable surface manifest

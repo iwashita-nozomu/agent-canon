@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Generates AgentCanon improvement guidance on PRs, branch pushes, and manual dispatch.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
 # upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py builds the guide

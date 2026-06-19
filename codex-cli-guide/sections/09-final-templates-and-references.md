@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Houses the split guide section: 最終追加テンプレート集と参考文献.
 upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end

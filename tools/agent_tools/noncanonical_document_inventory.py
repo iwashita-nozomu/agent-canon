@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Forwards the legacy non-canonical document inventory CLI to the Rust structured-analysis implementation.
 # upstream design ../../agents/skills/document-canon-cleanup.md document cleanup workflow
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest model

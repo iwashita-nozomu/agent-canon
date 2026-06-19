@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Fixes markdown math notation to repository-standard dollar delimiters.
 # upstream design ../README.md shared automation index
 # upstream implementation ./check_markdown_math.py defines math notation policy.

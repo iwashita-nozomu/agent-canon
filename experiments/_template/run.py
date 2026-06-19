@@ -1,4 +1,5 @@
 # @dependency-start
+# contract reference
 # responsibility Provides the template managed experiment entrypoint.
 # upstream design ../../documents/experiment-registry.md defines managed experiment command protocol.
 # upstream implementation ../../tools/experiments/create_experiment_topic.py copies this entrypoint into project topics.

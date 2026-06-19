@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests GitHub workflow convention checker behavior.
 # upstream implementation ../../tools/ci/check_github_workflows.py convention checker
 # @dependency-end

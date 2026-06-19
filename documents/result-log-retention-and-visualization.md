@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines retention and visualization rules for result logs and reports.
 upstream design coding-conventions-logging.md defines JSONL logging conventions
 downstream design experiment-report-style.md defines human-readable experiment reports

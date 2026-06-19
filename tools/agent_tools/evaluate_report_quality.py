@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Evaluates report-writing quality checklist surfaces.
 # upstream design ../../evidence/agent-evals/README.md eval usage contract
 # upstream design ../../evidence/agent-evals/report_quality_eval.toml report quality eval manifest

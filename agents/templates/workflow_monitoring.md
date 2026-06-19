@@ -1,6 +1,7 @@
 # Workflow Monitoring
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Workflow Monitoring for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
 upstream design ../workflows/agent-learning-workflow.md defines feedback and self-improvement capture

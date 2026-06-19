@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Defines Python structural duplicate analysis and module-group dependency semantics.
 upstream design ../rust-agent-tool-migration.md Rust tool migration policy for native agent tools.
 upstream design ../dependency-manifest-design.md repository dependency graph principles.

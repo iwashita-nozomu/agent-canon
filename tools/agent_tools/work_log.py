@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides run-local work log automation.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md run bundle artifact placement contract

@@ -1,6 +1,7 @@
 # Benchmark Levels Analysis
 <!--
 @dependency-start
+contract reference
 responsibility Documents Benchmark Levels Analysis for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

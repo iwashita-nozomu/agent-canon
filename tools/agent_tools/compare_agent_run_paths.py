@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Compares two agent run paths and flags inefficient route selection.
 # upstream design ../../agents/workflows/adaptive-improvement-workflow.md rerun comparison  # noqa: E501
 # upstream design ../../agents/templates/workflow_monitoring.md records path events

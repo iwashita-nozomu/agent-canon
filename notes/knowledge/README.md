@@ -1,6 +1,7 @@
 # Knowledge Notes
 <!--
 @dependency-start
+contract reference
 responsibility Documents Knowledge Notes for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end

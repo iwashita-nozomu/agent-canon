@@ -1,4 +1,5 @@
 # @dependency-start
+# contract data
 # responsibility Defines local LLM single-file responsibility eval cases.
 # upstream design README.md eval directory contract
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file local LLM scope policy

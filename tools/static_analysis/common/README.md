@@ -1,6 +1,7 @@
 # Common Static Analysis
 <!--
 @dependency-start
+contract tool
 responsibility Documents cross-language static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
 upstream design ../../../documents/dependency-manifest-design.md dependency manifest policy

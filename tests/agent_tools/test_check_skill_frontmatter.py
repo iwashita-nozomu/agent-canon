@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests runtime skill frontmatter validation.
 # upstream implementation ../../tools/agent_tools/check_skill_frontmatter.py validates SKILL.md frontmatter
 # upstream design ../../agents/canonical/skills.md skill runtime registry contract

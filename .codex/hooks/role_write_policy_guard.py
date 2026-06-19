@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Enforces active role write policy against current repository changes.
 # upstream implementation ../../tools/agent_tools/task_authority.py locates request-local authority.
 # upstream implementation ../../tools/agent_tools/agent_team.py validates role write scope.

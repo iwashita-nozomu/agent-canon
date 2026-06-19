@@ -4,6 +4,7 @@ description: Mandatory routing skill for repository tasks. Use before selecting 
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Orchestration for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/workflows/hypothesis-validation-workflow.md analysis-prioritized overlay routing

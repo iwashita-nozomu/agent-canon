@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides evaluate agent run agent workflow automation.
 # upstream design ../../agents/workflows/agent-learning-workflow.md behavior feedback
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation artifact shape

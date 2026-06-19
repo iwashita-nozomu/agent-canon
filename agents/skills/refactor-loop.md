@@ -1,6 +1,7 @@
 # refactor-loop
 <!--
 @dependency-start
+contract skill
 responsibility Documents refactor-loop for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable refactor structure contract

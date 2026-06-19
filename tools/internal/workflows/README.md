@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Defines the target area for workflow-owned AgentCanon helper tools.
 upstream design ../../catalog.yaml structured tool audience and placement catalog
 upstream design ../README.md internal tool placement policy

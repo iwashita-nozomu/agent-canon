@@ -4,6 +4,7 @@ description: Use when updating AgentCanon itself, refreshing a vendored vendor/a
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents AgentCanon Update for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/agent-canon-update.md human-facing skill canon

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Agent Task Workflows for this repository.
 upstream design README.md agent canon overview.
 upstream design ../documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.

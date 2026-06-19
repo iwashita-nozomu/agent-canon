@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides create experiment topic experiment workflow tooling.
 # upstream design ../README.md shared automation index
 # @dependency-end

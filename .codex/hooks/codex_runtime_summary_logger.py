@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Runs a non-blocking Codex runtime summary export at hook boundaries.
 # upstream implementation ../../tools/agent_tools/export_codex_runtime_summary.py exports bounded runtime summaries
 # upstream implementation ./hook_dispatcher.py invokes this hook from Stop

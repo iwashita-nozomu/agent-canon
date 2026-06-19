@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Summarizes subagent revision evidence from generated run-bundle artifacts.
 # upstream design ../../agents/skills/agent-log-analysis.md requires compact summaries before log analysis
 # upstream design ../../agents/skills/result-artifact-writeout.md defines raw and summary artifact writeout

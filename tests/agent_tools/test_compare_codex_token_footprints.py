@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests Codex token footprint comparison behavior.
 # upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py token comparer
 # upstream design ../../agents/workflows/token-efficient-codex-workflow.md token protocol

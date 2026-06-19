@@ -1,6 +1,7 @@
 # tools
 <!--
 @dependency-start
+contract tool
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
 upstream design ../documents/prose-reasoning-graph/dsl-spec.md shared graph visualization projection and adapter contract
@@ -871,7 +872,7 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 
 - `scan_code_dependencies.sh` extracts code dependency edges from imports, local includes, and shell `source` statements. This is not a dependency header tool.
 - `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
-- `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
+- `check_dependency_header_format.sh` validates manifest syntax, relative paths, dependency kinds, registered contract kinds, and target existence.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
 - `check_dependency_graph.sh --cycle-report-only` reports existing cycle debt without failing; pair it with `--graph-tsv` and a rendered graph report.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the Prose Reasoning Graph canon document set.
 upstream design ../README.md AgentCanon document index
 upstream design ../structured-analysis/README.md structured analysis package boundary

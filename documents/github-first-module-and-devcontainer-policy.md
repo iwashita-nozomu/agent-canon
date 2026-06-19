@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
 downstream design ./coding-conventions-project.md project environment rules

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy

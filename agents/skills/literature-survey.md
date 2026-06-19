@@ -1,6 +1,7 @@
 # literature-survey
 <!--
 @dependency-start
+contract skill
 responsibility Documents literature-survey for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design prose-reasoning-graph.md prose graph claim and evidence handoff overlay

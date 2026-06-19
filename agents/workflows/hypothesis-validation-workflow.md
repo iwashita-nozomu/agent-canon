@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents analysis-first hypothesis validation workflow before edits.
 upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract

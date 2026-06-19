@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests PDF/HTML reference materialization into Markdown.
 # upstream implementation ../../tools/agent_tools/reference_materializer.py converts external references
 # upstream design ../../references/README.md defines reference capture policy

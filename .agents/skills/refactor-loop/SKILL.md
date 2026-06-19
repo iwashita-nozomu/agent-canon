@@ -4,6 +4,7 @@ description: Use when a large refactor should run as a behavior-preserving refac
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Refactor Loop for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable refactor structure contracts

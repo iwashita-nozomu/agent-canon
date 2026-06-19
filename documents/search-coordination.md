@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines coordinated AgentCanon search across exact text, local LLM semantic cards, tool catalog, dependency headers, and code facts.
 upstream design ../tools/README.md shared tool command surface
 upstream design tools/README.md operator-facing tool guide

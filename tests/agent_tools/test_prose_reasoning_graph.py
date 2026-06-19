@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests prose reasoning graph CLI behavior.
 # upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py graph CLI
 # upstream design ../../documents/prose-reasoning-graph/dsl-spec.md graph DSL contract

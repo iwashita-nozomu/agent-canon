@@ -1,6 +1,7 @@
 # oop-readability-check
 <!--
 @dependency-start
+contract skill
 responsibility Documents oop-readability-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream implementation ../../tools/oop/python/readability.py OOP readability CLI

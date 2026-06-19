@@ -4,6 +4,7 @@ description: Use when drafting or revising reader-facing reports, decision brief
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Report Writing runtime skill for this repository.
 upstream design ../../../agents/skills/report-writing.md documents the human-facing report-writing workflow
 upstream design ../../../agents/skills/structure-planning.md defines report structure contracts

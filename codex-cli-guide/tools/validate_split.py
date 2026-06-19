@@ -1,4 +1,5 @@
 # @dependency-start
+# contract reference
 # responsibility Validates that the split Codex CLI Markdown sections reconstruct the preserved full source body.
 # upstream design ../source/codex_cli_guide_config_deepdive.full.md complete source body.
 # downstream design ../MANIFEST.md records expected split ranges and hashes.

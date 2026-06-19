@@ -1,6 +1,7 @@
 # agent-canon
 <!--
 @dependency-start
+contract reference
 responsibility Documents agent-canon for this repository.
 upstream design PHILOSOPHY.md AgentCanon design-time philosophy.
 upstream design AGENTS.md shared canon runtime contract

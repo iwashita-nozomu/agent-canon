@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Keeps legacy PreToolUse guard invocations non-blocking.
 # upstream design ../../documents/codex-configuration-reference.md documents hook policy
 # upstream implementation ../hooks.json no longer wires this hook for new sessions

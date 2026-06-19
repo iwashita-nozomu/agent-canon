@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests algorithm config partition checker behavior.
 # upstream implementation ../../tools/agent_tools/check_algorithm_config_partition.py checker
 # upstream design ../../documents/design/jax_util/algorithm_module_contract.md config contract

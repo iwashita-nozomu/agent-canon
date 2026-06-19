@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the tool proof coverage checker.
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog.
 upstream design lean_capability_matrix.md Lean capability routing policy.

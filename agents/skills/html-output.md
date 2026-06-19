@@ -1,6 +1,7 @@
 # html-output
 <!--
 @dependency-start
+contract skill
 responsibility Documents browser-readable HTML output, preview, and publication workflow.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

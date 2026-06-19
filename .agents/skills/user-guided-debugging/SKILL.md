@@ -4,6 +4,7 @@ description: Use when the user explicitly asks to debug or repair one issue at a
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents User-Guided Debugging for this repository.
 upstream design ../../../agents/skills/user-guided-debugging.md human-facing skill canon
 upstream design ../../../agents/canonical/skills.md skill canon registry

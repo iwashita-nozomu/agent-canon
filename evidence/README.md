@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract data
 responsibility Documents evidence/ for this repository.
 upstream design ../README.md shared canon overview
 upstream design ../responsibility-scope.toml evidence responsibility scope map

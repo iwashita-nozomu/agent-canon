@@ -1,7 +1,9 @@
 """Tests for dependency manifest shell tools."""
 
 # @dependency-start
+# contract test
 # responsibility Tests dependency manifest shell tool behavior.
+# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/dependency-manifest-design.md manifest design
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
@@ -96,6 +98,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     [
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Exercises large-file dependency header scanning.",
                         "upstream design README.md repo overview",
                         "@dependency-end",
@@ -143,6 +146,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target fixture for stable review.",
                         "downstream design source.md source consumes target",
                         "@dependency-end",
@@ -158,6 +162,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source fixture for stable review.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -216,6 +221,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines cwd-root dependency fixture.",
                         "upstream design README.md readme context",
                         "@dependency-end",
@@ -231,6 +237,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Readme",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines readme fixture.",
                         "downstream design target.md target fixture",
                         "@dependency-end",
@@ -287,6 +294,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Feature",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Documents feature fixture.",
                         "downstream implementation ../../tools/feature_runner.py runner",
                         "@dependency-end",
@@ -309,6 +317,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Implements feature fixture.",
                         "# upstream design ../documents/design/feature.md feature design",
                         "# @dependency-end",
@@ -369,6 +378,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Readme",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines fixture readme.",
                         "downstream design documents/design/legacy.md legacy design",
                         "@dependency-end",
@@ -384,6 +394,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Legacy",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Documents legacy design fixture.",
                         "upstream design ../../README.md readme context",
                         "@dependency-end",
@@ -428,6 +439,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Feature",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Documents feature fixture.",
                         "downstream implementation ../../tools/feature_runner.py runner",
                         "@dependency-end",
@@ -450,6 +462,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Implements feature fixture.",
                         "# upstream design ../documents/design/feature.md feature design",
                         "# @dependency-end",
@@ -717,6 +730,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises a valid line-comment manifest.",
                         "# upstream implementation target.py target contract",
                         "# @dependency-end",
@@ -745,6 +759,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Exercises H1 before manifest parsing.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -773,6 +788,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Exercises coverage-rule metadata in dependency manifests.",
                         "upstream design README.md readme context",
                         "coverage graph_trace requires node record|edge record",
@@ -788,6 +804,116 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_accepts_registered_contract_kind(self) -> None:
+        """Format validation accepts registry-backed manifest metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "source.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "contract design",
+                        "responsibility Exercises registered contract kind metadata.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                str(source),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_rejects_missing_contract_kind(self) -> None:
+        """Format validation rejects manifests without contract metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "source.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises missing contract kind metadata.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                str(source),
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("exactly one contract line", result.stdout)
+            self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
+            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
+
+    def test_format_rejects_unregistered_contract_kind(self) -> None:
+        """Format validation keeps contract kinds in the registry."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "source.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "contract invented-kind",
+                        "responsibility Exercises unregistered contract kind metadata.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                str(source),
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unregistered contract kind", result.stdout)
+            self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
+            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_accepts_skill_frontmatter_before_html_manifest(self) -> None:
         """YAML frontmatter may precede an HTML-comment dependency manifest."""
@@ -805,6 +931,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "---",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Exercises skill frontmatter manifest parsing.",
                         "upstream design README.md readme context",
                         "@dependency-end",
@@ -833,6 +960,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     [
                         "#!/usr/bin/env bash",
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises shell manifest parsing.",
                         "# upstream design target.md target context",
                         "# @dependency-end",
@@ -846,6 +974,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises TOML manifest parsing.",
                         "# upstream design target.md target context",
                         "# @dependency-end",
@@ -897,6 +1026,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "---",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Exercises explicit frontmatter allowance.",
                         "upstream design README.md readme context",
                         "@dependency-end",
@@ -1003,6 +1133,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Root Agents",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines the vendor source for root agent instructions.",
                         "upstream design README.md readme context",
                         "@dependency-end",
@@ -1053,6 +1184,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 [
                     "<!--",
                     "@dependency-start",
+                    "contract test",
                     "responsibility Defines a template AgentCanon PR checklist copy.",
                     "upstream design ../../issues/README.md durable issue storage",
                     "@dependency-end",
@@ -1109,6 +1241,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises focused dependency graph listing.",
                         "# upstream design design.md source design",
                         "# @dependency-end",
@@ -1121,6 +1254,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Tests focused dependency graph listing.",
                         "# upstream implementation ../source.py source behavior",
                         "# @dependency-end",
@@ -1170,6 +1304,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises TSV dependency graph output.",
                         "# upstream design design.md source design",
                         "# @dependency-end",
@@ -1182,6 +1317,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Tests TSV dependency graph output.",
                         "# upstream implementation ../source.py source behavior",
                         "# @dependency-end",
@@ -1227,6 +1363,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises search edit-scope expansion.",
                         "# upstream design design.md source design",
                         "# @dependency-end",
@@ -1239,6 +1376,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Tests search edit-scope expansion.",
                         "# upstream implementation ../source.py source behavior",
                         "# @dependency-end",
@@ -1305,6 +1443,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target fixture for report artifacts.",
                         "downstream design source.md source consumes target",
                         "@dependency-end",
@@ -1320,6 +1459,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source fixture for report artifacts.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -1385,6 +1525,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target fixture for changed scope.",
                         "downstream design source.md source consumes target",
                         "@dependency-end",
@@ -1400,6 +1541,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source fixture for changed scope.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -1466,6 +1608,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Vendor",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines a vendor source fixture.",
                         "upstream design README.md self fixture",
                         "@dependency-end",
@@ -1606,6 +1749,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "{",
                         '  "_dependency_manifest": [',
                         '    "@dependency-start",',
+                        '    "contract test",',
                         '    "responsibility Exercises a JSON string manifest.",',
                         '    "upstream implementation target.py target contract",',
                         '    "@dependency-end"',
@@ -1694,6 +1838,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises invalid direction validation.",
                         "# sideways implementation target.py invalid direction",
                         "# @dependency-end",
@@ -1719,6 +1864,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Defines source a for graph validation.",
                         "# downstream implementation b.py b consumes a",
                         "# @dependency-end",
@@ -1731,6 +1877,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Defines source b for graph validation.",
                         "# upstream implementation a.py a is consumed by b",
                         "# @dependency-end",
@@ -1761,6 +1908,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Exercises isolated manifest validation.",
                         "# @dependency-end",
                         "",
@@ -1785,6 +1933,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Defines source a for reverse validation.",
                         "# downstream implementation b.py b consumes a",
                         "# @dependency-end",
@@ -1819,6 +1968,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# upstream implementation b.py b is prerequisite",
                         "# downstream implementation b.py b also affected",
                         "# @dependency-end",
@@ -1831,6 +1981,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# upstream implementation a.py a is prerequisite",
                         "# downstream implementation a.py a also affected",
                         "# @dependency-end",
@@ -1863,6 +2014,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Defines a fixture with a known cycle.",
                         "# upstream implementation b.py b is prerequisite",
                         "# @dependency-end",
@@ -1875,6 +2027,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# contract test",
                         "# responsibility Defines b fixture with a known cycle.",
                         "# upstream implementation a.py a is prerequisite",
                         "# @dependency-end",
@@ -1923,6 +2076,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target test fixture context.",
                         "downstream design source.md source reads target",
                         "@dependency-end",
@@ -1938,6 +2092,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source test fixture context.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -1988,6 +2143,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines a cycle-report-only fixture.",
                         "upstream design b.md b is prerequisite",
                         "@dependency-end",
@@ -2004,6 +2160,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines b cycle-report-only fixture.",
                         "upstream design a.md a is prerequisite",
                         "@dependency-end",
@@ -2060,6 +2217,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target test fixture context.",
                         "downstream design source.md source reads target",
                         "@dependency-end",
@@ -2075,6 +2233,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source test fixture context.",
                         "upstream design target.md target context",
                         "@dependency-end",
@@ -2139,6 +2298,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines target test fixture context.",
                         "downstream design source.md source reads target",
                         "@dependency-end",
@@ -2154,6 +2314,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "contract test",
                         "responsibility Defines source test fixture context.",
                         "upstream design target.md target context",
                         "@dependency-end",

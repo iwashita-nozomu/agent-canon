@@ -1,6 +1,7 @@
 # 学術文章 workflow
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 学術文章 workflow for this repository.
 upstream design README.md workflow catalog
 upstream design ../skills/academic-writing.md Academic Writing skill contract and TeX output boundary

@@ -1,6 +1,7 @@
 # adaptive-improvement-loop
 <!--
 @dependency-start
+contract skill
 responsibility Documents adaptive-improvement-loop for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents internal agent routines that are workflow-routed but are not public Codex skills.
 upstream design ../skills/catalog.yaml enumerates public skill families
 upstream design ../skills/README.md defines the public skill surface contract

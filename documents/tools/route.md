@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents route tool usage.
 upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 upstream design ../tool-skill-routing-refactor.md defines short naming policy

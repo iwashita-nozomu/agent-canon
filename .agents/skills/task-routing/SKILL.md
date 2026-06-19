@@ -5,6 +5,7 @@ description: Use when choosing short AgentCanon tool, skill, profile, check, run
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Task Routing skill shim.
 upstream design ../../../agents/skills/task-routing.md human-facing task routing skill
 upstream implementation ../../../tools/agent_tools/route.py selects short routing areas

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Materializes cited PDF or HTML references as Markdown under references/.
 # upstream design ../../references/README.md external reference capture policy
 # downstream implementation ../../tests/agent_tools/test_reference_materializer.py verifies extraction behavior

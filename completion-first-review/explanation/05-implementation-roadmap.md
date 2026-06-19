@@ -1,6 +1,7 @@
 # Implementation Roadmap
 <!--
 @dependency-start
+contract reference
 responsibility Provides a phased implementation roadmap for the completion-first AgentCanon review.
 upstream design ../README.md completion-first review index
 upstream design 01-priority-layers.md revised priority layers

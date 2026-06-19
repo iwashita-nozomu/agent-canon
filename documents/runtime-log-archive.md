@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines the external GitHub archive for AgentCanon runtime hook and eval logs.
 upstream design coding-conventions-logging.md JSONL logging convention
 upstream design result-log-retention-and-visualization.md retention and visualization policy

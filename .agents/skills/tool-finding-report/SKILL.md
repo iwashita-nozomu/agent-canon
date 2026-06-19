@@ -4,6 +4,7 @@ description: Use when running tools, checkers, hooks, static analysis, or struct
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Tool Finding Report runtime skill for this repository.
 upstream design ../../../agents/skills/tool-finding-report.md documents the human-facing workflow
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result artifact policy

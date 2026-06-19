@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents lean_recursive_proof_search.py operator usage.
 upstream implementation ../../tools/agent_tools/lean_recursive_proof_search.py runs target-driven Lean proof attempts.
 upstream design lean_capability_matrix.md routes Lean tactics and theorem search features.

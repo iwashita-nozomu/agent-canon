@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents slide production workflow for this repository.
 upstream design ../../documents/codex-configuration-slides.md slide deck source reference
 upstream design ../../documents/template-bootstrap.md repo bootstrap and canonical runtime views

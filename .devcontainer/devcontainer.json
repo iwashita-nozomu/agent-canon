@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "contract environment",
     "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
     "upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
     "downstream implementation post-create.sh runs workspace-mounted setup and agent CLI setup",

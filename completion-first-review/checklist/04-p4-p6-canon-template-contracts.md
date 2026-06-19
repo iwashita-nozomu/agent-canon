@@ -1,6 +1,7 @@
 # P4-P6 Canon, Template, And Contract Checklist
 <!--
 @dependency-start
+contract reference
 responsibility Defines surface ownership, workflow/skill contract, and template propagation checks for the completion-first review.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/01-priority-layers.md priority layer explanation

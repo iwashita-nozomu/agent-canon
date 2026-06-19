@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Publishes experiment result artifacts to a dedicated Git branch.
 # upstream design ../../agents/workflows/experiment-workflow.md defines experiment execution and result publication flow.
 # upstream design ../../documents/result-log-retention-and-visualization.md defines experiment result retention policy.

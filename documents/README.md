@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents documents/ for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md documents ownership policy
 upstream design ./shared-runtime-surfaces.toml machine-readable ownership manifest

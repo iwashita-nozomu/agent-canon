@@ -1,6 +1,7 @@
 # Engineering Avoidances
 <!--
 @dependency-start
+contract policy
 responsibility Documents Engineering Avoidances for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

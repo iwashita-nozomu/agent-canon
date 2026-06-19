@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 # upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
 # downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks stale inventory drift

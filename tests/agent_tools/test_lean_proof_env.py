@@ -1,6 +1,7 @@
 """Tests for the AgentCanon Lean proof environment helper."""
 
 # @dependency-start
+# contract test
 # responsibility Tests Lean Mathlib/Aesop/Plausible/LeanSearchClient proof environment setup commands.
 # upstream implementation ../../tools/agent_tools/lean_proof_env.py creates reusable proof and counterexample environments.
 # upstream design ../../documents/tools/lean_proof_env.md documents the CLI contract.

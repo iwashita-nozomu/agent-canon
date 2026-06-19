@@ -1,6 +1,7 @@
 """Tests for the explicit Any static-analysis checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests explicit Any static-analysis checker behavior.
 # upstream implementation ../../tools/agent_tools/check_static_any.py checker
 # upstream design ../../documents/conventions/python/04_type_annotations.md type annotation policy

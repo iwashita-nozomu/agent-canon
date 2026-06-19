@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract template
 responsibility Documents reusable run artifact templates for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract.
 downstream implementation ../../tools/agent_tools/agent_team.py renders templates and partials.

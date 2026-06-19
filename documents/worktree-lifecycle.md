@@ -1,6 +1,7 @@
 # branch・worktree の legacy cleanup 運用
 <!--
 @dependency-start
+contract workflow
 responsibility Documents branch・worktree legacy cleanup for this repository.
 upstream design README.md durable document index
 @dependency-end

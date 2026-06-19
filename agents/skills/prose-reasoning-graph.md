@@ -1,6 +1,7 @@
 # prose-reasoning-graph
 <!--
 @dependency-start
+contract skill
 responsibility Documents prose-reasoning-graph analysis, source-truth graph contract, diagnostics, verification routes, presentation decisions, and skill handoff workflow.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

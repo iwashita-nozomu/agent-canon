@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Derived Agent-Canon Diff Workflow for this repository.
 upstream design ./agent-canon-pr-workflow.md defines shared canon PR gates
 upstream design ../../documents/agent-canon-subtree-migration.md defines submodule migration and legacy subtree compatibility

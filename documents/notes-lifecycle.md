@@ -1,6 +1,7 @@
 # Notes Lifecycle
 <!--
 @dependency-start
+contract reference
 responsibility Documents Notes Lifecycle for this repository.
 upstream design README.md durable document index
 @dependency-end

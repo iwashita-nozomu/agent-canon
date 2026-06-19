@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Compares before/after python-structure-hash-report JSON artifacts.
 // upstream design ../../../documents/design/python-structure-hash.md Python structural duplicate analysis policy
 // downstream implementation main.rs exposes python-structure-hash-impact

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Blocks hook/tool/skill log-surface drift not reflected in the generated inventory baseline.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted log fields.

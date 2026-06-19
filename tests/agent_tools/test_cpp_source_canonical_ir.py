@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests C++ source-canonical IR extraction into the shared thin operational IR.
 # upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source IR.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md documents the wrapper schema.

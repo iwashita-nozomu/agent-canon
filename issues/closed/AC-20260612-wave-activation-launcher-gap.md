@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the defect where recommended subagent waves do not become executable runtime waves.
 upstream design ../README.md defines durable AgentCanon operational issue conventions.
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines Codex subagent routing and lifecycle policy.
@@ -19,6 +20,7 @@ status: resolved
 source: user
 severity: S1
 evidence: reports/agents/20260612-091338-diagnose-wave-activation-blockers/wave_activation_diagnosis.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/259
 affected_surfaces: tools/agent_tools/bootstrap_agent_run.py, tools/agent_tools/task_start.py, tools/agent_tools/agent_team.py, tools/agent_tools/generate_agent_runtime_dashboard.py, agents/canonical/CODEX_SUBAGENTS.md, agents/TASK_WORKFLOWS.md, agents/templates/schedule.md, agents/skills/subagent-bootstrap.md, .codex/config.toml
 edit_scope: reports/agents/20260612-091338-diagnose-wave-activation-blockers/dependency-review/dependency_edit_scope.txt
 required_action: Add an explicit launcher or parent-execution gate that turns recommended waves into actual runtime spawns when authority exists, and expose wave/subagent execution health in compact runtime diagnostics.

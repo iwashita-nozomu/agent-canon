@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Fixes markdown code blocks documentation formatting.
 # upstream design ../README.md shared automation index
 # @dependency-end

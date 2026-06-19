@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Warns on context-polluting direct rg usage before shell execution.
 # upstream implementation ../hooks.json invokes hook dispatcher for PreToolUse.
 # upstream implementation ./hook_dispatcher.py dispatches this guard before read-only bypass.

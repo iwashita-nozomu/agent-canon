@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests the single full-expansion C++ template source to Lean evidence tool.
 # upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py expands C++ roots.
 # upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ IR.

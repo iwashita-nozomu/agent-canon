@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the finding that eval and hook evidence accumulation needs a dedicated gate.
 upstream design ../../evidence/agent-evals/README.md defines eval usage requirements.
 upstream design ../../documents/runtime-log-archive.md defines append-only eval and hook result storage.
@@ -15,6 +16,7 @@ status: in_progress
 source: user
 severity: S1
 evidence: User feedback on 2026-05-17: eval collection is still not reliably accumulating into AgentCanon.
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/242
 affected_surfaces: evidence/agent-evals/README.md, documents/runtime-log-archive.md, .codex/hooks/hook_event_log.py, .codex/hooks/skill_usage_logger.py, tools/agent_tools/evaluate_skill_workflow_prompts.py, tools/agent_tools/generate_agent_improvement_guide.py, tools/agent_tools/generate_agent_runtime_dashboard.py
 edit_scope: tools/agent_tools/eval_accumulation_check.py, tests/agent_tools/test_eval_accumulation_check.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, .github/workflows/agent-canon-static-gates.yml
 required_action: Add a gate that verifies AgentCanon-owned hook and skill eval result directories are append-only, tracked, and structurally readable.

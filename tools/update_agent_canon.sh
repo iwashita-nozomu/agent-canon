@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Validates request-local task authority before repo-changing hook events proceed.
 # upstream implementation ../../tools/agent_tools/task_authority.py defines the shared schema.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

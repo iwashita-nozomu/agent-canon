@@ -4,6 +4,7 @@ description: Use when drafting a submission paper, thesis chapter, or other pape
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents paper-writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable paper structure contracts

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Logs agent learning records for agent workflows.
 # upstream design ../README.md shared automation index
 # @dependency-end

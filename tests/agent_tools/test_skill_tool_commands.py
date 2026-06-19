@@ -1,6 +1,7 @@
 """Tests for runtime skill tool-command packets."""
 
 # @dependency-start
+# contract test
 # responsibility Tests skill tool-command packet sync and validation.
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py command packet tool
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests experiment result branch publication behavior.
 # upstream design ../../agents/workflows/experiment-workflow.md experiment publication flow
 # upstream implementation ../../tools/experiments/publish_result_branch.py helper under test

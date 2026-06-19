@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Converts JSONL result records into a compact Markdown report.
 # upstream design ../README.md shared tool index
 # downstream design ../../documents/result-log-retention-and-visualization.md result policy
