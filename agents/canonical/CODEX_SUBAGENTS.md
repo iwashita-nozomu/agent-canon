@@ -127,6 +127,25 @@ bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 `remaining_spawn_budget` so nested launch remains bounded by
 `run.delegated_spawn_policy`.
 
+## Subagent Return Investigation
+
+`wait_agent` timeout, empty wait status, or an absent final response at a wave
+decision point is a subagent lifecycle signal. The parent records
+`subagent_no_return_investigation` before choosing the next action for that
+run-local agent.
+
+The investigation record includes `agent_id`, `wave_id`, wait command and
+timeout, last known status, last workflow-monitor event, runtime / tool error,
+log or dashboard pointers, cause hypothesis, and the selected resolution
+decision. Valid resolution decisions are `continue_wait`,
+`status_probe_same_task`, `close_and_replace_fresh_wave`, and
+`escalate_runtime_issue`.
+
+`status_probe_same_task` is limited to bounded status evidence for the same
+active task. Scope, owner, allowed-path, or review-gate changes move through the
+fresh follow-up wave path already defined by the wave contract and lifecycle
+policy.
+
 ## Intake Responsibility Wave
 
 Intake Responsibility Wave は、repo-changing task の責務分割を要件、調査、実行計画に分ける intake wave です。独立 workstream が複数ある場合、Intake Responsibility Wave は各 workstream の責務分担 wave として扱い、以後は stage owner が必要な child wave を vertical dynamic wave として追加します。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route、Agent Wave Ledger を持ちます。parent はこの intake wave の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff prompt に含めます。

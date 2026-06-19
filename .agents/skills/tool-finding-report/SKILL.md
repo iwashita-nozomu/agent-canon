@@ -15,6 +15,19 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
 
 # Tool Finding Report
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/tool-finding-report.md`.
 1. Default the target scope to the full repository before running tools. Fix exclude rules, dependency roots, and output directory. Use targeted, changed-only, or selected-path scope only when the user explicitly asks for it, the tool cannot run repo-wide, or it is an additional diagnostic beside the full-repository run; record `scope_exception=<reason>`, `requested_scope=<...>`, and `omitted_surfaces=<...>` in the finding packet. Fix a baseline ref only when before/after impact is explicitly requested.
 1. Preserve raw machine results first with `$result-artifact-writeout`; failed or partial runs are evidence, not noise.

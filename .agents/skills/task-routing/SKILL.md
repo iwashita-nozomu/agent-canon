@@ -13,6 +13,19 @@ upstream implementation ../../../tools/agent_tools/route.py selects short routin
 
 # Task Routing
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/task-routing.md`.
 1. Use `python3 tools/agent_tools/route.py --name <candidate>` to resolve a long proposed tool or skill name before creating any new public surface.
 1. Use `agent-canon local-llm route-skill --prompt "<user request>" --format json` when a broad request needs deterministic public skill routing. Treat `ACTIVE_SKILLS` as current-wave skill guidance and `DEFERRED_SKILLS` as later wave triggers. `python3 tools/agent_tools/route.py --prompt ...` is the Python compatibility mirror.

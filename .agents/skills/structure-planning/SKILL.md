@@ -14,6 +14,19 @@ upstream design ../../../agents/workflows/slide-production-workflow.md defines P
 
 # Structure Planning
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/structure-planning.md`.
 1. Use this before drafting prose, writing a renderer, interpreting experiment output, planning a presentation/deck, planning follow-up runs, or editing refactor surfaces when the work has a nontrivial structure.
 1. For document additions or revisions, use this before prose edits when section order, responsibility, claim/support, reader path, source map, or canonical route changes; for typo/link/format-only edits, record `structure_contract=skipped` with the reason and use `$md-style-check`.
