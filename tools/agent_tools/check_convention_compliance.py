@@ -504,6 +504,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "check_agent_runtime_alignment.py",
                 ),
                 (
+                    "task bootstrap and CLI entrypoints",
+                    "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
+                    "task_start.py",
+                    "bootstrap_agent_run.py",
+                ),
+                (
                     "subagent lifecycle, same-role instances, wave ledger",
                     "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
                     "workflow_monitor.py",
@@ -647,6 +653,20 @@ AGENTS_FORWARDER_POLICY_MARKERS = (
     "caller chain",
     "canonical command",
 )
+ENTRYPOINT_DELEGATED_SECTION_HEADINGS = (
+    "## Subagent Usage",
+    "## Plan Mode",
+    "## Read Packets",
+    "## Execution Priorities",
+    "## Mechanical Guardrail Policy",
+    "## Default Search And Routing",
+    "## Runtime Profiles And Risk",
+    "## Experiment And Log Diagnostics",
+    "## AgentCanon Submodule Update Flow",
+    "## PR Mutation Authority",
+    "## Required Before Implementation",
+)
+ENTRYPOINT_DELEGATION_PATHS = ("ROOT_AGENTS.md", "AGENTS.md")
 
 
 @dataclass(frozen=True)
@@ -1112,6 +1132,29 @@ def check_owner_map_entrypoints(root: Path) -> list[Finding]:
     return findings
 
 
+def check_entrypoint_delegated_sections(root: Path) -> list[Finding]:
+    """Verify runtime entrypoints delegate detailed procedures to owner surfaces."""
+    findings: list[Finding] = []
+    for path in ENTRYPOINT_DELEGATION_PATHS:
+        resolved = readable_path(root, path)
+        if resolved is None:
+            findings.append(Finding("entrypoint_delegation", path, "missing-required-file"))
+            continue
+        if duplicate_root_view_entrypoint(root, path):
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for heading in ENTRYPOINT_DELEGATED_SECTION_HEADINGS:
+            if markdown_section_lines(text, heading) is not None:
+                findings.append(
+                    Finding(
+                        "entrypoint_delegation",
+                        path,
+                        f"delegated-section:{heading}",
+                    )
+                )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -1197,6 +1240,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_owner_map_entrypoints(root))
+    findings.extend(check_entrypoint_delegated_sections(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

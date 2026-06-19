@@ -276,6 +276,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| workflow family, spawn budget, role topology | "
         "`vendor/agent-canon/agents/task_catalog.yaml` | "
         "`check_agent_runtime_alignment.py` |\n"
+        "| task bootstrap and CLI entrypoints | "
+        "`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | "
+        "`task_start.py`; `bootstrap_agent_run.py` |\n"
         "| subagent lifecycle, same-role instances, wave ledger | "
         "`vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | "
         "`workflow_monitor.py` |\n"
@@ -849,6 +852,24 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "owner_map_entrypoints:ROOT_AGENTS.md:" + finding,
                 result.stdout,
             )
+
+    def test_entrypoint_delegation_rejects_old_operational_sections(self) -> None:
+        """Root runtime entrypoints delegate detailed procedures to owner surfaces."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            root_agents = root / "ROOT_AGENTS.md"
+            root_agents.write_text(
+                root_agents.read_text(encoding="utf-8")
+                + "\n## Subagent Usage\n\n- duplicate operational procedure\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("entrypoint_delegation", result.stdout)
+            self.assertIn("delegated-section:## Subagent Usage", result.stdout)
 
     def test_owner_map_entrypoint_requires_workflow_task_catalog_row(self) -> None:
         """Workflow owner row is required even when later reader rows repeat it."""
