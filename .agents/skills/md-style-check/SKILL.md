@@ -5,12 +5,26 @@ description: Use when Markdown files changed, docs formatter/fixer output must b
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Markdown Style Check for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 
 # Markdown Style Check
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/md-style-check.md`.
 1. Check `documents/coding-conventions-project.md` and

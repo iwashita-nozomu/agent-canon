@@ -1,6 +1,7 @@
 # References
 <!--
 @dependency-start
+contract reference
 responsibility Indexes AgentCanon reference material used by workflows, reviews, and research notes.
 upstream design ../agents/workflows/workflow-references.md cites workflow-level sources
 downstream design agent-canon-technology-bibliography.md catalogs implementation/runtime technical sources

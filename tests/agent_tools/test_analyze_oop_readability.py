@@ -1,6 +1,7 @@
 """Tests for the OOP readability analyzer."""
 
 # @dependency-start
+# contract test
 # responsibility Tests OOP readability analyzer behavior.
 # upstream implementation ../../tools/oop/python/readability.py Python analyzer
 # upstream implementation ../../tools/oop/cpp/readability.py C++ analyzer

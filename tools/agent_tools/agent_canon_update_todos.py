@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Tracks AgentCanon update TODOs that parent-repo agents must apply.
 # upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
 # upstream design ../../documents/agent-canon-update-tasks.toml shared update TODO manifest

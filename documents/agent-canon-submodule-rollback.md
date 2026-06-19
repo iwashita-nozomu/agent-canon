@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents rollback procedure for AgentCanon submodule pin updates in template and derived repositories.
 upstream design ./agent-canon-parent-repo-latest-checklist.md defines parent update readiness checks.
 upstream design ./agent-canon-update-route.md defines canonical update route ownership.

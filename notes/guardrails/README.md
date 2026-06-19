@@ -1,6 +1,7 @@
 # Guardrail Notes
 <!--
 @dependency-start
+contract policy
 responsibility Documents Guardrail Notes for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end

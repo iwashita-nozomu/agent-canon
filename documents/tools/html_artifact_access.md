@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents local-browser access for remote HTML artifacts.
 upstream design ../result-log-retention-and-visualization.md defines visual artifact retention.
 upstream design ../experiment-report-style.md defines experiment report artifact layout.

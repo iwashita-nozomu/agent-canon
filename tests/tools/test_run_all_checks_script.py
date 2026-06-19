@@ -1,6 +1,7 @@
 """Tests for the integrated CI shell entrypoint."""
 
 # @dependency-start
+# contract test
 # responsibility Tests integrated CI shell wiring that is too expensive to execute wholesale.
 # upstream implementation ../../tools/ci/run_all_checks.sh runs repository and AgentCanon CI gates
 # upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py writes accumulated eval reports

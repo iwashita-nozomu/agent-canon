@@ -1,5 +1,6 @@
 version: 1
 # @dependency-start
+# contract registry
 # responsibility Catalogs canonical agent skills and their descriptions.
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # @dependency-end
@@ -45,6 +46,11 @@ skill_families:
         - ["skill", "走査"]
         - ["skill", "scan"]
         - ["スキル", "走査"]
+        - ["スキル", "動線"]
+        - ["スキル", "ツール", "欠落"]
+        - ["スキル内", "起動コマンド"]
+        - ["スキル", "起動コマンド"]
+        - ["tool", "command", "skill"]
         - ["スキル", "一つずつ"]
         - ["スキル選択", "ルーティング"]
         - ["スキル", "ツール", "ルーティング"]
@@ -148,6 +154,9 @@ skill_families:
         - ["runbundle", "agent", "レポート"]
         - ["run bundle", "agent", "report"]
         - ["過去", "agent", "レポート"]
+        - ["欠落", "スキル"]
+        - ["弱い", "動線"]
+        - ["エージェント", "成長"]
   - id: agent-eval-accumulation
     purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
     canonical_doc: agents/skills/agent-eval-accumulation.md
@@ -306,6 +315,11 @@ skill_families:
         - [".codex", "config"]
         - ["codex", "personal", "runtime"]
         - ["personal", "runtime", "surface"]
+        - ["agents.md", "重複"]
+        - ["skill", "重複"]
+        - ["責務", "移行"]
+        - ["すべてのスキル", "修正"]
+        - ["全", "skill", "command"]
   - id: user-guided-debugging
     purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
     canonical_doc: agents/skills/user-guided-debugging.md
@@ -431,6 +445,11 @@ skill_families:
         - ["architecture", "redesign"]
         - ["workflow", "tools", "docs"]
         - ["repo-wide", "routing"]
+        - ["スキル", "動線", "ツール"]
+        - ["エージェント", "成長"]
+        - ["agent", "growth"]
+        - ["すべてのスキル", "修正"]
+        - ["all", "skills", "command"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -454,3 +473,7 @@ skill_families:
         - ["フィードバック", "修正"]
         - ["feedback", "repair"]
         - ["memory", "feedback"]
+        - ["エージェント", "成長"]
+        - ["agent", "growth"]
+        - ["起動コマンド", "ミス"]
+        - ["ミス", "多発"]

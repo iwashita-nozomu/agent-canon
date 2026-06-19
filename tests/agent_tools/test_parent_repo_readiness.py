@@ -1,6 +1,7 @@
 """Tests for parent repository readiness checker."""
 
 # @dependency-start
+# contract test
 # responsibility Tests AgentCanon parent repository readiness checks.
 # upstream implementation ../../tools/agent_tools/parent_repo_readiness.py checks parent repo surfaces
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
 # upstream implementation ./file_surface_inventory.py writes inventory reports
 # upstream implementation ./run_repo_dependency_review.sh validates dependency manifests

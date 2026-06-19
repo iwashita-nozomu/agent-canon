@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Documents test_design Rust CLI usage and output contract.
 upstream design ../../references/test-design-flexibility.md source basis for resilient test design
 upstream design ../coding-conventions-testing.md shared testing policy

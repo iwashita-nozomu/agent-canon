@@ -1,6 +1,7 @@
 # structure-planning
 <!--
 @dependency-start
+contract skill
 responsibility Documents reusable structure planning for reports, experiments, documents, and refactors.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

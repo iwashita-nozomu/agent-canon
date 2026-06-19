@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the GitHub canonical remote policy for the project template.
 upstream design ./agent-canon-github-remote.md defines AgentCanon remote policy.
 downstream design ./template-bootstrap.md consumes template GitHub remote policy.

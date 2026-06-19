@@ -1,4 +1,5 @@
 # @dependency-start
+# contract tool
 # responsibility Defines the portable audit-log JSON schema and dataclasses.
 # upstream design ../README.md shared tool index
 # downstream implementation audit_logger.py writes entries that follow this schema

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks nested algorithm ownership fields for algorithm modules.
 # upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
 # upstream implementation ./check_algorithm_module_public_surface.py discovers algorithm modules

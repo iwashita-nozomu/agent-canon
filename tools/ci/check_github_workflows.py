@@ -1,4 +1,5 @@
 # @dependency-start
+# contract tool
 # responsibility Checks GitHub workflow and PR template conventions.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
 # upstream design ../../README.md AgentCanon surface index

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests test task start and close behavior.
 # upstream design ../../tools/README.md validated automation surface
 # upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test

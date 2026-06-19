@@ -1,6 +1,7 @@
 # Research Notes
 <!--
 @dependency-start
+contract template
 responsibility Documents Research Notes for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents 作業別チェックリスト for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./github-first-module-and-devcontainer-policy.md environment ownership boundary

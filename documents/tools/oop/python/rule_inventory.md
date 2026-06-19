@@ -1,6 +1,7 @@
 # Python OOP Rule Inventory
 <!--
 @dependency-start
+contract reference
 responsibility Documents Python OOP rule inventory behavior in Japanese.
 upstream implementation ../../../../tools/oop/python/rule_inventory.py Python OOP inventory checker
 upstream design ../../../object-oriented-design.md OOP policy source

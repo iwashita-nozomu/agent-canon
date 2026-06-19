@@ -1,6 +1,7 @@
 # Literature Intake
 <!--
 @dependency-start
+contract reference
 responsibility Documents Literature Intake for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

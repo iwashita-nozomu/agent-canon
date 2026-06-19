@@ -1,6 +1,7 @@
 """Tests for accumulated agent eval producer runner."""
 
 # @dependency-start
+# contract test
 # responsibility Tests accumulated agent eval producer routing and bounded output capture.
 # upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py runs eval producers in accumulation mode
 # upstream design ../../evidence/agent-evals/README.md eval accumulation contract

@@ -4,6 +4,7 @@ description: Use when the user explicitly asks to debug or repair one issue at a
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents User-Guided Debugging for this repository.
 upstream design ../../../agents/skills/user-guided-debugging.md human-facing skill canon
 upstream design ../../../agents/canonical/skills.md skill canon registry
@@ -12,6 +13,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 
 # User-Guided Debugging
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill user-guided-debugging --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/user-guided-debugging.md`.
 1. Select exactly one next target issue.

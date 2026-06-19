@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract

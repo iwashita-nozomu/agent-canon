@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Prevents user-facing completion when goal.md still requires another iteration.
 # upstream implementation ../hooks.json invokes this hook for Stop.
 # upstream implementation ../../tools/agent_tools/goal_loop.py reports goal loop NEXT_ACTION.

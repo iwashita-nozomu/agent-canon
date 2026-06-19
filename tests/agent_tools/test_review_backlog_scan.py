@@ -1,6 +1,7 @@
 """Tests for the integrated review backlog scan wrapper."""
 
 # @dependency-start
+# contract test
 # responsibility Tests integrated review backlog scan reporting behavior.
 # upstream implementation ../../tools/agent_tools/review_backlog_scan.sh runs scan wrapper
 # upstream implementation ../../tools/agent_tools/file_surface_inventory.py writes inventory reports

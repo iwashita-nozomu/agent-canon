@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Provides unified Rust Markdown documentation formatting and checks.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../agents/skills/md-style-check.md Markdown style check skill contract
@@ -73,6 +74,7 @@ const FLOW_DIRECTIONS: &[&str] = &["bt", "lr", "rl", "tb", "td"];
 
 const RUNTIME_PROFILE_DEPENDENCY_HEADER: &str = "<!--
 @dependency-start
+contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy

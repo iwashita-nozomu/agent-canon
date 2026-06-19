@@ -1,6 +1,7 @@
 # Workflow References
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Workflow References for this repository.
 upstream design README.md workflow catalog
 downstream design ../../references/agent-canon-technology-bibliography.md catalogs implementation/runtime technical sources

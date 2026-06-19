@@ -1,6 +1,7 @@
 # worktree-health
 <!--
 @dependency-start
+contract skill
 responsibility Documents worktree-health for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

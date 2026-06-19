@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Classifies changed paths into runtime risk profiles and targeted validation checks.
 # upstream design ../../documents/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
 # upstream design ../../agents/TASK_WORKFLOWS.md defines risk-scaled workflow families.

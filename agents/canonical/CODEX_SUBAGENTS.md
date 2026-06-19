@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
@@ -126,6 +127,25 @@ updates `schedule.md` and `workflow_monitoring.md` by `wave_id` and replaces the
 bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 `remaining_spawn_budget` so nested launch remains bounded by
 `run.delegated_spawn_policy`.
+
+## Subagent Return Investigation
+
+`wait_agent` timeout, empty wait status, or an absent final response at a wave
+decision point is a subagent lifecycle signal. The parent records
+`subagent_no_return_investigation` before choosing the next action for that
+run-local agent.
+
+The investigation record includes `agent_id`, `wave_id`, wait command and
+timeout, last known status, last workflow-monitor event, runtime / tool error,
+log or dashboard pointers, cause hypothesis, and the selected resolution
+decision. Valid resolution decisions are `continue_wait`,
+`status_probe_same_task`, `close_and_replace_fresh_wave`, and
+`escalate_runtime_issue`.
+
+`status_probe_same_task` is limited to bounded status evidence for the same
+active task. Scope, owner, allowed-path, or review-gate changes move through the
+fresh follow-up wave path already defined by the wave contract and lifecycle
+policy.
 
 ## Intake Responsibility Wave
 

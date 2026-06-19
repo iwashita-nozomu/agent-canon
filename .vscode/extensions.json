@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "contract reference",
     "responsibility Lists recommended VS Code extensions for AgentCanon-managed workspace ergonomics.",
     "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
     "upstream design ../documents/github-first-module-and-devcontainer-policy.md VS Code and devcontainer boundary policy",

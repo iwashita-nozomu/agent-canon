@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents shortest safe onboarding path for repositories that vendor AgentCanon.
 upstream design ./SHARED_RUNTIME_SURFACES.md defines root view ownership.
 upstream design ./agent-canon-parent-repo-latest-checklist.md defines freshness and TODO handling.

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents Rust migration policy for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary

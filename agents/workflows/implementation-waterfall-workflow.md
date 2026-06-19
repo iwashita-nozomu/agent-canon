@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 実装ウォーターフォールワークフロー for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates

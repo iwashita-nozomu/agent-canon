@@ -1,6 +1,7 @@
 # 実験の標準手順
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 実験の標準手順 for this repository.
 upstream design README.md workflow catalog
 @dependency-end
@@ -70,7 +71,7 @@ cp -r vendor/agent-canon/experiments/_template experiments/<topic>
 - `Fairness Notes:`
   - 同じ case set、同じ timeout、同じ hardware、同じ seed policy、同じ allocator 方針をどこまで維持するか。
 - `Artifact Plan:`
-  - 実験ディレクトリ、`result/<run_name>/` の出力先、`result/<run_name>/logs/` のログ置き場、`experiments/report/<run_name>.md` の置き場を先に固定します。
+  - 実験ディレクトリ、`result/<run_name>/` の出力先、`result/<run_name>/logs/` のログ置き場、`experiments/report/<run_name>.md` の置き場、result branch 名を先に固定します。
 - `Visualization Plan:`
   - 可視化 notebook を `experiments/<topic>/visualize.ipynb` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
 - `Naming Plan:`
@@ -82,7 +83,7 @@ cp -r vendor/agent-canon/experiments/_template experiments/<topic>
 - `Make Target Plan:`
   - `make experiment-smoke TOPIC=<topic>`、`make experiment-formal TOPIC=<topic>`、または topic 固有 alias を先に固定します。正式 run の exact command を chat や notebook だけに残しません。
 - `Execution Plan:`
-  - `main` で進めるか、隔離が必要な場合だけ短期 branch を使うかを先に決めます。既定は `main` です。
+  - formal run は `main` source checkout で進めます。隔離が必要な実験だけ短期 branch を使い、その場合も生成結果の保存先は専用 result branch にします。
 - `Server Run Surface:`
   - main server host で formal run を回す場合、`tools/experiments/run_managed_experiment.py` を使うか、同等の metadata capture を topic README に固定します。
 
@@ -105,6 +106,8 @@ cp -r vendor/agent-canon/experiments/_template experiments/<topic>
   - `experiments/<topic>/visualize.ipynb`
 - 1 回の実験 report
   - `experiments/report/<run_name>.md`
+- result branch
+  - `experiment-results/<topic>` または topic README で固定した専用 branch
 - 複数 run をまたぐ要約や知見
   - `notes/experiments/<topic>.md` または `notes/themes/`
 
@@ -292,6 +295,20 @@ make experiment-formal TOPIC=<topic>
 wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
 各 run では `result/<run_name>/logs/` も初期化されます。
 
+formal run の完了後、生成物を source checkout から専用 result branch へ保存します。
+checkout は `main` のまま保ち、保存対象は `result/<run_name>/` と
+`experiments/report/<run_name>.md` に限定します。
+
+```bash
+python3 tools/experiments/publish_result_branch.py \
+  --result-dir experiments/<topic>/result/<run_name> \
+  --branch experiment-results/<topic>
+```
+
+remote にも保持する正式 run では `--push` を足します。
+この tool は `run_manifest.json` の source branch と current checkout が `main`
+で一致することを確認してから result branch を更新します。
+
 #### 4.4 long run のルール
 
 - 長時間 run でも、別 branch / worktree は必須ではありません。隔離が必要なときだけ使います。
@@ -355,6 +372,7 @@ carry-over のルールは次です。
 - 実行ごとの追加ログは `experiments/<topic>/result/<run_name>/logs/` に残す
 - 可視化 notebook は `experiments/<topic>/visualize.ipynb` に残し、run artifact を読む形にする
 - 1 回の実験 report は `experiments/report/<run_name>.md` に残す
+- formal run の生成物は `tools/experiments/publish_result_branch.py` で専用 result branch に保存する
 - 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 

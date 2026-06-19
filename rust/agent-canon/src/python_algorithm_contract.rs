@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Checks Python amp algorithm-module public surface and nested ownership from AST JSON.
 // upstream design ../../../documents/design/jax_util/algorithm_module_contract.md algorithm module contract
 // upstream implementation python_structure_hash.rs provides the Python-AST-to-Rust analysis pattern

@@ -1,6 +1,7 @@
 # Priority Layers
 <!--
 @dependency-start
+contract reference
 responsibility Explains the revised completion-first priority layers for AgentCanon improvement.
 upstream design ../README.md completion-first review index
 upstream design 00-completion-first-principle.md completion-first rationale

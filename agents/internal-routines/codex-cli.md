@@ -1,6 +1,7 @@
 # codex-cli
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents codex-cli for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

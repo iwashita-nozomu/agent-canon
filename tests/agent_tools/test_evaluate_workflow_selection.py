@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests workflow selection eval behavior.
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
 # upstream design ../../evidence/agent-evals/workflow_selection_eval.toml defines canonical workflow selection cases

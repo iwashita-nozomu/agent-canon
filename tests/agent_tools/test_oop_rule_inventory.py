@@ -1,6 +1,7 @@
 """Tests for OOP rule inventory tooling."""
 
 # @dependency-start
+# contract test
 # responsibility Tests language-specific OOP rule inventory tooling.
 # upstream implementation ../../tools/oop/python/rule_inventory.py Python inventory CLI
 # upstream implementation ../../tools/oop/cpp/rule_inventory.py C++ inventory CLI

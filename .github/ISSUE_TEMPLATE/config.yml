@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Configures GitHub issue template entrypoints for AgentCanon maintenance.
 # upstream design ../../documents/issue-label-taxonomy.md issue labels and template routing.
 # upstream design ../../issues/README.md durable operational issue storage policy.

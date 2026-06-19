@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy

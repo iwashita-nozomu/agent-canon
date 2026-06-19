@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Proposes conservative design-document organization by submodule.
 # upstream design ../README.md shared tool index
 # downstream design ../../documents/design/README.md documents design placement

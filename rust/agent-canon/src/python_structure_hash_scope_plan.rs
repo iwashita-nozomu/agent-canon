@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Builds deterministic change-impact scope plans from Python structural findings and dependency evidence.
 // upstream design ../../../documents/design/python-structure-hash.md Python structural duplicate analysis policy
 // upstream design ../../../agents/skills/dependency-analysis.md Change Impact Packet contract

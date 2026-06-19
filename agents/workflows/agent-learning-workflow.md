@@ -1,6 +1,7 @@
 # Agent Learning Workflow
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Agent Learning Workflow for this repository.
 upstream design README.md workflow catalog
 upstream design ../../issues/README.md durable operational finding storage

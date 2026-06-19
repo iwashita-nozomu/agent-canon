@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents Codex Configuration Reference for this repository.
 upstream design ../ROOT_AGENTS.md template-root Codex runtime entrypoint
 upstream implementation ../.codex/config.toml shared project-scoped Codex config

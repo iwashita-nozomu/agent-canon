@@ -1,6 +1,7 @@
 # comprehensive-development
 <!--
 @dependency-start
+contract skill
 responsibility Documents comprehensive-development for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../task_catalog.yaml workflow family spawn budget and role topology owner

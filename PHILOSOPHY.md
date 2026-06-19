@@ -1,6 +1,7 @@
 # PHILOSOPHY
 <!--
 @dependency-start
+contract reference
 responsibility Defines the top-level AgentCanon philosophy for users, maintainers, and agents.
 upstream design README.md AgentCanon source tree overview and first-read path.
 downstream design AGENTS.md repository runtime instruction entrypoint.

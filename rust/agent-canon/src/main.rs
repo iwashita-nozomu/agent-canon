@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 
 // @dependency-start
+// contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation docs.rs routes unified documentation formatting and checks

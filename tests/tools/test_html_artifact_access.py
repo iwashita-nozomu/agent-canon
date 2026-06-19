@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests remote HTML artifact access command rendering.
 # upstream design ../../documents/tools/html_artifact_access.md user-facing helper contract
 # upstream design ../../documents/result-log-retention-and-visualization.md visual artifact policy

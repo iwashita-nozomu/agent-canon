@@ -1,4 +1,5 @@
 # @dependency-start
+# contract registry
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
@@ -906,7 +907,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-header-format
-    summary: Validates dependency manifest syntax, paths, and edge fields.
+    summary: Validates dependency manifest syntax, paths, edge fields, and registered contract kind metadata.
     path: tools/agent_tools/check_dependency_header_format.sh
     family: agent_tools
     role: checker
@@ -919,11 +920,12 @@ entries:
     docs:
       - tools/README.md
       - documents/dependency-manifest-design.md
+      - documents/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks changed files for required dependency manifests.
+    summary: Checks changed files for required dependency manifests and registered contract kinds.
     path: tools/agent_tools/check_dependency_headers.py
     family: agent_tools
     role: checker
@@ -936,6 +938,7 @@ entries:
     docs:
       - tools/README.md
       - documents/dependency-manifest-design.md
+      - documents/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
 
@@ -1243,6 +1246,24 @@ entries:
       - agents/canonical/skills.md
     tests:
       - tests/agent_tools/test_check_skill_frontmatter.py
+
+  - id: skill-tool-commands
+    summary: Materializes and checks runtime skill Tool Commands packets.
+    path: tools/agent_tools/skill_tool_commands.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/skill_tool_commands.py check
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/task-routing.md
+    tests:
+      - tests/agent_tools/test_skill_tool_commands.py
 
   - id: vendor-skill-adapters
     summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
@@ -2050,6 +2071,25 @@ entries:
       - documents/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_update_latest_result.py
+
+  - id: publish-result-branch
+    summary: Publishes experiment result artifacts to a dedicated Git branch.
+    path: tools/experiments/publish_result_branch.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 tools/experiments/publish_result_branch.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/result-log-retention-and-visualization.md
+      - agents/workflows/experiment-workflow.md
+    tests:
+      - tests/tools/test_publish_result_branch.py
 
   - id: check-doc-test-triplet
     summary: Compatibility wrapper for doc and test triplet validation.

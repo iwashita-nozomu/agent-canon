@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Documents the jax_util algorithm module contract checked by AgentCanon tools.
 upstream design ../../algorithm-implementation-boundary.md algorithm boundary policy
 upstream design ../../coding-conventions-python.md Python implementation policy

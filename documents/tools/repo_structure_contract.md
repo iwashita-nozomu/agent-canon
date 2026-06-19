@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the repository structure contract checker.
 upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with the structure contract
 upstream design ../repo-structure-contract.toml defines expected repository structure profiles

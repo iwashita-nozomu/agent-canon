@@ -4,6 +4,7 @@ description: Use when entering an unfamiliar repository or subdirectory and you 
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Repo Onboarding for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
@@ -11,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 
 # Repo Onboarding
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill repo-onboarding --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `README.md`, `QUICK_START.md`, and `documents/README.md`.
 1. Read `agents/workflows/README.md` and `docker/README.md` when workflow selection or container runtime matters.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Searches AgentCanon text surfaces and expands dependency-aware context.
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md operator guide for shared tools

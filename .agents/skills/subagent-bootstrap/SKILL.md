@@ -4,6 +4,7 @@ description: Use when a task needs specialist delegation, run-bundle bootstrap, 
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Subagent Bootstrap for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
@@ -12,6 +13,19 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 
 
 # Subagent Bootstrap
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill subagent-bootstrap --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
@@ -56,5 +70,6 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 1. For user instructions added while the same active task is still running, do not drop the active multi-agent wave. The parent must classify the input as `same_active_task_delta`, `scope_or_contract_change`, or `new_task`; record a checkpoint in the run bundle, Agent Wave Ledger, and workflow monitoring; then either send the updated packet to the still-valid run-local agent or spawn a fresh follow-up wave when scope, allowed paths, owner, or review gate changed.
 1. When context changes mid-task, update the capsule artifact path and send that path; do not append unbounded chat summaries to old handoff prompts.
 1. Include `team_manifest.yaml` `run.subagent_lifecycle_policy` in every subagent handoff prompt, especially `fresh_subagents_required: true` and `reuse_for_new_task: forbidden`.
+1. If `wait_agent` times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` before closing, replacing, or escalating that agent. Include agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, cause hypothesis, and selected action: `continue_wait`, `status_probe_same_task`, `close_and_replace_fresh_wave`, or `escalate_runtime_issue`.
 1. Before assigning write-capable work, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and include `TOOL_REJECTION_PREDICTED_GATE` lines, `rejection_preflight_command`, and the gate-specific repair plan in the handoff. Treat hook runtime, skill mirror sync, tool catalog, agent protocol convention, and log-surface inventory gates as implementation blockers until the repair command is run or explicitly scheduled in the same handoff.
 1. Before closeout, close run-local subagents and record `subagents_closed=yes` plus `Subagent Lifecycle Evidence` in `closeout_gate.md`.

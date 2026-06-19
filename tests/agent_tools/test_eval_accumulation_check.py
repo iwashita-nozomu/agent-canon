@@ -1,6 +1,7 @@
 """Tests for eval accumulation validation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests eval accumulation validation.
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result evidence
 # upstream design ../../documents/runtime-log-archive.md eval result storage contract

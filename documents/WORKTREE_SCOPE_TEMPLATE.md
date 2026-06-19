@@ -1,6 +1,7 @@
 # WORKTREE_SCOPE Template
 <!--
 @dependency-start
+contract reference
 responsibility Documents WORKTREE_SCOPE Template for this repository.
 upstream design worktree-lifecycle.md worktree lifecycle policy
 @dependency-end

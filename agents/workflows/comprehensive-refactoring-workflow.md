@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents 包括的リファクタリングワークフロー for this repository.
 upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract

@@ -4,6 +4,7 @@ description: Use when agent-side working philosophy, interaction lessons, or tas
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Learning for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
@@ -11,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 
 # Agent Learning
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill agent-learning --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/agent-learning.md`.
 1. Read `agents/workflows/agent-learning-workflow.md`.

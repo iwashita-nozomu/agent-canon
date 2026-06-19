@@ -5,6 +5,7 @@ description: Use when rendering JIT-canonical IR records, generated Lean evidenc
 
 <!--
 @dependency-start
+contract skill
 responsibility Exposes JIT-canonical algorithm Mermaid flowcharts to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/algorithm-flowchart.md canonical skill document
 upstream design ../../../agents/skills/algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
@@ -15,6 +16,19 @@ upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers J
 -->
 
 # Algorithm Flowchart
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill algorithm-flowchart --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/algorithm-flowchart.md`.
 1. Use this with `$algorithm-proof-exploration` or `$formal-proof-workflow`

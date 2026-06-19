@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
 # upstream design ../CONTAINER_OPERATIONS.md canonical Docker and devcontainer ownership boundary

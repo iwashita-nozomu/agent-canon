@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract data
 responsibility Documents Agent Philosophy for this repository.
 upstream design README.md memory surface index
 @dependency-end
@@ -300,6 +301,12 @@ upstream design README.md memory surface index
   - scope: repo-wide
   - confidence: tentative
   - evidence: User said: 勝手に定義した名前で解説するのをやめて
+
+- 2026-06-19 | interaction-observation | When a run-local subagent does not return, parent workflow should investigate cause evidence before close, replacement, or escalation.
+  - source: chat
+  - scope: subagent-lifecycle
+  - confidence: stable
+  - evidence: 2026-06-19 user feedback: サブエージェントが帰らないとき，止めるのではなく原因探索をするべきです
 
 ## Task Retrospectives
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into Markdown and DOT reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
 # upstream design ../../documents/dependency-manifest-design.md defines manifest graph semantics.

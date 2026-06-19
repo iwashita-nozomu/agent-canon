@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents legacy fix_markdown_math forwarder usage.
 upstream implementation ../../rust/agent-canon/src/docs.rs rewrites markdown math delimiters and runs adjacent checks.
 upstream implementation ../../tools/docs/fix_markdown_math.py forwards legacy CLI calls.

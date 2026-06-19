@@ -4,6 +4,7 @@ description: Use when a repo-wide task spans code, docs, tools, workflows, and r
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Comprehensive Development for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/task_catalog.yaml workflow family spawn budget and role topology owner
@@ -14,6 +15,19 @@ upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent inve
 
 
 # Comprehensive Development
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/comprehensive-development.md`.
 1. Set `workflow=Comprehensive Development` and declare `skills=<...>`, `review=<...>`.

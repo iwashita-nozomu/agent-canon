@@ -1,4 +1,5 @@
 # @dependency-start
+# contract tool
 # responsibility Summarizes HLO JSONL records into compact JSON metrics.
 # upstream design ../README.md shared tool index
 # downstream design ../../documents/result-log-retention-and-visualization.md result policy

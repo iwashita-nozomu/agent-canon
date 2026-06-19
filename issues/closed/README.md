@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Documents closed AgentCanon operational issue storage.
 upstream design ../README.md defines issue lifecycle and required fields
 @dependency-end

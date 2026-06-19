@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks Python log helper function naming.
 # upstream design ../../documents/coding-conventions-logging.md logging helper naming policy
 # upstream design ../../documents/conventions/common/02_naming.md shared naming policy

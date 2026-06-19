@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract reference
 responsibility Documents machine-readable responsibility scope management for each repository.
 upstream design SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 upstream design shared-runtime-surfaces.toml shared surface manifest

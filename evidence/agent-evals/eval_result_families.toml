@@ -1,4 +1,5 @@
 # @dependency-start
+# contract data
 # responsibility Declares accumulated eval result families and artifact contracts.
 # upstream design README.md eval directory and accumulation contract
 # upstream design ../../documents/runtime-log-archive.md runtime archive contract

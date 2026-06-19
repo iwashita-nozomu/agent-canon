@@ -4,6 +4,7 @@ description: Use when drafting a paper, thesis chapter, scholarly note, or other
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Academic Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/academic-writing.md Academic Writing skill contract
@@ -15,6 +16,19 @@ upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling b
 
 
 # Academic Writing
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill academic-writing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/academic-writing.md`.
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.

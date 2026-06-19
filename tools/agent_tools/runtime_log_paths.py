@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
 # downstream implementation ../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver

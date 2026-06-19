@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Runs advisory local LLM responsibility review for exactly one file.
 # upstream design ../../documents/local-llm-responsibility-analysis.md local LLM single-file policy
 # upstream design ../../documents/responsibility-scope-management.md responsibility scope policy

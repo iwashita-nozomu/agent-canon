@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract reference
 responsibility Documents third-party skill vendor contract.
 upstream design ../README.md AgentCanon internal vendor ownership policy
 downstream implementation manifest.toml records imported third-party skill metadata

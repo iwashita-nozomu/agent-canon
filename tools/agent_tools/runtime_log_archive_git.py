@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Manages the ignored Git clone used for AgentCanon runtime log and report archives.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys

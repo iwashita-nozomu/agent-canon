@@ -1,4 +1,5 @@
 // @dependency-start
+// contract implementation
 // responsibility Provides Rust-native semantic vector indexing, search, similarity, natural/discourse-relation, thin-doc, and eval CLI support.
 // upstream design ../../../documents/semantic_index.md semantic index responsibility and generated-cache policy
 // upstream design ../../../documents/search-coordination.md coordinated search boundary and advisory search policy

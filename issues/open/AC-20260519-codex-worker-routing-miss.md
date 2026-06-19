@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the workflow defect where Codex used the broad worker role for a narrow implementation slice despite spark_worker being configured.
 upstream design ../README.md defines durable AgentCanon operational issue conventions.
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines Codex subagent routing and spark_worker-first policy.

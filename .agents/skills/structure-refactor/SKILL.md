@@ -4,6 +4,7 @@ description: Use when repository structure review, repo-refactor requests, expec
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Structure Refactor runtime skill for this repository.
 upstream design ../../../agents/skills/structure-refactor.md documents the human-facing skill canon
 upstream design ../../../agents/skills/refactor-loop.md defines behavior-preserving refactor gates
@@ -18,6 +19,19 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py va
 -->
 
 # Structure Refactor
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/structure-refactor.md`.
 1. Use this for structure review requests, repo-refactor requests, directory layout refactors, pre-task repair of AgentCanon expected repository-structure drift, directory responsibility splits or merges, canonical README ownership changes, root-view / submodule-view layout changes, project `.codex` / `.agents` view changes, personal `~/.codex` boundary triage, and responsibility-scope map changes.

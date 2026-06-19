@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy

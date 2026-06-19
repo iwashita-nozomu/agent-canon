@@ -5,6 +5,7 @@ description: Use when Codex needs a context-independent execution path for a rep
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Codex Task Workflow for this repository.
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit investigation and context capsule handoff packets
@@ -15,6 +16,19 @@ upstream design ../../../agents/skills/tool-finding-report.md defines tool findi
 -->
 
 # Codex Task Workflow
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill codex-task-workflow --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is fixed.

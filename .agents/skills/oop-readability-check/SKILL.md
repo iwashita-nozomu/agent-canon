@@ -4,6 +4,7 @@ description: Use when the user asks to run the OOP readability checker, OOP chec
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents the OOP readability check and analysis skill for this repository.
 upstream design ../../../agents/skills/oop-readability-check.md human-readable skill canon
 upstream implementation ../../../tools/oop/python/readability.py OOP readability CLI with language selection
@@ -13,6 +14,19 @@ upstream implementation ../../../tools/agent_tools/workflow_monitor.py records o
 -->
 
 # OOP Readability Check
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill oop-readability-check --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/oop-readability-check.md`.
 1. Select exactly one mode from the user's request:

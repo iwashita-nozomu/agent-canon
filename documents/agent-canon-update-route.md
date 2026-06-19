@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines the canonical AgentCanon update route and command responsibility split.
 upstream implementation ../tools/update_agent_canon.sh provides high-level update commands.
 upstream implementation ../tools/sync_agent_canon.sh provides low-level root view and submodule sync.

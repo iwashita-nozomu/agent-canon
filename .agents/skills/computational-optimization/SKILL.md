@@ -4,6 +4,7 @@ description: Use when designing, implementing, reviewing, or diagnosing numerica
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Computational Optimization for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/computational-optimization.md human-facing skill contract
@@ -15,6 +16,19 @@ upstream design ../../../agents/skills/test-design.md adversarial test design bo
 
 
 # Computational Optimization
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill computational-optimization --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/computational-optimization.md`.
 1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Evaluates deterministic workflow selection routing cases.
 # upstream design ../../evidence/agent-evals/README.md eval usage contract
 # upstream design ../../evidence/agent-evals/workflow_selection_eval.toml workflow selection eval manifest

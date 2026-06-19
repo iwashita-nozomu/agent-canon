@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "contract reference",
     "responsibility Exposes shared VS Code task entrypoints for AgentCanon validation commands.",
     "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
     "upstream implementation ../tools/bin/agent-canon AgentCanon CLI wrapper",

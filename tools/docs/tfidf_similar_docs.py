@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Finds TF-IDF-similar Markdown documents and drafts merge candidates.
 # upstream design ../README.md shared tool index
 # downstream design ../../documents/result-log-retention-and-visualization.md result policy

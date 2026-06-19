@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents legacy fix_mermaid forwarder usage and contract.
 upstream implementation ../../rust/agent-canon/src/docs.rs rewrites Mermaid fenced blocks and runs adjacent checks.
 upstream implementation ../../tools/docs/fix_mermaid.py forwards legacy CLI calls.

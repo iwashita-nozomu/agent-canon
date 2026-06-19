@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Runs a manual smoke check for changed-path risk/profile classification.
 # upstream design ../../documents/tools/classify_path_risk.md path/risk classifier contract
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation routing

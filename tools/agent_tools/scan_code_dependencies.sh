@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Extracts source-code dependency edges independently from manifest headers.
 # upstream design ../../agents/workflows/hypothesis-validation-workflow.md analysis-first workflow contract
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies scanner behavior

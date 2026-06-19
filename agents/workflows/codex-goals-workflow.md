@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Codex goals workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md Codex runtime workflow contract
 upstream design ../canonical/CODEX_SUBAGENTS.md pre-goal subagent routing contract

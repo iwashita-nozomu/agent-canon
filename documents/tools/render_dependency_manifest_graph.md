@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents dependency manifest graph report rendering.
 upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
 upstream implementation ../../tools/agent_tools/check_dependency_graph.sh writes dependency graph TSV artifacts.

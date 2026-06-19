@@ -1,6 +1,7 @@
 # experiment-lifecycle
 <!--
 @dependency-start
+contract skill
 responsibility Documents experiment-lifecycle for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable experiment and report structure contract
@@ -48,6 +49,9 @@ upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics
 - 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の互換ログとして残し、追加ログは `logs/` に分けます。
 - smoke / formal の入口は project `Makefile` に置き、内側で `tools/experiments/run_managed_experiment.py` を呼びます。
 - registered command は `{config_path}` を受け取ります。
+- formal run は source checkout、既定では `main` で実行し、run 完了後に
+  `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`
+  で結果と report を専用 result branch へ保存します。
 - result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
 - experiment plan / report の paragraph order、causal transition、evidence-to-claim transition が非自明な場合は、`structure-planning` 側で `agent-canon semantic-index discourse-relations --profile experiment-report` または `--profile methods-protocol` を使い、discourse edge を構造 evidence として保存します。

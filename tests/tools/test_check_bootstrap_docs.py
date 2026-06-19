@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests bootstrap docs checker behavior.
 # upstream implementation ../../tools/docs/check_bootstrap_docs.py bootstrap docs checker under test
 # upstream design ../../documents/template-bootstrap.md bootstrap documentation contract

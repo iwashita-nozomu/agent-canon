@@ -4,6 +4,7 @@ description: Use when a report, experiment plan, Eval output, presentation story
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Structure Planning runtime skill for this repository.
 upstream design ../../../agents/skills/structure-planning.md documents the human-facing structure planning workflow
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement
@@ -13,6 +14,19 @@ upstream design ../../../agents/workflows/slide-production-workflow.md defines P
 -->
 
 # Structure Planning
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/structure-planning.md`.
 1. Use this before drafting prose, writing a renderer, interpreting experiment output, planning a presentation/deck, planning follow-up runs, or editing refactor surfaces when the work has a nontrivial structure.

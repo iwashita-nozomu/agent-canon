@@ -4,6 +4,7 @@ description: Use when drafting a submission paper, thesis chapter, or other pape
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents paper-writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable paper structure contracts
@@ -13,6 +14,19 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 
 
 # paper-writing
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill paper-writing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/paper-writing.md`.
 1. Read `agents/workflows/paper-writing-workflow.md`.

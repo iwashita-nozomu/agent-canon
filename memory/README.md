@@ -1,6 +1,7 @@
 # Memory
 <!--
 @dependency-start
+contract data
 responsibility Documents Memory for this repository.
 upstream design ../README.md shared canon overview
 upstream design ../PHILOSOPHY.md stable design-time philosophy canon

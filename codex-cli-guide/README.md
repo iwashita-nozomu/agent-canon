@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Provides the root index and navigation for the split OpenAI Codex CLI Japanese guide.
 upstream design source/codex_cli_guide_config_deepdive.full.md preserved generated guide body with runtime hook flag normalization.
 downstream implementation tools/validate_split.py validates split guide reconstruction.

@@ -1,6 +1,7 @@
 """Tests for generated report artifact guard."""
 
 # @dependency-start
+# contract test
 # responsibility Tests generated report artifact guard behavior.
 # upstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated reports left in tree
 # upstream implementation ../../tools/agent_tools/report_artifact_checks.py classifies report artifact paths

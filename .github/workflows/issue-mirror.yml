@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Checks and optionally synchronizes AgentCanon local issues with GitHub Issues.
 # upstream design ../../issues/README.md durable local issue and GitHub mirror policy
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates and syncs issue mirrors

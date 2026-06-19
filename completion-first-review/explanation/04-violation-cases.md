@@ -1,6 +1,7 @@
 # Violation Cases
 <!--
 @dependency-start
+contract reference
 responsibility Catalogs cases that should not pass completion under the completion-first AgentCanon review.
 upstream design ../README.md completion-first review index
 upstream design 03-evidence-and-closeout.md evidence hierarchy and closeout rules

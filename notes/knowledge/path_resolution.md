@@ -1,6 +1,7 @@
 # Path Resolution
 <!--
 @dependency-start
+contract reference
 responsibility Documents Path Resolution for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

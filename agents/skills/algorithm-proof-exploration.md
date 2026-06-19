@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents theorem-driven algorithm exploration before final formal proof adoption.
 upstream design formal-proof-workflow.md checker-backed formal proof workflow.
 upstream design computational-optimization.md numerical optimization contract workflow.

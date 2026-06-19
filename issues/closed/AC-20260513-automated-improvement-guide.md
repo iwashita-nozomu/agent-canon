@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the workflow defect where memory, eval, hook, and issue evidence was not summarized on PR or branch push.
 upstream design ../README.md defines durable issue storage
 upstream design ../../agents/evals/README.md defines eval and behavior evidence
@@ -16,6 +17,7 @@ status: resolved
 source: user
 severity: S1
 evidence: .github/workflows/agent-improvement-guide.yml
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/245
 affected_surfaces: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, documents/runtime-log-archive.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, tools/catalog.yaml
 edit_scope: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, tests/agent_tools/test_generate_agent_improvement_guide.py, documents/runtime-log-archive.md, tools/README.md, tools/catalog.yaml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py
 required_action: Generate a deterministic memory/eval/hook/issues improvement guide on PR and branch push without mutating repository state.

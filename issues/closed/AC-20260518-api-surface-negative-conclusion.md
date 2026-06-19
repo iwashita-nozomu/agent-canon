@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the workflow defect where an agent declared an API path impossible before following nested public configuration surfaces.
 upstream design ../README.md defines durable AgentCanon operational issue conventions.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow.

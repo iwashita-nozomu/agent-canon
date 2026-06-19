@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents プロジェクト全体の運用規約 for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy

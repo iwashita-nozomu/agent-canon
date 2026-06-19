@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents the unified Rust docs formatter and checker.
 upstream implementation ../../rust/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.

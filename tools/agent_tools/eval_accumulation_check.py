@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Validates append-only AgentCanon eval and hook result accumulation.
 # upstream design ../../evidence/agent-evals/README.md eval usage contract
 # upstream design ../../evidence/agent-evals/eval_result_families.toml eval family artifact registry

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents path-risk classifier usage.
 upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths into runtime profiles.
 upstream design ../runtime-profiles-and-check-matrix.md defines profile-based validation routing.

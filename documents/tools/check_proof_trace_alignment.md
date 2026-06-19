@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents check_proof_trace_alignment.py operator usage.
 upstream implementation ../../tools/agent_tools/check_proof_trace_alignment.py checks proof trace anchors.
 upstream design ../../agents/skills/formal-proof-workflow.md defines proof trace alignment policy.

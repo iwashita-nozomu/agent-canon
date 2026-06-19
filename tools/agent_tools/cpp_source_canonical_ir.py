@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Extracts source-canonical C++ records into the shared thin operational IR.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md defines the wrapper contract.
 # upstream implementation jit_canonical_ir.py defines the shared thin operational IR schema shape.

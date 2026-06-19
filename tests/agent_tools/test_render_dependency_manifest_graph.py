@@ -1,6 +1,7 @@
 """Tests for dependency manifest graph report rendering."""
 
 # @dependency-start
+# contract test
 # responsibility Tests dependency manifest graph report rendering.
 # upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT reports.
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh produces graph TSV inputs.

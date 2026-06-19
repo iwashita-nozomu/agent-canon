@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records the operational finding that repo search tooling is difficult to discover without prior tool-name knowledge.
 upstream design ../README.md defines AgentCanon operational issue conventions.
 upstream design ../../documents/dependency-manifest-design.md defines search-to-edit-scope evidence.
@@ -24,6 +25,7 @@ status: resolved
 source: user
 severity: S2
 evidence: tools/agent_tools/search.py
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/257
 affected_surfaces: tools/agent_tools/route.py, tools/agent_tools/search.py, tools/agent_tools/search_index.py, tools/agent_tools/vector_search.py, tools/README.md, documents/tools/README.md, documents/search-coordination.md, tools/catalog.yaml, tests/agent_tools/test_route.py, tests/agent_tools/test_search.py, tests/agent_tools/test_search_index.py, tests/agent_tools/test_vector_search.py
 edit_scope: reports/agents/20260518-010710-add-coordinated-text-llm-vector-tool-cod/
 required_action: Add an obvious AgentCanon route and documentation path for searching tools, documents, agents, and dependency-expanded edit scopes without knowing `vector_search.py` by name.

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests the markdown math fixer CLI behavior.
 # upstream implementation ../../tools/docs/fix_markdown_math.py markdown math fixer under test
 # upstream design ../../tools/README.md validated automation surface

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract issue
 responsibility Records resolution of the 2026-05-16 Template / AgentCanon 500 item audit.
 upstream design ../README.md defines durable AgentCanon operational issue storage.
 upstream design ../../documents/template-agent-canon-audit-resolution.md records the audit coverage ledger.
@@ -15,6 +16,7 @@ status: resolved
 source: user
 severity: S1
 evidence: user-supplied audit artifact archived locally as parent reports/template_agent_canon_audit_500_issues.md; tracked coverage ledger in ../../documents/template-agent-canon-audit-resolution.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/252
 affected_surfaces: README.md, QUICK_START.md, Makefile, ROOT_AGENTS.md, agents/canonical/CODEX_WORKFLOW.md, agents/skills/start-repository.md, agents/skills/catalog.yaml, documents/runtime-profiles-and-check-matrix.md, documents/template-agent-canon-audit-resolution.md, documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, documents/tools/README.md, tools/sync_agent_canon.sh
 edit_scope: documents/runtime-profiles-and-check-matrix.md, documents/template-agent-canon-audit-resolution.md, README.md, ROOT_AGENTS.md, agents/canonical/CODEX_WORKFLOW.md, agents/skills/start-repository.md, agents/skills/catalog.yaml, documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, documents/tools/README.md, tools/catalog.yaml, tools/sync_agent_canon.sh, parent README.md, parent QUICK_START.md, parent Makefile, parent documents/README.md
 required_action: Convert broad always-on rules and legacy wording into profile-based, risk-based, or compatibility-only policy while preserving required MCP and AgentCanon source ownership constraints.

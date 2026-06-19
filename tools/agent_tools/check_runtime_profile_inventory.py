@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Detects drift between runtime profile inventory JSON and its rendered markdown doc.
 # upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
 # upstream design ../../documents/runtime-profiles-and-check-matrix.md human-readable runtime profile doc

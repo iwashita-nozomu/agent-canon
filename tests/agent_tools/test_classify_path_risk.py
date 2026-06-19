@@ -1,6 +1,7 @@
 """Tests for path/risk check matrix classification."""
 
 # @dependency-start
+# contract test
 # responsibility Tests path-risk classifier smoke routing.
 # upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths.
 # upstream design ../../documents/runtime-profiles-and-check-matrix.md defines risk/check routing.

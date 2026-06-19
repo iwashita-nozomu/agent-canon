@@ -1,6 +1,7 @@
 # Agent Update Branch Workflow
 <!--
 @dependency-start
+contract workflow
 responsibility Defines branch lanes for Template and AgentCanon runtime updates.
 upstream design ../canonical/CODEX_WORKFLOW.md provides closeout gates
 downstream implementation ../../tools/agent_tools/agent_update_branch.sh validates lane-specific diffs

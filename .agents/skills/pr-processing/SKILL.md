@@ -4,6 +4,7 @@ description: "Use when processing GitHub pull requests or issue queues: inventor
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents PR Processing runtime skill for this repository.
 upstream design ../../../agents/skills/pr-processing.md documents the human-facing workflow
 upstream design ../../../agents/workflows/pr-queue-cleanup-workflow.md defines AgentCanon source and parent pin queue cleanup
@@ -16,6 +17,19 @@ upstream implementation ../../../tools/agent_tools/github_publish.py publishes P
 -->
 
 # PR Processing
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/pr-processing.md`.
 1. If AgentCanon source PRs or parent pin PRs are involved, also read

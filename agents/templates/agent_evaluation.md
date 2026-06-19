@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract template
 responsibility Documents Agent Evaluation for this repository.
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py generates concrete evaluations
 downstream implementation ../../tools/agent_tools/task_close.py enforces pass status before user completion

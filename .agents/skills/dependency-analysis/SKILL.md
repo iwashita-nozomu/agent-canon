@@ -5,6 +5,7 @@ description: Use when checking, validating, or diagnosing repository dependency 
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Dependency Analysis for this repository.
 upstream design ../../../documents/dependency-manifest-design.md defines manifest format and graph semantics
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
@@ -15,6 +16,19 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py va
 -->
 
 # Dependency Analysis
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-analysis --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `documents/dependency-manifest-design.md`.
 1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.

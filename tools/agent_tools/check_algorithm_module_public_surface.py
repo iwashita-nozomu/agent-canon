@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks algorithm module public surface against the standard solver contract.
 # upstream design ../../documents/tools/README.md algorithm module surface checker
 # downstream implementation ../../tests/agent_tools/test_check_algorithm_module_public_surface.py tests checker  # noqa: E501

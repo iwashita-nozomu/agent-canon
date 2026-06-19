@@ -1,6 +1,7 @@
 """Tests for notebook quality validation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests notebook quality validation for readable runnable demo notebooks.
 # upstream implementation ../../tools/validation/notebook_quality.py validates notebook structure and content
 # @dependency-end

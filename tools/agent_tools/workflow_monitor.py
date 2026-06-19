@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy

@@ -1,6 +1,7 @@
 """Tests for responsibility scope validation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests responsibility scope validation.
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope manifest
 # upstream design ../../responsibility-scope.toml scope fixture contract

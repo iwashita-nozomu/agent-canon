@@ -4,6 +4,7 @@ description: Use when writing, exporting, saving, accumulating, or reporting too
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Result Artifact Writeout for this repository.
 upstream design ../../../agents/skills/result-artifact-writeout.md documents the human-facing skill
 upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md defines run-local and durable artifact placement
@@ -15,6 +16,19 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 
 # Result Artifact Writeout
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill result-artifact-writeout --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/result-artifact-writeout.md`.
 1. Classify the destination before writing: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, or `generated-triage`.
 1. Preserve the raw machine-readable source result first, then derive the Markdown/table summary from that same result.
@@ -25,6 +39,7 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 1. Use append-only JSONL or a unique file path for repeated hook, skill eval, prompt eval, checker, or experiment runs; do not overwrite detailed results.
 1. Include stable grouping fields such as payload/input fingerprint, hook/tool name, status, exit code, branch, commit, and runtime namespace when available.
 1. For experiment outputs, keep raw run artifacts under `experiments/<topic>/result/<run_name>/` and reader-facing reports under `experiments/report/<run_name>.md`.
+1. For formal experiment retention, publish those raw/report artifacts to the dedicated result branch with `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`; add `--push` when the retention plan includes remote storage.
 1. For run-local task evidence, write under `reports/agents/<run-id>/` and include the artifact path in the final response or handoff.
 1. To find the exact report placement for the current repo, run `python3 tools/agent_tools/runtime_log_archive_git.py status` and read `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`, `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR`.
 1. For normal cross-run retention of run-local agent reports, do not hand-generate an archive report. Use `python3 tools/agent_tools/runtime_log_archive_git.py sync`; it copies `reports/agents/` into `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>`.

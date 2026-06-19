@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract data
 responsibility Documents skill and workflow prompt eval definitions.
 upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents Branch Scope と Git ワークフロー for this repository.
 upstream design README.md durable document index
 @dependency-end

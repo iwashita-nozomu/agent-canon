@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents 責務分離 for this repository.
 upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end

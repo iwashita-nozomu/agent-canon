@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract workflow
 responsibility Documents token-efficient Codex workflow and agent modes.
 upstream design ../canonical/CODEX_WORKFLOW.md Codex runtime workflow contract
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent routing contract

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Updates latest experiment result pointers.
 # upstream design ../../documents/result-log-retention-and-visualization.md defines latest-result pointer policy.
 # upstream design ../../documents/experiment-report-style.md defines experiment report artifact layout.

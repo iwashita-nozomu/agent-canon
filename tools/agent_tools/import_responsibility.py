@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks Python imports for unused aliases and responsibility-scope boundary violations.
 # upstream design ../../responsibility-scope.toml declares scope ownership and import rules
 # upstream design ../../documents/responsibility-scope-management.md explains scope ownership policy

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

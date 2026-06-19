@@ -1,6 +1,7 @@
 # Coding Decision Methods
 <!--
 @dependency-start
+contract reference
 responsibility Documents Coding Decision Methods for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end

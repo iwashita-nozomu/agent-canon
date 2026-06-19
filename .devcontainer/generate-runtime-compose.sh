@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream environment devcontainer.json initializeCommand entrypoint
@@ -129,14 +130,63 @@ if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
 fi
 
-gpu_mode="disabled"
-if [ -e /dev/nvidiactl ] || command -v nvidia-smi >/dev/null 2>&1; then
-  gpu_mode="enabled"
+host_gpu_visible() {
+  [ -e /dev/nvidiactl ] && return 0
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
+}
+
+docker_gpu_runtime_available() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'
+}
+
+gpu_request_raw="${DEVCONTAINER_GPU_REQUEST:-auto}"
+gpu_request="auto"
+gpu_mode="unavailable"
+gpu_notice="host-gpu-not-visible"
+case "$gpu_request_raw" in
+  auto | "")
+    if host_gpu_visible; then
+      if docker_gpu_runtime_available; then
+        gpu_mode="enabled"
+        gpu_notice="docker-nvidia-runtime-available"
+      else
+        gpu_notice="docker-nvidia-runtime-unavailable"
+      fi
+    fi
+    ;;
+  disabled | off | false | FALSE | 0)
+    gpu_request="disabled"
+    gpu_mode="disabled"
+    gpu_notice="disabled-by-request"
+    ;;
+  enabled | on | true | TRUE | 1)
+    gpu_request="enabled"
+    if host_gpu_visible && docker_gpu_runtime_available; then
+      gpu_mode="enabled"
+      gpu_notice="docker-nvidia-runtime-available"
+    elif host_gpu_visible; then
+      gpu_notice="docker-nvidia-runtime-unavailable"
+    fi
+    ;;
+  *)
+    printf 'devcontainer gpu request ignored: DEVCONTAINER_GPU_REQUEST must be auto, enabled, or disabled\n' >&2
+    if host_gpu_visible && docker_gpu_runtime_available; then
+      gpu_mode="enabled"
+      gpu_notice="docker-nvidia-runtime-available"
+    fi
+    ;;
+esac
+
+if [ "$gpu_mode" = "unavailable" ]; then
+  printf 'devcontainer gpu unavailable: %s; continuing without gpus: all\n' "$gpu_notice" >&2
 fi
 
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
+  "      DEVCONTAINER_GPU_NOTICE: \"${gpu_notice}\""
+  "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   "${pack_environment_lines[@]}"

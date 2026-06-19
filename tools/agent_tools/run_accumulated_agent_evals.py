@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Runs all registered AgentCanon eval producers in append-only accumulation mode.
 # upstream design ../../evidence/agent-evals/README.md eval family and accumulation contract
 # upstream design ../../documents/runtime-log-archive.md external runtime log archive contract

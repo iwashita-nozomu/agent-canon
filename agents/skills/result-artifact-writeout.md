@@ -1,6 +1,7 @@
 # result-artifact-writeout
 <!--
 @dependency-start
+contract skill
 responsibility Documents result-artifact-writeout for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement
@@ -50,6 +51,9 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
   `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`
 - experiment reader report: `experiments/report/<run_name>.md`
+- formal experiment result branch: `experiment-results/<topic>` or the
+  topic-specific branch fixed in the experiment plan. Publish with
+  `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`.
 - generated triage report: `reports/<tool-or-task>/`
 
 Do not store generated reports as policy truth. If a report changes a rule, edit

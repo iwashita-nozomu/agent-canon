@@ -4,6 +4,7 @@ description: Use when producing a browser-readable HTML experiment or Eval repor
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents HTML Experiment Report runtime skill for this repository.
 upstream design ../../../agents/skills/html-experiment-report.md documents the canonical HTML experiment report workflow
 upstream design ../../../agents/skills/structure-planning.md defines reusable structure contracts
@@ -16,6 +17,19 @@ downstream implementation ../../../tools/agent_tools/semantic_provider_html_repo
 -->
 
 # HTML Experiment Report
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill html-experiment-report --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/html-experiment-report.md`.
 1. Use `$structure-planning` before renderer or experiment implementation to fix the first figure, source-to-structure map, metric contract, section order, and invalid interpretations.

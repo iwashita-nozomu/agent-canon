@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks Python run-log ownership and Info summary emission contracts.
 # upstream design ../../documents/coding-conventions-logging.md logging convention overview
 # upstream design ../../documents/conventions/common/01_principles.md canonical simplicity principle

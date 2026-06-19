@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests nested Codex container runner behavior.
 # upstream implementation ../../tools/ci/run_codex_in_repo_container.py runs Codex inside the repo container
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary

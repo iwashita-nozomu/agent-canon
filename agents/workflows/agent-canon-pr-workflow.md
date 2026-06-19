@@ -1,6 +1,7 @@
 # agent-canon PR ワークフロー
 <!--
 @dependency-start
+contract workflow
 responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/update_agent_canon.sh tool-first latest update and conflict handoff

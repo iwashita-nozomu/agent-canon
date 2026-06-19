@@ -1,6 +1,7 @@
 # html-experiment-report
 <!--
 @dependency-start
+contract skill
 responsibility Documents the HTML experiment report workflow and display contract.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog

@@ -4,6 +4,7 @@ description: Use when organizing repository documents, finding non-canonical doc
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Document Canon Cleanup for this repository.
 upstream design ../../../agents/skills/document-canon-cleanup.md human-facing skill canon
 upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs finds cleanup candidates
@@ -13,6 +14,19 @@ upstream implementation ../../../tools/agent_tools/noncanonical_document_invento
 
 
 # Document Canon Cleanup
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill document-canon-cleanup --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/document-canon-cleanup.md`.
 1. Prefer the Rust structured-analysis command:

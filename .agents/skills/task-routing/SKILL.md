@@ -5,6 +5,7 @@ description: Use when choosing short AgentCanon tool, skill, profile, check, run
 
 <!--
 @dependency-start
+contract skill
 responsibility Documents Task Routing skill shim.
 upstream design ../../../agents/skills/task-routing.md human-facing task routing skill
 upstream implementation ../../../tools/agent_tools/route.py selects short routing areas
@@ -12,6 +13,19 @@ upstream implementation ../../../tools/agent_tools/route.py selects short routin
 -->
 
 # Task Routing
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/task-routing.md`.
 1. Use `python3 tools/agent_tools/route.py --name <candidate>` to resolve a long proposed tool or skill name before creating any new public surface.

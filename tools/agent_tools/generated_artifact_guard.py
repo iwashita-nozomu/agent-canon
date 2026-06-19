@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Rejects mechanically regenerated report artifacts left in the source tree.
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
 # upstream design ../../agents/templates/closeout_gate.md closeout evidence template

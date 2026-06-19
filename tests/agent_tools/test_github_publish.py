@@ -1,6 +1,7 @@
 """Tests for the gh-backed GitHub publish tool."""
 
 # @dependency-start
+# contract test
 # responsibility Tests GitHub publish tool command construction and failure boundaries.
 # upstream implementation ../../tools/agent_tools/github_publish.py implements gh-backed publish.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines publish workflow policy.

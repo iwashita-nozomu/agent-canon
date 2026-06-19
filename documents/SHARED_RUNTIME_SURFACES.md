@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents Shared Runtime Surfaces for this repository.
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy

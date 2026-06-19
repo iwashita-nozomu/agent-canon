@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents Agent Hub for this repository.
 upstream design ../README.md shared canon overview
 @dependency-end

@@ -1,6 +1,7 @@
 """Tests for container configuration validation."""
 
 # @dependency-start
+# contract test
 # responsibility Tests Dockerfile, runtime pack, and devcontainer config validation.
 # upstream implementation ../../tools/ci/container_config.py validates container config
 # upstream implementation ../../tools/ci/container_runtime.py defines runtime pack fields
@@ -78,6 +79,37 @@ def write_file(root: Path, relative: str, text: str) -> None:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def write_valid_vscode_files(root: Path, relative: str = ".vscode") -> None:
+    """Write valid shared VS Code fixture files."""
+    write_file(root, f"{relative}/c_cpp_properties.json", "{}\n")
+    write_file(root, f"{relative}/extensions.json", "{}\n")
+    write_file(root, f"{relative}/settings.json", "{}\n")
+    write_file(root, f"{relative}/tasks.json", "{}\n")
+
+
+def write_vscode_surface_manifest(
+    root: Path,
+    relative: str = "documents/shared-runtime-surfaces.toml",
+) -> None:
+    """Write a minimal shared surface manifest with .vscode ownership."""
+    write_file(
+        root,
+        relative,
+        "\n".join(
+            [
+                'prefix = "vendor/agent-canon"',
+                "",
+                "[[group]]",
+                'mode = "symlink"',
+                'owner = "agent-canon"',
+                'class = "runtime_surface"',
+                'paths = [".vscode"]',
+                "",
+            ]
+        ),
+    )
 
 
 def write_valid_runtime(root: Path) -> None:
@@ -366,6 +398,50 @@ def test_missing_runtime_config_is_skipped(tmp_path: Path) -> None:
     assert "CONTAINER_CONFIG_CHECKED=none" in result.stdout
 
 
+def test_vscode_source_checkout_passes(tmp_path: Path) -> None:
+    """Standalone AgentCanon source owns the shared VS Code workspace defaults."""
+    write_vscode_surface_manifest(tmp_path)
+    write_valid_vscode_files(tmp_path)
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG=pass" in result.stdout
+    assert "CONTAINER_CONFIG_CHECKED=.vscode" in result.stdout
+
+
+def test_template_vscode_shared_view_passes(tmp_path: Path) -> None:
+    """Template roots expose .vscode as a shared view into AgentCanon."""
+    write_vscode_surface_manifest(
+        tmp_path,
+        "vendor/agent-canon/documents/shared-runtime-surfaces.toml",
+    )
+    write_valid_vscode_files(tmp_path, "vendor/agent-canon/.vscode")
+    (tmp_path / ".vscode").symlink_to("vendor/agent-canon/.vscode", target_is_directory=True)
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG=pass" in result.stdout
+    assert "CONTAINER_CONFIG_CHECKED=.vscode" in result.stdout
+
+
+def test_template_vscode_local_directory_fails(tmp_path: Path) -> None:
+    """Template roots keep the root .vscode path as the AgentCanon shared view."""
+    write_vscode_surface_manifest(
+        tmp_path,
+        "vendor/agent-canon/documents/shared-runtime-surfaces.toml",
+    )
+    write_valid_vscode_files(tmp_path, "vendor/agent-canon/.vscode")
+    write_valid_vscode_files(tmp_path)
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG=fail" in result.stdout
+    assert "inconsistency:.vscode:expected-shared-view:vendor/agent-canon/.vscode" in result.stdout
+
+
 def test_devcontainer_only_source_checkout_passes(tmp_path: Path) -> None:
     """Standalone AgentCanon source can validate shared devcontainer without docker/."""
     write_valid_devcontainer_only(tmp_path)
@@ -457,6 +533,113 @@ def test_shared_generator_mounts_configured_secret_directory(tmp_path: Path) -> 
     assert "read_only: false" in compose
     assert 'AGENT_CANON_SECRET_MOUNT: "/mnt/private-git"' in compose
     assert 'AGENT_CANON_SECRET_DIR_MODE: "rw"' in compose
+
+
+def test_shared_generator_warns_instead_of_requiring_missing_gpu_runtime(
+    tmp_path: Path,
+) -> None:
+    """A host GPU without Docker NVIDIA runtime should not make compose require GPUs."""
+    write_valid_runtime_pack(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        (PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    nvidia_smi = fake_bin / "nvidia-smi"
+    nvidia_smi.write_text("#!/usr/bin/env bash\nprintf 'GPU 0: fixture\\n'\n", encoding="utf-8")
+    nvidia_smi.chmod(0o755)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [ \"$1\" = info ]; then printf '%s\\n' '{\"runc\":{}}'; exit 0; fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(tmp_path / "home"),
+    }
+    env.pop("SSH_AUTH_SOCK", None)
+    Path(env["HOME"]).mkdir()
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (tmp_path / ".devcontainer" / "docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "gpus: all" not in compose
+    assert 'DEVCONTAINER_GPU_MODE: "unavailable"' in compose
+    assert 'DEVCONTAINER_GPU_NOTICE: "docker-nvidia-runtime-unavailable"' in compose
+    assert "devcontainer gpu unavailable: docker-nvidia-runtime-unavailable" in result.stderr
+
+
+def test_shared_generator_requires_gpu_only_when_runtime_is_available(
+    tmp_path: Path,
+) -> None:
+    """Generated compose should request GPUs only when Docker can satisfy it."""
+    write_valid_runtime_pack(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        (PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    nvidia_smi = fake_bin / "nvidia-smi"
+    nvidia_smi.write_text("#!/usr/bin/env bash\nprintf 'GPU 0: fixture\\n'\n", encoding="utf-8")
+    nvidia_smi.chmod(0o755)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [ \"$1\" = info ]; then printf '%s\\n' '{\"nvidia\":{}}'; exit 0; fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(tmp_path / "home"),
+    }
+    env.pop("SSH_AUTH_SOCK", None)
+    Path(env["HOME"]).mkdir()
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (tmp_path / ".devcontainer" / "docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "gpus: all" in compose
+    assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
+    assert 'DEVCONTAINER_GPU_NOTICE: "docker-nvidia-runtime-available"' in compose
 
 
 def test_valid_runtime_config_passes(tmp_path: Path) -> None:

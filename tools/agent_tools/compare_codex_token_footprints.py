@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Compares Codex session token footprints and records run-bundle evidence.
 # upstream design ../../agents/templates/workflow_monitoring.md stores run evidence
 # upstream design ../../agents/workflows/token-efficient-codex-workflow.md defines token comparison protocol

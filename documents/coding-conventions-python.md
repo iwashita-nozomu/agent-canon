@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract policy
 responsibility Documents Python コーディング規約 for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy for Python implementations

@@ -1,6 +1,7 @@
 # project-health
 <!--
 @dependency-start
+contract agent-runtime
 responsibility Documents project-health for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end

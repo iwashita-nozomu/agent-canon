@@ -1,0 +1,28 @@
+# @dependency-start
+# contract registry
+# responsibility Registers dependency header contract kinds for AgentCanon manifests.
+# upstream design dependency-manifest-design.md dependency manifest DSL design
+# downstream implementation ../tools/agent_tools/check_dependency_headers.py validates changed-file contract kinds
+# downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates registered contract kinds
+# @dependency-end
+
+schema = "agent_canon.dependency_contract_kinds.v1"
+
+allowed_kinds = [
+  "agent-runtime",
+  "configuration",
+  "data",
+  "design",
+  "environment",
+  "implementation",
+  "issue",
+  "policy",
+  "reference",
+  "registry",
+  "report",
+  "skill",
+  "template",
+  "test",
+  "tool",
+  "workflow",
+]

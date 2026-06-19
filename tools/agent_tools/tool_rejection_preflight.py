@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift

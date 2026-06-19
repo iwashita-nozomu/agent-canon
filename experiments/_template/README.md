@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract reference
 responsibility Documents the managed experiment topic scaffold.
 upstream design ../../documents/experiment-registry.md defines managed experiment command protocol.
 upstream implementation ../../tools/experiments/create_experiment_topic.py copies this template into project topics.

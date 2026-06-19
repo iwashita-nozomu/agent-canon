@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines document canon and duplicate-document analysis for structured analysis.
 upstream design README.md structured analysis package index
 upstream design database-design.md defines document-canon DB layer placement

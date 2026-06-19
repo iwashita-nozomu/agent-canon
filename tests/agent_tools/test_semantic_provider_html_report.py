@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests semantic provider HTML report rendering.
 # upstream implementation ../../tools/agent_tools/semantic_provider_html_report.py renders semantic provider comparison HTML
 # upstream design ../../agents/skills/html-experiment-report.md defines HTML experiment report workflow

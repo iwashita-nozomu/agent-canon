@@ -1,6 +1,7 @@
 """Tests for helper function inventory role inference."""
 
 # @dependency-start
+# contract test
 # responsibility Tests helper function inventory and role inference.
 # upstream implementation ../../tools/agent_tools/helper_function_inventory.py inventories helper roles
 # upstream design ../../documents/tools/README.md documents tool entrypoints

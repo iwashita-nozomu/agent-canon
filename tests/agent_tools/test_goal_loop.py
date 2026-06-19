@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests goal loop automation.
 # upstream implementation ../../tools/agent_tools/goal_loop.py goal loop CLI
 # upstream design ../../goal.md top-level goal contract

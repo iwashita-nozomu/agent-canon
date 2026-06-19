@@ -2,7 +2,8 @@
 
 <!--
 @dependency-start
-responsibility Documents AgentCanon-owned container, devcontainer, and recent cross-repository operation rules.
+contract reference
+responsibility Documents AgentCanon-owned container, devcontainer, editor workspace, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
@@ -11,6 +12,7 @@ downstream design documents/coding-conventions-project.md project environment an
 downstream environment agent-canon-environment.toml machine-readable AgentCanon environment contract.
 downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
 downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
+downstream implementation .vscode/settings.json shared AgentCanon VS Code workspace defaults.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
 downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
 @dependency-end
@@ -18,7 +20,8 @@ downstream implementation tools/ci/check_github_workflows.py GitHub workflow che
 
 This rulebook is the top-level AgentCanon reference for repositories that vendor
 AgentCanon as a submodule. Use it before editing, normalizing, or reformatting
-container and devcontainer surfaces in a template-derived repository.
+container, devcontainer, or shared editor workspace surfaces in a
+template-derived repository.
 
 ## Scope
 
@@ -29,6 +32,7 @@ AgentCanon shared root view.
 Read this file when a task touches any of these surfaces:
 
 - `.devcontainer/`
+- `.vscode/`
 - `Dockerfile`
 - `docker/`
 - `.github/workflows/*docker*`
@@ -40,7 +44,7 @@ Read this file when a task touches any of these surfaces:
 
 ## Canonical Source Contract
 
-This file is the source of truth for the Docker / devcontainer ownership
+This file is the source of truth for the Docker / devcontainer / VS Code ownership
 boundary. `agent-canon-environment.toml` is the machine-readable environment
 contract for Rust tooling, compiled tool cache, MCP preflight commands, and
 local LLM tool locations. Other files may summarize the boundary, but they must
@@ -67,11 +71,12 @@ only as needed to keep them consistent with this rulebook.
 
 ## Ownership Boundary
 
-Container surfaces have four owner classes.
+The ownership boundary covers these primary surfaces.
 
 | Surface | Owner | Rule |
 | --- | --- | --- |
 | `.devcontainer/` | AgentCanon | Shared runtime view. Keep common Codex, GitHub CLI, Rust toolchain, mount, and post-create behavior here. |
+| `.vscode/` | AgentCanon | Shared editor workspace view. Keep common AgentCanon recommendations, safe defaults, and validation tasks here. |
 | `Dockerfile` | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here. |
 | `docker/` | Template or derived repository | Project-local container runbook, dependency packs, runtime package contract, and repository-specific image policy. |
 | GitHub Docker workflow | Mixed | Workflow file may be GitHub path-constrained copy, but its Docker behavior must follow this rulebook and checkout AgentCanon before shared devcontainer smoke. |
@@ -168,6 +173,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - The generated Docker Compose file must not pin subnet, gateway, or other
   IPAM values. Let Docker Compose allocate the default network automatically so
   multiple checkouts and host networks do not collide.
+- GPU discovery is best-effort and notification-only by default. The generated
+  Compose file may include `gpus: all` only when the host GPU and Docker NVIDIA
+  runtime are both visible, or when `DEVCONTAINER_GPU_REQUEST=enabled` can be
+  satisfied. Missing GPU access must not fail container creation in the default
+  path; it should be reported in the generated status and post-attach banner.
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and

@@ -1,4 +1,5 @@
 # @dependency-start
+# contract configuration
 # responsibility Defines AgentCanon maintenance issue capture form.
 # upstream design ../../documents/issue-label-taxonomy.md issue labels and template routing.
 # upstream design ../../issues/README.md durable operational issue storage policy.

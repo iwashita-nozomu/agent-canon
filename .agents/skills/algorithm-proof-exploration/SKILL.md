@@ -5,6 +5,7 @@ description: Use when exploring, refactoring, or choosing an algorithm under pro
 
 <!--
 @dependency-start
+contract skill
 responsibility Exposes theorem-driven algorithm exploration to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/algorithm-proof-exploration.md canonical skill document
 upstream design ../../../agents/skills/formal-proof-workflow.md checker-backed claim workflow.
@@ -16,6 +17,19 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
 -->
 
 # Algorithm Proof Exploration
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill algorithm-proof-exploration --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/algorithm-proof-exploration.md`.
 1. Use `$formal-proof-workflow` with this skill. This skill owns algorithm

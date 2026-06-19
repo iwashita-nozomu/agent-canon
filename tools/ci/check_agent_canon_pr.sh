@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract tool
 # responsibility Checks agent canon pr CI readiness.
 # upstream design ../../tools/README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
@@ -11,6 +12,7 @@
 # upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
 # upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
+# upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
 # @dependency-end
@@ -74,6 +76,7 @@ run_direct_agent_checks() {
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
+  python3 tools/agent_tools/skill_tool_commands.py check
 }
 
 run_shared_surface_status() {
@@ -193,6 +196,7 @@ run_standalone_static_gate_ci() {
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
   python3 tools/agent_tools/check_convention_compliance.py
+  python3 tools/agent_tools/skill_tool_commands.py check
   python3 tools/ci/check_github_workflows.py
   python3 tools/ci/container_config.py
 }

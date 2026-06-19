@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests vendored third-party skill adapter validation.
 # upstream implementation ../../tools/agent_tools/vendor_skill_adapters.py validates and syncs adapters
 # upstream design ../../vendor/skills/README.md third-party skill vendor contract

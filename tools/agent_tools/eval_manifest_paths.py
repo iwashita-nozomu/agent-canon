@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Resolves canonical and legacy eval manifest source paths.
 # upstream design ../../evidence/README.md evidence directory ownership
 # upstream design ../../evidence/agent-evals/README.md canonical eval manifest source

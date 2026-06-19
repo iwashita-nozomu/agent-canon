@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Checks jax export stack CI readiness.
 # upstream design ../README.md shared automation index
 # @dependency-end

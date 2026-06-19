@@ -1,6 +1,7 @@
 """Tests for AgentCanon repository structure contract checks."""
 
 # @dependency-start
+# contract test
 # responsibility Tests repo structure contract comparison from filesystem and tree JSON input.
 # upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
 # upstream design ../../documents/repo-structure-contract.toml defines expected repository structure profiles

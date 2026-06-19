@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Provides shared OOP rule inventory CLI behavior.
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
 # upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy

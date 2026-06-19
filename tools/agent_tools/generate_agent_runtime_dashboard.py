@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Generates read-only dashboards for AgentCanon runtime logs and eval results.
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime-log-archive.md eval and hook result storage contract

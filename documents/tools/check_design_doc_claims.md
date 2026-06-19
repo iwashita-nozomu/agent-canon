@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract design
 responsibility Documents check_design_doc_claims.py operator usage.
 upstream design ../dependency-manifest-design.md dependency manifest graph semantics
 upstream design ../design/README.md design-document evidence policy

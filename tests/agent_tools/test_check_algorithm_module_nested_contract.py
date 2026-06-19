@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests algorithm module nested ownership checker behavior.
 # upstream implementation ../../tools/agent_tools/check_algorithm_module_nested_contract.py checker
 # upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy

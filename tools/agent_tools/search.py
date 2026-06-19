@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Coordinates purpose-based search across text, local LLM cards, tool catalog, dependency headers, and Python code facts.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts

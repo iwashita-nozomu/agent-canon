@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Defines how dependency header graph evidence enters structured prose and report analysis.
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and validation boundary

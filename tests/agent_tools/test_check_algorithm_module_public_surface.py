@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests algorithm module public surface checker behavior.
 # upstream implementation ../../tools/agent_tools/check_algorithm_module_public_surface.py checker
 # upstream design ../../documents/tools/README.md algorithm module surface checker

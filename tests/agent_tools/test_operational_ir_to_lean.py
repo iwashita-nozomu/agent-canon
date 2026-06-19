@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests shared thin operational IR to Lean evidence rendering.
 # upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean evidence.
 # upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py produces C++ source IR.

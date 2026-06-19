@@ -1,6 +1,7 @@
 # Experiment Result JSON Archive
 <!--
 @dependency-start
+contract reference
 responsibility Documents Experiment Result JSON Archive for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+contract reference
 responsibility Documents local LLM responsibility review, implementation-surface routing, prose IR extraction, graph handoff, and result-surface boundaries.
 coverage local_llm_design_trace requires command surface; result surface; authority boundary; prompt contract; implementation surface routing; Prose IR|intermediate representation; graph DB|SQLite|nodes table; skill integration
 upstream design responsibility-scope-management.md responsibility scope policy

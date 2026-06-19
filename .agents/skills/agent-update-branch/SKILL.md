@@ -4,6 +4,7 @@ description: Use when Memory, eval results, AgentCanon pins, or other agent-runt
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Agent Update Branch skill for this repository.
 upstream design ../../../agents/workflows/agent-update-branch-workflow.md defines branch lanes and integration gates
 upstream implementation ../../../tools/agent_tools/agent_update_branch.sh validates and pushes update branches
@@ -11,6 +12,19 @@ upstream implementation ../../../tools/agent_tools/agent_update_branch.sh valida
 -->
 
 # Agent Update Branch
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill agent-update-branch --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/workflows/agent-update-branch-workflow.md`.
 1. Classify the update lane:

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# contract environment
 # responsibility Runs shared devcontainer post-create setup after workspace mount.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary

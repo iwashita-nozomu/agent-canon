@@ -4,6 +4,7 @@ description: Use as the general explanatory-doc DSL-to-prose adapter for README,
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents Long-Form Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts
@@ -14,6 +15,19 @@ upstream design ../../../agents/skills/formal-proof-workflow.md defines mathemat
 
 
 # Long-Form Writing
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill long-form-writing --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/long-form-writing.md`.
 1. Treat the skill name as compatibility wording. Select this skill by file/document responsibility, not by word count: it is the prose projection adapter for general explanatory repository documents such as README, workflow, guide, migration, and specification docs.

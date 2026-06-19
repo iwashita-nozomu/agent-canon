@@ -1,6 +1,7 @@
 """Tests for request-local task authority lookup."""
 
 # @dependency-start
+# contract test
 # responsibility Tests request-local task authority lookup behavior.
 # upstream implementation ../../tools/agent_tools/task_authority.py locates active task authority files.
 # downstream implementation ../../.codex/hooks/task_authority_schema_guard.py consumes active task authority.

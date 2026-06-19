@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents formal_proof.py operator usage and proof-status boundary.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
 upstream design ../../agents/skills/formal-proof-workflow.md defines the natural-language to formal-proof workflow.

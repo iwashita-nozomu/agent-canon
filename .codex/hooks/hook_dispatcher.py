@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract agent-runtime
 # responsibility Dispatches Codex lifecycle hook events to the configured guard scripts.
 # upstream implementation ../hooks.json invokes this dispatcher once per active hook event.
 # upstream design ../README.md documents dispatcher-based hook wiring.

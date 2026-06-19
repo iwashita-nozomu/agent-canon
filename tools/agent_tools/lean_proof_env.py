@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# contract tool
 # responsibility Creates and checks AgentCanon Lean proof environments with proof-search, theorem-search, and counterexample tools.
 # upstream design ../../agents/skills/formal-proof-workflow.md requires checked Lean automation and counterexample routes before hand-built proof scaffolds.
 # downstream design ../../documents/tools/lean_proof_env.md documents the CLI contract.

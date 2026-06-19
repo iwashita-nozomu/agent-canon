@@ -4,6 +4,7 @@ description: Use when the user explicitly asks for HTML output, a browser-readab
 ---
 <!--
 @dependency-start
+contract skill
 responsibility Documents HTML Output runtime skill for this repository.
 upstream design ../../../agents/skills/html-output.md documents the canonical HTML output workflow
 upstream design ../../../agents/skills/structure-planning.md defines reusable page structure contracts
@@ -13,6 +14,19 @@ upstream design ../../../agents/skills/html-experiment-report.md defines experim
 -->
 
 # HTML Output
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill html-output --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
 
 1. Read `agents/skills/html-output.md`.
 1. Confirm HTML is explicit. If the user asks for a report without saying HTML,

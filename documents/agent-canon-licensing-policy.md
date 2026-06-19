@@ -1,6 +1,7 @@
 # AgentCanon Licensing Policy
 <!--
 @dependency-start
+contract policy
 responsibility Documents AgentCanon licensing ownership and parent-repository boundary.
 upstream design ../LICENSE AgentCanon license text
 upstream design ./SHARED_RUNTIME_SURFACES.md shared surface ownership policy

@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Upstream sync note:.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 upstream design ../../issues/README.md durable operational issue storage

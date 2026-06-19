@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents GitHub Copilot and PR automation configuration boundaries.
 upstream design ../ROOT_AGENTS.md defines PR mutation authority and Copilot-visible evidence rules.
 upstream implementation ../.github/PULL_REQUEST_TEMPLATE/agent_canon.md records template / derived repo AgentCanon-pin PR evidence fields.
