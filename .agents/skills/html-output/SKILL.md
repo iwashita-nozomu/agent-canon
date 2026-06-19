@@ -14,6 +14,19 @@ upstream design ../../../agents/skills/html-experiment-report.md defines experim
 
 # HTML Output
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill html-output --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/html-output.md`.
 1. Confirm HTML is explicit. If the user asks for a report without saying HTML,
    browser view, dashboard, web page, or external browser publication, default to Markdown through `$report-writing` instead.

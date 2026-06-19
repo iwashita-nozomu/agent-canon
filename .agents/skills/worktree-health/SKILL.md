@@ -12,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # Worktree Health
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill worktree-health --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/worktree-health.md`.
 1. Read `reports/agents/.active_run`, `task_authority.yaml`, and `team_manifest.yaml` before judging current checkout write authority.
 1. Open `WORKTREE_SCOPE.md` and any legacy worktree action log as cleanup evidence only; do not treat them as scope authority for new work.

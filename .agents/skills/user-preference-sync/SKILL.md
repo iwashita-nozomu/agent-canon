@@ -12,6 +12,19 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # User Preference Sync
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+Use the command packet before applying this skill's workflow:
+
+```bash
+python3 tools/agent_tools/skill_tool_commands.py show --skill user-preference-sync --format text
+```
+
+Execute the required and task-matching conditional commands that the packet prints.
+<!-- skill-tool-commands:end -->
+
+
 1. Read `agents/skills/user-preference-sync.md`.
 1. Read `AGENTS.md` and `memory/USER_PREFERENCES.md`.
 1. Separate durable repo-wide preferences from task-local instructions.
