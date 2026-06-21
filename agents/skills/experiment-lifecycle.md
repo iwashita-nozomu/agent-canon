@@ -39,8 +39,9 @@ upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics
 
 - この repo の実験運用正本は `agents/workflows/experiment-workflow.md` です。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
-- topic の entrypoint と formal command は `experiments/registry.toml` を正本にします。
-- 新規 topic は最初に実験名を固定し、AgentCanon template path `vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーして始めます。
+- topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiment-registry.md` で定義します。template / derived repo root からは `vendor/agent-canon/documents/experiment-registry.md` として読み、project registry が無い場合は formal entrypoint 登録前に project-root registry を作成または更新します。
+- project registry がある場合は、formal 実行前に `python3 tools/ci/check_experiment_registry.py` で registry schema と registered command placeholder を確認します。
+- 新規 topic は最初に実験名を固定し、AgentCanon template path `vendor/agent-canon/experiments/_template/` を project-root `experiments/<topic>/` へコピーして始めます。
 - コピー後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - main server host で formal run を回す場合は、`run_manifest.json` と `run.log` を残す wrapper を優先します。
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config.json` または YAML snapshot として保存します。

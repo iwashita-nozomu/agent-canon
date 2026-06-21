@@ -47,7 +47,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         return runtime
 
     def test_sync_adds_command_section_and_check_passes(self) -> None:
-        """sync materializes the show command for every runtime skill."""
+        """Sync materializes the show command for every runtime skill."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             skill = self.write_skill(root, "example-skill", "Use the canon.\n")
@@ -65,7 +65,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             )
 
     def test_show_returns_discovered_commands(self) -> None:
-        """show prints commands discovered from the runtime and canon docs."""
+        """Show prints commands discovered from the runtime and canon docs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_skill(
@@ -84,6 +84,75 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "python3 tools/agent_tools/example.py",
                 payload["discovered_commands"],
             )
+
+    def test_show_ignores_directory_literals(self) -> None:
+        """Show excludes directory paths that are not executable commands."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "example-skill",
+                "Shared automation lives in `tools/`.\n",
+            )
+
+            result = self.run_tool(root, "show", "--skill", "example-skill", "--format", "json")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertNotIn("tools/", payload["discovered_commands"])
+
+    def test_check_rejects_bare_internal_tool_command(self) -> None:
+        """Check reports issue-backed bare internal tool command drift."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "result-artifact-writeout",
+                "Run `runtime_log_archive_git.py push` after archiving.\n",
+            )
+            sync = self.run_tool(root, "sync")
+
+            result = self.run_tool(root, "check")
+
+            self.assertIn("SKILL_TOOL_COMMANDS_SYNC_CHANGED=1", sync.stdout)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("bare-runtime-log-archive-push:present", result.stdout)
+
+    def test_check_requires_template_root_document_resolution_marker(self) -> None:
+        """Check reports issue-backed AgentCanon document path resolution drift."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "start-repository",
+                "Read `documents/agent-canon-github-remote.md`.\n",
+            )
+            sync = self.run_tool(root, "sync")
+
+            result = self.run_tool(root, "check")
+
+            self.assertIn("SKILL_TOOL_COMMANDS_SYNC_CHANGED=1", sync.stdout)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("remote-doc-template-path:missing", result.stdout)
+
+    def test_check_accepts_qualified_workflow_monitoring_paths(self) -> None:
+        """Check allows run-local and template workflow monitoring paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "tool-finding-report",
+                (
+                    "Register warnings in `reports/agents/123/workflow_monitoring.md` "
+                    "using template `agents/templates/workflow_monitoring.md`.\n"
+                ),
+            )
+            sync = self.run_tool(root, "sync")
+
+            result = self.run_tool(root, "check")
+
+            self.assertEqual(sync.returncode, 0, sync.stdout + sync.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
