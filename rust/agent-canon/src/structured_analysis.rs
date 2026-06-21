@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -27,6 +27,36 @@ const DOCUMENT_RESPONSIBILITY_GAP: &str = "document_responsibility_gap";
 const DIRECTORY_RESPONSIBILITY_LOW_CHILD_COVERAGE: &str =
     "directory_responsibility_low_child_coverage";
 const DIRECTORY_RESPONSIBILITY_EVIDENCE_LIMIT: usize = 8;
+const GRAPH_CONTRACT_VERSION: &str = "graph_storage_core.v1";
+const REGISTERED_GRAPH_LAYERS: &[&str] = &[
+    "source",
+    "form",
+    "prose",
+    "concept",
+    "discourse",
+    "argument",
+    "evidence",
+    "presentation",
+    "projection",
+    "diagnostics",
+    "edit-operation",
+    "artifact",
+    "document-canon",
+    "deps",
+    "code",
+    "report",
+    "algorithm",
+    "proof",
+];
+const KNOWN_ORDER_KINDS: &[&str] = &[
+    "",
+    "hard",
+    "hard_before",
+    "adjacency_preferred",
+    "preferred",
+    "none",
+];
+const DIAGNOSTIC_SEVERITIES: &[&str] = &["blocker", "warn", "info"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DocumentRecord {
@@ -59,6 +89,7 @@ struct InventoryReport {
     root: String,
     documents: Vec<DocumentRecord>,
     findings: Vec<DocumentFinding>,
+    historical_records: Vec<DocumentFinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,8 +147,15 @@ struct BuildArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphContractArgs {
+    db: Option<PathBuf>,
+    format: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct BuildResult {
     cache_dir: PathBuf,
+    report_dir: PathBuf,
     db: PathBuf,
     diagnostics_db: PathBuf,
     document_inventory_json: PathBuf,
@@ -126,6 +164,7 @@ struct BuildResult {
     directory_count: usize,
     document_count: usize,
     document_finding_count: usize,
+    document_historical_record_count: usize,
     warning_count: usize,
     blocker_count: usize,
     warn_count: usize,
@@ -153,6 +192,14 @@ struct WarningSummary {
     info_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphContractFinding {
+    severity: String,
+    rule: String,
+    location: String,
+    message: String,
+}
+
 pub fn run(args: &[String]) -> i32 {
     let Some(command) = args.first() else {
         eprintln!("STRUCTURED_ANALYSIS=fail");
@@ -163,6 +210,7 @@ pub fn run(args: &[String]) -> i32 {
         "analyze" => run_analyze(&args[1..]),
         "build" => run_build(&args[1..]),
         "document-inventory" => run_document_inventory(&args[1..]),
+        "graph-contract" => run_graph_contract(&args[1..]),
         "import-document-inventory" => run_import_document_inventory(&args[1..]),
         "help" | "--help" | "-h" => {
             print_usage();
@@ -179,7 +227,7 @@ pub fn run(args: &[String]) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon structured-analysis build --root <repo-root> [--profile name] [--out-dir path] | analyze --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | document-inventory --root <repo-root> [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory --db <graph.sqlite> --json <inventory.json>"
+        "usage: agent-canon structured-analysis build --root <repo-root> [--profile name] [--out-dir path] | analyze --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | graph-contract [--db <graph.sqlite>] [--format text|json] | document-inventory --root <repo-root> [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory --db <graph.sqlite> --json <inventory.json>"
     );
 }
 
@@ -238,6 +286,10 @@ fn run_build(args: &[String]) -> i32 {
         "STRUCTURED_ANALYSIS_CACHE_DIR={}",
         result.cache_dir.display()
     );
+    println!(
+        "STRUCTURED_ANALYSIS_REPORT_DIR={}",
+        result.report_dir.display()
+    );
     println!("STRUCTURED_ANALYSIS_DB={}", result.db.display());
     println!(
         "STRUCTURED_ANALYSIS_DIAGNOSTICS_DB={}",
@@ -258,11 +310,64 @@ fn run_build(args: &[String]) -> i32 {
         "STRUCTURED_ANALYSIS_DOCUMENT_CANON_FINDINGS={}",
         result.document_finding_count
     );
+    println!(
+        "STRUCTURED_ANALYSIS_DOCUMENT_HISTORICAL_RECORDS={}",
+        result.document_historical_record_count
+    );
     println!("STRUCTURED_ANALYSIS_WARNINGS={}", result.warning_count);
     println!("STRUCTURED_ANALYSIS_BLOCKERS={}", result.blocker_count);
     println!("STRUCTURED_ANALYSIS_WARNS={}", result.warn_count);
     println!("STRUCTURED_ANALYSIS_INFOS={}", result.info_count);
     0
+}
+
+fn run_graph_contract(args: &[String]) -> i32 {
+    let parsed = match parse_graph_contract_args(args) {
+        Ok(value) => value,
+        Err(message) => {
+            eprintln!("STRUCTURED_ANALYSIS_GRAPH_CONTRACT=fail");
+            eprintln!("STRUCTURED_ANALYSIS_FINDING=invalid-arguments:{message}");
+            return 2;
+        }
+    };
+    let findings = match &parsed.db {
+        Some(path) => {
+            let connection = match Connection::open(path) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!("STRUCTURED_ANALYSIS_GRAPH_CONTRACT=fail");
+                    eprintln!("STRUCTURED_ANALYSIS_FINDING=open-db:{error}");
+                    return 1;
+                }
+            };
+            match validate_graph_contract(&connection) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!("STRUCTURED_ANALYSIS_GRAPH_CONTRACT=fail");
+                    eprintln!("STRUCTURED_ANALYSIS_FINDING=validate:{error}");
+                    return 1;
+                }
+            }
+        }
+        None => Vec::new(),
+    };
+    let failed = findings.iter().any(|finding| finding.severity == "blocker");
+    if parsed.format == "json" {
+        println!(
+            "{}",
+            render_graph_contract_json(parsed.db.as_deref(), &findings)
+        );
+    } else {
+        print!(
+            "{}",
+            render_graph_contract_text(parsed.db.as_deref(), &findings)
+        );
+    }
+    if failed {
+        1
+    } else {
+        0
+    }
 }
 
 fn run_document_inventory(args: &[String]) -> i32 {
@@ -305,10 +410,20 @@ fn run_document_inventory(args: &[String]) -> i32 {
         "STRUCTURED_ANALYSIS_DOCUMENT_FINDINGS={}",
         report.findings.len()
     );
+    println!(
+        "STRUCTURED_ANALYSIS_DOCUMENT_HISTORICAL_RECORDS={}",
+        report.historical_records.len()
+    );
     for finding in &report.findings {
         println!(
             "STRUCTURED_ANALYSIS_DOCUMENT_FINDING={}:{}:{}:{}",
             finding.kind, finding.path, finding.canonical_path, finding.action
+        );
+    }
+    for record in &report.historical_records {
+        println!(
+            "STRUCTURED_ANALYSIS_DOCUMENT_HISTORICAL_RECORD={}:{}:{}:{}",
+            record.kind, record.path, record.canonical_path, record.action
         );
     }
 
@@ -453,6 +568,32 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
     })
 }
 
+fn parse_graph_contract_args(args: &[String]) -> Result<GraphContractArgs, String> {
+    let mut db = None;
+    let mut format = "text".to_string();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--db" => {
+                db = Some(next_path(args, index, "--db")?);
+                index += 2;
+            }
+            "--format" => {
+                format = args
+                    .get(index + 1)
+                    .cloned()
+                    .ok_or_else(|| "--format requires a value".to_string())?;
+                if !matches!(format.as_str(), "text" | "json") {
+                    return Err("--format must be text or json".to_string());
+                }
+                index += 2;
+            }
+            unknown => return Err(format!("unknown argument {unknown}")),
+        }
+    }
+    Ok(GraphContractArgs { db, format })
+}
+
 fn parse_inventory_args(args: &[String]) -> Result<InventoryArgs, String> {
     let mut root = PathBuf::from(".");
     let mut json_out = None;
@@ -520,16 +661,18 @@ fn next_path(args: &[String], index: usize, name: &str) -> Result<PathBuf, Strin
 fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, String> {
     let root = fs::canonicalize(&parsed.root)
         .map_err(|error| format!("canonicalize {}: {error}", parsed.root.display()))?;
-    let cache_dir = match &parsed.out_dir {
-        Some(path) => path.clone(),
-        None => default_cache_dir(&root, &parsed.profile)?,
-    };
-    let exports_dir = cache_dir.join("exports");
+    let cache_dir = default_cache_dir(&root, &parsed.profile)?;
+    let report_dir = parsed.out_dir.clone().unwrap_or_else(|| cache_dir.clone());
+    fs::create_dir_all(&cache_dir)
+        .map_err(|error| format!("create-dir {}: {error}", cache_dir.display()))?;
+    fs::create_dir_all(&report_dir)
+        .map_err(|error| format!("create-dir {}: {error}", report_dir.display()))?;
+    let exports_dir = report_dir.join("exports");
     fs::create_dir_all(&exports_dir)
         .map_err(|error| format!("create-dir {}: {error}", exports_dir.display()))?;
 
     let report = build_report(&root)?;
-    let inventory_json = cache_dir.join("document_inventory.json");
+    let inventory_json = report_dir.join("document_inventory.json");
     let inventory_markdown = exports_dir.join("document_inventory.md");
     let inventory_text = render_json(&report);
     write_file(&inventory_json, &inventory_text)?;
@@ -537,6 +680,7 @@ fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, St
 
     let files = collect_files(&root)?;
     let db = cache_dir.join("prose_graph.sqlite");
+    remove_regenerated_file(&db)?;
     let connection =
         Connection::open(&db).map_err(|error| format!("open-db {}: {error}", db.display()))?;
     initialize_graph_schema(&connection).map_err(|error| format!("schema: {error}"))?;
@@ -554,9 +698,11 @@ fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, St
     let artifact_counts = import_artifact_layer(&connection, &document_id, &files)
         .map_err(|error| format!("artifact-import: {error}"))?;
     let diagnostics_db = cache_dir.join("diagnostics.sqlite");
+    remove_regenerated_file(&diagnostics_db)?;
     let warning_summary = analyze_structured_analysis_db(&db, &diagnostics_db, &parsed.profile)?;
     let result = BuildResult {
         cache_dir,
+        report_dir,
         db,
         diagnostics_db,
         document_inventory_json: inventory_json,
@@ -565,6 +711,7 @@ fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, St
         directory_count: artifact_counts.1,
         document_count: imported.0,
         document_finding_count: imported.1,
+        document_historical_record_count: imported.2,
         warning_count: warning_summary.warning_count,
         blocker_count: warning_summary.blocker_count,
         warn_count: warning_summary.warn_count,
@@ -574,13 +721,22 @@ fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, St
     Ok(result)
 }
 
+fn remove_regenerated_file(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("remove-file {}: {error}", path.display())),
+    }
+}
+
 fn build_report(root: &Path) -> Result<InventoryReport, String> {
     let documents = collect_documents(root)?;
-    let findings = collect_findings(&documents);
+    let (findings, historical_records) = collect_findings(&documents);
     Ok(InventoryReport {
         root: root.to_string_lossy().to_string(),
         documents,
         findings,
+        historical_records,
     })
 }
 
@@ -896,7 +1052,7 @@ fn strip_comment_prefix(line: &str) -> &str {
     }
 }
 
-fn collect_findings(records: &[DocumentRecord]) -> Vec<DocumentFinding> {
+fn collect_findings(records: &[DocumentRecord]) -> (Vec<DocumentFinding>, Vec<DocumentFinding>) {
     let mut findings = Vec::new();
     let records_by_path = records
         .iter()
@@ -907,7 +1063,7 @@ fn collect_findings(records: &[DocumentRecord]) -> Vec<DocumentFinding> {
     }
     findings.extend(duplicate_title_findings(records));
     let mut seen = BTreeSet::new();
-    findings
+    let deduped = findings
         .into_iter()
         .filter(|finding| {
             let key = format!(
@@ -916,7 +1072,34 @@ fn collect_findings(records: &[DocumentRecord]) -> Vec<DocumentFinding> {
             );
             seen.insert(key)
         })
-        .collect()
+        .collect::<Vec<_>>();
+    let mut active_findings = Vec::new();
+    let mut historical_records = Vec::new();
+    for finding in deduped {
+        if is_historical_document_record(&finding) {
+            historical_records.push(normalize_historical_record(finding));
+        } else {
+            active_findings.push(finding);
+        }
+    }
+    (active_findings, historical_records)
+}
+
+fn is_historical_document_record(finding: &DocumentFinding) -> bool {
+    let path = Path::new(&finding.path);
+    path.starts_with("issues/closed")
+        && path.file_name().and_then(|name| name.to_str()) != Some("README.md")
+}
+
+fn normalize_historical_record(mut finding: DocumentFinding) -> DocumentFinding {
+    if finding.kind == "closed_issue_record" {
+        finding.action = "retain as historical record; open a new issue for new scope".to_string();
+    } else if finding.kind == "stale_name_candidate" {
+        finding.action = "retain historical filename; open a new issue for new scope".to_string();
+        finding.reason =
+            "closed issue filenames preserve historical operational context".to_string();
+    }
+    finding
 }
 
 fn direct_findings(
@@ -955,7 +1138,7 @@ fn direct_findings(
             path: record.path.clone(),
             kind: "closed_issue_record".to_string(),
             canonical_path: "issues/README.md".to_string(),
-            action: "retain as historical finding; open a new issue for new scope".to_string(),
+            action: "retain as historical record; open a new issue for new scope".to_string(),
             reason: "closed issue files are immutable operational records".to_string(),
         });
     }
@@ -1182,8 +1365,10 @@ fn render_json(report: &InventoryReport) -> String {
         "root": report.root,
         "documents": report.documents.iter().map(document_json).collect::<Vec<_>>(),
         "findings": report.findings.iter().map(finding_json).collect::<Vec<_>>(),
+        "historical_records": report.historical_records.iter().map(finding_json).collect::<Vec<_>>(),
         "document_count": report.documents.len(),
         "finding_count": report.findings.len(),
+        "historical_record_count": report.historical_records.len(),
     });
     serde_json::to_string_pretty(&payload).expect("inventory JSON should serialize")
 }
@@ -1208,7 +1393,8 @@ fn finding_json(finding: &DocumentFinding) -> Value {
 }
 
 fn render_markdown(report: &InventoryReport) -> String {
-    let mut lines = vec![
+    let mut lines =
+        vec![
         "# Non-Canonical Document Inventory".to_string(),
         String::new(),
         "<!--".to_string(),
@@ -1222,6 +1408,7 @@ fn render_markdown(report: &InventoryReport) -> String {
         format!("- root: `{}`", report.root),
         format!("- documents: `{}`", report.documents.len()),
         format!("- findings: `{}`", report.findings.len()),
+        format!("- historical records: `{}`", report.historical_records.len()),
         String::new(),
         "## Findings".to_string(),
         String::new(),
@@ -1238,6 +1425,25 @@ fn render_markdown(report: &InventoryReport) -> String {
         lines.push(format!(
             "| truncated | ... | ... | ... | {} additional findings omitted |",
             report.findings.len() - MAX_MARKDOWN_FINDINGS
+        ));
+    }
+    lines.extend([
+        String::new(),
+        "## Historical Records".to_string(),
+        String::new(),
+        "| Kind | Path | Canonical Path | Action | Reason |".to_string(),
+        "| ---- | ---- | -------------- | ------ | ------ |".to_string(),
+    ]);
+    for record in report.historical_records.iter().take(MAX_MARKDOWN_FINDINGS) {
+        lines.push(format!(
+            "| {} | `{}` | `{}` | {} | {} |",
+            record.kind, record.path, record.canonical_path, record.action, record.reason
+        ));
+    }
+    if report.historical_records.len() > MAX_MARKDOWN_FINDINGS {
+        lines.push(format!(
+            "| truncated | ... | ... | ... | {} additional historical records omitted |",
+            report.historical_records.len() - MAX_MARKDOWN_FINDINGS
         ));
     }
     format!("{}\n", lines.join("\n"))
@@ -1346,7 +1552,31 @@ fn collect_warning_rows(source: &Connection) -> rusqlite::Result<Vec<WarningRow>
             })
         })?
         .collect();
-    rows
+    let mut rows = rows?;
+    rows.extend(graph_contract_warning_rows(source)?);
+    Ok(rows)
+}
+
+fn graph_contract_warning_rows(source: &Connection) -> rusqlite::Result<Vec<WarningRow>> {
+    Ok(validate_graph_contract(source)?
+        .into_iter()
+        .enumerate()
+        .map(|(index, finding)| WarningRow {
+            id: format!("warning:graph-contract:{}", index + 1),
+            source_layer: "graph-contract".to_string(),
+            severity: finding.severity,
+            rule: finding.rule,
+            target_node_id: String::new(),
+            target_edge_id: String::new(),
+            target_path: String::new(),
+            message: finding.message,
+            suggested_action_json: json!({
+                "verification_route": "graph_contract_validation",
+                "contract_version": GRAPH_CONTRACT_VERSION,
+            })
+            .to_string(),
+        })
+        .collect())
 }
 
 fn write_warning_rows(
@@ -1432,6 +1662,517 @@ fn warning_target_path(payload_json: &str) -> String {
         return String::new();
     };
     json_string(payload.get("path"))
+}
+
+fn validate_graph_contract(connection: &Connection) -> rusqlite::Result<Vec<GraphContractFinding>> {
+    let mut findings = Vec::new();
+    validate_required_table(
+        connection,
+        "documents",
+        &["id", "path", "title", "kind", "created_at"],
+        &mut findings,
+    )?;
+    validate_required_table(
+        connection,
+        "nodes",
+        &[
+            "id",
+            "document_id",
+            "layer",
+            "kind",
+            "label",
+            "text",
+            "source_start",
+            "source_end",
+            "confidence",
+            "payload_json",
+        ],
+        &mut findings,
+    )?;
+    validate_required_table(
+        connection,
+        "edges",
+        &[
+            "id",
+            "layer",
+            "kind",
+            "from_node_id",
+            "to_node_id",
+            "order_kind",
+            "confidence",
+            "evidence_node_id",
+            "payload_json",
+        ],
+        &mut findings,
+    )?;
+    validate_required_table(
+        connection,
+        "diagnostics",
+        &[
+            "id",
+            "layer",
+            "target_node_id",
+            "target_edge_id",
+            "severity",
+            "rule",
+            "message",
+            "suggested_action_json",
+        ],
+        &mut findings,
+    )?;
+    validate_required_table(connection, "metadata", &["key", "value"], &mut findings)?;
+    let node_table_ready = table_has_required_columns(
+        connection,
+        "nodes",
+        &[
+            "id",
+            "document_id",
+            "layer",
+            "kind",
+            "label",
+            "text",
+            "source_start",
+            "source_end",
+            "confidence",
+            "payload_json",
+        ],
+    )?;
+    let edge_table_ready = table_has_required_columns(
+        connection,
+        "edges",
+        &[
+            "id",
+            "layer",
+            "kind",
+            "from_node_id",
+            "to_node_id",
+            "order_kind",
+            "confidence",
+            "evidence_node_id",
+            "payload_json",
+        ],
+    )?;
+    let diagnostic_table_ready = table_has_required_columns(
+        connection,
+        "diagnostics",
+        &[
+            "id",
+            "layer",
+            "target_node_id",
+            "target_edge_id",
+            "severity",
+            "rule",
+            "message",
+            "suggested_action_json",
+        ],
+    )?;
+    if node_table_ready {
+        validate_node_rows(connection, &mut findings)?;
+    }
+    if edge_table_ready {
+        validate_edge_rows(connection, &mut findings)?;
+    }
+    if diagnostic_table_ready {
+        validate_diagnostic_rows(connection, &mut findings)?;
+    }
+    Ok(findings)
+}
+
+fn validate_required_table(
+    connection: &Connection,
+    table: &str,
+    required_columns: &[&str],
+    findings: &mut Vec<GraphContractFinding>,
+) -> rusqlite::Result<()> {
+    let Some(columns) = table_columns(connection, table)? else {
+        findings.push(graph_contract_finding(
+            "blocker",
+            "missing_required_table",
+            format!("table:{table}"),
+            format!("Graph contract table `{table}` is missing."),
+        ));
+        return Ok(());
+    };
+    for column in required_columns {
+        if !columns.contains(*column) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "missing_required_column",
+                format!("table:{table}.{column}"),
+                format!("Graph contract table `{table}` is missing column `{column}`."),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn table_has_required_columns(
+    connection: &Connection,
+    table: &str,
+    required_columns: &[&str],
+) -> rusqlite::Result<bool> {
+    let Some(columns) = table_columns(connection, table)? else {
+        return Ok(false);
+    };
+    Ok(required_columns
+        .iter()
+        .all(|column| columns.contains(*column)))
+}
+
+fn table_columns(
+    connection: &Connection,
+    table: &str,
+) -> rusqlite::Result<Option<BTreeSet<String>>> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns: rusqlite::Result<BTreeSet<_>> = statement
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect();
+    let columns = columns?;
+    if columns.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(columns))
+    }
+}
+
+fn validate_node_rows(
+    connection: &Connection,
+    findings: &mut Vec<GraphContractFinding>,
+) -> rusqlite::Result<()> {
+    let document_ids = string_set_query(connection, "SELECT id FROM documents")?;
+    let mut statement =
+        connection.prepare("SELECT id, document_id, layer, confidence, payload_json FROM nodes")?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, f64>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    for row in rows {
+        let (id, document_id, layer, confidence, payload_json) = row?;
+        if id.trim().is_empty() {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "empty_node_id",
+                "nodes:<empty>",
+                "A node row has an empty id.",
+            ));
+        }
+        if !document_ids.contains(&document_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "missing_document_reference",
+                format!("nodes:{id}.document_id"),
+                format!("Node `{id}` references missing document `{document_id}`."),
+            ));
+        }
+        if !is_registered_graph_layer(&layer) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "unknown_layer",
+                format!("nodes:{id}.layer"),
+                format!("Node `{id}` uses unregistered layer `{layer}`."),
+            ));
+        }
+        if !(0.0..=1.0).contains(&confidence) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "invalid_confidence",
+                format!("nodes:{id}.confidence"),
+                format!("Node `{id}` confidence `{confidence}` is outside [0.0, 1.0]."),
+            ));
+        }
+        validate_payload_json("node", &id, "payload_json", &payload_json, findings);
+    }
+    Ok(())
+}
+
+fn validate_edge_rows(
+    connection: &Connection,
+    findings: &mut Vec<GraphContractFinding>,
+) -> rusqlite::Result<()> {
+    let node_ids = string_set_query(connection, "SELECT id FROM nodes")?;
+    let mut statement = connection.prepare(
+        "SELECT id, layer, from_node_id, to_node_id, order_kind, confidence, COALESCE(evidence_node_id, ''), payload_json FROM edges",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, f64>(5)?,
+            row.get::<_, String>(6)?,
+            row.get::<_, String>(7)?,
+        ))
+    })?;
+    for row in rows {
+        let (
+            id,
+            layer,
+            from_node_id,
+            to_node_id,
+            order_kind,
+            confidence,
+            evidence_node_id,
+            payload_json,
+        ) = row?;
+        if !is_registered_graph_layer(&layer) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "unknown_layer",
+                format!("edges:{id}.layer"),
+                format!("Edge `{id}` uses unregistered layer `{layer}`."),
+            ));
+        }
+        if !node_ids.contains(&from_node_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "broken_edge_endpoint",
+                format!("edges:{id}.from_node_id"),
+                format!("Edge `{id}` references missing from_node_id `{from_node_id}`."),
+            ));
+        }
+        if !node_ids.contains(&to_node_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "broken_edge_endpoint",
+                format!("edges:{id}.to_node_id"),
+                format!("Edge `{id}` references missing to_node_id `{to_node_id}`."),
+            ));
+        }
+        if !evidence_node_id.is_empty() && !node_ids.contains(&evidence_node_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "missing_evidence_node",
+                format!("edges:{id}.evidence_node_id"),
+                format!("Edge `{id}` references missing evidence_node_id `{evidence_node_id}`."),
+            ));
+        }
+        if !KNOWN_ORDER_KINDS.contains(&order_kind.as_str()) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "unknown_order_kind",
+                format!("edges:{id}.order_kind"),
+                format!("Edge `{id}` uses order_kind `{order_kind}` outside the core registry."),
+            ));
+        }
+        if !(0.0..=1.0).contains(&confidence) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "invalid_confidence",
+                format!("edges:{id}.confidence"),
+                format!("Edge `{id}` confidence `{confidence}` is outside [0.0, 1.0]."),
+            ));
+        }
+        validate_payload_json("edge", &id, "payload_json", &payload_json, findings);
+    }
+    Ok(())
+}
+
+fn validate_diagnostic_rows(
+    connection: &Connection,
+    findings: &mut Vec<GraphContractFinding>,
+) -> rusqlite::Result<()> {
+    let node_ids = string_set_query(connection, "SELECT id FROM nodes")?;
+    let edge_ids = string_set_query(connection, "SELECT id FROM edges")?;
+    let mut statement = connection.prepare(
+        "SELECT id, layer, target_node_id, target_edge_id, severity, suggested_action_json FROM diagnostics",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, String>(5)?,
+        ))
+    })?;
+    for row in rows {
+        let (id, layer, target_node_id, target_edge_id, severity, suggested_action_json) = row?;
+        if !is_registered_graph_layer(&layer) {
+            findings.push(graph_contract_finding(
+                "warn",
+                "unknown_layer",
+                format!("diagnostics:{id}.layer"),
+                format!("Diagnostic `{id}` uses unregistered layer `{layer}`."),
+            ));
+        }
+        if !target_node_id.is_empty() && !node_ids.contains(&target_node_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "invalid_diagnostic_target",
+                format!("diagnostics:{id}.target_node_id"),
+                format!("Diagnostic `{id}` references missing target_node_id `{target_node_id}`."),
+            ));
+        }
+        if !target_edge_id.is_empty() && !edge_ids.contains(&target_edge_id) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "invalid_diagnostic_target",
+                format!("diagnostics:{id}.target_edge_id"),
+                format!("Diagnostic `{id}` references missing target_edge_id `{target_edge_id}`."),
+            ));
+        }
+        if !DIAGNOSTIC_SEVERITIES.contains(&severity.as_str()) {
+            findings.push(graph_contract_finding(
+                "blocker",
+                "unknown_diagnostic_severity",
+                format!("diagnostics:{id}.severity"),
+                format!("Diagnostic `{id}` uses severity `{severity}`."),
+            ));
+        }
+        validate_suggested_action_json(
+            "diagnostic",
+            &id,
+            "suggested_action_json",
+            &suggested_action_json,
+            findings,
+        );
+    }
+    Ok(())
+}
+
+fn string_set_query(connection: &Connection, sql: &str) -> rusqlite::Result<BTreeSet<String>> {
+    let mut statement = connection.prepare(sql)?;
+    let values: rusqlite::Result<BTreeSet<_>> = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect();
+    values
+}
+
+fn validate_payload_json(
+    row_kind: &str,
+    id: &str,
+    field: &str,
+    text: &str,
+    findings: &mut Vec<GraphContractFinding>,
+) {
+    match serde_json::from_str::<Value>(text) {
+        Ok(Value::Object(_)) => {}
+        Ok(_) => findings.push(graph_contract_finding(
+            "blocker",
+            "invalid_payload_json",
+            format!("{row_kind}s:{id}.{field}"),
+            format!("{row_kind} `{id}` field `{field}` must be a JSON object."),
+        )),
+        Err(error) => findings.push(graph_contract_finding(
+            "blocker",
+            "invalid_payload_json",
+            format!("{row_kind}s:{id}.{field}"),
+            format!("{row_kind} `{id}` field `{field}` is invalid JSON: {error}."),
+        )),
+    }
+}
+
+fn validate_suggested_action_json(
+    row_kind: &str,
+    id: &str,
+    field: &str,
+    text: &str,
+    findings: &mut Vec<GraphContractFinding>,
+) {
+    match serde_json::from_str::<Value>(text) {
+        Ok(Value::Object(_)) => {}
+        Ok(_) => findings.push(graph_contract_finding(
+            "blocker",
+            "invalid_suggested_action_json",
+            format!("{row_kind}s:{id}.{field}"),
+            format!("{row_kind} `{id}` field `{field}` must be a JSON object."),
+        )),
+        Err(error) => findings.push(graph_contract_finding(
+            "blocker",
+            "invalid_suggested_action_json",
+            format!("{row_kind}s:{id}.{field}"),
+            format!("{row_kind} `{id}` field `{field}` is invalid JSON: {error}."),
+        )),
+    }
+}
+
+fn is_registered_graph_layer(layer: &str) -> bool {
+    REGISTERED_GRAPH_LAYERS.contains(&layer) || layer.starts_with("adapter:")
+}
+
+fn graph_contract_finding(
+    severity: &str,
+    rule: &str,
+    location: impl Into<String>,
+    message: impl Into<String>,
+) -> GraphContractFinding {
+    GraphContractFinding {
+        severity: severity.to_string(),
+        rule: rule.to_string(),
+        location: location.into(),
+        message: message.into(),
+    }
+}
+
+fn render_graph_contract_text(db: Option<&Path>, findings: &[GraphContractFinding]) -> String {
+    let status = if findings.iter().any(|finding| finding.severity == "blocker") {
+        "fail"
+    } else {
+        "pass"
+    };
+    let mut lines = vec![
+        format!("STRUCTURED_ANALYSIS_GRAPH_CONTRACT={status}"),
+        format!(
+            "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_VERSION={GRAPH_CONTRACT_VERSION}"
+        ),
+        "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_NECESSARY_SUFFICIENT=yes".to_string(),
+        "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_OBJECT_FAMILIES=documents,nodes,edges,diagnostics,projections,operations,metadata".to_string(),
+        format!(
+            "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_LAYERS={}",
+            REGISTERED_GRAPH_LAYERS.join(",")
+        ),
+        format!(
+            "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_DB={}",
+            db.map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_else(|| "<none>".to_string())
+        ),
+        format!(
+            "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_FINDINGS={}",
+            findings.len()
+        ),
+    ];
+    for finding in findings {
+        lines.push(format!(
+            "STRUCTURED_ANALYSIS_GRAPH_CONTRACT_FINDING={}:{}:{}:{}",
+            finding.severity, finding.rule, finding.location, finding.message
+        ));
+    }
+    format!("{}\n", lines.join("\n"))
+}
+
+fn render_graph_contract_json(db: Option<&Path>, findings: &[GraphContractFinding]) -> String {
+    let status = if findings.iter().any(|finding| finding.severity == "blocker") {
+        "fail"
+    } else {
+        "pass"
+    };
+    serde_json::to_string_pretty(&json!({
+        "status": status,
+        "schema": "agent_canon.structured_analysis.graph_contract.v1",
+        "contract_version": GRAPH_CONTRACT_VERSION,
+        "necessary_sufficient": true,
+        "db": db.map(|path| path.to_string_lossy().to_string()),
+        "object_families": ["documents", "nodes", "edges", "diagnostics", "projections", "operations", "metadata"],
+        "layers": REGISTERED_GRAPH_LAYERS,
+        "authority_boundary": "storage and projection validation only; adapter tools keep semantic pass/fail authority",
+        "findings": findings.iter().map(|finding| {
+            json!({
+                "severity": finding.severity,
+                "rule": finding.rule,
+                "location": finding.location,
+                "message": finding.message,
+            })
+        }).collect::<Vec<_>>(),
+    }))
+    .expect("graph contract JSON should serialize")
 }
 
 fn default_cache_dir(root: &Path, profile: &str) -> Result<PathBuf, String> {
@@ -1928,6 +2669,7 @@ fn write_build_artifacts(result: &BuildResult, root: &Path, profile: &str) -> Re
         "root": root.to_string_lossy(),
         "profile": profile,
         "cache_dir": result.cache_dir.to_string_lossy(),
+        "report_dir": result.report_dir.to_string_lossy(),
         "db": result.db.to_string_lossy(),
         "diagnostics_db": result.diagnostics_db.to_string_lossy(),
         "document_inventory_json": result.document_inventory_json.to_string_lossy(),
@@ -1936,18 +2678,19 @@ fn write_build_artifacts(result: &BuildResult, root: &Path, profile: &str) -> Re
         "directory_count": result.directory_count,
         "document_count": result.document_count,
         "document_finding_count": result.document_finding_count,
+        "document_historical_record_count": result.document_historical_record_count,
         "warning_count": result.warning_count,
         "blocker_count": result.blocker_count,
         "warn_count": result.warn_count,
         "info_count": result.info_count,
     });
     write_file(
-        &result.cache_dir.join("structured_analysis_build.json"),
+        &result.report_dir.join("structured_analysis_build.json"),
         &serde_json::to_string_pretty(&payload).expect("build JSON should serialize"),
     )?;
     write_file(
         &result
-            .cache_dir
+            .report_dir
             .join("exports/structured_analysis_summary.md"),
         &render_build_summary(result, root, profile),
     )
@@ -1955,7 +2698,7 @@ fn write_build_artifacts(result: &BuildResult, root: &Path, profile: &str) -> Re
 
 fn render_build_summary(result: &BuildResult, root: &Path, profile: &str) -> String {
     format!(
-        "# Structured Analysis Build\n\n- root: `{}`\n- profile: `{}`\n- source database: `{}`\n- diagnostics database: `{}`\n- files: `{}`\n- directories: `{}`\n- documents: `{}`\n- document canon findings: `{}`\n- warnings: `{}`\n- blockers: `{}`\n- warns: `{}`\n- infos: `{}`\n",
+        "# Structured Analysis Build\n\n- root: `{}`\n- profile: `{}`\n- source database: `{}`\n- diagnostics database: `{}`\n- files: `{}`\n- directories: `{}`\n- documents: `{}`\n- document canon findings: `{}`\n- document historical records: `{}`\n- warnings: `{}`\n- blockers: `{}`\n- warns: `{}`\n- infos: `{}`\n",
         root.display(),
         profile,
         result.db.display(),
@@ -1964,6 +2707,7 @@ fn render_build_summary(result: &BuildResult, root: &Path, profile: &str) -> Str
         result.directory_count,
         result.document_count,
         result.document_finding_count,
+        result.document_historical_record_count,
         result.warning_count,
         result.blocker_count,
         result.warn_count,
@@ -2033,7 +2777,7 @@ fn import_inventory_payload(
     document_id: &str,
     payload: &Value,
     inventory_path: &Path,
-) -> rusqlite::Result<(usize, usize)> {
+) -> rusqlite::Result<(usize, usize, usize)> {
     let documents = payload
         .get("documents")
         .and_then(Value::as_array)
@@ -2041,6 +2785,11 @@ fn import_inventory_payload(
         .unwrap_or_default();
     let findings = payload
         .get("findings")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let historical_records = payload
+        .get("historical_records")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
@@ -2077,8 +2826,65 @@ fn import_inventory_payload(
         document_count += 1;
     }
 
-    let mut finding_count = 0;
-    for (index, item) in findings.iter().enumerate() {
+    let finding_count = import_document_canon_records(
+        connection,
+        document_id,
+        inventory_path,
+        &path_to_node,
+        &findings,
+        DocumentCanonRecordImport {
+            node_kind: "finding",
+            node_id_prefix: "doccanon:finding",
+            target_edge_prefix: "doccanon:target",
+            canonical_edge_prefix: "doccanon:canonical",
+            emit_diagnostics: true,
+        },
+    )?;
+    let historical_record_count = import_document_canon_records(
+        connection,
+        document_id,
+        inventory_path,
+        &path_to_node,
+        &historical_records,
+        DocumentCanonRecordImport {
+            node_kind: "historical_record",
+            node_id_prefix: "doccanon:historical",
+            target_edge_prefix: "doccanon:historical-target",
+            canonical_edge_prefix: "doccanon:historical-canonical",
+            emit_diagnostics: false,
+        },
+    )?;
+    connection.execute(
+        "INSERT OR REPLACE INTO metadata(key, value) VALUES ('document_canon_inventory', ?)",
+        [json!({
+            "inventory_path": inventory_path.to_string_lossy(),
+            "document_count": document_count,
+            "finding_count": finding_count,
+            "historical_record_count": historical_record_count,
+        })
+        .to_string()],
+    )?;
+    Ok((document_count, finding_count, historical_record_count))
+}
+
+struct DocumentCanonRecordImport<'a> {
+    node_kind: &'a str,
+    node_id_prefix: &'a str,
+    target_edge_prefix: &'a str,
+    canonical_edge_prefix: &'a str,
+    emit_diagnostics: bool,
+}
+
+fn import_document_canon_records(
+    connection: &Connection,
+    document_id: &str,
+    inventory_path: &Path,
+    path_to_node: &BTreeMap<String, String>,
+    items: &[Value],
+    config: DocumentCanonRecordImport<'_>,
+) -> rusqlite::Result<usize> {
+    let mut imported_count = 0;
+    for (index, item) in items.iter().enumerate() {
         let Some(finding) = item.as_object() else {
             continue;
         };
@@ -2087,7 +2893,7 @@ fn import_inventory_payload(
         let canonical_path = json_string(finding.get("canonical_path"));
         let action = json_string(finding.get("action"));
         let reason = json_string(finding.get("reason"));
-        let node_id = format!("doccanon:finding:{}", index + 1);
+        let node_id = format!("{}:{}", config.node_id_prefix, index + 1);
         let message = format!("{kind}: `{path}` -> `{canonical_path}`. {reason}");
         let payload_json = json!({
             "path": path,
@@ -2099,44 +2905,37 @@ fn import_inventory_payload(
         })
         .to_string();
         connection.execute(
-            "INSERT OR REPLACE INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES (?, ?, 'document-canon', 'finding', ?, ?, 0, 0, 0.8, ?)",
-            params![node_id, document_id, kind, message, payload_json],
+            "INSERT OR REPLACE INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES (?, ?, 'document-canon', ?, ?, ?, 0, 0, 0.8, ?)",
+            params![node_id, document_id, config.node_kind, kind, message, payload_json],
         )?;
         if let Some(target_node) = path_to_node.get(&path) {
             connection.execute(
                 "INSERT OR REPLACE INTO edges(id, layer, kind, from_node_id, to_node_id, order_kind, confidence, evidence_node_id, payload_json) VALUES (?, 'document-canon', 'targets_document', ?, ?, '', 1.0, NULL, ?)",
-                params![format!("doccanon:target:{}", index + 1), node_id, target_node, json!({"path": path}).to_string()],
+                params![format!("{}:{}", config.target_edge_prefix, index + 1), node_id, target_node, json!({"path": path}).to_string()],
             )?;
         }
         if let Some(canonical_node) = path_to_node.get(&canonical_path) {
             connection.execute(
                 "INSERT OR REPLACE INTO edges(id, layer, kind, from_node_id, to_node_id, order_kind, confidence, evidence_node_id, payload_json) VALUES (?, 'document-canon', 'references_canonical', ?, ?, '', 1.0, NULL, ?)",
-                params![format!("doccanon:canonical:{}", index + 1), node_id, canonical_node, json!({"canonical_path": canonical_path}).to_string()],
+                params![format!("{}:{}", config.canonical_edge_prefix, index + 1), node_id, canonical_node, json!({"canonical_path": canonical_path}).to_string()],
             )?;
         }
-        connection.execute(
-            "INSERT OR REPLACE INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES (?, 'document-canon', ?, '', ?, ?, ?, ?)",
-            params![
-                format!("diag:document-canon:{}", index + 1),
-                node_id,
-                document_canon_severity(&kind),
-                kind,
-                message,
-                document_canon_suggested_action_json(&kind, &action, &path, &canonical_path, &reason)
-            ],
-        )?;
-        finding_count += 1;
+        if config.emit_diagnostics {
+            connection.execute(
+                "INSERT OR REPLACE INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES (?, 'document-canon', ?, '', ?, ?, ?, ?)",
+                params![
+                    format!("diag:document-canon:{}", index + 1),
+                    node_id,
+                    document_canon_severity(&kind),
+                    kind,
+                    message,
+                    document_canon_suggested_action_json(&kind, &action, &path, &canonical_path, &reason)
+                ],
+            )?;
+        }
+        imported_count += 1;
     }
-    connection.execute(
-        "INSERT OR REPLACE INTO metadata(key, value) VALUES ('document_canon_inventory', ?)",
-        [json!({
-            "inventory_path": inventory_path.to_string_lossy(),
-            "document_count": document_count,
-            "finding_count": finding_count,
-        })
-        .to_string()],
-    )?;
-    Ok((document_count, finding_count))
+    Ok(imported_count)
 }
 
 fn json_string(value: Option<&Value>) -> String {
@@ -2412,6 +3211,36 @@ mod tests {
     }
 
     #[test]
+    fn closed_issue_records_are_historical_not_active_findings() {
+        let root = test_root("structured-analysis-closed-issue-history");
+        write_fixture(
+            &root,
+            "issues/README.md",
+            "<!--\n@dependency-start\nresponsibility Documents local issue storage.\nupstream design ../README.md repo root\n@dependency-end\n-->\n\n# Issues\n",
+        );
+        write_fixture(
+            &root,
+            "issues/closed/AC-20260517-legacy-tool-directory-regression.md",
+            "<!--\n@dependency-start\nresponsibility Records a closed legacy tool directory issue.\nupstream design ../README.md issue storage\n@dependency-end\n-->\n\n# Closed Issue\n",
+        );
+
+        let report = build_report(&root).expect("report");
+
+        assert!(!report.findings.iter().any(|finding| {
+            finding.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
+        }));
+        assert!(report.historical_records.iter().any(|record| {
+            record.kind == "closed_issue_record"
+                && record.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
+        }));
+        assert!(report.historical_records.iter().any(|record| {
+            record.kind == "stale_name_candidate"
+                && record.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn dsl_upstream_without_design_trace_is_responsibility_gap() {
         let root = test_root("structured-analysis-dsl-trace-missing");
         write_fixture(
@@ -2524,7 +3353,7 @@ mod tests {
             &root.join("inventory.json"),
         )
         .expect("import");
-        assert_eq!(imported, (2, 1));
+        assert_eq!(imported, (2, 1, 0));
         let count: i64 = connection
             .query_row(
                 "SELECT COUNT(*) FROM diagnostics WHERE layer = 'document-canon'",
@@ -2611,9 +3440,10 @@ mod tests {
         });
         let connection = Connection::open(&source_db).expect("db");
         initialize_graph_schema(&connection).expect("schema");
+        let document_id = ensure_analysis_document(&connection, &root).expect("analysis document");
         import_inventory_payload(
             &connection,
-            "doc:analysis",
+            &document_id,
             &inventory,
             &root.join("inventory.json"),
         )
@@ -2661,6 +3491,10 @@ mod tests {
         assert!(result.db.is_file());
         assert!(result.diagnostics_db.is_file());
         assert!(result.document_inventory_json.is_file());
+        assert_eq!(result.report_dir, out_dir);
+        assert!(result.document_inventory_json.starts_with(&out_dir));
+        assert!(!result.db.starts_with(&out_dir));
+        assert!(out_dir.join("structured_analysis_build.json").is_file());
         assert_eq!(result.warning_count, result.document_finding_count);
 
         let connection = Connection::open(&result.db).expect("db");
@@ -2699,6 +3533,7 @@ mod tests {
 
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);
+        let _ = fs::remove_dir_all(result.cache_dir);
     }
 
     #[test]
@@ -2751,6 +3586,269 @@ mod tests {
 
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);
+        let _ = fs::remove_dir_all(result.cache_dir);
+    }
+
+    #[test]
+    fn graph_contract_text_exposes_core_contract() {
+        let text = render_graph_contract_text(None, &[]);
+        assert!(text.contains("STRUCTURED_ANALYSIS_GRAPH_CONTRACT=pass"));
+        assert!(text.contains("STRUCTURED_ANALYSIS_GRAPH_CONTRACT_NECESSARY_SUFFICIENT=yes"));
+        assert!(text.contains("documents,nodes,edges,diagnostics,projections,operations,metadata"));
+    }
+
+    #[test]
+    fn graph_contract_accepts_build_cache_schema() {
+        let root = test_root("structured-analysis-graph-contract-root");
+        let out_dir = test_root("structured-analysis-graph-contract-out");
+        write_fixture(
+            &root,
+            "README.md",
+            "# Fixture\n\n<!--\n@dependency-start\nresponsibility Documents fixture root.\n@dependency-end\n-->\n",
+        );
+        write_fixture(
+            &root,
+            "src/main.rs",
+            "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../README.md fixture root\n// @dependency-end\nfn main() {}\n",
+        );
+
+        let result = build_structured_analysis_cache(&BuildArgs {
+            root: root.clone(),
+            profile: "test".to_string(),
+            out_dir: Some(out_dir.clone()),
+        })
+        .expect("build cache");
+        let connection = Connection::open(&result.db).expect("db");
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.iter().all(|finding| finding.severity != "blocker"));
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(out_dir);
+        let _ = fs::remove_dir_all(result.cache_dir);
+    }
+
+    #[test]
+    fn graph_contract_reports_broken_edge_endpoint() {
+        let root = test_root("structured-analysis-broken-edge");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+        initialize_graph_schema(&connection).expect("schema");
+        let document_id = ensure_analysis_document(&connection, &root).expect("analysis document");
+        connection
+            .execute(
+                "INSERT INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES ('node:a', ?, 'artifact', 'file', 'a', 'a', 0, 0, 1.0, '{}')",
+                [document_id],
+            )
+            .expect("node");
+        connection
+            .execute(
+                "INSERT INTO edges(id, layer, kind, from_node_id, to_node_id, order_kind, confidence, evidence_node_id, payload_json) VALUES ('edge:broken', 'artifact', 'contains', 'node:a', 'node:missing', 'hard_before', 1.0, NULL, '{}')",
+                [],
+            )
+            .expect("edge");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "blocker" && finding.rule == "broken_edge_endpoint"
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn graph_contract_reports_invalid_payload_json() {
+        let root = test_root("structured-analysis-invalid-payload");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+        initialize_graph_schema(&connection).expect("schema");
+        let document_id = ensure_analysis_document(&connection, &root).expect("analysis document");
+        connection
+            .execute(
+                "INSERT INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES ('node:a', ?, 'artifact', 'file', 'a', 'a', 0, 0, 1.0, '{')",
+                [document_id],
+            )
+            .expect("node");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "blocker" && finding.rule == "invalid_payload_json"
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn graph_contract_reports_missing_required_table() {
+        let root = test_root("structured-analysis-missing-table");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "blocker" && finding.rule == "missing_required_table"
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn graph_contract_reports_missing_required_column() {
+        let root = test_root("structured-analysis-missing-column");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+        connection
+            .execute_batch(
+                "
+                CREATE TABLE documents (
+                    id TEXT PRIMARY KEY,
+                    path TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE nodes (
+                    id TEXT PRIMARY KEY,
+                    document_id TEXT NOT NULL,
+                    layer TEXT NOT NULL
+                );
+                CREATE TABLE edges (
+                    id TEXT PRIMARY KEY,
+                    layer TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    from_node_id TEXT NOT NULL,
+                    to_node_id TEXT NOT NULL,
+                    order_kind TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    evidence_node_id TEXT,
+                    payload_json TEXT NOT NULL
+                );
+                CREATE TABLE diagnostics (
+                    id TEXT PRIMARY KEY,
+                    layer TEXT NOT NULL,
+                    target_node_id TEXT NOT NULL,
+                    target_edge_id TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    rule TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    suggested_action_json TEXT NOT NULL
+                );
+                CREATE TABLE metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                ",
+            )
+            .expect("partial schema");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "blocker"
+                && finding.rule == "missing_required_column"
+                && finding.message.contains("payload_json")
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn graph_contract_reports_non_blocker_rules() {
+        let root = test_root("structured-analysis-non-blocker-rules");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+        initialize_graph_schema(&connection).expect("schema");
+        let document_id = ensure_analysis_document(&connection, &root).expect("analysis document");
+        connection
+            .execute(
+                "INSERT INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES ('node:a', ?, 'adapter:fixture', 'file', 'a', 'a', 0, 0, 1.2, '{}')",
+                [document_id],
+            )
+            .expect("node");
+        connection
+            .execute(
+                "INSERT INTO edges(id, layer, kind, from_node_id, to_node_id, order_kind, confidence, evidence_node_id, payload_json) VALUES ('edge:a', 'artifact', 'contains', 'node:a', 'node:a', 'weird', 1.0, NULL, '{}')",
+                [],
+            )
+            .expect("edge");
+        connection
+            .execute(
+                "INSERT INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES ('diag:a', 'artifact', 'node:a', '', 'debug', 'fixture', 'fixture', '{}')",
+                [],
+            )
+            .expect("diagnostic");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings
+            .iter()
+            .any(|finding| finding.rule == "invalid_confidence"));
+        assert!(findings
+            .iter()
+            .any(|finding| finding.rule == "unknown_order_kind"));
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "blocker" && finding.rule == "unknown_diagnostic_severity"
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn graph_contract_json_output_is_parseable() {
+        let finding = graph_contract_finding(
+            "blocker",
+            "missing_required_table",
+            "table:nodes",
+            "Graph contract table `nodes` is missing.",
+        );
+        let json_text = render_graph_contract_json(None, &[finding]);
+        let payload: Value = serde_json::from_str(&json_text).expect("json output");
+        assert_eq!(
+            payload.get("contract_version").and_then(Value::as_str),
+            Some(GRAPH_CONTRACT_VERSION)
+        );
+        let findings = payload
+            .get("findings")
+            .and_then(Value::as_array)
+            .expect("findings");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].get("location").and_then(Value::as_str),
+            Some("table:nodes")
+        );
+    }
+
+    #[test]
+    fn graph_contract_cli_rejects_invalid_format_argument() {
+        let args = vec!["--format".to_string(), "yaml".to_string()];
+        assert_eq!(run_graph_contract(&args), 2);
+    }
+
+    #[test]
+    fn graph_contract_cli_returns_failure_on_blocker() {
+        let root = test_root("structured-analysis-cli-blocker");
+        fs::create_dir_all(&root).expect("mkdir");
+        let db = root.join("graph.sqlite");
+        let connection = Connection::open(&db).expect("db");
+        initialize_graph_schema(&connection).expect("schema");
+        let document_id = ensure_analysis_document(&connection, &root).expect("analysis document");
+        connection
+            .execute(
+                "INSERT INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES ('node:a', ?, 'artifact', 'file', 'a', 'a', 0, 0, 1.0, '{}')",
+                [document_id],
+            )
+            .expect("node");
+        connection
+            .execute(
+                "INSERT INTO edges(id, layer, kind, from_node_id, to_node_id, order_kind, confidence, evidence_node_id, payload_json) VALUES ('edge:broken', 'artifact', 'contains', 'node:a', 'node:missing', 'hard_before', 1.0, NULL, '{}')",
+                [],
+            )
+            .expect("edge");
+        let args = vec![
+            "--db".to_string(),
+            db.to_string_lossy().to_string(),
+            "--format".to_string(),
+            "text".to_string(),
+        ];
+        assert_eq!(run_graph_contract(&args), 1);
+        let _ = fs::remove_dir_all(root);
     }
 
     fn test_root(name: &str) -> PathBuf {

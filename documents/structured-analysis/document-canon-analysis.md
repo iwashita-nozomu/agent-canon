@@ -13,8 +13,24 @@ downstream implementation ../../tools/agent_tools/noncanonical_document_inventor
 
 # Document Canon Analysis Adapter
 
-この文書は、文書の正本候補、runtime mirror、generated report、closed issue record、
+この文書は、文書の正本候補、runtime mirror、generated report、closed issue history、
 stale name、duplicate heading を structured analysis に取り込む adapter contract を定義する。
+
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `database-design.md`, `README.md`,
+  `../../rust/agent-canon/src/structured_analysis.rs`, and
+  `../../tools/agent_tools/noncanonical_document_inventory.py`.
+- Assumptions:
+  Document canon inventory JSON uses the implemented keys `documents`,
+  `findings`, and `historical_records`; graph storage uses the implemented
+  `document-canon` layer, node kinds `document_record`, `finding`,
+  `historical_record`, edge kinds `targets_document` and
+  `references_canonical`, and metadata key `document_canon_inventory`.
+- Parent-doc alignment:
+  `database-design.md` owns the shared table contract. This adapter owns the
+  document-inventory classification and import mapping.
 
 ## Rust CLI
 
@@ -41,37 +57,46 @@ structured-analysis integration は Rust CLI を参照する。shim の警告が
 | Kind | Meaning | Structured severity |
 | --- | --- | --- |
 | `generated_report` | `reports/...` が source policy と混同される可能性。 | `info` |
-| `closed_issue_record` | closed issue record が active scope と混同される可能性。 | `info` |
 | `missing_dependency_manifest` | source doc に dependency manifest がない。 | `blocker` |
 | `stale_name_candidate` | path name が old / copy / duplicate / legacy / snapshot / stale を示す。 | `warn` |
 | `duplicate_heading_candidate` | active document が同じ H1 title を共有する。 | `warn` |
+
+## Historical Records
+
+| Kind | Meaning | Structured severity |
+| --- | --- | --- |
+| `closed_issue_record` | `issues/closed/...` の履歴 record。active cleanup scope ではなく、同名の新 scope は `issues/open/...` に作る。 | diagnostic なし |
+| `stale_name_candidate` on `issues/closed/...` | closed issue filename に legacy / old などの語が含まれる履歴 record。closed issue の immutable history として扱う。 | diagnostic なし |
 
 ## DB Mapping
 
 | Inventory field | DB target |
 | --- | --- |
-| `documents[]` | `nodes.layer = document-canon`, `kind = document_record` |
-| `findings[]` | `nodes.layer = document-canon`, `kind = finding` |
-| finding target path | `edges.layer = document-canon`, `kind = targets_document` |
-| finding canonical path | `edges.layer = document-canon`, `kind = references_canonical` |
-| finding severity/rule/message | `diagnostics.layer = document-canon` |
-| inventory summary | `metadata.key = document_canon_inventory` |
+| `documents` | table `nodes`; layer `document-canon`; kind `document_record` |
+| `findings` | table `nodes`; layer `document-canon`; kind `finding` |
+| `historical_records` | table `nodes`; layer `document-canon`; kind `historical_record` |
+| finding target path | table `edges`; layer `document-canon`; kind `targets_document` |
+| finding canonical path | table `edges`; layer `document-canon`; kind `references_canonical` |
+| finding severity/rule/message | table `diagnostics`; layer `document-canon` |
+| inventory summary | table `metadata`; key `document_canon_inventory` |
 
-Document canon findings are structural cleanup evidence. They do not prove prose
-quality, citation validity, code behavior, or merge readiness.
+Document canon findings are active structural cleanup evidence. Historical
+records remain queryable graph nodes, but do not create diagnostics, warning
+counts, or cleanup blockers. Neither class proves prose quality, citation
+validity, code behavior, or merge readiness.
 
-## Use With Prose Graph
+## Query Surface
 
-Document canon evidence joins the prose graph at report claim and source-packet
-selection time.
+Importing document-canon evidence into `prose_graph.sqlite` makes source
+classification queryable by downstream report, source-packet, or cleanup tools.
+This adapter only defines the import surface.
 
 ```text
-report claim
-  -> source document path
+source document path
   -> document-canon document_record
-  -> duplicate / mirror / stale / missing-header finding
-  -> cleanup action or explicit accepted exception
+  -> active cleanup finding or historical record
+  -> adapter action / reason payload
 ```
 
-This lets a report explain when a source is canonical, duplicated, generated,
-or only historical before a writing skill relies on it.
+Callers that need reader-facing explanations own their own report wording and
+review gates.
