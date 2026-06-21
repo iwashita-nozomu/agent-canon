@@ -78,7 +78,7 @@ evidence.
    detailed eval, hook, skill, or experiment results.
 1. When the active run-local agent report needs cross-run retention, call
    `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
-   and then `runtime_log_archive_git.py push`. The snapshot records the run id,
+   and then `python3 tools/agent_tools/runtime_log_archive_git.py push`. The snapshot records the run id,
    repo key, Codex trace key when exposed, and Git HEAD when available.
 1. Use broad `python3 tools/agent_tools/runtime_log_archive_git.py sync` only
    when intentionally collecting accumulated runtime families such as hook
@@ -121,7 +121,7 @@ evidence.
 
 ## Closeout Tokens
 
-Record these in `workflow_monitoring.md`, a handoff, or the generated report:
+Record these in `reports/agents/<run-id>/workflow_monitoring.md`, a handoff, or the generated report:
 
 ```text
 result_writeout=complete

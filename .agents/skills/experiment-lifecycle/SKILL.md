@@ -30,8 +30,9 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/experiment-lifecycle.md`.
 1. Keep execution steps, result paths, and report locations consistent with the canonical experiment workflow.
-1. For a new experiment topic, fix the topic name first, copy AgentCanon template path `vendor/agent-canon/experiments/_template/` to `experiments/<topic>/`, then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order.
-1. Treat `experiments/registry.toml` as the canonical topic registry for entrypoints and registered smoke/formal commands.
+1. For a new experiment topic, fix the topic name first, copy AgentCanon template path `vendor/agent-canon/experiments/_template/` to project-root `experiments/<topic>/`, then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order.
+1. Treat project-root `experiments/registry.toml` as the project-owned topic registry for entrypoints and registered smoke/formal commands. AgentCanon owns the registry contract in `documents/experiment-registry.md`; from a template or derived repo root, read that contract as `vendor/agent-canon/documents/experiment-registry.md`. When the project registry is absent, create or update the project-root registry before formal entrypoint registration.
+1. When a project registry exists, validate registry schema and registered command placeholders with `python3 tools/ci/check_experiment_registry.py` before formal execution.
 1. For formal or server-side runs, use a project `Makefile` target that calls `tools/experiments/run_managed_experiment.py` so `run_manifest.json` and `run.log` are captured automatically.
 1. After a formal run from the source checkout, usually `main`, publish the generated result/report artifacts with `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`, adding `--push` when remote result-branch retention is part of the run plan.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a `config.json` or YAML snapshot, and registered commands must consume `{config_path}`.
