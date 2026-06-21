@@ -3932,414 +3932,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS",
-      "line": 158,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS",
-      "line": 172,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 190,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 199,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_ANALYZE",
-      "line": 204,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
-      "line": 212,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
-      "line": 262,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 222,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 230,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_BUILD",
-      "line": 235,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DB",
-      "line": 206,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DB",
-      "line": 241,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DB",
-      "line": 376,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DIRECTORIES",
-      "line": 255,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
-      "line": 256,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
-      "line": 303,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_FINDINGS",
-      "line": 382,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_RECORDS",
-      "line": 381,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 272,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 281,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 289,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 296,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
-      "line": 302,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FILES",
-      "line": 254,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 159,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 173,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 191,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 200,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 223,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 231,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 273,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 282,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 290,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 297,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 326,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 334,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 342,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 350,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 356,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 363,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_FINDING",
-      "line": 371,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 325,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 333,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 341,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 349,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 355,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 362,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 370,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
-      "line": 375,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_INFOS",
-      "line": 214,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_INFOS",
-      "line": 264,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_PROFILE",
       "line": 205,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
@@ -4347,8 +3939,464 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS",
+      "line": 220,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_ANALYZE",
+      "line": 238,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_ANALYZE",
+      "line": 247,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_ANALYZE",
+      "line": 252,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
+      "line": 260,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BLOCKERS",
+      "line": 318,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 270,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 278,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_BUILD",
+      "line": 283,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DB",
+      "line": 254,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DB",
+      "line": 293,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DB",
+      "line": 491,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DIRECTORIES",
+      "line": 307,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
+      "line": 308,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENTS",
+      "line": 408,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_FINDINGS",
+      "line": 497,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_CANON_RECORDS",
+      "line": 496,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 377,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 386,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 394,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 401,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY",
+      "line": 407,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FILES",
+      "line": 306,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 206,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 221,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 239,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 248,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 271,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 279,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 329,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 339,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 347,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 378,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 387,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 395,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 402,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 441,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 449,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 457,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 465,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 471,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 478,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_FINDING",
+      "line": 486,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_GRAPH_CONTRACT",
+      "line": 328,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_GRAPH_CONTRACT",
+      "line": 338,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_GRAPH_CONTRACT",
+      "line": 346,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 440,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 448,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 456,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 464,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 470,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 477,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 485,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY",
+      "line": 490,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_INFOS",
+      "line": 262,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_INFOS",
+      "line": 320,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_PROFILE",
-      "line": 236,
+      "line": 253,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_PROFILE",
+      "line": 284,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -4356,7 +4404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNINGS",
-      "line": 211,
+      "line": 259,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -4364,6 +4412,14 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNINGS",
+      "line": 317,
+      "path": "rust/agent-canon/src/structured_analysis.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "STRUCTURED_ANALYSIS_WARNS",
       "line": 261,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
@@ -4372,15 +4428,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "STRUCTURED_ANALYSIS_WARNS",
-      "line": 213,
-      "path": "rust/agent-canon/src/structured_analysis.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "STRUCTURED_ANALYSIS_WARNS",
-      "line": 263,
+      "line": 319,
       "path": "rust/agent-canon/src/structured_analysis.rs",
       "surface": "tool"
     },
@@ -12620,7 +12668,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 300,
+      "line": 389,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12628,7 +12676,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "changed_files",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12636,7 +12684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12644,7 +12692,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 323,
+      "line": 412,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12652,7 +12700,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12660,7 +12708,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 323,
+      "line": 412,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12668,7 +12716,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 300,
+      "line": 389,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12676,7 +12724,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "changed_files",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12684,7 +12732,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12692,7 +12740,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 323,
+      "line": 412,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12700,7 +12748,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 313,
+      "line": 402,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12708,7 +12756,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 323,
+      "line": 412,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12716,7 +12764,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 201,
+      "line": 289,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12724,7 +12772,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_CANONICAL_DOC",
-      "line": 278,
+      "line": 367,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12732,7 +12780,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_FINDING",
-      "line": 74,
+      "line": 130,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12740,7 +12788,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_RUNTIME_SKILL",
-      "line": 277,
+      "line": 366,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12748,7 +12796,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_SKILL",
-      "line": 276,
+      "line": 365,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12756,7 +12804,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS",
-      "line": 336,
+      "line": 425,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12764,7 +12812,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_FINDINGS",
-      "line": 335,
+      "line": 424,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12772,7 +12820,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SYNC",
-      "line": 318,
+      "line": 407,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12780,7 +12828,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SYNC_CHANGED",
-      "line": 315,
+      "line": 404,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
