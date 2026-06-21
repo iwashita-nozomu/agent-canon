@@ -133,10 +133,11 @@ python3 tools/agent_tools/workflow_monitor.py \
 ```
 
    修復後は同じ `warning_id` を `status=resolved evidence=<path-or-command>` で
-   追記します。通常 warning を採択・延期する場合は `accepted_with_reason` または
-   `deferred_with_issue issue=<issue-or-pr>` を使います。fix-now / S0 / S1 は
-   defer せず resolved にします。警告がなければ次で `tool_warnings_status: none` を
-   明示します。
+   追記します。通常 warning の `tool_warning_exit_status` は `resolved`、
+   durable owner 付きの `deferred_with_issue issue=<issue-or-pr>`、または
+   `explicit_approval_evidence` と durable rationale artifact 付きの
+   `accepted_with_reason` に接続します。fix-now / S0 / S1 は resolved にします。
+   警告がなければ次で `tool_warnings_status: none` を明示します。
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \

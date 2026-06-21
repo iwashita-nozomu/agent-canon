@@ -1,3 +1,5 @@
+"""Tests for JIT-canonical IR extraction and backend runtime routing."""
+
 # @dependency-start
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
@@ -55,6 +57,7 @@ def _load_jit_tool_module() -> _JitToolModule:
 
 
 def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -> None:
+    """JIT IR extraction records StableHLO, public roots, and backend trace."""
     root = tmp_path / "jit_root.py"
     root.write_text(
         "\n".join(
@@ -144,6 +147,7 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
 
 
 def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> None:
+    """Control-flow lowering records recursive region and expansion edges."""
     root = tmp_path / "while_root.py"
     root.write_text(
         "\n".join(
@@ -213,6 +217,7 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
 
 
 def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Path) -> None:
+    """Answer/state/info tuple returns keep named public return leaves."""
     root = tmp_path / "asi_root.py"
     root.write_text(
         "\n".join(
@@ -310,6 +315,7 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
 
 
 def test_jit_runtime_backend_config_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Backend config resolution requires the explicit JIT platform env var."""
     tool = _load_jit_tool_module()
     monkeypatch.delenv("AGENT_CANON_JIT_JAX_PLATFORM", raising=False)
 
@@ -318,6 +324,7 @@ def test_jit_runtime_backend_config_requires_env(monkeypatch: pytest.MonkeyPatch
 
 
 def test_jit_gpu_platform_selects_open_slot(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GPU platform routing selects an idle visible device slot."""
     tool = _load_jit_tool_module()
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     monkeypatch.delenv("NVIDIA_VISIBLE_DEVICES", raising=False)
