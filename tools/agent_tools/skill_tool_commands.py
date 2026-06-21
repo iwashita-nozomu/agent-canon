@@ -47,6 +47,62 @@ COMMAND_PREFIXES = (
 )
 PROMPT_PLACEHOLDER = "<user request>"
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
+    "experiment-lifecycle": (
+        (
+            "experiment-registry-contract",
+            "documents/experiment-registry.md",
+        ),
+        (
+            "experiment-registry-template-contract-path",
+            "vendor/agent-canon/documents/experiment-registry.md",
+        ),
+        (
+            "experiment-registry-project-root",
+            "project-root `experiments/registry.toml`",
+        ),
+    ),
+    "research-workflow": (
+        (
+            "critical-review-template-path",
+            "vendor/agent-canon/documents/experiment-critical-review.md",
+        ),
+    ),
+    "start-repository": (
+        (
+            "remote-doc-template-path",
+            "vendor/agent-canon/documents/agent-canon-github-remote.md",
+        ),
+        (
+            "profile-doc-template-path",
+            "vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md",
+        ),
+    ),
+    "tool-finding-report": (
+        (
+            "workflow-monitoring-run-local-path",
+            "reports/agents/",
+        ),
+        (
+            "workflow-monitoring-template-path",
+            "agents/templates/workflow_monitoring.md",
+        ),
+    ),
+}
+ISSUE_CONTRACT_FORBIDDEN: dict[str, tuple[tuple[str, re.Pattern[str]], ...]] = {
+    "result-artifact-writeout": (
+        (
+            "bare-runtime-log-archive-push",
+            re.compile(r"(?<!tools/agent_tools/)runtime_log_archive_git\.py push"),
+        ),
+    ),
+    "tool-finding-report": (
+        (
+            "bare-workflow-monitoring-path",
+            re.compile(r"(?<!/)workflow_monitoring\.md"),
+        ),
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -143,12 +199,19 @@ def iter_command_lines(text: str) -> Iterable[str]:
             candidate = candidate[:-1].rstrip()
         if candidate.startswith("$ "):
             candidate = candidate[2:].strip()
-        if candidate.startswith(COMMAND_PREFIXES):
+        if is_command_candidate(candidate):
             yield candidate
         for inline in INLINE_CODE_RE.findall(raw_line):
             command = inline.strip()
-            if command.startswith(COMMAND_PREFIXES):
+            if is_command_candidate(command):
                 yield command
+
+
+def is_command_candidate(value: str) -> bool:
+    """Return whether a string is command-shaped enough for a packet."""
+    if value.endswith("/"):
+        return False
+    return value.startswith(COMMAND_PREFIXES)
 
 
 def unique_preserve_order(values: Iterable[str]) -> tuple[str, ...]:
@@ -192,6 +255,31 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
         discovered_commands=discovered,
         validation_commands=validation,
     )
+
+
+def skill_pair_text(root: Path, skill: str) -> str:
+    """Return combined runtime and human-facing skill text."""
+    parts: list[str] = []
+    for path in (runtime_skill_path(root, skill), canonical_skill_doc(root, skill)):
+        if path.is_file():
+            parts.append(path.read_text(encoding="utf-8", errors="replace"))
+    return "\n".join(parts)
+
+
+def check_issue_contract_rules(root: Path, skill: str) -> tuple[Finding, ...]:
+    """Check issue-backed skill contract drift markers."""
+    text = skill_pair_text(root, skill)
+    if not text:
+        return ()
+    path = f"{RUNTIME_SKILL_ROOT.as_posix()}/{skill}/SKILL.md+{HUMAN_SKILL_ROOT.as_posix()}/{skill}.md"
+    findings: list[Finding] = []
+    for marker_name, marker in ISSUE_CONTRACT_MARKERS.get(skill, ()):
+        if marker not in text:
+            findings.append(Finding("skill_issue_contract", path, f"{marker_name}:missing"))
+    for marker_name, pattern in ISSUE_CONTRACT_FORBIDDEN.get(skill, ()):
+        if pattern.search(text):
+            findings.append(Finding("skill_issue_contract", path, f"{marker_name}:present"))
+    return tuple(findings)
 
 
 def expected_section(skill: str) -> str:
@@ -267,6 +355,7 @@ def check(root: Path) -> tuple[Finding, ...]:
             findings.append(Finding("skill_tool_commands", relative, "missing-command-packet-entry"))
         if section not in text:
             findings.append(Finding("skill_tool_commands", relative, "stale-tool-commands-section"))
+        findings.extend(check_issue_contract_rules(root, skill))
     return tuple(findings)
 
 
