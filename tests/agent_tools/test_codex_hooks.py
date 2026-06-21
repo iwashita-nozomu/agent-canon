@@ -1170,6 +1170,9 @@ class CodexHooksTest(unittest.TestCase):
         """Validation commands should not be blocked by post-tool hook children."""
         commands = [
             "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+            "python3 tools/agent_tools/runtime_log_archive_git.py check-clean",
+            "python3 tools/agent_tools/runtime_log_archive_git.py --source-root . --canon-root vendor/agent-canon status --porcelain",
+            "bash tools/agent_tools/runtime_log_archive_git.py --source-root . repo-key",
             "bash tools/ci/check_agent_canon_latest.sh",
             "bash tools/update_agent_canon.sh plan",
             "bash tools/sync_agent_canon.sh status",
@@ -1235,6 +1238,9 @@ class CodexHooksTest(unittest.TestCase):
             "bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "bash tools/sync_agent_canon.sh ensure-latest",
             "bash tools/sync_agent_canon.sh link-root",
+            "python3 tools/agent_tools/runtime_log_archive_git.py ensure",
+            "python3 tools/agent_tools/runtime_log_archive_git.py sync",
+            "bash tools/agent_tools/runtime_log_archive_git.py archive-agent-reports",
         ]
         for command in commands:
             with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
