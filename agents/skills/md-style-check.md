@@ -51,6 +51,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 ## Mandatory Checklist
 
+- typo / link / format-only route でも selected_runtime_skill_read と small_change_skill_read の evidence に runtime `SKILL.md` path が残っている
 - changed Markdown files have been checked with `tools/bin/agent-canon docs check`
 - 見出し階層が飛んでいない
 - command、path、file reference の書式が揃っている

@@ -124,6 +124,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`m
 
 raw text search の hit だけで編集対象を決めません。
 large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
+small changes でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。
 
 ```bash
 rg -l "topic keywords" <responsibility-scoped dirs> \

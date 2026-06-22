@@ -41,6 +41,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Classify the task with `agents/TASK_WORKFLOWS.md` before touching files.
 1. In the first work update, declare `workflow=<family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list.
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
+1. For repo-changing edits, read the full body of every selected runtime
+   `SKILL.md`. The selected_runtime_skill_read contract applies to
+   `Scoped Change Lite`, Routine docs, Focused code, typo/link/format-only, and
+   parent-direct routes; record small_change_skill_read evidence with skill
+   names and paths ahead of patching.
 1. Keep user-facing updates and final reports in ordinary language. Internal field names, enum values, role keys, and helper-style words stay in commands, paths, tables, or exact evidence references. When a technical term is needed, use an established repository term or an external standard term and explain it in natural language.
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.

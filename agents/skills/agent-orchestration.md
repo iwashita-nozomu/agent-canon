@@ -47,6 +47,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. prompt-derived skill routing が必要なら `agent-canon local-llm route-skill --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`python3 tools/agent_tools/route.py --prompt ...` は互換 mirror です
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
+1. repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない

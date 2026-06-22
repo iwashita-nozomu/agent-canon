@@ -46,6 +46,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
 - `Scoped Change Lite` では cheap local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では、実装前に parent-direct route と targeted validation が固定された場合に parent-direct を使う
+- repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す
 - ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理・allowed_paths 固定・write scope 固定・validation route 固定・`tool_rejection_preflight` 固定後に `spark_worker` / `worker` を起動してから実装へ進む
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
