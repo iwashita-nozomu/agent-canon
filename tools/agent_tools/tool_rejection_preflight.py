@@ -197,6 +197,17 @@ PYTHON_GATE_TEMPLATES = (
         ),
     ),
     GateTemplate(
+        gate="solid_evidence_gate",
+        command_template=(
+            "python3 tools/agent_tools/check_solid_evidence.py --root . {path} "
+            "--evidence <oop-readability-report>"
+        ),
+        handoff=(
+            "attach a path-covered OOP readability JSON or Markdown report for "
+            "SOLID-sensitive Python boundaries before closeout"
+        ),
+    ),
+    GateTemplate(
         gate="helper_inventory_guard",
         command_template=(
             "python3 tools/agent_tools/helper_function_inventory.py "

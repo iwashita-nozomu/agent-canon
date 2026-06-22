@@ -137,6 +137,8 @@ Python 実装で class、dataclass、`Protocol`、継承、public API、型境�
 `tools/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
 `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
 SOLID 見出しへの機械投影を所有します。
+`tools/agent_tools/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
+OOP readability report の `scanned_paths` coverage を照合します。
 
 | Principle | Python coding contract | Static risk signal |
 |---|---|---|
@@ -149,6 +151,8 @@ SOLID 見出しへの機械投影を所有します。
 SOLID / OOP 境界の検証は、pytest wrapper ではなく該当 checker command を validation route に置きます。
 repo-wide review では `$oop-readability-check` を使い、Markdown / JSON report の
 SOLID principle signal counts、OOP dimension、finding kind、`path:line` を design artifact に引用します。
+closeout では `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>`
+で、SOLID-sensitive な path と OOP readability evidence の対応を確認します。
 
 ## 目次
 

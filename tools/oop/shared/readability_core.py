@@ -103,11 +103,14 @@ INFO_SCORE_PENALTY = 2
 UNKNOWN_SEVERITY_SCORE_PENALTY = 3
 UNKNOWN_SEVERITY_FINDING_RANK = 9
 KLOC_NORMALIZER = 1000
+MILLISECONDS_PER_SECOND = 1000
 MODERATE_RISK_WARN_OR_ERROR_PER_KLOC = 3
 HIGH_RISK_WARN_OR_ERROR_PER_KLOC = 6
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
+CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS = 16
+CPP_ABI_MARKER_LOOKBACK_LINES = 4
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
 CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES = (
@@ -1869,7 +1872,9 @@ def cpp_constructor_usage_count(analysis_text: str, class_name: str) -> int:
         rf"\b{escaped}\s+[a-z_][A-Za-z0-9_]*\s*(?:[;={{(])"
     )
     for match in expression_pattern.finditer(analysis_text):
-        prefix = analysis_text[max(0, match.start() - 16) : match.start()]
+        prefix = analysis_text[
+            max(0, match.start() - CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS) : match.start()
+        ]
         if re.search(r"(?:class|struct)\s+$", prefix):
             continue
         count += 1
@@ -2958,7 +2963,7 @@ def cpp_abi_boundary_function(
         return True
     if "extern" in prefix and name.startswith(CPP_ABI_FUNCTION_PREFIXES):
         return True
-    preceding = cpp_preceding_lines(analysis_text, start, 4)
+    preceding = cpp_preceding_lines(analysis_text, start, CPP_ABI_MARKER_LOOKBACK_LINES)
     return any(marker in preceding for marker in CPP_ABI_MARKER_MACROS)
 
 
@@ -3012,7 +3017,7 @@ def cpp_depth_tuple_with_delta(
     """Return delimiter depths after changing one depth slot."""
     items = list(depths)
     items[index] = max(0, items[index] + delta)
-    return (items[0], items[1], items[2], items[3])
+    return cast(tuple[int, int, int, int], tuple(items))
 
 
 def cpp_parameter_names(params: str) -> list[str]:
@@ -3800,6 +3805,7 @@ def summarize_findings(
         grade = "severe-risk"
     return {
         "files": len(files),
+        "scanned_paths": selected_relative_paths(root, files),
         "source_loc": loc,
         "findings": len(findings),
         "score": final_score,
@@ -3849,6 +3855,7 @@ def render_markdown_report(spec: MarkdownReportSpec) -> str:
 def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
     """Render Markdown summary lines."""
     excluded_patterns_summary = cast(list[str], summary["excluded_patterns"])
+    scanned_paths = cast(list[str], summary["scanned_paths"])
     return [
         "# OOP Readability Mechanical Report",
         "",
@@ -3860,6 +3867,7 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         f"- mechanical_grade: `{summary['mechanical_grade']}`",
         f"- score: `{summary['score']}` / min `{summary['min_score']}`",
         f"- files: `{summary['files']}`",
+        f"- scanned_paths: `{', '.join(scanned_paths) or 'none'}`",
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
@@ -4007,7 +4015,7 @@ def append_workflow_monitor_timing(
     monitor = root / "tools" / "agent_tools" / "workflow_monitor.py"
     if not report_dir or not monitor.is_file():
         return
-    duration_ms = int((time.perf_counter() - started_at) * 1000)
+    duration_ms = int((time.perf_counter() - started_at) * MILLISECONDS_PER_SECOND)
     scope = ",".join(str(path) for path in args.paths) if args.paths else "."
     output_path = str(args.review_prompt_out) if args.review_prompt_out else "stdout"
     event = (

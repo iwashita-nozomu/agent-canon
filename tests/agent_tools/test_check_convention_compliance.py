@@ -77,7 +77,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
         "Interface segregation Dependency inversion "
         "tools/oop/python/readability.py tools/oop/shared/readability_core.py "
-        "SOLID principle signal "
+        "tools/agent_tools/check_solid_evidence.py SOLID principle signal scanned_paths "
         "SOLID_PRINCIPLES_BY_KIND readability.py\n"
     ),
     "documents/coding-conventions-cpp.md": "cpp\n",
@@ -209,7 +209,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker "
         "$oop-readability-check SOLID principle signal OOP dimension "
-        "finding kind tools/oop/shared/readability_core.py classes Protocol\n"
+        "finding kind tools/oop/shared/readability_core.py check_solid_evidence.py "
+        "scanned_paths classes Protocol\n"
     ),
     ".agents/skills/refactor-loop/SKILL.md": skill_fixture(
         "refactor-loop",
@@ -294,7 +295,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker "
         "$oop-readability-check SOLID principle signal OOP dimension finding kind "
-        "tools/oop/shared/readability_core.py class Protocol\n"
+        "tools/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
+        "class Protocol\n"
     ),
     "agents/skills/refactor-loop.md": (
         "two-stage refactor forced migration usage-surface repair "

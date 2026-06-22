@@ -1453,6 +1453,24 @@ entries:
     tests:
       - tests/agent_tools/test_check_static_any.py
 
+  - id: check-solid-evidence
+    summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
+    path: tools/agent_tools/check_solid_evidence.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/coding-conventions-python.md
+      - agents/skills/oop-readability-check.md
+    tests:
+      - tests/agent_tools/test_check_solid_evidence.py
+
   - id: check-log-helper-names
     summary: Checks logging helper functions use the required name prefix.
     path: tools/agent_tools/check_log_helper_names.py

@@ -117,6 +117,7 @@ Common execution routes:
 | Runtime log archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
 | Generated report roots left in source tree | `python3 tools/agent_tools/generated_artifact_guard.py` |
 | Design-doc claim evidence against code and dependency headers | `python3 tools/agent_tools/check_design_doc_claims.py <design-doc>` |
+| SOLID-sensitive Python diff evidence coverage | `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` |
 | Test-design resilience diagnostics | `agent-canon test-design check tests` |
 
 Use `documents/tools/README.md` for reader-facing tool-family guidance and
