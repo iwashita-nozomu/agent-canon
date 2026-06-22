@@ -149,10 +149,12 @@ directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
 `render_dependency_manifest_graph.py` turns a dependency graph TSV from
-`check_dependency_graph.sh --graph-tsv` into Markdown, DOT, and HTML review
-projection artifacts. It is the dependency-manifest adapter for the shared
-graph visualization DSL; `check_dependency_graph.sh` keeps dependency
-validation authority.
+`check_dependency_graph.sh --graph-tsv` into a repo-local Graph IR JSON,
+Markdown, DOT, and a single-file HTML Graph Workbench with a Voronoi-style code
+territory map, complete static graph map, dependency tables, inferred directory
+containment table, and filtered exploration. It is the dependency-manifest
+adapter for the shared graph visualization DSL; `check_dependency_graph.sh`
+keeps dependency validation authority.
 `check_design_doc_claims.py` compares design-document claim tokens with
 dependency-header closure, implementation text, and upstream parent design
 documents. Use it before accepting implementation-backed design prose or route

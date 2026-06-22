@@ -1588,7 +1588,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "closeout_gate",
-      "line": 94,
+      "line": 101,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -1596,7 +1596,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "evidence_cells",
-      "line": 90,
+      "line": 97,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -1604,7 +1604,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "finding_class",
-      "line": 89,
+      "line": 96,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -1612,7 +1612,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "instance_partition",
-      "line": 92,
+      "line": 99,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -1620,7 +1620,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "required_packet",
-      "line": 93,
+      "line": 100,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -1628,7 +1628,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "route_target",
-      "line": 91,
+      "line": 98,
       "path": "agents/skills/agent-log-analysis.md",
       "surface": "skill"
     },
@@ -2180,7 +2180,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "tool_call",
-      "line": 149,
+      "line": 157,
       "path": "agents/skills/oop-readability-check.md",
       "surface": "skill"
     },
@@ -2980,7 +2980,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "EVIDENCE",
-      "line": 1304,
+      "line": 1313,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2988,7 +2988,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM",
-      "line": 2942,
+      "line": 2951,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -2996,7 +2996,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 716,
+      "line": 718,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3004,7 +3004,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 723,
+      "line": 725,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3012,7 +3012,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 737,
+      "line": 739,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3020,7 +3020,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_ERROR",
-      "line": 2999,
+      "line": 3008,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3028,7 +3028,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_FILE",
-      "line": 2939,
+      "line": 2948,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3036,7 +3036,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_MODEL",
-      "line": 2940,
+      "line": 2949,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3044,7 +3044,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_PROMPT_SHA",
-      "line": 2941,
+      "line": 2950,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3052,7 +3052,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FILE_RESP_LLM_SCOPE",
-      "line": 2938,
+      "line": 2947,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3060,7 +3060,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "FORBIDDEN_PATHS",
-      "line": 1922,
+      "line": 1931,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3068,102 +3068,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 863,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1889,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER",
-      "line": 1905,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 848,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 855,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1857,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1884,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
-      "line": 1892,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE",
-      "line": 1891,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 864,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1894,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
-      "line": 1913,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
       "line": 865,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3171,15 +3075,47 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
-      "line": 1895,
+      "field": "IMPLEMENTATION_SURFACE_ROUTER",
+      "line": 1898,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER",
+      "line": 1914,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 850,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 857,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 1866,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
       "line": 1893,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3187,8 +3123,72 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR",
+      "line": 1901,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_ERROR_CODE",
+      "line": 1900,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
+      "line": 866,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
+      "line": 1903,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_MODEL",
+      "line": 1922,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
+      "line": 867,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_PROMPT_SHA",
+      "line": 1904,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "IMPLEMENTATION_SURFACE_ROUTER_REQUIRED_ACTION",
+      "line": 1902,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
       "field": "IMPLEMENTATION_SURFACE_ROUTER_SCHEMA",
-      "line": 1890,
+      "line": 1899,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3196,7 +3196,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI",
-      "line": 83,
+      "line": 85,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3204,7 +3204,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI",
-      "line": 147,
+      "line": 149,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3212,7 +3212,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI",
-      "line": 159,
+      "line": 161,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3220,7 +3220,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI_ERROR",
-      "line": 84,
+      "line": 86,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3228,7 +3228,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI_ERROR",
-      "line": 148,
+      "line": 150,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3236,7 +3236,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_CLI_ERROR",
-      "line": 160,
+      "line": 162,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3244,7 +3244,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR",
-      "line": 800,
+      "line": 802,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3252,22 +3252,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR",
-      "line": 832,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
-      "line": 795,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
       "line": 834,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3275,79 +3259,7 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 753,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 760,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 769,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 777,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 817,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 824,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_ERROR",
-      "line": 829,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_JSON",
-      "line": 833,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_MODEL",
-      "line": 798,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_PARTS",
+      "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
       "line": 797,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3355,7 +3267,7 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_PARTS",
+      "field": "LOCAL_LLM_PROSE_IR_DOCUMENTS",
       "line": 836,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3363,7 +3275,79 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_PROMPT_SHA",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 755,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 762,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 771,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 779,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 819,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 826,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_ERROR",
+      "line": 831,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_JSON",
+      "line": 835,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_MODEL",
+      "line": 800,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_PARTS",
       "line": 799,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3371,8 +3355,24 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_PARTS",
+      "line": 838,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_PROMPT_SHA",
-      "line": 837,
+      "line": 801,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_PROMPT_SHA",
+      "line": 839,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3380,14 +3380,6 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_SCOPE",
-      "line": 794,
-      "path": "rust/agent-canon/src/local_llm.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "LOCAL_LLM_PROSE_IR_TERMS",
       "line": 796,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
@@ -3396,7 +3388,15 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "LOCAL_LLM_PROSE_IR_TERMS",
-      "line": 835,
+      "line": 798,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_PROSE_IR_TERMS",
+      "line": 837,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3404,7 +3404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "MODE",
-      "line": 1256,
+      "line": 1265,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3412,7 +3412,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_OWNER",
-      "line": 1919,
+      "line": 1928,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3420,7 +3420,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_PATHS",
-      "line": 1921,
+      "line": 1930,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3428,7 +3428,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SCORE",
-      "line": 1920,
+      "line": 1929,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3436,7 +3436,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PRIMARY_SURFACE",
-      "line": 1918,
+      "line": 1927,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3444,7 +3444,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "ROUTE",
-      "line": 1254,
+      "line": 1263,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3452,7 +3452,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SCHEMA",
-      "line": 1255,
+      "line": 1264,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3460,7 +3460,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 930,
+      "line": 932,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3468,7 +3468,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 937,
+      "line": 939,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3476,7 +3476,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 944,
+      "line": 946,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -3484,7 +3484,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 951,
+      "line": 953,
       "path": "rust/agent-canon/src/local_llm.rs",
       "surface": "tool"
     },
@@ -4828,7 +4828,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2004,
+      "line": 1998,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4836,7 +4836,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2038,
+      "line": 2032,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4852,7 +4852,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1635,
+      "line": 1629,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4860,7 +4860,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1638,
+      "line": 1632,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4868,7 +4868,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1640,
+      "line": 1634,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4876,7 +4876,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1643,
+      "line": 1637,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4884,7 +4884,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1645,
+      "line": 1639,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 1642,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4900,7 +4908,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1654,
+      "line": 1660,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4908,7 +4916,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1666,
+      "line": 1663,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4916,7 +4924,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1669,
+      "line": 1668,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4924,7 +4932,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1674,
+      "line": 1670,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4932,7 +4940,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1676,
+      "line": 1709,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4940,15 +4948,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1715,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 1939,
+      "line": 1933,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5572,7 +5572,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 1237,
+      "line": 1331,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -5884,7 +5884,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "convention_sources",
-      "line": 1550,
+      "line": 1667,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5892,7 +5892,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 1550,
+      "line": 1667,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5900,7 +5900,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 1550,
+      "line": 1667,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5908,7 +5908,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_gates",
-      "line": 1550,
+      "line": 1667,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5916,7 +5916,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_prompts",
-      "line": 1550,
+      "line": 1667,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5924,7 +5924,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONVENTION_COMPLIANCE_FINDING",
-      "line": 842,
+      "line": 920,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5932,7 +5932,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE",
-      "line": 1569,
+      "line": 1686,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5940,7 +5940,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_FINDINGS",
-      "line": 1568,
+      "line": 1685,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5948,7 +5948,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_SOURCES",
-      "line": 1565,
+      "line": 1682,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5956,7 +5956,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_TOOL_GATES",
-      "line": 1566,
+      "line": 1683,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -5964,7 +5964,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_WORKFLOWS",
-      "line": 1567,
+      "line": 1684,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6596,7 +6596,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 137,
+      "line": 141,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -6604,7 +6604,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 137,
+      "line": 141,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -6612,7 +6612,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 137,
+      "line": 141,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -6620,7 +6620,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_FRONTMATTER_FINDING",
-      "line": 39,
+      "line": 41,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -6628,7 +6628,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_FRONTMATTER",
-      "line": 151,
+      "line": 155,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -6636,7 +6636,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_FRONTMATTER_CHECKED",
-      "line": 150,
+      "line": 154,
       "path": "tools/agent_tools/check_skill_frontmatter.py",
       "surface": "tool"
     },
@@ -10964,7 +10964,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 225,
+      "line": 340,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10972,7 +10972,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 292,
+      "line": 669,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10980,7 +10980,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 934,
+      "line": 675,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 2166,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10988,7 +10996,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 934,
+      "line": 2166,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10996,7 +11004,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH",
-      "line": 936,
+      "line": 2168,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11004,7 +11012,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_DOT",
-      "line": 942,
+      "line": 2176,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11012,7 +11020,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_HTML",
-      "line": 944,
+      "line": 2178,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DEPENDENCY_MANIFEST_GRAPH_IR",
+      "line": 2172,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11020,7 +11036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_MARKDOWN",
-      "line": 940,
+      "line": 2174,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11028,7 +11044,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_SOURCE_CHECK",
-      "line": 938,
+      "line": 2170,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11212,7 +11228,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 641,
+      "line": 646,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11220,7 +11236,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 659,
+      "line": 664,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11228,7 +11244,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 679,
+      "line": 684,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11236,7 +11252,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 722,
+      "line": 727,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11244,7 +11260,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 312,
+      "line": 315,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11252,7 +11268,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 793,
+      "line": 798,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11260,7 +11276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 780,
+      "line": 785,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -16868,7 +16884,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 4207,
+      "line": 4280,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16876,7 +16892,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 4207,
+      "line": 4280,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16884,7 +16900,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 4207,
+      "line": 4280,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16892,7 +16908,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 4207,
+      "line": 4280,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16900,7 +16916,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1586,
+      "line": 1626,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16908,7 +16924,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2857,
+      "line": 2897,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16916,7 +16932,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "OOP_READABILITY_FINDING",
-      "line": 363,
+      "line": 403,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16924,7 +16940,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "construct",
-      "line": 420,
+      "line": 460,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16932,7 +16948,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "construct",
-      "line": 491,
+      "line": 531,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16940,7 +16956,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 4239,
+      "line": 4312,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16948,7 +16964,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 4234,
+      "line": 4307,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16956,7 +16972,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 4235,
+      "line": 4308,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16964,7 +16980,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 4237,
+      "line": 4310,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16972,7 +16988,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 4236,
+      "line": 4309,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -16980,7 +16996,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 4238,
+      "line": 4311,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -19056,6 +19072,7 @@
     ".agents/skills/formal-proof-workflow/SKILL.md",
     ".agents/skills/html-experiment-report/SKILL.md",
     ".agents/skills/html-output/SKILL.md",
+    ".agents/skills/issue-finding-report/SKILL.md",
     ".agents/skills/literature-survey/SKILL.md",
     ".agents/skills/long-form-writing/SKILL.md",
     ".agents/skills/md-style-check/SKILL.md",
@@ -19128,6 +19145,7 @@
     "agents/skills/formal-proof-workflow.md",
     "agents/skills/html-experiment-report.md",
     "agents/skills/html-output.md",
+    "agents/skills/issue-finding-report.md",
     "agents/skills/literature-survey.md",
     "agents/skills/long-form-writing.md",
     "agents/skills/md-style-check.md",

@@ -27,6 +27,8 @@ local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}
 gitleaks_version="${AGENT_CANON_GITLEAKS_VERSION:-8.30.1}"
 trufflehog_version="${AGENT_CANON_TRUFFLEHOG_VERSION:-3.95.3}"
 detect_secrets_version="${AGENT_CANON_DETECT_SECRETS_VERSION:-1.5.0}"
+playwright_version="${AGENT_CANON_PLAYWRIGHT_VERSION:-1.61.0}"
+playwright_browsers_path="${AGENT_CANON_PLAYWRIGHT_BROWSERS_PATH:-/usr/local/share/ms-playwright}"
 
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
@@ -104,6 +106,28 @@ install_codex_cli() {
   run_as_root env "PATH=${PATH}" npm install -g @openai/codex
   run_as_root env "PATH=${PATH}" npm cache clean --force
   codex --version >/dev/null
+}
+
+install_browser_validation_tooling() {
+  local profile_script
+
+  install_node_for_codex
+  run_as_root install -d -m 755 "$playwright_browsers_path"
+  profile_script="$(mktemp)"
+  cat >"$profile_script" <<EOF
+export PLAYWRIGHT_BROWSERS_PATH="${playwright_browsers_path}"
+EOF
+  run_as_root install -m 644 "$profile_script" /etc/profile.d/agent-canon-playwright.sh
+  rm -f "$profile_script"
+  export PLAYWRIGHT_BROWSERS_PATH="$playwright_browsers_path"
+
+  if ! command -v playwright >/dev/null 2>&1 \
+    || ! playwright --version | grep -F "Version ${playwright_version}" >/dev/null 2>&1; then
+    run_as_root env "PATH=${PATH}" npm install -g "playwright@${playwright_version}"
+  fi
+  run_as_root env "PATH=${PATH}" "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}" \
+    playwright install --with-deps chromium
+  playwright --version
 }
 
 install_json_cli_tools() {
@@ -459,6 +483,7 @@ else
 fi
 install_github_cli
 install_codex_cli
+install_browser_validation_tooling
 install_json_cli_tools
 install_tex_tooling
 install_lean_toolchain
@@ -477,3 +502,4 @@ lean --version
 lake --version
 gh --version
 codex --version
+playwright --version
