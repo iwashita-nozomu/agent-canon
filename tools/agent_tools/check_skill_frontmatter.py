@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -24,6 +25,7 @@ import yaml
 SKILL_GLOB = ".agents/skills/*/SKILL.md"
 FRONTMATTER_DELIMITER = "---"
 REQUIRED_STRING_FIELDS = ("name", "description")
+SKILL_NAME_RE = re.compile(r"_?[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,8 @@ def validate_skill(path: Path, root: Path) -> list[Finding]:
         if not isinstance(value, str) or not value.strip():
             findings.append(Finding("field", rel_path, f"missing-{field}"))
     name = frontmatter.get("name")
+    if isinstance(name, str) and not SKILL_NAME_RE.fullmatch(name.strip()):
+        findings.append(Finding("field", rel_path, f"invalid-name:{name}"))
     if isinstance(name, str) and name.strip() != path.parent.name:
         findings.append(
             Finding("field", rel_path, f"name-must-match-directory:{name}!={path.parent.name}")

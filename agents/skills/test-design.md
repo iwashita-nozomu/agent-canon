@@ -45,6 +45,9 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
   checker-owned property に結び付いている
 - 数値テストを提案する場合は numerical trigger、non-numerical alternative、oracle、
   budget があり、提案しない場合は省略理由と代替 observable behavior が書かれている
+- 数理的な判定・oracle・assertion は `mathematical necessity gate` を通し、
+  `Numerical Trigger`、`Non-Numerical Alternative`、checker-owned property、
+  proof obligation、または approved design の acceptance criterion に接続している
 
 ## Mandatory Checklist
 
@@ -88,6 +91,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 1. branch、error path、parsing path、state mutation point を静的に洗います。
 1. 各 case の `Behavior Contract / Observation Level / Oracle / Input Space / Adequacy Evidence` を固定します。
 1. 数値テスト候補は `Numerical Trigger / Non-Numerical Alternative / Oracle / Budget` を固定し、trigger がない場合は省略理由と非数値の代替 test を書きます。
+1. 数理的な判定・oracle・assertion は `mathematical necessity gate` の採用条件に照合し、checker-owned property や proof obligation で足りる性質を test oracle に昇格させる前に validation route へ戻します。
 1. nasty case を `Target / Case / Why It Is Nasty / Expected Outcome / Oracle` で列挙します。
 1. regression として残すべき case を分けます。
 1. worker がどこへ test を実装すべきかを `Implementation Notes` に書きます。

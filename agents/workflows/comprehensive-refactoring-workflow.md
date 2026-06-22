@@ -49,7 +49,7 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Forbidden Semantic Delta:` 今回混ぜない仕様変更、数値変更、protocol change、performance tuning。
 - `Path Mapping:` old path / symbol から new path / symbol への対応。
 - `Deletion Plan:` 消す file、helper、alias、alternate route、旧 route。
-- `Compatibility Plan:` 互換 layer を残すか、残すなら期限と削除 gate。
+- `Removal and Caller Migration Plan:` compatibility-preservation drift と duplicate implementation を残さず、旧 entry、旧 alias、alternate route の caller migration と削除順序を固定する。
 
 設計見直しは、既存コードを読まずに始めません。
 `rg`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
@@ -83,7 +83,7 @@ refactor 後の拡張は、Gate B で固定した OOP boundary を迂回しま�
 - 既存 boundary へ入らない場合、新しい boundary が必要な理由。
 - 既存 class を肥大化させず、composition、値オブジェクト、純粋関数で足りるか。
 - public API、docstring、test が OOP boundary と一致しているか。
-- 互換 alias、legacy route、temporary adapter を残す場合、削除 gate があるか。
+- compatibility-preservation drift と duplicate implementation を避けるため、旧 alias、legacy route、temporary adapter が見つかった場合は canonical owner、caller migration、削除順序を固定する。
 
 拡張時に OOP boundary と合わない実装を見つけた場合は、局所追加で逃げず Gate A-B に戻ります。
 
@@ -147,24 +147,24 @@ closeout gate に使う report は、別途 task の target score を指定し�
 
 ## Gate D. 実装分割
 
-refactor は chunk に切りますが、chunk completion を user-facing completion と扱いません。
-各 chunk は次を満たします。
+refactor は two-stage refactor に一本化します。stage 1 は `forced migration`、
+stage 2 は `usage-surface repair` です。chunk 名で作業を増やさず、この二段に
+入る対象だけを扱います。
 
-- behavior contract に触れない。
-- 1 chunk で 1 種類の structural delta だけを扱う。
-- path mapping の一部を完了させる。
-- old route、旧 helper、compat alias を残す場合は期限付きで記録する。
-- tests と docs を同じ chunk で更新する。
+stage 1 `forced migration` は次をまとめて行います。
 
-chunk の例:
+- canonical surface の移動、rename、delete。
+- old route、旧 helper、compat alias、alternate route の削除。
+- generated surface、config route、public entrypoint の正本更新。
+- `Path Mapping:` と `Removal and Caller Migration Plan:` の更新。
 
-- `baseline capture`
-- `extract value objects`
-- `split state owner`
-- `move pure functions`
-- `replace adapter boundary`
-- `delete stale route`
-- `documentation sweep`
+stage 2 `usage-surface repair` は次をまとめて行います。
+
+- caller、import、CLI、hook、workflow、skill、document、report consumer を新しい surface に合わせる。
+- compatibility-preservation drift または duplicate implementation finding を Gate A に戻す。
+- return-gate validation の対象 command、static check、behavior evidence を一括して確定する。
+
+test、smoke、behavior execution は二段完了後の return-gate validation に集約します。
 
 ## Gate E. Review と Closeout
 

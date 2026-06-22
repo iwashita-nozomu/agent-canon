@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents レビュー手順とポリシー for this repository.
 upstream design README.md durable document index
+upstream design ../issues/README.md durable issue and GitHub mirror policy
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 @dependency-end
 -->
@@ -118,6 +119,12 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、implementation が設計上の問題を勝手に吸収していないことを確認します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾が local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで処理されていれば `fix now` です。正しい処理は `design_issue_blocker` と evidence を残して design gate へ戻すことです。
 1. checkpoint review と final acceptance review では、`bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
 1. checkpoint review 後から closeout までに、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目がある限り closeout へ進みません。
+1. checkpoint review と final acceptance review では、`fix now` と
+   `follow-up` finding ごとに `issue_route` を記録します。現在の review loop で
+   閉じる finding は `run_local_resolution:<evidence>`、durable に残す finding は
+   `existing_issue:<path-or-url>` または
+   `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>`、GitHub で見える triage が必要な
+   finding は `github_mirror:<issue_sync.py command-or-url>` を使います。
 1. final acceptance review 前に read-only diff-check agent が最新 diff を確認し、decision、findings disposition、再実行 evidence を artifact に残します。指摘に応じて修正した場合は loop を先頭へ戻し、最新 diff で再度 diff-check agent を通します。
 1. review artifact が `revise`、`required_change`、または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、修正の大小に関係なく required review family 全体を最新 diff に対してやり直します。直前の approve を流用して closeout してはいけません。
 1. 各 review では artifact に `request_clause_ids` があるか確認し、無い場合は差し戻します。
@@ -183,6 +190,19 @@ findings は少なくとも次に分けます。
 - `delete-ok`
   - stale asset や重複導線のように安全に削除できるもの
   - non-canonical design doc、implementation copy、dated snapshot のように tree head 以外の truth surface を増やすもの
+
+## Review Finding Issue Routing
+
+Review artifact の finding table には `issue_route` を置きます。
+
+- `run_local_resolution:<evidence>`: 現在の diff、validation、または review loop で閉じる finding。
+- `existing_issue:<path-or-url>`: 既存の `issues/open/AC-*.md`、`issues/closed/AC-*.md`、または GitHub Issue に接続する finding。
+- `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>`: `issues/README.md` の required fields を満たす durable local issue として起票する finding。
+- `github_mirror:<issue_sync.py command-or-url>`: local issue を operator-facing GitHub Issue へ mirror する finding。
+
+Durable operational defect は local issue file を正本にします。GitHub Issue は
+`python3 tools/agent_tools/issue_sync.py --root . --repo <owner>/<repo>` の
+plan output、または explicit apply / sync command に接続します。
 
 ## 関連正本
 

@@ -24,6 +24,20 @@ The tool is candidate generation, not deletion authority. Strict structure
 hashes, dependency graph analysis, AST equality, and safe removal decisions stay
 in the existing strict analysis tools.
 
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `search-coordination.md`, `local-llm-responsibility-analysis.md`,
+  `../rust/agent-canon/src/semantic_index.rs`, and
+  `../tools/catalog.yaml`.
+- Assumption:
+  implementation surface routing uses semantic-index output as bounded
+  candidate evidence. It does not replace source ownership, dependency-header
+  closure, exact symbol search, static analysis, tests, or review judgement.
+- Parent-doc alignment:
+  The coordinated-search document owns provider order. This document owns the
+  semantic-index cache and context-pack evidence contract.
+
 ## Generated Cache
 
 The default database is:

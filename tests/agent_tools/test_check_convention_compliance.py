@@ -21,8 +21,12 @@ from tools.agent_tools.check_convention_compliance import (
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     FALLBACK_EXIT_POLICY_MARKERS,
+    IMPLEMENTATION_GUARDRAIL_MARKERS,
+    MATHEMATICAL_NECESSITY_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
+    REFACTOR_SEQUENCE_MARKERS,
+    REVIEW_ISSUE_ROUTING_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -52,7 +56,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/common/05_docs.md": (
         "docs claim grounding program contract public entrypoint "
         "return projection proof obligation provisional wording "
-        "check_convention_compliance.py\n"
+        "check_convention_compliance.py mathematical necessity gate "
+        "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route "
+        "necessary-and-sufficient condition non-contractual mathematical judgment\n"
     ),
     "documents/conventions/python/01_scope.md": "scope\n",
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
@@ -69,10 +75,19 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "project container_config.py claim grounding program contract proof obligation "
         "run-local planning evidence\n"
     ),
-    "documents/coding-conventions-house-style.md": "house\n",
+    "documents/coding-conventions-house-style.md": (
+        "house compatibility-preservation drift duplicate implementation "
+        "canonical owner caller migration contract-complete implementation "
+        "acceptance contract design_issue_blocker implementation shortcut "
+        "two-stage refactor forced migration usage-surface repair "
+        "return-gate validation "
+        "check_convention_compliance.py\n"
+    ),
     "documents/coding-conventions-testing.md": (
         "testing contract-only wrapper static contract validation "
-        "static-analysis-duplicate-test canonical command Validation repair scope\n"
+        "static-analysis-duplicate-test canonical command Validation repair scope "
+        "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
+        "checker-owned property\n"
     ),
     "documents/coding-conventions-reviews.md": "reviews\n",
     "documents/coding-conventions-experiments.md": "experiments\n",
@@ -81,7 +96,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/object-oriented-design.md": "readability.py\n",
     "documents/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
-        "structure_contract=skipped\n"
+        "structure_contract=skipped Review Finding Issue Routing issue_route "
+        "issues/open/ issue_sync.py github_mirror\n"
     ),
     "documents/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
@@ -114,6 +130,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
     "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
+    "notes/guardrails/engineering_avoidances.md": (
+        "compatibility-preservation drift duplicate implementation canonical owner "
+        "contract-complete implementation acceptance contract design_issue_blocker "
+        "implementation shortcut\n"
+    ),
     "tools/README.md": (
         "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
         "check_runtime_profile_inventory.py\n"
@@ -126,6 +147,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "run_repo_dependency_review.sh\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
+        "compatibility-preservation drift duplicate implementation canonical owner "
+        "caller migration contract-complete implementation acceptance contract "
+        "design_issue_blocker implementation shortcut\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -151,8 +175,19 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "codex-task-workflow",
         "codex task workflow prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
+        "contract-complete implementation acceptance contract design_issue_blocker "
+        "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    ".agents/skills/refactor-loop/SKILL.md": skill_fixture(
+        "refactor-loop",
+        "two-stage refactor forced migration usage-surface repair "
+        "return-gate validation\n",
+    ),
+    ".agents/skills/change-review/SKILL.md": skill_fixture(
+        "change-review",
+        "issue_route issues/README.md issue_sync.py new_local_issue github_mirror\n",
     ),
     ".agents/skills/subagent-bootstrap/SKILL.md": skill_fixture(
         "subagent-bootstrap",
@@ -172,7 +207,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/test-design/SKILL.md": skill_fixture(
         "test-design",
         "contract-only wrapper static contract validation canonical command evidence "
-        "observable behavior validation repair scope\n"
+        "observable behavior validation repair scope mathematical necessity gate "
+        "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+    ),
+    ".agents/skills/computational-optimization/SKILL.md": skill_fixture(
+        "computational-optimization",
+        "mathematical necessity gate iteration map stopping scalar failure semantics\n",
     ),
     ".agents/skills/mvp-skeleton/SKILL.md": skill_fixture(
         "mvp-skeleton",
@@ -189,8 +229,17 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/codex-task-workflow.md": (
         "codex task workflow prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
+        "contract-complete implementation acceptance contract design_issue_blocker "
+        "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    "agents/skills/refactor-loop.md": (
+        "two-stage refactor forced migration usage-surface repair "
+        "return-gate validation\n"
+    ),
+    "agents/skills/change-review.md": (
+        "issue_route issues/open/ issue_sync.py new_local_issue github_mirror\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -206,7 +255,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
-        "observable behavior validation repair scope\n"
+        "observable behavior validation repair scope mathematical necessity gate "
+        "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+    ),
+    "agents/skills/computational-optimization.md": (
+        "mathematical necessity gate iteration map stopping scalar failure semantics\n"
     ),
     "agents/skills/long-form-writing.md": (
         "数学的 claim program contract proof obligation $formal-proof-workflow "
@@ -218,11 +271,13 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "provisional wording\n"
     ),
     "agents/skills/formal-proof-workflow.md": (
-        "program contract public entrypoint return projection proof obligation\n"
+        "program contract public entrypoint return projection proof obligation "
+        "mathematical necessity gate theorem surface\n"
     ),
     ".agents/skills/formal-proof-workflow/SKILL.md": skill_fixture(
         "formal-proof-workflow",
-        "program contract public entrypoint return projection validation command\n"
+        "program contract public entrypoint return projection validation command "
+        "mathematical necessity gate theorem surface proof obligation\n"
     ),
     "agents/skills/README.md": (
         "prose-reasoning-graph structure-planning md-style-check "
@@ -283,6 +338,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/workflows/comprehensive-refactoring-workflow.md": (
         "readability.py check_convention_compliance.py\n"
+        "compatibility-preservation drift duplicate implementation canonical owner "
+        "Removal and Caller Migration Plan two-stage refactor forced migration "
+        "usage-surface repair return-gate validation\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
@@ -902,6 +960,123 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in TEST_CONTRACT_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_mathematical_necessity_gate_requires_markers(self) -> None:
+        """Mathematical judgment surfaces keep necessity-gate markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            proof_skill = root / "agents" / "skills" / "formal-proof-workflow.md"
+            proof_skill.write_text(
+                "program contract public entrypoint proof obligation\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("mathematical_necessity_gate", result.stdout)
+            self.assertIn("missing-marker:mathematical necessity gate", result.stdout)
+            self.assertIn("missing-marker:theorem surface", result.stdout)
+
+    def test_minimal_fixture_covers_mathematical_necessity_surfaces(self) -> None:
+        """The minimal test fixture includes every math necessity surface."""
+        missing = sorted(
+            path
+            for path in MATHEMATICAL_NECESSITY_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_implementation_guardrails_require_markers(self) -> None:
+        """Implementation policy keeps compatibility and duplicate guards visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            house_style = root / "documents" / "coding-conventions-house-style.md"
+            house_style.write_text(
+                "house canonical owner check_convention_compliance.py\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("implementation_guardrails", result.stdout)
+            self.assertIn(
+                "missing-marker:compatibility-preservation drift",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:duplicate implementation", result.stdout)
+            self.assertIn("missing-marker:caller migration", result.stdout)
+            self.assertIn(
+                "missing-marker:contract-complete implementation",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:acceptance contract", result.stdout)
+            self.assertIn("missing-marker:design_issue_blocker", result.stdout)
+            self.assertIn("missing-marker:implementation shortcut", result.stdout)
+
+    def test_minimal_fixture_covers_implementation_guardrail_surfaces(self) -> None:
+        """The minimal test fixture includes every implementation guardrail surface."""
+        missing = sorted(
+            path
+            for path in IMPLEMENTATION_GUARDRAIL_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_refactor_sequence_requires_two_stage_markers(self) -> None:
+        """Refactor workflow keeps the forced-migration usage-repair sequence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            refactor_skill = root / "agents" / "skills" / "refactor-loop.md"
+            refactor_skill.write_text("refactor workflow only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("refactor_sequence", result.stdout)
+            self.assertIn("missing-marker:two-stage refactor", result.stdout)
+            self.assertIn("missing-marker:forced migration", result.stdout)
+            self.assertIn("missing-marker:usage-surface repair", result.stdout)
+            self.assertIn("missing-marker:return-gate validation", result.stdout)
+
+    def test_minimal_fixture_covers_refactor_sequence_surfaces(self) -> None:
+        """The minimal test fixture includes every refactor sequence surface."""
+        missing = sorted(
+            path for path in REFACTOR_SEQUENCE_MARKERS if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_review_issue_routing_requires_markers(self) -> None:
+        """Review findings keep durable issue routing markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_skill = root / "agents" / "skills" / "change-review.md"
+            review_skill.write_text("review findings only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("review_issue_routing", result.stdout)
+            self.assertIn("missing-marker:issue_route", result.stdout)
+            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+
+    def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every review issue route surface."""
+        missing = sorted(
+            path
+            for path in REVIEW_ISSUE_ROUTING_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

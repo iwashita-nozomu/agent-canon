@@ -57,6 +57,11 @@ Execute the required and task-matching conditional commands that the packet prin
    text or reader-facing prose: public entrypoint, input schema, runtime
    profile, return projection, observable effect, assumptions / preconditions,
    and checker / validation command.
+1. Route mathematical judgments through the `mathematical necessity gate`:
+   accept theorem surface, proof obligation, accepted assumption,
+   counterexample obligation, and checker-backed validation command only when
+   they project from the public entrypoint and program contract. Select helper
+   lemmas and local judgments through the target theorem dependency graph.
 1. Build the theorem statement from the public root's static argument schema
    and return schema. The target theorem must talk about `let out := main
    problem config` and its returned `Answer` / `State` / `Info` fields, or

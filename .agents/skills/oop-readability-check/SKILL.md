@@ -46,8 +46,8 @@ Execute the required and task-matching conditional commands that the packet prin
    exclude generated or vendored surfaces (`vendor`, `reports`, `.git`, `build`,
    `.pytest_cache`, `.ruff_cache`).
 1. If the user asks for a report, render the mechanical result as tables:
-   command, exit status, summary metrics, dimensions, finding kinds, hotspots,
-   and the first relevant finding rows.
+   command, exit status, summary metrics, SOLID principle signals, dimensions,
+   finding kinds, hotspots, and the first relevant finding rows.
 1. In any tool-running mode, create a Markdown report artifact by default at
    `reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md`.
    Chat-only tables do not satisfy this skill unless the user explicitly says
@@ -58,6 +58,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
    Keep it under a separate `Agent Analysis` section after the mechanical
    result. Prioritize by risk and leverage, identify likely false positives,
-   cite mechanical evidence, and read hotspot files only when needed.
+   group by SOLID principle signals, cite mechanical evidence, and read hotspot
+   files only when needed.
 1. When a run bundle is active, record timing as a behavior event:
    `tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths>`.

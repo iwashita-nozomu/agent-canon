@@ -74,6 +74,13 @@ Execute the required and task-matching conditional commands that the packet prin
    the repository runnable after each intermediate edit; per-step operation
    checks are not required until the user-facing return gate, where the final
    intended API and all updated call sites must be validated together.
+1. Run API-shaping and structure refactors as a two-stage refactor:
+   `forced migration` first, then `usage-surface repair`. The first stage
+   moves or removes the canonical surface, legacy entry, alias, wrapper,
+   config route, and generated surface as one structural migration. The second
+   stage updates every caller, document, workflow, skill, hook, config, and
+   report consumer that uses the moved surface. Put test, smoke, and behavior
+   execution in return-gate validation after both stages are complete.
 1. Explicitly list every function, method, or class being changed before editing, using `path:start-end:qualname`; do not start implementation from a file-level or module-level target alone.
 1. If a shared policy or base abstraction is being consolidated, first declare the canonical module/object, refactor that root surface, then run dependency and usage scans before touching dependents.
 1. Record delete, move, rename, and split targets before implementation.

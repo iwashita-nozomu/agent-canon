@@ -37,6 +37,20 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 - composition を既定にし、所有する部品と lifecycle を明示します。
 - `None` を渡して内部で runtime 分岐する設計より、型、値オブジェクト、`Protocol`、`Optional` を外した別 entrypoint、または variant boundary で静的解析へ委譲します。
 
+## SOLID との対応
+
+SOLID は、この文書の責務、状態、契約、公開面の規約をレビュー時に並べ替える見出しとして扱います。
+機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
+投影の正本は `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
+
+- Single responsibility: class / function の肥大化、曖昧名、state 過多、副作用混在、不要 wrapper を同じ責務境界の risk として読む。
+- Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、variant や entrypoint の増設で表す候補として読む。
+- Liskov substitution: base class 過多を、置換可能な契約として読める継承かどうかの確認対象にする。
+- Interface segregation: public method / field / parameter 過多を、利用側が必要とする最小契約へ分ける候補として読む。
+- Dependency inversion: public annotation 欠落や `Optional` 境界を、具象詳細へ寄りすぎた抽象境界の risk として読む。
+
+SOLID signal は設計レビューの入口です。最終判断では機械 finding の `path:line`、OOP dimension、周辺 contract、既存例外規約を併読します。
+
 ## 規約
 
 ### 1. Class を作る条件
@@ -166,6 +180,9 @@ python3 tools/oop/cpp/rule_inventory.py
 - control-flow が深く、人間が追う負荷が高い function。
 - 数理的に不要な identity function、pass-through function、stateless callable class。
 - domain contract を足さない trivial formatting function。
+
+Markdown / JSON report は、上記 finding を SOLID principle signal としても集計します。
+この集計は reviewer が risk を Single responsibility、Open/closed、Liskov substitution、Interface segregation、Dependency inversion の見出しで読むための機械分類です。
 
 C++ checker は schema / DTO / config / metrics などの named aggregate value
 object、annotated primitive ABI / `__nad_` exported ABI function、式 DSL の

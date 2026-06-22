@@ -142,7 +142,7 @@ protecting_tools = [
 ]
 issues = [
   "issues/closed/AC-20260517-check-tool-fragmentation.md",
-  "issues/open/AC-20260517-responsibility-scope-management.md",
+  "issues/closed/AC-20260517-responsibility-scope-management.md",
 ]
 
 [[scope]]
@@ -209,7 +209,7 @@ protecting_tools = [
 ]
 issues = [
   "issues/closed/AC-20260517-check-tool-fragmentation.md",
-  "issues/open/AC-20260517-responsibility-scope-management.md",
+  "issues/closed/AC-20260517-responsibility-scope-management.md",
 ]
 
 [[scope]]
@@ -226,7 +226,7 @@ protecting_tools = [
   "tools/ci/run_all_checks.sh",
 ]
 issues = [
-  "issues/open/AC-20260517-responsibility-scope-management.md",
+  "issues/closed/AC-20260517-responsibility-scope-management.md",
 ]
 
 [[scope]]
@@ -253,7 +253,7 @@ protecting_tools = [
   "tools/agent_tools/responsibility_scope.py",
 ]
 issues = [
-  "issues/open/AC-20260517-responsibility-scope-management.md",
+  "issues/closed/AC-20260517-responsibility-scope-management.md",
 ]
 
 [[scope]]

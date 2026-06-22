@@ -5,7 +5,8 @@ responsibility Documents dependency manifest graph report rendering.
 upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
 upstream implementation ../../tools/agent_tools/check_dependency_graph.sh writes dependency graph TSV artifacts.
 upstream design ../dependency-manifest-design.md defines dependency manifest semantics.
-upstream design ../prose-reasoning-graph/dsl-spec.md defines shared graph visualization projection and adapter contract.
+upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
+upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
 downstream implementation ../../tests/agent_tools/test_render_dependency_manifest_graph.py tests renderer behavior.
 @dependency-end
 -->
@@ -16,22 +17,39 @@ Use this read-only tool when a review needs a compact dependency-manifest graph
 instead of raw edge output. The tool can render Markdown, Graphviz DOT, and a
 self-contained HTML code-space viewer from the same graph TSV artifact.
 
-This tool is the dependency-manifest graph adapter for the shared
-Prose Reasoning Graph DSL visualization contract. `check_dependency_graph.sh`
-keeps dependency validation authority. This renderer maps TSV source/target
-edges into inspectable projection artifacts: Markdown summary, DOT, and HTML
-viewer. Future reusable graph UI work should flow through the DSL projection
-payload described in `documents/prose-reasoning-graph/dsl-spec.md`; this tool
-keeps the domain-specific TSV extraction and compatibility route.
+This tool is the dependency-manifest graph adapter for the shared Graph DSL Core
+projection contract. `check_dependency_graph.sh` keeps dependency validation
+authority. This renderer maps TSV source/target edges into inspectable
+projection artifacts: Markdown summary, DOT, and HTML viewer. Future reusable
+graph UI work should flow through the projection payload described in
+`documents/structured-analysis/graph-dsl.md`; this tool keeps the
+domain-specific TSV extraction and compatibility route.
 
-Adapter mapping uses each dependency manifest entry as the source-truth anchor
-and records the manifest source span when available. Repository files,
-logical artifacts, or checker findings become node record entries; dependency,
-upstream, downstream, and coverage relations become typed relation edge record
-entries. `payload_json` carries native locators such as path, line, dependency
-kind, checker id, and graph TSV row. The exported Markdown, DOT, and HTML views
-are projection view products over this lower graph of dependency facts, with
-reader-state and macro-claim context supplied by the surrounding review packet.
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `../structured-analysis/graph-dsl.md`,
+  `../prose-reasoning-graph/dsl-spec.md`,
+  `../../tools/agent_tools/render_dependency_manifest_graph.py`, and
+  `../../tools/agent_tools/check_dependency_graph.sh`.
+- Assumption:
+  DSL vocabulary in this document names Graph DSL Core projection terms.
+  Dependency validation remains with `check_dependency_graph.sh`.
+- Parent-doc alignment:
+  `../structured-analysis/graph-dsl.md` owns storage vocabulary. The prose graph
+  DSL owns prose-specific projection vocabulary used when dependency graph views
+  appear inside prose workflows.
+
+Adapter mapping uses each dependency manifest entry as the source record or
+native locator and records the manifest source span when available. Repository
+files, logical artifacts, or checker findings become node records; dependency,
+upstream, downstream, and coverage relations become typed relation entries as
+layer-qualified edge record rows under `deps`. `payload_json` carries native
+locators such as path, line, dependency kind, checker id, and graph TSV row.
+The exported Markdown, DOT, and
+HTML views are projection products over this lower graph of dependency facts,
+with reader-state and macro-claim context supplied by the surrounding review
+packet.
 
 ```bash
 bash tools/agent_tools/check_dependency_graph.sh --graph-tsv reports/dependency_graph.tsv

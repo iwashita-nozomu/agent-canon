@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents prose_reasoning_graph.py usage and contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
+upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
 upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed prose reasoning graphs
 upstream implementation ../../rust/agent-canon/src/structured_analysis.rs checks document responsibility gaps for tool docs
 upstream design ../../agents/workflows/workflow-references.md discourse, argument, and writing prior art
@@ -16,13 +17,15 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 `prose_reasoning_graph.py` は、Markdown または plain text を一時的な
 SQLite-backed prose reasoning graph に変換する文章解析ツールです。
 根拠として graph DB は中間解析 artifact であり、したがって source document や DSL spec の代替ではありません。
-この文書は DSL を再定義せず、tool の責務、command surface、result surface、
-verification route、skill handoff を説明します。
+この文書は Graph DSL Core や prose adapter DSL を再定義せず、tool の責務、
+command surface、result surface、verification route、skill handoff を説明します。
 
 ## 根拠 Surface
 
 - DSL と graph contract:
   [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)
+- Shared graph storage:
+  [Graph DSL Core](../structured-analysis/graph-dsl.md)
 - CLI behavior:
   [tools/agent_tools/prose_reasoning_graph.py](../../tools/agent_tools/prose_reasoning_graph.py)
 - expected behavior:
@@ -50,16 +53,18 @@ rewrite の採否は skill、reviewer、workflow の責務です。
 
 ## Graph Visualization Owner
 
-AgentCanon の graph visualization contract は
-[Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)
-が持ちます。`prose_reasoning_graph.py` は source-anchored graph、projection
+AgentCanon の generic graph storage contract は
+[Graph DSL Core](../structured-analysis/graph-dsl.md) が持ちます。Prose-specific
+projection and source anchoring are owned by
+[Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)。
+`prose_reasoning_graph.py` は source-anchored graph、projection
 payload、presentation feature、adapter metadata、diagnostic / verification route
 を保持する共通入口です。
 
 Dependency manifest graph、Algorithm Expansion IR / LemmaGraph flowchart、
 semantic-provider comparison HTML、runtime dashboard evidence flow は、source
 extractor または domain checker を持つ adapter surface です。これらの viewer は
-DSL projection を読む、または DSL object model に lossless mapping できる adapter
+Graph DSL Core projection を読む、または Graph DSL Core object model に lossless mapping できる adapter
 payload を読む形へ寄せます。domain checker の pass / fail authority は元 tool に残し、
 HTML、DOT、Mermaid、SVG は review projection artifact として扱います。
 

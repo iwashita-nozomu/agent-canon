@@ -126,13 +126,16 @@ raw text search の hit だけで編集対象を決めません。
 large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
 
 ```bash
-rg -l "topic keywords" > reports/search_hits.txt
+rg -l "topic keywords" <responsibility-scoped dirs> \
+  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+  | sed -n '1,200p' > reports/search_hits.txt
+wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```
 
-`dependency_edit_scope.txt` を issue、PR body、または run bundle に残し、編集した file、確認した file、意図的に外した candidate を説明します。
+`dependency_edit_scope.txt` は path artifact として残します。会話、Issue、PR body、または run bundle の本文には、件数、主要 path、編集した file、確認した file、意図的に外した candidate だけを書きます。
 
 ### Missing File Or Path Triage
 
@@ -444,7 +447,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、bounded review / report traceability / checklist gate は mini reviewer TOML、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして Abstract Design Frame と design trace で完全に切れる狭い実装 slice は Spark role TOML に寄せます。
+default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、bounded review / report traceability / checklist gate は mini role TOML、Abstract Design Frame と design trace で完全に切れる狭い実装 slice は `spark_worker` に寄せます。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
@@ -557,6 +560,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
+- compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
@@ -564,7 +568,7 @@ cost を無視して review coverage を優先する run では、research-drive
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
-- 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は Spark role TOML へ先に渡し、bounded review / report traceability は mini review role TOML へ渡します。parent は統合判断と次 gate 判定に集中する
+- 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は mini role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
 - `spark_worker` に渡す実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
@@ -589,9 +593,10 @@ cost を無視して review coverage を優先する run では、research-drive
 - まず導入済みライブラリ、既存 code path、既存 helper、既存 style を調べ、再利用と拡張を優先する
 - 新規 helper や新規 module を足すときは、既存実装で足りる範囲と、導入済みライブラリの設定変更や薄い wrapper で足りる範囲を design packet に結び付ける
 - worker は approved design または明白な局所 precedent に由来する variable、function、class、file、CLI flag、config key、public API identifier を使う
+- implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice と execution-only experiment/log work の preferred candidate は Spark role TOML とする
+- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice の preferred candidate は `spark_worker`、execution-only experiment/log work は mini role TOML とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ
@@ -599,6 +604,12 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 6. Validation
 
+- Validation starts with lightweight evidence: static analysis, dependency
+  checks, docs checks, route checks, and changed-file targeted tests. Full CI,
+  long test suites, benchmarks, experiments, GPU / CPU numerical runs, solver
+  sweeps, and randomized large cases use a task-linked approval note with
+  request clause, expected signal, runtime / resource budget, stop condition,
+  artifact path, and owner.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
 - Shared canon、Large delivery、高 risk 変更では user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Routine docs / Focused code は active profile の targeted checks を evidence にできる
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する

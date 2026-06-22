@@ -19,6 +19,11 @@ Public skill instructions live in `agents/skills/`, are listed in
 shims. Internal routines are called by workflow stages, subagent roles, or
 public skills.
 
+Runtime-internal Codex skill shims, when a shim is needed for agent runtime
+activation, use `.agents/skills/_<name>/SKILL.md`. The leading underscore marks
+the shim as private; its human-facing owner remains the workflow, role, public
+skill, or routine that calls it.
+
 ## Routine Groups
 
 | Group | Files | Public Route |
@@ -34,6 +39,8 @@ public skills.
 - Add a new public skill under `agents/skills/` only with a catalog entry and a
   matching `.agents/skills/<skill>/SKILL.md` shim.
 - Keep workflow-only routines in this directory.
+- Keep runtime-internal shims under `.agents/skills/_<name>/SKILL.md` and route
+  their human-facing explanation through the owner routine or public skill.
 - Promote an internal routine to public skill by moving it into
   `agents/skills/`, adding a catalog entry, adding a shim, and updating runtime
   alignment evidence in the same change.

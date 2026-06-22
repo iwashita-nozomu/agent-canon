@@ -16,6 +16,9 @@ AgentCanon update、docs、log/eval の経路を選びます。
 prompt から public skill set を選ぶときは Rust harness
 `agent-canon local-llm route-skill` で `$agent-orchestration` first の
 `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
+公式 system skill で足りる task は、AgentCanon 側で別 skill を増やさず、
+`$openai-docs`、`$skill-creator`、`$skill-installer`、`$imagegen`、
+`$plugin-creator` へ route します。
 
 ## Use When
 
@@ -50,3 +53,14 @@ route is genuinely reusable.
 Runtime skill command packets are owned by `skill_tool_commands.py`. Use
 `python3 tools/agent_tools/skill_tool_commands.py check` when changing
 `.agents/skills/*/SKILL.md` files.
+
+## Official System Skill Delegation
+
+Task routing keeps official system skills as host-provided capabilities:
+
+- OpenAI / Codex current product facts route to `$openai-docs`.
+- Skill creation or skill-instruction refactor guidance routes to
+  `$skill-creator` after the local AgentCanon owner surface is identified.
+- External skill installation routes to `$skill-installer`.
+- Bitmap image asset creation routes to `$imagegen`.
+- Codex plugin scaffolding routes to `$plugin-creator`.

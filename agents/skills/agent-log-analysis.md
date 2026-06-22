@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
+downstream design issue-finding-report.md converts compact log findings into durable issues
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns compact dashboard API fields
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
@@ -28,6 +29,7 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 - token 消費を抑えながら AgentCanon runtime evidence を見る
 - accumulated eval family の missing / stale / fail を見つけ、producer / checker loop
   に戻す必要がある
+- compact evidence を durable skill issue 候補に変換する前段分析を行う
 
 ## Required Flow
 
@@ -67,6 +69,9 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
    再 check、archive sync の順で閉じます。
 1. event file drilldown は tool 実装、schema debugging、破損 audit、または API が明示した drilldown path に限定します。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `rg -n` を使います。
 1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
+1. compact evidence を durable skill issue に変換する場合は、`issue-finding-report`
+   に渡し、抽象原因、重複検索、dependency-expanded edit scope、multi-agent
+   partition をそこで固定します。
 
 ## Boundaries
 
@@ -74,6 +79,8 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   wave execution reconciliation の観測と解釈を所有します。
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。
+- durable issue 作成は `issue-finding-report` の責務です。この skill は issue
+  作成に必要な compact evidence と finding route packet を渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は
   `generate_agent_runtime_dashboard.py --api-out` の JSON、compact summary、

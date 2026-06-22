@@ -16,15 +16,17 @@ import json
 import os
 import re
 import subprocess
-from collections import defaultdict, deque
+from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
+from itertools import groupby
 from pathlib import Path
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
 MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
 DEFAULT_RECURSIVE_DEPTH = 3
+CHECKABLE_TOKEN_MAX_CHARS = 120
 TEXT_SUFFIXES = {
     ".bash",
     ".c",
@@ -128,6 +130,15 @@ class CheckResult:
     findings: tuple[Finding, ...]
 
 
+@dataclass
+class ClosureAccumulator:
+    """Mutable traversal state for dependency closure."""
+
+    evidence: set[str]
+    parents: set[str]
+    queue: deque[tuple[str, int]]
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -184,6 +195,26 @@ def resolve_repo_path(root: Path, path: str | Path) -> Path:
     if vendor.exists():
         return vendor
     return direct
+
+
+def resolve_claim_token_path(root: Path, claim_path: str, token_path: str) -> Path:
+    """Resolve one path-like claim token from its claim document."""
+    candidate = Path(token_path)
+    if candidate.is_absolute():
+        return candidate
+    if token_path.startswith("../"):
+        claim_file = resolve_repo_path(root, claim_path)
+        return Path(os.path.normpath((claim_file.parent / candidate).as_posix()))
+    return resolve_repo_path(root, candidate)
+
+
+def path_is_under_root(root: Path, path: Path) -> bool:
+    """Return whether one path stays inside the repository root."""
+    try:
+        path.resolve(strict=False).relative_to(root.resolve(strict=False))
+        return True
+    except ValueError:
+        return False
 
 
 def normalize_target(root: Path, source: Path, relative_target: str) -> str:
@@ -292,6 +323,11 @@ def all_manifest_edges(root: Path) -> tuple[ManifestEdge, ...]:
 
 def changed_design_paths(root: Path) -> tuple[str, ...]:
     """Return changed design-document paths."""
+    return design_paths_from_candidates(run_git_changed_path_names(root))
+
+
+def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
+    """Return git changed path names from the current checkout."""
     result = subprocess.run(
         ["git", "-C", str(root), "diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"],
         check=False,
@@ -300,9 +336,14 @@ def changed_design_paths(root: Path) -> tuple[str, ...]:
     )
     if result.returncode != 0:
         return ()
+    return tuple(result.stdout.splitlines())
+
+
+def design_paths_from_candidates(paths: Iterable[str]) -> tuple[str, ...]:
+    """Return design-document paths from candidate path names."""
     return tuple(
         path
-        for path in result.stdout.splitlines()
+        for path in paths
         if is_design_doc_path(path)
     )
 
@@ -322,12 +363,29 @@ def is_design_doc_path(path: str) -> bool:
 
 def dependency_indexes(edges: Sequence[ManifestEdge]) -> tuple[dict[str, list[ManifestEdge]], dict[str, list[ManifestEdge]]]:
     """Return outgoing and incoming manifest-edge indexes."""
-    outgoing: dict[str, list[ManifestEdge]] = defaultdict(list)
-    incoming: dict[str, list[ManifestEdge]] = defaultdict(list)
-    for edge in edges:
-        outgoing[edge.source].append(edge)
-        incoming[edge.target].append(edge)
-    return outgoing, incoming
+    return edge_index_by_source(edges), edge_index_by_target(edges)
+
+
+def edge_index_by_source(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
+    """Return manifest edges grouped by source path."""
+    return {
+        source: list(group)
+        for source, group in groupby(
+            sorted(edges, key=lambda edge: edge.source),
+            key=lambda edge: edge.source,
+        )
+    }
+
+
+def edge_index_by_target(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
+    """Return manifest edges grouped by target path."""
+    return {
+        target: list(group)
+        for target, group in groupby(
+            sorted(edges, key=lambda edge: edge.target),
+            key=lambda edge: edge.target,
+        )
+    }
 
 
 def dependency_closure(
@@ -337,36 +395,81 @@ def dependency_closure(
 ) -> tuple[set[str], set[str], list[Finding]]:
     """Return evidence paths, parent paths, and dependency traversal findings."""
     outgoing, incoming = dependency_indexes(edges)
-    evidence: set[str] = set()
-    parents: set[str] = set()
     findings: list[Finding] = []
-    queue: deque[tuple[str, int]] = deque([(target, 0)])
+    accumulator = ClosureAccumulator(set(), set(), deque([(target, 0)]))
     visited: set[str] = set()
-    while queue:
-        current, depth = queue.popleft()
-        if current in visited:
+    while accumulator.queue:
+        current, depth = accumulator.queue.popleft()
+        if closure_node_visited_or_too_deep(current, depth, recursive_depth, visited):
             continue
         visited.add(current)
-        if depth > recursive_depth:
-            continue
-        related = sorted(
+        for edge in related_dependency_edges(outgoing, incoming, current):
+            record_dependency_closure_edge(target, current, depth, recursive_depth, edge, accumulator)
+    return accumulator.evidence, accumulator.parents, findings
+
+
+def closure_node_visited_or_too_deep(
+    current: str,
+    depth: int,
+    recursive_depth: int,
+    visited: set[str],
+) -> bool:
+    """Return whether one closure node should be skipped."""
+    return current in visited or depth > recursive_depth
+
+
+def related_dependency_edges(
+    outgoing: dict[str, list[ManifestEdge]],
+    incoming: dict[str, list[ManifestEdge]],
+    current: str,
+) -> tuple[ManifestEdge, ...]:
+    """Return deterministic manifest edges touching one path."""
+    return tuple(
+        sorted(
             [*outgoing.get(current, ()), *incoming.get(current, ())],
             key=lambda edge: (edge.source, edge.direction, edge.kind, edge.target),
         )
-        for edge in related:
-            next_path = edge.target if edge.source == current else edge.source
-            if edge.kind not in {"design", "implementation"}:
-                continue
-            if not is_checkable_path(next_path):
-                continue
-            if next_path == target:
-                continue
-            evidence.add(next_path)
-            if edge.source == target and edge.direction == "upstream" and edge.kind == "design":
-                parents.add(next_path)
-            if depth < recursive_depth:
-                queue.append((next_path, depth + 1))
-    return evidence, parents, findings
+    )
+
+
+def record_dependency_closure_edge(
+    target: str,
+    current: str,
+    depth: int,
+    recursive_depth: int,
+    edge: ManifestEdge,
+    accumulator: ClosureAccumulator,
+) -> None:
+    """Record one traversable dependency edge in closure state."""
+    next_path = dependency_next_path(edge, current)
+    if not dependency_edge_is_traversable(edge, next_path, target):
+        return
+    accumulator.evidence.add(next_path)
+    if dependency_edge_is_parent(target, edge):
+        accumulator.parents.add(next_path)
+    if depth < recursive_depth:
+        accumulator.queue.append((next_path, depth + 1))
+
+
+def dependency_next_path(edge: ManifestEdge, current: str) -> str:
+    """Return the opposite endpoint from the current path."""
+    if edge.source == current:
+        return edge.target
+    return edge.source
+
+
+def dependency_edge_is_traversable(edge: ManifestEdge, next_path: str, target: str) -> bool:
+    """Return whether one dependency edge participates in claim evidence closure."""
+    return (
+        edge.kind in {"design", "implementation"}
+        and is_checkable_path(next_path)
+        and next_path != target
+    )
+
+
+def dependency_edge_is_parent(target: str, edge: ManifestEdge) -> bool:
+    """Return whether one edge identifies an upstream parent design document."""
+    return edge.source == target and edge.direction == "upstream" and edge.kind == "design"
 
 
 def read_text(root: Path, relative_path: str) -> str:
@@ -404,6 +507,7 @@ def evidence_texts(root: Path, paths: Iterable[str]) -> dict[str, str]:
 def iter_body_lines(text: str) -> Iterable[tuple[int, str]]:
     """Yield non-fenced Markdown body lines."""
     in_fence = False
+    in_manifest = False
     for index, raw_line in enumerate(text.splitlines(), start=1):
         stripped = raw_line.strip()
         if stripped.startswith("```") or stripped.startswith("~~~"):
@@ -411,9 +515,15 @@ def iter_body_lines(text: str) -> Iterable[tuple[int, str]]:
             continue
         if in_fence:
             continue
-        if not stripped or stripped.startswith("<!--") or stripped.startswith("-->"):
+        manifest_line = strip_manifest_line(stripped)
+        if manifest_line == "@dependency-start":
+            in_manifest = True
             continue
-        if stripped.startswith("@dependency-") or stripped.startswith("responsibility "):
+        if in_manifest:
+            if manifest_line == "@dependency-end":
+                in_manifest = False
+            continue
+        if not stripped or stripped.startswith("<!--") or stripped.startswith("-->"):
             continue
         if stripped.startswith("|") and set(stripped.replace("|", "").strip()) <= {"-", ":"}:
             continue
@@ -449,20 +559,29 @@ def checkable_tokens(line: str) -> tuple[str, ...]:
     """Return checkable backtick tokens from one line."""
     tokens: list[str] = []
     for raw_token in TOKEN_RE.findall(line):
-        token = raw_token.strip()
-        if not token or len(token) > 120:
-            continue
-        if "<" in token and ">" in token:
-            continue
-        if token.startswith(("http://", "https://")):
-            continue
-        if token.lower() in {"yes", "no", "pass", "fail", "active", "pending"}:
-            continue
-        if token.startswith("<") and token.endswith(">"):
-            continue
-        if is_checkable_token(token):
+        if token := normalized_checkable_token(raw_token):
             tokens.append(token)
     return tuple(dict.fromkeys(tokens))
+
+
+def normalized_checkable_token(raw_token: str) -> str | None:
+    """Return a normalized token when one Markdown code span is checkable."""
+    token = raw_token.strip()
+    if not token or len(token) > CHECKABLE_TOKEN_MAX_CHARS:
+        return None
+    if "..." in token:
+        return None
+    if "<" in token and ">" in token:
+        return None
+    if token.startswith(("http://", "https://")):
+        return None
+    if token.lower() in {"yes", "no", "pass", "fail", "active", "pending"}:
+        return None
+    if token.startswith("<") and token.endswith(">"):
+        return None
+    if not is_checkable_token(token):
+        return None
+    return token
 
 
 def is_checkable_token(token: str) -> bool:
@@ -476,9 +595,21 @@ def is_checkable_token(token: str) -> bool:
     return token.isupper() and len(token) > 2
 
 
+def strict_claim_prose_required(path: str, text: str) -> bool:
+    """Return whether cue-only prose lines are design claims for this document."""
+    if "/design/" in path or path.endswith("-design.md"):
+        return True
+    for raw_line in text.splitlines()[:HEADER_SCAN_LINES]:
+        line = strip_manifest_line(raw_line)
+        if line == "contract design":
+            return True
+    return False
+
+
 def extract_claims(path: str, text: str) -> tuple[Claim, ...]:
     """Extract checkable design claim lines."""
     claims: list[Claim] = []
+    strict_prose = strict_claim_prose_required(path, text)
     for line_number, line in iter_body_lines(text):
         stripped = line.strip()
         if stripped.startswith("#"):
@@ -486,7 +617,7 @@ def extract_claims(path: str, text: str) -> tuple[Claim, ...]:
         if is_non_claim_control_line(stripped):
             continue
         tokens = checkable_tokens(stripped)
-        if tokens or CLAIM_CUE_RE.search(stripped):
+        if tokens or (strict_prose and CLAIM_CUE_RE.search(stripped)):
             claims.append(Claim(path, line_number, stripped, tokens))
     return tuple(claims)
 
@@ -515,15 +646,41 @@ def token_path_candidates(token: str) -> tuple[str, ...]:
     normalized: list[str] = []
     for part in parts:
         candidate = part.strip("'\";,")
-        if candidate.startswith(("./", "../")):
-            candidate = candidate[2:] if candidate.startswith("./") else candidate
+        if candidate.startswith("./"):
+            candidate = candidate[2:]
         normalized.append(candidate)
     return tuple(dict.fromkeys(normalized))
 
 
-def token_is_path_in_repo(root: Path, token: str) -> bool:
+def token_is_path_in_repo(root: Path, claim_path: str, token: str) -> bool:
     """Return whether one token points to an existing repo path."""
-    return any(resolve_repo_path(root, candidate).exists() for candidate in token_path_candidates(token))
+    for candidate in token_path_candidates(token):
+        if "*" in candidate:
+            base = resolve_repo_path(root, claim_path).parent if candidate.startswith("../") else root
+            if any(path_is_under_root(root, path) for path in base.glob(candidate)):
+                return True
+            continue
+        path = resolve_claim_token_path(root, claim_path, candidate)
+        if path_is_under_root(root, path) and path.exists():
+            return True
+    return False
+
+
+def key_value_token_in_evidence(token: str, texts: dict[str, str]) -> bool:
+    """Return whether a key/value token has same-record evidence."""
+    for separator in (":", "="):
+        if separator not in token:
+            continue
+        key, value = (part.strip() for part in token.split(separator, 1))
+        if not key or not value:
+            return False
+        pattern = re.compile(
+            rf"(?<![\w.-]){re.escape(key)}[ \t]*[:=][ \t]*[\"'{{]?"
+            rf"{re.escape(value)}[\"'}}]?(?![\w.-])",
+            re.IGNORECASE,
+        )
+        return any(pattern.search(text) for text in texts.values())
+    return False
 
 
 def token_in_evidence(token: str, texts: dict[str, str]) -> bool:
@@ -531,7 +688,14 @@ def token_in_evidence(token: str, texts: dict[str, str]) -> bool:
     token_lower = token.lower()
     candidates = [token_lower]
     candidates.extend(candidate.lower() for candidate in token_path_candidates(token))
-    return any(candidate and candidate in text.lower() for text in texts.values() for candidate in candidates)
+    if any(candidate and candidate in text.lower() for text in texts.values() for candidate in candidates):
+        return True
+    if "*" in token:
+        pattern = re.compile(re.escape(token_lower).replace(r"\*", r"[^\s`'\"|,]+"))
+        return any(pattern.search(text.lower()) for text in texts.values())
+    if key_value_token_in_evidence(token, texts):
+        return True
+    return False
 
 
 def has_evidence_ledger(text: str) -> bool:
@@ -580,14 +744,25 @@ def polarity_for_line(line: str) -> str:
 
 def token_polarities(text: str) -> dict[str, set[str]]:
     """Return token to modal polarity mapping for one text."""
-    polarities: dict[str, set[str]] = defaultdict(set)
-    for _line_number, line in iter_body_lines(text):
-        polarity = polarity_for_line(line)
-        if polarity == "neutral":
-            continue
-        for token in checkable_tokens(line):
-            polarities[token.lower()].add(polarity)
-    return polarities
+    entries = tuple(
+        entry
+        for _line_number, line in iter_body_lines(text)
+        for entry in token_polarity_entries(line)
+    )
+    return {
+        token: {polarity for entry_token, polarity in entries if entry_token == token}
+        for token in sorted({entry_token for entry_token, _polarity in entries})
+    }
+
+
+def token_polarity_entries(line: str) -> tuple[tuple[str, str], ...]:
+    """Return polarity entries for checkable tokens in one prose line."""
+    return tuple(
+        (token.lower(), polarity)
+        for match in TOKEN_RE.finditer(line)
+        if (token := normalized_checkable_token(match.group(1)))
+        if (polarity := polarity_for_line(line[: match.start()])) != "neutral"
+    )
 
 
 def check_parent_contradictions(
@@ -635,7 +810,7 @@ def check_claim_support(
             continue
         token_findings = []
         for token in claim.tokens:
-            if token_is_path_in_repo(root, token) or token_in_evidence(token, evidence):
+            if token_is_path_in_repo(root, claim.path, token) or token_in_evidence(token, evidence):
                 continue
             token_findings.append(
                 Finding(

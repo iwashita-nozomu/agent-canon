@@ -54,6 +54,16 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 1. Failure Semantics
    - infeasible、singular、non-finite、max-iter、not-converged を success と分ける
 
+### Mathematical Necessity Gate
+
+数理的な runtime 判定、diagnostic gate、stopping check、test oracle、
+proof obligation は `mathematical necessity gate` を通します。採用条件は、
+public contract の precondition / invariant / postcondition、iteration map、
+stopping scalar、failure semantics、accepted theorem target、または approved
+design の acceptance criterion に接続できることです。接続先のない判定候補は
+algorithm-change guidance、proof / review backlog、または experiment hypothesis
+として記録します。
+
 For iterative solvers, convergence evidence is a theorem about the implemented
 iteration map and stopping scalar, not a runtime proof check. State the map as
 `z_next = Step_impl(Problem, Config, z)` and the stopping quantity as

@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 47
+expected_count = 48
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -23,7 +23,7 @@ description = "Every discoverable Codex skill shim must be loadable and dependen
 id = "SKILL-SHIM-GENERIC-1"
 critical = true
 description = "Starts with YAML frontmatter and includes required name/description fields."
-required_regex = ["\\A---\\n", "\\nname:\\s*[-a-z0-9]+", "\\ndescription:\\s*\\S"]
+required_regex = ["\\A---\\n", "\\nname:\\s*_?[a-z0-9]+(?:-[a-z0-9]+)*", "\\ndescription:\\s*\\S"]
 
 [[evals.checklist]]
 id = "SKILL-SHIM-GENERIC-2"
@@ -40,7 +40,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 48
+expected_count = 49
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 

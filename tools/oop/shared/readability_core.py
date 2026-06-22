@@ -327,6 +327,46 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
     ),
 }
 
+SOLID_PRINCIPLES = {
+    "single_responsibility": "single responsibility",
+    "open_closed": "open/closed",
+    "liskov_substitution": "liskov substitution",
+    "interface_segregation": "interface segregation",
+    "dependency_inversion": "dependency inversion",
+}
+
+SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
+    "vague_class_name": ("single_responsibility",),
+    "class_lines": ("single_responsibility",),
+    "function_lines": ("single_responsibility",),
+    "cognitive_complexity": ("single_responsibility", "open_closed"),
+    "public_methods": ("single_responsibility", "interface_segregation"),
+    "public_fields": ("single_responsibility", "interface_segregation"),
+    "state_heavy_public_surface": ("single_responsibility",),
+    "instance_attributes": ("single_responsibility",),
+    "parameters": ("interface_segregation",),
+    "base_classes": ("liskov_substitution",),
+    "static_method_namespace": ("single_responsibility",),
+    "thin_class": ("single_responsibility",),
+    "redundant_class_boundary": ("single_responsibility",),
+    "method_without_self_use": ("single_responsibility",),
+    "module_helper_name": ("single_responsibility",),
+    "module_helper_bucket": ("single_responsibility",),
+    "missing_public_annotations": ("dependency_inversion",),
+    "optional_boundary": (
+        "open_closed",
+        "interface_segregation",
+        "dependency_inversion",
+    ),
+    "none_runtime_branch": ("open_closed",),
+    "null_runtime_branch": ("open_closed",),
+    "mixed_morphism_effect": ("single_responsibility",),
+    "identity_function": ("single_responsibility",),
+    "pass_through_function": ("single_responsibility",),
+    "stateless_callable_class": ("single_responsibility",),
+    "trivial_format_function": ("single_responsibility",),
+}
+
 
 @dataclass(frozen=True)
 class Thresholds:
@@ -3674,10 +3714,22 @@ def finding_facts(finding: Finding) -> dict[str, str]:
     }
 
 
+def solid_principles_for_kind(kind: str) -> tuple[str, ...]:
+    """Return SOLID principle names mechanically associated with a finding kind."""
+    principle_keys = SOLID_PRINCIPLES_BY_KIND.get(kind, ())
+    return tuple(SOLID_PRINCIPLES[key] for key in principle_keys)
+
+
+def solid_principles_for_finding(finding: Finding) -> tuple[str, ...]:
+    """Return SOLID principle names mechanically associated with a finding."""
+    return solid_principles_for_kind(finding.kind)
+
+
 def finding_payload(finding: Finding) -> dict[str, object]:
     """Return JSON payload with mechanical interpretation attached."""
     payload = asdict(finding)
     payload.update(finding_facts(finding))
+    payload["solid_principles"] = list(solid_principles_for_finding(finding))
     return payload
 
 
@@ -3727,6 +3779,11 @@ def summarize_findings(
     severity_counts = Counter(finding.severity for finding in findings)
     kind_counts = Counter(finding.kind for finding in findings)
     dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
+    solid_counts = Counter(
+        principle
+        for finding in findings
+        for principle in solid_principles_for_finding(finding)
+    )
     warn_or_error = sum(
         1 for finding in findings if finding.severity in {"error", "warn"}
     )
@@ -3754,6 +3811,7 @@ def summarize_findings(
         "severity_counts": dict(severity_counts),
         "kind_counts": dict(kind_counts),
         "dimension_counts": dict(dimension_counts),
+        "solid_counts": dict(solid_counts),
         "top_files": [
             {"path": path, "findings": count}
             for path, count in Counter(finding.path for finding in findings).most_common(
@@ -3779,6 +3837,7 @@ def render_markdown_report(spec: MarkdownReportSpec) -> str:
         else {}
     )
     lines = markdown_summary_lines(summary)
+    lines.extend(markdown_solid_lines(summary))
     lines.extend(markdown_dimension_lines(summary))
     lines.extend(markdown_hotspot_lines(summary))
     lines.extend(
@@ -3807,6 +3866,18 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         f"- excluded_patterns: `{', '.join(excluded_patterns_summary) or 'none'}`",
         "",
     ]
+
+
+def markdown_solid_lines(summary: dict[str, object]) -> list[str]:
+    """Render SOLID principle signal counts."""
+    solid_counts = cast(dict[str, int], summary["solid_counts"])
+    lines = ["## SOLID Principle Signals", ""]
+    if not solid_counts:
+        lines.append("- none")
+    for principle, count in Counter(solid_counts).most_common():
+        lines.append(f"- `{principle}`: {count}")
+    lines.append("")
+    return lines
 
 
 def markdown_dimension_lines(summary: dict[str, object]) -> list[str]:
@@ -3847,6 +3918,7 @@ def markdown_finding_detail_lines(
     lines = ["## Finding Details", ""]
     for finding in sorted(findings, key=finding_rank)[:max_report_findings]:
         facts = finding_facts(finding)
+        solid_principles = ", ".join(solid_principles_for_finding(finding)) or "none"
         lines.extend(
             [
                 (
@@ -3856,6 +3928,7 @@ def markdown_finding_detail_lines(
                 "",
                 f"- symbol: `{finding.symbol}`",
                 f"- dimension: `{facts['dimension']}`",
+                f"- solid_principles: `{solid_principles}`",
                 f"- actual_vs_limit: `{finding.actual}` > `{finding.limit}`",
                 f"- mechanical_explanation: {facts['explanation']}",
                 f"- mechanical_action: {facts['recommended_action']}",
@@ -3891,8 +3964,8 @@ def write_review_prompt(path: Path, report_path: str) -> None:
                 "- Do not change the pass/fail status, score, thresholds, or counts.",
                 "- Treat mechanical findings as facts and write a reader-facing summary of them.",
                 "- Separate false-positive candidates from accepted design risks.",
-                "- Group comments by OOP principle: responsibility, state ownership,",
-                "  typed boundary, composition, mathematical redundancy, and effect separation.",
+                "- Group comments by the report's SOLID Principle Signals section first.",
+                "- Then cite the OOP dimension for each accepted mechanical finding.",
                 "- For each hotspot, cite `path:line`, `kind`, and the mechanical explanation.",
                 "- Do not request code edits unless the report identifies a concrete risk.",
                 "",

@@ -14,6 +14,7 @@ downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extract
 downstream implementation ../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream design ./structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ./structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
 -->

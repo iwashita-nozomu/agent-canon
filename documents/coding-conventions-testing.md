@@ -91,6 +91,11 @@ convergence、reference comparison、scientific experiment contract のどれに
 docs、routing、metadata、string parsing、configuration、structure refactor では、
 数値 smoke、large random case、benchmark 風 test を追加しません。
 
+この判断は `mathematical necessity gate` として扱います。数値または数理的な
+判定・oracle・assertion は、`Numerical Trigger`、`Non-Numerical Alternative`、
+checker-owned property、proof obligation、または approved design の acceptance
+criterion に接続できる場合に採用します。
+
 数値テストを提案する前に、test plan で次を固定します。
 
 - `Numerical Trigger`: 数値テストが必要な具体的契約、既知 regression、acceptance

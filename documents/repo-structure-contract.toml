@@ -55,6 +55,7 @@ allowed_top_level = [
   "AGENTS.md",
   "CONTAINER_OPERATIONS.md",
   "LICENSE",
+  "PHILOSOPHY.md",
   "README.md",
   "ROOT_AGENTS.md",
   "agent-canon-environment.toml",
@@ -63,6 +64,7 @@ allowed_top_level = [
   "completion-first-review",
   "documents",
   "evidence",
+  "experiments",
   "goal.md",
   "helper_inventory_guard_policy.json",
   "issues",
@@ -206,6 +208,16 @@ category = "durable_state"
 path = "references"
 kind = "dir"
 category = "reference_material"
+
+[[profile.optional]]
+path = "PHILOSOPHY.md"
+kind = "file"
+category = "durable_state"
+
+[[profile.optional]]
+path = "experiments"
+kind = "dir"
+category = "research_artifacts"
 
 [[profile.optional]]
 path = "vendor"

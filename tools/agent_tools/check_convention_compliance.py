@@ -7,12 +7,12 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
-# upstream design ../../agents/skills/codex-task-workflow.md codex task workflow skill
+# upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
-# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime task workflow skill
+# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime implementation workflow skill
 # upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
 # upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
@@ -22,6 +22,8 @@
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
 # upstream design ../../documents/codex-configuration-reference.md Codex hook severity policy
+# upstream design ../../documents/coding-conventions-house-style.md implementation ownership guardrail
+# upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
@@ -491,6 +493,155 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "behavior-owned cases",
     ),
 }
+MATHEMATICAL_NECESSITY_MARKERS = {
+    "documents/conventions/common/05_docs.md": (
+        "mathematical necessity gate",
+        "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route",
+        "necessary-and-sufficient condition",
+        "non-contractual mathematical judgment",
+    ),
+    "documents/coding-conventions-testing.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    "agents/skills/test-design.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    ".agents/skills/test-design/SKILL.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    "agents/skills/computational-optimization.md": (
+        "mathematical necessity gate",
+        "iteration map",
+        "stopping scalar",
+        "failure semantics",
+    ),
+    ".agents/skills/computational-optimization/SKILL.md": (
+        "mathematical necessity gate",
+        "iteration map",
+        "stopping scalar",
+        "failure semantics",
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "mathematical necessity gate",
+        "program contract",
+        "theorem surface",
+        "proof obligation",
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "mathematical necessity gate",
+        "program contract",
+        "theorem surface",
+        "proof obligation",
+    ),
+}
+IMPLEMENTATION_GUARDRAIL_MARKERS = {
+    "documents/coding-conventions-house-style.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "caller migration",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+        "check_convention_compliance.py",
+    ),
+    "notes/guardrails/engineering_avoidances.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "caller migration",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/workflows/comprehensive-refactoring-workflow.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "Removal and Caller Migration Plan",
+    ),
+}
+REFACTOR_SEQUENCE_MARKERS = {
+    "agents/skills/refactor-loop.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    ".agents/skills/refactor-loop/SKILL.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    "agents/workflows/comprehensive-refactoring-workflow.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    "documents/coding-conventions-house-style.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+}
+REVIEW_ISSUE_ROUTING_MARKERS = {
+    "agents/skills/change-review.md": (
+        "issue_route",
+        "issues/open/",
+        "issue_sync.py",
+        "new_local_issue",
+        "github_mirror",
+    ),
+    ".agents/skills/change-review/SKILL.md": (
+        "issue_route",
+        "issues/README.md",
+        "issue_sync.py",
+        "new_local_issue",
+        "github_mirror",
+    ),
+    "documents/REVIEW_PROCESS.md": (
+        "Review Finding Issue Routing",
+        "issue_route",
+        "issues/open/",
+        "issue_sync.py",
+        "github_mirror",
+    ),
+}
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
     r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
@@ -833,10 +984,8 @@ def markdown_table_rows(lines: Sequence[str]) -> list[str]:
     return rows
 
 
-def same_resolved_file(left: Path | None, right: Path | None) -> bool:
-    """Return whether two optional paths point to the same filesystem entry."""
-    if left is None or right is None:
-        return False
+def same_resolved_file(left: Path, right: Path) -> bool:
+    """Return whether two paths point to the same filesystem entry."""
     try:
         return left.resolve(strict=True) == right.resolve(strict=True)
     except OSError:
@@ -847,9 +996,13 @@ def owner_map_entrypoint_rows(
     root: Path, path: str
 ) -> Sequence[tuple[str, Sequence[tuple[str, ...]]]]:
     """Return owner-map rows for the entrypoint role active at ``path``."""
-    if path == "AGENTS.md" and same_resolved_file(
-        readable_path(root, "AGENTS.md"),
-        readable_path(root, "ROOT_AGENTS.md"),
+    agents_path = readable_path(root, "AGENTS.md")
+    root_agents_path = readable_path(root, "ROOT_AGENTS.md")
+    if (
+        path == "AGENTS.md"
+        and agents_path is not None
+        and root_agents_path is not None
+        and same_resolved_file(agents_path, root_agents_path)
     ):
         return OWNER_MAP_ENTRYPOINT_TABLE_ROWS["ROOT_AGENTS.md"]
     return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
@@ -857,9 +1010,13 @@ def owner_map_entrypoint_rows(
 
 def duplicate_root_view_entrypoint(root: Path, path: str) -> bool:
     """Return whether ``path`` is already covered by the root entrypoint view."""
-    return path == "AGENTS.md" and same_resolved_file(
-        readable_path(root, "AGENTS.md"),
-        readable_path(root, "ROOT_AGENTS.md"),
+    agents_path = readable_path(root, "AGENTS.md")
+    root_agents_path = readable_path(root, "ROOT_AGENTS.md")
+    return (
+        path == "AGENTS.md"
+        and agents_path is not None
+        and root_agents_path is not None
+        and same_resolved_file(agents_path, root_agents_path)
     )
 
 
@@ -1106,6 +1263,90 @@ def check_test_contract_routing(root: Path) -> list[Finding]:
                 findings.append(
                     Finding(
                         "test_contract_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_mathematical_necessity_gate(root: Path) -> list[Finding]:
+    """Verify mathematical judgments stay wired to necessity evidence."""
+    paths = tuple(MATHEMATICAL_NECESSITY_MARKERS)
+    findings = check_required_files(root, paths, "mathematical_necessity_gate")
+    for path, markers in MATHEMATICAL_NECESSITY_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "mathematical_necessity_gate",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_implementation_guardrails(root: Path) -> list[Finding]:
+    """Verify implementation ownership and acceptance guardrails stay visible."""
+    paths = tuple(IMPLEMENTATION_GUARDRAIL_MARKERS)
+    findings = check_required_files(root, paths, "implementation_guardrails")
+    for path, markers in IMPLEMENTATION_GUARDRAIL_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "implementation_guardrails",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_refactor_sequence(root: Path) -> list[Finding]:
+    """Verify refactor procedure stays routed through the two-stage sequence."""
+    paths = tuple(REFACTOR_SEQUENCE_MARKERS)
+    findings = check_required_files(root, paths, "refactor_sequence")
+    for path, markers in REFACTOR_SEQUENCE_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "refactor_sequence",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_review_issue_routing(root: Path) -> list[Finding]:
+    """Verify review findings stay connected to durable issue routes."""
+    paths = tuple(REVIEW_ISSUE_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "review_issue_routing")
+    for path, markers in REVIEW_ISSUE_ROUTING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "review_issue_routing",
                         path,
                         f"missing-marker:{marker}",
                     )
@@ -1394,6 +1635,10 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
     findings.extend(check_test_contract_routing(root))
+    findings.extend(check_mathematical_necessity_gate(root))
+    findings.extend(check_implementation_guardrails(root))
+    findings.extend(check_refactor_sequence(root))
+    findings.extend(check_review_issue_routing(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

@@ -35,6 +35,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For a `contract-only wrapper` or thin adapter, classify whether it adds observable behavior, branch logic, parser/error behavior, state mutation, diagnostic keys, serialization shape, or external process behavior. Names, types, forwards, configuration, and documentation for an existing contract use static contract validation and canonical command evidence.
 1. For each test case, fix `Behavior Contract`, `Observation Level`, `Oracle`, `Input Space`, and `Adequacy Evidence`.
 1. Classify generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` as checker-command validation candidates when they observe only process success, import success, no-crash, or exit code 0.
+1. Route mathematical judgments, oracles, and assertions through the `mathematical necessity gate`: connect them to `Numerical Trigger`, `Non-Numerical Alternative`, checker-owned property, proof obligation, or approved design acceptance criterion before making them test evidence.
 1. Before proposing numerical, randomized, tolerance, solver, convergence,
    residual, benchmark, or experiment-style tests, apply the Numerical Test Admission Gate from `documents/coding-conventions-testing.md`: record the
    numerical trigger, non-numerical alternative, oracle, GPU target, and budget.

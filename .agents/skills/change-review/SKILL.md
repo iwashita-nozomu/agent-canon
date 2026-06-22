@@ -7,6 +7,7 @@ description: Use for code review, doc review, or AI-generated diff review when y
 contract skill
 responsibility Documents Change Review for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../issues/README.md durable issue and GitHub mirror policy
 @dependency-end
 -->
 
@@ -36,6 +37,15 @@ Execute the required and task-matching conditional commands that the packet prin
    - stale documentation
 1. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository during checkpoint and final review; changed-file dependency checks alone are not enough.
 1. Separate `fix now` from `follow-up`.
+1. Add `issue_route` to every `fix now` and `follow-up` finding: use
+   `run_local_resolution:<evidence>` for findings closed in the current review
+   loop, `existing_issue:<path-or-url>` for known durable findings,
+   `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>` for durable local records,
+   and `github_mirror:<issue_sync.py command-or-url>` for operator-facing
+   GitHub Issue visibility.
+1. Use `issues/README.md` for required issue fields and
+   `python3 tools/agent_tools/issue_sync.py --root .` for local validation or
+   GitHub mirror planning.
 1. Use `documents/REVIEW_PROCESS.md` for repo review expectations.
    In template or derived repo roots, `documents/...` is a logical AgentCanon
    path: resolve it under `vendor/agent-canon/documents/` unless

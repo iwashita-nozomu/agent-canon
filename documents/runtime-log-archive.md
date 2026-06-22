@@ -159,13 +159,13 @@ legacy-import/eval-results/
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 ```
 
-When the archive clone is on a different `logs/<repo-key>` branch, `ensure`
-switches to the current source repo branch. Dirty paths that already belong to
-the same repo key are preserved onto that branch when they are known runtime
-artifacts, including append-only JSONL logs and
-`skill_usage_context.json`. Foreign repo-key paths, archive-level policy/tool
-paths, unknown JSON conflicts, malformed context JSON, and deletions remain
-blockers.
+Hook log writers run this branch selection before durable archive writes. When
+the archive clone is on a different `logs/<environment-key>-<chat-key>` branch,
+`ensure` preserves managed runtime artifacts in the current branch with a local
+commit, then switches to the current source repo branch. Managed runtime
+artifacts are `hook-runs/`, `codex-runtime/`, `agent-reports/`,
+`eval-results/`, and `legacy-import/`. Archive-level policy/tool paths remain
+blockers and require a direct archive review.
 
 If the mount is absent, hooks use a local state directory outside the
 repository tree. Set `AGENT_CANON_HOOK_ARCHIVE_DIR` to route logs to another
@@ -232,8 +232,8 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 foreign repo-key directories, not only uncommitted dirt. A foreign dirty or
 foreign tree finding means logs for a different `<repo-key>` were written while
 the archive worktree was on the current runtime branch. Treat that as a log
-repository operation blocker, not as optional cleanup: migrate the listed
-foreign key to the correct runtime branch before unlocking the run bundle.
+repository operation blocker: migrate the listed foreign key to the correct
+runtime branch before unlocking the run bundle.
 
 To print the resolved placement without writing anything, run:
 

@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents change-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../issues/README.md durable issue and GitHub mirror policy
 @dependency-end
 -->
 
@@ -26,6 +27,8 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 
 - findings が summary より先に並んでいる
 - `fix now` と `follow-up` が分かれている
+- 各 finding に `issue_route` があり、既存 issue、new local issue、
+  GitHub mirror plan、または run-local resolution のいずれかへ分類されている
 - review で見ていない範囲や validation gap が残っている
 
 ## Mandatory Checklist
@@ -35,6 +38,14 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、`--changed` だけで済ませていない
 - 回帰、欠落テスト、stale documentation を優先して見ている
 - 必要な validation が走っているか、未実行なら明記している
+- `fix now` と `follow-up` finding には `issue_route` を付けている。
+  現在の diff で閉じるものは `run_local_resolution:<evidence>`、
+  durable に残すものは `existing_issue:<path-or-url>` または
+  `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>`、
+  GitHub 可視化が必要なものは `github_mirror:<issue_sync.py command-or-url>`
+  を選ぶ
+- durable finding を作る場合は `issues/README.md` の required fields と
+  `issue_sync.py` の mirror route を使う
 - `no findings` の場合でも residual risk を残している
 
 ## Default Sequence
@@ -44,6 +55,10 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 1. docs と tests が実装に追随しているか確認します。
 1. `bash tools/agent_tools/run_repo_dependency_review.sh` を実行し、全 repo の dependency manifest coverage / format / graph を確認します。
 1. findings を priority 順に並べ、evidence を付けます。
+1. 各 finding に `issue_route` を付けます。現在の review loop で閉じるものは
+   `run_local_resolution`、運用上残すものは既存 `issues/open/` または新規
+   local issue、外部 triage が必要なものは `issue_sync.py` による GitHub mirror
+   plan へ接続します。
 1. summary は findings の後に短く付けます。
 
 ## Findings Buckets
@@ -51,6 +66,14 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `fix now`
 - `follow-up`
 - `delete-ok`
+
+Finding rows include:
+
+- `severity`
+- `evidence`
+- `required_action`
+- `issue_route`
+- `rerun_review_required`
 
 ## Boundary
 

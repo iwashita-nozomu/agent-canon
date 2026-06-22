@@ -47,10 +47,12 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:gpt-5.3-codex-spark:low", result.stdout)
-        self.assertIn("experiment_runner:gpt-5.3-codex-spark:low", result.stdout)
+        self.assertIn("diff_triage_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("experiment_runner:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("explorer:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("manager_reviewer:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("plan_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("spark_worker:gpt-5.3-codex-spark:low", result.stdout)
         self.assertIn("ship_reviewer:gpt-5.5:high", result.stdout)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
@@ -175,6 +177,73 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:T1:must-use-scoped-change-lite", result.stdout)
+
+    def test_spark_model_is_reserved_for_spark_worker(self) -> None:
+        """Read-heavy and review roles should use the mini route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
+            (root / ".codex").mkdir(exist_ok=True)
+            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
+            (root / "agents").mkdir()
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "agents_config.json",
+                root / "agents" / "agents_config.json",
+            )
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "task_catalog.yaml",
+                root / "agents" / "task_catalog.yaml",
+            )
+            explorer = root / ".codex" / "agents" / "explorer.toml"
+            explorer.write_text(
+                explorer.read_text(encoding="utf-8").replace(
+                    'model = "gpt-5.4-mini"',
+                    'model = "gpt-5.3-codex-spark"',
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=model-settings:explorer:"
+                "spark-model-reserved-for-spark-worker",
+                result.stdout,
+            )
+
+    def test_deprecated_codex_models_are_reported(self) -> None:
+        """Deprecated Codex model slugs should stay out of role TOML."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
+            (root / ".codex").mkdir(exist_ok=True)
+            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
+            (root / "agents").mkdir()
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "agents_config.json",
+                root / "agents" / "agents_config.json",
+            )
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "task_catalog.yaml",
+                root / "agents" / "task_catalog.yaml",
+            )
+            worker = root / ".codex" / "agents" / "worker.toml"
+            worker.write_text(
+                worker.read_text(encoding="utf-8").replace(
+                    'model = "gpt-5.5"',
+                    'model = "gpt-5.3-codex"',
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=model-settings:worker:deprecated-model-gpt-5.3-codex",
+                result.stdout,
+            )
 
 
 if __name__ == "__main__":

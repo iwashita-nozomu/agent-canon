@@ -8,6 +8,7 @@ contract skill
 responsibility Documents Agent Log Analysis for this repository.
 upstream design ../../../agents/skills/agent-log-analysis.md documents the human-facing skill
 upstream design ../../../agents/skills/agent-eval-accumulation.md repairs missing accumulated eval evidence
+downstream design ../../../agents/skills/issue-finding-report.md converts compact log findings into durable issues
 upstream design ../../../documents/runtime-log-archive.md defines the external log archive mount
 upstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py owns compact dashboard API fields
 upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
@@ -64,6 +65,9 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
 1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
 1. Report observations separately from interpretation, repair target, and unknowns.
+1. When the user asks to turn compact evidence into durable skill issues, hand
+   the compact API, compact Markdown, and Finding Route Packet to
+   `$issue-finding-report`.
 1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
 1. Route by finding class:
    wave execution findings to `$subagent-bootstrap`;
