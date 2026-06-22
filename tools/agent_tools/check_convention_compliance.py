@@ -10,11 +10,14 @@
 # upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
+# upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
+# upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
 # upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime implementation workflow skill
 # upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
 # upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
+# upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
 # upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
@@ -385,6 +388,72 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "Document Structure Evidence",
         "document_structure_evidence",
         "DOCUMENT_STRUCTURE_REQUIRED",
+    ),
+}
+SMALL_CHANGE_SKILL_READ_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "Scoped Change Lite",
+        "parent-direct",
+        "SKILL.md",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "Scoped Change Lite",
+        "parent-direct",
+        "SKILL.md",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "Scoped Change Lite",
+        "parent-direct",
+        "SKILL.md",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "Scoped Change Lite",
+        "parent-direct",
+        "SKILL.md",
+    ),
+    ".agents/skills/md-style-check/SKILL.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "format-only",
+        "SKILL.md",
+    ),
+    "agents/skills/md-style-check.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "format-only",
+        "SKILL.md",
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "typo/link/format-only",
+        "SKILL.md",
+    ),
+    "agents/skills/long-form-writing.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "typo",
+        "format-only",
+        "SKILL.md",
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "small changes",
+        "SKILL.md",
+    ),
+    "agents/USER_GUIDE_JA.md": (
+        "selected_runtime_skill_read",
+        "small_change_skill_read",
+        "runtime `SKILL.md`",
     ),
 }
 
@@ -1171,6 +1240,27 @@ def check_document_structure_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_small_change_skill_read(root: Path) -> list[Finding]:
+    """Verify small edit routes keep selected runtime skill reading visible."""
+    paths = tuple(SMALL_CHANGE_SKILL_READ_MARKERS)
+    findings = check_required_files(root, paths, "small_change_skill_read")
+    for path, markers in SMALL_CHANGE_SKILL_READ_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "small_change_skill_read",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_closeout_readiness(root: Path) -> list[Finding]:
     """Verify workflow completion readiness remains wired into the workflow."""
     path = "agents/canonical/CODEX_WORKFLOW.md"
@@ -1631,6 +1721,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
+    findings.extend(check_small_change_skill_read(root))
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))

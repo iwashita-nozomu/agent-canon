@@ -27,6 +27,7 @@ from tools.agent_tools.check_convention_compliance import (
     POSITIVE_RUNTIME_WORDING_SURFACES,
     REFACTOR_SEQUENCE_MARKERS,
     REVIEW_ISSUE_ROUTING_MARKERS,
+    SMALL_CHANGE_SKILL_READ_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -145,6 +146,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
+        "small changes selected_runtime_skill_read small_change_skill_read SKILL.md\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
         "compatibility-preservation drift duplicate implementation canonical owner "
@@ -168,6 +170,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "parent-direct SKILL.md "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker\n"
     ),
@@ -175,6 +179,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "codex-task-workflow",
         "codex task workflow prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "parent-direct SKILL.md "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -202,7 +208,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/md-style-check/SKILL.md": skill_fixture(
         "md-style-check",
         "$prose-reasoning-graph $structure-planning format-only "
-        "structure_contract=skipped\n"
+        "structure_contract=skipped selected_runtime_skill_read "
+        "small_change_skill_read SKILL.md\n"
     ),
     ".agents/skills/test-design/SKILL.md": skill_fixture(
         "test-design",
@@ -223,12 +230,16 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "parent-direct SKILL.md "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker\n"
     ),
     "agents/skills/codex-task-workflow.md": (
         "codex task workflow prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "parent-direct SKILL.md "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -251,7 +262,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/md-style-check.md": (
         "prose-reasoning-graph structure-planning format-only "
-        "structure_contract=skipped\n"
+        "structure_contract=skipped selected_runtime_skill_read "
+        "small_change_skill_read SKILL.md\n"
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
@@ -263,12 +275,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/long-form-writing.md": (
         "数学的 claim program contract proof obligation $formal-proof-workflow "
-        "provisional wording\n"
+        "provisional wording selected_runtime_skill_read small_change_skill_read "
+        "typo format-only SKILL.md\n"
     ),
     ".agents/skills/long-form-writing/SKILL.md": skill_fixture(
         "long-form-writing",
         "mathematical claim program contract proof obligation $formal-proof-workflow "
-        "provisional wording\n"
+        "provisional wording selected_runtime_skill_read small_change_skill_read "
+        "typo/link/format-only SKILL.md\n"
     ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation "
@@ -320,7 +334,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
     "agents/USER_GUIDE_JA.md": (
         "structure-planning prose-reasoning-graph md-style-check "
-        "Document Structure Evidence structure_contract=skipped\n"
+        "Document Structure Evidence structure_contract=skipped "
+        "selected_runtime_skill_read small_change_skill_read runtime `SKILL.md`\n"
     ),
     "agents/templates/closeout_gate.md": (
         "evaluate_agent_run.py run_repo_dependency_review.sh\n"
@@ -889,6 +904,36 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_small_change_skill_read_requires_selected_skill_markers(self) -> None:
+        """Small edit routes must keep selected runtime skill-read markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "agent-orchestration.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8").replace(
+                    " selected_runtime_skill_read",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("small_change_skill_read", result.stdout)
+            self.assertIn("missing-marker:selected_runtime_skill_read", result.stdout)
+
+    def test_minimal_fixture_covers_small_change_skill_read_surfaces(self) -> None:
+        """The minimal test fixture includes every small change skill-read surface."""
+        missing = sorted(
+            path
+            for path in SMALL_CHANGE_SKILL_READ_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 
