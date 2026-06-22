@@ -101,6 +101,37 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("SKILL_FRONTMATTER=pass", result.stdout)
 
+    def test_private_underscore_prefixed_skill_name_passes(self) -> None:
+        """Private runtime skill shims use a leading underscore in the skill name."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "_internal-skill",
+                skill_text("_internal-skill", "Use for internal runtime routing."),
+            )
+
+            result = self.run_cli(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("SKILL_FRONTMATTER=pass", result.stdout)
+
+    def test_internal_underscore_skill_name_fails(self) -> None:
+        """Skill names use hyphens after the optional private prefix."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "internal_skill",
+                skill_text("internal_skill", "Use for invalid runtime routing."),
+            )
+
+            result = self.run_cli(root)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("SKILL_FRONTMATTER=fail", result.stdout)
+            self.assertIn("invalid-name:internal_skill", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,7 @@ const DEFAULT_PROSE_IR_TERM_BATCH_SIZE: usize = 32;
 const DEFAULT_PROSE_IR_LLM_JOBS: usize = 4;
 const PROMPT_DIGEST_LENGTH: usize = 12;
 const SKILL_CATALOG_PATH: &str = "agents/skills/catalog.yaml";
+const PRIVATE_SKILL_PREFIX: &str = "_";
 const LOCAL_LLM_CPU_ENV: [(&str, &str); 4] = [
     ("CUDA_VISIBLE_DEVICES", ""),
     ("NVIDIA_VISIBLE_DEVICES", "void"),
@@ -1088,6 +1089,9 @@ fn load_skill_route_rules(root: &Path) -> Result<Vec<SkillRoutingRule>, String> 
     let mut rules = Vec::with_capacity(families.len());
     for entry in families {
         let skill_id = yaml_required_string(entry, "id", "skill_families")?;
+        if skill_id.starts_with(PRIVATE_SKILL_PREFIX) {
+            return Err(format!("skill-catalog-private-id-in-public-catalog:{skill_id}"));
+        }
         let routing = &entry["routing"];
         let reason = yaml_optional_string(routing, "reason", &skill_id)?
             .unwrap_or_else(default_skill_route_reason);

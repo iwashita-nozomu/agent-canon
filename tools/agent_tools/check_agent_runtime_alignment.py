@@ -67,6 +67,7 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
     "job_max_runtime_seconds",
 }
 SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
+PRIVATE_SKILL_PREFIX = "_"
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial intake wave role: own user-request clauses",
     "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
@@ -224,13 +225,24 @@ def validate_project_config() -> None:
 
 
 def expected_skill_config_paths() -> tuple[str, ...]:
-    """Return the project-local skill paths that must be enabled in Codex config."""
+    """Return public project-local skill paths that must be enabled in Codex config."""
     return tuple(
         sorted(
             f"../{path.relative_to(ROOT).as_posix()}"
             for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
+            if is_public_skill_id(path.parent.name)
         )
     )
+
+
+def is_private_skill_id(skill_id: str) -> bool:
+    """Return whether one skill id is private and runtime-internal."""
+    return skill_id.startswith(PRIVATE_SKILL_PREFIX)
+
+
+def is_public_skill_id(skill_id: str) -> bool:
+    """Return whether one skill id belongs to the user-facing public catalog."""
+    return bool(skill_id) and not is_private_skill_id(skill_id)
 
 
 def validate_skill_config(config: dict[str, object]) -> None:
@@ -251,6 +263,10 @@ def validate_skill_config(config: dict[str, object]) -> None:
         ensure(
             resolved.is_relative_to(SKILL_SHIM_ROOT.resolve()),
             f"skills.config path is outside .agents/skills: {path_value}",
+        )
+        ensure(
+            is_public_skill_id(resolved.parent.name),
+            f"private skill shims must stay out of skills.config: {path_value}",
         )
         observed.append(path_value)
     expected = expected_skill_config_paths()
@@ -548,6 +564,10 @@ def validate_public_skill_shims() -> None:
     for entry in families:
         ensure(isinstance(entry, dict), "skill_families entries must be mappings")
         skill_id = str(entry["id"])
+        ensure(
+            is_public_skill_id(skill_id),
+            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
+        )
         ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
         observed_skill_ids.add(skill_id)
         canonical_doc = ROOT / str(entry["canonical_doc"])
@@ -570,8 +590,15 @@ def validate_public_skill_shims() -> None:
         path.parent.name
         for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
     }
-    extra_shims = sorted(observed_shim_ids - observed_skill_ids)
+    public_shim_ids = {skill_id for skill_id in observed_shim_ids if is_public_skill_id(skill_id)}
+    private_catalog_ids = sorted(skill_id for skill_id in observed_skill_ids if is_private_skill_id(skill_id))
+    extra_shims = sorted(public_shim_ids - observed_skill_ids)
     missing_shims = sorted(observed_skill_ids - observed_shim_ids)
+    ensure(
+        not private_catalog_ids,
+        "private skill ids must stay out of public skill catalog: "
+        + ", ".join(private_catalog_ids),
+    )
     ensure(
         not extra_shims,
         "public skill shims missing catalog entries: " + ", ".join(extra_shims),
@@ -584,9 +611,11 @@ def validate_public_skill_shims() -> None:
 
 
 def validate_public_skill_document_contract(
-    data: Mapping[str, object], root: Path = ROOT
+    data: Mapping[str, object], root: Path | None = None
 ) -> None:
     """Check that agents/skills contains only catalog-backed public skills."""
+    if root is None:
+        root = ROOT
     public_doc_root = root / "agents" / "skills"
     internal_routine_root = root / "agents" / "internal-routines"
     ensure(public_doc_root.is_dir(), "public skill doc root missing: agents/skills")
@@ -604,6 +633,11 @@ def validate_public_skill_document_contract(
     for entry in families:
         ensure(isinstance(entry, dict), "skill_families entries must be mappings")
         canonical_doc = str(entry.get("canonical_doc", "")).strip()
+        skill_id = str(entry.get("id", "")).strip()
+        ensure(
+            is_public_skill_id(skill_id),
+            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
+        )
         ensure(canonical_doc, "skill_families canonical_doc must be non-empty")
         canonical_path = root / canonical_doc
         ensure(

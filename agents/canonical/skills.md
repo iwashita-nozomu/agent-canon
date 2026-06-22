@@ -19,3 +19,13 @@ Workflow-routed review, validation, and compatibility routines live in
 
 Runtime alignment enforces that public skill docs, catalog IDs, and
 `.agents/skills/*/SKILL.md` shims stay in parity.
+
+Naming carries the visibility boundary:
+
+- Public, user-facing skills use plain hyphen-case and appear in the public
+  catalog.
+- Runtime-internal skill shims use a leading underscore in
+  `.agents/skills/_<name>/SKILL.md` and are owned by the workflow, role, routine,
+  or public skill that calls them.
+- Workflow-only routines live in `../internal-routines/` as Markdown routines
+  rather than Codex skill shims.

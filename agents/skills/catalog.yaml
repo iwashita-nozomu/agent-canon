@@ -6,6 +6,8 @@ version: 1
 # @dependency-end
 
 skill_families:
+  # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
+  # shims use .agents/skills/_<name>/SKILL.md and stay owner-routed.
   - id: agent-orchestration
     purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
@@ -54,6 +56,10 @@ skill_families:
         - ["スキル", "一つずつ"]
         - ["スキル選択", "ルーティング"]
         - ["スキル", "ツール", "ルーティング"]
+        - ["スキル", "命名"]
+        - ["skill", "naming"]
+        - ["userfacing", "skill"]
+        - ["private", "skill"]
         - ["根本", "設計", "見直"]
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.

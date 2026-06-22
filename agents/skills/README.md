@@ -22,6 +22,18 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
 - Workflow-routed internal routine は `agents/internal-routines/` に置きます。
 
+## Skill Visibility Naming
+
+User-facing skill names use plain hyphen-case, such as `research-workflow`.
+They are catalog-backed, documented in this directory, exposed through
+`.agents/skills/<skill>/SKILL.md`, and enabled from `.codex/config.toml`.
+
+Runtime-internal skill shims use a leading underscore, such as
+`_runtime-helper`. Their owner surface is the calling workflow, role, or public
+skill rather than the public catalog, public table, or `.codex/config.toml`.
+Use this lane when a Codex runtime shim is genuinely needed; workflow-only
+material belongs in `agents/internal-routines/`.
+
 ## Public Skill Surface
 
 CLI に出す公開 skill は、user が直接選ぶ価値が高いものだけに絞ります。

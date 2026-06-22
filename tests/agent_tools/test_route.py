@@ -128,6 +128,48 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
+    def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
+        """Underscore-prefixed skills are private and stay out of public routing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: _private-skill",
+                        "    purpose: Private skill.",
+                        "    canonical_doc: agents/skills/_private-skill.md",
+                        "    shim: .agents/skills/_private-skill/SKILL.md",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "private skill",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("must be public", result.stderr)
+
+    def test_prompt_routes_skill_visibility_naming_to_task_routing(self) -> None:
+        """Skill visibility naming requests belong to the routing skill surface."""
+        prompt = "UserFacingなスキルとそうでないものを命名で分ける。private skill は _ 始まりにする"
+        result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+
     def test_prompt_routes_agent_learning_and_oop_readability(self) -> None:
         """Weak historical skill surfaces should be recommended from contextual prompts."""
         result = self.run_route(

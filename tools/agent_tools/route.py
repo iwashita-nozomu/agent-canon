@@ -35,6 +35,7 @@ AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
 STAGE_POLICY_VALUES = ("active", "deferred")
+PRIVATE_SKILL_PREFIX = "_"
 
 AREA_DATA: tuple[AreaData, ...] = (
     (
@@ -513,6 +514,8 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
         skill_id = entry.get("id")
         if not isinstance(skill_id, str) or not skill_id.strip():
             raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        if skill_id.startswith(PRIVATE_SKILL_PREFIX):
+            raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
         if skill_id in observed_skill_ids:
             raise ValueError(f"duplicate skill catalog id: {skill_id}")
         observed_skill_ids.add(skill_id)
