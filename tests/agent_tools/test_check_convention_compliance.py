@@ -20,6 +20,7 @@ from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    FALLBACK_EXIT_POLICY_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
     TEST_CONTRACT_ROUTING_MARKERS,
@@ -142,12 +143,26 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $prose-reasoning-graph $structure-planning "
-        "$md-style-check format-only structure_contract=skipped\n"
+        "$md-style-check format-only structure_contract=skipped "
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
     ),
     ".agents/skills/codex-task-workflow/SKILL.md": skill_fixture(
         "codex-task-workflow",
         "codex task workflow prose-reasoning-graph $structure-planning "
-        "$md-style-check format-only structure_contract=skipped\n"
+        "$md-style-check format-only structure_contract=skipped "
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    ".agents/skills/subagent-bootstrap/SKILL.md": skill_fixture(
+        "subagent-bootstrap",
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    ".agents/skills/tool-finding-report/SKILL.md": skill_fixture(
+        "tool-finding-report",
+        "tool_warning_exit_status resolved deferred_with_issue "
+        "accepted_with_reason explicit_approval_evidence\n"
     ),
     ".agents/skills/md-style-check/SKILL.md": skill_fixture(
         "md-style-check",
@@ -167,11 +182,23 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
-        "md-style-check format-only structure_contract=skipped\n"
+        "md-style-check format-only structure_contract=skipped "
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
     ),
     "agents/skills/codex-task-workflow.md": (
         "codex task workflow prose-reasoning-graph structure-planning "
-        "md-style-check format-only structure_contract=skipped\n"
+        "md-style-check format-only structure_contract=skipped "
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    "agents/skills/subagent-bootstrap.md": (
+        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
+        "explicit_approval_evidence router_unavailable_blocker\n"
+    ),
+    "agents/skills/tool-finding-report.md": (
+        "tool_warning_exit_status resolved deferred_with_issue "
+        "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/skills/md-style-check.md": (
         "prose-reasoning-graph structure-planning format-only "
@@ -244,6 +271,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "evaluate_agent_run.py run_repo_dependency_review.sh\n"
         "Document Structure Evidence document_structure_status structure_planning "
         "prose_graph md_style_check format_only_reason\n"
+    ),
+    "agents/templates/workflow_monitoring.md": (
+        "tool_warning_exit_status resolved deferred_with_issue "
+        "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/workflows/hypothesis-validation-workflow.md": (
         "scan_code_dependencies.sh\n"
@@ -683,6 +714,77 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("skill_routing", result.stdout)
             self.assertIn("missing-marker:$subagent-bootstrap", result.stdout)
+
+    def test_fallback_exit_policy_rejects_parent_direct_alternate_route(self) -> None:
+        """Fallback route wording must point at explicit exit evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8")
+                + "\nrecord blocker before falling back to a parent-direct alternate route\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_fallback_exit_policy", result.stdout)
+            self.assertIn("forbidden-fallback-completion-wording", result.stdout)
+
+    def test_fallback_exit_policy_requires_exit_markers(self) -> None:
+        """Fallback route surfaces keep canonical exit status markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " explicit_approval_evidence",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_fallback_exit_policy", result.stdout)
+            self.assertIn("missing-marker:explicit_approval_evidence", result.stdout)
+
+    def test_warning_acceptance_requires_explicit_approval_evidence(self) -> None:
+        """Accepted warning closeout requires approval evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "tool-finding-report" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " explicit_approval_evidence",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_fallback_exit_policy", result.stdout)
+            self.assertIn(
+                "accepted-without-explicit-approval-evidence",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_fallback_exit_policy_surfaces(self) -> None:
+        """The minimal test fixture includes every fallback exit policy surface."""
+        missing = sorted(
+            path
+            for path in FALLBACK_EXIT_POLICY_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def test_document_structure_routing_requires_structure_planning(self) -> None:
         """Document edit routing must keep structure analysis markers."""

@@ -7,9 +7,16 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../agents/skills/codex-task-workflow.md codex task workflow skill
+# upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
+# upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
+# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime task workflow skill
+# upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
+# upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
+# upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
@@ -218,6 +225,79 @@ SKILL_ROUTING_MARKERS = (
     "$subagent-bootstrap",
     "task-shape skill",
     "check_convention_compliance.py",
+)
+FALLBACK_EXIT_POLICY_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/subagent-bootstrap/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/subagent-bootstrap.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/tool-finding-report/SKILL.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+    "agents/skills/tool-finding-report.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+    "agents/templates/workflow_monitoring.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+}
+FALLBACK_EXIT_FORBIDDEN_RE = re.compile(
+    r"(?i)(?:"
+    r"sole basis for path selection|"
+    r"falling back to a parent-direct alternate route|"
+    r"parent-direct[^\n.。]{0,120}alternate route|"
+    r"parent-direct\s*代替|"
+    r"worker[^\n.。]{0,80}alternate route)"
 )
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
     ".agents/skills/agent-orchestration/SKILL.md": (
@@ -875,6 +955,44 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_fallback_exit_policy(root: Path) -> list[Finding]:
+    """Verify fallback paths are routed to explicit exit evidence."""
+    paths = tuple(FALLBACK_EXIT_POLICY_MARKERS)
+    findings = check_required_files(root, paths, "skill_fallback_exit_policy")
+    for path, markers in FALLBACK_EXIT_POLICY_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "skill_fallback_exit_policy",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+        for match in FALLBACK_EXIT_FORBIDDEN_RE.finditer(text):
+            line_no = text.count("\n", 0, match.start()) + 1
+            findings.append(
+                Finding(
+                    "skill_fallback_exit_policy",
+                    path,
+                    f"forbidden-fallback-completion-wording:{line_no}",
+                )
+            )
+        if "accepted_with_reason" in text and "explicit_approval_evidence" not in text:
+            findings.append(
+                Finding(
+                    "skill_fallback_exit_policy",
+                    path,
+                    "accepted-without-explicit-approval-evidence",
+                )
+            )
+    return findings
+
+
 def check_document_structure_routing(root: Path) -> list[Finding]:
     """Verify docs edit routing keeps structure analysis mechanically visible."""
     paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
@@ -1270,6 +1388,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
+    findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
