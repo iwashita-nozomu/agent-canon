@@ -32,7 +32,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 - tool_warnings_status: pending
 
-<!-- If any non-blocking tool, hook, checker, wrapper, or guardrail emits a warning, record it immediately with `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"`. Record the same warning_id again with `status=resolved evidence=<path-or-command>` after repair. Normal warnings may close with `accepted_with_reason` or `deferred_with_issue issue=<issue-path-or-pr>`; fix-now / S0 / S1 warnings must be `resolved`. If no warnings were observed, run `workflow_monitor.py --tool-warning-status none`. Do not leave this section pending at closeout. -->
+<!-- If any non-blocking tool, hook, checker, wrapper, or guardrail emits a warning, record it immediately with `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"`. Record the same warning_id again with `status=resolved evidence=<path-or-command>` after repair. Normal warnings reach tool_warning_exit_status through resolved, deferred_with_issue issue=<issue-path-or-pr> with durable owner, or accepted_with_reason with explicit_approval_evidence and a durable rationale artifact; fix-now / S0 / S1 warnings must be `resolved`. If no warnings were observed, run `workflow_monitor.py --tool-warning-status none`. Do not leave this section pending at closeout. -->
 
 ## Interventions
 
