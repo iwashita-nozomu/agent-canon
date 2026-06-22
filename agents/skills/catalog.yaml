@@ -212,7 +212,7 @@ skill_families:
         - ["agent-canon", "update"]
         - ["vendor/agent-canon"]
   - id: pr-processing
-    purpose: Process GitHub pull request and issue queues by inventorying state, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
     shim: .agents/skills/pr-processing/SKILL.md
     routing:
@@ -226,6 +226,9 @@ skill_families:
         - ["pr", "片づ"]
         - ["pull request"]
         - ["pull request", "merge"]
+        - ["PR Essence"]
+        - ["PR", "本質"]
+        - ["PR", "本文", "本質"]
         - ["merge queue"]
         - ["conflict", "解消"]
         - ["コンフリクト", "解消"]

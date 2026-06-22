@@ -10,6 +10,9 @@
 # upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
+# upstream design ../../agents/skills/pr-processing.md PR body and run-bundle evidence skill
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
+# upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
@@ -17,6 +20,7 @@
 # upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime implementation workflow skill
 # upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
 # upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
+# upstream design ../../.agents/skills/pr-processing/SKILL.md runtime PR processing skill
 # upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
 # upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
@@ -29,6 +33,8 @@
 # upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
 # upstream implementation ./skill_tool_commands.py validates runtime skill command packets
@@ -709,6 +715,56 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
         "issues/open/",
         "issue_sync.py",
         "github_mirror",
+    ),
+}
+PR_ESSENCE_DOCUMENTATION_MARKERS = {
+    ".github/PULL_REQUEST_TEMPLATE.md": (
+        "## PR Essence",
+        "Problem / user request",
+        "Design intent",
+        "Canonical owner",
+        "Behavior or contract delta",
+        "Evidence route",
+    ),
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
+        "## PR Essence",
+        "Problem / user request",
+        "Design intent",
+        "Canonical owner",
+        "Behavior or contract delta",
+        "Evidence route",
+    ),
+    "agents/skills/pr-processing.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    ".agents/skills/pr-processing/SKILL.md": (
+        "PR Essence",
+        "problem / user",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    "agents/workflows/agent-canon-pr-workflow.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    "agents/workflows/pr-queue-cleanup-workflow.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
     ),
 }
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
@@ -1444,6 +1500,27 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_pr_essence_documentation(root: Path) -> list[Finding]:
+    """Verify PR routes preserve change essence in body and run-bundle evidence."""
+    paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
+    findings = check_required_files(root, paths, "pr_essence_documentation")
+    for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "pr_essence_documentation",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
     """Verify AgentCanon PR workflow documents remote verification before push."""
     path = AGENT_CANON_PR_WORKFLOW_PATH
@@ -1730,6 +1807,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_implementation_guardrails(root))
     findings.extend(check_refactor_sequence(root))
     findings.extend(check_review_issue_routing(root))
+    findings.extend(check_pr_essence_documentation(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

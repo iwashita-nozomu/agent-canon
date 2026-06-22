@@ -25,6 +25,7 @@ from tools.agent_tools.check_convention_compliance import (
     MATHEMATICAL_NECESSITY_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
     POSITIVE_RUNTIME_WORDING_SURFACES,
+    PR_ESSENCE_DOCUMENTATION_MARKERS,
     REFACTOR_SEQUENCE_MARKERS,
     REVIEW_ISSUE_ROUTING_MARKERS,
     SMALL_CHANGE_SKILL_READ_MARKERS,
@@ -164,6 +165,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
+    "agents/workflows/pr-queue-cleanup-workflow.md": (
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
     ".agents/skills/agent-orchestration/SKILL.md": skill_fixture(
         "agent-orchestration",
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
@@ -225,6 +232,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "mvp-skeleton",
         "mvp core loop vertical slice\n",
     ),
+    ".agents/skills/pr-processing/SKILL.md": skill_fixture(
+        "pr-processing",
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n",
+    ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -251,6 +263,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/change-review.md": (
         "issue_route issues/open/ issue_sync.py new_local_issue github_mirror\n"
+    ),
+    "agents/skills/pr-processing.md": (
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -366,9 +382,27 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "check_github_workflows.py\n"
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
         + "".join(f"{marker}\n" for marker in AGENT_CANON_PUSH_REMOTE_MARKERS)
+    ),
+    ".github/PULL_REQUEST_TEMPLATE.md": (
+        "## PR Essence\n"
+        "Problem / user request\n"
+        "Design intent\n"
+        "Canonical owner\n"
+        "Behavior or contract delta\n"
+        "Evidence route\n"
+    ),
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
+        "## PR Essence\n"
+        "Problem / user request\n"
+        "Design intent\n"
+        "Canonical owner\n"
+        "Behavior or contract delta\n"
+        "Evidence route\n"
     ),
     "tools/ci/run_all_checks.sh": (
         "check_hardcoded_numbers.py check_static_any.py "
@@ -1122,6 +1156,39 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in REVIEW_ISSUE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_pr_essence_documentation_requires_body_contract_markers(self) -> None:
+        """PR body routes keep essence markers in their owner surfaces."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+            template.write_text(
+                template.read_text(encoding="utf-8").replace(
+                    "Behavior or contract delta\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("pr_essence_documentation", result.stdout)
+            self.assertIn(
+                "missing-marker:Behavior or contract delta",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_pr_essence_documentation_surfaces(self) -> None:
+        """The minimal test fixture includes every PR essence documentation surface."""
+        missing = sorted(
+            path
+            for path in PR_ESSENCE_DOCUMENTATION_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

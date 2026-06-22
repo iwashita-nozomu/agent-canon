@@ -11,6 +11,7 @@ upstream design result-artifact-writeout.md run-local result artifact writeout c
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
 @dependency-end
 -->
 
@@ -31,6 +32,8 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
 - AgentCanon source PR と template / derived repo の parent pin PR を連動処理する
 - GitHub Issue と local issue ledger の stale / duplicate / resolved 判定を行う
 - PR body、evidence comment、run bundle に merge 判断の証跡を残す
+- PR Essence として problem / user request、design intent、canonical owner、
+  behavior or contract delta、evidence route を PR body と run bundle に残す
 
 ## Boundary
 
@@ -70,6 +73,8 @@ PR 作成 / 更新は、GitHub 上の PR body だけでなく run-local report �
 run bundle には次を置きます。
 
 - `pr_body.md`: agent が確認した最終 PR body
+- `pr_body.md` の `PR Essence`: problem / user request、design intent、
+  canonical owner、behavior or contract delta、evidence route
 - `github_publish.json`: `github_publish.py publish-pr --summary-out` の機械可読結果
 - `pr_checks.*` または `workflow_monitoring.md`: `gh pr checks` / `github_publish.py checks` の要約
 - `work_log.md` または `pr_processing_log.md`: PR number / URL、branch、head SHA、mutation authority、check summary、Issue action、blocker、次 action
@@ -78,6 +83,11 @@ PR body を更新したら、同じ内容または要約を run bundle にも反
 run bundle に無い判断を PR body だけに置かず、PR body に無い validation /
 authority 判断を chat だけで完了扱いにしません。
 
+`PR Essence` は validation list とは別枠です。PR body と run bundle の同じ
+section に、user が求めた問題、採用した design intent、正本として更新した
+canonical owner、behavior or contract delta、検証や Issue へ接続する evidence
+route を短く書きます。
+
 ## Procedure
 
 1. Run bundle と PR log report を固定します。
@@ -85,6 +95,8 @@ authority 判断を chat だけで完了扱いにしません。
    - 無ければ `bootstrap_agent_run.py` で作る
    - `work_log.md` に bootstrap output、routing declaration、PR task summary を残す
    - `pr_body.md` と `github_publish.json` の path を決める
+   - `pr_body.md` の `PR Essence` に problem / user request、design intent、
+     canonical owner、behavior or contract delta、evidence route を書く
 1. Queue snapshot を作ります。
    - `gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt`
    - `gh issue list --state open --json number,title,labels,updatedAt,url`
@@ -122,7 +134,7 @@ authority 判断を chat だけで完了扱いにしません。
    - mergeable
    - required checks pass
    - blocking review なし
-   - validation evidence が PR body、comment、または run bundle にある
+   - PR Essence と validation evidence が PR body、comment、または run bundle にある
    - repo の GitHub automation authority fields が必要なら visible になっている
 1. Issue を処理します。
    - resolved: merge PR / commit / policy reference を書いて close

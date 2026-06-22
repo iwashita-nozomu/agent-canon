@@ -1,6 +1,6 @@
 ---
 name: pr-processing
-description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
+description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
 ---
 <!--
 @dependency-start
@@ -13,6 +13,7 @@ upstream design ../../../documents/agent-canon-update-route.md defines source PR
 upstream design ../../../agents/skills/result-artifact-writeout.md defines run-local result artifact writeout
 upstream implementation ../../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
+downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates PR Essence runtime skill markers
 @dependency-end
 -->
 
@@ -42,6 +43,9 @@ Execute the required and task-matching conditional commands that the packet prin
    `workflow_monitoring.md`.
 1. Keep PR publication artifacts inside the run bundle:
    - write the reviewed PR body to `reports/agents/<run-id>/pr_body.md`;
+   - include a `PR Essence` section in `pr_body.md` with problem / user
+     request, design intent, canonical owner, behavior or contract delta, and
+     evidence route;
    - pass `--summary-out reports/agents/<run-id>/github_publish.json` to
      `github_publish.py publish-pr`;
    - record PR number / URL, branch, head SHA, authority decision, checks
@@ -73,8 +77,8 @@ Execute the required and task-matching conditional commands that the packet prin
    - mergeable state;
    - required checks passing;
    - no blocking review request or requested-change review;
-   - PR body, comment, or run bundle includes validation evidence and any
-     automation authority lines required by the repo.
+   - PR body, comment, or run bundle includes `PR Essence`, validation
+     evidence, and any automation authority lines required by the repo.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
    `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
    and the parent PR gate.
