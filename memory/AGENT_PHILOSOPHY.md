@@ -332,6 +332,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User feedback: 小規模修正のときスキル読まないのはよくない
 
+- 2026-06-22 | interaction-observation | PR processing should preserve the change essence as a distinct PR body contract covering problem, design intent, canonical owner, behavior delta, and evidence route.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: 2026-06-22 user feedback that PR essence tends to be absent from documentation
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.

@@ -318,7 +318,7 @@ expected_skills = ["pr-processing"]
 limit = 25
 prompt_templates = [
   "{subject} の PR #42 を確認して checks と merge readiness を見て",
-  "GitHub pull request の {subject} を review して PR body に evidence を追記して",
+  "GitHub pull request の {subject} を review して PR body に PR Essence と evidence を追記して",
   "{subject} の merge PR 状態を inspect して blocker を整理して",
   "PR #42 の checks とレビューを見て {subject} の処理順を決めて",
   "{subject} の pull request queue を pr-processing で棚卸しして",

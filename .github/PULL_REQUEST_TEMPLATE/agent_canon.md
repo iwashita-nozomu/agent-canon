@@ -8,11 +8,20 @@ upstream design ../../tools/catalog.yaml structured tool catalog
 downstream implementation ../../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
+downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
 @dependency-end
 -->
 
 <!-- Synced to /.github/PULL_REQUEST_TEMPLATE/agent_canon.md by tools/sync_agent_canon.sh link-root. -->
 <!-- Edit vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE/agent_canon.md, not the root copy. -->
+
+## PR Essence
+
+- Problem / user request:
+- Design intent:
+- Canonical owner:
+- Behavior or contract delta:
+- Evidence route:
 
 ## Summary
 
