@@ -26,6 +26,22 @@ AgentCanon coordinated search has six provider classes:
 - `header-deps`: dependency-header upstream / downstream edges.
 - `code-deps`: Python symbol and direct-call facts from the AST scanner.
 
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `local-llm-responsibility-analysis.md`,
+  `../rust/agent-canon/src/local_llm.rs`,
+  `../rust/agent-canon/src/semantic_index.rs`, and
+  `../tools/agent_tools/search.py`.
+- Assumption:
+  implementation surface routing is a bounded candidate-selection step. Search
+  providers can nominate tool, document, code, or dependency-header surfaces,
+  while dependency review, structure checks, tests, and review gates keep
+  acceptance authority.
+- Parent-doc alignment:
+  Local LLM output is advisory, matching the local LLM runtime boundary in the
+  upstream design.
+
 Use `agent-canon local-llm search` when the user gives a purpose rather than an
 exact symbol:
 
@@ -66,8 +82,8 @@ skill integration rule is:
 Use `rg` first only when the input is an exact path, symbol, literal error
 message, or short unique token. For every broader search, use this order:
 
-1. Write the current task, reviewer question, or reuse purpose to
-   `reports/query.txt`.
+1. Write the current task, reviewer question, or reuse purpose to a run-local
+   query file such as `reports/<run-id>/query.txt`.
 1. Run responsibility-based search before `rg` to identify the responsibility
    bucket, dependency-header surface, tool/workflow/document family, and
    candidate source paths.

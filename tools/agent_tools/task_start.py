@@ -32,10 +32,12 @@ from agent_team import (
     expand_enabled_specialists,
     format_subagent_wave,
     format_subagent_wave_chunks,
+    format_subagent_role_instance_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
     recommended_dynamic_expansion_waves,
+    recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     resolve_cross_cutting_document_packet,
     resolve_report_root,
@@ -356,8 +358,17 @@ def emit_task_start_output(
             active_budget,
             initial_wave,
         )
+        expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
+            runtime.roles,
+            active_budget,
+            initial_wave,
+        )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
         print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        print(
+            "RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES="
+            f"{format_subagent_role_instance_wave_chunks(expansion_wave_slots)}"
+        )
         for line in same_role_subagent_policy_output_lines():
             print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")

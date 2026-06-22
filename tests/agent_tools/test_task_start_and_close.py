@@ -639,8 +639,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
             return
         prompt_contract = cast("dict[str, object]", role["prompt_contract"])
         self.assertIsInstance(prompt_contract, dict)
-        prompt_must_include = cast("list[object]", prompt_contract["prompt_must_include"])
-        prompt_fields = {str(field) for field in prompt_must_include}
+        run = cast("dict[str, object]", manifest["run"])
+        context_policy = cast("dict[str, object]", run["handoff_context_policy"])
+        common_fields = cast("list[object]", context_policy["common_prompt_must_include"])
+        role_fields = cast("list[object]", prompt_contract["role_prompt_must_include"])
+        prompt_fields = {str(field) for field in (*common_fields, *role_fields)}
         self.assertTrue(required_fields.issubset(prompt_fields), role_id)
 
     def assert_abstract_design_prompt_contracts(self, manifest: dict[str, object]) -> None:
@@ -975,7 +978,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIsNotNone(dynamic_waves_match)
             dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
             self.assertIn("WAVE-2=manager_reviewer", dynamic_waves)
-            self.assertNotIn("explorer", dynamic_waves)
+            role_instances_match = re.search(
+                r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(role_instances_match)
+            role_instances = cast(re.Match[str], role_instances_match).group(1)
+            self.assertIn("researcher:explorer:researcher_explorer", role_instances)
+            self.assertIn("research_reviewer:reviewer:research_reviewer_reviewer", role_instances)
+            self.assertIn("infra_reviewer:reviewer:infra_reviewer_reviewer", role_instances)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -1035,6 +1047,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "allowed",
             )
             self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
+            self.assertIn("role_instances", spawn_wave_recommendation["dynamic_expansion_waves"][0])
             self.assertIn("implementation", role_topology["role_families"])
             self.assertIn("review", role_topology["role_families"])
             self.assertEqual(
@@ -1051,6 +1064,82 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assert_initial_wave_execution_gate(report_root / "test-task-start")
             self.assert_abstract_design_prompt_contracts(manifest)
+
+    def test_academic_reviewers_precede_ship_review_in_dynamic_waves(self) -> None:
+        """Task-specific academic reviewers should run before final review."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "academic draft",
+                    "--task-id",
+                    "T10",
+                    "--owner",
+                    "codex",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--run-id",
+                    "test-academic-wave-order",
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            dynamic_waves_match = re.search(
+                r"^RECOMMENDED_DYNAMIC_EXPANSION_WAVES=(.+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(dynamic_waves_match)
+            dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
+            self.assertLess(dynamic_waves.index("report_reviewer"), dynamic_waves.index("ship_reviewer"))
+            self.assertLess(
+                dynamic_waves.index("citation_evidence_reviewer"),
+                dynamic_waves.index("ship_reviewer"),
+            )
+            self.assertLess(
+                dynamic_waves.index("notation_definition_reviewer"),
+                dynamic_waves.index("ship_reviewer"),
+            )
+            self.assertLess(
+                dynamic_waves.index("logic_gap_reviewer"),
+                dynamic_waves.index("ship_reviewer"),
+            )
+            role_instances_match = re.search(
+                r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
+                result.stdout,
+                re.M,
+            )
+            self.assertIsNotNone(role_instances_match)
+            role_instances = cast(re.Match[str], role_instances_match).group(1)
+            self.assertIn("research_reviewer:reviewer:research_reviewer_reviewer", role_instances)
+            self.assertIn(
+                "citation_evidence_reviewer:citation_evidence_reviewer:"
+                "citation_evidence_reviewer_citation_evidence_reviewer",
+                role_instances,
+            )
+            manifest_text = (
+                report_root / "test-academic-wave-order" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
+            manifest = yaml.safe_load(manifest_text)
+            wave_ids = [
+                wave["wave_id"]
+                for wave in manifest["run"]["spawn_wave_recommendation"]["dynamic_expansion_waves"]
+                if any("citation_evidence_reviewer" in item for item in wave["role_instances"])
+            ]
+            self.assertEqual(wave_ids, ["WAVE-6"])
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""

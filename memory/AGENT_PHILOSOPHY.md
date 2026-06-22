@@ -308,6 +308,24 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: 2026-06-19 user feedback: サブエージェントが帰らないとき，止めるのではなく原因探索をするべきです
 
+- 2026-06-21 | interaction-observation | Repository-task investigation should converge on a canonical route, edit surface, validation route, or durable issue target; exploration outside those outputs becomes supporting evidence and returns to active work.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: 2026-06-21 user feedback: unnecessary consideration causes many side-track cases
+
+- 2026-06-21 | interaction-observation | Expensive commands should start from a task-linked approval note after lightweight evidence, with an owner, a budget, and a stop condition.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: 2026-06-21 user feedback: 勝手に重い計算を実行するのをやめさせる
+
+- 2026-06-21 | interaction-observation | User-facing reports should use ordinary language; internal names belong only in commands, paths, tables, and exact evidence references, and new terms should come from established repository or external standard vocabulary.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: 2026-06-21 user feedback: 出力にコード命名由来の単語を使わない．存在しない単語を作らない
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.

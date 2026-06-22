@@ -403,6 +403,13 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
         self.assertTrue(DIRECT_RG_CONTEXT_GUARD.exists())
 
+    def test_hooks_json_uses_codex_supported_top_level_keys(self) -> None:
+        """Codex hook configuration should keep only runtime-supported top-level keys."""
+        hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
+
+        self.assertEqual(set(hooks), {"hooks"})
+        self.assertIsInstance(hooks["hooks"], dict)
+
     def _dispatcher_scripts(self, event: str) -> list[str]:
         """Return the child hook scripts configured for one dispatcher event."""
         result = subprocess.run(
@@ -3494,6 +3501,67 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
         self.assertEqual(entries[0]["observed_text_field_count"], 1)
 
+    def test_skill_usage_logger_ensures_archive_branch_before_durable_write(self) -> None:
+        """Durable hook output should select the archive branch before appending logs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            archive_root = temp_root / ".agent-canon" / "archive"
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            archive_root.mkdir(parents=True)
+            subprocess.run(["git", "init"], cwd=archive_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=archive_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=archive_root, check=True)
+            (archive_root / "README.md").write_text("# Runtime Log Archive\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=archive_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial"], cwd=archive_root, check=True, capture_output=True)
+            subprocess.run(["git", "branch", "-M", "main"], cwd=archive_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "switch", "-c", "logs/test-env-other-thread"],
+                cwd=archive_root,
+                check=True,
+                capture_output=True,
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(archive_root),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_LOG_ENV": "test-env",
+                    "CODEX_THREAD_ID": "thread-1",
+                },
+            )
+            branch = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=archive_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            log_path = (
+                archive_root
+                / "hook-runs"
+                / repo_log_key(temp_root)
+                / "test-container"
+                / "skill_usage-no-git-head.jsonl"
+            )
+            log_exists = log_path.exists()
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(branch, "logs/test-env-thread-1")
+        self.assertTrue(log_exists)
+
     def test_skill_usage_logger_honors_source_root_override(self) -> None:
         """Source-root override should route hook logs to the intended repo key."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3848,8 +3916,8 @@ class CodexHooksTest(unittest.TestCase):
                         "tool_name": "spawn_agent",
                         "tool_input": {
                             "agent_type": "test_designer",
-                            "model": "gpt-5.3-codex-spark",
-                            "reasoning_effort": "low",
+                            "model": "gpt-5.4-mini",
+                            "reasoning_effort": "medium",
                             "fork_context": True,
                             "message": "Design tests for the changed hook.",
                             "items": [{"type": "text", "text": "packet"}],
@@ -3868,8 +3936,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["subagent_event_kind"], "spawn")
         self.assertEqual(entry["subagent_tool_name"], "spawn_agent")
         self.assertEqual(entry["subagent_agent_type"], "test_designer")
-        self.assertEqual(entry["subagent_model"], "gpt-5.3-codex-spark")
-        self.assertEqual(entry["subagent_reasoning_effort"], "low")
+        self.assertEqual(entry["subagent_model"], "gpt-5.4-mini")
+        self.assertEqual(entry["subagent_reasoning_effort"], "medium")
         self.assertTrue(entry["subagent_fork_context"])
         self.assertTrue(entry["subagent_prompt_fingerprint"])
         self.assertEqual(entry["subagent_prompt_char_count"], len("Design tests for the changed hook."))

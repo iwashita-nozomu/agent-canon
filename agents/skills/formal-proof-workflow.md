@@ -70,6 +70,11 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   runtime profile、return projection、observable effect、assumptions /
   preconditions、checker / validation command を束ねた入口です。theorem target、
   proof obligation、reader-facing proof note はこの契約から射影します。
+- 数学的判定は `mathematical necessity gate` を通します。theorem surface、
+  proof obligation、accepted assumption、counterexample obligation、
+  checker-backed validation command は、public entrypoint と program contract から
+  射影した必要性を持つ場合に採用します。補助 lemma や局所判定は、target theorem の
+  dependency graph 上で必要な場合に選びます。
 - 目的定理は public entrypoint の静的な引数 schema と戻り値 schema から作ります。
   低レベルの op id、binding、region、frame、trace row、または
   `generatedMainFuel` の内部 state を目的定理の表面にしてはいけません。

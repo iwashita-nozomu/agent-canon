@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import tomllib
 from collections.abc import Mapping
@@ -33,12 +34,14 @@ from agent_team import (
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
     required_output_templates_missing,
     resolve_cross_cutting_document_packet,
     resolve_role,
     resolve_role_document_packet,
+    select_roles,
     task_ids,
-    workflow_always_on_roles,
     workflow_spawn_budget,
 )
 from vendor_skill_adapters import VendorSkillValidator
@@ -56,6 +59,8 @@ EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+MIN_DYNAMIC_SPAWN_BUDGET = 4
+INTAKE_AGENT_COUNT = 3
 ALLOWED_AGENT_RUNTIME_KEYS = {
     "max_threads",
     "max_depth",
@@ -78,6 +83,25 @@ TOOL_RESULT_ROUTE_MARKERS = (
     "repo-wide drift and integration risk -> project_reviewer",
 )
 PERMANENT_TEAM_MAPPING_HEADING = "## Permanent Team To Codex Mapping"
+NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
+PRE_FINAL_REVIEW_ROLE_IDS = {
+    "change_reviewer",
+    "research_reviewer",
+    "experiment_reviewer",
+    "report_reviewer",
+    "reproducibility_reviewer",
+    "artifact_reviewer",
+    "scientific_computing_reviewer",
+    "benchmark_reviewer",
+    "fair_data_reviewer",
+    "ml_science_reviewer",
+    "citation_evidence_reviewer",
+    "notation_definition_reviewer",
+    "logic_gap_reviewer",
+    "infra_reviewer",
+    "python_reviewer",
+    "cpp_reviewer",
+}
 
 
 @dataclass(frozen=True)
@@ -239,6 +263,7 @@ def validate_skill_config(config: dict[str, object]) -> None:
 def validate_project_hooks() -> None:
     """Check that project hooks cover active safety and completion guardrails."""
     hooks_payload = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
+    ensure(set(hooks_payload) == {"hooks"}, "hooks.json top-level keys must match Codex hook schema")
     hooks = hooks_payload.get("hooks", {})
     ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
 
@@ -251,6 +276,8 @@ def validate_project_hooks() -> None:
         "mcp_session_context.sh" not in hooks_text,
         "mcp_session_context.sh must not be wired as a startup hook",
     )
+    ensure("hook_dispatcher.py" in hooks_text, "hooks.json must invoke hook_dispatcher.py")
+    dispatcher_scripts = configured_dispatcher_scripts()
     for hook_script in (
         "log_archive_mount_warning.py",
         "prompt_secret_guard.py",
@@ -261,8 +288,33 @@ def validate_project_hooks() -> None:
         "style_checker_guard.py",
         "skill_usage_logger.py",
     ):
-        ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")
+        ensure(hook_script in dispatcher_scripts, f"{hook_script} must be wired through hook_dispatcher.py")
         ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
+
+
+def configured_dispatcher_scripts() -> set[str]:
+    """Return hook scripts declared by the project dispatcher."""
+    scripts: set[str] = set()
+    dispatcher = ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
+    for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"):
+        result = subprocess.run(
+            ["python3", str(dispatcher), "--list", event],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        events = payload.get("events", {})
+        ensure(isinstance(events, dict), f"dispatcher list output for {event} must contain events")
+        entries = events.get(event, [])
+        ensure(isinstance(entries, list), f"dispatcher list output for {event} must be a list")
+        for entry in entries:
+            ensure(isinstance(entry, dict), f"dispatcher entry for {event} must be a mapping")
+            script = entry.get("script", "")
+            ensure(isinstance(script, str) and script, f"dispatcher entry for {event} must name a script")
+            scripts.add(script)
+    return scripts
 
 
 def validate_codex_agent_settings() -> None:
@@ -439,6 +491,51 @@ def validate_task_catalog_references() -> None:
             )
 
 
+def validate_dynamic_wave_policy() -> None:
+    """Check generated waves preserve role instances and pre-final reviewers."""
+    config = load_team_config()
+    catalog = load_task_catalog(config)
+    for task_id in task_ids(catalog):
+        task = task_by_id(catalog, task_id)
+        roles = roles_for_task(config, catalog, task_id)
+        active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
+        initial_wave = recommended_initial_subagent_wave(roles, active_budget)
+        wave_slots = recommended_dynamic_expansion_wave_slots(roles, active_budget, initial_wave)
+        flattened_slots = tuple(slot for wave in wave_slots for slot in wave)
+        slot_keys = {(slot.role_id, slot.agent_type) for slot in flattened_slots}
+        expected_slots = {
+            (role.id, agent_type)
+            for role in roles
+            if role.id not in NON_SPAWN_WAVE_ROLE_IDS
+            for agent_type in role.codex_agents
+        }
+        missing_slots = sorted(expected_slots - slot_keys)
+        ensure(
+            not missing_slots,
+            f"task {task_id} dynamic waves collapsed role instances: {missing_slots}",
+        )
+        if any(role.id == "final_reviewer" for role in roles):
+            final_wave_indexes = [
+                index
+                for index, wave in enumerate(wave_slots)
+                if any(slot.role_id == "final_reviewer" for slot in wave)
+            ]
+            ensure(final_wave_indexes, f"task {task_id} dynamic waves missing final_reviewer")
+            final_wave_index = min(final_wave_indexes)
+            pre_final_role_ids = {
+                slot.role_id
+                for wave in wave_slots[:final_wave_index]
+                for slot in wave
+            }
+            late_reviewers = sorted(
+                role.id
+                for role in roles
+                if role.id in PRE_FINAL_REVIEW_ROLE_IDS and role.id not in pre_final_role_ids
+            )
+            ensure(
+                not late_reviewers,
+                f"task {task_id} review roles scheduled after final review: {late_reviewers}",
+            )
 def validate_public_skill_shims() -> None:
     """Check that public skill catalog entries have discoverable SKILL.md shims."""
     catalog_path = ROOT / "agents" / "skills" / "catalog.yaml"
@@ -715,9 +812,12 @@ def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tu
         include_default_review_packs=True,
     )
     task = task_by_id(catalog, task_id)
-    always_on = workflow_always_on_roles(config, catalog, str(task["family"]))
-    return tuple(always_on) + tuple(
-        resolve_role(config, role_id) for role_id in enabled
+    return select_roles(
+        config=config,
+        enabled_specialists=list(enabled),
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id=str(task["family"]),
     )
 
 
@@ -884,7 +984,10 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         isinstance(initial_wave, list) and len(initial_wave) >= 1,
         f"task {task_id} manifest must recommend at least one initial agent type",
     )
-    if expected_active > 4 and len(total_agent_candidates) > 3:
+    if (
+        expected_active > MIN_DYNAMIC_SPAWN_BUDGET
+        and len(total_agent_candidates) > INTAKE_AGENT_COUNT
+    ):
         dynamic_agent_candidates: list[str] = []
         if isinstance(dynamic_expansion_waves, list):
             for wave in dynamic_expansion_waves:
@@ -908,7 +1011,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
             f"task {task_id} manifest must expose dynamic expansion waves",
         )
         ensure(
-            len(set(initial_wave + dynamic_agent_candidates)) > 3,
+            len(set(initial_wave + dynamic_agent_candidates)) > INTAKE_AGENT_COUNT,
             f"task {task_id} manifest must not collapse multi-agent work to intake responsibility",
         )
     ensure(
@@ -980,6 +1083,14 @@ def ensure_manifest_abstract_design_prompt_contracts(
     ensure(isinstance(roles, list), f"task {task_id} manifest missing roles list")
 
     def prompt_fields(role_id: str) -> set[str] | None:
+        common_fields: set[str] = set()
+        run = manifest.get("run")
+        if isinstance(run, dict):
+            context_policy = run.get("handoff_context_policy")
+            if isinstance(context_policy, dict):
+                raw_common_fields = context_policy.get("common_prompt_must_include")
+                if isinstance(raw_common_fields, list):
+                    common_fields = {str(field) for field in raw_common_fields}
         for role in roles:
             if not isinstance(role, dict) or role.get("id") != role_id:
                 continue
@@ -988,12 +1099,12 @@ def ensure_manifest_abstract_design_prompt_contracts(
                 isinstance(prompt_contract, dict),
                 f"task {task_id} role {role_id} missing prompt_contract",
             )
-            raw_fields = prompt_contract.get("prompt_must_include")
+            raw_fields = prompt_contract.get("role_prompt_must_include")
             ensure(
                 isinstance(raw_fields, list),
-                f"task {task_id} role {role_id} missing prompt_must_include",
+                f"task {task_id} role {role_id} missing role_prompt_must_include",
             )
-            return {str(field) for field in raw_fields}
+            return common_fields | {str(field) for field in raw_fields}
         return None
 
     expected_role_fields = {
@@ -1118,6 +1229,7 @@ def main() -> int:
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()
+    validate_dynamic_wave_policy()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
     validate_vendor_skill_adapters()

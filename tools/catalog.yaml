@@ -201,7 +201,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML projection reports under the shared graph visualization DSL contract.
+    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker
@@ -216,6 +216,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/render_dependency_manifest_graph.md
       - documents/dependency-manifest-design.md
+      - documents/structured-analysis/graph-dsl.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_render_dependency_manifest_graph.py
@@ -794,7 +795,7 @@ entries:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, shared graph visualization projection contracts, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
+    summary: Builds SQLite-backed prose structure graphs, Graph DSL Core projection payloads, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -808,6 +809,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/prose_reasoning_graph.md
+      - documents/structured-analysis/graph-dsl.md
       - documents/prose-reasoning-graph/dsl-spec.md
       - agents/skills/prose-reasoning-graph.md
       - agents/skills/structure-planning.md
@@ -1657,7 +1659,7 @@ entries:
       - tests/agent_tools/test_file_surface_inventory.py
 
   - id: structured-document-inventory
-    summary: Builds the structured-analysis SQLite cache, writes a separate warning DB, and finds document-canon cleanup candidates.
+    summary: Builds the structured-analysis SQLite cache, emits and validates the Graph DSL Core storage contract, writes a separate warning DB, and finds document-canon cleanup candidates.
     path: rust/agent-canon/src/structured_analysis.rs
     family: root
     role: inventory
@@ -1671,6 +1673,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/structured-analysis/README.md
+      - documents/structured-analysis/graph-dsl.md
       - documents/structured-analysis/database-design.md
       - documents/structured-analysis/document-canon-analysis.md
       - documents/rust-agent-tool-migration.md

@@ -41,6 +41,18 @@ DEFAULT_RESULTS_FAMILY = "codex-agent-role"
 RUN_ID_DIGEST_LENGTH = 10
 GIT_COMMAND_TIMEOUT_SECONDS = 5
 VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
+SPARK_MODEL = "gpt-5.3-codex-spark"
+MINI_MODEL = "gpt-5.4-mini"
+DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
+SPARK_MODEL_AGENT_IDS = {"spark_worker"}
+MINI_MEDIUM_AGENT_IDS = {
+    "cpp_reviewer",
+    "diff_triage_reviewer",
+    "experiment_runner",
+    "explorer",
+    "python_reviewer",
+    "test_designer",
+}
 
 
 @dataclass(frozen=True)
@@ -184,8 +196,17 @@ def evaluate_static_agent_configs(
         effort = config.get("model_reasoning_effort")
         if not isinstance(model, str) or not model:
             findings.append(Finding("model-settings", agent_id, "missing-model"))
+        elif model in DEPRECATED_CODEX_MODELS:
+            findings.append(Finding("model-settings", agent_id, f"deprecated-model-{model}"))
+        elif model == SPARK_MODEL and agent_id not in SPARK_MODEL_AGENT_IDS:
+            findings.append(Finding("model-settings", agent_id, "spark-model-reserved-for-spark-worker"))
         if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
             findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
+        if agent_id in MINI_MEDIUM_AGENT_IDS:
+            if model != MINI_MODEL:
+                findings.append(Finding("model-settings", agent_id, f"expected-model-{MINI_MODEL}"))
+            if effort != "medium":
+                findings.append(Finding("model-settings", agent_id, "expected-medium-reasoning"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
     return findings
 

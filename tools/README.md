@@ -23,6 +23,8 @@ downstream implementation agent_tools/search.py coordinates purpose-based search
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream design user/README.md defines stable user-facing tool entrypoint migration target
 downstream design internal/README.md defines skill, workflow, and compatibility helper migration targets
+downstream implementation agent_tools/review_backlog_scan.sh generates integrated review backlog artifacts
+downstream implementation agent_tools/compare_agent_run_paths.py compares run-bundle route efficiency
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
@@ -233,15 +235,44 @@ prose structure graph, exports diagnostics and natural-language explanations,
 and writes handoff packets for writing, review, literature, experiment, and
 artifact skills. DB creation defaults to the user-home prose graph cache and
 accepts an explicit `--db` path when a workflow needs one.
-The Prose Reasoning Graph DSL also owns the shared graph visualization contract:
+
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `../documents/structured-analysis/graph-dsl.md`,
+  `../documents/prose-reasoning-graph/dsl-spec.md`,
+  `../rust/agent-canon/src/structured_analysis.rs`, and
+  `agent_tools/render_dependency_manifest_graph.py`.
+- Assumption:
+  Graph DSL terms in this operator guide describe shared storage and projection
+  vocabulary. Native tool contracts remain the authority for pass/fail
+  decisions.
+- Parent-doc alignment:
+  `../documents/structured-analysis/graph-dsl.md` owns Graph DSL Core storage.
+  Prose Reasoning Graph owns the prose adapter/profile over that core.
+
+Graph DSL Core owns the shared graph storage and projection contract:
 dependency graph HTML/DOT, algorithm Mermaid flowcharts, semantic-provider HTML,
-and runtime decision-flow diagrams are adapter projections over DSL graph
-objects rather than independent graph schemas.
+and runtime decision-flow diagrams are adapter projections over core graph
+objects rather than independent graph schemas. Prose Reasoning Graph owns the
+prose adapter/profile over that core.
 `agent-canon structured-analysis build --root . --profile manual` rebuilds the
 SQLite intermediate representation from git-visible files into the user-home
 structured-analysis cache. It materializes an `artifact` layer and imports
 document-canon findings, then writes current warnings to `diagnostics.sqlite`
-without rewriting the repository tree.
+without rewriting the repository tree. When `--out-dir` is supplied, SQLite DB
+files stay in the cache and the report directory receives
+`document_inventory.json`, `exports/document_inventory.md`,
+`structured_analysis_build.json`, and
+`exports/structured_analysis_summary.md`.
+`agent-canon structured-analysis graph-contract --db <prose_graph.sqlite>`
+checks that the materialized DB satisfies the Graph DSL Core storage contract.
+Without `--db`, it emits the contract summary and registered layer set.
+The shared graph vocabulary covers source-truth anchor / source span, lower
+graph / lower text unit, typed relation, projection view / derived projection,
+reader-state, macro-claim, node record / nodes table, edge record / edges
+table, and `payload_json` so adapter projections do not introduce independent
+graph schemas.
 `agent-canon structured-analysis document-inventory --root .` is the canonical
 Rust entrypoint for document-canon inventory. It reports runtime mirrors,
 generated evidence, closed issue records, missing dependency manifests,
@@ -383,12 +414,12 @@ findings for resilient test planning.
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
 1. `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で通常の AgentCanon `main` 更新、eval / hook log parking、root view check、compiled tool rebuild、親 repo update TODO routing / acknowledge を tool に任せます。
-1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を出します。その場合は agent が conflict workflow に入り、必要なら `make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
+1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を出します。その場合は agent が conflict workflow に入り、必要なら `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
 1. AgentCanon PR が merge された後も `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `update_agent_canon.sh latest` を通り、pin 更新後に `tools/rebuild_agent_tools.sh` を走らせます。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば `latest` は成功終了のまま `updated_with_pending_todos` を出し、親 repo の agent が先に適用します。完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` は `make agent-canon-latest` と同じ high-level latest route の互換 alias です。
-1. root view が drift した場合だけ `make agent-canon-links` を使います。
+1. root view が drift した場合だけ `bash tools/sync_agent_canon.sh link-root` を使います。
 1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`vendor/agent-canon/` branch を GitHub に push して AgentCanon PR を使います。
 
 `sync_agent_canon.sh` は低レベル実装です。
@@ -731,9 +762,9 @@ Minimum evidence to keep with the run bundle:
 
 - `file_surface_inventory.json` and `file_surface_inventory.md` for root,
   submodule pin, symlink/copy views, and AgentCanon source classification.
-- `dependency_review_root.txt` and `dependency_review_agentcanon.txt` for
+- `dependency_review_<scope>.txt` artifacts for
   manifest coverage, format, and dependency graph checks.
-- `code_dependencies_root.txt` and `code_dependencies_agentcanon.txt` for
+- `code_dependencies_<scope>.txt` artifacts for
   import/include/source reachability.
 - `oop_*_readability_*.md`, `static_any_*.txt`,
   `hardcoded_numbers_*.txt`, and `log_helper_names_*.txt` for mechanical
@@ -913,7 +944,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `helper_function_inventory.py` inventories Python helper functions/classes and infers roles from AST body facts, calls, side effects, path domain, internal call graph evidence, single-caller or file-local specialization, and functional candidate rules. It reports high-confidence `auto_helper` verdicts separately from `needs_user_judgment` symbols, with `--only-auto-helpers` and `--only-user-judgment` filters for review loops.
 - `agent-canon python-structure-hash` emits normalized AST duplicate findings and Rust-side `single_caller_structural_helper` findings. SingleCaller counts unique enclosing caller blocks, not raw call sites, so construction/use repeated inside one function remains `caller_count=1` with a larger `call_site_count`.
-- `agent-canon python-structure-hash-report` converts those findings to JSON, keeps `caller_analysis` evidence, and ranks duplicate and SingleCaller findings with dependency-aware `priority_order` and `repair_slice` data.
+- `python-structure-hash-report` converts those findings to JSON, keeps `caller_analysis` evidence, and ranks duplicate and SingleCaller findings with dependency-aware `priority_order` and `repair_slice` data.
 - `tools/oop/python/readability.py` scores Python OOP readability risks. It checks vague class/helper names, oversized classes/functions, wide public surfaces, excessive instance state/parameters, static-method namespace classes, `None` runtime routing, mixed transform/effect boundaries, cognitive-complexity signals, redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
 - `tools/oop/cpp/readability.py` scores C/C++ OOP readability risks. It checks vague type names, oversized classes/functions, wide public fields/methods, excessive parameters/base classes, `nullptr` runtime routing, mixed transform/effect boundaries, pass-through wrappers, identity functions, and trivial formatting functions. It also preserves intentional C++ boundaries for schema/value-object aggregates, annotated primitive ABI functions, `__nad_` exported ABI functions, expression-DSL identity terminals, and compact numeric scalar wrappers.
 - `tools/oop/*/readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.

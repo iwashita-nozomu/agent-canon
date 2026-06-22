@@ -118,9 +118,11 @@ AgentCanon PR の前に、運用 finding を durable storage に残すかを必�
 1. Durable surfaces を検索する
 
 ```bash
-rg -n "topic keywords" \
+rg -l "topic keywords" \
   issues/open issues/closed memory notes/failures documents agents \
-  2>/dev/null || true
+  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+  2>/dev/null | sed -n '1,200p' > reports/search_hits.txt
+wc -l reports/search_hits.txt > reports/search_hits.count
 ```
 
 template / derived repo から作業している場合は、`vendor/agent-canon/` prefix 付きで同じ surface を検索します。
@@ -129,7 +131,6 @@ run bundle は補助 evidence であり、durable storage の代替ではあり�
 2. Raw search hit を dependency edit scope に展開する
 
 ```bash
-rg -l "topic keywords" > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
