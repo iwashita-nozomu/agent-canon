@@ -21,7 +21,7 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 | 1 | 対象範囲を確認 | [01_scope.md](./conventions/python/01_scope.md) |
 | 2 | 公開境界の型注釈を決める | [04_type_annotations.md](./conventions/python/04_type_annotations.md) |
 | 3 | アルゴリズム境界を決める | [algorithm-implementation-boundary.md](./algorithm-implementation-boundary.md) |
-| 4 | OOP 境界を決める | [object-oriented-design.md](./object-oriented-design.md) |
+| 4 | OOP / SOLID 境界を決める | [object-oriented-design.md](./object-oriented-design.md) |
 | 5 | 配置と責務を決める | [09_file_roles.md](./conventions/python/09_file_roles.md) |
 | 6 | 名前を確定する | [11_naming.md](./conventions/python/11_naming.md) |
 | 7 | 数値リテラルの由来を確認 | [基本方針](./conventions/common/01_principles.md#数値ハードコード検証) |
@@ -129,6 +129,26 @@ def load_config(path: Path) -> dict[str, str]:
   `.codex/hooks/helper_first_guard.py` はこの規約の edit-time gate です。
 - `.codex/hooks/cause_investigation_guard.py` は code edit 前の cause evidence
   gate です。
+
+## SOLID 設計契約
+
+Python 実装で class、dataclass、`Protocol`、継承、public API、型境界、依存方向を
+触る場合は、[オブジェクト指向設計方針](./object-oriented-design.md) と
+`tools/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
+`tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
+SOLID 見出しへの機械投影を所有します。
+
+| Principle | Python coding contract | Static risk signal |
+|---|---|---|
+| Single responsibility | domain calculation、IO、persistence、rendering、orchestration、reporting を責務語彙で分ける。 | OOP readability の large boundary、mixed effect、vague name、helper bucket、identity/pass-through finding |
+| Open/closed | 予測済み variant は `Protocol`、value object、registry、adapter、別 entrypoint で拡張軸に置く。 | OOP readability の `Optional` / `None` runtime routing、deep variant branch、cognitive complexity signal |
+| Liskov substitution | subtype / subclass / protocol implementation は base contract、入力条件、戻り値、例外、invariant を保存する。 | type checker、shared behavior tests、OOP readability の base class signal |
+| Interface segregation | caller が使う最小 role を `Protocol` または小さい public surface にする。 | OOP readability の public method / field / parameter breadth signal |
+| Dependency inversion | high-level policy は stable abstraction、typed dataclass、`Protocol`、composition root へ依存を寄せる。 | OOP readability の annotation / optional boundary signal。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
+
+SOLID / OOP 境界の検証は、pytest wrapper ではなく該当 checker command を validation route に置きます。
+repo-wide review では `$oop-readability-check` を使い、Markdown / JSON report の
+SOLID principle signal counts、OOP dimension、finding kind、`path:line` を design artifact に引用します。
 
 ## 目次
 

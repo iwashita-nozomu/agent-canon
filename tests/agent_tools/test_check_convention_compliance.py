@@ -29,6 +29,7 @@ from tools.agent_tools.check_convention_compliance import (
     REFACTOR_SEQUENCE_MARKERS,
     REVIEW_ISSUE_ROUTING_MARKERS,
     SMALL_CHANGE_SKILL_READ_MARKERS,
+    SOLID_CODING_CONTRACT_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -71,7 +72,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
-    "documents/coding-conventions-python.md": "python import_responsibility.py\n",
+    "documents/coding-conventions-python.md": (
+        "python import_responsibility.py\n"
+        "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion "
+        "tools/oop/python/readability.py tools/oop/shared/readability_core.py "
+        "SOLID principle signal "
+        "SOLID_PRINCIPLES_BY_KIND readability.py\n"
+    ),
     "documents/coding-conventions-cpp.md": "cpp\n",
     "documents/coding-conventions-project.md": (
         "project container_config.py claim grounding program contract proof obligation "
@@ -89,13 +97,20 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "testing contract-only wrapper static contract validation "
         "static-analysis-duplicate-test canonical command Validation repair scope "
         "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
-        "checker-owned property\n"
+        "checker-owned property SOLID / OOP boundary assertion "
+        "$oop-readability-check tools/oop/python/readability.py "
+        "tools/oop/cpp/readability.py import_responsibility.py\n"
     ),
     "documents/coding-conventions-reviews.md": "reviews\n",
     "documents/coding-conventions-experiments.md": "experiments\n",
     "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
     "documents/algorithm-implementation-boundary.md": "algorithm\n",
-    "documents/object-oriented-design.md": "readability.py\n",
+    "documents/object-oriented-design.md": (
+        "readability.py SOLID との対応 Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion "
+        "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
+        "import_responsibility.py\n"
+    ),
     "documents/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
         "structure_contract=skipped Review Finding Issue Routing issue_route "
@@ -191,7 +206,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "explicit_approval_evidence router_unavailable_blocker "
+        "$oop-readability-check SOLID principle signal OOP dimension "
+        "finding kind tools/oop/shared/readability_core.py classes Protocol\n"
     ),
     ".agents/skills/refactor-loop/SKILL.md": skill_fixture(
         "refactor-loop",
@@ -237,6 +254,19 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n",
     ),
+    ".agents/skills/python-review/SKILL.md": skill_fixture(
+        "python-review",
+        "OOP readability evidence $oop-readability-check "
+        "python3 tools/oop/python/readability.py downstream evidence "
+        "SOLID principle signal counts "
+        "readability.py\n",
+    ),
+    ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
+        "oop-readability-check",
+        "SOLID check SOLID route owner Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion OOP readability CLI "
+        "readability.py\n",
+    ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -255,7 +285,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "explicit_approval_evidence router_unavailable_blocker "
+        "$oop-readability-check SOLID principle signal OOP dimension finding kind "
+        "tools/oop/shared/readability_core.py class Protocol\n"
     ),
     "agents/skills/refactor-loop.md": (
         "two-stage refactor forced migration usage-surface repair "
@@ -294,6 +326,18 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "provisional wording selected_runtime_skill_read small_change_skill_read "
         "typo format-only SKILL.md\n"
     ),
+    "agents/skills/python-review.md": (
+        "SOLID principle signal OOP readability report "
+        "tools/oop/python/readability.py Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion "
+        "readability.py\n"
+    ),
+    "agents/skills/oop-readability-check.md": (
+        "SOLID Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion "
+        "tools/oop/shared/readability_core.py SOLID route owner mechanical projections "
+        "readability.py\n"
+    ),
     ".agents/skills/long-form-writing/SKILL.md": skill_fixture(
         "long-form-writing",
         "mathematical claim program contract proof obligation $formal-proof-workflow "
@@ -315,7 +359,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/catalog.yaml": (
         "skill catalog routing entry skill format-only docs work "
-        "prose-reasoning-graph structure-planning\n"
+        "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
+        "Single responsibility Open/closed Liskov Interface segregation "
+        "Dependency inversion Protocol\n"
+        "- [\"SOLID\"]\n"
+        "- [\"SRP\"]\n"
+        "- [\"Dependency inversion\"]\n"
     ),
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
@@ -1189,6 +1238,76 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in PR_ESSENCE_DOCUMENTATION_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_solid_coding_contract_requires_oop_checker_route_markers(self) -> None:
+        """SOLID coding guidance stays wired to OOP readability evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            python_policy = root / "documents" / "coding-conventions-python.md"
+            python_policy.write_text(
+                python_policy.read_text(encoding="utf-8").replace(
+                    "SOLID_PRINCIPLES_BY_KIND",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:SOLID_PRINCIPLES_BY_KIND", result.stdout)
+
+    def test_solid_runtime_skill_requires_route_owner_marker(self) -> None:
+        """Runtime OOP skill keeps the SOLID route owner visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "oop-readability-check" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "SOLID route owner",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:SOLID route owner", result.stdout)
+
+    def test_solid_catalog_requires_trigger_marker(self) -> None:
+        """Skill catalog keeps the direct SOLID trigger marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace(
+                    '- ["SOLID"]\n',
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn('missing-marker:- ["SOLID"]', result.stdout)
+
+    def test_minimal_fixture_covers_solid_coding_contract_surfaces(self) -> None:
+        """The minimal test fixture includes every SOLID coding contract surface."""
+        missing = sorted(
+            path
+            for path in SOLID_CODING_CONTRACT_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

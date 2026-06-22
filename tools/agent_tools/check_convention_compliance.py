@@ -130,6 +130,11 @@ TOOL_GATES = {
         "tools/oop/python/readability.py",
         (
             "documents/object-oriented-design.md",
+            "documents/coding-conventions-python.md",
+            "agents/skills/oop-readability-check.md",
+            ".agents/skills/oop-readability-check/SKILL.md",
+            "agents/skills/python-review.md",
+            ".agents/skills/python-review/SKILL.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
         ),
     ),
@@ -765,6 +770,112 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "canonical owner",
         "behavior or contract delta",
         "evidence route",
+    ),
+}
+SOLID_CODING_CONTRACT_MARKERS = {
+    "documents/coding-conventions-python.md": (
+        "SOLID 設計契約",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov substitution",
+        "Interface segregation",
+        "Dependency inversion",
+        "tools/oop/python/readability.py",
+        "tools/oop/shared/readability_core.py",
+        "SOLID principle signal",
+        "SOLID_PRINCIPLES_BY_KIND",
+    ),
+    "documents/object-oriented-design.md": (
+        "SOLID との対応",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov substitution",
+        "Interface segregation",
+        "Dependency inversion",
+        "tools/oop/shared/readability_core.py",
+        "SOLID_PRINCIPLES_BY_KIND",
+        "import_responsibility.py",
+    ),
+    "documents/coding-conventions-testing.md": (
+        "SOLID / OOP boundary assertion",
+        "$oop-readability-check",
+        "checker-owned property",
+        "tools/oop/python/readability.py",
+        "tools/oop/cpp/readability.py",
+        "import_responsibility.py",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "$oop-readability-check",
+        "SOLID principle signal",
+        "OOP dimension",
+        "finding kind",
+        "tools/oop/shared/readability_core.py",
+        "class",
+        "Protocol",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "$oop-readability-check",
+        "SOLID principle signal",
+        "OOP dimension",
+        "finding kind",
+        "tools/oop/shared/readability_core.py",
+        "classes",
+        "Protocol",
+    ),
+    "agents/skills/python-review.md": (
+        "SOLID principle signal",
+        "OOP readability report",
+        "tools/oop/python/readability.py",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov substitution",
+        "Interface segregation",
+        "Dependency inversion",
+    ),
+    ".agents/skills/python-review/SKILL.md": (
+        "OOP readability evidence",
+        "$oop-readability-check",
+        "python3 tools/oop/python/readability.py",
+        "downstream evidence",
+        "SOLID principle signal counts",
+    ),
+    "agents/skills/oop-readability-check.md": (
+        "SOLID",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov substitution",
+        "Interface segregation",
+        "Dependency inversion",
+        "tools/oop/shared/readability_core.py",
+        "SOLID route owner",
+        "mechanical projections",
+    ),
+    ".agents/skills/oop-readability-check/SKILL.md": (
+        "SOLID check",
+        "SOLID route owner",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov substitution",
+        "Interface segregation",
+        "Dependency inversion",
+        "OOP readability CLI",
+    ),
+    "agents/skills/catalog.yaml": (
+        "SOLID",
+        "SRP",
+        "OCP",
+        "LSP",
+        "ISP",
+        "DIP",
+        "Single responsibility",
+        "Open/closed",
+        "Liskov",
+        "Interface segregation",
+        "Dependency inversion",
+        "Protocol",
+        '- ["SOLID"]',
+        '- ["SRP"]',
+        '- ["Dependency inversion"]',
     ),
 }
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
@@ -1521,6 +1632,27 @@ def check_pr_essence_documentation(root: Path) -> list[Finding]:
     return findings
 
 
+def check_solid_coding_contract(root: Path) -> list[Finding]:
+    """Verify SOLID coding guidance is wired to the OOP checker route."""
+    paths = tuple(SOLID_CODING_CONTRACT_MARKERS)
+    findings = check_required_files(root, paths, "solid_coding_contract")
+    for path, markers in SOLID_CODING_CONTRACT_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "solid_coding_contract",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
     """Verify AgentCanon PR workflow documents remote verification before push."""
     path = AGENT_CANON_PR_WORKFLOW_PATH
@@ -1808,6 +1940,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_refactor_sequence(root))
     findings.extend(check_review_issue_routing(root))
     findings.extend(check_pr_essence_documentation(root))
+    findings.extend(check_solid_coding_contract(root))
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

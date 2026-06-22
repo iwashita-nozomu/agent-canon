@@ -107,15 +107,25 @@ skill_families:
         - ["コード", "レビュー"]
         - ["根本", "設計", "レビュー"]
   - id: python-review
-    purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
+    purpose: Review Python diffs with pyright, pytest, ruff, type-boundary awareness, API behavior, and OOP readability evidence when a Python diff already owns it.
     canonical_doc: agents/skills/python-review.md
     shim: .agents/skills/python-review/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: Python implementation review is in scope
+      triggers:
+        - ["Python", "review"]
+        - ["Python", "コードレビュー"]
+        - ["Python", "レビュー"]
+        - ["pyright"]
+        - ["ruff"]
+        - ["pytest", "Python"]
   - id: cpp-review
     purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
     canonical_doc: agents/skills/cpp-review.md
     shim: .agents/skills/cpp-review/SKILL.md
   - id: oop-readability-check
-    purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
+    purpose: Run the OOP readability checker, produce mechanical SOLID/OOP report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
     routing:
@@ -129,6 +139,19 @@ skill_families:
         - ["readability", "check"]
         - ["可読性", "class"]
         - ["可読性", "method"]
+        - ["SOLID"]
+        - ["SRP"]
+        - ["OCP"]
+        - ["LSP"]
+        - ["ISP"]
+        - ["DIP"]
+        - ["Single responsibility"]
+        - ["Open/closed"]
+        - ["Liskov"]
+        - ["Interface segregation"]
+        - ["Dependency inversion"]
+        - ["責務", "class"]
+        - ["Protocol", "境界"]
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md

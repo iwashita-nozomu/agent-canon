@@ -66,6 +66,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きで処理してはいけない
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、`Implementation Source Packet`、validation route を結び、要求を縮める implementation shortcut を見つけたら `design_issue_blocker` と evidence を記録して design review へ戻る
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱う
+- class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る implementation slice は `$oop-readability-check` を validation route に入れ、SOLID principle signal、OOP dimension、finding kind、`tools/oop/shared/readability_core.py` の mapping を design artifact に結びます。
 - 実装前に `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と design trace から導かれた narrow slice は `spark_worker` を使い、design interpretation / conflict resolution / broad architecture judgment / scope judgment を含む slice は `worker` を使う
 - 変更対象の `Dependency Manifest Plan` を設計で固定し、編集前に upstream、編集後に downstream を読む
 - parent 直編集でも write-capable subagent でも、実装前に cause investigation artifact を固定し、`Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残してから code edit に入る
