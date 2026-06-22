@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 47
+expected_count = 48
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 

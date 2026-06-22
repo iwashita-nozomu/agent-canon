@@ -131,6 +131,24 @@ skill_families:
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .agents/skills/tool-finding-report/SKILL.md
+  - id: issue-finding-report
+    purpose: Convert accumulated prompt, run-bundle, hook, skill/tool/workflow routing, and eval evidence into durable AgentCanon skill issues by abstract cause with multi-agent review partitions.
+    canonical_doc: agents/skills/issue-finding-report.md
+    shim: .agents/skills/issue-finding-report/SKILL.md
+    routing:
+      stage_policy: active
+      reason: accumulated runtime evidence should become durable skill or workflow issues
+      triggers:
+        - ["スキル", "issue"]
+        - ["skill", "issue"]
+        - ["ログ", "issue"]
+        - ["runbundle", "issue"]
+        - ["run bundle", "issue"]
+        - ["過去", "やり取り", "issue"]
+        - ["抽象原因"]
+        - ["原因", "抽象"]
+        - ["durable", "issue"]
+        - ["issue", "finding"]
   - id: agent-log-analysis
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
