@@ -1090,7 +1090,9 @@ fn load_skill_route_rules(root: &Path) -> Result<Vec<SkillRoutingRule>, String> 
     for entry in families {
         let skill_id = yaml_required_string(entry, "id", "skill_families")?;
         if skill_id.starts_with(PRIVATE_SKILL_PREFIX) {
-            return Err(format!("skill-catalog-private-id-in-public-catalog:{skill_id}"));
+            return Err(format!(
+                "skill-catalog-private-id-in-public-catalog:{skill_id}"
+            ));
         }
         let routing = &entry["routing"];
         let reason = yaml_optional_string(routing, "reason", &skill_id)?
