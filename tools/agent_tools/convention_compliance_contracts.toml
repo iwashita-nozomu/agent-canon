@@ -1,0 +1,118 @@
+# @dependency-start
+# contract tool
+# responsibility Declares marker contracts consumed by convention compliance checks.
+# upstream design ../../agents/skills/small-change-routing.md small change routing skill contract
+# upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
+# downstream implementation ./check_convention_compliance.py loads marker contracts
+# downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
+# @dependency-end
+
+schema_version = 1
+
+[[contracts]]
+id = "small_change_skill_read"
+description = "Small repository edits keep selected runtime skill reading visible and route through the small-change skill surface."
+
+[[contracts.surfaces]]
+path = ".agents/skills/agent-orchestration/SKILL.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/small-change-routing/SKILL.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/small-change-routing.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/md-style-check/SKILL.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "format-only", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/md-style-check.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "format-only", "$small-change-routing", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/long-form-writing/SKILL.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "typo/link/format-only", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/long-form-writing.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "typo", "format-only", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/skills/README.md"
+markers = ["small-change-routing", "selected_runtime_skill_read", "small_change_skill_read", ".codex/config.toml"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["small-change-routing", "small repository edit", "小規模修正", "Scoped Change Lite"]
+
+[[contracts.surfaces]]
+path = ".codex/config.toml"
+markers = ["../.agents/skills/small-change-routing/SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "small changes", "SKILL.md"]
+
+[[contracts.surfaces]]
+path = "agents/USER_GUIDE_JA.md"
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "runtime `SKILL.md`"]
+
+[[contracts]]
+id = "solid_coding_contract"
+description = "SOLID guidance stays routed to OOP readability checker evidence instead of prose-only review."
+
+[[contracts.surfaces]]
+path = "documents/coding-conventions-python.md"
+markers = ["SOLID 設計契約", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/python/readability.py", "tools/oop/shared/readability_core.py", "SOLID principle signal", "SOLID_PRINCIPLES_BY_KIND"]
+
+[[contracts.surfaces]]
+path = "documents/object-oriented-design.md"
+markers = ["SOLID との対応", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID_PRINCIPLES_BY_KIND", "import_responsibility.py"]
+
+[[contracts.surfaces]]
+path = "documents/coding-conventions-testing.md"
+markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/oop/python/readability.py", "tools/oop/cpp/readability.py", "import_responsibility.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "class", "Protocol"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "classes", "Protocol"]
+
+[[contracts.surfaces]]
+path = "agents/skills/python-review.md"
+markers = ["SOLID principle signal", "OOP readability report", "tools/oop/python/readability.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/python-review/SKILL.md"
+markers = ["SOLID principle signal", "$oop-readability-check", "tools/oop/python/readability.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/oop-readability-check.md"
+markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID route owner", "mechanical projections", "readability.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/oop-readability-check/SKILL.md"
+markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID route owner", "mechanical projections", "readability.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["SOLID", "SRP", "OCP", "LSP", "ISP", "DIP", "Single responsibility", "Open/closed", "Liskov", "Interface segregation", "Dependency inversion", "Protocol", "- [\"SOLID\"]", "- [\"SRP\"]", "- [\"Dependency inversion\"]"]

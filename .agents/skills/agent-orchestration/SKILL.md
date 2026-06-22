@@ -68,6 +68,7 @@ Execute the required and task-matching conditional commands that the packet prin
      - nontrivial report, experiment plan/report, Eval output, decision brief, presentation/PPT deck, HTML view, document, paper, or refactor structure; primary figure/table/ponchi-e/slide/section/slice choice; source map; source-to-slide map; or invalid interpretation boundary -> `$structure-planning`
      - tool/checker/hook/static-analysis runs to discover problems, create finding packets, compare before/after impact, or feed implementation/refactor planning -> `$tool-finding-report`; if raw results are written, also add `$result-artifact-writeout`; if the output is reader-facing narrative, also add `$report-writing`; if that narrative has a nontrivial finding packet, priority policy, metric/count contract, or source map, also add `$structure-planning`
      - README, workflow, guide, migration, or specification docs keep their domain projection adapter; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
+     - one-file or single-abstraction fixes, Routine docs, Focused code, typo/link/format-only edits, or explicit small change requests -> `$small-change-routing`; keep `selected_runtime_skill_read` and `small_change_skill_read` evidence before patching
      - large refactor -> `$refactor-loop`
      - directory layout, directory README responsibility, root view, path mapping, responsibility-scope map, or source-tree ownership refactor -> `$structure-refactor` plus `$refactor-loop`
      - expected AgentCanon repo structure, root view, `vendor/agent-canon/`, `.gitmodules`, or canonical path drift before an ordinary task -> `$structure-refactor` pre-task repair route; add `$agent-canon-update` for AgentCanon-owned root-view or submodule drift
@@ -84,7 +85,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For repo-changing edits, read the full body of every selected runtime
    `SKILL.md`. The selected_runtime_skill_read contract applies to
    `Scoped Change Lite`, Routine docs, Focused code, typo/link/format-only, and
-   parent-direct routes; record small_change_skill_read evidence with skill
+   parent-direct routes; use `$small-change-routing` to record small_change_skill_read evidence with skill
    names and paths ahead of patching.
 1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, defer repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, and repo-changing-only skills until explicit repo-changing intent is provided. In the interim, keep consultation, brainstorming, and explanation turns conversational until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation execution.
 1. Choose the starter command with explicit precedence:

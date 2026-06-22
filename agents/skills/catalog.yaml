@@ -58,6 +58,11 @@ skill_families:
         - ["スキル", "ツール", "ルーティング"]
         - ["スキル", "命名"]
         - ["skill", "naming"]
+        - ["スキル", "細分化"]
+        - ["skill", "split"]
+        - ["skill", "granular"]
+        - ["ハードコード", "スキル"]
+        - ["hardcode", "skill"]
         - ["userfacing", "skill"]
         - ["private", "skill"]
         - ["公式", "スキル"]
@@ -81,6 +86,27 @@ skill_families:
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .agents/skills/codex-task-workflow/SKILL.md
+  - id: small-change-routing
+    purpose: Route small repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
+    canonical_doc: agents/skills/small-change-routing.md
+    shim: .agents/skills/small-change-routing/SKILL.md
+    routing:
+      stage_policy: active
+      reason: small repository edit needs a minimal skill-read and targeted-validation route
+      triggers:
+        - ["小規模修正"]
+        - ["小規模", "修正"]
+        - ["軽微", "修正"]
+        - ["小さい", "変更"]
+        - ["small", "change"]
+        - ["small repository edit"]
+        - ["Scoped Change Lite"]
+        - ["one-file", "fix"]
+        - ["single-abstraction"]
+        - ["typo", "link"]
+        - ["format-only"]
+        - ["selected_runtime_skill_read"]
+        - ["small_change_skill_read"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -172,6 +198,21 @@ skill_families:
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .agents/skills/tool-finding-report/SKILL.md
+    routing:
+      stage_policy: active
+      reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
+      triggers:
+        - ["警告", "tool"]
+        - ["警告", "checker"]
+        - ["ad hoc", "warning"]
+        - ["adhoc", "warning"]
+        - ["ad hoc", "警告"]
+        - ["adhoc", "警告"]
+        - ["ハードコード", "警告"]
+        - ["hardcode", "warning"]
+        - ["checker", "finding"]
+        - ["tool", "finding"]
+        - ["static analysis", "finding"]
   - id: issue-finding-report
     purpose: Convert accumulated prompt, run-bundle, hook, skill/tool/workflow routing, and eval evidence into durable AgentCanon skill issues by abstract cause with multi-agent review partitions.
     canonical_doc: agents/skills/issue-finding-report.md

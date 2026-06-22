@@ -32,5 +32,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Run or inspect `pytest tests/`.
 1. Run or inspect `ruff check python tests --select D,E,F,I,UP --ignore E501`.
 1. For changed classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction in the Python diff, run or inspect `$oop-readability-check` / `python3 tools/oop/python/readability.py` as downstream evidence and review SOLID principle signal counts.
+   Use the report's Single responsibility, Open/closed, Liskov substitution,
+   Interface segregation, and Dependency inversion signals as review evidence.
 1. Check API behavior, type boundaries, and docs/test follow-through.
 1. Report findings before summaries.

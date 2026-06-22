@@ -189,6 +189,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/agent-orchestration/SKILL.md": skill_fixture(
         "agent-orchestration",
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
+        "$small-change-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
@@ -202,7 +203,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "codex task workflow prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
-        "parent-direct SKILL.md "
+        "parent-direct $small-change-routing SKILL.md "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -231,9 +232,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/md-style-check/SKILL.md": skill_fixture(
         "md-style-check",
-        "$prose-reasoning-graph $structure-planning format-only "
+        "$prose-reasoning-graph $structure-planning $small-change-routing format-only "
         "structure_contract=skipped selected_runtime_skill_read "
         "small_change_skill_read SKILL.md\n"
+    ),
+    ".agents/skills/small-change-routing/SKILL.md": skill_fixture(
+        "small-change-routing",
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "targeted validation tool_rejection_preflight.py "
+        "structure_contract=skipped SKILL.md\n"
     ),
     ".agents/skills/test-design/SKILL.md": skill_fixture(
         "test-design",
@@ -256,19 +263,19 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/python-review/SKILL.md": skill_fixture(
         "python-review",
-        "OOP readability evidence $oop-readability-check "
-        "python3 tools/oop/python/readability.py downstream evidence "
-        "SOLID principle signal counts "
-        "readability.py\n",
+        "SOLID principle signal $oop-readability-check "
+        "tools/oop/python/readability.py Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion\n",
     ),
     ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
         "oop-readability-check",
-        "SOLID check SOLID route owner Single responsibility Open/closed Liskov substitution "
-        "Interface segregation Dependency inversion OOP readability CLI "
-        "readability.py\n",
+        "SOLID SOLID route owner Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion tools/oop/shared/readability_core.py "
+        "mechanical projections readability.py\n",
     ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
+        "$small-change-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
@@ -281,7 +288,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "codex task workflow prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
-        "parent-direct SKILL.md "
+        "parent-direct $small-change-routing SKILL.md "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -309,9 +316,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/skills/md-style-check.md": (
-        "prose-reasoning-graph structure-planning format-only "
+        "prose-reasoning-graph structure-planning $small-change-routing format-only "
         "structure_contract=skipped selected_runtime_skill_read "
         "small_change_skill_read SKILL.md\n"
+    ),
+    "agents/skills/small-change-routing.md": (
+        "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
+        "targeted validation tool_rejection_preflight.py "
+        "structure_contract=skipped SKILL.md\n"
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
@@ -354,6 +366,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "mathematical necessity gate theorem surface proof obligation\n"
     ),
     "agents/skills/README.md": (
+        "small-change-routing selected_runtime_skill_read "
+        "small_change_skill_read .codex/config.toml "
         "prose-reasoning-graph structure-planning md-style-check "
         "structure_contract=skipped\n"
     ),
@@ -362,10 +376,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol\n"
+        "small-change-routing small repository edit 小規模修正 Scoped Change Lite\n"
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
         "- [\"Dependency inversion\"]\n"
     ),
+    ".codex/config.toml": "../.agents/skills/small-change-routing/SKILL.md\n",
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
         "## Workflow Contract Owners\n\n"
@@ -1021,6 +1037,34 @@ class CheckConventionComplianceTest(unittest.TestCase):
         )
 
         self.assertEqual(missing, [])
+
+    def test_small_change_routing_requires_catalog_trigger_marker(self) -> None:
+        """Small change route stays discoverable from the skill catalog."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace("小規模修正", ""),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("small_change_skill_read", result.stdout)
+            self.assertIn("missing-marker:小規模修正", result.stdout)
+
+    def test_small_change_marker_contract_is_manifest_backed(self) -> None:
+        """Small change marker surfaces are loaded from the manifest contract."""
+        self.assertIn(
+            ".agents/skills/small-change-routing/SKILL.md",
+            SMALL_CHANGE_SKILL_READ_MARKERS,
+        )
+        self.assertIn(
+            "agents/skills/small-change-routing.md",
+            SMALL_CHANGE_SKILL_READ_MARKERS,
+        )
 
     def test_document_claim_grounding_requires_markers(self) -> None:
         """Canonical docs must keep prose-claim grounding markers."""

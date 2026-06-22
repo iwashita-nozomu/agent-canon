@@ -44,7 +44,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For repo-changing edits, read the full body of every selected runtime
    `SKILL.md`. The selected_runtime_skill_read contract applies to
    `Scoped Change Lite`, Routine docs, Focused code, typo/link/format-only, and
-   parent-direct routes; record small_change_skill_read evidence with skill
+   parent-direct routes; route small edits through `$small-change-routing` and record small_change_skill_read evidence with skill
    names and paths ahead of patching.
 1. Keep user-facing updates and final reports in ordinary language. Internal field names, enum values, role keys, and helper-style words stay in commands, paths, tables, or exact evidence references. When a technical term is needed, use an established repository term or an external standard term and explain it in natural language.
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
@@ -58,6 +58,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Close the `Pre-Edit Repository Investigation Packet` by naming the next concrete step and one owner. Continue with that step before opening another line of exploration.
 1. Close the validation route by stating whether the task uses only static checks or also has approval for broader execution, and name the owner. Use static-only validation for policy, docs, metadata, contract-only wrappers, and checker-owned properties.
 1. Load only the minimal extra skills the task needs; nontrivial document creation or revision adds `prose-reasoning-graph` as the common graph/DSL gate and `$structure-planning` as the structure contract gate, then file/document responsibility selects the DSL-to-prose adapter: general explanatory README/workflow/guide/migration/spec docs add `long-form-writing`, submission papers or thesis-chapter drafts add `paper-writing`, broader academic or scholarly-note writing adds `academic-writing`, and the required notation/logic/citation reviewers follow that adapter choice. For typo/link/format-only edits, pair `$md-style-check` with `structure_contract=skipped` and the reason.
+1. For one-file or single-abstraction fixes, Routine docs, Focused code, or typo/link/format-only edits, add `$small-change-routing` before patching and keep targeted validation as the closeout route.
 1. If the task needs explicit handoff or specialist roles, bootstrap `reports/agents/<run-id>/` first.
 1. Update canonical docs before runtime entrypoints when both are affected.
 1. Before implementation, read the approved `design_brief.md` `Abstract Design Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and `Design-To-Implementation Trace`; confirm each implementation slice and downstream side effect is derived from the abstract responsibility model before citing the design artifact path, design section, test-plan item, and user-request clause IDs.

@@ -41,7 +41,8 @@ Execute the required and task-matching conditional commands that the packet prin
    readability scope.
 1. Treat this skill as the SOLID route owner for SOLID check prompts and
    mechanical SOLID signal reports; language-specific review skills consume the
-   report only when their changed diff already owns that language surface.
+   report only when their changed diff already owns that language surface. Keep
+   SOLID labels as mechanical projections of the checker categories.
 1. In tool-running modes, use the OOP readability CLI with language selection
    delegated to the tool. The default command shape is:
 
