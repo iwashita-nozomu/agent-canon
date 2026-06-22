@@ -6,6 +6,7 @@ contract skill
 responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
+downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
 @dependency-end
 -->
 
@@ -100,10 +101,24 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
 - Internal / compatibility review docs の一覧と route は [internal-routines/README.md](../internal-routines/README.md) に集約します。
 
+## Official System Skill Delegation
+
+OpenAI system skills stay host-provided. AgentCanon records routing triggers,
+local evidence, and repo-specific contracts, while the official skill body stays
+in the Codex host runtime.
+
+| Official System Skill | AgentCanon Route |
+| --- | --- |
+| `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
+| `$skill-creator` | Skill creation, skill refactor, and skill instruction quality work after AgentCanon fixes the local owner surface. |
+| `$skill-installer` | External skill installation and curated skill listing. |
+| `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
+| `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
+
 ## Codex Defaults
 
 - Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
-- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs; do not vendor duplicate OpenAI docs alternate route references in AgentCanon. Use `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
+- AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。

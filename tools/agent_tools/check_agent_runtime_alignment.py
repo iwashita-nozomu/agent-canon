@@ -4,6 +4,7 @@
 # responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/skills/README.md public skill surface contract
+# upstream design ../../agents/canonical/skills.md official system skill delegation boundary
 # upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
@@ -68,6 +69,17 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
 }
 SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 PRIVATE_SKILL_PREFIX = "_"
+OFFICIAL_SYSTEM_SKILLS = (
+    "imagegen",
+    "openai-docs",
+    "plugin-creator",
+    "skill-creator",
+    "skill-installer",
+)
+OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS = (
+    Path("agents/skills/README.md"),
+    Path("agents/canonical/skills.md"),
+)
 INITIAL_INTAKE_MARKERS = {
     "requirements_organizer": "Initial intake wave role: own user-request clauses",
     "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
@@ -608,6 +620,7 @@ def validate_public_skill_shims() -> None:
         "skill catalog entries missing public shims: " + ", ".join(missing_shims),
     )
     validate_public_skill_document_contract(data)
+    validate_official_system_skill_delegation(data)
 
 
 def validate_public_skill_document_contract(
@@ -662,6 +675,53 @@ def validate_public_skill_document_contract(
         "skill catalog canonical docs missing from agents/skills: "
         + ", ".join(missing_public_docs),
     )
+
+
+def validate_official_system_skill_delegation(
+    data: Mapping[str, object], root: Path | None = None
+) -> None:
+    """Check that host-provided system skills stay in the delegation lane."""
+    if root is None:
+        root = ROOT
+    families = data.get("skill_families", [])
+    ensure(isinstance(families, list), "skill_families must be a list")
+    catalog_skill_ids = {
+        str(entry.get("id", "")).strip()
+        for entry in families
+        if isinstance(entry, dict)
+    }
+    catalog_official_skills = sorted(set(OFFICIAL_SYSTEM_SKILLS) & catalog_skill_ids)
+    ensure(
+        not catalog_official_skills,
+        "move official system skills to the host-provided lane outside AgentCanon public catalog: "
+        + ", ".join(catalog_official_skills),
+    )
+
+    for skill_id in OFFICIAL_SYSTEM_SKILLS:
+        public_doc = root / "agents" / "skills" / f"{skill_id}.md"
+        ensure(
+            not public_doc.exists(),
+            f"move official system skill public doc to host-provided delegation: {public_doc.relative_to(root)}",
+        )
+        shim = root / ".agents" / "skills" / skill_id / "SKILL.md"
+        ensure(
+            not shim.exists(),
+            f"move official system skill local shim to host-provided delegation: {shim.relative_to(root)}",
+        )
+
+    for relative_path in OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS:
+        path = root / relative_path
+        ensure(path.is_file(), f"official system skill delegation doc missing: {relative_path}")
+        text = path.read_text(encoding="utf-8")
+        ensure(
+            "Official System Skill Delegation" in text,
+            f"{relative_path} missing official system skill delegation section",
+        )
+        for skill_id in OFFICIAL_SYSTEM_SKILLS:
+            ensure(
+                f"${skill_id}" in text,
+                f"{relative_path} missing official system skill route: ${skill_id}",
+            )
 
 
 def validate_skill_routing_entry(skill_id: str, routing: object) -> None:

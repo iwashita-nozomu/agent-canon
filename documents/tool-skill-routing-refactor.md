@@ -34,6 +34,10 @@ evidence, not an AgentCanon product dependency.
   `agents/skills/catalog.yaml` under `skill_families[].routing`; `route.py
   --prompt <text>` is the Python compatibility mirror while area/name routing
   remains in `route.py`.
+- Host-provided system skills such as `$openai-docs`, `$skill-creator`,
+  `$skill-installer`, `$imagegen`, and `$plugin-creator` stay outside the
+  AgentCanon public catalog. AgentCanon routes to those names and keeps local
+  owner-surface contracts.
 - Japanese or English prompts about unnecessary numerical tests, heavy tests,
   brittle tests, tolerance-based tests, or test-design gaps route to
   `$test-design`; they are not handled by ad hoc worker judgment.

@@ -344,6 +344,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "---\nname: _internal-example\ndescription: Private skill.\n---\n# Internal\n",
                 encoding="utf-8",
             )
+            self.write_official_skill_delegation_docs(root)
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
@@ -391,6 +392,74 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, "must not start with _"),
             ):
                 runtime_alignment.validate_public_skill_shims()
+
+    def write_official_skill_delegation_docs(
+        self,
+        root: Path,
+        *,
+        missing_skill: str | None = None,
+    ) -> None:
+        """Create the official system skill delegation docs for checker fixtures."""
+        skill_lines = [
+            f"- ${skill}"
+            for skill in runtime_alignment.OFFICIAL_SYSTEM_SKILLS
+            if skill != missing_skill
+        ]
+        text = "\n".join(
+            (
+                "# Fixture",
+                "",
+                "## Official System Skill Delegation",
+                "",
+                *skill_lines,
+            )
+        )
+        for relative_path in runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS:
+            path = root / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+    def test_official_system_skills_stay_out_of_public_catalog(self) -> None:
+        """Host-provided skills must not be re-declared as AgentCanon public skills."""
+        catalog = {
+            "skill_families": [
+                {
+                    "id": "skill-creator",
+                    "canonical_doc": "agents/skills/skill-creator.md",
+                    "shim": ".agents/skills/skill-creator/SKILL.md",
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "host-provided"):
+            runtime_alignment.validate_official_system_skill_delegation(catalog, PROJECT_ROOT)
+
+    def test_official_system_skill_delegation_docs_must_name_every_route(self) -> None:
+        """Delegation docs carry the official system skill routing map."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_official_skill_delegation_docs(root, missing_skill="imagegen")
+
+            with self.assertRaisesRegex(RuntimeError, "missing official system skill route"):
+                runtime_alignment.validate_official_system_skill_delegation(
+                    {"skill_families": []},
+                    root,
+                )
+
+    def test_official_system_skill_delegation_rejects_local_shim(self) -> None:
+        """Official system skills stay host-provided instead of local shim backed."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_official_skill_delegation_docs(root)
+            shim = root / ".agents" / "skills" / "openai-docs" / "SKILL.md"
+            shim.parent.mkdir(parents=True)
+            shim.write_text("---\nname: openai-docs\n---\n# OpenAI Docs\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "local shim"):
+                runtime_alignment.validate_official_system_skill_delegation(
+                    {"skill_families": []},
+                    root,
+                )
 
     def test_runtime_max_depth_is_exposed_for_spawn_policy(self) -> None:
         """The generator must expose max_depth for delegated spawn policies."""

@@ -5,6 +5,7 @@
 // upstream design ../../../documents/search-coordination.md coordinated search provider contract
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
 // upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
+// upstream design ../../../agents/skills/catalog.yaml catalog-backed skill routing rules
 // upstream design ../../../agent-canon-environment.toml records local LLM CLI environment commands
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
 // downstream design ../../../tools/README.md documents root tool entrypoints
@@ -1204,6 +1205,8 @@ fn infer_skill_route_mode(prompt: &str, requested_mode: &str) -> String {
         "修正",
         "実装",
         "リファクタ",
+        "移行",
+        "移譲",
         "変更",
         "直して",
         "見直",

@@ -60,6 +60,18 @@ skill_families:
         - ["skill", "naming"]
         - ["userfacing", "skill"]
         - ["private", "skill"]
+        - ["公式", "スキル"]
+        - ["system", "skill"]
+        - ["official", "skill"]
+        - ["host-provided"]
+        - ["openai-docs"]
+        - ["skill-creator"]
+        - ["skill-installer"]
+        - ["imagegen"]
+        - ["plugin-creator"]
+        - ["公式", "委譲"]
+        - ["スキル", "委譲"]
+        - ["スキル", "移譲"]
         - ["根本", "設計", "見直"]
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.

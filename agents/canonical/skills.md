@@ -7,6 +7,7 @@ responsibility Points readers to the public skill registry and internal routine 
 upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract
 upstream design ../internal-routines/README.md internal routine registry
+downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates official system skill delegation
 @dependency-end
 -->
 
@@ -29,3 +30,16 @@ Naming carries the visibility boundary:
   or public skill that calls them.
 - Workflow-only routines live in `../internal-routines/` as Markdown routines
   rather than Codex skill shims.
+
+## Official System Skill Delegation
+
+Host-provided Codex skills remain outside the AgentCanon public catalog. The
+local registry routes to these names and records repo-specific evidence.
+
+| Official System Skill | Owner Boundary |
+| --- | --- |
+| `$openai-docs` | OpenAI / Codex current product source route. |
+| `$skill-creator` | General Codex skill authoring and refactor guidance. |
+| `$skill-installer` | Curated and external skill installation. |
+| `$imagegen` | Generated bitmap assets. |
+| `$plugin-creator` | Codex plugin scaffolding and marketplace metadata. |
