@@ -17,6 +17,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -52,6 +53,9 @@ REPORT_SNAPSHOT_DIGEST_CHARS = 16
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
 MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset({"eval-results", "legacy-import"})
 BRANCH_SWITCH_COMMIT_MESSAGE = "Preserve managed runtime logs before branch switch"
+GIT_INDEX_LOCK_MESSAGE = "index.lock"
+GIT_INDEX_LOCK_RETRIES = 5
+GIT_INDEX_LOCK_RETRY_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -263,7 +267,22 @@ def git(
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """Run git inside the archive clone."""
-    return run(["git", "-C", str(archive_root), *args], check=check)
+    command = ["git", "-C", str(archive_root), *args]
+    for attempt in range(GIT_INDEX_LOCK_RETRIES + 1):
+        result = run(command, check=False)
+        if result.returncode == 0 or not git_index_locked(result) or attempt == GIT_INDEX_LOCK_RETRIES:
+            if check and result.returncode != 0:
+                detail = result.stderr.strip() or result.stdout.strip()
+                raise ArchiveGitError(f"{' '.join(command)} failed: {detail}")
+            return result
+        time.sleep(GIT_INDEX_LOCK_RETRY_SECONDS)
+    raise ArchiveGitError(f"{' '.join(command)} failed after index lock retries")
+
+
+def git_index_locked(result: subprocess.CompletedProcess[str]) -> bool:
+    """Return whether a git failure is caused by a transient index lock."""
+    detail = f"{result.stderr}\n{result.stdout}"
+    return GIT_INDEX_LOCK_MESSAGE in detail
 
 
 def git_root(path: Path) -> Path | None:
@@ -411,11 +430,21 @@ def archive_tree_keys(context: ArchiveContext) -> tuple[str, ...]:
     return tuple(sorted(keys))
 
 
+def associated_repo_keys(context: ArchiveContext) -> tuple[str, ...]:
+    """Return repo keys allowed to coexist on the same chat archive branch."""
+    keys = {context.repo_key, repo_log_key(context.canon_root)}
+    parent = superproject_root(context.canon_root)
+    if parent is not None:
+        keys.add(repo_log_key(parent))
+    return tuple(sorted(keys))
+
+
 def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
     """Return structured archive dirty-state information."""
     current = current_branch(context)
     status = porcelain_status(context)
     tree_keys = archive_tree_keys(context)
+    associated_keys = set(associated_repo_keys(context))
     dirty_keys: set[str] = set()
     global_dirty = False
     for line in status.splitlines():
@@ -424,8 +453,8 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
             dirty_keys.add(key)
         if is_global:
             global_dirty = True
-    foreign_keys = tuple(sorted(key for key in dirty_keys if key != context.repo_key))
-    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key != context.repo_key))
+    foreign_keys = tuple(sorted(key for key in dirty_keys if key not in associated_keys))
+    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key not in associated_keys))
     return ArchiveStatusSummary(
         current_branch=current,
         dirty=bool(status.strip()),

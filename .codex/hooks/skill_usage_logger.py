@@ -485,6 +485,9 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "docs format",
         "docs fix-math",
         "docs fix-mermaid",
+        "run_docs_checks.sh",
+        "docs-check",
+        "markdownlint",
         "agent-canon-ensure-latest",
         "sync_agent_canon.sh",
         "agentcanon 最新",
@@ -507,7 +510,6 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
     ),
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
     "run_repo_dependency_review.sh": ("run_repo_dependency_review.sh", "dependency review", "dependency graph"),
-    "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "docs check", "markdownlint"),
     "runtime_log_archive_git.py": (
         "runtime_log_archive_git.py",
         "agent report archive",

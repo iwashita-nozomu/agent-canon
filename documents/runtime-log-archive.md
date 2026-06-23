@@ -229,11 +229,14 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 `RUNTIME_LOG_ARCHIVE_BRANCH_MATCH=yes`, `RUNTIME_LOG_ARCHIVE_DIRTY=no`, and
 `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`. It must also report
 `RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no`; that line catches already committed
-foreign repo-key directories, not only uncommitted dirt. A foreign dirty or
-foreign tree finding means logs for a different `<repo-key>` were written while
-the archive worktree was on the current runtime branch. Treat that as a log
-repository operation blocker: migrate the listed foreign key to the correct
-runtime branch before unlocking the run bundle.
+unrelated repo-key directories, not only uncommitted dirt. The source repo key,
+the AgentCanon repo key, and the source repo key of the AgentCanon superproject
+are associated keys for the same chat branch and do not count as foreign dirty
+or foreign tree entries. A foreign dirty or foreign tree finding means logs for
+an unrelated `<repo-key>` were written while the archive worktree was on the
+current runtime branch. Treat that as a log repository operation blocker:
+migrate the listed foreign key to the correct runtime branch before unlocking
+the run bundle.
 
 To print the resolved placement without writing anything, run:
 

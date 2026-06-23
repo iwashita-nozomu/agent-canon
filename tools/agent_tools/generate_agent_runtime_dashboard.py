@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -102,6 +102,9 @@ MARKDOWN_TOOL_IDS = (
     "fix_markdown_headers.py",
     "run_docs_checks.sh",
 )
+TOOL_SELECTION_ALIASES = {
+    "run_docs_checks.sh": "agent-canon-cli",
+}
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"
 MARKDOWN_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
 PROMPT_TOOL_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
@@ -117,12 +120,22 @@ SELECTED_WORKFLOW_FIELDS = (
     "workflow_family",
     "selected_workflow",
 )
+RUN_BUNDLE_WORKFLOW_RE = re.compile(
+    r"(?:^|[\s`])workflow=([^\n\r,]+?)(?=\s+skills=|,\s*skills=|$)"
+)
 ALL_SELECTION_NAMESPACES = "*"
 CROSS_NAMESPACE_SELECTION_COMPONENTS = frozenset(
     {
         ("skill", "oop-readability-check"),
     }
 )
+SelectionEvent = tuple[
+    int,
+    int,
+    str,
+    dict[str, tuple[str, ...]],
+    dict[str, tuple[str, ...]],
+]
 
 
 @dataclass(frozen=True)
@@ -551,7 +564,11 @@ class HookWorkflowBreakdownReader:
     ) -> tuple[dict[str, object], ...]:
         """Return parsed hook entries from one JSONL file."""
         entries: list[dict[str, object]] = []
-        for line in hook_file.read_text(encoding="utf-8").splitlines():
+        try:
+            lines = hook_file.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return ()
+        for line in lines:
             if not line.strip():
                 continue
             try:
@@ -907,6 +924,8 @@ class SelectionMetricsReader:
     def __init__(self, root: Path) -> None:
         """Store the AgentCanon root used to resolve reset windows."""
         self.root = root
+        self.known_skill_ids = known_skill_ids(root)
+        self.known_workflow_names = known_workflow_names(root)
 
     def read(
         self,
@@ -919,23 +938,19 @@ class SelectionMetricsReader:
         entries_with_candidates = 0
         entries_with_selection = 0
         filtered_observations = 0
-        events: list[
-            tuple[
-                int,
-                int,
-                str,
-                dict[str, tuple[str, ...]],
-                dict[str, tuple[str, ...]],
-            ]
-        ] = []
+        events: list[SelectionEvent] = []
         sequence = 0
         for hook_file in hook_files:
             for entry in HookWorkflowBreakdownReader.iter_entries(
                 hook_file,
                 recent_cutoff_epoch,
             ):
-                selected = selected_by_responsibility(entry, hook_file)
-                candidates = candidates_by_responsibility(entry)
+                selected = self.canonical_selection_map(
+                    selected_by_responsibility(entry, hook_file)
+                )
+                candidates = self.canonical_selection_map(
+                    candidates_by_responsibility(entry)
+                )
                 events.append(
                     (
                         sequence,
@@ -946,7 +961,11 @@ class SelectionMetricsReader:
                     )
                 )
                 sequence += 1
-        future_selected = future_selected_positions(events)
+        workflow_events = self.workflow_report_selection_events(
+            sequence,
+            recent_cutoff_epoch or NO_RESET_EPOCH,
+        )
+        future_selected = future_selected_positions((*events, *workflow_events))
         for sequence, entry_epoch, namespace, selected, candidates in events:
             entries_seen += 1
             entries_with_selection += int(any(selected.values()))
@@ -961,6 +980,8 @@ class SelectionMetricsReader:
                 namespace,
                 sequence,
             )
+        for _sequence, entry_epoch, _namespace, selected, _candidates in workflow_events:
+            filtered_observations += self.add_selected_components(store, selected, entry_epoch)
         return SelectionMetricsBreakdown(
             metrics=store.to_metrics(),
             entries_seen=entries_seen,
@@ -968,6 +989,53 @@ class SelectionMetricsReader:
             entries_with_selection=entries_with_selection,
             filtered_observations=filtered_observations,
         )
+
+    def canonical_selection_map(
+        self,
+        values_by_responsibility: dict[str, tuple[str, ...]],
+    ) -> dict[str, tuple[str, ...]]:
+        """Return selection values normalized for responsibility-local matching."""
+        return {
+            responsibility: canonical_selection_values(
+                responsibility,
+                values,
+                self.known_skill_ids,
+                self.known_workflow_names,
+            )
+            for responsibility, values in values_by_responsibility.items()
+        }
+
+    def workflow_report_selection_events(
+        self,
+        start_sequence: int,
+        cutoff_epoch: int,
+    ) -> tuple[SelectionEvent, ...]:
+        """Return workflow selections recorded in run-bundle monitor reports."""
+        events: list[SelectionEvent] = []
+        sequence = start_sequence
+        for workflow_path in WaveExecutionBreakdownReader.candidate_paths(self.root):
+            text = workflow_path.read_text(encoding="utf-8")
+            epoch = TokenUsageBreakdownReader.evidence_epoch(workflow_path, text)
+            if cutoff_epoch > NO_RESET_EPOCH and not timestamped_evidence_after_cutoff(
+                workflow_path,
+                epoch,
+                cutoff_epoch,
+            ):
+                continue
+            workflows = workflow_names_from_run_bundle(text)
+            if not workflows:
+                continue
+            events.append(
+                (
+                    sequence,
+                    epoch,
+                    ALL_SELECTION_NAMESPACES,
+                    {"workflow": workflows},
+                    {},
+                )
+            )
+            sequence += 1
+        return tuple(events)
 
     @staticmethod
     def add_selected_components(
@@ -1464,14 +1532,7 @@ def compact_next_action_lines(summary: RuntimeDashboardSummary) -> list[str]:
 
 def compact_selection_miss_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return top skill, workflow, and tool selection misses."""
-    missed = sorted(
-        (
-            row
-            for row in summary.selection_metrics_breakdown.metrics
-            if row.missed_count > 0
-        ),
-        key=lambda row: (-row.missed_count, row.responsibility, row.name),
-    )[:MAX_COMPACT_REPORT_LINES]
+    missed = top_selection_misses(summary)
     lines = [
         "| responsibility | name | selected | candidate | missed | miss rate | reset basis |",
         "| --- | --- | --- | --- | --- | --- | --- |",
@@ -1499,6 +1560,19 @@ def compact_selection_miss_lines(summary: RuntimeDashboardSummary) -> list[str]:
         for row in missed
     )
     return lines
+
+
+def top_selection_misses(summary: RuntimeDashboardSummary) -> tuple[SelectionMetric, ...]:
+    """Return highest-impact selection misses in compact-dashboard order."""
+    missed = sorted(
+        (
+            row
+            for row in summary.selection_metrics_breakdown.metrics
+            if row.missed_count > 0
+        ),
+        key=lambda row: (-row.missed_count, row.responsibility, row.name),
+    )
+    return tuple(missed[:MAX_COMPACT_REPORT_LINES])
 
 
 def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
@@ -1803,7 +1877,66 @@ def render_dashboard_api(summary: RuntimeDashboardSummary) -> str:
         "hook_entries": summary.hook_entries,
     }
     payload.update(hook_schema_breakdown(summary))
+    payload.update(dashboard_repair_payload(summary))
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def dashboard_repair_payload(summary: RuntimeDashboardSummary) -> dict[str, object]:
+    """Return structured repair candidates mirrored by the compact dashboard."""
+    return {
+        "priority_problems": [
+            problem_component_payload(component)
+            for component in dashboard_problem_components(summary)[:MAX_COMPACT_REPORT_LINES]
+        ],
+        "priority_next_actions": [
+            next_action_payload(action)
+            for action in dashboard_next_actions(summary)[:MAX_COMPACT_REPORT_LINES]
+        ],
+        "selection_misses": [
+            selection_metric_payload(row)
+            for row in top_selection_misses(summary)
+        ],
+    }
+
+
+def problem_component_payload(component: ProblemComponent) -> dict[str, str]:
+    """Return one dashboard problem component as API data."""
+    return {
+        "type": component.component_type,
+        "component": component.name,
+        "status": component.status,
+        "problem": component.problem,
+        "evidence": component.evidence,
+        "next_action": component.next_action,
+    }
+
+
+def next_action_payload(action: DashboardNextAction) -> dict[str, str]:
+    """Return one dashboard next action as API data."""
+    return {
+        "priority": action.priority,
+        "action": action.action,
+        "reason": action.reason,
+        "evidence": action.evidence,
+        "owner_surface": action.owner_surface,
+        "command": action.command,
+        "done_condition": action.done_condition,
+        "issue": action.issue,
+        "automation": action.automation,
+    }
+
+
+def selection_metric_payload(row: SelectionMetric) -> dict[str, object]:
+    """Return one selection-miss row as API data."""
+    return {
+        "responsibility": row.responsibility,
+        "name": row.name,
+        "selected": row.selected_count,
+        "candidate": row.candidate_count,
+        "missed": row.missed_count,
+        "miss_rate": failure_rate(row.missed_count, row.candidate_count),
+        "reset_basis": selection_reset_label(row),
+    }
 
 
 def hook_schema_breakdown(summary: RuntimeDashboardSummary) -> dict[str, object]:
@@ -3473,7 +3606,7 @@ def has_future_selection(
     )
     if namespace_match:
         return True
-    if (responsibility, name) in CROSS_NAMESPACE_SELECTION_COMPONENTS:
+    if responsibility == "workflow" or (responsibility, name) in CROSS_NAMESPACE_SELECTION_COMPONENTS:
         return bool(positions.get((ALL_SELECTION_NAMESPACES, responsibility, name), ()))
     return False
 
@@ -3518,6 +3651,69 @@ def selected_tool_values(entry: dict[str, object]) -> tuple[str, ...]:
     names.extend(normalized_text_values(entry.get("selected_tools")))
     names.extend(command_tool_values(entry.get("commands")))
     return unique_text_values(names)
+
+
+def canonical_selection_values(
+    responsibility: str,
+    values: tuple[str, ...],
+    valid_skill_ids: Collection[str],
+    valid_workflow_names: Collection[str],
+) -> tuple[str, ...]:
+    """Return responsibility-local canonical selection values."""
+    if responsibility == "skill":
+        if not valid_skill_ids:
+            return unique_text_values(values)
+        return tuple(value for value in unique_text_values(values) if value in valid_skill_ids)
+    if responsibility == "workflow":
+        workflows = unique_text_values(canonical_workflow_name(value) for value in values)
+        if not valid_workflow_names:
+            return workflows
+        return tuple(value for value in workflows if value in valid_workflow_names)
+    if responsibility == "tool":
+        return unique_text_values(canonical_tool_name(value) for value in values)
+    return unique_text_values(values)
+
+
+def canonical_tool_name(value: str) -> str:
+    """Return the canonical tool id used for selection accounting."""
+    return TOOL_SELECTION_ALIASES.get(value, value)
+
+
+def canonical_workflow_name(value: str) -> str:
+    """Return a stable workflow selection slug."""
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
+    return re.sub(r"-+", "-", normalized)
+
+
+def known_workflow_names(root: Path) -> frozenset[str]:
+    """Return canonical workflow family names from the task catalog."""
+    catalog = root / "agents" / "task_catalog.yaml"
+    if not catalog.is_file():
+        return frozenset()
+    names: set[str] = set()
+    in_workflow_families = False
+    for line in catalog.read_text(encoding="utf-8").splitlines():
+        if line.strip() == "workflow_families:":
+            in_workflow_families = True
+            continue
+        if in_workflow_families and line and not line.startswith(" "):
+            break
+        if not in_workflow_families:
+            continue
+        match = re.match(r"\s*-\s+id:\s+([A-Za-z0-9_-]+)\s*$", line)
+        if match is not None:
+            names.add(canonical_workflow_name(match.group(1)))
+    return frozenset(names)
+
+
+def workflow_names_from_run_bundle(text: str) -> tuple[str, ...]:
+    """Return canonical workflow selections from run-bundle monitoring text."""
+    workflows: list[str] = []
+    for match in RUN_BUNDLE_WORKFLOW_RE.finditer(text):
+        name = canonical_workflow_name(match.group(1))
+        if name and name != "unspecified":
+            workflows.append(name)
+    return unique_text_values(workflows)
 
 
 def command_tool_values(value: object) -> tuple[str, ...]:
@@ -3621,6 +3817,17 @@ def evidence_inside_recent_window(
     if evidence_epoch > 0:
         return evidence_epoch >= recent_cutoff_epoch
     return path_inside_recent_window(path, recent_cutoff_epoch)
+
+
+def timestamped_evidence_after_cutoff(
+    path: Path,
+    evidence_epoch: int,
+    cutoff_epoch: int,
+) -> bool:
+    """Return whether timestamped evidence is at or after a concrete cutoff."""
+    if evidence_epoch > NO_RESET_EPOCH:
+        return evidence_epoch >= cutoff_epoch
+    return path_mtime_epoch(path) >= cutoff_epoch
 
 
 def hook_entry_inside_recent_window(
