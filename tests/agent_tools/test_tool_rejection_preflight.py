@@ -178,6 +178,43 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertIn("codex_hook_runtime_alignment", gates)
         self.assertIn("dependency_review", gates)
+        dependency_gates = [
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "dependency_review"
+        ]
+        self.assertEqual(len(dependency_gates), 1)
+        self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
+        self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
+
+    def test_agentcanon_hook_config_source_path_preserves_schema_route(self) -> None:
+        """Parent symlink resolution should keep hook runtime and schema routing."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "vendor/agent-canon/.codex/hooks.json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        dependency_gates = [
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "dependency_review"
+        ]
+        self.assertIn("codex_hook_runtime_alignment", gates)
+        self.assertEqual(len(dependency_gates), 1)
+        self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
+        self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
 
     def test_markdown_path_predicts_style_checker_gate(self) -> None:
         """Markdown edits should carry automatic style checker coverage."""

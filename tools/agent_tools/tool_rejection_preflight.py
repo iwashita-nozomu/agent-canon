@@ -34,6 +34,8 @@ from responsibility_scope import (
     Scope,
     ScopeReport,
     scope_covers,
+)
+from responsibility_scope import (
     validate as validate_responsibility_scope,
 )
 
@@ -85,6 +87,13 @@ HOOK_SURFACE_PREFIXES = (
     ".codex/hooks/",
 )
 HOOK_CONFIG_PATHS = frozenset({".codex/hooks.json"})
+AGENT_CANON_HOOK_SURFACE_PREFIXES = (
+    "vendor/agent-canon/.codex/hooks/",
+)
+AGENT_CANON_HOOK_CONFIG_PATHS = frozenset(
+    {"vendor/agent-canon/.codex/hooks.json"}
+)
+STRICT_SCHEMA_JSON_PATHS = HOOK_CONFIG_PATHS | AGENT_CANON_HOOK_CONFIG_PATHS
 SKILL_SURFACE_PREFIXES = (
     ".agents/skills/",
     "agents/skills/",
@@ -92,7 +101,12 @@ SKILL_SURFACE_PREFIXES = (
 TOOL_SURFACE_PREFIXES = (
     "tools/",
 )
-LOG_SURFACE_PREFIXES = HOOK_SURFACE_PREFIXES + SKILL_SURFACE_PREFIXES + TOOL_SURFACE_PREFIXES
+LOG_SURFACE_PREFIXES = (
+    HOOK_SURFACE_PREFIXES
+    + AGENT_CANON_HOOK_SURFACE_PREFIXES
+    + SKILL_SURFACE_PREFIXES
+    + TOOL_SURFACE_PREFIXES
+)
 GITHUB_SURFACE_PREFIXES = (".github/workflows/", ".github/actions/")
 AGENT_PROTOCOL_PATHS = frozenset(
     {
@@ -286,6 +300,19 @@ DEPENDENCY_GATE_TEMPLATES = (
         ),
     ),
 )
+STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="dependency_review",
+        command_template=(
+            "bash tools/agent_tools/run_repo_dependency_review.sh "
+            "--root . --fail-missing --list-changed-dependencies"
+        ),
+        handoff=(
+            "preserve the strict JSON schema with top-level hooks only; record "
+            "dependency context in owner docs, tests, or review artifacts"
+        ),
+    ),
+)
 LOG_SURFACE_GATE_TEMPLATES = (
     GateTemplate(
         gate="log_surface_inventory_guard",
@@ -465,8 +492,8 @@ def path_gates(path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...
     if suffix in PYTHON_SUFFIXES | CPP_SUFFIXES | NOTEBOOK_SUFFIXES | MARKDOWN_SUFFIXES:
         templates.extend(STYLE_CHECK_GATE_TEMPLATES)
     if suffix in TEXT_SUFFIXES:
-        templates.extend(DEPENDENCY_GATE_TEMPLATES)
-    if path in HOOK_CONFIG_PATHS or path.startswith(HOOK_SURFACE_PREFIXES):
+        templates.extend(dependency_gate_templates(path))
+    if hook_runtime_surface_path(path):
         templates.extend(HOOK_RUNTIME_GATE_TEMPLATES)
     if path.startswith(LOG_SURFACE_PREFIXES):
         templates.extend(LOG_SURFACE_GATE_TEMPLATES)
@@ -531,6 +558,23 @@ def agent_canon_tool_source_path(path: str) -> bool:
     """Return whether a parent-root path resolves to AgentCanon tool source."""
     return path == AGENT_CANON_TOOL_SOURCE_ROOT or path.startswith(
         AGENT_CANON_TOOL_SOURCE_ROOT + "/"
+    )
+
+
+def dependency_gate_templates(path: str) -> tuple[GateTemplate, ...]:
+    """Return dependency review templates for one planned path."""
+    if path in STRICT_SCHEMA_JSON_PATHS:
+        return STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES
+    return DEPENDENCY_GATE_TEMPLATES
+
+
+def hook_runtime_surface_path(path: str) -> bool:
+    """Return whether a planned path belongs to Codex hook runtime wiring."""
+    return (
+        path in HOOK_CONFIG_PATHS
+        or path in AGENT_CANON_HOOK_CONFIG_PATHS
+        or path.startswith(HOOK_SURFACE_PREFIXES)
+        or path.startswith(AGENT_CANON_HOOK_SURFACE_PREFIXES)
     )
 
 
