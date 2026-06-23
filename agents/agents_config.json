@@ -237,7 +237,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts."
+        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts. Python chunks that touch class, dataclass, Protocol, inheritance, public API, type-boundary, or dependency-direction surfaces require python_reviewer plus OOP readability report, SOLID principle signal, and check_solid_evidence.py path-coverage evidence."
       }
     },
     {

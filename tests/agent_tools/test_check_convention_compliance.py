@@ -235,7 +235,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/change-review/SKILL.md": skill_fixture(
         "change-review",
-        "issue_route issues/README.md issue_sync.py new_local_issue github_mirror\n",
+        "issue_route issues/README.md issue_sync.py new_local_issue github_mirror "
+        "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
+        "SOLID principle signal OOP readability report classes Protocol\n",
     ),
     ".agents/skills/subagent-bootstrap/SKILL.md": skill_fixture(
         "subagent-bootstrap",
@@ -282,8 +284,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/python-review/SKILL.md": skill_fixture(
         "python-review",
         "SOLID principle signal $oop-readability-check "
-        "tools/oop/python/readability.py Single responsibility Open/closed "
-        "Liskov substitution Interface segregation Dependency inversion\n",
+        "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
+        "Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion "
+        "scanned_paths\n",
     ),
     ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
         "oop-readability-check",
@@ -322,7 +326,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "return-gate validation\n"
     ),
     "agents/skills/change-review.md": (
-        "issue_route issues/open/ issue_sync.py new_local_issue github_mirror\n"
+        "issue_route issues/open/ issue_sync.py new_local_issue github_mirror "
+        "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
+        "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
         "PR Essence problem / user request design intent canonical owner "
@@ -362,9 +368,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/python-review.md": (
         "SOLID principle signal OOP readability report "
-        "tools/oop/python/readability.py Single responsibility Open/closed "
+        "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
+        "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "readability.py\n"
+        "readability.py scanned_paths\n"
     ),
     "agents/skills/oop-readability-check.md": (
         "SOLID Single responsibility Open/closed Liskov substitution "
@@ -404,6 +411,23 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "- [\"Dependency inversion\"]\n"
     ),
     ".codex/config.toml": "../.agents/skills/small-change-routing/SKILL.md\n",
+    ".codex/agents/python_reviewer.toml": (
+        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "Single responsibility Open/closed Liskov substitution Interface segregation "
+        "Dependency inversion path-covered\n"
+    ),
+    ".codex/agents/reviewer.toml": (
+        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "path-covered return revise\n"
+    ),
+    ".codex/agents/diff_triage_reviewer.toml": (
+        "python_reviewer check_solid_evidence.py OOP readability report "
+        "SOLID principle signal escalate\n"
+    ),
+    "agents/agents_config.json": (
+        "python_reviewer OOP readability report SOLID principle signal "
+        "check_solid_evidence.py path-coverage\n"
+    ),
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
         "## Workflow Contract Owners\n\n"
@@ -1398,6 +1422,26 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("solid_coding_contract", result.stdout)
             self.assertIn('missing-marker:- ["SOLID"]', result.stdout)
+
+    def test_solid_contract_requires_default_reviewer_evidence_gate(self) -> None:
+        """Default reviewers keep SOLID evidence verification wired."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            reviewer = root / ".codex" / "agents" / "reviewer.toml"
+            reviewer.write_text(
+                reviewer.read_text(encoding="utf-8").replace(
+                    "check_solid_evidence.py",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:check_solid_evidence.py", result.stdout)
 
     def test_minimal_fixture_covers_solid_coding_contract_surfaces(self) -> None:
         """The minimal test fixture includes every SOLID coding contract surface."""

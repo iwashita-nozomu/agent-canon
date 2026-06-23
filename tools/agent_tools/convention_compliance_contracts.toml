@@ -135,11 +135,35 @@ markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", 
 
 [[contracts.surfaces]]
 path = "agents/skills/python-review.md"
-markers = ["SOLID principle signal", "OOP readability report", "tools/oop/python/readability.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py"]
+markers = ["SOLID principle signal", "OOP readability report", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/python-review/SKILL.md"
-markers = ["SOLID principle signal", "$oop-readability-check", "tools/oop/python/readability.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion"]
+markers = ["SOLID principle signal", "$oop-readability-check", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "scanned_paths"]
+
+[[contracts.surfaces]]
+path = "agents/skills/change-review.md"
+markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/change-review/SKILL.md"
+markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "classes", "Protocol"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/python_reviewer.toml"
+markers = ["check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "path-covered"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/reviewer.toml"
+markers = ["check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "path-covered", "return revise"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/diff_triage_reviewer.toml"
+markers = ["python_reviewer", "check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "escalate"]
+
+[[contracts.surfaces]]
+path = "agents/agents_config.json"
+markers = ["python_reviewer", "OOP readability report", "SOLID principle signal", "check_solid_evidence.py", "path-coverage"]
 
 [[contracts.surfaces]]
 path = "agents/skills/oop-readability-check.md"
