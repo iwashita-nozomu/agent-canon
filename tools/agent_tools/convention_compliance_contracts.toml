@@ -74,6 +74,42 @@ path = "agents/USER_GUIDE_JA.md"
 markers = ["selected_runtime_skill_read", "small_change_skill_read", "runtime `SKILL.md`"]
 
 [[contracts]]
+id = "responsibility_preflight_gate"
+description = "Pre-edit routing keeps planned paths tied to responsibility-scope.toml owner scopes before implementation directories are selected."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/tool_rejection_preflight.py"
+markers = ["RESPONSIBILITY_SCOPE_COMMAND", "responsibility_scope_gate", "scope_covers", "protecting_tools", "gate=\"responsibility_scope\""]
+
+[[contracts.surfaces]]
+path = "agents/COMMUNICATION_PROTOCOL.md"
+markers = ["responsibility_scope", "responsibility-scope.toml", "owner", "class", "protecting tools", "planned path"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "implementation directory"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/small-change-routing/SKILL.md"
+markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "implementation directory"]
+
+[[contracts.surfaces]]
+path = "agents/skills/small-change-routing.md"
+markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
+
+[[contracts.surfaces]]
+path = "tools/README.md"
+markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
+
+[[contracts.surfaces]]
+path = "documents/tools/README.md"
+markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
+
+[[contracts]]
 id = "solid_coding_contract"
 description = "SOLID guidance stays routed to OOP readability checker evidence instead of prose-only review."
 

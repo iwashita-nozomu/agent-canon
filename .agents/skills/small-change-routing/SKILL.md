@@ -9,7 +9,7 @@ responsibility Documents Small Change Routing runtime skill for this repository.
 upstream design ../../../agents/skills/small-change-routing.md documents the human-facing route
 upstream design ../../../agents/task_catalog.yaml owns Scoped Change Lite workflow identity
 upstream design ../../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
-upstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
+downstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
 @dependency-end
 -->
 
@@ -39,6 +39,8 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root .
    <planned-edit-paths>` before editing, and keep predicted repair commands in
    the work log or handoff.
+   Record each `responsibility_scope` line with its owner scope and protecting tools
+   before choosing the implementation directory.
 1. For typo/link/format-only Markdown edits, route `$md-style-check`, record
    `structure_contract=skipped` with the reason, and validate with
    `tools/bin/agent-canon docs check <changed-docs>`.

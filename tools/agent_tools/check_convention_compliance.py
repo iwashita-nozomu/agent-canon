@@ -426,6 +426,9 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
 SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "small_change_skill_read"
 ]
+RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "responsibility_preflight_gate"
+]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -1764,6 +1767,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "small_change_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "responsibility_preflight_gate",
+            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
         )
     )
     findings.extend(check_closeout_readiness(root))

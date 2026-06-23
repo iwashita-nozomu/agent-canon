@@ -7,7 +7,7 @@ responsibility Documents small-change-routing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../task_catalog.yaml owns Scoped Change Lite workflow identity
 upstream design ../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
-upstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
+downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
 downstream implementation ../../.agents/skills/small-change-routing/SKILL.md exposes this route as a runtime skill
 @dependency-end
 -->
@@ -40,6 +40,8 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 1. `python3 tools/agent_tools/tool_rejection_preflight.py --root .
    <planned-edit-paths>` を使い、予測される checker / hook / dependency repair
    commands を記録します。
+   `responsibility_scope` 行の owner scope と protecting tools を実装ディレクトリの
+   選択前に記録します。
 1. typo / link / format-only では `$md-style-check` を併用し、
    `structure_contract=skipped` と理由を残します。
 1. code の小規模修正では、changed-file dependency checks、該当 static checker、

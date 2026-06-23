@@ -28,6 +28,7 @@ from tools.agent_tools.check_convention_compliance import (
     PR_ESSENCE_DOCUMENTATION_MARKERS,
     REFACTOR_SEQUENCE_MARKERS,
     REVIEW_ISSUE_ROUTING_MARKERS,
+    RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
     SMALL_CHANGE_SKILL_READ_MARKERS,
     SOLID_CODING_CONTRACT_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
@@ -146,7 +147,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "caller chain canonical command\n"
     ),
     "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
-    "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
+    "documents/tools/README.md": (
+        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
+        "protecting tools\n"
+    ),
     "notes/guardrails/engineering_avoidances.md": (
         "compatibility-preservation drift duplicate implementation canonical owner "
         "contract-complete implementation acceptance contract design_issue_blocker "
@@ -154,7 +159,16 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/README.md": (
         "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
-        "check_runtime_profile_inventory.py\n"
+        "check_runtime_profile_inventory.py tool_rejection_preflight.py "
+        "responsibility_scope responsibility-scope.toml protecting tools\n"
+    ),
+    "tools/agent_tools/tool_rejection_preflight.py": (
+        "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
+        "protecting_tools gate=\"responsibility_scope\"\n"
+    ),
+    "agents/COMMUNICATION_PROTOCOL.md": (
+        "responsibility_scope responsibility-scope.toml owner class protecting tools "
+        "planned path\n"
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Completion Readiness\n"
@@ -204,13 +218,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$md-style-check format-only structure_contract=skipped "
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
         "parent-direct $small-change-routing SKILL.md "
+        "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker "
         "$oop-readability-check SOLID principle signal OOP dimension "
         "finding kind tools/oop/shared/readability_core.py check_solid_evidence.py "
-        "scanned_paths classes Protocol\n"
+        "scanned_paths classes Protocol responsibility_scope owner scope "
+        "protecting tools implementation directory\n"
     ),
     ".agents/skills/refactor-loop/SKILL.md": skill_fixture(
         "refactor-loop",
@@ -241,7 +257,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "small-change-routing",
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
         "targeted validation tool_rejection_preflight.py "
-        "structure_contract=skipped SKILL.md\n"
+        "structure_contract=skipped responsibility_scope owner scope protecting tools "
+        "implementation directory SKILL.md\n"
     ),
     ".agents/skills/test-design/SKILL.md": skill_fixture(
         "test-design",
@@ -290,13 +307,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "md-style-check format-only structure_contract=skipped "
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
         "parent-direct $small-change-routing SKILL.md "
+        "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker "
         "$oop-readability-check SOLID principle signal OOP dimension finding kind "
         "tools/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
-        "class Protocol\n"
+        "class Protocol responsibility_scope owner scope protecting tools "
+        "実装ディレクトリ\n"
     ),
     "agents/skills/refactor-loop.md": (
         "two-stage refactor forced migration usage-surface repair "
@@ -325,7 +344,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/small-change-routing.md": (
         "selected_runtime_skill_read small_change_skill_read Scoped Change Lite "
         "targeted validation tool_rejection_preflight.py "
-        "structure_contract=skipped SKILL.md\n"
+        "structure_contract=skipped responsibility_scope owner scope protecting tools "
+        "実装ディレクトリ SKILL.md\n"
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
@@ -1067,6 +1087,36 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "agents/skills/small-change-routing.md",
             SMALL_CHANGE_SKILL_READ_MARKERS,
         )
+
+    def test_responsibility_preflight_gate_requires_markers(self) -> None:
+        """Pre-edit routing must keep responsibility-scope markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            protocol = root / "agents" / "COMMUNICATION_PROTOCOL.md"
+            protocol.write_text(
+                protocol.read_text(encoding="utf-8").replace(
+                    "responsibility_scope",
+                    "scope route",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("responsibility_preflight_gate", result.stdout)
+            self.assertIn("missing-marker:responsibility_scope", result.stdout)
+
+    def test_minimal_fixture_covers_responsibility_preflight_gate_surfaces(self) -> None:
+        """The minimal test fixture includes every responsibility preflight surface."""
+        missing = sorted(
+            path
+            for path in RESPONSIBILITY_PREFLIGHT_GATE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def test_document_claim_grounding_requires_markers(self) -> None:
         """Canonical docs must keep prose-claim grounding markers."""

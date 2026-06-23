@@ -4,7 +4,6 @@ contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
-downstream design ../README.md AgentCanon repository overview
 downstream design ../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../tools/ci/run_all_checks.sh repo check runner

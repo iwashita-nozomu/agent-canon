@@ -3,6 +3,12 @@
 # contract tool
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
+# upstream design ../../agents/skills/codex-task-workflow.md owns implementation preflight routing
+# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
+# upstream design ../../agents/skills/small-change-routing.md owns small-change preflight routing
+# upstream design ../../.agents/skills/small-change-routing/SKILL.md exposes small-change preflight routing
+# upstream design ../../tools/README.md documents tool entrypoints
+# upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
 # upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
@@ -10,6 +16,7 @@
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
+# upstream implementation ./responsibility_scope.py validates responsibility owner scopes
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
 # @dependency-end
@@ -22,6 +29,13 @@ import json
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from responsibility_scope import (
+    Scope,
+    ScopeReport,
+    scope_covers,
+    validate as validate_responsibility_scope,
+)
 
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
@@ -101,6 +115,9 @@ LIBRARY_SURFACE_PREFIXES = (
 )
 AGENT_CANON_SUBMODULE_PREFIX = "vendor/agent-canon"
 AGENT_CANON_TOOL_SOURCE_ROOT = f"{AGENT_CANON_SUBMODULE_PREFIX}/tools"
+RESPONSIBILITY_SCOPE_COMMAND = (
+    "python3 tools/agent_tools/responsibility_scope.py --root . --format json"
+)
 
 
 @dataclass(frozen=True, order=True)
@@ -425,18 +442,20 @@ def normalize_path(root: Path, raw_path: str) -> str:
         return raw_path
 
 
-def predict_gates(paths: tuple[str, ...]) -> tuple[PredictedGate, ...]:
+def predict_gates(root: Path, paths: tuple[str, ...]) -> tuple[PredictedGate, ...]:
     """Predict rejection gates for planned paths."""
+    scope_report = validate_responsibility_scope(root, "responsibility-scope.toml")
     gates: set[PredictedGate] = set()
     for path in paths:
-        gates.update(path_gates(path))
+        gates.update(path_gates(path, scope_report))
     return tuple(sorted(gates))
 
 
-def path_gates(path: str) -> tuple[PredictedGate, ...]:
+def path_gates(path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
     templates: list[GateTemplate] = []
+    gates = [render_responsibility_scope_gate(path, scope_report)]
     if suffix in CODE_SUFFIXES:
         templates.extend(CAUSE_INVESTIGATION_GATE_TEMPLATES)
     if suffix in PYTHON_SUFFIXES:
@@ -466,7 +485,46 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES)
     if library_surface_path(path):
         templates.extend(LIBRARY_GATE_TEMPLATES)
-    return tuple(template.for_path(path) for template in templates)
+    gates.extend(template.for_path(path) for template in templates)
+    return tuple(gates)
+
+
+def render_responsibility_scope_gate(path: str, report: ScopeReport) -> PredictedGate:
+    """Return the owner-scope gate for one planned path."""
+    if report.findings:
+        handoff = (
+            "repair responsibility-scope.toml or run from the repository owner "
+            f"root before editing; findings:{len(report.findings)}"
+        )
+    else:
+        scopes = tuple(scope for scope in report.scopes if scope_covers(scope, path))
+        if len(scopes) == 1:
+            handoff = " | ".join(render_scope_handoff(scope) for scope in scopes)
+        elif scopes:
+            handoff = (
+                "resolve planned path responsibility overlap before editing; "
+                + " | ".join(render_scope_handoff(scope) for scope in scopes)
+            )
+        else:
+            handoff = (
+                "assign this planned path to exactly one responsibility-scope.toml "
+                "scope or move the edit to an existing owner surface before editing"
+            )
+    return PredictedGate(
+        path=path,
+        gate="responsibility_scope",
+        command=RESPONSIBILITY_SCOPE_COMMAND,
+        handoff=handoff,
+    )
+
+
+def render_scope_handoff(scope: Scope) -> str:
+    """Render one responsibility scope as compact handoff text."""
+    protecting_tools = ",".join(scope.protecting_tools)
+    return (
+        f"scope:{scope.scope_id} owner:{scope.owner} class:{scope.scope_class} "
+        f"protecting_tools:{protecting_tools}"
+    )
 
 
 def agent_canon_tool_source_path(path: str) -> bool:
@@ -516,7 +574,7 @@ def main() -> int:
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
     paths = planned_paths(root, list(args.paths), use_changed=args.changed)
-    gates = predict_gates(paths)
+    gates = predict_gates(root, paths)
     if args.format == "json":
         print(json_output(gates))
     else:
