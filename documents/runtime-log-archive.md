@@ -60,10 +60,12 @@ In short: work in `reports/agents/<run-id>/`; retain across runs in
 The branch key is `<environment-key>-<chat-key>`. `<environment-key>` comes
 from `AGENT_CANON_LOG_ENV`, devcontainer / Compose / Codespace metadata, or a
 host fallback. `<chat-key>` comes from `CODEX_THREAD_ID`, `CODEX_SESSION_ID`,
-or `CODEX_CONVERSATION_ID`; non-chat CLI / CI runs use the explicit fallback
-`no-chat-<repo-key>`. The source isolation key remains `<repo-key>` inside the
-branch tree, so one chat branch can still separate parent repo and standalone
-AgentCanon evidence by path.
+or `CODEX_CONVERSATION_ID`; Codex lifecycle hooks also promote top-level
+payload trace fields such as `session_id`, `conversation_id`, and `thread_id`
+to `CODEX_THREAD_ID` before child hooks run. Non-chat CLI / CI runs use the
+explicit fallback `no-chat-<repo-key>`. The source isolation key remains
+`<repo-key>` inside the branch tree, so one chat branch can still separate
+parent repo and standalone AgentCanon evidence by path.
 
 Hook JSONL filenames and Codex runtime summary filenames carry the AgentCanon
 checkout commit key, not the source repo commit. Hook JSONL, Codex runtime
