@@ -21,7 +21,6 @@ python3 tools/agent_tools/route.py --area checks --changed README.md
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
 python3 tools/agent_tools/route.py --name repo_refactor_skill.py
 python3 tools/agent_tools/route.py --prompt "fix skill routing with multi-agent evidence" --format json
-tools/bin/agent-canon local-llm route-skill --prompt "fix skill routing with multi-agent evidence" --format json
 python3 tools/agent_tools/route.py --list --format markdown
 ```
 
@@ -37,11 +36,9 @@ COMMANDS=make check-matrix
 ```
 
 Prompt skill routing is owned by the Python fast path
-`route.py --prompt`. It returns a compatibility `SKILLS` list plus
+`route.py --prompt`. It returns the full selected `SKILLS` list plus
 `ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS` for dynamic wave
-triggers. `tools/bin/agent-canon local-llm route-skill ...` remains a CLI
-compatibility mirror for older call sites and dispatches to the same catalog
-route.
+triggers.
 
 Japanese or English prompts about unnecessary numerical tests, heavy tests,
 test brittleness, tolerance-based tests, or test-design gaps route to

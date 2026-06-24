@@ -31,9 +31,7 @@ evidence, not an AgentCanon product dependency.
   `python3 tools/agent_tools/route.py --prompt <text>` so candidate evidence,
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
   by the fast deterministic harness. Routing rules and stage policy live in
-  `agents/skills/catalog.yaml` under `skill_families[].routing`;
-  `tools/bin/agent-canon local-llm route-skill ...` is the CLI compatibility
-  mirror for the same catalog-backed route.
+  `agents/skills/catalog.yaml` under `skill_families[].routing`.
 - Host-provided system skills such as `$openai-docs`, `$skill-creator`,
   `$skill-installer`, `$imagegen`, and `$plugin-creator` stay outside the
   AgentCanon public catalog. AgentCanon routes to those names and keeps local
@@ -80,13 +78,10 @@ tokens.
 - Deterministic prompt-to-skill routing lives in
   `tools/agent_tools/route.py --prompt` and reads
   `agents/skills/catalog.yaml`.
-- `tools/bin/agent-canon local-llm route-skill` is a CLI compatibility mirror
-  for prompt skill routing. The wrapper dispatches this subcommand to the
-  Python fast path so routine routing uses catalog I/O and Python startup only.
 - `agents/skills/catalog.yaml` remains the skill registry for id, purpose,
   doc/shim paths, prompt trigger groups, and stage policy. Routing metadata
-  changes include the Rust reader, runtime-alignment schema check, and
-  Python/Rust parity fixtures in the same diff.
+  changes include the runtime-alignment schema check and route.py tests in the
+  same diff.
 - Codex CLI capabilities are not mirrored into AgentCanon routing docs. Runtime
   capability belongs in a probe or route output, and skill routing should name
   only the current task's core AgentCanon functions.
@@ -94,5 +89,5 @@ tokens.
 For broad user prompts, `python3 tools/agent_tools/route.py --prompt "<request>"`
 prints `ROUTE=skill-selection`, `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
 `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
-`SKILLS` preserves compatibility, while `ACTIVE_SKILLS` is the current-stage
+`SKILLS` is the full selected set, while `ACTIVE_SKILLS` is the current-stage
 skill declaration and `DEFERRED_SKILLS` is the dynamic wave trigger set.

@@ -218,10 +218,9 @@ implementation ownership. Pass the user request or design question with
 primary surface, candidate paths, forbidden paths, required pre-edit checks, and
 an environment error when llama.cpp is unavailable.
 `python3 tools/agent_tools/route.py --prompt` is the deterministic fast
-prompt-to-skill router. It returns compatibility `SKILLS`, current-stage
+prompt-to-skill router. It returns the full selected `SKILLS`, current-stage
 `ACTIVE_SKILLS`, and later-stage `DEFERRED_SKILLS` so agents do not predeclare
-every skill family. `agent-canon local-llm route-skill` is the CLI mirror for
-the same catalog-backed route.
+every skill family.
 `agent-canon local-llm extract-prose-ir` partitions documents and terms into
 part prompts and, when `llama-cli` is available, runs those parts with bounded
 parallelism controlled by `--llm-jobs` before writing deterministic prose IR.

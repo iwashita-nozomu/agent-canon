@@ -52,7 +52,6 @@ Execute the required and task-matching conditional commands that the packet prin
    - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, `run.spawn_budget.runtime_max_depth`, `run.delegated_spawn_policy`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - when prompt-derived routing is needed, run `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`; use `ACTIVE_SKILLS` for the current stage and carry `DEFERRED_SKILLS` as dynamic wave triggers instead of listing every possible skill up front
-   - use `tools/bin/agent-canon local-llm route-skill --prompt "<user request>" --format json` as the CLI compatibility mirror for the same deterministic route
    - lead with `$agent-orchestration` and preserve every user-provided `$skill-name`
    - add `$codex-task-workflow` when repo-changing execution starts
    - add `$subagent-bootstrap` only when an explicit handoff/wave is ready or the task shape requires subagent bootstrap evidence

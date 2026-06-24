@@ -468,7 +468,7 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
     parser.add_argument("--format", choices=FORMAT_VALUES, default="text")
     parser.add_argument("--risk", choices=RISK_VALUES, default="focused")
     parser.add_argument("--changed", nargs="*", default=[], help="changed paths for evidence")
-    parser.add_argument("prompt_parts", nargs="*", help="positional prompt text for route-skill compatibility")
+    parser.add_argument("prompt_parts", nargs="*", help="positional prompt text for prompt routing")
     return parser
 
 
@@ -734,7 +734,7 @@ class RouteRenderer:
     def render_skill_decision(self, decision: SkillRouteDecision) -> str:
         """Render one prompt-derived skill selection decision."""
         if self._format == "json":
-            payload = {"schema": "agent_canon.local_llm.skill_route.v1", **asdict(decision)}
+            payload = {"schema": "agent_canon.route.skill_route.v1", **asdict(decision)}
             return json.dumps(payload, indent=2, sort_keys=True)
         if self._format == "markdown":
             skills = ", ".join(f"`${skill}`" for skill in decision.skills)
@@ -760,7 +760,7 @@ class RouteRenderer:
         return "\n".join(
             [
                 f"ROUTE={decision.route}",
-                "SCHEMA=agent_canon.local_llm.skill_route.v1",
+                "SCHEMA=agent_canon.route.skill_route.v1",
                 f"MODE={decision.mode}",
                 f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
                 f"ACTIVE_SKILLS={','.join(f'${skill}' for skill in decision.active_skills)}",

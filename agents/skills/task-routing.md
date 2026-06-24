@@ -16,8 +16,6 @@ AgentCanon update、docs、log/eval の経路を選びます。
 prompt から public skill set を選ぶときは fast path の
 `python3 tools/agent_tools/route.py --prompt` で `$agent-orchestration`
 first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
-`tools/bin/agent-canon local-llm route-skill` は同じ catalog-backed route
-の CLI 互換 mirror です。
 公式 system skill で足りる task は、AgentCanon 側で別 skill を増やさず、
 `$openai-docs`、`$skill-creator`、`$skill-installer`、`$imagegen`、
 `$plugin-creator` へ route します。
@@ -35,7 +33,6 @@ first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
 python3 tools/agent_tools/route.py --prompt "<user request>" --format json
-tools/bin/agent-canon local-llm route-skill --prompt "<user request>" --format json
 python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text
 ```
 

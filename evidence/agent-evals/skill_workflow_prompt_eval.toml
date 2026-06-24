@@ -1049,7 +1049,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
 description = "Routes skill selection through the catalog, runtime shims, and deterministic router owner row."
-required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "agent-canon local-llm route-skill"]
+required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "python3 tools/agent_tools/route\\.py --prompt"]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-1"
@@ -1673,7 +1673,7 @@ description = "Documents exclude usage for vendored snapshots and generated repo
 required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bundle"]
 
 [[evals]]
-id = "oop-refactor-skill-route"
+id = "oop-refactor-routing-scope"
 target = "agents/skills/refactor-loop.md"
 kind = "skill"
 description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
@@ -2015,7 +2015,7 @@ description = "Keeps generated evidence append-only in the archive and separates
 required_regex = ["append-only", "runtime_log_archive_git\\.py", "\\$report-writing", "generated_artifact_guard\\.py"]
 
 [[evals]]
-id = "agent-canon-update-route-skill"
+id = "agent-canon-update-routing"
 target = ".agents/skills/agent-canon-update/SKILL.md"
 kind = "skill"
 description = "The runtime AgentCanon update skill must route parent pin updates, source PR work, root-view repair, and update TODO state through the canonical high-level commands."

@@ -28,7 +28,7 @@ workflow family, roles, skills, stage gates, wave budgets, and closeout checks.
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |
-| skill selection | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt`; `tools/bin/agent-canon local-llm route-skill` mirror |
+| skill selection | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt` |
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
 | implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md`; run bundle design packet |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |

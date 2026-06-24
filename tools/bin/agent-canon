@@ -27,11 +27,6 @@ if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
   installed_binary="$legacy_binary"
 fi
 
-if [ "${1:-}" = "local-llm" ] && { [ "${2:-}" = "route-skill" ] || [ "${2:-}" = "skill-route" ]; }; then
-  shift 2
-  exec python3 "${canon_root}/tools/agent_tools/route.py" --root "$canon_root" "$@"
-fi
-
 if [ "${1:-}" = "local-llm" ] && command -v cargo >/dev/null 2>&1; then
   exec cargo run --manifest-path "$manifest" -- "$@"
 fi
