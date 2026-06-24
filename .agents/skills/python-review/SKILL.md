@@ -1,6 +1,6 @@
 ---
 name: python-review
-description: Use when Python code changes need strict review for pyright, pytest, ruff, type boundaries, and API behavior.
+description: Use when Python code changes need strict review for pyright, pytest, ruff, type boundaries, API behavior, and OOP readability evidence already owned by the Python diff.
 ---
 <!--
 @dependency-start
@@ -31,5 +31,9 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Run or inspect `pyright`.
 1. Run or inspect `pytest tests/`.
 1. Run or inspect `ruff check python tests --select D,E,F,I,UP --ignore E501`.
+1. For changed classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction in the Python diff, run or inspect `$oop-readability-check` / `python3 tools/oop/python/readability.py` as downstream evidence and review SOLID principle signal counts.
+   Use the report's Single responsibility, Open/closed, Liskov substitution,
+   Interface segregation, and Dependency inversion signals as review evidence.
+1. For the same changed Python paths, run or inspect `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` and verify the report `scanned_paths` cover the reviewed SOLID-sensitive files.
 1. Check API behavior, type boundaries, and docs/test follow-through.
 1. Report findings before summaries.

@@ -117,6 +117,7 @@ Common execution routes:
 | Runtime log archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
 | Generated report roots left in source tree | `python3 tools/agent_tools/generated_artifact_guard.py` |
 | Design-doc claim evidence against code and dependency headers | `python3 tools/agent_tools/check_design_doc_claims.py <design-doc>` |
+| SOLID-sensitive Python diff evidence coverage | `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` |
 | Test-design resilience diagnostics | `agent-canon test-design check tests` |
 
 Use `documents/tools/README.md` for reader-facing tool-family guidance and
@@ -216,9 +217,10 @@ implementation ownership. Pass the user request or design question with
 `--request-file`, `--request-stdin`, or `--request`; the command returns a
 primary surface, candidate paths, forbidden paths, required pre-edit checks, and
 an environment error when llama.cpp is unavailable.
-`agent-canon local-llm route-skill` is the deterministic prompt-to-skill
-router. It returns compatibility `SKILLS`, current-stage `ACTIVE_SKILLS`, and
-later-stage `DEFERRED_SKILLS` so agents do not predeclare every skill family.
+`python3 tools/agent_tools/route.py --prompt` is the deterministic fast
+prompt-to-skill router. It returns the full selected `SKILLS`, current-stage
+`ACTIVE_SKILLS`, and later-stage `DEFERRED_SKILLS` so agents do not predeclare
+every skill family.
 `agent-canon local-llm extract-prose-ir` partitions documents and terms into
 part prompts and, when `llama-cli` is available, runs those parts with bounded
 parallelism controlled by `--llm-jobs` before writing deterministic prose IR.
@@ -322,7 +324,7 @@ findings for resilient test planning.
   - `search.py` は `--purpose` から text / LLM card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers llm,tool,vector` のように絞れます。
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では responsibility-based semantic / local-LLM search を先に走らせた後の比較 evidence として併用します。
-  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `agent-canon local-llm route-skill --prompt "<user request>" --format json` で `$agent-orchestration` first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を確認します。
+  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を確認します。
   - `skill_tool_commands.py` は `.agents/skills/*/SKILL.md` の `## Tool Commands` 入口を同期し、`show --skill <skill>` で runtime skill と human skill canon から command packet を表示します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `lean_proof_env.py` は Mathlib / Aesop / Plausible / LeanSearchClient を含む Lean 4 Lake 環境を AgentCanon 側に作り、`smoke`、`agent-smoke`、`counterexample-smoke`、`all-smoke`、または `check-file` で proof-search、theorem-search、counterexample、generated proof stub を検査します。active theorem package では依存を一度 pin して `lake build` で再利用し、この tool は探索用・fallback 用の環境確認に使います。個別 proof package に ad hoc な Lean 依存を入れず、環境責務をこの tool に集約します。
@@ -352,7 +354,7 @@ findings for resilient test planning.
   - `noncanonical_document_inventory.py` は Markdown / text 文書棚卸しの legacy migration shim です。operator は `agent-canon structured-analysis document-inventory --root .` を使います。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
   - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
-  - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、AgentCanon tool source route、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。親 repo の `tools/` symlink view が `vendor/agent-canon/tools/` に解決される場合も、AgentCanon branch / PR と source-root validation へ誘導します。
+  - `tool_rejection_preflight.py` は planned edit path から responsibility_scope、cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、AgentCanon tool source route、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。`responsibility_scope` は `responsibility-scope.toml` の owner scope、class、protecting tools を返します。親 repo の `tools/` symlink view が `vendor/agent-canon/tools/` に解決される場合も、AgentCanon branch / PR と source-root validation へ誘導します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans、semantic-index review artifacts、任意の provider-comparison artifact を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
 - `ci/`

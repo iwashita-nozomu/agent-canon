@@ -6,6 +6,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream implementation ../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
+downstream implementation ../tools/agent_tools/convention_compliance_contracts.toml declares convention marker contracts
 @dependency-end
 -->
 
@@ -130,3 +131,14 @@ downstream implementation ../tools/agent_tools/check_convention_compliance.py va
 - 規約の分類は `必須`、`許可`、`任意`、`受け入れ条件`、`完了条件`、`例外` で明示します。
 - 必須事項は `必須`、`必要です`、`実行します` などの肯定形で書きます。
 - 運用ルールは具体的な実行条件、検証条件、記録先で表します。
+
+## 9. Checker Contract Surface
+
+- checker が文書、skill、workflow の marker contract を検査する場合、marker
+  一覧は `tools/agent_tools/convention_compliance_contracts.toml` に置きます。
+- Python checker 本体は contract manifest の読み込み、path 解決、finding
+  出力を担当します。
+- tool、hook、checker の warning は、free-form note ではなく
+  `tool_warning_ledger`、`warning_id`、`source_tool`、`severity`、
+  `repair_command`、`tool_warning_exit_status` を持つ closeout obligation として
+  記録します。

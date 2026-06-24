@@ -14,6 +14,7 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
+# upstream design ../../agents/skills/small-change-routing.md small change routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
@@ -36,6 +37,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
 # upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
 # upstream implementation ./skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
@@ -49,9 +51,29 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import tomllib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+MARKER_CONTRACTS_PATH = Path("tools/agent_tools/convention_compliance_contracts.toml")
+
+
+def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
+    """Load declarative marker contracts from the checked-in manifest."""
+    manifest = Path(__file__).resolve().parents[2] / MARKER_CONTRACTS_PATH
+    payload = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    contracts: dict[str, dict[str, tuple[str, ...]]] = {}
+    for contract in payload.get("contracts", []):
+        contract_id = contract["id"]
+        surfaces: dict[str, tuple[str, ...]] = {}
+        for surface in contract.get("surfaces", []):
+            surfaces[surface["path"]] = tuple(surface.get("markers", []))
+        contracts[contract_id] = surfaces
+    return contracts
+
+
+DECLARATIVE_MARKER_CONTRACTS = load_marker_contracts()
 
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
@@ -130,6 +152,11 @@ TOOL_GATES = {
         "tools/oop/python/readability.py",
         (
             "documents/object-oriented-design.md",
+            "documents/coding-conventions-python.md",
+            "agents/skills/oop-readability-check.md",
+            ".agents/skills/oop-readability-check/SKILL.md",
+            "agents/skills/python-review.md",
+            ".agents/skills/python-review/SKILL.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
         ),
     ),
@@ -396,72 +423,12 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "DOCUMENT_STRUCTURE_REQUIRED",
     ),
 }
-SMALL_CHANGE_SKILL_READ_MARKERS = {
-    ".agents/skills/agent-orchestration/SKILL.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "Scoped Change Lite",
-        "parent-direct",
-        "SKILL.md",
-    ),
-    "agents/skills/agent-orchestration.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "Scoped Change Lite",
-        "parent-direct",
-        "SKILL.md",
-    ),
-    ".agents/skills/codex-task-workflow/SKILL.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "Scoped Change Lite",
-        "parent-direct",
-        "SKILL.md",
-    ),
-    "agents/skills/codex-task-workflow.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "Scoped Change Lite",
-        "parent-direct",
-        "SKILL.md",
-    ),
-    ".agents/skills/md-style-check/SKILL.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "format-only",
-        "SKILL.md",
-    ),
-    "agents/skills/md-style-check.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "format-only",
-        "SKILL.md",
-    ),
-    ".agents/skills/long-form-writing/SKILL.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "typo/link/format-only",
-        "SKILL.md",
-    ),
-    "agents/skills/long-form-writing.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "typo",
-        "format-only",
-        "SKILL.md",
-    ),
-    "agents/canonical/CODEX_WORKFLOW.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "small changes",
-        "SKILL.md",
-    ),
-    "agents/USER_GUIDE_JA.md": (
-        "selected_runtime_skill_read",
-        "small_change_skill_read",
-        "runtime `SKILL.md`",
-    ),
-}
+SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "small_change_skill_read"
+]
+RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "responsibility_preflight_gate"
+]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -767,6 +734,9 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "evidence route",
     ),
 }
+SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "solid_coding_contract"
+]
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
     r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
@@ -880,7 +850,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -943,7 +913,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "implementation stage gate",
@@ -1296,24 +1266,20 @@ def check_document_structure_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def check_small_change_skill_read(root: Path) -> list[Finding]:
-    """Verify small edit routes keep selected runtime skill reading visible."""
-    paths = tuple(SMALL_CHANGE_SKILL_READ_MARKERS)
-    findings = check_required_files(root, paths, "small_change_skill_read")
-    for path, markers in SMALL_CHANGE_SKILL_READ_MARKERS.items():
+def collect_marker_contract_findings(
+    root: Path, check: str, required_markers: dict[str, tuple[str, ...]]
+) -> list[Finding]:
+    """Verify a manifest-backed marker contract against repository files."""
+    paths = tuple(required_markers)
+    findings = check_required_files(root, paths, check)
+    for path, markers in required_markers.items():
         resolved = readable_path(root, path)
         if resolved is None:
             continue
         text = resolved.read_text(encoding="utf-8")
         for marker in markers:
             if marker not in text:
-                findings.append(
-                    Finding(
-                        "small_change_skill_read",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
+                findings.append(Finding(check, path, f"missing-marker:{marker}"))
     return findings
 
 
@@ -1798,7 +1764,18 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
-    findings.extend(check_small_change_skill_read(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "small_change_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "responsibility_preflight_gate",
+            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+        )
+    )
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
@@ -1808,6 +1785,11 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_refactor_sequence(root))
     findings.extend(check_review_issue_routing(root))
     findings.extend(check_pr_essence_documentation(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
+        )
+    )
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

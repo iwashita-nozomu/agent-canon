@@ -51,6 +51,20 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 
 SOLID signal は設計レビューの入口です。最終判断では機械 finding の `path:line`、OOP dimension、周辺 contract、既存例外規約を併読します。
 
+| Principle | Source-informed meaning | Local implementation contract | Static risk route |
+|---|---|---|---|
+| Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `function_lines`、`class_lines`、`mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket` |
+| Open/closed | 安定した policy を extension point で拡張可能にする。 | 予測済み variant は branch cascade ではなく `Protocol`、registry、adapter、variant value、別 entrypoint へ置く。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
+| Liskov substitution | subtype は supertype の証明済み性質を保存する。 | 継承は置換可能な契約の特殊化に限定し、入力条件、戻り値、例外、invariant、history property を保存する。 | `base_classes` と type checker / shared behavior contract |
+| Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの小さい contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
+| Dependency inversion | high-level policy と low-level detail は stable abstraction に依存する。 | composition root / factory / adapter で具象生成を閉じ、policy layer は `Protocol`、typed value、stable interface を受ける。 | OOP primary signal は `missing_public_annotations` と `optional_boundary`。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
+
+この表は Martin の SOLID 系 article、Liskov/Wing の behavioral subtyping、
+Parnas の information-hiding modularity、Python の PEP 544 Protocol から得た
+設計語彙を、AgentCanon の operational guidance と static risk signal に写像したものです。
+checker は semantic proof ではなく静的な risk signal を出し、review は source contract、
+caller graph、design artifact と合わせて判断します。
+
 ## 規約
 
 ### 1. Class を作る条件
