@@ -38,7 +38,11 @@ import unittest
 from pathlib import Path
 from typing import cast
 
-from tools.agent_tools.runtime_log_paths import mounted_log_archive_root, repo_log_key
+from tools.agent_tools.runtime_log_paths import (
+    CODEX_TRACE_ENV_NAMES,
+    mounted_log_archive_root,
+    repo_log_key,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -683,6 +687,92 @@ class CodexHooksTest(unittest.TestCase):
                 "reference_capture_guard.py:12",
             ],
         )
+
+    def test_hook_dispatcher_promotes_trace_alias_to_child_thread_env(self) -> None:
+        """Dispatcher should make trace aliases available to child hooks."""
+        cases: tuple[tuple[str, dict[str, object], dict[str, str], str], ...] = (
+            ("payload_thread", {"thread_id": "thread-from-payload"}, {}, "thread-from-payload"),
+            ("payload_session", {"session_id": "session-from-payload"}, {}, "session-from-payload"),
+            (
+                "payload_conversation",
+                {"conversation_id": "conversation-from-payload"},
+                {},
+                "conversation-from-payload",
+            ),
+            ("env_session", {}, {"CODEX_SESSION_ID": "session-from-env"}, "session-from-env"),
+            (
+                "env_thread_wins",
+                {"session_id": "session-from-payload"},
+                {"CODEX_THREAD_ID": "thread-from-env"},
+                "thread-from-env",
+            ),
+        )
+        for label, payload_extra, env_extra, expected_trace in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "trace-env.txt"
+                for script_name in (
+                    "log_archive_mount_warning.py",
+                    "prompt_secret_guard.py",
+                    "skill_usage_logger.py",
+                    "reference_capture_guard.py",
+                ):
+                    (hook_dir / script_name).write_text(
+                        "\n".join(
+                            [
+                                "#!/usr/bin/env python3",
+                                "import os",
+                                f"script_name = {script_name!r}",
+                                "trace = os.environ.get('CODEX_THREAD_ID', '')",
+                                "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                                "    stream.write(f'{script_name}:{trace}\\n')",
+                                "",
+                            ]
+                        ),
+                        encoding="utf-8",
+                    )
+                child_env = {
+                    key: value
+                    for key, value in os.environ.items()
+                    if key not in CODEX_TRACE_ENV_NAMES
+                }
+                child_env.update(
+                    {
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                        **env_extra,
+                    }
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "UserPromptSubmit",
+                            "prompt": "Use $agent-orchestration.",
+                            **payload_extra,
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=child_env,
+                )
+                invocations = log_path.read_text(encoding="utf-8").splitlines()
+
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(
+                invocations,
+                [
+                    f"log_archive_mount_warning.py:{expected_trace}",
+                    f"prompt_secret_guard.py:{expected_trace}",
+                    f"skill_usage_logger.py:{expected_trace}",
+                    f"reference_capture_guard.py:{expected_trace}",
+                ],
+            )
 
     def test_hook_dispatcher_downgrades_noncritical_child_blocks(self) -> None:
         """Dispatcher should keep non-secret guard findings from stopping work."""
