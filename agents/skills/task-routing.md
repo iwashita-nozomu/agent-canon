@@ -15,7 +15,10 @@ downstream implementation ../../tools/agent_tools/route.py selects short routing
 AgentCanon update、docs、log/eval の経路を選びます。
 prompt から public skill set を選ぶときは fast path の
 `python3 tools/agent_tools/route.py --prompt` で `$agent-orchestration`
-first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
+first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` /
+`RELATED_SKILL_CANDIDATES` を機械的に確認します。
+`RELATED_SKILL_CANDIDATES` は次 stage で evidence が揃ったときに追加する
+候補であり、初期 skill 読み込みには含めません。
 公式 system skill で足りる task は、AgentCanon 側で別 skill を増やさず、
 `$openai-docs`、`$skill-creator`、`$skill-installer`、`$imagegen`、
 `$plugin-creator` へ route します。
@@ -44,7 +47,8 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format t
 - `COMMANDS`
 - `EVIDENCE`
 - prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
-  `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`
+  `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,
+  `RELATED_SKILLS`, `REASONS`
 
 Long candidate names are aliases. Do not create a new public tool or skill
 until `route.py --name <candidate>` returns `STATUS=unknown` and the missing

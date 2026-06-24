@@ -6,6 +6,7 @@
 # upstream design ../../agents/skills/README.md public skill surface contract
 # upstream design ../../agents/canonical/skills.md official system skill delegation boundary
 # upstream design ../../agents/internal-routines/README.md internal routine surface contract
+# upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
@@ -598,6 +599,7 @@ def validate_public_skill_shims() -> None:
         )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
         validate_skill_routing_entry(skill_id, entry.get("routing"))
+    validate_skill_related_entries(families, observed_skill_ids)
     observed_shim_ids = {
         path.parent.name
         for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
@@ -750,6 +752,36 @@ def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
             ensure(
                 isinstance(term, str) and bool(term.strip()),
                 f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
+            )
+
+
+def validate_skill_related_entries(families: object, observed_skill_ids: set[str]) -> None:
+    """Check related-skill metadata points to public catalog entries."""
+    ensure(isinstance(families, list), "skill_families must be a list")
+    for entry in families:
+        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
+        skill_id = str(entry.get("id", "")).strip()
+        related_skills = entry.get("related_skills", [])
+        ensure(
+            isinstance(related_skills, list),
+            f"{skill_id} related_skills must be a list",
+        )
+        for related_index, related_skill in enumerate(related_skills):
+            ensure(
+                isinstance(related_skill, str) and bool(related_skill.strip()),
+                f"{skill_id} related_skills[{related_index}] must be a non-empty string",
+            )
+            ensure(
+                related_skill != skill_id,
+                f"{skill_id} related_skills[{related_index}] must not self-reference",
+            )
+            ensure(
+                is_public_skill_id(related_skill),
+                f"{skill_id} related_skills[{related_index}] must be public: {related_skill}",
+            )
+            ensure(
+                related_skill in observed_skill_ids,
+                f"{skill_id} related_skills[{related_index}] unknown skill: {related_skill}",
             )
 
 

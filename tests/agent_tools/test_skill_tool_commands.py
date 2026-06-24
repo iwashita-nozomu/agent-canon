@@ -5,6 +5,7 @@
 # responsibility Tests skill tool-command packet sync and validation.
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py command packet tool
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
+# upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
 # @dependency-end
 
 from __future__ import annotations
@@ -46,6 +47,15 @@ class SkillToolCommandsTest(unittest.TestCase):
         )
         return runtime
 
+    def write_catalog(self, root: Path, entries: list[str]) -> None:
+        """Create one public skill catalog fixture."""
+        catalog = root / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text(
+            "\n".join(["version: 1", "skill_families:", *entries]),
+            encoding="utf-8",
+        )
+
     def test_sync_adds_command_section_and_check_passes(self) -> None:
         """Sync materializes the show command for every runtime skill."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -84,6 +94,42 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "python3 tools/agent_tools/example.py",
                 payload["discovered_commands"],
             )
+
+    def test_show_returns_related_skills_from_catalog(self) -> None:
+        """Show prints related skills from the public skill catalog."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(root, "example-skill", "Use the canon.\n")
+            self.write_skill(root, "review-skill", "Use the canon.\n")
+            self.write_catalog(
+                root,
+                [
+                    "  - id: example-skill",
+                    "    canonical_doc: agents/skills/example-skill.md",
+                    "    shim: .agents/skills/example-skill/SKILL.md",
+                    "    related_skills:",
+                    "      - review-skill",
+                    "  - id: review-skill",
+                    "    canonical_doc: agents/skills/review-skill.md",
+                    "    shim: .agents/skills/review-skill/SKILL.md",
+                ],
+            )
+
+            json_result = self.run_tool(
+                root,
+                "show",
+                "--skill",
+                "example-skill",
+                "--format",
+                "json",
+            )
+            text_result = self.run_tool(root, "show", "--skill", "example-skill")
+
+            self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
+            self.assertEqual(text_result.returncode, 0, text_result.stdout + text_result.stderr)
+            payload = json.loads(json_result.stdout)
+            self.assertEqual(payload["related_skills"], ["review-skill"])
+            self.assertIn("SKILL_TOOL_COMMANDS_RELATED_SKILLS=$review-skill", text_result.stdout)
 
     def test_show_ignores_directory_literals(self) -> None:
         """Show excludes directory paths that are not executable commands."""
