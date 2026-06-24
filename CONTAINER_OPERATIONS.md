@@ -124,6 +124,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   They are audit tooling, not project runtime dependencies, and must not be
   installed in the project Dockerfile unless a project explicitly needs them at
   runtime.
+- Browser automation tooling used by agents to validate generated HTML and
+  JavaScript report artifacts, including Playwright and its Chromium browser
+  cache, belongs in `.devcontainer/post-create.sh`. It is report-validation
+  infrastructure, not a project runtime dependency.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.

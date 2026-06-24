@@ -201,7 +201,7 @@ entries:
       - tests/agent_tools/test_parent_repo_readiness.py
 
   - id: render-dependency-manifest-graph
-    summary: Renders dependency manifest graph TSV artifacts into Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
+    summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
     path: tools/agent_tools/render_dependency_manifest_graph.py
     family: agent_tools
     role: checker

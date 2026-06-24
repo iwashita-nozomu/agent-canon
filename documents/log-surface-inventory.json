@@ -10988,7 +10988,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 225,
+      "line": 340,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -10996,7 +10996,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 292,
+      "line": 669,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11004,7 +11004,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 934,
+      "line": 675,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 2166,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11012,7 +11020,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 934,
+      "line": 2166,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11020,7 +11028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH",
-      "line": 936,
+      "line": 2168,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11028,7 +11036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_DOT",
-      "line": 942,
+      "line": 2176,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11036,7 +11044,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_HTML",
-      "line": 944,
+      "line": 2178,
+      "path": "tools/agent_tools/render_dependency_manifest_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DEPENDENCY_MANIFEST_GRAPH_IR",
+      "line": 2172,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11044,7 +11060,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_MARKDOWN",
-      "line": 940,
+      "line": 2174,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
@@ -11052,7 +11068,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MANIFEST_GRAPH_SOURCE_CHECK",
-      "line": 938,
+      "line": 2170,
       "path": "tools/agent_tools/render_dependency_manifest_graph.py",
       "surface": "tool"
     },
