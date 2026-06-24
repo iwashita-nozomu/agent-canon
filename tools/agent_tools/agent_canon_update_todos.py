@@ -14,12 +14,12 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
-import tomllib
 
 DEFAULT_MANIFEST = Path("documents/agent-canon-update-tasks.toml")
 DEFAULT_STATE_PATH = Path(".agent-canon/update-state.toml")
@@ -579,6 +579,7 @@ def render_state(state: UpdateState) -> str:
     """Render parent repo update state as TOML."""
     lines = [
         "# @dependency-start",
+        "# contract data",
         "# responsibility Tracks this parent repo's applied AgentCanon update TODO boundary.",
         "# upstream design ../vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md parent update workflow",
         "# upstream design ../vendor/agent-canon/documents/agent-canon-update-tasks.toml shared update TODO manifest",
