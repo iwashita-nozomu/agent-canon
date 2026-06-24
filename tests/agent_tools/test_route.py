@@ -136,6 +136,16 @@ class RouteToolTest(unittest.TestCase):
         for key in ("skills", "active_skills", "deferred_skills", "matched_skills"):
             self.assertIn(key, python_decision)
 
+    def test_prompt_routes_old_tool_document_cleanup(self) -> None:
+        """Old tool and document cleanup requests should enter document-canon cleanup."""
+        result = self.run_route("--prompt", "古いツール，文書の掃除を", "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("document-canon-cleanup", decision["matched_skills"])
+        self.assertIn("document-canon-cleanup", decision["active_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
         """The shell wrapper must not preserve a local-llm route-skill alias."""
         result = subprocess.run(

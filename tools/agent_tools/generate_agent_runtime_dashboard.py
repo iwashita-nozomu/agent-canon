@@ -93,11 +93,6 @@ MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
     "agent-canon-cli",
     "audit_and_fix_links.py",
-    "check_markdown_lint.py",
-    "check_markdown_math.py",
-    "format_markdown.py",
-    "fix_markdown_math.py",
-    "fix_mermaid.py",
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
     "run_docs_checks.sh",

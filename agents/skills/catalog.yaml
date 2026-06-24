@@ -457,7 +457,6 @@ skill_families:
         - ["markdown", "heading"]
         - ["markdown", "link"]
         - ["markdown", "formatter"]
-        - ["format_markdown"]
         - ["formatter", "adjacent"]
         - ["フォーマッタ"]
         - ["フォーマット", "周辺"]
@@ -472,6 +471,24 @@ skill_families:
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
     shim: .agents/skills/document-canon-cleanup/SKILL.md
+    routing:
+      stage_policy: active
+      reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
+      triggers:
+        - ["document-canon"]
+        - ["document", "cleanup"]
+        - ["docs", "cleanup"]
+        - ["stale", "docs"]
+        - ["old", "docs"]
+        - ["non-canonical", "document"]
+        - ["noncanonical", "document"]
+        - ["document", "inventory"]
+        - ["文書", "掃除"]
+        - ["文書", "整理"]
+        - ["古い", "文書"]
+        - ["古い", "ツール"]
+        - ["旧", "文書"]
+        - ["生成", "文書"]
   - id: dependency-analysis
     purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md

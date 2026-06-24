@@ -197,6 +197,23 @@ class ImportResponsibilityTest(unittest.TestCase):
         self.assertNotIn("IMPORT_RESPONSIBILITY_FINDING=", result.stdout)
         self.assertNotIn("bad.py", result.stdout + result.stderr)
 
+    def test_full_repo_scan_skips_deleted_cached_python_paths(self) -> None:
+        """Repository-wide scans should ignore tracked Python paths removed from disk."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subprocess.run(["git", "-C", str(root), "init"], check=True, capture_output=True)
+            self.write_fixture(root)
+            self.write_file(root, "app/live.py", "VALUE = 1\n")
+            self.write_file(root, "app/deleted.py", "VALUE = 2\n")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+            (root / "app" / "deleted.py").unlink()
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
+        self.assertNotIn("deleted.py", result.stdout + result.stderr)
+
     def test_exclude_paths_select_more_specific_responsibility_scope(self) -> None:
         """Excluded files should resolve to their owning scope for import rules."""
         with tempfile.TemporaryDirectory() as temp_dir:

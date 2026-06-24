@@ -1338,50 +1338,6 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
-  - id: fix-markdown-math
-    summary: Legacy CLI forwarder for Markdown math notation repair; use agent-canon docs fix-math.
-    path: tools/docs/fix_markdown_math.py
-    family: docs
-    role: helper
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: tools/bin/agent-canon docs fix-math <files...>
-    writes: true
-    callable_by_default: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/fix_markdown_math.md
-      - agents/skills/md-style-check.md
-    tests:
-      - tests/tools/test_fix_markdown_math.py
-
-  - id: fix-mermaid
-    summary: Legacy CLI forwarder for Mermaid fenced block repair; use agent-canon docs fix-mermaid.
-    path: tools/docs/fix_mermaid.py
-    family: docs
-    role: helper
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: tools/bin/agent-canon docs fix-mermaid <files...>
-    writes: true
-    callable_by_default: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/fix_mermaid.md
-      - agents/skills/md-style-check.md
-    tests:
-      - tests/tools/test_fix_mermaid.py
-
   - id: run-docs-checks
     summary: Legacy shell forwarder for the unified Rust documentation check.
     path: tools/ci/run_docs_checks.sh
@@ -1698,27 +1654,6 @@ entries:
       - agents/skills/document-canon-cleanup.md
     tests:
       - rust/agent-canon/src/structured_analysis.rs
-
-  - id: noncanonical-document-inventory
-    summary: Legacy migration shim that warns with caller chain and forwards to structured-document-inventory.
-    path: tools/agent_tools/noncanonical_document_inventory.py
-    family: agent_tools
-    role: inventory
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: python3 tools/agent_tools/noncanonical_document_inventory.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/document-canon-cleanup.md
-      - documents/structured-analysis/document-canon-analysis.md
-    tests:
-      - tests/agent_tools/test_noncanonical_document_inventory.py
 
   - id: helper-function-inventory
     summary: Inventories Python helper functions/classes with functional AST facts and role/action name tokens.

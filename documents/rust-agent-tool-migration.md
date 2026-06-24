@@ -158,10 +158,9 @@ current canonical command.
 
 ## Completed Rust Migrations
 
-- `noncanonical_document_inventory.py` has been absorbed into
-  `agent-canon structured-analysis document-inventory`. The Python path remains
-  only as a legacy migration shim that emits caller chain, `fix-now` severity,
-  and the canonical command before forwarding.
+- Document-canon inventory has been absorbed into
+  `agent-canon structured-analysis document-inventory`. The old Python
+  entrypoint has been retired; callers use the Rust command directly.
 - `agent-canon structured-analysis build` materializes the git-visible file
   tree as an `artifact` layer and imports document inventory findings into the
   `document-canon` layer of `prose_graph.sqlite`, then writes current warnings

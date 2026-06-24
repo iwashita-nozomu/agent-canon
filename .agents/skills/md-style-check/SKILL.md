@@ -30,7 +30,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Check `documents/coding-conventions-project.md` and
    `documents/conventions/common/05_docs.md`.
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
-1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, `format_markdown.py`, or `agent-canon docs` failures.
+1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
 1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Pair it with `$small-change-routing` when the whole task is a small repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
 1. For typo/link/format-only edits, keep selected_runtime_skill_read and
    small_change_skill_read evidence for this runtime `SKILL.md` before patching.

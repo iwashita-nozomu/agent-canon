@@ -7,7 +7,6 @@ upstream design database-design.md defines document-canon DB layer placement
 upstream design ../rust-agent-tool-migration.md Rust tool migration policy
 upstream design ../../agents/skills/document-canon-cleanup.md document cleanup workflow
 upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI
-downstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py forwards legacy calls to the Rust CLI
 @dependency-end
 -->
 
@@ -19,9 +18,8 @@ stale name、duplicate heading を structured analysis に取り込む adapter c
 ## Evidence And Assumption Ledger
 
 - Evidence sources:
-  `database-design.md`, `README.md`,
-  `../../rust/agent-canon/src/structured_analysis.rs`, and
-  `../../tools/agent_tools/noncanonical_document_inventory.py`.
+  `database-design.md`, `README.md`, and
+  `../../rust/agent-canon/src/structured_analysis.rs`.
 - Assumptions:
   Document canon inventory JSON uses the implemented keys `documents`,
   `findings`, and `historical_records`; graph storage uses the implemented
@@ -47,10 +45,8 @@ agent-canon structured-analysis import-document-inventory \
   --json "$GRAPH_HOME/document_inventory.json"
 ```
 
-Python の `tools/agent_tools/noncanonical_document_inventory.py` は caller warning
-付きの legacy migration shim である。新しい workflow / hook /
-structured-analysis integration は Rust CLI を参照する。shim の警告が出た場合は、
-呼び出し元を Rust CLI へ移行してから元 task へ戻る。
+Old Python document-inventory entrypoints are retired. New workflow, hook, and
+structured-analysis integration references the Rust CLI directly.
 
 ## Finding Kinds
 

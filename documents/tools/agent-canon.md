@@ -79,11 +79,6 @@ a blocker.
 These old commands are compatibility forwarders:
 
 - `bash tools/ci/run_docs_checks.sh`
-- `python3 tools/docs/format_markdown.py`
-- `python3 tools/docs/fix_markdown_math.py`
-- `python3 tools/docs/fix_mermaid.py`
-- `python3 tools/docs/check_markdown_lint.py`
-- `python3 tools/docs/check_markdown_math.py`
 - `python3 tools/docs/audit_and_fix_links.py --check`
 
 When a forwarder is called, it prints `AGENT_CANON_FORWARDER=deprecated`,
