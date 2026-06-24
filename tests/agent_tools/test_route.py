@@ -164,6 +164,39 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("document-canon-cleanup", decision["active_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
+    def test_prompt_routes_codex_report_document_repo_optimization(self) -> None:
+        """Codex report and document based repo optimization should not fall through."""
+        result = self.run_route(
+            "--prompt",
+            "Codexのレポとか文書とか見ながら，ここのレポの最適化を行ってください",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        for skill in ("agent-log-analysis", "document-canon-cleanup", "structure-refactor"):
+            self.assertIn(skill, decision["matched_skills"])
+            self.assertIn(skill, decision["active_skills"])
+        self.assertIn("report-writing", decision["related_skill_candidates"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_explicit_reader_report_to_report_writing(self) -> None:
+        """Explicit reader-facing report requests should activate report-writing."""
+        result = self.run_route(
+            "--prompt",
+            "評価レポートを作り，source packet と limitations を含めて",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("report-writing", decision["matched_skills"])
+        self.assertIn("report-writing", decision["active_skills"])
+        self.assertIn("structure-planning", decision["related_skill_candidates"])
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+
     def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
         """The shell wrapper must not preserve a local-llm route-skill alias."""
         result = subprocess.run(

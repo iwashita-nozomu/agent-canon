@@ -284,6 +284,7 @@ skill_families:
       - result-artifact-writeout
       - tool-finding-report
       - agent-learning
+      - report-writing
     routing:
       stage_policy: active
       reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
@@ -302,7 +303,16 @@ skill_families:
         - ["toolcall", "skillcall", "ルーティング"]
         - ["runbundle", "agent", "レポート"]
         - ["run bundle", "agent", "report"]
+        - ["codex", "レポ"]
+        - ["codex", "report"]
+        - ["runtime", "dashboard"]
+        - ["compact", "dashboard"]
+        - ["agent-runtime-dashboard"]
+        - ["runbundle", "ログ"]
+        - ["runbundle", "レポート"]
         - ["過去", "agent", "レポート"]
+        - ["過去", "runbundle"]
+        - ["過去", "run bundle"]
         - ["欠落", "スキル"]
         - ["弱い", "動線"]
         - ["エージェント", "成長"]
@@ -366,6 +376,32 @@ skill_families:
     purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
+    related_skills:
+      - result-artifact-writeout
+      - structure-planning
+      - prose-reasoning-graph
+      - html-output
+      - change-review
+    routing:
+      stage_policy: active
+      reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
+      triggers:
+        - ["レポート"]
+        - ["報告書"]
+        - ["評価", "報告"]
+        - ["報告", "作"]
+        - ["レポート", "作"]
+        - ["report", "write"]
+        - ["report", "draft"]
+        - ["report", "quality"]
+        - ["decision", "brief"]
+        - ["audit", "report"]
+        - ["status", "report"]
+        - ["experiment", "report"]
+        - ["evaluation", "report"]
+        - ["reader-facing", "report"]
+        - ["presentation", "narrative"]
+        - ["ppt", "storyboard"]
   - id: prose-reasoning-graph
     purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
     canonical_doc: agents/skills/prose-reasoning-graph.md
@@ -481,6 +517,9 @@ skill_families:
         - ["repository", "refactor"]
         - ["repo", "structure"]
         - ["repository", "structure"]
+        - ["repo", "optimization"]
+        - ["repository", "optimization"]
+        - ["レポの", "最適化"]
         - ["ディレクトリ", "構成"]
         - ["directory", "structure"]
         - ["path", "layout"]
@@ -571,6 +610,10 @@ skill_families:
         - ["document", "inventory"]
         - ["文書", "掃除"]
         - ["文書", "整理"]
+        - ["文書", "最適化"]
+        - ["文書", "棚卸"]
+        - ["docs", "inventory"]
+        - ["documents", "optimize"]
         - ["古い", "文書"]
         - ["古い", "ツール"]
         - ["旧", "文書"]
