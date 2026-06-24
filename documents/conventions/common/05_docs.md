@@ -46,6 +46,14 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
   proof obligation、`proof_status`、checker evidence を分けて書きます。
   実装由来の数学 claim は public entrypoint、入力 schema、戻り値 projection、
   実装 trace / checker evidence へ接続し、`$formal-proof-workflow` の証明状態表へ渡します。
+- 数学的判定は `mathematical necessity gate` を通します。判定ごとに
+  `Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route`
+  を固定し、`necessary-and-sufficient condition`、program contract の
+  precondition / invariant / postcondition、theorem target / proof obligation、
+  user request、approved design のいずれかから採用根拠を示します。
+- 採用根拠が未接続の判定候補は `non-contractual mathematical judgment` として
+  proof / review backlog へ回し、実装 branch、runtime diagnostic gate、
+  test oracle、checker pass condition へ昇格する前の修復対象にします。
 - `program contract` は実装由来 claim の入口です。public entrypoint、入力 schema、
   設定 / runtime profile、return projection、observable state / effect、
   assumptions / preconditions、validation command を並べます。

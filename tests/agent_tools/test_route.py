@@ -22,24 +22,12 @@ AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class RouteToolTest(unittest.TestCase):
-    """Exercise route.py output and compatibility aliases."""
+    """Exercise route.py output and routing aliases."""
 
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run route.py with arguments."""
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-    def run_rust_skill_route(self, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the Rust-backed skill router."""
-        if not AGENT_CANON_CLI.is_file():
-            self.skipTest("Rust agent-canon CLI wrapper is not available")
-        return subprocess.run(
-            [str(AGENT_CANON_CLI), "local-llm", "route-skill", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -128,6 +116,111 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
+    def test_prompt_file_routes_through_python_owner(self) -> None:
+        """Prompt files should use the Python routing owner."""
+        prompt = "スキルとツールのルーティングが遅すぎるので改善して"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            python_result = self.run_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        self.assertEqual(python_decision["schema"], "agent_canon.route.skill_route.v1")
+        self.assertIn("task-routing", python_decision["active_skills"])
+        for key in ("skills", "active_skills", "deferred_skills", "matched_skills"):
+            self.assertIn(key, python_decision)
+
+    def test_prompt_routes_old_tool_document_cleanup(self) -> None:
+        """Old tool and document cleanup requests should enter document-canon cleanup."""
+        result = self.run_route("--prompt", "古いツール，文書の掃除を", "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("document-canon-cleanup", decision["matched_skills"])
+        self.assertIn("document-canon-cleanup", decision["active_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
+        """The shell wrapper must not preserve a local-llm route-skill alias."""
+        result = subprocess.run(
+            [str(AGENT_CANON_CLI), "local-llm", "route-skill", "--prompt", "x", "--format", "json"],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("LOCAL_LLM_CLI_ERROR=unknown local-llm command route-skill", result.stderr)
+
+    def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
+        """Underscore-prefixed skills are private and stay out of public routing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: _private-skill",
+                        "    purpose: Private skill.",
+                        "    canonical_doc: agents/skills/_private-skill.md",
+                        "    shim: .agents/skills/_private-skill/SKILL.md",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "private skill",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("must be public", result.stderr)
+
+    def test_prompt_routes_skill_visibility_naming_to_task_routing(self) -> None:
+        """Skill visibility naming requests belong to the routing skill surface."""
+        prompt = "UserFacingなスキルとそうでないものを命名で分ける。private skill は _ 始まりにする"
+        result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+
+    def test_prompt_routes_official_skill_delegation_to_task_routing(self) -> None:
+        """Official skill delegation prompts should enter the deterministic router."""
+        prompt = "公式スキルで賄えるところを移譲して"
+        python_result = self.run_route(
+            "--prompt",
+            prompt,
+            "--mode",
+            "routing-only",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        self.assertEqual(python_decision["mode"], "repo-changing")
+        self.assertIn("task-routing", python_decision["matched_skills"])
+        self.assertIn("task-routing", python_decision["active_skills"])
+        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_routes_agent_learning_and_oop_readability(self) -> None:
         """Weak historical skill surfaces should be recommended from contextual prompts."""
         result = self.run_route(
@@ -172,35 +265,17 @@ class RouteToolTest(unittest.TestCase):
         for prompt in prompts:
             with self.subTest(prompt=prompt):
                 python_result = self.run_route("--prompt", prompt, "--format", "json")
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    prompt_path = Path(tmp_dir) / "prompt.txt"
-                    prompt_path.write_text(prompt, encoding="utf-8")
-                    rust_result = self.run_rust_skill_route(
-                        "--prompt-file",
-                        str(prompt_path),
-                        "--format",
-                        "json",
-                    )
 
                 self.assertEqual(
                     python_result.returncode,
                     0,
                     python_result.stdout + python_result.stderr,
                 )
-                self.assertEqual(
-                    rust_result.returncode,
-                    0,
-                    rust_result.stdout + rust_result.stderr,
-                )
                 python_decision = json.loads(python_result.stdout)
-                rust_decision = json.loads(rust_result.stdout)
                 self.assertIn("adaptive-improvement-loop", python_decision["skills"])
                 self.assertIn("adaptive-improvement-loop", python_decision["matched_skills"])
                 self.assertIn("adaptive-improvement-loop", python_decision["active_skills"])
                 self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
-                self.assertEqual(python_decision["skills"], rust_decision["skills"])
-                self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
-                self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_routes_root_design_followup_to_task_routing(self) -> None:
         """Broad follow-up redesign prompts should not fall through to matched=none."""
@@ -226,20 +301,9 @@ class RouteToolTest(unittest.TestCase):
             "AGENTS.md と skill の重複を削って skill 側へ責務移行する"
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
         for skill in (
             "task-routing",
             "agent-log-analysis",
@@ -255,9 +319,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertIn("agent-learning", python_decision["deferred_skills"])
         self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
-        self.assertEqual(python_decision["skills"], rust_decision["skills"])
-        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
-        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
         """All-skill command packet repair should not fall through."""
@@ -266,20 +327,9 @@ class RouteToolTest(unittest.TestCase):
             "ミスることが多発しています．すべてのスキルを修正してください"
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
         for skill in ("task-routing", "structure-refactor", "comprehensive-development", "agent-learning"):
             self.assertIn(skill, python_decision["matched_skills"])
             self.assertIn(skill, python_decision["skills"])
@@ -288,9 +338,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertIn("agent-learning", python_decision["deferred_skills"])
         self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
-        self.assertEqual(python_decision["skills"], rust_decision["skills"])
-        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
-        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(self) -> None:
         """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
@@ -540,110 +587,48 @@ class RouteToolTest(unittest.TestCase):
             "ルーティングも含めてリファクタリング。実装時の抽象化不足も修正対象。"
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
         for skill in ("task-routing", "pr-processing", "refactor-loop"):
             self.assertIn(skill, python_decision["matched_skills"])
             self.assertIn(skill, python_decision["active_skills"])
         self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
-        for key in (
-            "skills",
-            "active_skills",
-            "deferred_skills",
-            "matched_skills",
-        ):
-            self.assertEqual(python_decision[key], rust_decision[key], key)
 
     def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
         """Unneeded numerical-test complaints should activate test-design routing."""
         prompt = "不要な数値テストを入れるのをやめさせてください"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
         self.assertIn("test-design", python_decision["matched_skills"])
         self.assertIn("test-design", python_decision["active_skills"])
-        self.assertEqual(python_decision["skills"], rust_decision["skills"])
-        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
-        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
     def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(self) -> None:
-        """English unneeded numerical-test prompts should match the Rust router."""
+        """English unneeded numerical-test prompts should route to test design."""
         prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
         self.assertIn("test-design", python_decision["matched_skills"])
         self.assertIn("test-design", python_decision["active_skills"])
-        self.assertEqual(python_decision["skills"], rust_decision["skills"])
-        self.assertEqual(python_decision["active_skills"], rust_decision["active_skills"])
-        self.assertEqual(python_decision["matched_skills"], rust_decision["matched_skills"])
 
-    def test_prompt_skill_route_matches_rust_harness(self) -> None:
-        """Python compatibility prompt routing should match the Rust skill router."""
+    def test_prompt_skill_route_schema_and_wave_fields(self) -> None:
+        """Prompt routing should emit the route-owned schema and wave fields."""
         prompt = (
             "スキルとツールのルーティングを根本の設計から見直し、"
             "マルチエージェントでログのレポートを残す"
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            prompt_path = Path(tmp_dir) / "prompt.txt"
-            prompt_path.write_text(prompt, encoding="utf-8")
-            rust_result = self.run_rust_skill_route(
-                "--prompt-file",
-                str(prompt_path),
-                "--format",
-                "json",
-            )
 
         self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
-        self.assertEqual(rust_result.returncode, 0, rust_result.stdout + rust_result.stderr)
         python_decision = json.loads(python_result.stdout)
-        rust_decision = json.loads(rust_result.stdout)
-        for key in (
-            "route",
-            "mode",
-            "skills",
-            "active_skills",
-            "deferred_skills",
-            "matched_skills",
-        ):
-            self.assertEqual(python_decision[key], rust_decision[key], key)
+        self.assertEqual(python_decision["schema"], "agent_canon.route.skill_route.v1")
+        self.assertEqual(python_decision["route"], "skill-selection")
+        for key in ("active_skills", "deferred_skills", "matched_skills"):
+            self.assertIsInstance(python_decision[key], list)
 
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""

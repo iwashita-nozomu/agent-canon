@@ -21,6 +21,7 @@ import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -32,9 +33,11 @@ FORMAT_VALUES = ("text", "json", "markdown")
 MODE_VALUES = ("routing-only", "repo-changing")
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
+JsonMapping = Mapping[str, object]
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
 STAGE_POLICY_VALUES = ("active", "deferred")
+PRIVATE_SKILL_PREFIX = "_"
 
 AREA_DATA: tuple[AreaData, ...] = (
     (
@@ -285,6 +288,8 @@ REPO_CHANGING_TERMS = (
     "修正",
     "実装",
     "リファクタ",
+    "移行",
+    "移譲",
     "変更",
     "直して",
     "見直",
@@ -434,12 +439,36 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
     parser.add_argument("--root", default=str(DEFAULT_ROOT), help="repository root for catalog-backed routing")
     parser.add_argument("--area", choices=[area.key for area in catalog.areas()])
     parser.add_argument("--name", action="append", default=[], help="long tool or skill name")
-    parser.add_argument("--prompt", default="", help="prompt text to route into public skills")
+    parser.add_argument(
+        "--prompt",
+        "--request",
+        "--purpose",
+        "--task",
+        action="append",
+        default=[],
+        help="prompt text to route into public skills",
+    )
+    parser.add_argument(
+        "--prompt-file",
+        "--request-file",
+        "--query-file",
+        action="append",
+        default=[],
+        help="read prompt text from a file relative to --root when not absolute",
+    )
+    parser.add_argument(
+        "--prompt-stdin",
+        "--request-stdin",
+        "--query-stdin",
+        action="store_true",
+        help="read prompt text from stdin",
+    )
     parser.add_argument("--mode", choices=MODE_VALUES, default="repo-changing")
     parser.add_argument("--list", action="store_true", help="list short routing areas")
     parser.add_argument("--format", choices=FORMAT_VALUES, default="text")
     parser.add_argument("--risk", choices=RISK_VALUES, default="focused")
     parser.add_argument("--changed", nargs="*", default=[], help="changed paths for evidence")
+    parser.add_argument("prompt_parts", nargs="*", help="positional prompt text for prompt routing")
     return parser
 
 
@@ -463,24 +492,34 @@ def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     return all(term.lower() in text for term in group)
 
 
-def load_skill_catalog(root: Path) -> dict[str, object]:
+def object_mapping(value: object, field: str) -> JsonMapping:
+    """Return one string-keyed mapping from parsed catalog data."""
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field} must be a mapping")
+    return cast(JsonMapping, value)
+
+
+def object_sequence(value: object, field: str) -> Sequence[object]:
+    """Return one sequence from parsed catalog data."""
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list")
+    return cast(Sequence[object], value)
+
+
+def load_skill_catalog(root: Path) -> JsonMapping:
     """Load the machine-readable public skill catalog."""
     path = root / SKILL_CATALOG_PATH
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         raise ValueError(f"{SKILL_CATALOG_PATH} YAML parse failed: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise ValueError(f"{SKILL_CATALOG_PATH} must be a mapping")
-    return raw
+    return object_mapping(raw, str(SKILL_CATALOG_PATH))
 
 
 def string_list(value: object, field: str) -> tuple[str, ...]:
     """Return a tuple of non-empty strings from one YAML sequence."""
-    if not isinstance(value, list):
-        raise ValueError(f"{field} must be a list")
     result: list[str] = []
-    for item in value:
+    for item in object_sequence(value, field):
         if not isinstance(item, str) or not item.strip():
             raise ValueError(f"{field} entries must be non-empty strings")
         result.append(item)
@@ -491,10 +530,8 @@ def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
     """Return normalized trigger term groups from YAML."""
     if value is None:
         return ()
-    if not isinstance(value, list):
-        raise ValueError(f"{field} must be a list")
     groups: list[tuple[str, ...]] = []
-    for index, group in enumerate(value):
+    for index, group in enumerate(object_sequence(value, field)):
         groups.append(string_list(group, f"{field}[{index}]"))
     return tuple(groups)
 
@@ -502,29 +539,28 @@ def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
 def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
     """Load prompt-routing rules from the public skill catalog."""
     data = load_skill_catalog(root)
-    families = data.get("skill_families")
-    if not isinstance(families, list):
-        raise ValueError("skill_families must be a list")
+    families = object_sequence(data.get("skill_families"), "skill_families")
     rules: list[SkillRoutingRule] = []
     observed_skill_ids: set[str] = set()
     for index, entry in enumerate(families):
-        if not isinstance(entry, dict):
-            raise ValueError(f"skill_families[{index}] must be a mapping")
-        skill_id = entry.get("id")
+        entry_mapping = object_mapping(entry, f"skill_families[{index}]")
+        skill_id = entry_mapping.get("id")
         if not isinstance(skill_id, str) or not skill_id.strip():
             raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        if skill_id.startswith(PRIVATE_SKILL_PREFIX):
+            raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
         if skill_id in observed_skill_ids:
             raise ValueError(f"duplicate skill catalog id: {skill_id}")
         observed_skill_ids.add(skill_id)
-        routing = entry.get("routing", {})
+        routing = entry_mapping.get("routing")
         if routing is None:
-            routing = {}
-        if not isinstance(routing, dict):
-            raise ValueError(f"{skill_id}.routing must be a mapping")
-        reason = routing.get("reason", "prompt explicitly names public skill")
+            routing_mapping: JsonMapping = {}
+        else:
+            routing_mapping = object_mapping(routing, f"{skill_id}.routing")
+        reason = routing_mapping.get("reason", "prompt explicitly names public skill")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError(f"{skill_id}.routing.reason must be a non-empty string")
-        stage_policy = routing.get("stage_policy", "deferred")
+        stage_policy = routing_mapping.get("stage_policy", "deferred")
         if stage_policy not in STAGE_POLICY_VALUES:
             raise ValueError(f"{skill_id}.routing.stage_policy must be one of {STAGE_POLICY_VALUES}")
         rules.append(
@@ -532,10 +568,32 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                 skill=skill_id,
                 reason=reason,
                 stage_policy=str(stage_policy),
-                triggers=trigger_groups(routing.get("triggers"), f"{skill_id}.routing.triggers"),
+                triggers=trigger_groups(routing_mapping.get("triggers"), f"{skill_id}.routing.triggers"),
             )
         )
     return tuple(rules)
+
+
+def read_prompt_file(root: Path, raw_path: str) -> str:
+    """Read one prompt file, resolving relative paths from the repository root."""
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = root / path
+    if not path.is_file():
+        raise FileNotFoundError(f"prompt-file-not-found:{raw_path}")
+    return path.read_text(encoding="utf-8")
+
+
+def prompt_text_from_args(args: argparse.Namespace, root: Path) -> str:
+    """Return normalized prompt text from CLI prompt sources."""
+    parts: list[str] = []
+    parts.extend(str(part) for part in args.prompt)
+    parts.extend(str(part) for part in args.prompt_parts)
+    for prompt_file in args.prompt_file:
+        parts.append(read_prompt_file(root, str(prompt_file)))
+    if args.prompt_stdin:
+        parts.append(sys.stdin.read())
+    return "\n".join(part.strip() for part in parts if part.strip())
 
 
 def public_skill_name_mentioned(text: str, skill: str) -> bool:
@@ -676,7 +734,8 @@ class RouteRenderer:
     def render_skill_decision(self, decision: SkillRouteDecision) -> str:
         """Render one prompt-derived skill selection decision."""
         if self._format == "json":
-            return json.dumps(asdict(decision), indent=2, sort_keys=True)
+            payload = {"schema": "agent_canon.route.skill_route.v1", **asdict(decision)}
+            return json.dumps(payload, indent=2, sort_keys=True)
         if self._format == "markdown":
             skills = ", ".join(f"`${skill}`" for skill in decision.skills)
             reasons = "<br>".join(f"`{reason}`" for reason in decision.reasons) or "`none`"
@@ -701,6 +760,7 @@ class RouteRenderer:
         return "\n".join(
             [
                 f"ROUTE={decision.route}",
+                "SCHEMA=agent_canon.route.skill_route.v1",
                 f"MODE={decision.mode}",
                 f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
                 f"ACTIVE_SKILLS={','.join(f'${skill}' for skill in decision.active_skills)}",
@@ -773,13 +833,20 @@ def main() -> int:
     args = parser.parse_args()
     renderer = RouteRenderer(args.format)
 
-    if args.prompt:
+    root = Path(args.root).resolve()
+    try:
+        prompt_text = prompt_text_from_args(args, root)
+    except OSError as exc:
+        print(f"SKILL_ROUTER_ERROR={exc}", file=sys.stderr)
+        return 2
+
+    if prompt_text:
         try:
-            rules = load_skill_route_rules(Path(args.root).resolve())
+            rules = load_skill_route_rules(root)
         except (OSError, ValueError) as exc:
             print(f"SKILL_ROUTER_ERROR={exc}", file=sys.stderr)
             return 2
-        print(renderer.render_skill_decision(decide_skills(str(args.prompt), str(args.mode), rules)))
+        print(renderer.render_skill_decision(decide_skills(prompt_text, str(args.mode), rules)))
         return 0
 
     if args.name:

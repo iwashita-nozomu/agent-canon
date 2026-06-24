@@ -108,6 +108,9 @@ SAFE_TOOL_SCRIPT_PREFIXES = (
     "scan_dependency_headers",
     "tool_rejection_preflight",
 )
+SAFE_TOOL_SCRIPT_SUBCOMMANDS = {
+    "runtime_log_archive_git.py": {"repo-key", "status", "check-clean"},
+}
 SAFE_SED_PRINT_SCRIPT = re.compile(r"^(?:\d+|\$)(?:,(?:\d+|\$))?p$")
 FAST_HOOK_TIMEOUT_SECONDS = 10
 REFERENCE_CAPTURE_TIMEOUT_SECONDS = 15
@@ -433,6 +436,8 @@ def safe_python_validation(tokens: tuple[str, ...]) -> bool:
         return module in SAFE_PYTHON_MODULE_CHECKS
     if len(tokens) >= SCRIPT_MIN_TOKENS:
         script = Path(tokens[SCRIPT_PATH_INDEX])
+        if safe_tool_script_subcommand(script, tokens[SCRIPT_SUBCOMMAND_INDEX:]):
+            return True
         if script.parts[:2] == ("tools", "agent_tools"):
             return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
         if script.parts[:2] == ("tools", "docs") and script.name.startswith("check_"):
@@ -457,11 +462,40 @@ def safe_bash_validation(tokens: tuple[str, ...]) -> bool:
             len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS
             and tokens[SCRIPT_SUBCOMMAND_INDEX] in {"plan", "status"}
         )
+    if safe_tool_script_subcommand(script, tokens[SCRIPT_SUBCOMMAND_INDEX:]):
+        return True
     if script.parts[:2] == ("tools", "agent_tools"):
         return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
     if script.parts[:2] == ("tools", "ci"):
         return script.name.startswith(("check_", "run_"))
     return False
+
+
+def safe_tool_script_subcommand(script: Path, arguments: tuple[str, ...]) -> bool:
+    """Return whether one repo tool subcommand is a read-only validation command."""
+    allowed = SAFE_TOOL_SCRIPT_SUBCOMMANDS.get(script.name)
+    if not allowed:
+        return False
+    if script.parts[:2] != ("tools", "agent_tools"):
+        return False
+    subcommand = first_non_option_argument(arguments)
+    return subcommand in allowed
+
+
+def first_non_option_argument(arguments: tuple[str, ...]) -> str:
+    """Return the first positional token after leading CLI options."""
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--":
+            return arguments[index + 1] if index + 1 < len(arguments) else ""
+        if not argument.startswith("-"):
+            return argument
+        if argument in {"--source-root", "--canon-root", "--remote", "--archive-root"}:
+            index += 2
+            continue
+        index += 1
+    return ""
 
 
 def validation_command(command: str) -> bool:

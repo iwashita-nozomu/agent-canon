@@ -28,6 +28,15 @@ C / C++ source に対して、class / struct / function が責務と所有境界
 - pass-through / identity に近い wrapper: 役割が薄く、domain contract を持たない adapter 候補を検出します。
 - 未完了の brace body: class / struct / function の `{ ... }` が閉じていない場合は `syntax_error` として検出します。
 
+## SOLID report fields
+
+Markdown / JSON report は、finding kind を SOLID principle signal へ投影した
+`solid_counts` と finding ごとの `solid_principles` を含みます。
+対応表の正本は `tools/oop/shared/readability_core.py` の
+`SOLID_PRINCIPLES_BY_KIND` です。C++ checker では、public surface、base class、
+public field、`nullptr` routing、mixed effect、不要 wrapper を SOLID の見出しで
+review できるようにします。
+
 ## 許容する境界
 
 この checker はすべての public field、長い primitive 引数列、identity

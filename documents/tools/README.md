@@ -5,6 +5,7 @@ responsibility Documents ツール入口 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
@@ -26,6 +27,7 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py run
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
+downstream implementation ../../tools/agent_tools/compare_agent_run_paths.py compares run-bundle route efficiency
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
 downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
 downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
@@ -35,7 +37,6 @@ downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py ext
 downstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
 downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template source roots into Lean evidence
 downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
-downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary and shared graph visualization projection contract
 @dependency-end
 -->
 
@@ -88,8 +89,11 @@ Detailed tool behavior belongs in the same-named tool document or in
 `tools/catalog.yaml`. This hub keeps only the families a reader usually needs
 to choose a route:
 
-- Catalog and drift checks: `tool_catalog.py`, `tool_drift.py`,
-  `responsibility_scope.py`, and `import_responsibility.py`.
+- Catalog, drift, and pre-edit routing checks: `tool_catalog.py`,
+  `tool_drift.py`, `tool_rejection_preflight.py`, `responsibility_scope.py`,
+  and `import_responsibility.py`. `tool_rejection_preflight.py` reports a
+  `responsibility_scope` gate with the owner scope, class, and protecting tools
+  from `responsibility-scope.toml`.
 - Runtime evidence and generated output guards: `runtime_log_archive_git.py`,
   `eval_accumulation_check.py`, `run_accumulated_agent_evals.py`, and
   `generated_artifact_guard.py`.
@@ -109,6 +113,21 @@ Graph visualization follows the Prose Reasoning Graph DSL projection contract.
 runtime dashboard diagrams are adapters or projections; their domain producers
 keep validation authority. Proof and JIT-canonical IR tools provide source facts
 that future graph viewers map through the same DSL contract.
+
+## Evidence And Assumption Ledger
+
+- Evidence sources:
+  `../structured-analysis/graph-dsl.md`,
+  `../prose-reasoning-graph/dsl-spec.md`,
+  `../../rust/agent-canon/src/structured_analysis.rs`, and
+  `../../tools/agent_tools/render_dependency_manifest_graph.py`.
+- Assumption:
+  Graph DSL terms in this tool index describe shared storage and projection
+  vocabulary. Standard-form / 標準形 terms stay with the design-claim checker
+  contract. Individual tools keep pass/fail authority for their native domain.
+- Parent-doc alignment:
+  `../structured-analysis/graph-dsl.md` owns Graph DSL Core storage. The prose
+  reasoning graph DSL owns prose adapter vocabulary used by prose workflows.
 
 When a reader needs exact options, run the command with `--help` or open the
 same-named file under `documents/tools/`. Do not expand this README into a
@@ -171,7 +190,7 @@ second command manual.
 - `tools/ci/check_experiment_registry.py`
   - shared experiment registry contract の entrypoint と command を確認します。
 - `tools/validation/notebook_quality.py`
-  - `jupyter/` や `notebooks/` の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
+  - default notebook directories の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
   - Codex hook では changed notebook だけを見て、`assert`、`pytest`、`test_` 関数、保存済み error output、可視化 code 不在を block します。
 - `tools/experiments/create_experiment_topic.py`
   - shared topic scaffold から experiment topic を作ります。
@@ -243,7 +262,7 @@ second command manual.
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
   - 新しい public tool / skill を足す前に `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳めるか確認します。
 - `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の `make agent-canon-ensure-latest`、root view 修復の `make agent-canon-links`、drift check の `make agent-canon-check` 経由で使います。
+  - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、drift check の `bash tools/sync_agent_canon.sh check` 経由で使います。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
@@ -275,9 +294,21 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
   - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
 - `agent-canon structured-analysis build --root . --profile manual`
-  - user-home cache に `prose_graph.sqlite`、`diagnostics.sqlite`、`document_inventory.json`、`exports/` を作り、source file から中間表現 DB と warning DB を再生成します。`--out-dir` を指定した場合だけその artifact root に出力します。
+  - user-home cache に `prose_graph.sqlite` と `diagnostics.sqlite` を作り、
+    source file から中間表現 DB と warning DB を再生成します。`--out-dir`
+    を指定した場合は、その artifact root に `document_inventory.json`、
+    `exports/document_inventory.md`、`structured_analysis_build.json`、
+    `exports/structured_analysis_summary.md` を出力します。
+- `agent-canon structured-analysis graph-contract --db <prose_graph.sqlite>`
+  - Graph DSL Core の storage contract に対して、materialized DB の table、row、
+    layer、edge endpoint、JSON payload、diagnostic target を検査します。`--db`
+    なしでは contract summary と layer registry を出します。
+  - Graph projection vocabulary は source-truth anchor / source span、
+    lower graph / lower text unit、typed relation、projection view /
+    derived projection、reader-state、macro-claim、node record / nodes
+    table、edge record / edges table、`payload_json` を共通語彙として扱います。
 - `agent-canon structured-analysis document-inventory --root .`
-  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。旧 `tools/agent_tools/noncanonical_document_inventory.py` は caller warning 付きの legacy migration shim です。
+  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。
   - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
 - `tools/agent_tools/reference_materializer.py`
   - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
@@ -338,7 +369,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
-  - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-report|archive-agent-reports|push` を使います。
+  - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時の subcommand set は `tools/agent_tools/runtime_log_archive_git.py` が所有します。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、local LLM、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。

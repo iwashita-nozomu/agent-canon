@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 47
+expected_count = 49
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -23,7 +23,7 @@ description = "Every discoverable Codex skill shim must be loadable and dependen
 id = "SKILL-SHIM-GENERIC-1"
 critical = true
 description = "Starts with YAML frontmatter and includes required name/description fields."
-required_regex = ["\\A---\\n", "\\nname:\\s*[-a-z0-9]+", "\\ndescription:\\s*\\S"]
+required_regex = ["\\A---\\n", "\\nname:\\s*_?[a-z0-9]+(?:-[a-z0-9]+)*", "\\ndescription:\\s*\\S"]
 
 [[evals.checklist]]
 id = "SKILL-SHIM-GENERIC-2"
@@ -40,7 +40,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 48
+expected_count = 50
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -1049,7 +1049,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
 description = "Routes skill selection through the catalog, runtime shims, and deterministic router owner row."
-required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "agent-canon local-llm route-skill"]
+required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "python3 tools/agent_tools/route\\.py --prompt"]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-1"
@@ -1079,7 +1079,7 @@ description = "The discoverable agent-orchestration skill must enforce mandatory
 id = "CONVENTION-SKILL-1"
 critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "selected_runtime_skill_read", "small_change_skill_read"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]
@@ -1176,7 +1176,7 @@ description = "The discoverable Codex task workflow skill must call convention c
 id = "CONVENTION-SKILL-2"
 critical = true
 description = "Requires convention compliance verifier during repo task closeout."
-required_regex = ["check_convention_compliance\\.py", "before closeout"]
+required_regex = ["check_convention_compliance\\.py", "before closeout", "selected_runtime_skill_read", "small_change_skill_read"]
 
 [[evals.checklist]]
 id = "CODEX-TASK-PRE-EDIT-PACKET-1"
@@ -1673,7 +1673,7 @@ description = "Documents exclude usage for vendored snapshots and generated repo
 required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bundle"]
 
 [[evals]]
-id = "oop-refactor-skill-route"
+id = "oop-refactor-routing-scope"
 target = "agents/skills/refactor-loop.md"
 kind = "skill"
 description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
@@ -2015,7 +2015,7 @@ description = "Keeps generated evidence append-only in the archive and separates
 required_regex = ["append-only", "runtime_log_archive_git\\.py", "\\$report-writing", "generated_artifact_guard\\.py"]
 
 [[evals]]
-id = "agent-canon-update-route-skill"
+id = "agent-canon-update-routing"
 target = ".agents/skills/agent-canon-update/SKILL.md"
 kind = "skill"
 description = "The runtime AgentCanon update skill must route parent pin updates, source PR work, root-view repair, and update TODO state through the canonical high-level commands."

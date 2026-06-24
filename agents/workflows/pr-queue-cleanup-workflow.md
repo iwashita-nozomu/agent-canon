@@ -10,6 +10,7 @@ upstream design goal-plan-implementation-loop.md defines blocked-goal next-actio
 downstream design README.md lists this workflow in the maintenance catalog.
 downstream implementation ../../tools/ci/check_agent_canon_pr.sh enforces template-side AgentCanon PR gates.
 downstream implementation ../../tools/ci/check_agent_canon_latest.sh enforces AgentCanon freshness gates.
+downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence queue markers.
 @dependency-end
 -->
 
@@ -58,8 +59,8 @@ as part of default cleanup.
    - mergeability is `MERGEABLE`;
    - no review requests block it;
    - required checks pass or no checks are configured for that repository;
-   - the PR body contains validation evidence and GitHub automation evidence
-     when applicable.
+   - the PR body contains `PR Essence`, validation evidence, and GitHub
+     automation evidence when applicable.
 1. After source merge, update the template / derived repo:
    - fetch AgentCanon `main`;
    - run `make agent-canon-ensure-latest`;
@@ -73,6 +74,8 @@ as part of default cleanup.
    - `make agent-canon-pr-check`;
    - `make ci`.
 1. Update the dependent PR body with:
+   - `PR Essence`: problem / user request, design intent, canonical owner,
+     behavior or contract delta, and evidence route;
    - AgentCanon source PR URL and merge SHA;
    - template pin SHA;
    - validation pass lines or exact blockers;

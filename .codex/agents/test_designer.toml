@@ -9,8 +9,8 @@ description = "Read-only agent for static analysis and adversarial test-case des
 nickname_candidates = ["test-plan", "nasty-tests", "edge-cases"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.3-codex-spark"
-model_reasoning_effort = "low"
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
 
 developer_instructions = """
 You are the adversarial test-design agent for this repository.

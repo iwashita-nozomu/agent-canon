@@ -7,17 +7,37 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
+# upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
+# upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
+# upstream design ../../agents/skills/pr-processing.md PR body and run-bundle evidence skill
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
+# upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
+# upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
+# upstream design ../../agents/skills/small-change-routing.md small change routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
+# upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
+# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime implementation workflow skill
+# upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
+# upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
+# upstream design ../../.agents/skills/pr-processing/SKILL.md runtime PR processing skill
+# upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
+# upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
 # upstream design ../../documents/codex-configuration-reference.md Codex hook severity policy
+# upstream design ../../documents/coding-conventions-house-style.md implementation ownership guardrail
+# upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
 # upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
 # upstream implementation ./skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
@@ -31,9 +51,29 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import tomllib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+MARKER_CONTRACTS_PATH = Path("tools/agent_tools/convention_compliance_contracts.toml")
+
+
+def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
+    """Load declarative marker contracts from the checked-in manifest."""
+    manifest = Path(__file__).resolve().parents[2] / MARKER_CONTRACTS_PATH
+    payload = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    contracts: dict[str, dict[str, tuple[str, ...]]] = {}
+    for contract in payload.get("contracts", []):
+        contract_id = contract["id"]
+        surfaces: dict[str, tuple[str, ...]] = {}
+        for surface in contract.get("surfaces", []):
+            surfaces[surface["path"]] = tuple(surface.get("markers", []))
+        contracts[contract_id] = surfaces
+    return contracts
+
+
+DECLARATIVE_MARKER_CONTRACTS = load_marker_contracts()
 
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
@@ -112,6 +152,11 @@ TOOL_GATES = {
         "tools/oop/python/readability.py",
         (
             "documents/object-oriented-design.md",
+            "documents/coding-conventions-python.md",
+            "agents/skills/oop-readability-check.md",
+            ".agents/skills/oop-readability-check/SKILL.md",
+            "agents/skills/python-review.md",
+            ".agents/skills/python-review/SKILL.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
         ),
     ),
@@ -219,6 +264,79 @@ SKILL_ROUTING_MARKERS = (
     "task-shape skill",
     "check_convention_compliance.py",
 )
+FALLBACK_EXIT_POLICY_MARKERS = {
+    ".agents/skills/agent-orchestration/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/subagent-bootstrap/SKILL.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    "agents/skills/subagent-bootstrap.md": (
+        "fallback_exit_status",
+        "canonical_rerun_pass",
+        "durable_blocker_or_issue",
+        "explicit_approval_evidence",
+        "router_unavailable_blocker",
+    ),
+    ".agents/skills/tool-finding-report/SKILL.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+    "agents/skills/tool-finding-report.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+    "agents/templates/workflow_monitoring.md": (
+        "tool_warning_exit_status",
+        "resolved",
+        "deferred_with_issue",
+        "accepted_with_reason",
+        "explicit_approval_evidence",
+    ),
+}
+FALLBACK_EXIT_FORBIDDEN_RE = re.compile(
+    r"(?i)(?:"
+    r"sole basis for path selection|"
+    r"falling back to a parent-direct alternate route|"
+    r"parent-direct[^\n.。]{0,120}alternate route|"
+    r"parent-direct\s*代替|"
+    r"worker[^\n.。]{0,80}alternate route)"
+)
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
     ".agents/skills/agent-orchestration/SKILL.md": (
         "$prose-reasoning-graph",
@@ -305,6 +423,12 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "DOCUMENT_STRUCTURE_REQUIRED",
     ),
 }
+SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "small_change_skill_read"
+]
+RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "responsibility_preflight_gate"
+]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -411,6 +535,208 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "behavior-owned cases",
     ),
 }
+MATHEMATICAL_NECESSITY_MARKERS = {
+    "documents/conventions/common/05_docs.md": (
+        "mathematical necessity gate",
+        "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route",
+        "necessary-and-sufficient condition",
+        "non-contractual mathematical judgment",
+    ),
+    "documents/coding-conventions-testing.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    "agents/skills/test-design.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    ".agents/skills/test-design/SKILL.md": (
+        "mathematical necessity gate",
+        "Numerical Trigger",
+        "Non-Numerical Alternative",
+        "checker-owned property",
+    ),
+    "agents/skills/computational-optimization.md": (
+        "mathematical necessity gate",
+        "iteration map",
+        "stopping scalar",
+        "failure semantics",
+    ),
+    ".agents/skills/computational-optimization/SKILL.md": (
+        "mathematical necessity gate",
+        "iteration map",
+        "stopping scalar",
+        "failure semantics",
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "mathematical necessity gate",
+        "program contract",
+        "theorem surface",
+        "proof obligation",
+    ),
+    ".agents/skills/formal-proof-workflow/SKILL.md": (
+        "mathematical necessity gate",
+        "program contract",
+        "theorem surface",
+        "proof obligation",
+    ),
+}
+IMPLEMENTATION_GUARDRAIL_MARKERS = {
+    "documents/coding-conventions-house-style.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "caller migration",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+        "check_convention_compliance.py",
+    ),
+    "notes/guardrails/engineering_avoidances.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "caller migration",
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    ".agents/skills/codex-task-workflow/SKILL.md": (
+        "contract-complete implementation",
+        "acceptance contract",
+        "design_issue_blocker",
+        "implementation shortcut",
+    ),
+    "agents/workflows/comprehensive-refactoring-workflow.md": (
+        "compatibility-preservation drift",
+        "duplicate implementation",
+        "canonical owner",
+        "Removal and Caller Migration Plan",
+    ),
+}
+REFACTOR_SEQUENCE_MARKERS = {
+    "agents/skills/refactor-loop.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    ".agents/skills/refactor-loop/SKILL.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    "agents/workflows/comprehensive-refactoring-workflow.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+    "documents/coding-conventions-house-style.md": (
+        "two-stage refactor",
+        "forced migration",
+        "usage-surface repair",
+        "return-gate validation",
+    ),
+}
+REVIEW_ISSUE_ROUTING_MARKERS = {
+    "agents/skills/change-review.md": (
+        "issue_route",
+        "issues/open/",
+        "issue_sync.py",
+        "new_local_issue",
+        "github_mirror",
+    ),
+    ".agents/skills/change-review/SKILL.md": (
+        "issue_route",
+        "issues/README.md",
+        "issue_sync.py",
+        "new_local_issue",
+        "github_mirror",
+    ),
+    "documents/REVIEW_PROCESS.md": (
+        "Review Finding Issue Routing",
+        "issue_route",
+        "issues/open/",
+        "issue_sync.py",
+        "github_mirror",
+    ),
+}
+PR_ESSENCE_DOCUMENTATION_MARKERS = {
+    ".github/PULL_REQUEST_TEMPLATE.md": (
+        "## PR Essence",
+        "Problem / user request",
+        "Design intent",
+        "Canonical owner",
+        "Behavior or contract delta",
+        "Evidence route",
+    ),
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
+        "## PR Essence",
+        "Problem / user request",
+        "Design intent",
+        "Canonical owner",
+        "Behavior or contract delta",
+        "Evidence route",
+    ),
+    "agents/skills/pr-processing.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    ".agents/skills/pr-processing/SKILL.md": (
+        "PR Essence",
+        "problem / user",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    "agents/workflows/agent-canon-pr-workflow.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+    "agents/workflows/pr-queue-cleanup-workflow.md": (
+        "PR Essence",
+        "problem / user request",
+        "design intent",
+        "canonical owner",
+        "behavior or contract delta",
+        "evidence route",
+    ),
+}
+SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "solid_coding_contract"
+]
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
     r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
@@ -524,7 +850,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -587,7 +913,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "implementation stage gate",
@@ -753,10 +1079,8 @@ def markdown_table_rows(lines: Sequence[str]) -> list[str]:
     return rows
 
 
-def same_resolved_file(left: Path | None, right: Path | None) -> bool:
-    """Return whether two optional paths point to the same filesystem entry."""
-    if left is None or right is None:
-        return False
+def same_resolved_file(left: Path, right: Path) -> bool:
+    """Return whether two paths point to the same filesystem entry."""
     try:
         return left.resolve(strict=True) == right.resolve(strict=True)
     except OSError:
@@ -767,9 +1091,13 @@ def owner_map_entrypoint_rows(
     root: Path, path: str
 ) -> Sequence[tuple[str, Sequence[tuple[str, ...]]]]:
     """Return owner-map rows for the entrypoint role active at ``path``."""
-    if path == "AGENTS.md" and same_resolved_file(
-        readable_path(root, "AGENTS.md"),
-        readable_path(root, "ROOT_AGENTS.md"),
+    agents_path = readable_path(root, "AGENTS.md")
+    root_agents_path = readable_path(root, "ROOT_AGENTS.md")
+    if (
+        path == "AGENTS.md"
+        and agents_path is not None
+        and root_agents_path is not None
+        and same_resolved_file(agents_path, root_agents_path)
     ):
         return OWNER_MAP_ENTRYPOINT_TABLE_ROWS["ROOT_AGENTS.md"]
     return OWNER_MAP_ENTRYPOINT_TABLE_ROWS[path]
@@ -777,9 +1105,13 @@ def owner_map_entrypoint_rows(
 
 def duplicate_root_view_entrypoint(root: Path, path: str) -> bool:
     """Return whether ``path`` is already covered by the root entrypoint view."""
-    return path == "AGENTS.md" and same_resolved_file(
-        readable_path(root, "AGENTS.md"),
-        readable_path(root, "ROOT_AGENTS.md"),
+    agents_path = readable_path(root, "AGENTS.md")
+    root_agents_path = readable_path(root, "ROOT_AGENTS.md")
+    return (
+        path == "AGENTS.md"
+        and agents_path is not None
+        and root_agents_path is not None
+        and same_resolved_file(agents_path, root_agents_path)
     )
 
 
@@ -875,6 +1207,44 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_fallback_exit_policy(root: Path) -> list[Finding]:
+    """Verify fallback paths are routed to explicit exit evidence."""
+    paths = tuple(FALLBACK_EXIT_POLICY_MARKERS)
+    findings = check_required_files(root, paths, "skill_fallback_exit_policy")
+    for path, markers in FALLBACK_EXIT_POLICY_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "skill_fallback_exit_policy",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+        for match in FALLBACK_EXIT_FORBIDDEN_RE.finditer(text):
+            line_no = text.count("\n", 0, match.start()) + 1
+            findings.append(
+                Finding(
+                    "skill_fallback_exit_policy",
+                    path,
+                    f"forbidden-fallback-completion-wording:{line_no}",
+                )
+            )
+        if "accepted_with_reason" in text and "explicit_approval_evidence" not in text:
+            findings.append(
+                Finding(
+                    "skill_fallback_exit_policy",
+                    path,
+                    "accepted-without-explicit-approval-evidence",
+                )
+            )
+    return findings
+
+
 def check_document_structure_routing(root: Path) -> list[Finding]:
     """Verify docs edit routing keeps structure analysis mechanically visible."""
     paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
@@ -893,6 +1263,23 @@ def check_document_structure_routing(root: Path) -> list[Finding]:
                         f"missing-marker:{marker}",
                     )
                 )
+    return findings
+
+
+def collect_marker_contract_findings(
+    root: Path, check: str, required_markers: dict[str, tuple[str, ...]]
+) -> list[Finding]:
+    """Verify a manifest-backed marker contract against repository files."""
+    paths = tuple(required_markers)
+    findings = check_required_files(root, paths, check)
+    for path, markers in required_markers.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(Finding(check, path, f"missing-marker:{marker}"))
     return findings
 
 
@@ -988,6 +1375,111 @@ def check_test_contract_routing(root: Path) -> list[Finding]:
                 findings.append(
                     Finding(
                         "test_contract_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_mathematical_necessity_gate(root: Path) -> list[Finding]:
+    """Verify mathematical judgments stay wired to necessity evidence."""
+    paths = tuple(MATHEMATICAL_NECESSITY_MARKERS)
+    findings = check_required_files(root, paths, "mathematical_necessity_gate")
+    for path, markers in MATHEMATICAL_NECESSITY_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "mathematical_necessity_gate",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_implementation_guardrails(root: Path) -> list[Finding]:
+    """Verify implementation ownership and acceptance guardrails stay visible."""
+    paths = tuple(IMPLEMENTATION_GUARDRAIL_MARKERS)
+    findings = check_required_files(root, paths, "implementation_guardrails")
+    for path, markers in IMPLEMENTATION_GUARDRAIL_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "implementation_guardrails",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_refactor_sequence(root: Path) -> list[Finding]:
+    """Verify refactor procedure stays routed through the two-stage sequence."""
+    paths = tuple(REFACTOR_SEQUENCE_MARKERS)
+    findings = check_required_files(root, paths, "refactor_sequence")
+    for path, markers in REFACTOR_SEQUENCE_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "refactor_sequence",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_review_issue_routing(root: Path) -> list[Finding]:
+    """Verify review findings stay connected to durable issue routes."""
+    paths = tuple(REVIEW_ISSUE_ROUTING_MARKERS)
+    findings = check_required_files(root, paths, "review_issue_routing")
+    for path, markers in REVIEW_ISSUE_ROUTING_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "review_issue_routing",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
+def check_pr_essence_documentation(root: Path) -> list[Finding]:
+    """Verify PR routes preserve change essence in body and run-bundle evidence."""
+    paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
+    findings = check_required_files(root, paths, "pr_essence_documentation")
+    for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "pr_essence_documentation",
                         path,
                         f"missing-marker:{marker}",
                     )
@@ -1270,11 +1762,34 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
+    findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "small_change_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "responsibility_preflight_gate",
+            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+        )
+    )
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
     findings.extend(check_test_contract_routing(root))
+    findings.extend(check_mathematical_necessity_gate(root))
+    findings.extend(check_implementation_guardrails(root))
+    findings.extend(check_refactor_sequence(root))
+    findings.extend(check_review_issue_routing(root))
+    findings.extend(check_pr_essence_documentation(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
+        )
+    )
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))

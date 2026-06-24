@@ -113,6 +113,10 @@ path = "../.agents/skills/html-output/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/issue-finding-report/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/literature-survey/SKILL.md"
 enabled = true
 
@@ -166,6 +170,10 @@ enabled = true
 
 [[skills.config]]
 path = "../.agents/skills/result-artifact-writeout/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/small-change-routing/SKILL.md"
 enabled = true
 
 [[skills.config]]

@@ -56,6 +56,12 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 1. user-facing return までの内部 step では、途中状態を毎回動作可能に保つための
    分割や per-step operation check を要求しません。期待 API と対象 call site を
    一貫して更新し、最後の return gate で intended API 全体を検証します。
+1. API 形状と構造を変える refactor は two-stage refactor として扱います。
+   stage 1 は `forced migration` で、canonical surface、旧 entry、alias、
+   wrapper、config route、generated surface の移動または削除をまとめて行います。
+   stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
+   config、report consumer を新しい surface に合わせます。test、smoke、
+   behavior execution は二段完了後の return-gate validation に集約します。
 1. 実装前に `Targets To Change:` として、変更する関数、method、class を
    `path:start-end:qualname` で列挙します。file や module だけを target にして
    実装へ入ってはいけません。
@@ -105,8 +111,9 @@ Stopping、logging、runtime tolerance、preconditioner など、複数 algorith
    initialize-time policy、削除する legacy alias / helper を明示します。この
    expected API は write-capable subagent と reviewer の context に含めます。
 1. `Targets To Change:` には canonical surface を構成する関数、method、class を
-   `path:start-end:qualname` で列挙します。利用側の全置換を同じ最初の slice に
-   混ぜません。
+   `path:start-end:qualname` で列挙します。stage 1 の forced migration は正本
+   surface の移動または削除をまとめ、stage 2 の usage-surface repair で利用面を
+   更新します。
 1. `Forbidden Semantic Delta:` には、停止条件、tolerance 解決、ログ項目、数値
    residual の定義を変えないことを明記します。意味を変える必要がある場合は
    refactor pass ではなく design / algorithm pass に分離します。

@@ -1,6 +1,6 @@
 ---
 name: oop-readability-check
-description: Use when the user asks to run the OOP readability checker, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis.
+description: Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis.
 ---
 <!--
 @dependency-start
@@ -35,6 +35,14 @@ Execute the required and task-matching conditional commands that the packet prin
    - `run-and-analyze`: run the tool, then add agent analysis
 1. Treat user-provided paths as authoritative. Do not broaden scope unless the
    user asks for broader scope.
+1. Treat SOLID, Single responsibility, Open/closed, Liskov substitution,
+   Interface segregation, Dependency inversion, class responsibility, public API
+   width, `Protocol`, inheritance, and dependency inversion prompts as OOP
+   readability scope.
+1. Treat this skill as the SOLID route owner for SOLID check prompts and
+   mechanical SOLID signal reports; language-specific review skills consume the
+   report only when their changed diff already owns that language surface. Keep
+   SOLID labels as mechanical projections of the checker categories.
 1. In tool-running modes, use the OOP readability CLI with language selection
    delegated to the tool. The default command shape is:
 
@@ -46,8 +54,8 @@ Execute the required and task-matching conditional commands that the packet prin
    exclude generated or vendored surfaces (`vendor`, `reports`, `.git`, `build`,
    `.pytest_cache`, `.ruff_cache`).
 1. If the user asks for a report, render the mechanical result as tables:
-   command, exit status, summary metrics, dimensions, finding kinds, hotspots,
-   and the first relevant finding rows.
+   command, exit status, summary metrics, SOLID principle signals, dimensions,
+   finding kinds, hotspots, and the first relevant finding rows.
 1. In any tool-running mode, create a Markdown report artifact by default at
    `reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md`.
    Chat-only tables do not satisfy this skill unless the user explicitly says
@@ -58,6 +66,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
    Keep it under a separate `Agent Analysis` section after the mechanical
    result. Prioritize by risk and leverage, identify likely false positives,
-   cite mechanical evidence, and read hotspot files only when needed.
+   group by SOLID principle signals, cite mechanical evidence, and read hotspot
+   files only when needed.
 1. When a run bundle is active, record timing as a behavior event:
    `tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths>`.

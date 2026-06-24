@@ -4,6 +4,7 @@ contract reference
 responsibility Documents the Prose Reasoning Graph canon document set.
 upstream design ../README.md AgentCanon document index
 upstream design ../structured-analysis/README.md structured analysis package boundary
+upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
 downstream design dsl-spec.md normative DSL and graph contract
 downstream design ../tools/prose_reasoning_graph.md tool usage documentation
 downstream design ../../agents/skills/prose-reasoning-graph.md skill handoff contract
@@ -13,20 +14,22 @@ downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py curre
 
 # Prose Reasoning Graph
 
-This directory is the AgentCanon source of truth for Prose Reasoning Graph
-concepts that are larger than one tool invocation. Tool usage stays under
-`documents/tools/`; the graph language, validation rules, and extension
-contract live here.
+This directory owns the prose adapter/profile for AgentCanon graph analysis.
+The shared storage language lives in
+[Graph DSL Core](../structured-analysis/graph-dsl.md). Tool usage stays under
+`documents/tools/`; prose-specific source anchoring, discourse relations,
+projection rules, validation rules, and extension contract live here.
 
 ## Canon Documents
 
-- [DSL Specification](dsl-spec.md): the normative graph/DSL contract for the
-  SQLite-backed MVP and later independent tool extraction.
+- [DSL Specification](dsl-spec.md): the prose adapter/profile contract over the
+  shared Graph DSL Core.
 
 ## Ownership Boundary
 
-- This directory owns the Prose Reasoning Graph DSL vocabulary and validation
-  contract.
+- This directory owns prose graph vocabulary and validation contract.
+- Generic graph storage object families, layer registry, and contract
+  validation belong to [Graph DSL Core](../structured-analysis/graph-dsl.md).
 - The broader extraction-oriented package boundary lives in
   [Structured Analysis](../structured-analysis/).
 - The DSL treats prose as one text-anchored semantic graph; macro prose

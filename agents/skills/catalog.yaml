@@ -6,6 +6,8 @@ version: 1
 # @dependency-end
 
 skill_families:
+  # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
+  # shims use .agents/skills/_<name>/SKILL.md and stay owner-routed.
   - id: agent-orchestration
     purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
@@ -54,6 +56,27 @@ skill_families:
         - ["スキル", "一つずつ"]
         - ["スキル選択", "ルーティング"]
         - ["スキル", "ツール", "ルーティング"]
+        - ["スキル", "命名"]
+        - ["skill", "naming"]
+        - ["スキル", "細分化"]
+        - ["skill", "split"]
+        - ["skill", "granular"]
+        - ["ハードコード", "スキル"]
+        - ["hardcode", "skill"]
+        - ["userfacing", "skill"]
+        - ["private", "skill"]
+        - ["公式", "スキル"]
+        - ["system", "skill"]
+        - ["official", "skill"]
+        - ["host-provided"]
+        - ["openai-docs"]
+        - ["skill-creator"]
+        - ["skill-installer"]
+        - ["imagegen"]
+        - ["plugin-creator"]
+        - ["公式", "委譲"]
+        - ["スキル", "委譲"]
+        - ["スキル", "移譲"]
         - ["根本", "設計", "見直"]
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.
@@ -63,6 +86,27 @@ skill_families:
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .agents/skills/codex-task-workflow/SKILL.md
+  - id: small-change-routing
+    purpose: Route small repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
+    canonical_doc: agents/skills/small-change-routing.md
+    shim: .agents/skills/small-change-routing/SKILL.md
+    routing:
+      stage_policy: active
+      reason: small repository edit needs a minimal skill-read and targeted-validation route
+      triggers:
+        - ["小規模修正"]
+        - ["小規模", "修正"]
+        - ["軽微", "修正"]
+        - ["小さい", "変更"]
+        - ["small", "change"]
+        - ["small repository edit"]
+        - ["Scoped Change Lite"]
+        - ["one-file", "fix"]
+        - ["single-abstraction"]
+        - ["typo", "link"]
+        - ["format-only"]
+        - ["selected_runtime_skill_read"]
+        - ["small_change_skill_read"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -89,15 +133,25 @@ skill_families:
         - ["コード", "レビュー"]
         - ["根本", "設計", "レビュー"]
   - id: python-review
-    purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
+    purpose: Review Python diffs with pyright, pytest, ruff, type-boundary awareness, API behavior, and OOP readability evidence when a Python diff already owns it.
     canonical_doc: agents/skills/python-review.md
     shim: .agents/skills/python-review/SKILL.md
+    routing:
+      stage_policy: deferred
+      reason: Python implementation review is in scope
+      triggers:
+        - ["Python", "review"]
+        - ["Python", "コードレビュー"]
+        - ["Python", "レビュー"]
+        - ["pyright"]
+        - ["ruff"]
+        - ["pytest", "Python"]
   - id: cpp-review
     purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
     canonical_doc: agents/skills/cpp-review.md
     shim: .agents/skills/cpp-review/SKILL.md
   - id: oop-readability-check
-    purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
+    purpose: Run the OOP readability checker, produce mechanical SOLID/OOP report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
     routing:
@@ -111,6 +165,19 @@ skill_families:
         - ["readability", "check"]
         - ["可読性", "class"]
         - ["可読性", "method"]
+        - ["SOLID"]
+        - ["SRP"]
+        - ["OCP"]
+        - ["LSP"]
+        - ["ISP"]
+        - ["DIP"]
+        - ["Single responsibility"]
+        - ["Open/closed"]
+        - ["Liskov"]
+        - ["Interface segregation"]
+        - ["Dependency inversion"]
+        - ["責務", "class"]
+        - ["Protocol", "境界"]
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
@@ -131,6 +198,39 @@ skill_families:
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .agents/skills/tool-finding-report/SKILL.md
+    routing:
+      stage_policy: active
+      reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
+      triggers:
+        - ["警告", "tool"]
+        - ["警告", "checker"]
+        - ["ad hoc", "warning"]
+        - ["adhoc", "warning"]
+        - ["ad hoc", "警告"]
+        - ["adhoc", "警告"]
+        - ["ハードコード", "警告"]
+        - ["hardcode", "warning"]
+        - ["checker", "finding"]
+        - ["tool", "finding"]
+        - ["static analysis", "finding"]
+  - id: issue-finding-report
+    purpose: Convert accumulated prompt, run-bundle, hook, skill/tool/workflow routing, and eval evidence into durable AgentCanon skill issues by abstract cause with multi-agent review partitions.
+    canonical_doc: agents/skills/issue-finding-report.md
+    shim: .agents/skills/issue-finding-report/SKILL.md
+    routing:
+      stage_policy: active
+      reason: accumulated runtime evidence should become durable skill or workflow issues
+      triggers:
+        - ["スキル", "issue"]
+        - ["skill", "issue"]
+        - ["ログ", "issue"]
+        - ["runbundle", "issue"]
+        - ["run bundle", "issue"]
+        - ["過去", "やり取り", "issue"]
+        - ["抽象原因"]
+        - ["原因", "抽象"]
+        - ["durable", "issue"]
+        - ["issue", "finding"]
   - id: agent-log-analysis
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
@@ -176,7 +276,7 @@ skill_families:
         - ["agent-canon", "update"]
         - ["vendor/agent-canon"]
   - id: pr-processing
-    purpose: Process GitHub pull request and issue queues by inventorying state, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
     shim: .agents/skills/pr-processing/SKILL.md
     routing:
@@ -190,6 +290,9 @@ skill_families:
         - ["pr", "片づ"]
         - ["pull request"]
         - ["pull request", "merge"]
+        - ["PR Essence"]
+        - ["PR", "本質"]
+        - ["PR", "本文", "本質"]
         - ["merge queue"]
         - ["conflict", "解消"]
         - ["コンフリクト", "解消"]
@@ -354,7 +457,6 @@ skill_families:
         - ["markdown", "heading"]
         - ["markdown", "link"]
         - ["markdown", "formatter"]
-        - ["format_markdown"]
         - ["formatter", "adjacent"]
         - ["フォーマッタ"]
         - ["フォーマット", "周辺"]
@@ -369,6 +471,24 @@ skill_families:
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
     shim: .agents/skills/document-canon-cleanup/SKILL.md
+    routing:
+      stage_policy: active
+      reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
+      triggers:
+        - ["document-canon"]
+        - ["document", "cleanup"]
+        - ["docs", "cleanup"]
+        - ["stale", "docs"]
+        - ["old", "docs"]
+        - ["non-canonical", "document"]
+        - ["noncanonical", "document"]
+        - ["document", "inventory"]
+        - ["文書", "掃除"]
+        - ["文書", "整理"]
+        - ["古い", "文書"]
+        - ["古い", "ツール"]
+        - ["旧", "文書"]
+        - ["生成", "文書"]
   - id: dependency-analysis
     purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md

@@ -3,6 +3,7 @@
 contract reference
 responsibility Defines the Prose Reasoning Graph DSL and graph contract.
 upstream design README.md Prose Reasoning Graph canon directory index
+upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
 upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
 coverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim
 coverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json
@@ -21,11 +22,13 @@ downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md ru
 
 # Prose Reasoning Graph DSL Specification
 
-This document is the normative contract for the Prose Reasoning Graph DSL used
-inside AgentCanon. The current implementation stores the graph in SQLite, but
-the SQLite database is an intermediate analysis artifact. The durable source of
-truth for vocabulary, layers, object shape, validation, and extension rules is
-this specification.
+This document is the prose adapter/profile contract over the shared
+[Graph DSL Core](../structured-analysis/graph-dsl.md). The current implementation
+stores the graph in SQLite, but the SQLite database is an intermediate analysis
+artifact. The durable source of truth for prose vocabulary, prose layers,
+projection rules, validation, and extension rules is this specification.
+Generic storage object families and cross-adapter contract validation are owned
+by Graph DSL Core.
 
 The DSL represents prose as a typed, layered graph. A reader-facing order is a
 projection from that graph, not the graph itself. This keeps discourse
@@ -44,7 +47,7 @@ view, not one prose layer versus another.
 
 This specification is binding for:
 
-- graph layers and allowed MVP layer names;
+- prose graph layers and allowed prose MVP layer names;
 - graph visualization adapters and projection artifacts;
 - document responsibility contracts and responsibility-derived coverage checks;
 - directory responsibility projections derived from README and child artifact
@@ -55,11 +58,12 @@ This specification is binding for:
 - projection and topological ordering rules;
 - split, merge, bridge, and reorder operation packets;
 - handoff boundaries to writing, review, experiment, and artifact skills;
-- adapter rules for future code/design mirror inputs.
+- adapter rules for future code/design mirror inputs that enter prose analysis.
 
-This specification does not define final prose quality, citation approval,
-experiment acceptance, PR merge authority, or repository policy. Those
-decisions remain with the receiving skill, reviewer, or workflow.
+This specification does not define generic graph storage, final prose quality,
+citation approval, experiment acceptance, PR merge authority, or repository
+policy. Generic storage belongs to Graph DSL Core. Other decisions remain with
+the receiving skill, reviewer, or workflow.
 
 ## Linguistic Grounding
 
@@ -303,7 +307,9 @@ must still cite or inspect actual sources before making scholarly claims.
 
 ### Edge
 
-An edge represents a typed relation between two nodes.
+An edge represents a typed relation between two prose-profile nodes. The shared
+storage shape is defined by Graph DSL Core; this section constrains prose
+relation meaning and projection use.
 
 | Field | Required | Meaning |
 | ----- | -------- | ------- |
@@ -380,12 +386,14 @@ The MVP schema reserves judgements for future workflow integration. A receiving
 skill must not infer human approval from a generated judgement unless the
 workflow explicitly records that authority.
 
-## MVP Layer Registry
+## MVP Prose Layer Registry
 
-The MVP layer registry is closed. New first-class layers require an update to
-this specification and the implementation. Adapter-specific experiments must use
-payload fields or documented extension layers until promoted. The registry
-distinguishes source-truth layers from derived analysis and projection layers.
+The prose MVP layer registry is closed for prose-profile semantics. New
+first-class shared layers require an update to Graph DSL Core. New
+prose-specific layer meanings require an update to this specification and the
+implementation. Adapter-specific experiments use payload fields or documented
+extension layers until promoted. The registry distinguishes source-truth layers
+from derived analysis and projection layers.
 
 | Layer | Primary Nodes | Primary Edges | Responsibility |
 | ----- | ------------- | ------------- | -------------- |

@@ -27,6 +27,7 @@ Responsibilities:
 - verify that checkpoint success is not treated as task-level completion when planned work units remain
 - when assigned as diff-check agent, verify the latest diff against run bundle evidence rather than accepting a parent summary
 - when assigned as diff-check agent, verify mechanical completion loop evidence covers planned work, review findings, validation, dependency review, static analysis, commit / push, canon sync, and follow-up decisions
+- when reviewing Python diffs, verify SOLID-sensitive class, dataclass, `Protocol`, inheritance, public API, type-boundary, or dependency-direction changes cite a path-covered OOP readability report and `check_solid_evidence.py` output
 - return one explicit decision: approve, revise, or escalate when used as a checkpoint reviewer
 
 Rules:
@@ -59,4 +60,5 @@ Rules:
 - return revise when correctness evidence and performance evidence are conflated
 - return escalate when one implementation slice mixes code changes, protocol changes, and XLA/runtime flag changes without an explicit request clause
 - return revise when experiment scripts duplicate runner, scheduler, GPU-slot, timeout-cleanup, pid-registry, or monitoring-loop responsibilities
+- return revise when a Python diff changes SOLID-sensitive boundaries without path-covered OOP readability evidence, SOLID principle signal counts, and `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` evidence
 """

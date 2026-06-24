@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
-# responsibility Tests the markdown math fixer CLI behavior.
-# upstream implementation ../../tools/docs/fix_markdown_math.py markdown math fixer under test
+# responsibility Tests the Rust markdown math fixer CLI behavior.
+# upstream implementation ../../rust/agent-canon/src/docs.rs implements docs fix-math.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 
@@ -10,13 +10,12 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "fix_markdown_math.py"
+AGENT_CANON = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class FixMarkdownMathTest(unittest.TestCase):
@@ -25,7 +24,7 @@ class FixMarkdownMathTest(unittest.TestCase):
     def run_cli(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the fixer and capture output."""
         return subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), *args],
+            [str(AGENT_CANON), "docs", "fix-math", *args],
             cwd=root,
             check=False,
             capture_output=True,
@@ -50,6 +49,8 @@ class FixMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("DOCS_FIX_MATH=wrote", result.stdout)
+            self.assertIn("DOCS_CHECK=pass", result.stdout)
             rewritten = doc.read_text(encoding="utf-8")
             self.assertIn("Inline $x + y$ text.", rewritten)
             self.assertIn("$$\nx + y = z\n$$", rewritten)
@@ -67,6 +68,8 @@ class FixMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("DOCS_FIX_MATH=wrote", result.stdout)
+            self.assertIn("DOCS_CHECK=pass", result.stdout)
             rewritten = doc.read_text(encoding="utf-8")
             self.assertIn("$$x + y = z$$", rewritten)
             self.assertIn("$$\na + b = c\n$$", rewritten)
@@ -84,6 +87,7 @@ class FixMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("DOCS_CHECK=pass", result.stdout)
             rewritten = doc.read_text(encoding="utf-8")
             self.assertIn("\\(x + y\\)", rewritten)
             self.assertIn("\\[", rewritten)

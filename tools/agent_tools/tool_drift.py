@@ -182,6 +182,38 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="tool_rejection_preflight",
+        tool="tools/agent_tools/tool_rejection_preflight.py",
+        links=(
+            LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
+            LinkCheck("agents/skills/codex-task-workflow.md"),
+            LinkCheck(".agents/skills/codex-task-workflow/SKILL.md"),
+            LinkCheck("agents/skills/small-change-routing.md"),
+            LinkCheck(".agents/skills/small-change-routing/SKILL.md"),
+            LinkCheck("tools/agent_tools/responsibility_scope.py"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tests/agent_tools/test_tool_rejection_preflight.py"),
+        ),
+        text_checks=(
+            TextCheck(
+                "agents/COMMUNICATION_PROTOCOL.md",
+                "`responsibility_scope` gate records",
+                "missing-responsibility-scope-preflight-protocol",
+            ),
+            TextCheck(
+                ".agents/skills/codex-task-workflow/SKILL.md",
+                "responsibility_scope",
+                "missing-runtime-workflow-responsibility-preflight",
+            ),
+            TextCheck(
+                ".agents/skills/small-change-routing/SKILL.md",
+                "responsibility_scope",
+                "missing-runtime-small-change-responsibility-preflight",
+            ),
+        ),
+    ),
+    ToolContract(
         name="local_llm_eval",
         tool="tools/agent_tools/local_llm_eval.py",
         links=(

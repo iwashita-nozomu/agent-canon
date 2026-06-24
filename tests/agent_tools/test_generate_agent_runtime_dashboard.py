@@ -20,6 +20,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from generate_agent_runtime_dashboard import HookWorkflowBreakdownReader  # noqa: E402
 from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
@@ -27,6 +28,15 @@ DASHBOARD_PROMPT_CHAR_COUNT = 27
 
 class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     """Verify dashboard output from accumulated runtime evidence."""
+
+    def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
+        """Log archive readers should tolerate hook files removed after discovery."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_log = Path(temp_dir) / "removed.jsonl"
+
+            entries = HookWorkflowBreakdownReader.iter_entries(missing_log)
+
+        self.assertEqual(entries, ())
 
     def test_generates_log_location_dashboard(self) -> None:
         """The dashboard should show canonical paths and accumulated counts."""
@@ -410,6 +420,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "skip_by_hook_family",
             "namespace_debt_by_hook_family",
             "oop_applicability",
+            "priority_problems",
+            "priority_next_actions",
+            "selection_misses",
         ):
             self.assertIn(key, payload)
         self.assertEqual(payload["unknown_event_count"], 1)
@@ -424,8 +437,125 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["oop_applicability"]["applicable_count"], 1)
         self.assertEqual(payload["oop_applicability"]["not_applicable_count"], 1)
         self.assertEqual(payload["oop_applicability"]["missing_reason_count"], 0)
+        self.assertTrue(
+            any(
+                problem["type"] == "skill"
+                and problem["component"] == "agent-orchestration"
+                and problem["status"] == "fail"
+                for problem in payload["priority_problems"]
+            )
+        )
+        self.assertTrue(
+            any(
+                action["action"] == "repair failed skill eval for agent-orchestration"
+                for action in payload["priority_next_actions"]
+            )
+        )
+        self.assertIn(
+            {
+                "responsibility": "skill",
+                "name": "md-style-check",
+                "selected": 0,
+                "candidate": 1,
+                "missed": 1,
+                "miss_rate": "100.0%",
+                "reset_basis": "untracked-or-unknown",
+            },
+            payload["selection_misses"],
+        )
         self.assertIn("| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard)
         self.assertIn("oop_applicability", compact_dashboard)
+
+    def test_selection_metrics_normalize_workflows_and_known_skills(self) -> None:
+        """Selection metrics should compare canonical workflow names only."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.append_selection_normalization_fixture(root)
+            output = root / "reports" / "dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `workflow` | `platform-and-environment` | `1` | `1` | `0` | `0.0%` |",
+            dashboard,
+        )
+        self.assertNotIn("| `skill` | `pid` |", dashboard)
+
+    def test_selection_metrics_use_run_bundle_workflow_selection(self) -> None:
+        """Run-bundle workflow declarations should confirm workflow candidates."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_workflow_catalog_fixture(root)
+            self.append_run_bundle_workflow_selection_fixture(root)
+            output = root / "reports" / "dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `workflow` | `platform-and-environment` | `1` | `1` | `0` | `0.0%` |",
+            dashboard,
+        )
+        self.assertNotIn("| `workflow` | `agent-canon-update-route` |", dashboard)
+
+    def test_selection_metrics_alias_legacy_docs_tool(self) -> None:
+        """Legacy docs tool names should be counted under the canonical CLI."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.append_tool_alias_fixture(root)
+            output = root / "reports" / "dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `tool` | `agent-canon-cli` | `2` | `2` | `0` | `0.0%` |",
+            dashboard,
+        )
+        self.assertNotIn("| `tool` | `run_docs_checks.sh` |", dashboard)
 
     def write_fixture(self, root: Path, *, source_root: Path | None = None) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -629,6 +759,125 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 }
             )
             + "\n",
+            encoding="utf-8",
+        )
+
+    def append_selection_normalization_fixture(self, root: Path) -> None:
+        """Add workflow display-name and stale selected-skill evidence."""
+        skill_dir = root / ".agents" / "skills" / "agent-orchestration"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("# agent-orchestration\n", encoding="utf-8")
+        hook_dir = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / repo_log_key(root)
+            / "test-container"
+        )
+        with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-normalization",
+                        "hook_log_namespace": "test-container",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "payload_fingerprint": "payload-normalization",
+                        "timestamp": "2026-05-17T01:02:04Z",
+                        "skills": ["agent-orchestration", "pid"],
+                        "selected_workflows": ["Platform And Environment"],
+                        "workflow": ["Platform And Environment"],
+                        "candidate_workflows": ["platform-and-environment"],
+                    }
+                )
+                + "\n"
+            )
+
+    def append_run_bundle_workflow_selection_fixture(self, root: Path) -> None:
+        """Add a workflow candidate confirmed only by run-bundle monitoring."""
+        hook_dir = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / repo_log_key(root)
+            / "test-container"
+        )
+        with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-workflow-candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "payload_fingerprint": "payload-workflow-candidate",
+                        "timestamp": "2026-05-17T01:02:04Z",
+                        "candidate_workflows": [
+                            "platform-and-environment",
+                            "agent-canon-update-route",
+                        ],
+                    }
+                )
+                + "\n"
+            )
+        workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report.write_text(
+            workflow_report.read_text(encoding="utf-8")
+            + "- `2026-05-17 10:02 JST` workflow=Platform And Environment, "
+            + "skills=$agent-orchestration, review=local\n",
+            encoding="utf-8",
+        )
+
+    def append_tool_alias_fixture(self, root: Path) -> None:
+        """Add a legacy docs-tool candidate and canonical tool selection."""
+        hook_dir = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / repo_log_key(root)
+            / "test-container"
+        )
+        with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-tool-alias-candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "payload_fingerprint": "payload-tool-alias-candidate",
+                        "timestamp": "2026-05-17T01:02:04Z",
+                        "candidate_tools": ["run_docs_checks.sh"],
+                    }
+                )
+                + "\n"
+                + json.dumps(
+                    {
+                        "hook_run_id": "hook-tool-alias-selected",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "pass",
+                        "payload_fingerprint": "payload-tool-alias-selected",
+                        "timestamp": "2026-05-17T01:02:05Z",
+                        "selected_tools": ["agent-canon-cli"],
+                    }
+                )
+                + "\n"
+            )
+
+    def write_workflow_catalog_fixture(self, root: Path) -> None:
+        """Write a minimal workflow family catalog."""
+        catalog = root / "agents" / "task_catalog.yaml"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text(
+            "\n".join(
+                [
+                    "workflow_families:",
+                    "  - id: platform_and_environment",
+                    "    name: Platform And Environment",
+                    "tasks:",
+                    "  - id: T1",
+                    "    family: platform_and_environment",
+                    "",
+                ]
+            ),
             encoding="utf-8",
         )
 

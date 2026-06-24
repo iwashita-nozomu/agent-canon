@@ -19,6 +19,11 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
 - class、dataclass、`Protocol`、composition、継承の判断は [オブジェクト指向設計方針](./object-oriented-design.md) に従います。
+- compatibility-preservation drift は旧入口、旧名、旧 wrapper、旧 config route を残して caller migration を先送りする状態です。
+- duplicate implementation は同じ責務、同じ normalized body、同じ tool behavior、同じ DSL / contract を複数 path に置く状態です。
+- 実装追加前に canonical owner を確認し、既存 owner の拡張、caller migration、削除順序を同じ変更に含めます。
+- 実装 slice は contract-complete implementation として request clause、acceptance contract、source packet、validation route を結びます。
+- 構造 refactor は two-stage refactor とし、forced migration の後に usage-surface repair を行い、return-gate validation でまとめて確認します。
 - JAX を使う場合、trace 対象では `jax.lax.*` と配列演算を使い、Python 制御や暗黙変換を混ぜません。
 - 正本文書は日本語で書き、`## 要約`、`## 規約`、`## 禁止事項`、`## 例外` を使い分けます。
 
@@ -45,6 +50,17 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - 非自明な関数、メソッド、内部 helper の直前には `# 責務:` コメントを 1 行で置くことを必須にします。
 - 1 つの関数が複数段階の責務を持つことを禁止します。判定、変換、保存、通知を同時に抱え込んではなりません。
 - `util`、`helper`、`misc`、`tmp`、`data` のような責務が読めない名前を公開 API に使うことを禁止します。
+
+### 2.5 実装所有と統合 GuardRail
+
+- compatibility-preservation drift は、旧入口、旧名、旧 helper、旧 wrapper、旧 config route を残して caller migration を先送りする状態として扱います。
+- duplicate implementation は、同じ責務、同じ normalized body、同じ tool behavior、同じ DSL / contract を複数 path に置く状態として扱います。
+- 互換 route が必要に見える場合は、canonical owner、caller migration、削除順序、validation route を同じ変更に含めなければなりません。
+- 新しい helper、module、wrapper、alternate route を足す前に canonical owner を確認し、既存 owner の拡張で足りる場合はそちらへ統合しなければなりません。
+- contract-complete implementation は、request clause、acceptance contract、Implementation Source Packet、validation route が同じ implementation slice で対応している状態です。
+- 要求を縮める implementation shortcut を見つけた場合は、局所実装で埋めず `design_issue_blocker` と evidence を記録して design review へ戻します。
+- two-stage refactor は、forced migration で正本 surface と旧 route を移動または削除し、usage-surface repair で全利用面を新 surface へ合わせ、return-gate validation で検証をまとめる手順です。
+- この GuardRail は `check_convention_compliance.py` の `implementation_guardrails` check で marker coverage を検証します。
 
 ### 3. 型境界
 
@@ -117,6 +133,8 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - 境界検証を後回しにして深い内部で失敗させることを禁止します。
 - 正本文書に backup、proposal、dated report、run 固有メモを混ぜることを禁止します。
 - 文書で `原則`、`望ましい`、`できれば`、`必要なら` を必須条件や禁止条件の代わりに使うことを禁止します。
+- compatibility-preservation drift を残すために旧入口、旧名、旧 wrapper、旧 config route を併存させることを禁止します。
+- duplicate implementation を複数 path に置くことを禁止します。
 
 ## 例外
 

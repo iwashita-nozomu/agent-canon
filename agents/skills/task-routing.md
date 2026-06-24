@@ -13,9 +13,12 @@ downstream implementation ../../tools/agent_tools/route.py selects short routing
 
 短い tool / skill 名で、task に必要な profile、check、runtime、closeout、
 AgentCanon update、docs、log/eval の経路を選びます。
-prompt から public skill set を選ぶときは Rust harness
-`agent-canon local-llm route-skill` で `$agent-orchestration` first の
-`ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
+prompt から public skill set を選ぶときは fast path の
+`python3 tools/agent_tools/route.py --prompt` で `$agent-orchestration`
+first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を機械的に確認します。
+公式 system skill で足りる task は、AgentCanon 側で別 skill を増やさず、
+`$openai-docs`、`$skill-creator`、`$skill-installer`、`$imagegen`、
+`$plugin-creator` へ route します。
 
 ## Use When
 
@@ -29,7 +32,7 @@ prompt から public skill set を選ぶときは Rust harness
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
-agent-canon local-llm route-skill --prompt "<user request>" --format json
+python3 tools/agent_tools/route.py --prompt "<user request>" --format json
 python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text
 ```
 
@@ -50,3 +53,14 @@ route is genuinely reusable.
 Runtime skill command packets are owned by `skill_tool_commands.py`. Use
 `python3 tools/agent_tools/skill_tool_commands.py check` when changing
 `.agents/skills/*/SKILL.md` files.
+
+## Official System Skill Delegation
+
+Task routing keeps official system skills as host-provided capabilities:
+
+- OpenAI / Codex current product facts route to `$openai-docs`.
+- Skill creation or skill-instruction refactor guidance routes to
+  `$skill-creator` after the local AgentCanon owner surface is identified.
+- External skill installation routes to `$skill-installer`.
+- Bitmap image asset creation routes to `$imagegen`.
+- Codex plugin scaffolding routes to `$plugin-creator`.

@@ -37,14 +37,18 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 ## Decision Order
 
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
-1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流す。LocalLLM が無い場合は deterministic fallback output を使うか、router unavailable blocker として記録し、chat 印象で implementation path を選ばない
+1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `agent-canon local-llm route-implementation-surface --request-file <request.txt> --format text` を走らせる。`PRIMARY_SURFACE`、`PRIMARY_PATHS`、`FORBIDDEN_PATHS`、`REQUIRED_PRE_EDIT_CHECKS` を source packet seed にし、write-capable handoff では `PRIMARY_PATHS` を `allowed_paths`、`FORBIDDEN_PATHS` を `do_not_read` に流す。LocalLLM が無い場合は deterministic fallback output を provisional source-packet seed として使うか、`router_unavailable_blocker` として記録し、responsibility search と dependency scope で edit path を確定する。fallback routing は `fallback_exit_status` として `canonical_rerun_pass`、`durable_blocker_or_issue`、`explicit_approval_evidence` のいずれかに接続する
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の compact output を信頼し、修正に必要な path / line / bounded slice だけを読む
+1. 調査、レビュー、追加確認は、継続前に次に進む作業を記録します。次の作業は、経路決定、編集場所の決定、検証、Issue 記録、担当者付きの保留、対象外記録のいずれかです。次の作業が同じ場合は、現在の記録の補助根拠に圧縮して、実装、検証、Issue 処理へ戻ります。
+1. 重い計算系コマンドを予定する前に、タスクに結び付いた実行前の確認記録を作るか引用します。確認記録には、依頼の対応箇所、コマンドの種類、先に使った軽量な根拠、見込み時間、使う資源、停止条件、成果物の場所、担当者を入れます。重い計算系コマンドには、CI 全体、長いテスト一式、ベンチマーク、実験、GPU / CPU 数値実行、ソルバーの一括確認、大きな乱択ケースが含まれます。
 1. 編集 path、parent-direct 実装、または write-capable subagent handoff の前に、`agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` を作るか引用する。packet には implementation surface route、responsibility search、reuse survey、stale surface scan、dependency scope、validation route を含める。raw search hits、nearest editable file、または chat context だけで調査完了扱いにしない
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
 1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget ceiling、stage wave は parent が current stage の evidence と dependency order から切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Intake Responsibility Wave は責務 intake wave であり、family budget を埋める target ではありません。後続 role / skill は dynamic expansion wave として evidence gate で追加します。独立 workstream は同一階層の flat wave ではなく、stage owner ごとの vertical dynamic wave chain として扱います
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. prompt-derived skill routing が必要なら `agent-canon local-llm route-skill --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`python3 tools/agent_tools/route.py --prompt ...` は互換 mirror です
+1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
+1. repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す
+1. 1 file / single abstraction、Routine docs、Focused code、typo / link / format-only、明示的な小規模修正では `$small-change-routing` を追加し、selected_runtime_skill_read、small_change_skill_read、targeted validation をそこで固定する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
@@ -75,7 +79,7 @@ mode の意味:
 - `Pre-Edit Repository Investigation Packet` の path または parent-direct rationale
 - repo-editing task なら、workflow family ごとの順序。`Scoped Change Lite` は cheap local route、full staged route は requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
-- PR を作る task では、同じ routing 宣言と `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
+- PR を作る task では、同じ routing 宣言と `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
 - `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
@@ -145,7 +149,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - user が coding / implementation / patch work の subagent 委譲を明示した task は、read-only survey / review role だけで完了扱いにしません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
-- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残します。parent-direct 実装は、その blocker を記録した後の alternate route として扱います。
-- Routine docs / Focused code では parent-direct を許可します。subagent 実装では、Abstract Design Frame から導かれ、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
+- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、`fallback_exit_status` を `canonical_rerun_pass`、`durable_blocker_or_issue`、`explicit_approval_evidence` のいずれかへ接続します。parent-direct 実装へ進める route は、実装前に選ばれた Routine docs / Focused code か、明示承認 evidence 付きの revised workflow route です。
+- Routine docs / Focused code では、risk class と check matrix が実装前に固定された場合に parent-direct を使います。subagent 実装では、Abstract Design Frame から導かれ、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。

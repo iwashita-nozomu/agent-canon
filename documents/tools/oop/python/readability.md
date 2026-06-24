@@ -30,6 +30,15 @@ Python source に対して、OOP 境界が「責務、状態、契約、公開�
 - 純粋変換と副作用の混在: 値を返しながら IO、process、filesystem、外部 effect をまたぐ処理を検出します。
 - 数学的に冗長な wrapper: identity function、単純 pass-through、stateless callable class、trivial format function を検出します。
 
+## SOLID report fields
+
+Markdown / JSON report は、finding kind を SOLID principle signal へ投影した
+`solid_counts` と finding ごとの `solid_principles` を含みます。
+対応表の正本は `tools/oop/shared/readability_core.py` の
+`SOLID_PRINCIPLES_BY_KIND` です。Python checker では、public method 過多、
+annotation 欠落、`Optional` / `None` routing、mixed effect、不要 wrapper を
+SOLID の見出しで review できるようにします。
+
 ## 実行例
 
 ```bash

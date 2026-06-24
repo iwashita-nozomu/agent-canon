@@ -86,6 +86,249 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
             self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", result.stdout)
 
+    def test_dependency_manifest_lines_are_not_claims(self) -> None:
+        """Dependency header route lines are evidence metadata, not body claims."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                upstream implementation ../../tools/feature_runner.py runner implementation
+                downstream design sibling.md sibling design
+                @dependency-end
+                -->
+
+                ## Context
+
+                Descriptive text.
+                """,
+            )
+            write(
+                root / "documents" / "design" / "sibling.md",
+                """
+                # Sibling
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                """
+                def run_feature() -> None:
+                    pass
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
+
+    def test_reference_document_prose_without_tokens_is_not_design_claim(self) -> None:
+        """Reference docs keep cue-only prose out of design-claim enforcement."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "tools" / "guide.md",
+                """
+                # Tool Guide
+                <!--
+                @dependency-start
+                contract reference
+                responsibility Documents a reference guide fixture.
+                upstream design ../README.md fixture index
+                @dependency-end
+                -->
+
+                This guide must preserve reader flow.
+                """,
+            )
+            write(
+                root / "documents" / "README.md",
+                """
+                # Docs
+                """,
+            )
+
+            result = run_checker("documents/tools/guide.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
+
+    def test_reference_document_placeholder_token_is_not_design_claim(self) -> None:
+        """Ellipsis placeholders document command families without exact evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "tools" / "guide.md",
+                """
+                # Tool Guide
+                <!--
+                @dependency-start
+                contract reference
+                responsibility Documents a reference guide fixture.
+                upstream design ../README.md fixture index
+                @dependency-end
+                -->
+
+                Use `agent-canon semantic-index ...` for the command family.
+                """,
+            )
+            write(root / "documents" / "README.md", "# Docs\n")
+
+            result = run_checker("documents/tools/guide.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
+
+    def test_relative_parent_path_token_resolves_to_repo_path(self) -> None:
+        """Parent-relative Markdown path tokens resolve from the claim file."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "tools" / "README.md",
+                """
+                # Tools
+                <!--
+                @dependency-start
+                contract reference
+                responsibility Documents tool guide fixture.
+                upstream design ../documents/contract.md fixture contract
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `../documents/contract.md`.
+                - Assumptions: relative paths are operator-facing links.
+
+                The reader guide points to `../documents/contract.md`.
+                """,
+            )
+            write(root / "documents" / "contract.md", "# Contract\n")
+
+            result = run_checker("tools/README.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
+    def test_fail_parent_relative_path_token_does_not_collapse_to_repo_root(self) -> None:
+        """Parent-relative path claims do not fall back to unrelated root files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "tools" / "guide.md",
+                """
+                # Tool Guide
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents nested tool guide fixture.
+                upstream design ../README.md fixture docs index
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `../README.md`.
+                - Assumptions: parent-relative links are resolved from the guide.
+
+                The guide must read `../README.md`.
+                """,
+            )
+            write(root / "README.md", "# Root Docs\n")
+
+            result = run_checker("documents/tools/guide.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertIn("token=../README.md", result.stdout)
+
+    def test_wildcard_and_status_tokens_can_be_supported_by_evidence(self) -> None:
+        """Wildcard and key-value status tokens match implementation evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/feature_runner.py runner implementation
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/feature_runner.py`.
+                - Assumptions: wildcard and status tokens describe emitted output.
+
+                ## Claims
+
+                - The design records `TOKEN_FOOTPRINT_*`.
+                - The loop can record `goal_status: blocked`.
+                - The comparator emits `NEXT_ACTION=repair_skill_workflow_prompt`.
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                """
+                TOKEN_FOOTPRINT_COMPARISON = "pass"
+                goal_status = "blocked"
+                print(f"NEXT_ACTION={repair_skill_workflow_prompt}")
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
+    def test_fail_key_value_token_requires_same_record_evidence(self) -> None:
+        """A key and value in separate evidence records do not support a pair claim."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/feature_runner.py runner implementation
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/feature_runner.py`.
+                - Assumptions: status tokens must describe emitted output records.
+
+                ## Claims
+
+                - The loop can record `goal_status: blocked`.
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                """
+                goal_status = "ready"
+                message = "worker blocked on unrelated condition"
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertIn("token=goal_status: blocked", result.stdout)
+
     def test_fail_claim_without_evidence_after_recursive_expansion(self) -> None:
         """A missing token remains visible after recursive header expansion."""
         with tempfile.TemporaryDirectory() as tmp_dir:

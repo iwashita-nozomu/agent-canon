@@ -7,8 +7,7 @@ description: Use when organizing repository documents, finding non-canonical doc
 contract skill
 responsibility Documents Document Canon Cleanup for this repository.
 upstream design ../../../agents/skills/document-canon-cleanup.md human-facing skill canon
-upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs finds cleanup candidates
-upstream implementation ../../../tools/agent_tools/noncanonical_document_inventory.py legacy migration shim
+upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs canonical document inventory implementation
 @dependency-end
 -->
 
@@ -38,7 +37,7 @@ agent-canon structured-analysis document-inventory \
   --markdown-out reports/noncanonical-documents.md
 ```
 
-1. If the legacy Python entrypoint is observed in a caller chain, migrate that caller to the Rust command before returning to the original task.
+1. If an old document-inventory command is observed in a caller chain, migrate that caller to the Rust command before returning to the original task.
 1. Treat the report as triage, not deletion authority.
 1. Edit canonical sources, not generated evidence:
    - `.agent-canon/log-archive/eval-results/*` -> edit eval definitions, workflow prompts, or generator logic.

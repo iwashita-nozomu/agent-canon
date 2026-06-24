@@ -23,6 +23,7 @@ upstream design ../../documents/template-github-remote.md defines template remot
 upstream design ../canonical/ARTIFACT_PLACEMENT.md defines run-local artifact placement
 upstream design ../skills/result-artifact-writeout.md defines result artifact writeout
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
+downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
 @dependency-end
 -->
 
@@ -118,9 +119,11 @@ AgentCanon PR の前に、運用 finding を durable storage に残すかを必�
 1. Durable surfaces を検索する
 
 ```bash
-rg -n "topic keywords" \
+rg -l "topic keywords" \
   issues/open issues/closed memory notes/failures documents agents \
-  2>/dev/null || true
+  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+  2>/dev/null | sed -n '1,200p' > reports/search_hits.txt
+wc -l reports/search_hits.txt > reports/search_hits.count
 ```
 
 template / derived repo から作業している場合は、`vendor/agent-canon/` prefix 付きで同じ surface を検索します。
@@ -129,7 +132,6 @@ run bundle は補助 evidence であり、durable storage の代替ではあり�
 2. Raw search hit を dependency edit scope に展開する
 
 ```bash
-rg -l "topic keywords" > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
@@ -256,6 +258,8 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
   `work_log.md` または `workflow_monitoring.md` に残します。
 - PR body は先に `reports/agents/<run-id>/pr_body.md` へ展開し、agent が
   body 全文、validation、authority、blocker、Issue reference を確認してから publish します。
+- PR body の `PR Essence` には problem / user request、design intent、
+  canonical owner、behavior or contract delta、evidence route を書きます。
 - `github_publish.py publish-pr` には
   `--summary-out reports/agents/<run-id>/github_publish.json` を付けます。
   PR 作成 / 更新後は PR number / URL、branch、head SHA、mutation authority、
@@ -264,6 +268,8 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - standalone AgentCanon repo へ shared canon source change を出す PR では `.github/PULL_REQUEST_TEMPLATE.md` を使います。
 - template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
+- 変更の本質を validation list から分け、どの問題をどの正本 owner で解いたかを
+  `PR Essence` として PR 本文に書きます。
 - issue file または durable finding 不要判断、dependency-expanded edit scope、tool / memory / eval route を PR 本文に書きます。
 - PR body は run bundle の `pr_body.md` などの明示 file に展開します。template の path だけを `gh pr create --template` に渡して、agent が最終 body を確認しない状態にしません。
 - standalone AgentCanon PR、template / derived repo の AgentCanon PR、default template / repo-local PR のいずれも、作成または更新は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。
@@ -353,6 +359,13 @@ Direct updates must still leave the same evidence in the commit and run bundle.
 ### AgentCanon Pin-Only Update
 
 ```text
+PR Essence:
+- Problem / user request: refresh the template to the current AgentCanon main.
+- Design intent: keep the parent repo as a consumer of shared canon.
+- Canonical owner: template submodule pin and root shared surface.
+- Behavior or contract delta: pin-only consumer state for the current AgentCanon source contract.
+- Evidence route: sync check and pin SHA evidence.
+
 Summary:
 - Updated template vendor/agent-canon pin only.
 
@@ -370,6 +383,13 @@ AgentCanon Evidence:
 ### AgentCanon Source Change Plus Template Pin
 
 ```text
+PR Essence:
+- Problem / user request: shared AgentCanon behavior changed and parent repos need the pin update.
+- Design intent: land source canon first, then propagate through the template pin.
+- Canonical owner: AgentCanon source PR plus template submodule pin.
+- Behavior or contract delta: source contract changed under AgentCanon.
+- Evidence route: source PR, dependency review, and template sync evidence.
+
 Summary:
 - Changed AgentCanon source under vendor/agent-canon.
 - Advanced template submodule pin after AgentCanon main was updated.
@@ -389,6 +409,13 @@ Propagation:
 ### Root-Only Template Workflow Change
 
 ```text
+PR Essence:
+- Problem / user request: template-local workflow behavior changed.
+- Design intent: keep repo-local workflow policy outside shared canon.
+- Canonical owner: template root GitHub Actions or PR checklist.
+- Behavior or contract delta: template workflow contract changed.
+- Evidence route: GitHub workflow checker and docs check.
+
 Summary:
 - Changed template-local GitHub Actions or PR checklist.
 
@@ -408,6 +435,8 @@ Validation:
 
 - standalone AgentCanon repo では explicit validation commands が pass、template / derived repo では `make agent-canon-pr-check` が pass
 - root shared surface が `bash tools/sync_agent_canon.sh check` で clean
+- PR 本文に `PR Essence` として problem / user request、design intent、
+  canonical owner、behavior or contract delta、evidence route が記録されている
 - PR 本文に changed surface と validation が記録されている
 - PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
 - PR 本文に search-to-edit-scope evidence、または search-to-edit-scope 不要判断が記録されている

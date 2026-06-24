@@ -103,11 +103,14 @@ INFO_SCORE_PENALTY = 2
 UNKNOWN_SEVERITY_SCORE_PENALTY = 3
 UNKNOWN_SEVERITY_FINDING_RANK = 9
 KLOC_NORMALIZER = 1000
+MILLISECONDS_PER_SECOND = 1000
 MODERATE_RISK_WARN_OR_ERROR_PER_KLOC = 3
 HIGH_RISK_WARN_OR_ERROR_PER_KLOC = 6
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
+CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS = 16
+CPP_ABI_MARKER_LOOKBACK_LINES = 4
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
 CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES = (
@@ -325,6 +328,46 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
         "The source cannot be parsed, so readability analysis is incomplete.",
         "Fix parseability before trusting readability metrics for this file.",
     ),
+}
+
+SOLID_PRINCIPLES = {
+    "single_responsibility": "single responsibility",
+    "open_closed": "open/closed",
+    "liskov_substitution": "liskov substitution",
+    "interface_segregation": "interface segregation",
+    "dependency_inversion": "dependency inversion",
+}
+
+SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
+    "vague_class_name": ("single_responsibility",),
+    "class_lines": ("single_responsibility",),
+    "function_lines": ("single_responsibility",),
+    "cognitive_complexity": ("single_responsibility", "open_closed"),
+    "public_methods": ("single_responsibility", "interface_segregation"),
+    "public_fields": ("single_responsibility", "interface_segregation"),
+    "state_heavy_public_surface": ("single_responsibility",),
+    "instance_attributes": ("single_responsibility",),
+    "parameters": ("interface_segregation",),
+    "base_classes": ("liskov_substitution",),
+    "static_method_namespace": ("single_responsibility",),
+    "thin_class": ("single_responsibility",),
+    "redundant_class_boundary": ("single_responsibility",),
+    "method_without_self_use": ("single_responsibility",),
+    "module_helper_name": ("single_responsibility",),
+    "module_helper_bucket": ("single_responsibility",),
+    "missing_public_annotations": ("dependency_inversion",),
+    "optional_boundary": (
+        "open_closed",
+        "interface_segregation",
+        "dependency_inversion",
+    ),
+    "none_runtime_branch": ("open_closed",),
+    "null_runtime_branch": ("open_closed",),
+    "mixed_morphism_effect": ("single_responsibility",),
+    "identity_function": ("single_responsibility",),
+    "pass_through_function": ("single_responsibility",),
+    "stateless_callable_class": ("single_responsibility",),
+    "trivial_format_function": ("single_responsibility",),
 }
 
 
@@ -1829,7 +1872,9 @@ def cpp_constructor_usage_count(analysis_text: str, class_name: str) -> int:
         rf"\b{escaped}\s+[a-z_][A-Za-z0-9_]*\s*(?:[;={{(])"
     )
     for match in expression_pattern.finditer(analysis_text):
-        prefix = analysis_text[max(0, match.start() - 16) : match.start()]
+        prefix = analysis_text[
+            max(0, match.start() - CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS) : match.start()
+        ]
         if re.search(r"(?:class|struct)\s+$", prefix):
             continue
         count += 1
@@ -2918,7 +2963,7 @@ def cpp_abi_boundary_function(
         return True
     if "extern" in prefix and name.startswith(CPP_ABI_FUNCTION_PREFIXES):
         return True
-    preceding = cpp_preceding_lines(analysis_text, start, 4)
+    preceding = cpp_preceding_lines(analysis_text, start, CPP_ABI_MARKER_LOOKBACK_LINES)
     return any(marker in preceding for marker in CPP_ABI_MARKER_MACROS)
 
 
@@ -2972,7 +3017,7 @@ def cpp_depth_tuple_with_delta(
     """Return delimiter depths after changing one depth slot."""
     items = list(depths)
     items[index] = max(0, items[index] + delta)
-    return (items[0], items[1], items[2], items[3])
+    return cast(tuple[int, int, int, int], tuple(items))
 
 
 def cpp_parameter_names(params: str) -> list[str]:
@@ -3674,10 +3719,22 @@ def finding_facts(finding: Finding) -> dict[str, str]:
     }
 
 
+def solid_principles_for_kind(kind: str) -> tuple[str, ...]:
+    """Return SOLID principle names mechanically associated with a finding kind."""
+    principle_keys = SOLID_PRINCIPLES_BY_KIND.get(kind, ())
+    return tuple(SOLID_PRINCIPLES[key] for key in principle_keys)
+
+
+def solid_principles_for_finding(finding: Finding) -> tuple[str, ...]:
+    """Return SOLID principle names mechanically associated with a finding."""
+    return solid_principles_for_kind(finding.kind)
+
+
 def finding_payload(finding: Finding) -> dict[str, object]:
     """Return JSON payload with mechanical interpretation attached."""
     payload = asdict(finding)
     payload.update(finding_facts(finding))
+    payload["solid_principles"] = list(solid_principles_for_finding(finding))
     return payload
 
 
@@ -3727,6 +3784,11 @@ def summarize_findings(
     severity_counts = Counter(finding.severity for finding in findings)
     kind_counts = Counter(finding.kind for finding in findings)
     dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
+    solid_counts = Counter(
+        principle
+        for finding in findings
+        for principle in solid_principles_for_finding(finding)
+    )
     warn_or_error = sum(
         1 for finding in findings if finding.severity in {"error", "warn"}
     )
@@ -3743,6 +3805,7 @@ def summarize_findings(
         grade = "severe-risk"
     return {
         "files": len(files),
+        "scanned_paths": selected_relative_paths(root, files),
         "source_loc": loc,
         "findings": len(findings),
         "score": final_score,
@@ -3754,6 +3817,7 @@ def summarize_findings(
         "severity_counts": dict(severity_counts),
         "kind_counts": dict(kind_counts),
         "dimension_counts": dict(dimension_counts),
+        "solid_counts": dict(solid_counts),
         "top_files": [
             {"path": path, "findings": count}
             for path, count in Counter(finding.path for finding in findings).most_common(
@@ -3779,6 +3843,7 @@ def render_markdown_report(spec: MarkdownReportSpec) -> str:
         else {}
     )
     lines = markdown_summary_lines(summary)
+    lines.extend(markdown_solid_lines(summary))
     lines.extend(markdown_dimension_lines(summary))
     lines.extend(markdown_hotspot_lines(summary))
     lines.extend(
@@ -3790,6 +3855,7 @@ def render_markdown_report(spec: MarkdownReportSpec) -> str:
 def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
     """Render Markdown summary lines."""
     excluded_patterns_summary = cast(list[str], summary["excluded_patterns"])
+    scanned_paths = cast(list[str], summary["scanned_paths"])
     return [
         "# OOP Readability Mechanical Report",
         "",
@@ -3801,12 +3867,25 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         f"- mechanical_grade: `{summary['mechanical_grade']}`",
         f"- score: `{summary['score']}` / min `{summary['min_score']}`",
         f"- files: `{summary['files']}`",
+        f"- scanned_paths: `{', '.join(scanned_paths) or 'none'}`",
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
         f"- excluded_patterns: `{', '.join(excluded_patterns_summary) or 'none'}`",
         "",
     ]
+
+
+def markdown_solid_lines(summary: dict[str, object]) -> list[str]:
+    """Render SOLID principle signal counts."""
+    solid_counts = cast(dict[str, int], summary["solid_counts"])
+    lines = ["## SOLID Principle Signals", ""]
+    if not solid_counts:
+        lines.append("- none")
+    for principle, count in Counter(solid_counts).most_common():
+        lines.append(f"- `{principle}`: {count}")
+    lines.append("")
+    return lines
 
 
 def markdown_dimension_lines(summary: dict[str, object]) -> list[str]:
@@ -3847,6 +3926,7 @@ def markdown_finding_detail_lines(
     lines = ["## Finding Details", ""]
     for finding in sorted(findings, key=finding_rank)[:max_report_findings]:
         facts = finding_facts(finding)
+        solid_principles = ", ".join(solid_principles_for_finding(finding)) or "none"
         lines.extend(
             [
                 (
@@ -3856,6 +3936,7 @@ def markdown_finding_detail_lines(
                 "",
                 f"- symbol: `{finding.symbol}`",
                 f"- dimension: `{facts['dimension']}`",
+                f"- solid_principles: `{solid_principles}`",
                 f"- actual_vs_limit: `{finding.actual}` > `{finding.limit}`",
                 f"- mechanical_explanation: {facts['explanation']}",
                 f"- mechanical_action: {facts['recommended_action']}",
@@ -3891,8 +3972,8 @@ def write_review_prompt(path: Path, report_path: str) -> None:
                 "- Do not change the pass/fail status, score, thresholds, or counts.",
                 "- Treat mechanical findings as facts and write a reader-facing summary of them.",
                 "- Separate false-positive candidates from accepted design risks.",
-                "- Group comments by OOP principle: responsibility, state ownership,",
-                "  typed boundary, composition, mathematical redundancy, and effect separation.",
+                "- Group comments by the report's SOLID Principle Signals section first.",
+                "- Then cite the OOP dimension for each accepted mechanical finding.",
                 "- For each hotspot, cite `path:line`, `kind`, and the mechanical explanation.",
                 "- Do not request code edits unless the report identifies a concrete risk.",
                 "",
@@ -3934,7 +4015,7 @@ def append_workflow_monitor_timing(
     monitor = root / "tools" / "agent_tools" / "workflow_monitor.py"
     if not report_dir or not monitor.is_file():
         return
-    duration_ms = int((time.perf_counter() - started_at) * 1000)
+    duration_ms = int((time.perf_counter() - started_at) * MILLISECONDS_PER_SECOND)
     scope = ",".join(str(path) for path in args.paths) if args.paths else "."
     output_path = str(args.review_prompt_out) if args.review_prompt_out else "stdout"
     event = (

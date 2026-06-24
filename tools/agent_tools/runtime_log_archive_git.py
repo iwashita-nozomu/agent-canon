@@ -14,12 +14,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import re
 import shutil
 import subprocess
 import sys
-import tempfile
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -49,12 +47,15 @@ AGENT_REPORT_EXCLUDED_DIRS = frozenset(
 )
 AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.json"})
 DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
+GIT_PORCELAIN_STATUS_PATH_START = 3
+GIT_PORCELAIN_STATUS_MIN_LINE_LENGTH = GIT_PORCELAIN_STATUS_PATH_START + 1
+REPORT_SNAPSHOT_DIGEST_CHARS = 16
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
-WORKFLOW_CONTEXT_JSON_NAME = "skill_usage_context.json"
-WORKFLOW_CONTEXT_JSON_KEYS = frozenset({"workflows", "report_dir", "timestamp", "source_event"})
-WORKFLOW_CONTEXT_TIMESTAMP_PATTERN = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$"
-)
+MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset({"eval-results", "legacy-import"})
+BRANCH_SWITCH_COMMIT_MESSAGE = "Preserve managed runtime logs before branch switch"
+GIT_INDEX_LOCK_MESSAGE = "index.lock"
+GIT_INDEX_LOCK_RETRIES = 5
+GIT_INDEX_LOCK_RETRY_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -84,16 +85,6 @@ class ArchiveStatusSummary:
     tree_keys: tuple[str, ...]
     foreign_tree_keys: tuple[str, ...]
     global_dirty: bool
-
-
-@dataclass(frozen=True)
-class RestorePlanEntry:
-    """One validated restore operation for preserved dirty archive content."""
-
-    relative_path: str
-    target: Path
-    planned: Path
-    should_write: bool
 
 
 class ArchiveGitError(RuntimeError):
@@ -276,7 +267,22 @@ def git(
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """Run git inside the archive clone."""
-    return run(["git", "-C", str(archive_root), *args], check=check)
+    command = ["git", "-C", str(archive_root), *args]
+    for attempt in range(GIT_INDEX_LOCK_RETRIES + 1):
+        result = run(command, check=False)
+        if result.returncode == 0 or not git_index_locked(result) or attempt == GIT_INDEX_LOCK_RETRIES:
+            if check and result.returncode != 0:
+                detail = result.stderr.strip() or result.stdout.strip()
+                raise ArchiveGitError(f"{' '.join(command)} failed: {detail}")
+            return result
+        time.sleep(GIT_INDEX_LOCK_RETRY_SECONDS)
+    raise ArchiveGitError(f"{' '.join(command)} failed after index lock retries")
+
+
+def git_index_locked(result: subprocess.CompletedProcess[str]) -> bool:
+    """Return whether a git failure is caused by a transient index lock."""
+    detail = f"{result.stderr}\n{result.stdout}"
+    return GIT_INDEX_LOCK_MESSAGE in detail
 
 
 def git_root(path: Path) -> Path | None:
@@ -303,7 +309,11 @@ def superproject_root(path: Path) -> Path | None:
 
 def default_source_root(canon_root: Path) -> Path:
     """Return the default source repo for branch naming."""
-    return superproject_root(canon_root) or git_root(Path.cwd()) or Path.cwd().resolve()
+    cwd_git_root = git_root(Path.cwd())
+    canon_git_root = git_root(canon_root)
+    if cwd_git_root is not None and canon_git_root is not None and cwd_git_root == canon_git_root:
+        return cwd_git_root
+    return superproject_root(canon_root) or cwd_git_root or Path.cwd().resolve()
 
 
 def build_context(args: argparse.Namespace) -> ArchiveContext:
@@ -357,35 +367,34 @@ def porcelain_status(context: ArchiveContext) -> str:
     ).stdout
 
 
+def porcelain_paths(context: ArchiveContext) -> tuple[str, ...]:
+    """Return dirty archive-relative paths from porcelain status."""
+    paths = []
+    for line in porcelain_status(context).splitlines():
+        path = porcelain_path(line)
+        if path:
+            paths.append(path)
+    return tuple(paths)
+
+
 def porcelain_path(line: str) -> str:
     """Extract a path from one non-z porcelain status line."""
-    if len(line) < 4:
+    if len(line) < GIT_PORCELAIN_STATUS_MIN_LINE_LENGTH:
         return ""
-    path = line[3:]
+    path = line[GIT_PORCELAIN_STATUS_PATH_START:]
     if " -> " in path:
         path = path.rsplit(" -> ", 1)[-1]
     return path.strip()
 
 
-def dirty_paths_for_repo_key(context: ArchiveContext, repo_key: str) -> tuple[str, ...]:
-    """Return dirty archive-relative paths that belong to one repo key."""
-    paths: list[str] = []
-    for line in porcelain_status(context).splitlines():
-        path = porcelain_path(line)
-        key, is_global = dirty_key_for_path(path)
-        if key == repo_key and not is_global:
-            paths.append(path)
-    return tuple(paths)
-
-
-def all_dirty_paths_belong_to_repo_key(context: ArchiveContext, repo_key: str) -> bool:
-    """Return whether every dirty archive path is keyed to one repo."""
-    for line in porcelain_status(context).splitlines():
-        path = porcelain_path(line)
-        key, is_global = dirty_key_for_path(path)
-        if key != repo_key or is_global:
-            return False
-    return True
+def managed_runtime_archive_path(path: str) -> bool:
+    """Return whether a dirty archive path is a managed runtime artifact."""
+    parts = Path(path).parts
+    if not parts:
+        return False
+    if parts[0] in REPO_KEYED_ARCHIVE_FAMILIES and len(parts) >= 2:
+        return True
+    return parts[0] in MANAGED_GLOBAL_ARCHIVE_FAMILIES
 
 
 def dirty_key_for_path(path: str) -> tuple[str, bool]:
@@ -421,11 +430,21 @@ def archive_tree_keys(context: ArchiveContext) -> tuple[str, ...]:
     return tuple(sorted(keys))
 
 
+def associated_repo_keys(context: ArchiveContext) -> tuple[str, ...]:
+    """Return repo keys allowed to coexist on the same chat archive branch."""
+    keys = {context.repo_key, repo_log_key(context.canon_root)}
+    parent = superproject_root(context.canon_root)
+    if parent is not None:
+        keys.add(repo_log_key(parent))
+    return tuple(sorted(keys))
+
+
 def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
     """Return structured archive dirty-state information."""
     current = current_branch(context)
     status = porcelain_status(context)
     tree_keys = archive_tree_keys(context)
+    associated_keys = set(associated_repo_keys(context))
     dirty_keys: set[str] = set()
     global_dirty = False
     for line in status.splitlines():
@@ -434,8 +453,8 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
             dirty_keys.add(key)
         if is_global:
             global_dirty = True
-    foreign_keys = tuple(sorted(key for key in dirty_keys if key != context.repo_key))
-    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key != context.repo_key))
+    foreign_keys = tuple(sorted(key for key in dirty_keys if key not in associated_keys))
+    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key not in associated_keys))
     return ArchiveStatusSummary(
         current_branch=current,
         dirty=bool(status.strip()),
@@ -474,11 +493,6 @@ def archive_next_action(context: ArchiveContext, summary: ArchiveStatusSummary) 
             "commit or migrate foreign repo-key log paths before closeout: "
             + ",".join(summary.foreign_dirty_keys)
         )
-    if summary.foreign_tree_keys:
-        return (
-            "migrate committed foreign repo-key log trees before closeout: "
-            + ",".join(summary.foreign_tree_keys)
-        )
     if summary.global_dirty:
         return "commit or revert archive-level dirty paths before closeout"
     if summary.dirty:
@@ -511,6 +525,27 @@ def ensure_commit_identity(context: ArchiveContext) -> None:
         git(context.archive_root, ["config", "user.name", DEFAULT_COMMIT_NAME])
     if email.returncode != 0 or not email.stdout.strip():
         git(context.archive_root, ["config", "user.email", DEFAULT_COMMIT_EMAIL])
+
+
+def preserve_managed_dirty_paths(context: ArchiveContext, current: str) -> None:
+    """Commit managed runtime artifacts before switching archive branches."""
+    paths = porcelain_paths(context)
+    unmanaged = [path for path in paths if not managed_runtime_archive_path(path)]
+    if unmanaged:
+        raise ArchiveGitError(
+            "archive has non-runtime local changes on "
+            f"{current}: {', '.join(unmanaged)}"
+        )
+    if not paths:
+        return
+    ensure_commit_identity(context)
+    git(context.archive_root, ["add", "--", *paths])
+    staged = git(context.archive_root, ["diff", "--cached", "--quiet"], check=False)
+    if staged.returncode != 0:
+        git(
+            context.archive_root,
+            ["commit", "-m", f"{BRANCH_SWITCH_COMMIT_MESSAGE}: {current}"],
+        )
 
 
 def source_is_tracked(canon_root: Path, path: Path) -> bool:
@@ -568,299 +603,6 @@ def switch_to_archive_branch(context: ArchiveContext, branch: str) -> None:
     git(context.archive_root, ["switch", "-c", branch])
 
 
-def stash_ref_sha(context: ArchiveContext) -> str:
-    """Return the current refs/stash SHA, or an empty string when no stash exists."""
-    result = git(context.archive_root, ["rev-parse", "--verify", "refs/stash"], check=False)
-    return result.stdout.strip() if result.returncode == 0 else ""
-
-
-def merged_jsonl_bytes(target: Path, source: Path) -> bytes:
-    """Return JSONL bytes with source lines appended when missing."""
-    target_bytes = target.read_bytes()
-    source_lines = [line for line in source.read_bytes().splitlines() if line.strip()]
-    existing_lines = set(target_bytes.splitlines())
-    missing_lines = [line for line in source_lines if line not in existing_lines]
-    if not missing_lines:
-        return target_bytes
-    parts = [target_bytes]
-    if target_bytes and not target_bytes.endswith(b"\n"):
-        parts.append(b"\n")
-    parts.extend(line + b"\n" for line in missing_lines)
-    return b"".join(parts)
-
-
-def workflow_context_json(path: Path, relative_path: str) -> dict[str, object]:
-    """Load a known workflow context JSON object or fail for unsafe shape."""
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ArchiveGitError(f"archive context JSON is not mergeable: {relative_path}") from exc
-    if not isinstance(value, dict):
-        raise ArchiveGitError(f"archive context JSON must be an object: {relative_path}")
-    context = cast(dict[str, object], value)
-    unknown_keys = set(context) - WORKFLOW_CONTEXT_JSON_KEYS
-    if unknown_keys:
-        raise ArchiveGitError(
-            f"archive context JSON has unknown keys in {relative_path}: {','.join(sorted(unknown_keys))}"
-        )
-    workflows = context.get("workflows", [])
-    if not isinstance(workflows, list):
-        raise ArchiveGitError(f"archive context JSON has invalid workflows: {relative_path}")
-    workflow_items = cast(list[object], workflows)
-    if not all(isinstance(item, str) for item in workflow_items):
-        raise ArchiveGitError(f"archive context JSON has invalid workflows: {relative_path}")
-    for key in ("report_dir", "timestamp", "source_event"):
-        value = context.get(key, "")
-        if not isinstance(value, str):
-            raise ArchiveGitError(f"archive context JSON has invalid {key}: {relative_path}")
-    validate_workflow_context_timestamp(cast(str, context.get("timestamp", "")), relative_path)
-    return context
-
-
-def validate_workflow_context_timestamp(value: str, relative_path: str) -> datetime:
-    """Return a parsed UTC timestamp or fail before merge precedence is chosen."""
-    if not value:
-        raise ArchiveGitError(f"archive context JSON has empty timestamp: {relative_path}")
-    if not value.endswith("Z"):
-        raise ArchiveGitError(f"archive context JSON timestamp must end with Z: {relative_path}")
-    if not WORKFLOW_CONTEXT_TIMESTAMP_PATTERN.fullmatch(value):
-        raise ArchiveGitError(f"archive context JSON has malformed timestamp: {relative_path}")
-    try:
-        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
-    except ValueError as exc:
-        raise ArchiveGitError(f"archive context JSON has malformed timestamp: {relative_path}") from exc
-    if parsed.tzinfo is None:
-        raise ArchiveGitError(f"archive context JSON timestamp must include UTC timezone: {relative_path}")
-    return parsed.astimezone(UTC)
-
-
-def workflow_context_scalar(
-    target_context: dict[str, object],
-    source_context: dict[str, object],
-    key: str,
-    *,
-    target_is_newer: bool,
-) -> str:
-    """Merge one scalar context field using timestamp recency."""
-    target_value = cast(str, target_context.get(key, ""))
-    source_value = cast(str, source_context.get(key, ""))
-    if target_value == source_value:
-        return target_value
-    target_timestamp = cast(str, target_context.get("timestamp", ""))
-    source_timestamp = cast(str, source_context.get("timestamp", ""))
-    if target_timestamp == source_timestamp and target_value and source_value:
-        raise ArchiveGitError(f"archive context JSON has conflicting {key} for equal timestamps")
-    newer_value = target_value if target_is_newer else source_value
-    older_value = source_value if target_is_newer else target_value
-    return newer_value or older_value
-
-
-def merged_workflow_context_json_bytes(target: Path, source: Path, relative_path: str) -> bytes:
-    """Return merged bytes for the short-lived skill usage workflow context snapshot."""
-    target_context = workflow_context_json(target, relative_path)
-    source_context = workflow_context_json(source, relative_path)
-    target_timestamp = cast(str, target_context.get("timestamp", ""))
-    source_timestamp = cast(str, source_context.get("timestamp", ""))
-    target_is_newer = (
-        validate_workflow_context_timestamp(target_timestamp, relative_path)
-        >= validate_workflow_context_timestamp(source_timestamp, relative_path)
-    )
-
-    merged_workflows = list(
-        dict.fromkeys(
-            [
-                *cast(list[str], target_context.get("workflows", [])),
-                *cast(list[str], source_context.get("workflows", [])),
-            ]
-        )
-    )
-    merged = {
-        "report_dir": workflow_context_scalar(
-            target_context,
-            source_context,
-            "report_dir",
-            target_is_newer=target_is_newer,
-        ),
-        "source_event": workflow_context_scalar(
-            target_context,
-            source_context,
-            "source_event",
-            target_is_newer=target_is_newer,
-        ),
-        "timestamp": target_timestamp if target_is_newer else source_timestamp,
-        "workflows": merged_workflows,
-    }
-    return (json.dumps(merged, sort_keys=True) + "\n").encode("utf-8")
-
-
-def write_restore_plan_file(
-    archive_root: Path,
-    relative_path: str,
-    preserved: Path,
-    planned: Path,
-) -> bool:
-    """Write one planned restore file and return whether archive mutation is needed."""
-    target = archive_root / relative_path
-    planned.parent.mkdir(parents=True, exist_ok=True)
-    if not target.exists():
-        shutil.copy2(preserved, planned)
-        return True
-    if target.read_bytes() == preserved.read_bytes():
-        return False
-    if target.suffix == ".jsonl":
-        planned.write_bytes(merged_jsonl_bytes(target, preserved))
-        return target.read_bytes() != planned.read_bytes()
-    if target.name == WORKFLOW_CONTEXT_JSON_NAME and target.suffix == ".json":
-        planned.write_bytes(merged_workflow_context_json_bytes(target, preserved, relative_path))
-        return target.read_bytes() != planned.read_bytes()
-    raise ArchiveGitError(
-        f"archive destination already exists with different content after switching: {relative_path}"
-    )
-
-
-def build_restore_plan(
-    archive_root: Path,
-    dirty_paths: tuple[str, ...],
-    preserved_root: Path,
-    plan_root: Path,
-) -> tuple[RestorePlanEntry, ...]:
-    """Validate every restore and materialize planned output before mutation."""
-    entries: list[RestorePlanEntry] = []
-    for dirty_path in dirty_paths:
-        planned = plan_root / dirty_path
-        should_write = write_restore_plan_file(
-            archive_root,
-            dirty_path,
-            preserved_root / dirty_path,
-            planned,
-        )
-        entries.append(
-            RestorePlanEntry(
-                relative_path=dirty_path,
-                target=archive_root / dirty_path,
-                planned=planned,
-                should_write=should_write,
-            )
-        )
-    return tuple(entries)
-
-
-def rollback_restore_plan(applied: list[tuple[RestorePlanEntry, Path | None]]) -> tuple[str, ...]:
-    """Restore archive files changed by a failed restore plan application."""
-    errors: list[str] = []
-    for entry, original in reversed(applied):
-        try:
-            if original is None:
-                try:
-                    entry.target.unlink()
-                except FileNotFoundError:
-                    pass
-                continue
-            entry.target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(original, entry.target)
-        except OSError as exc:
-            errors.append(f"{entry.relative_path}: {exc}")
-    return tuple(errors)
-
-
-def apply_restore_plan(entries: tuple[RestorePlanEntry, ...], original_root: Path) -> None:
-    """Apply a validated restore plan, rolling back any partial writes on failure."""
-    applied: list[tuple[RestorePlanEntry, Path | None]] = []
-    try:
-        for entry in entries:
-            if not entry.should_write:
-                continue
-            original: Path | None = None
-            if entry.target.exists():
-                original = original_root / entry.relative_path
-                original.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(entry.target, original)
-            entry.target.parent.mkdir(parents=True, exist_ok=True)
-            applied.append((entry, original))
-            temp_target = entry.target.with_name(f".{entry.target.name}.agent-canon-restore-tmp")
-            try:
-                shutil.copy2(entry.planned, temp_target)
-                os.replace(temp_target, entry.target)
-            finally:
-                try:
-                    temp_target.unlink()
-                except FileNotFoundError:
-                    pass
-    except OSError as exc:
-        rollback_errors = rollback_restore_plan(applied)
-        rollback_detail = ""
-        if rollback_errors:
-            rollback_detail = f"; rollback errors: {'; '.join(rollback_errors)}"
-        raise ArchiveGitError(
-            f"archive restore plan application failed: {exc}{rollback_detail}"
-        ) from exc
-
-
-def switch_with_current_key_dirty_paths(context: ArchiveContext, branch: str) -> None:
-    """Move current repo-key dirty archive paths onto the expected branch."""
-    dirty_paths = dirty_paths_for_repo_key(context, context.repo_key)
-    if not dirty_paths:
-        raise ArchiveGitError(
-            f"archive has local changes; commit or stash before switching to {branch}"
-        )
-
-    with tempfile.TemporaryDirectory(prefix="agent-canon-log-preserve-") as temp_dir:
-        preserved_root = Path(temp_dir)
-        for dirty_path in dirty_paths:
-            source = context.archive_root / dirty_path
-            if not source.is_file():
-                raise ArchiveGitError(
-                    f"archive current repo-key dirty path is not a file: {dirty_path}"
-                )
-            destination = preserved_root / dirty_path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-
-        before_stash = stash_ref_sha(context)
-        git(
-            context.archive_root,
-            [
-                "stash",
-                "push",
-                "--include-untracked",
-                "-m",
-                f"Preserve {context.repo_key} runtime logs before switching to {branch}",
-                "--",
-                *dirty_paths,
-            ],
-        )
-        preserved_stash = stash_ref_sha(context)
-        if not preserved_stash or preserved_stash == before_stash:
-            raise ArchiveGitError(
-                f"archive current repo-key changes could not be preserved before switching to {branch}"
-            )
-
-        try:
-            switch_to_archive_branch(context, branch)
-        except ArchiveGitError as exc:
-            raise ArchiveGitError(
-                "archive current repo-key changes were preserved in stash@{0} "
-                f"but switching to {branch} failed: {exc}"
-            ) from exc
-        try:
-            plan_root = preserved_root / ".restore-plan"
-            original_root = preserved_root / ".restore-originals"
-            restore_plan = build_restore_plan(
-                context.archive_root,
-                dirty_paths,
-                preserved_root,
-                plan_root,
-            )
-            apply_restore_plan(restore_plan, original_root)
-        except ArchiveGitError as exc:
-            raise ArchiveGitError(
-                "archive current repo-key changes were preserved in stash@{0} "
-                f"but restoring them on {branch} failed: {exc}"
-            ) from exc
-        if stash_ref_sha(context) == preserved_stash:
-            git(context.archive_root, ["stash", "drop", "stash@{0}"])
-
-
 def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
     """Ensure the ignored clone exists and is on the runtime log branch."""
     if not context.archive_root.exists():
@@ -879,17 +621,12 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
         return
     summary = archive_status_summary(context)
     if summary.dirty:
-        if (
-            summary.current_key_dirty
-            and not summary.foreign_dirty_keys
-            and not summary.global_dirty
-            and all_dirty_paths_belong_to_repo_key(context, context.repo_key)
-        ):
-            switch_with_current_key_dirty_paths(context, branch)
-            return
-        raise ArchiveGitError(
-            f"archive has local changes; commit or stash before switching to {branch}"
-        )
+        preserve_managed_dirty_paths(context, current)
+        summary = archive_status_summary(context)
+        if summary.dirty:
+            raise ArchiveGitError(
+                f"archive has local changes on {current}; run sync or push for that branch before switching to {branch}"
+            )
     switch_to_archive_branch(context, branch)
 
 
@@ -962,8 +699,7 @@ def command_check_clean(context: ArchiveContext, args: argparse.Namespace) -> in
     status = porcelain_status(context)
     summary = archive_status_summary(context)
     print_status_summary(context, summary)
-    clean = summary.branch_matches and not summary.dirty
-    clean = clean and not summary.foreign_tree_keys
+    clean = summary.branch_matches and not summary.dirty and not summary.foreign_tree_keys
     print(f"RUNTIME_LOG_ARCHIVE_NEXT_ACTION={archive_next_action(context, summary)}")
     if args.porcelain:
         for line in status.splitlines():
@@ -1117,7 +853,7 @@ def report_snapshot_digest(report_dir: Path, files: list[Path]) -> str:
         digest.update(b"\0")
         digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("ascii"))
         digest.update(b"\0")
-    return digest.hexdigest()[:16]
+    return digest.hexdigest()[:REPORT_SNAPSHOT_DIGEST_CHARS]
 
 
 def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:

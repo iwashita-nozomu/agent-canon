@@ -6,6 +6,7 @@ contract skill
 responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
+downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
 @dependency-end
 -->
 
@@ -22,6 +23,18 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
 - Workflow-routed internal routine は `agents/internal-routines/` に置きます。
 
+## Skill Visibility Naming
+
+User-facing skill names use plain hyphen-case, such as `research-workflow`.
+They are catalog-backed, documented in this directory, exposed through
+`.agents/skills/<skill>/SKILL.md`, and enabled from `.codex/config.toml`.
+
+Runtime-internal skill shims use a leading underscore, such as
+`_runtime-helper`. Their owner surface is the calling workflow, role, or public
+skill rather than the public catalog, public table, or `.codex/config.toml`.
+Use this lane when a Codex runtime shim is genuinely needed; workflow-only
+material belongs in `agents/internal-routines/`.
+
 ## Public Skill Surface
 
 CLI に出す公開 skill は、user が直接選ぶ価値が高いものだけに絞ります。
@@ -36,6 +49,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
 | `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
+| `small-change-routing` | 小規模修正で selected runtime skill 読了、軽量 preflight、targeted validation を固定する | `agents/skills/small-change-routing.md` | `.agents/skills/small-change-routing/SKILL.md` |
 | `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
@@ -43,6 +57,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `oop-readability-check` | OOP readability tool を走らせ、必要なら機械結果と分離して agent 分析も出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
 | `result-artifact-writeout` | tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す | `agents/skills/result-artifact-writeout.md` | `.agents/skills/result-artifact-writeout/SKILL.md` |
 | `tool-finding-report` | tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る | `agents/skills/tool-finding-report.md` | `.agents/skills/tool-finding-report/SKILL.md` |
+| `issue-finding-report` | prompt / run bundle / hook / routing / eval evidence を抽象原因でまとめ、durable skill issue 候補に変換する | `agents/skills/issue-finding-report.md` | `.agents/skills/issue-finding-report/SKILL.md` |
 | `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
 | `agent-eval-accumulation` | missing / stale な AgentCanon eval family を registered producer と checker で append-only evidence に戻す | `agents/skills/agent-eval-accumulation.md` | `.agents/skills/agent-eval-accumulation/SKILL.md` |
 | `agent-canon-update` | AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する | `agents/skills/agent-canon-update.md` | `.agents/skills/agent-canon-update/SKILL.md` |
@@ -87,17 +102,31 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
 - Internal / compatibility review docs の一覧と route は [internal-routines/README.md](../internal-routines/README.md) に集約します。
 
+## Official System Skill Delegation
+
+OpenAI system skills stay host-provided. AgentCanon records routing triggers,
+local evidence, and repo-specific contracts, while the official skill body stays
+in the Codex host runtime.
+
+| Official System Skill | AgentCanon Route |
+| --- | --- |
+| `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
+| `$skill-creator` | Skill creation, skill refactor, and skill instruction quality work after AgentCanon fixes the local owner surface. |
+| `$skill-installer` | External skill installation and curated skill listing. |
+| `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
+| `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
+
 ## Codex Defaults
 
 - Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
-- OpenAI system skills stay host-provided rather than vendored. Use `$openai-docs` when changing Codex/OpenAI API config or docs; do not vendor duplicate OpenAI docs alternate route references in AgentCanon. Use `$skill-creator` when creating or refactoring skill instructions, `$skill-installer` for external skill installation, `$imagegen` for bitmap visual assets in HTML/report workflows, and `$plugin-creator` for plugin scaffolding.
+- AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。
+- task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
-- repo-changing task では `$agent-orchestration` から始め、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
+- repo-changing task では `$agent-orchestration` から始めます。小規模修正では `$small-change-routing` を使い、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
 - アルゴリズムの収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは `algorithm-proof-exploration` を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は `formal-proof-workflow` へ接続します。
@@ -107,6 +136,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - observable behavior、regression risk、または test contract を変える code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
+- 1 file、single abstraction、typo / link / format-only、Routine docs、Focused code で閉じる小規模修正では `small-change-routing` を使い、selected_runtime_skill_read、small_change_skill_read、targeted validation を evidence に残します。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
 - 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。
@@ -117,6 +147,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
 - tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
 - skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に compact summary を生成して読みます。
+- compact summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
 - accumulated eval family が missing / stale / fail のときは `agent-eval-accumulation` を使い、registered producer、compact checker、log archive sync の順に戻します。eval report を手で生成しません。
 - PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは `pr-processing` を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
 - AgentCanon source、`vendor/agent-canon` pin、root runtime view、parent update TODO を更新するときは `agent-canon-update` を使い、source PR と parent pin 更新を分けます。

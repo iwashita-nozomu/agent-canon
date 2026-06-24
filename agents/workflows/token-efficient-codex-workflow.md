@@ -88,8 +88,10 @@ Mode selection rules:
   property.
 - Read exact paths, lines, dependency headers, and named upstream files only
   after the tool output identifies a repair or ambiguity that needs context.
-- Prefer `rg`, `sed -n`, `git diff --stat`, and MCP status tools over bulk
-  file dumps.
+- Prefer `rg -l`, bounded `sed -n`, `git diff --stat`, and MCP status tools
+  over bulk file dumps. Direct match output must use a small path scope,
+  `--max-count`, or a pipeline that stores results in an artifact and prints
+  only the count or first screen of paths.
 - Summarize long artifacts into the run bundle before handing them to another
   agent.
 - Hand compact tool artifacts to subagents; do not ask them to re-run

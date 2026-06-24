@@ -33,6 +33,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/computational-optimization.md`.
 1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.
 1. Before implementation or experiment runs, fix an optimization contract: objective or residual, variables, constraints, derivatives, algorithm state, stopping policy, numerical invariants, and failure semantics.
+1. Route mathematical runtime checks, diagnostic gates, stopping checks, test
+   oracles, and proof obligations through the `mathematical necessity gate`:
+   connect each one to the public contract, iteration map, stopping scalar,
+   failure semantics, accepted theorem target, or approved design acceptance
+   criterion before adding it to implementation or validation evidence.
 1. For iterative solvers, treat convergence evidence as a theorem about the
    implemented iteration map and stopping scalar, e.g.
    `z_next = Step_impl(Problem, Config, z)` and

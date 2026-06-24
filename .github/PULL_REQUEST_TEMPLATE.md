@@ -11,9 +11,18 @@ upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
 downstream implementation ../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
+downstream implementation ../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
 downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side AgentCanon PRs
 @dependency-end
 -->
+
+## PR Essence
+
+- Problem / user request:
+- Design intent:
+- Canonical owner:
+- Behavior or contract delta:
+- Evidence route:
 
 ## Summary
 
@@ -81,7 +90,7 @@ Plan / exception:
 ## Agent Orchestration Evidence
 
 - [ ] First work update, run bundle, or linked PR comment recorded `workflow=<family>`, `skills=$agent-orchestration,...`, and `review=<...>` before implementation.
-- [ ] `agent-canon local-llm route-skill --prompt "<user request>" --format json` was reviewed, or the no-repo-task / routing-only exception is recorded below.
+- [ ] `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` was reviewed, or the no-repo-task / routing-only exception is recorded below.
 - [ ] If `$agent-orchestration` was not selected first, this PR is paused until the exception is explicit and reviewed.
 
 Orchestration evidence:

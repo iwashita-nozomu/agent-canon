@@ -21,6 +21,10 @@ upstream design README.md notes lifecycle index
 - dependency surface、導入済みライブラリ、既存実装候補を見ずに、新規 helper や新規 module を足す
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
 - 既存実装や導入済みライブラリでは足りない理由を書かずに、完全新規実装を選ぶ
+- compatibility-preservation drift として、旧入口、旧名、旧 wrapper、旧 config route を残して caller migration を先送りする
+- duplicate implementation として、同じ責務、同じ normalized body、同じ tool behavior、同じ DSL / contract を別 path に再実装する
+- canonical owner を確認せず、互換 helper、mirror、wrapper、alternate route を足す
+- contract-complete implementation として request clause、acceptance contract、Implementation Source Packet、validation route を結ばず、implementation shortcut を `design_issue_blocker` に戻さない
 - `git status --short --branch`、`git remote -v`、alternate route の `git config --get-regexp '^remote\\..*\\.url$'` / `.git/config` を確認せず、PR 文脈や template 名から push 先 repository を推定する
 - 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
 - notes、guardrails、documents、prior logs、local code / tests で解決できる曖昧さを調べずにユーザーへ戻す

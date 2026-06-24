@@ -81,21 +81,40 @@ INITIAL_INTAKE_AGENT_TYPES = (
     "explorer",
     "execution_planner",
 )
-DYNAMIC_EXPANSION_AGENT_STAGE_WAVES = (
+DYNAMIC_EXPANSION_ROLE_STAGE_WAVES = (
     (
         "manager_reviewer",
+        "scheduler",
+        "schedule_reviewer",
         "project_reviewer",
         "docs_workflow_steward",
         "prompt_config_reviewer",
-        "literature_researcher",
-        "plan_reviewer",
+        "researcher",
     ),
-    ("detailed_designer",),
-    ("detailed_design_reviewer", "document_flow_reviewer", "test_designer"),
-    ("spark_worker", "worker"),
-    ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
-    ("ship_reviewer",),
+    ("designer",),
+    ("design_reviewer", "document_flow_reviewer", "test_designer"),
+    ("implementer", "experimenter", "infra_steward"),
+    (
+        "change_reviewer",
+        "research_reviewer",
+        "experiment_reviewer",
+        "report_reviewer",
+        "reproducibility_reviewer",
+        "artifact_reviewer",
+        "scientific_computing_reviewer",
+        "benchmark_reviewer",
+        "fair_data_reviewer",
+        "ml_science_reviewer",
+        "citation_evidence_reviewer",
+        "notation_definition_reviewer",
+        "logic_gap_reviewer",
+        "infra_reviewer",
+        "python_reviewer",
+        "cpp_reviewer",
+    ),
+    ("final_reviewer",),
 )
+NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
 SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
     "identity_key": "role_type+instance_id",
@@ -123,6 +142,24 @@ SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
     "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
     "write_scope=<scope> validation_route=<route> review_gate=<gate> "
     "handoff_artifacts=<artifacts> status=<status>\""
+)
+COMMON_PROMPT_MUST_INCLUDE = (
+    "request_clause_ids",
+    "run_report_dir",
+    "team_manifest_path",
+    "subagent_lifecycle_policy",
+    "cross_cutting_document_packet",
+    "role_document_packet",
+    "compact_artifacts",
+    "allowed_paths",
+    "do_not_read",
+    "expected_output_artifacts",
+    "expected_output_schema",
+    "implementation_surface_route",
+    "tool_reuse_ledger",
+    "pre_edit_rejection_prediction",
+    "dependency_files_header_plan",
+    "next_review_gate",
 )
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
@@ -270,6 +307,19 @@ class Role:
     activation: str
     write_policy: WritePolicy
     codex_agents: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SubagentWaveSlot:
+    """One executable subagent instance in a stage wave."""
+
+    role_id: str
+    agent_type: str
+
+    @property
+    def instance_id(self) -> str:
+        """Return a stable role-instance id for wave ledgers."""
+        return f"{self.role_id}_{self.agent_type}"
 
 
 @dataclass(frozen=True)
@@ -615,32 +665,35 @@ def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str
     return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
 
 
-def _available_stage_agents(
-    preferred_agents: tuple[str, ...],
+def _role_stage_slots(
+    roles_by_id: dict[str, Role],
+    role_ids: tuple[str, ...],
     available_agents: set[str],
-    used_agents: set[str],
-) -> tuple[str, ...]:
-    """Return preferred agent types that are available and not already scheduled."""
-    agents: list[str] = []
-    for agent_type in preferred_agents:
-        if agent_type not in available_agents or agent_type in used_agents:
-            continue
-        agents.append(agent_type)
-        used_agents.add(agent_type)
-    return tuple(agents)
+    used_slots: set[tuple[str, str]],
+) -> tuple[SubagentWaveSlot, ...]:
+    """Return stage-ready slots without collapsing shared agent types."""
+    return tuple(
+        SubagentWaveSlot(role_id=role.id, agent_type=agent_type)
+        for role_id in role_ids
+        for role in (roles_by_id.get(role_id),)
+        if role is not None
+        for agent_type in role.codex_agents
+        if agent_type in available_agents
+        if (role.id, agent_type) not in used_slots
+    )
 
 
-def _chunk_agent_wave(
-    agent_types: tuple[str, ...],
+def _chunk_wave_slots(
+    slots: tuple[SubagentWaveSlot, ...],
     active_subagents: int,
-) -> tuple[tuple[str, ...], ...]:
-    """Split one stage wave without exceeding the active subagent budget."""
+) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
+    """Split one role-instance stage wave within the active subagent budget."""
     if active_subagents < 1:
         return ()
     return tuple(
-        agent_types[index : index + active_subagents]
-        for index in range(0, len(agent_types), active_subagents)
-        if agent_types[index : index + active_subagents]
+        slots[index : index + active_subagents]
+        for index in range(0, len(slots), active_subagents)
+        if slots[index : index + active_subagents]
     )
 
 
@@ -667,23 +720,51 @@ def recommended_dynamic_expansion_waves(
     initial_wave: tuple[str, ...],
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
+    return tuple(
+        tuple(slot.agent_type for slot in wave)
+        for wave in recommended_dynamic_expansion_wave_slots(roles, active_subagents, initial_wave)
+    )
+
+
+def recommended_dynamic_expansion_wave_slots(
+    roles: tuple[Role, ...],
+    active_subagents: int,
+    initial_wave: tuple[str, ...],
+) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
+    """Return executable follow-up role-instance waves inside the active budget."""
     if active_subagents < 1:
         return ()
-    ordered_agents = unique_codex_agents_for_roles(roles)
-    available_agents = set(ordered_agents)
-    used_agents = set(initial_wave)
-    waves: list[tuple[str, ...]] = []
-    for preferred_stage_agents in DYNAMIC_EXPANSION_AGENT_STAGE_WAVES:
-        stage_agents = _available_stage_agents(
-            preferred_stage_agents,
-            available_agents,
-            used_agents,
-        )
-        waves.extend(_chunk_agent_wave(stage_agents, active_subagents))
-    fallback_agents = tuple(
-        agent_type for agent_type in ordered_agents if agent_type not in used_agents
+    initial_agent_types = set(initial_wave)
+    available_agents = set(unique_codex_agents_for_roles(roles))
+    roles_by_id = {role.id: role for role in roles}
+    used_slots: set[tuple[str, str]] = set()
+    waves: list[tuple[SubagentWaveSlot, ...]] = []
+    staged_role_ids = {
+        role_id
+        for stage_role_ids in DYNAMIC_EXPANSION_ROLE_STAGE_WAVES
+        for role_id in stage_role_ids
+    }
+    for stage_role_ids in DYNAMIC_EXPANSION_ROLE_STAGE_WAVES[:-1]:
+        stage_slots = _role_stage_slots(roles_by_id, stage_role_ids, available_agents, used_slots)
+        used_slots.update((slot.role_id, slot.agent_type) for slot in stage_slots)
+        waves.extend(_chunk_wave_slots(stage_slots, active_subagents))
+    fallback_role_ids = tuple(
+        role.id
+        for role in roles
+        if role.id not in staged_role_ids
+        and role.id not in NON_SPAWN_WAVE_ROLE_IDS
+        and any(agent_type not in initial_agent_types for agent_type in role.codex_agents)
     )
-    waves.extend(_chunk_agent_wave(fallback_agents, active_subagents))
+    fallback_slots = _role_stage_slots(roles_by_id, fallback_role_ids, available_agents, used_slots)
+    used_slots.update((slot.role_id, slot.agent_type) for slot in fallback_slots)
+    waves.extend(_chunk_wave_slots(fallback_slots, active_subagents))
+    final_stage_slots = _role_stage_slots(
+        roles_by_id,
+        DYNAMIC_EXPANSION_ROLE_STAGE_WAVES[-1],
+        available_agents,
+        used_slots,
+    )
+    waves.extend(_chunk_wave_slots(final_stage_slots, active_subagents))
     return tuple(waves)
 
 
@@ -707,6 +788,19 @@ def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
     """Render follow-up waves in a machine-readable compact form."""
     return ";".join(
         f"WAVE-{index + 2}={format_subagent_wave(wave)}"
+        for index, wave in enumerate(waves)
+    )
+
+
+def format_subagent_role_instance_wave_chunks(
+    waves: tuple[tuple[SubagentWaveSlot, ...], ...],
+) -> str:
+    """Render follow-up role-instance waves in a compact machine-readable form."""
+    return ";".join(
+        f"WAVE-{index + 2}="
+        + ",".join(
+            f"{slot.role_id}:{slot.agent_type}:{slot.instance_id}" for slot in wave
+        )
         for index, wave in enumerate(waves)
     )
 
@@ -1240,6 +1334,12 @@ def manifest_run_lines(
         "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
         "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
     ]
+    insert_index = lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
+    lines.insert(insert_index, "    common_prompt_must_include:")
+    insert_index += 1
+    for field in COMMON_PROMPT_MUST_INCLUDE:
+        lines.insert(insert_index, f"      - {field}")
+        insert_index += 1
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
@@ -1257,7 +1357,7 @@ def manifest_run_lines(
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
         initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
-        expansion_waves = recommended_dynamic_expansion_waves(
+        expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
             active_subagents,
             initial_wave,
@@ -1269,15 +1369,22 @@ def manifest_run_lines(
         for agent_type in initial_wave:
             lines.append(f"      - {agent_type}")
         lines.append("    dynamic_expansion_waves:")
-        if expansion_waves:
-            for index, wave in enumerate(expansion_waves, start=2):
+        if expansion_wave_slots:
+            for index, wave in enumerate(expansion_wave_slots, start=2):
                 lines.append(f"      - wave_id: WAVE-{index}")
                 lines.append("        agent_types:")
-                for agent_type in wave:
-                    lines.append(f"          - {agent_type}")
+                for slot in wave:
+                    lines.append(f"          - {slot.agent_type}")
+                lines.append("        role_instances:")
+                for slot in wave:
+                    lines.append(
+                        "          - "
+                        f"{slot.role_id}:{slot.instance_id}:team_manifest.yaml#roles.{slot.role_id}"
+                    )
         else:
             lines.append("      - wave_id: none")
             lines.append("        agent_types: []")
+            lines.append("        role_instances: []")
         lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.append("  delegated_spawn_policy:")
         lines.append("    dynamic_mid_task_spawn: allowed")
@@ -1405,9 +1512,14 @@ def manifest_prompt_contract_lines(
     lines = ["    prompt_contract:"]
     lines.append(
         "      assignment_prompt: "
-        f"{role_prompt_contract(role, workflow_family).replace(NEWLINE, ' ')!r}"
+        f"{compact_role_prompt_contract(role, workflow_family)!r}"
     )
-    lines.append("      prompt_must_include:")
+    lines.append(
+        "      assignment_prompt_source: "
+        "'tools/agent_tools/agent_team.py#role_prompt_contract'"
+    )
+    lines.append("      common_prompt_must_include_ref: run.handoff_context_policy.common_prompt_must_include")
+    lines.append("      role_prompt_must_include:")
     for item in role_prompt_must_include(role):
         lines.append(f"        - {item!r}")
     return lines
@@ -1453,11 +1565,24 @@ def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]
     )
     if document_packet.notes:
         lines.append(f"      notes: {document_packet.notes!r}")
-    lines.append("      read_before_work:")
-    for entry in document_packet.read_before_work:
+    lines.append("      common_packet_ref: run.cross_cutting_document_packet")
+    lines.append("      common_packet_read_rule: active_when_route_or_review_gate_requires_it")
+    lines.append("      role_specific_read_before_work:")
+    for entry in role_specific_document_entries(document_packet):
         lines.append(f"        - path: {str(entry.path)!r}")
         lines.append(f"          rationale: {entry.rationale!r}")
     return lines
+
+
+def role_specific_document_entries(
+    document_packet: RoleDocumentPacket,
+) -> tuple[DocumentPacketEntry, ...]:
+    """Return per-role document entries without repeating common packet paths."""
+    return tuple(
+        entry
+        for entry in document_packet.read_before_work
+        if not entry.rationale.startswith("cross_cutting_doc:")
+    )
 
 
 def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
@@ -1569,26 +1694,27 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
     )
 
 
+def compact_role_prompt_contract(
+    role: Role,
+    workflow_family: dict[str, object] | None,
+) -> str:
+    """Return a compact manifest copy of the role prompt contract."""
+    family_name = (
+        str(workflow_family["name"])
+        if workflow_family is not None
+        else "the selected workflow"
+    )
+    write_scope = "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
+    return (
+        f"{role.id} for {family_name}; {write_scope}; use compact artifacts, "
+        "role-specific packet, common packet only when active, allowed paths, "
+        "and the listed output fields."
+    )
+
+
 def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     """Return handoff fields every invocation prompt should include for one role."""
-    common = [
-        "request_clause_ids",
-        "run_report_dir",
-        "team_manifest_path",
-        "subagent_lifecycle_policy",
-        "cross_cutting_document_packet",
-        "role_document_packet",
-        "compact_artifacts",
-        "allowed_paths",
-        "do_not_read",
-        "expected_output_artifacts",
-        "expected_output_schema",
-        "implementation_surface_route",
-        "tool_reuse_ledger",
-        "pre_edit_rejection_prediction",
-        "dependency_files_header_plan",
-        "next_review_gate",
-    ]
+    common = []
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
     if role.id == "designer":
