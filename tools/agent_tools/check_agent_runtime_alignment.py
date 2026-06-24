@@ -766,7 +766,7 @@ def validate_subagent_protocol_docs() -> None:
                 "task_start.py",
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
-                "agent-canon local-llm route-skill",
+                "python3 tools/agent_tools/route.py --prompt",
                 "Implementation Flow Graph",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")

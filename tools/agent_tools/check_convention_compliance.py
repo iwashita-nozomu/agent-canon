@@ -850,7 +850,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -913,7 +913,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "implementation stage gate",

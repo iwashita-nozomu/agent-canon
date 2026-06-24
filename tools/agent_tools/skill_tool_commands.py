@@ -372,7 +372,7 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
     if packet.discovered_commands:
         lines.extend(f"- {command}" for command in packet.discovered_commands)
     else:
-        lines.append(f"- agent-canon local-llm route-skill --prompt \"{PROMPT_PLACEHOLDER}\" --format json")
+        lines.append(f"- python3 tools/agent_tools/route.py --prompt \"{PROMPT_PLACEHOLDER}\" --format json")
     lines.append("SKILL_TOOL_COMMANDS_VALIDATION:")
     lines.extend(f"- {command}" for command in packet.validation_commands)
     return "\n".join(lines)

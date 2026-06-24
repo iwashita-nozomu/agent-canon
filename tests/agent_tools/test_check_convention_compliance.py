@@ -440,7 +440,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| run bundle, declared workflow / skills / review, and dynamic wave ledger | "
         "`task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
-        "`agent-canon local-llm route-skill` |\n"
+        "`python3 tools/agent_tools/route.py --prompt` |\n"
         "| implementation stage gate | "
         "`agents/workflows/implementation-waterfall-workflow.md` |\n"
         "| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md` |\n"
@@ -560,7 +560,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`agent-canon local-llm route-skill` |\n"
+        "`python3 tools/agent_tools/route.py --prompt` |\n"
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (
@@ -1589,7 +1589,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflows = root / "agents" / "TASK_WORKFLOWS.md"
             workflows.write_text(
                 workflows.read_text(encoding="utf-8").replace(
-                    "agent-canon local-llm route-skill",
+                    "python3 tools/agent_tools/route.py --prompt",
                     "skill router owner omitted",
                 ),
                 encoding="utf-8",

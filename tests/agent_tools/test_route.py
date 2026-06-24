@@ -128,6 +128,35 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
+    def test_prompt_file_routes_through_python_fast_path(self) -> None:
+        """Prompt files should use the Python routing fast path."""
+        prompt = "スキルとツールのルーティングが遅すぎるので改善して"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = Path(tmp_dir) / "prompt.txt"
+            prompt_path.write_text(prompt, encoding="utf-8")
+            python_result = self.run_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+            wrapper_result = self.run_rust_skill_route(
+                "--prompt-file",
+                str(prompt_path),
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(wrapper_result.returncode, 0, wrapper_result.stdout + wrapper_result.stderr)
+        self.assertNotIn("cargo run", wrapper_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        wrapper_decision = json.loads(wrapper_result.stdout)
+        self.assertEqual(python_decision["schema"], "agent_canon.local_llm.skill_route.v1")
+        self.assertIn("task-routing", python_decision["active_skills"])
+        for key in ("skills", "active_skills", "deferred_skills", "matched_skills"):
+            self.assertEqual(python_decision[key], wrapper_decision[key], key)
+
     def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
         """Underscore-prefixed skills are private and stay out of public routing."""
         with tempfile.TemporaryDirectory() as tmp_dir:

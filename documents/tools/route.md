@@ -20,6 +20,7 @@ small command surface:
 python3 tools/agent_tools/route.py --area checks --changed README.md
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
 python3 tools/agent_tools/route.py --name repo_refactor_skill.py
+python3 tools/agent_tools/route.py --prompt "fix skill routing with multi-agent evidence" --format json
 tools/bin/agent-canon local-llm route-skill --prompt "fix skill routing with multi-agent evidence" --format json
 python3 tools/agent_tools/route.py --list --format markdown
 ```
@@ -35,11 +36,12 @@ NEXT_ACTION=run_selected_checks
 COMMANDS=make check-matrix
 ```
 
-Prompt skill routing is owned by the Rust
-`agent-canon local-llm route-skill` harness. It returns a compatibility
-`SKILLS` list plus `ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS`
-for dynamic wave triggers. The Python `route.py --prompt ...` path remains a
-compatibility mirror for older call sites.
+Prompt skill routing is owned by the Python fast path
+`route.py --prompt`. It returns a compatibility `SKILLS` list plus
+`ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS` for dynamic wave
+triggers. `tools/bin/agent-canon local-llm route-skill ...` remains a CLI
+compatibility mirror for older call sites and dispatches to the same catalog
+route.
 
 Japanese or English prompts about unnecessary numerical tests, heavy tests,
 test brittleness, tolerance-based tests, or test-design gaps route to
@@ -54,10 +56,9 @@ structure-review skill unless `route.py --name <candidate>` returns
 `STATUS=unknown` after the structure route has been considered.
 
 Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are
-log-analysis tasks. `agent-canon local-llm route-skill ... --format json`
-should include `$agent-log-analysis` for those requests so the agent reads
-compact runtime dashboard evidence before editing prompt, hook, skill, or
-workflow surfaces.
+log-analysis tasks. `route.py --prompt ... --format json` should include
+`$agent-log-analysis` for those requests so the agent reads compact runtime
+dashboard evidence before editing prompt, hook, skill, or workflow surfaces.
 
 Use this tool when a task needs a short answer to "which profile, check,
 runtime, skill, or closeout path applies?" Use the specialized checker or

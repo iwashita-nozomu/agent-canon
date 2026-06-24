@@ -14,8 +14,9 @@ downstream implementation ../../tools/ci/run_docs_checks.sh forwards legacy docs
 tooling. This page covers the command families that share the wrapper.
 `agent-canon docs` owns Markdown documentation formatting and adjacent checks.
 `agent-canon test-design` owns resilient test-design diagnostics.
-`agent-canon local-llm route-skill` owns deterministic prompt-to-skill routing
-without copying Codex CLI capability lists into AgentCanon prose.
+`agent-canon local-llm route-skill` is the CLI compatibility mirror for
+deterministic prompt-to-skill routing. The fast owner path is
+`python3 tools/agent_tools/route.py --prompt`.
 
 Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
@@ -30,6 +31,7 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs fix-math <paths...>
 tools/bin/agent-canon docs fix-mermaid <paths...>
 tools/bin/agent-canon test-design check <test-paths...>
+python3 tools/agent_tools/route.py --prompt "<request>" --format json
 tools/bin/agent-canon local-llm route-skill --prompt "<request>" --format json
 ```
 
@@ -65,9 +67,10 @@ mock/output/prose assertions, time coupling, unseeded randomness, and
 property/metamorphic candidates. Its detailed contract lives in
 [test_design.md](test_design.md).
 
-`local-llm route-skill` returns `SKILLS` for compatibility, `ACTIVE_SKILLS` for
-the current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it
-before broad skill-selection prose or subagent fan-out.
+`route.py --prompt` returns `SKILLS` for compatibility, `ACTIVE_SKILLS` for the
+current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
+broad skill-selection prose or subagent fan-out. `local-llm route-skill`
+returns the same route through the CLI mirror.
 
 `format`, `fix-math`, and `fix-mermaid` write mechanical repairs and then run
 the same adjacent `check` path. A formatter run is complete only when the final

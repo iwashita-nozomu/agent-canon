@@ -121,7 +121,7 @@ in the Codex host runtime.
 - Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。
+- task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。`tools/bin/agent-canon local-llm route-skill` は CLI 互換 mirror です。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
