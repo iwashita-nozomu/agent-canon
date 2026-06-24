@@ -4,6 +4,7 @@
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../agents/skills/catalog.yaml public skill catalog and related skill metadata
 # upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
@@ -340,6 +341,7 @@ class SkillRoutingRule:
     reason: str
     stage_policy: str
     triggers: tuple[tuple[str, ...], ...]
+    related_skills: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -360,6 +362,8 @@ class SkillRouteDecision:
     active_skills: tuple[str, ...]
     deferred_skills: tuple[str, ...]
     matched_skills: tuple[str, ...]
+    related_skill_candidates: tuple[str, ...]
+    related_skills: dict[str, tuple[str, ...]]
     reasons: tuple[str, ...]
     evidence: str
 
@@ -536,6 +540,13 @@ def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
     return tuple(groups)
 
 
+def optional_string_list(value: object, field: str) -> tuple[str, ...]:
+    """Return a tuple of strings from an optional YAML list."""
+    if value is None:
+        return ()
+    return string_list(value, field)
+
+
 def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
     """Load prompt-routing rules from the public skill catalog."""
     data = load_skill_catalog(root)
@@ -569,9 +580,26 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                 reason=reason,
                 stage_policy=str(stage_policy),
                 triggers=trigger_groups(routing_mapping.get("triggers"), f"{skill_id}.routing.triggers"),
+                related_skills=optional_string_list(
+                    entry_mapping.get("related_skills"),
+                    f"{skill_id}.related_skills",
+                ),
             )
         )
+    for rule in rules:
+        for related_skill in rule.related_skills:
+            if related_skill == rule.skill:
+                raise ValueError(f"{rule.skill}.related_skills must not include itself")
+            if related_skill.startswith(PRIVATE_SKILL_PREFIX):
+                raise ValueError(f"{rule.skill}.related_skills must be public: {related_skill}")
+            if related_skill not in observed_skill_ids:
+                raise ValueError(f"{rule.skill}.related_skills unknown skill: {related_skill}")
     return tuple(rules)
+
+
+def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
+    """Return catalog-backed related-skill candidates keyed by public skill id."""
+    return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
 
 
 def read_prompt_file(root: Path, raw_path: str) -> str:
@@ -647,6 +675,31 @@ def is_current_stage_skill(skill: str, rules_by_skill: Mapping[str, SkillRouting
     return rule is not None and rule.stage_policy == "active"
 
 
+def related_skill_candidates(
+    matched_skills: Sequence[str],
+    rules_by_skill: Mapping[str, SkillRoutingRule],
+    selected_skills: Sequence[str],
+) -> tuple[dict[str, tuple[str, ...]], tuple[str, ...]]:
+    """Return related skills for matched skills without activating them."""
+    related_by_source: dict[str, tuple[str, ...]] = {}
+    candidates: list[str] = []
+    selected = set(selected_skills)
+    for skill in matched_skills:
+        rule = rules_by_skill.get(skill)
+        if rule is None or not rule.related_skills:
+            continue
+        pending_related = tuple(
+            related_skill
+            for related_skill in rule.related_skills
+            if related_skill not in selected
+        )
+        if not pending_related:
+            continue
+        related_by_source[skill] = pending_related
+        candidates.extend(pending_related)
+    return related_by_source, ordered_unique(candidates)
+
+
 def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     active_mode = infer_mode(prompt, mode)
@@ -669,10 +722,16 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         )
     )
     deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
+    related_by_source, related_candidates = related_skill_candidates(
+        matched_skills,
+        rules_by_skill,
+        skills,
+    )
     evidence = (
         f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
         f"active={','.join(active_skills)};"
-        f"deferred={','.join(deferred_skills) if deferred_skills else 'none'}"
+        f"deferred={','.join(deferred_skills) if deferred_skills else 'none'};"
+        f"related={','.join(related_candidates) if related_candidates else 'none'}"
     )
     return SkillRouteDecision(
         route="skill-selection",
@@ -681,6 +740,8 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         active_skills=active_skills,
         deferred_skills=deferred_skills,
         matched_skills=matched_skills,
+        related_skill_candidates=related_candidates,
+        related_skills=related_by_source,
         reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
         evidence=evidence,
     )
@@ -753,6 +814,12 @@ class RouteRenderer:
                         else "`none`"
                     ),
                     f"- Matched skills: `{','.join(decision.matched_skills) or 'none'}`",
+                    "- Related skill candidates: "
+                    + (
+                        ", ".join(f"`${skill}`" for skill in decision.related_skill_candidates)
+                        if decision.related_skill_candidates
+                        else "`none`"
+                    ),
                     f"- Reasons: {reasons}",
                     f"- Evidence: `{decision.evidence}`",
                 ]
@@ -771,6 +838,21 @@ class RouteRenderer:
                     else "-"
                 ),
                 f"MATCHED_SKILLS={','.join(decision.matched_skills) or '-'}",
+                "RELATED_SKILL_CANDIDATES="
+                + (
+                    ",".join(f"${skill}" for skill in decision.related_skill_candidates)
+                    if decision.related_skill_candidates
+                    else "-"
+                ),
+                "RELATED_SKILLS="
+                + (
+                    ";".join(
+                        f"{source}:{'|'.join(skills)}"
+                        for source, skills in decision.related_skills.items()
+                    )
+                    if decision.related_skills
+                    else "-"
+                ),
                 f"REASONS={';'.join(decision.reasons) or '-'}",
                 f"EVIDENCE={decision.evidence}",
             ]

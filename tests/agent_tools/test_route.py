@@ -116,6 +116,24 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
+    def test_prompt_routes_related_skill_candidates_without_activating(self) -> None:
+        """Related skill metadata should guide later waves without expanding active skills."""
+        result = self.run_route(
+            "--prompt",
+            "スキルが重いので分割し、関連スキルを明示して実行時に適切なスキルを使う",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("small-change-routing", decision["related_skill_candidates"])
+        self.assertNotIn("small-change-routing", decision["active_skills"])
+        self.assertIn("task-routing", decision["related_skills"])
+        self.assertIn("small-change-routing", decision["related_skills"]["task-routing"])
+
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
         prompt = "スキルとツールのルーティングが遅すぎるので改善して"
@@ -522,6 +540,37 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("SKILL_ROUTER_ERROR=duplicate skill catalog id: task-routing", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_prompt_route_unknown_related_skill_fails_structured(self) -> None:
+        """Related skill metadata should reference public catalog entries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: task-routing",
+                        "    related_skills:",
+                        "      - missing-skill",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "routing",
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("task-routing.related_skills unknown skill: missing-skill", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_routes_formatter_adjacent_checks_to_markdown_style(self) -> None:

@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests test check agent runtime alignment behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates runtime alignment contracts
 # @dependency-end
 
 """Integration test for the agent runtime alignment checker."""
@@ -182,6 +183,30 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                     "triggers": [["routing"]],
                 },
             )
+
+    def test_skill_related_schema_rejects_unknown_skill(self) -> None:
+        """Related skill metadata must point to catalog-backed public skills."""
+        families: list[object] = [
+            {
+                "id": "task-routing",
+                "related_skills": ["missing-skill"],
+            }
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "unknown skill: missing-skill"):
+            runtime_alignment.validate_skill_related_entries(families, {"task-routing"})
+
+    def test_skill_related_schema_rejects_self_reference(self) -> None:
+        """Related skill metadata must not point back to the same skill."""
+        families: list[object] = [
+            {
+                "id": "task-routing",
+                "related_skills": ["task-routing"],
+            }
+        ]
+
+        with self.assertRaisesRegex(RuntimeError, "must not self-reference"):
+            runtime_alignment.validate_skill_related_entries(families, {"task-routing"})
 
     def test_public_skill_document_contract_rejects_extra_public_doc(self) -> None:
         """Public skill docs must be catalog-backed instead of internal routines."""
