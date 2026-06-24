@@ -89,8 +89,11 @@ Detailed tool behavior belongs in the same-named tool document or in
 `tools/catalog.yaml`. This hub keeps only the families a reader usually needs
 to choose a route:
 
-- Catalog and drift checks: `tool_catalog.py`, `tool_drift.py`,
-  `responsibility_scope.py`, and `import_responsibility.py`.
+- Catalog, drift, and pre-edit routing checks: `tool_catalog.py`,
+  `tool_drift.py`, `tool_rejection_preflight.py`, `responsibility_scope.py`,
+  and `import_responsibility.py`. `tool_rejection_preflight.py` reports a
+  `responsibility_scope` gate with the owner scope, class, and protecting tools
+  from `responsibility-scope.toml`.
 - Runtime evidence and generated output guards: `runtime_log_archive_git.py`,
   `eval_accumulation_check.py`, `run_accumulated_agent_evals.py`, and
   `generated_artifact_guard.py`.

@@ -45,8 +45,10 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
 1. subagent concurrency を次の階層で解決する。`.codex/config.toml` の `[agents].max_threads` は runtime hard ceiling、`agents/task_catalog.yaml` の `workflow_families[].spawn_budget.active_subagents` は workflow active budget ceiling、stage wave は parent が current stage の evidence と dependency order から切る bounded wave、`workflow_families[].spawn_budget.max_write_subagents` は disjoint write scope を持つ write-capable subagent だけの上限です。Intake Responsibility Wave は責務 intake wave であり、family budget を埋める target ではありません。後続 role / skill は dynamic expansion wave として evidence gate で追加します。独立 workstream は同一階層の flat wave ではなく、stage owner ごとの vertical dynamic wave chain として扱います
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. prompt-derived skill routing が必要なら `agent-canon local-llm route-skill --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`python3 tools/agent_tools/route.py --prompt ...` は互換 mirror です
+1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
+1. repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す
+1. 1 file / single abstraction、Routine docs、Focused code、typo / link / format-only、明示的な小規模修正では `$small-change-routing` を追加し、selected_runtime_skill_read、small_change_skill_read、targeted validation をそこで固定する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
@@ -77,7 +79,7 @@ mode の意味:
 - `Pre-Edit Repository Investigation Packet` の path または parent-direct rationale
 - repo-editing task なら、workflow family ごとの順序。`Scoped Change Lite` は cheap local route、full staged route は requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
-- PR を作る task では、同じ routing 宣言と `agent-canon local-llm route-skill --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
+- PR を作る task では、同じ routing 宣言と `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
 - `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層

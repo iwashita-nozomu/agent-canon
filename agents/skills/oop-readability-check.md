@@ -22,9 +22,17 @@ still keeping mechanical tool output separate from agent judgment.
 - The user says `$oop-readability-check`.
 - The user asks to run the OOP tool, OOP check, readability check, or mechanical
   OOP report.
+- The user asks about SOLID, Single responsibility, Open/closed, Liskov
+  substitution, Interface segregation, Dependency inversion, class
+  responsibility, public API width, `Protocol`, inheritance, or dependency
+  inversion signals.
 - The user wants tool output, tables, status, counts, or hotspot rows.
 - The user asks to interpret, prioritize, or review false positives in OOP
   readability output.
+
+SOLID route owner: this skill owns SOLID check prompts and mechanical SOLID
+signal reports. Language-specific review skills consume the resulting evidence
+when their changed diff already owns that language surface.
 
 ## Modes
 
@@ -116,6 +124,8 @@ SOLID principle signal counts are mechanical projections from finding kind to
 review heading. The source mapping lives in
 `tools/oop/shared/readability_core.py`; keep the skill as routing and report
 usage guidance.
+Reports should preserve all five headings when present: Single responsibility,
+Open/closed, Liskov substitution, Interface segregation, and Dependency inversion.
 
 The user-facing response must include the artifact path, status, and headline
 counts. It may include a short table excerpt, but the durable report is the

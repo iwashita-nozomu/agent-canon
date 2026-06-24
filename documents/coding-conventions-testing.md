@@ -139,6 +139,13 @@ contract-only wrapper の validation evidence は次のように固定します�
   canonical checker validation への移行を repair route として扱います。
 - pytest smoke、execution-only test、no-crash test、exit-code wrapper、数値 smoke は
   該当 checker command の直接実行を validation route に置きます。
+- SOLID / OOP boundary assertion は checker-owned property として扱います。
+  Single responsibility、Open/closed、Liskov substitution、Interface segregation、
+  Dependency inversion の risk は `$oop-readability-check`、
+  `tools/oop/python/readability.py` / `tools/oop/cpp/readability.py`、
+  `import_responsibility.py`、type checker、dependency review の evidence route に置きます。
+  実行テストは observable behavior、shared behavior contract、または public API regression
+  を固定する場合に限ります。
 
 Validation repair scope は、changed contract、changed lines、または task plan が名指しした
 checker-owned property に結び付く finding です。formatter、lint、test-design checker、

@@ -1,6 +1,6 @@
 ---
 name: oop-readability-check
-description: Use when the user asks to run the OOP readability checker, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis.
+description: Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis.
 ---
 <!--
 @dependency-start
@@ -35,6 +35,14 @@ Execute the required and task-matching conditional commands that the packet prin
    - `run-and-analyze`: run the tool, then add agent analysis
 1. Treat user-provided paths as authoritative. Do not broaden scope unless the
    user asks for broader scope.
+1. Treat SOLID, Single responsibility, Open/closed, Liskov substitution,
+   Interface segregation, Dependency inversion, class responsibility, public API
+   width, `Protocol`, inheritance, and dependency inversion prompts as OOP
+   readability scope.
+1. Treat this skill as the SOLID route owner for SOLID check prompts and
+   mechanical SOLID signal reports; language-specific review skills consume the
+   report only when their changed diff already owns that language surface. Keep
+   SOLID labels as mechanical projections of the checker categories.
 1. In tool-running modes, use the OOP readability CLI with language selection
    delegated to the tool. The default command shape is:
 

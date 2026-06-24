@@ -40,9 +40,13 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("TOOL_REJECTION_PREFLIGHT=warn", result.stdout)
         self.assertIn("gate:cause_investigation_guard", result.stdout)
         self.assertIn("gate:import_responsibility", result.stdout)
+        self.assertIn("gate:responsibility_scope", result.stdout)
+        self.assertIn("scope:shared-tooling", result.stdout)
+        self.assertIn("owner:agent-canon", result.stdout)
         self.assertIn("gate:module_boundary_guard", result.stdout)
         self.assertIn("gate:helper_first_guard", result.stdout)
         self.assertIn("gate:oop_readability_guard", result.stdout)
+        self.assertIn("gate:solid_evidence_gate", result.stdout)
         self.assertIn("gate:helper_inventory_guard", result.stdout)
         self.assertIn("gate:style_checker_guard", result.stdout)
         self.assertIn("gate:dependency_review", result.stdout)
@@ -86,6 +90,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             "vendor/agent-canon/tools/agent_tools/new_shared_checker.py", paths
         )
         self.assertIn("agentcanon_tool_source_route", gates)
+        self.assertIn("responsibility_scope", gates)
         self.assertIn("tool_catalog", gates)
         self.assertIn("log_surface_inventory_guard", gates)
         self.assertTrue(
@@ -173,6 +178,43 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertIn("codex_hook_runtime_alignment", gates)
         self.assertIn("dependency_review", gates)
+        dependency_gates = [
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "dependency_review"
+        ]
+        self.assertEqual(len(dependency_gates), 1)
+        self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
+        self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
+
+    def test_agentcanon_hook_config_source_path_preserves_schema_route(self) -> None:
+        """Parent symlink resolution should keep hook runtime and schema routing."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "vendor/agent-canon/.codex/hooks.json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        dependency_gates = [
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "dependency_review"
+        ]
+        self.assertIn("codex_hook_runtime_alignment", gates)
+        self.assertEqual(len(dependency_gates), 1)
+        self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
+        self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
 
     def test_markdown_path_predicts_style_checker_gate(self) -> None:
         """Markdown edits should carry automatic style checker coverage."""
@@ -195,6 +237,43 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertIn("style_checker_guard", gates)
         self.assertIn("dependency_review", gates)
+        self.assertIn("responsibility_scope", gates)
+        self.assertTrue(
+            any(
+                gate["handoff"].startswith("scope:shared-policy-documents ")
+                for gate in payload["predicted_gates"]
+                if gate["gate"] == "responsibility_scope"
+            )
+        )
+
+    def test_unknown_path_predicts_responsibility_assignment(self) -> None:
+        """Unscoped planned paths should route through responsibility assignment."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "scratch-drift/example.txt",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        responsibility_gates = [
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "responsibility_scope"
+        ]
+        self.assertEqual(len(responsibility_gates), 1)
+        self.assertIn(
+            "assign this planned path to exactly one responsibility-scope.toml scope",
+            responsibility_gates[0]["handoff"],
+        )
 
     def test_skill_path_predicts_log_surface_gate(self) -> None:
         """Skill edits should require Codex log-surface validation."""

@@ -173,6 +173,10 @@ path = "../.agents/skills/result-artifact-writeout/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/small-change-routing/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/start-repository/SKILL.md"
 enabled = true
 

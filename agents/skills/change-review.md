@@ -38,6 +38,7 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、`--changed` だけで済ませていない
 - 回帰、欠落テスト、stale documentation を優先して見ている
 - 必要な validation が走っているか、未実行なら明記している
+- Python の class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る diff は `python-review` と `$oop-readability-check` の対象にし、`check_solid_evidence.py` で OOP readability report の path coverage と SOLID principle signal を確認している
 - `fix now` と `follow-up` finding には `issue_route` を付けている。
   現在の diff で閉じるものは `run_local_resolution:<evidence>`、
   durable に残すものは `existing_issue:<path-or-url>` または
@@ -53,6 +54,7 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
 1. 破壊的変更、削除、rename、config 変更を先に見ます。
 1. docs と tests が実装に追随しているか確認します。
+1. Python の class、dataclass、`Protocol`、継承、public API、型境界、依存方向が変わる場合は `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。
 1. `bash tools/agent_tools/run_repo_dependency_review.sh` を実行し、全 repo の dependency manifest coverage / format / graph を確認します。
 1. findings を priority 順に並べ、evidence を付けます。
 1. 各 finding に `issue_route` を付けます。現在の review loop で閉じるものは
@@ -78,4 +80,5 @@ Finding rows include:
 ## Boundary
 
 - Python 差分で型と test を強く見る場合は `python-review` を追加します。
+- Python 差分が SOLID-sensitive boundary を持つ場合は `python-review` と `$oop-readability-check` を追加し、`python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` の結果を review evidence に含めます。
 - C / C++ 差分で build、header、ownership を強く見る場合は `cpp-review` を追加します。

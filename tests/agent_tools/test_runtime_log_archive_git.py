@@ -26,10 +26,23 @@ from tools.agent_tools.runtime_log_paths import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import runtime_log_archive_git  # noqa: E402
 
 
 class RuntimeLogArchiveGitTest(unittest.TestCase):
     """Validate the runtime log archive Git workflow."""
+
+    def test_git_index_locked_detects_transient_lock_failure(self) -> None:
+        """Index lock errors should be classified for bounded retry."""
+        result = subprocess.CompletedProcess(
+            ["git", "commit"],
+            128,
+            "",
+            "fatal: Unable to create '.git/index.lock': File exists.",
+        )
+
+        self.assertTrue(runtime_log_archive_git.git_index_locked(result))
 
     def run_tool(
         self,
@@ -501,6 +514,98 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=yes", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
+
+    def test_check_clean_allows_source_and_canon_repo_key_trees(self) -> None:
+        """A chat branch may contain source and AgentCanon repo-key trees."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            canon_key = repo_log_key(canon)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage-no-git-head.jsonl"
+            canon_log.parent.mkdir(parents=True)
+            canon_log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-associated-canon",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": canon_key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "-C", str(archive), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(archive), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(archive), "add", "hook-runs"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "-C", str(archive), "commit", "-m", "Commit associated canon tree"],
+                check=True,
+                capture_output=True,
+            )
+
+            clean_check = self.run_tool(
+                "check-clean",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(clean_check.returncode, 0, clean_check.stdout + clean_check.stderr)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_TREE_KEYS={canon_key}", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS=", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean_check.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass", clean_check.stdout)
+
+    def test_status_allows_associated_repo_key_dirty_paths(self) -> None:
+        """Dirty logs from source or AgentCanon repo keys are associated chat evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            canon_key = repo_log_key(canon)
+
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
+            archive = mounted_log_archive_root(canon)
+            canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage.jsonl"
+            canon_log.parent.mkdir(parents=True)
+            canon_log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "hook-associated-dirty",
+                        "timestamp": "2026-05-25T00:00:00Z",
+                        "status": "pass",
+                        "source_repo_key": canon_key,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = self.run_tool(
+                "status",
+                "--porcelain",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={canon_key}", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS=", status.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", status.stdout)
 
     def test_status_reports_archive_level_dirty_paths(self) -> None:
         """Status should separate archive-level tool or policy dirt from repo-key logs."""

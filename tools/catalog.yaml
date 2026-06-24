@@ -634,12 +634,12 @@ entries:
       - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: agent-canon-local-llm
-    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, deterministic skill routing, bounded-parallel prose IR extraction, local LLM search, index, and eval routing.
+    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, bounded-parallel prose IR extraction, local LLM search, index, and eval routing.
     path: rust/agent-canon/src/local_llm.rs
     family: root
     role: runner
     status: canonical
-    command: tools/bin/agent-canon local-llm route-skill --prompt <task>
+    command: tools/bin/agent-canon local-llm route-implementation-surface --request <task>
     writes: true
     default_wiring:
       ci: false
@@ -817,7 +817,7 @@ entries:
       - tests/agent_tools/test_prose_reasoning_graph.py
 
   - id: route
-    summary: Maps long proposed tool/skill names to short task-routing areas and mirrors prompt skill routing for compatibility.
+    summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
     path: tools/agent_tools/route.py
     family: agent_tools
     role: workflow
@@ -1453,6 +1453,24 @@ entries:
     tests:
       - tests/agent_tools/test_check_static_any.py
 
+  - id: check-solid-evidence
+    summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
+    path: tools/agent_tools/check_solid_evidence.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/coding-conventions-python.md
+      - agents/skills/oop-readability-check.md
+    tests:
+      - tests/agent_tools/test_check_solid_evidence.py
+
   - id: check-log-helper-names
     summary: Checks logging helper functions use the required name prefix.
     path: tools/agent_tools/check_log_helper_names.py
@@ -1739,7 +1757,7 @@ entries:
       - tests/agent_tools/test_log_surface_inventory.py
 
   - id: tool-rejection-preflight
-    summary: Predicts edit-time hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
+    summary: Predicts edit-time responsibility, hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
     path: tools/agent_tools/tool_rejection_preflight.py
     family: agent_tools
     role: workflow
@@ -1751,7 +1769,12 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
+      - documents/tools/README.md
       - agents/COMMUNICATION_PROTOCOL.md
+      - agents/skills/codex-task-workflow.md
+      - .agents/skills/codex-task-workflow/SKILL.md
+      - agents/skills/small-change-routing.md
+      - .agents/skills/small-change-routing/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 

@@ -211,7 +211,7 @@ recorded as task-appropriate `not_run` evidence with a reason.
 
 1. Identify the requested root and non-goals.
 1. Route before reading broad prose. For prompt-derived routing, run
-   `agent-canon local-llm route-skill --prompt "<request>" --format json`.
+   `python3 tools/agent_tools/route.py --prompt "<request>" --format json`.
    For proposed tool or skill names such as `repo_refactor_skill.py`, run
    `python3 tools/agent_tools/route.py --name <candidate>`. If these tools do
    not route repo-refactor or `~/.codex` boundary work to

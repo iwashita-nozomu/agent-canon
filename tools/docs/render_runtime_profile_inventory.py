@@ -25,7 +25,6 @@ contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
-downstream design ../README.md AgentCanon repository overview
 downstream design ../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../tools/ci/run_all_checks.sh repo check runner
@@ -82,42 +81,97 @@ def render_table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join([header_row, separator_row, *body_rows]).rstrip() + "\n"
 
 
-def render_doc(inventory: dict[str, object], inventory_rel_link: str) -> str:
-    title = inventory.get("title")
-    if not isinstance(title, str) or not title.strip():
-        raise ValueError("inventory.title must be a non-empty string")
+def require_string(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
 
-    summary = inventory.get("summary")
-    if not isinstance(summary, list) or not all(isinstance(s, str) for s in summary):
-        raise ValueError("inventory.summary must be a list of strings")
 
-    profile_classes = inventory.get("profile_classes")
-    if not isinstance(profile_classes, list):
-        raise ValueError("inventory.profile_classes must be a list")
+def require_string_list(value: object, field: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{field} must be a list of strings")
+    return list(value)
 
-    risk_classes = inventory.get("risk_classes")
-    if not isinstance(risk_classes, list):
-        raise ValueError("inventory.risk_classes must be a list")
 
-    check_matrix = inventory.get("check_matrix")
-    if not isinstance(check_matrix, list):
-        raise ValueError("inventory.check_matrix must be a list")
+def require_object_list(value: object, field: str) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list")
+    objects: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise ValueError(f"{field} entries must be objects")
+        objects.append(item)
+    return objects
 
-    compatibility_note = inventory.get("compatibility_note")
-    if not isinstance(compatibility_note, list) or not all(
-        isinstance(s, str) for s in compatibility_note
-    ):
-        raise ValueError("inventory.compatibility_note must be a list of strings")
 
-    risk_note = inventory.get("risk_note")
-    if not isinstance(risk_note, list) or not all(isinstance(s, str) for s in risk_note):
-        raise ValueError("inventory.risk_note must be a list of strings")
+def collect_profile_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    profile_rows: list[list[str]] = []
+    for item in items:
+        profile = require_string(item.get("profile"), "profile_classes.profile")
+        activates = require_string_list(
+            item.get("activates"),
+            "profile_classes.activates",
+        )
+        required_when = require_string(
+            item.get("required_when"),
+            "profile_classes.required_when",
+        )
+        profile_rows.append([profile, ", ".join(activates), required_when])
+    return profile_rows
 
-    closeout_rule = inventory.get("closeout_rule")
-    if not isinstance(closeout_rule, list) or not all(
-        isinstance(s, str) for s in closeout_rule
-    ):
-        raise ValueError("inventory.closeout_rule must be a list of strings")
+
+def collect_risk_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    risk_rows: list[list[str]] = []
+    for item in items:
+        risk = require_string(item.get("risk"), "risk_classes.risk")
+        examples = require_string(item.get("examples"), "risk_classes.examples")
+        minimum_validation = require_string(
+            item.get("minimum_validation"),
+            "risk_classes.minimum_validation",
+        )
+        risk_rows.append([risk, examples, minimum_validation])
+    return risk_rows
+
+
+def collect_check_matrix_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    check_rows: list[list[str]] = []
+    for item in items:
+        changed_surface = require_string(
+            item.get("changed_surface"),
+            "check_matrix.changed_surface",
+        )
+        required_check = require_string_list(
+            item.get("required_check"),
+            "check_matrix.required_check",
+        )
+        check_rows.append([changed_surface, "; ".join(required_check)])
+    return check_rows
+
+
+def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_link: str) -> str:
+    title = require_string(inventory.get("title"), "inventory.title")
+    summary = require_string_list(inventory.get("summary"), "inventory.summary")
+    profile_classes = require_object_list(
+        inventory.get("profile_classes"),
+        "inventory.profile_classes",
+    )
+    risk_classes = require_object_list(
+        inventory.get("risk_classes"),
+        "inventory.risk_classes",
+    )
+    check_matrix = require_object_list(
+        inventory.get("check_matrix"),
+        "inventory.check_matrix",
+    )
+    compatibility_note = require_string_list(
+        inventory.get("compatibility_note"),
+        "inventory.compatibility_note",
+    )
+    risk_note = require_string_list(inventory.get("risk_note"), "inventory.risk_note")
+    closeout_rule = require_string_list(
+        inventory.get("closeout_rule"),
+        "inventory.closeout_rule",
+    )
 
     output = []
     output.append(DEPENDENCY_HEADER.rstrip() + "\n\n")
@@ -125,64 +179,26 @@ def render_doc(inventory: dict[str, object], inventory_rel_link: str) -> str:
     output.append(
         f"Source of truth: [{DEFAULT_INVENTORY.name}]({inventory_rel_link}).\n\n"
     )
-    output.append(render_paragraph([str(s) for s in summary]) + "\n")
+    output.append(render_paragraph(summary) + "\n")
 
     output.append("## Profile Classes\n\n")
-    profile_rows: list[list[str]] = []
-    for item in profile_classes:
-        if not isinstance(item, dict):
-            raise ValueError("inventory.profile_classes entries must be objects")
-        profile = item.get("profile")
-        activates = item.get("activates")
-        required_when = item.get("required_when")
-        if not isinstance(profile, str) or not profile.strip():
-            raise ValueError("profile_classes.profile must be a non-empty string")
-        if not isinstance(activates, list) or not all(isinstance(s, str) for s in activates):
-            raise ValueError("profile_classes.activates must be a list of strings")
-        if not isinstance(required_when, str) or not required_when.strip():
-            raise ValueError("profile_classes.required_when must be a non-empty string")
-        profile_rows.append([profile, ", ".join(activates), required_when])
+    profile_rows = collect_profile_class_rows(profile_classes)
     output.append(render_table(["Profile", "Activates", "Required when"], profile_rows) + "\n")
 
-    output.append(render_paragraph([str(s) for s in compatibility_note]) + "\n\n")
+    output.append(render_paragraph(compatibility_note) + "\n\n")
 
     output.append("## Risk Classes\n\n")
-    risk_rows: list[list[str]] = []
-    for item in risk_classes:
-        if not isinstance(item, dict):
-            raise ValueError("inventory.risk_classes entries must be objects")
-        risk = item.get("risk")
-        examples = item.get("examples")
-        minimum_validation = item.get("minimum_validation")
-        if not isinstance(risk, str) or not risk.strip():
-            raise ValueError("risk_classes.risk must be a non-empty string")
-        if not isinstance(examples, str) or not examples.strip():
-            raise ValueError("risk_classes.examples must be a non-empty string")
-        if not isinstance(minimum_validation, str) or not minimum_validation.strip():
-            raise ValueError("risk_classes.minimum_validation must be a non-empty string")
-        risk_rows.append([risk, examples, minimum_validation])
+    risk_rows = collect_risk_class_rows(risk_classes)
     output.append(render_table(["Risk", "Examples", "Minimum validation"], risk_rows) + "\n")
 
-    output.append(render_paragraph([str(s) for s in risk_note]) + "\n\n")
+    output.append(render_paragraph(risk_note) + "\n\n")
 
     output.append("## Check Matrix\n\n")
-    check_rows: list[list[str]] = []
-    for item in check_matrix:
-        if not isinstance(item, dict):
-            raise ValueError("inventory.check_matrix entries must be objects")
-        changed_surface = item.get("changed_surface")
-        required_check = item.get("required_check")
-        if not isinstance(changed_surface, str) or not changed_surface.strip():
-            raise ValueError("check_matrix.changed_surface must be a non-empty string")
-        if not isinstance(required_check, list) or not all(
-            isinstance(s, str) for s in required_check
-        ):
-            raise ValueError("check_matrix.required_check must be a list of strings")
-        check_rows.append([changed_surface, "; ".join(required_check)])
+    check_rows = collect_check_matrix_rows(check_matrix)
     output.append(render_table(["Changed surface", "Required check"], check_rows) + "\n")
 
     output.append("## Closeout Rule\n\n")
-    output.append(render_paragraph([str(s) for s in closeout_rule]))
+    output.append(render_paragraph(closeout_rule))
 
     return "".join(output).rstrip() + "\n"
 
@@ -194,7 +210,7 @@ def main() -> int:
 
     inventory = load_inventory(inventory_path)
     inventory_rel_link = Path(inventory_path.name).as_posix()
-    rendered = render_doc(inventory, inventory_rel_link)
+    rendered = bridge_inventory_to_markdown(inventory, inventory_rel_link)
 
     if args.check:
         if not doc_path.exists():

@@ -35,6 +35,7 @@ Execute the required and task-matching conditional commands that the packet prin
    - missing validation
    - missing tests
    - stale documentation
+1. For Python diffs that touch classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction, add `python-review` and `$oop-readability-check`; require an OOP readability report with SOLID principle signal evidence plus `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` path coverage.
 1. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository during checkpoint and final review; changed-file dependency checks alone are not enough.
 1. Separate `fix now` from `follow-up`.
 1. Add `issue_route` to every `fix now` and `follow-up` finding: use
