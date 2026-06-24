@@ -101,20 +101,6 @@ language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
 
 [[tool]]
-id = "fix-markdown-math"
-tool = "tools/docs/fix_markdown_math.py"
-doc = "documents/tools/fix_markdown_math.md"
-language = "python-forwarder"
-summary = "Legacy Markdown math notation fixer forwarder."
-
-[[tool]]
-id = "fix-mermaid"
-tool = "tools/docs/fix_mermaid.py"
-doc = "documents/tools/fix_mermaid.md"
-language = "python-forwarder"
-summary = "Legacy Mermaid fenced-block formatter forwarder."
-
-[[tool]]
 id = "render-dependency-manifest-graph"
 tool = "tools/agent_tools/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"

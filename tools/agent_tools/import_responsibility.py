@@ -213,7 +213,7 @@ def string_tuple(value: object) -> tuple[str, ...]:
     """Return a tuple of strings from a TOML value."""
     if not isinstance(value, list):
         return ()
-    return tuple(item for item in value if isinstance(item, str))
+    return tuple(item for item in cast(list[object], value) if isinstance(item, str))
 
 
 def mapping_list(value: object) -> tuple[Mapping[str, object], ...]:
@@ -319,6 +319,11 @@ def add_changed_python_paths(paths: set[str], command: list[str]) -> None:
         )
 
 
+def existing_python_path(root: Path, relative_path: str) -> bool:
+    """Return whether a git-visible Python path exists as a file."""
+    return (root / relative_path).is_file()
+
+
 def git_visible_python_paths(root: Path) -> tuple[str, ...] | None:
     """Return Python paths visible to git, respecting standard ignore rules."""
     result = subprocess.run(
@@ -342,7 +347,9 @@ def git_visible_python_paths(root: Path) -> tuple[str, ...] | None:
         sorted(
             path
             for path in result.stdout.split("\0")
-            if path.endswith(PYTHON_SUFFIX) and not should_skip(path)
+            if path.endswith(PYTHON_SUFFIX)
+            and not should_skip(path)
+            and existing_python_path(root, path)
         )
     )
 

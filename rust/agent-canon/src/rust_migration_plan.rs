@@ -75,9 +75,9 @@ const KEEP_PYTHON_TARGETS: &[ToolTarget] = &[
 ];
 
 const COMPLETED_RUST_TARGETS: &[ToolTarget] = &[ToolTarget {
-    name: "noncanonical_document_inventory.py",
-    path: "tools/agent_tools/noncanonical_document_inventory.py",
-    reason: "absorbed into agent-canon structured-analysis document-inventory; legacy shim remains only to warn and forward",
+    name: "structured-analysis document-inventory",
+    path: "tools/bin/agent-canon",
+    reason: "document-canon inventory is owned by the Rust structured-analysis command; the old Python entrypoint is retired",
 }];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -568,11 +568,7 @@ mod tests {
         assert!(plan
             .completed
             .iter()
-            .any(|candidate| candidate.name == "noncanonical_document_inventory.py"));
-        assert!(!plan
-            .candidates
-            .iter()
-            .any(|candidate| candidate.name == "noncanonical_document_inventory.py"));
+            .any(|candidate| candidate.name == "structured-analysis document-inventory"));
         let _ = fs::remove_dir_all(root);
     }
 

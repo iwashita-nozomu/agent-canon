@@ -1,7 +1,8 @@
 # @dependency-start
 # contract test
-# responsibility Tests test check markdown math behavior.
-# upstream design ../../tools/README.md validated automation surface
+# responsibility Tests Rust markdown math check behavior.
+# upstream implementation ../../rust/agent-canon/src/docs.rs implements docs check.
+# upstream design ../../tools/README.md validates automation surface.
 # @dependency-end
 
 """Tests for the markdown math notation checker."""
@@ -9,13 +10,12 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "check_markdown_math.py"
+AGENT_CANON = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class CheckMarkdownMathTest(unittest.TestCase):
@@ -24,7 +24,7 @@ class CheckMarkdownMathTest(unittest.TestCase):
     def run_cli(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker and capture output."""
         return subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), *args],
+            [str(AGENT_CANON), "docs", "check", *args],
             cwd=root,
             check=False,
             capture_output=True,

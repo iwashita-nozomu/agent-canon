@@ -312,8 +312,7 @@ findings for resilient test planning.
     `structured-analysis build` は repo source を書き換えず、user-home
     cache に全ファイルの中間表現 DB と warning DB を再生成します。
     `structured-analysis document-inventory` は document-canon cleanup の
-    canonical Rust CLI です。旧 `noncanonical_document_inventory.py` は
-    caller warning 付きの legacy migration shim として残します。
+    canonical Rust CLI です。古い Python entrypoint は retired です。
     `python-structure-hash` は normalized AST duplicate、single-caller
     ownership、similar-responsibility caller evidence を Rust で検出します。
     `python-structure-hash-report` は text output を structured JSON に変換し、
@@ -353,7 +352,7 @@ findings for resilient test planning.
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
-  - `noncanonical_document_inventory.py` は Markdown / text 文書棚卸しの legacy migration shim です。operator は `agent-canon structured-analysis document-inventory --root .` を使います。
+  - `agent-canon structured-analysis document-inventory --root .` は Markdown / text 文書棚卸しの canonical entrypoint です。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
   - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
   - `tool_rejection_preflight.py` は planned edit path から responsibility_scope、cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、AgentCanon tool source route、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。`responsibility_scope` は `responsibility-scope.toml` の owner scope、class、protecting tools を返します。親 repo の `tools/` symlink view が `vendor/agent-canon/tools/` に解決される場合も、AgentCanon branch / PR と source-root validation へ誘導します。

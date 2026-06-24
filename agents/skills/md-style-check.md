@@ -26,7 +26,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 - 文書整理や report 整備を行う
 - user request が plain `md-style-check` または `$md-style-check` を挙げている
 - docs lint、link check、heading hierarchy、markdown math、docs-check failure、Markdown style drift を直す
-- `format_markdown.py`、docs formatter、Mermaid formatter、math fixer、または `agent-canon docs` が scope にある
+- docs formatter、Mermaid formatter、math fixer、または `agent-canon docs` が scope にある
 - formatter 後の lint、link、math、Mermaid、heading の確認が抜けている
 - substantive な文書変更は `prose-reasoning-graph` と `structure-planning` の構造解析後に、この skill で Markdown checks を閉じる
 

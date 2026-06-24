@@ -6,8 +6,7 @@ responsibility Documents document-canon cleanup workflow for this repository.
 upstream design README.md shared skill canon
 upstream design ../canonical/CODEX_WORKFLOW.md shared workflow contract
 downstream implementation ../../.agents/skills/document-canon-cleanup/SKILL.md exposes runtime skill
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs finds non-canonical document candidates
-downstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py legacy migration shim
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs canonical document inventory implementation
 @dependency-end
 -->
 
@@ -32,16 +31,8 @@ agent-canon structured-analysis document-inventory \
   --markdown-out reports/noncanonical-documents.md
 ```
 
-The old Python entrypoint is a legacy migration shim. If it emits a forwarder
-warning, update the caller to the Rust command before returning to the original
-task:
-
-```bash
-python3 tools/agent_tools/noncanonical_document_inventory.py \
-  --root . \
-  --json-out reports/noncanonical-documents.json \
-  --markdown-out reports/noncanonical-documents.md
-```
+Old Python document-inventory entrypoints have been retired. Update any caller
+that still names one to the Rust command before returning to the original task.
 
 `--fail-on-findings` は gate 用です。通常の整理 pass では、まず report を出して分類を読みます。
 

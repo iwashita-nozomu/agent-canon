@@ -308,7 +308,7 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
     derived projection、reader-state、macro-claim、node record / nodes
     table、edge record / edges table、`payload_json` を共通語彙として扱います。
 - `agent-canon structured-analysis document-inventory --root .`
-  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。旧 `tools/agent_tools/noncanonical_document_inventory.py` は caller warning 付きの legacy migration shim です。
+  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。
   - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
 - `tools/agent_tools/reference_materializer.py`
   - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
