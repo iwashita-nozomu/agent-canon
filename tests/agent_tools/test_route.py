@@ -134,6 +134,34 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("task-routing", decision["related_skills"])
         self.assertIn("small-change-routing", decision["related_skills"]["task-routing"])
 
+    def test_prompt_routes_code_visualization_selection(self) -> None:
+        """Code visualization prompts should enter the diagram selector skill."""
+        prompts = (
+            (
+                "コードの可視化にはフローチャート、コールグラフ、制御フローグラフ、"
+                "シーケンス図、状態遷移図、データフロー図、依存関係図、"
+                "タイミング図など色々な図示があるので適切に選択して"
+            ),
+            "HTML dashboardでコードの依存グラフを見たい",
+            "文書に埋め込む図も文脈から適切に選んで",
+            "READMEのvisual_planにMermaid図を入れる",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("code-visualization", decision["matched_skills"])
+                self.assertIn("code-visualization", decision["active_skills"])
+                self.assertIn("dependency-analysis", decision["related_skill_candidates"])
+                self.assertIn("structure-planning", decision["related_skill_candidates"])
+                self.assertIn("algorithm-flowchart", decision["related_skill_candidates"])
+                self.assertIn("html-output", decision["related_skill_candidates"])
+                self.assertIn("md-style-check", decision["related_skill_candidates"])
+                self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
         prompt = "スキルとツールのルーティングが遅すぎるので改善して"

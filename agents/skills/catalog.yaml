@@ -440,6 +440,77 @@ skill_families:
         - ["設計", "構造"]
         - ["structure", "contract"]
         - ["根本", "設計", "構造"]
+  - id: code-visualization
+    purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
+    canonical_doc: agents/skills/code-visualization.md
+    shim: .agents/skills/code-visualization/SKILL.md
+    related_skills:
+      - dependency-analysis
+      - structure-planning
+      - structure-refactor
+      - algorithm-flowchart
+      - prose-reasoning-graph
+      - html-output
+      - md-style-check
+      - test-design
+      - oop-readability-check
+    routing:
+      stage_policy: active
+      reason: code, repository, or document-embedded visualization needs context-question and evidence-source selection before rendering
+      triggers:
+        - ["コード", "可視化"]
+        - ["コード", "図示"]
+        - ["文書", "図"]
+        - ["文書", "図示"]
+        - ["文書", "Mermaid"]
+        - ["文書", "visual_plan"]
+        - ["埋め込む", "図"]
+        - ["埋め込み", "図"]
+        - ["README", "図"]
+        - ["design doc", "diagram"]
+        - ["document", "diagram"]
+        - ["embedded", "diagram"]
+        - ["visual_plan", "diagram"]
+        - ["visual_plan", "Mermaid"]
+        - ["図示", "選択"]
+        - ["図", "選択"]
+        - ["図の", "種類"]
+        - ["フローチャート"]
+        - ["アクティビティ図"]
+        - ["コールグラフ"]
+        - ["制御フローグラフ"]
+        - ["シーケンス図"]
+        - ["状態遷移図"]
+        - ["データフロー図"]
+        - ["依存関係図"]
+        - ["依存グラフ"]
+        - ["依存", "グラフ"]
+        - ["タイミング図"]
+        - ["並行シーケンス図"]
+        - ["関数", "呼び出し関係"]
+        - ["実行経路", "分岐"]
+        - ["処理", "順番"]
+        - ["状態", "変化"]
+        - ["データ", "流れ"]
+        - ["モジュール間", "依存"]
+        - ["並行処理", "時間関係"]
+        - ["code", "visualization"]
+        - ["code", "diagram"]
+        - ["dependency", "graph"]
+        - ["call", "graph"]
+        - ["control-flow", "graph"]
+        - ["control", "flow", "graph"]
+        - ["sequence", "diagram"]
+        - ["state", "diagram"]
+        - ["data-flow", "diagram"]
+        - ["data", "flow", "diagram"]
+        - ["timing", "diagram"]
+        - ["concurrency", "diagram"]
+        - ["class", "diagram"]
+        - ["type", "diagram"]
+        - ["html", "dashboard", "コード"]
+        - ["html", "dashboard", "graph"]
+        - ["graph", "visualization"]
   - id: html-output
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md

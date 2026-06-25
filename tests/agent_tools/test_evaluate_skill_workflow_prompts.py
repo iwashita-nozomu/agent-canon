@@ -26,8 +26,8 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
-EXPECTED_SKILL_SHIM_COUNT = 49
-EXPECTED_HUMAN_SKILL_DOC_COUNT = 50
+EXPECTED_SKILL_SHIM_COUNT = 50
+EXPECTED_HUMAN_SKILL_DOC_COUNT = 51
 EXPECTED_INTERNAL_ROUTINE_DOC_COUNT = 20
 EXPECTED_WORKFLOW_DOC_COUNT = 21
 EXPECTED_CANONICAL_DOC_COUNT = 6
