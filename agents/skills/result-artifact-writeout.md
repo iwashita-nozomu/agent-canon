@@ -51,6 +51,11 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
   `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`
 - experiment reader report: `experiments/report/<run_name>.md`
+- managed experiment reproducibility artifacts:
+  `run_manifest.json`, `eval_manifest.json`, `artifact_manifest.json`,
+  `command.json`, `environment.json`, `source_snapshot.json`, `config.json`,
+  `config_source.yaml`, `run.log`, `logs/startup.jsonl`, `logs/stdout.log`,
+  and `logs/stderr.log` under the same `result/<run_name>/`
 - formal experiment result branch: `experiment-results/<topic>` or the
   topic-specific branch fixed in the experiment plan. Publish with
   `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`.

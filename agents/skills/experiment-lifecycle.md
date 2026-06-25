@@ -44,10 +44,11 @@ upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics
 - 新規 topic は最初に実験名を固定し、AgentCanon template path `vendor/agent-canon/experiments/_template/` を project-root `experiments/<topic>/` へコピーして始めます。
 - コピー後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - main server host で formal run を回す場合は、`run_manifest.json` と `run.log` を残す wrapper を優先します。
-- 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config.json` または YAML snapshot として保存します。
+- 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config.json` と `config_source.yaml` として保存します。
 - topic README は、実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を固定する入口です。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置き、formal run の起動や設定正本にはしません。
 - 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の互換ログとして残し、追加ログは `logs/` に分けます。
+- managed runner の標準 run artifact は `command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に rerun または明示的な limitation を残します。
 - smoke / formal の入口は project `Makefile` に置き、内側で `tools/experiments/run_managed_experiment.py` を呼びます。
 - registered command は `{config_path}` を受け取ります。
 - formal run は source checkout、既定では `main` で実行し、run 完了後に
