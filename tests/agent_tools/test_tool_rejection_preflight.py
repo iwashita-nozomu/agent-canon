@@ -319,6 +319,73 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("agent_protocol_convention", gates)
         self.assertIn("dependency_review", gates)
 
+    def test_experiment_execution_surface_predicts_lifecycle_guard(self) -> None:
+        """Managed experiment execution surfaces should route to lifecycle gates."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "tools/experiments/run_managed_experiment.py",
+                "tools/ci/check_experiment_registry.py",
+                "documents/experiment-registry.md",
+                "experiments/registry.toml",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        guarded_paths = {
+            gate["path"]
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "experiment_execution_surface_guard"
+        }
+        self.assertEqual(
+            guarded_paths,
+            {
+                "tools/experiments/run_managed_experiment.py",
+                "tools/ci/check_experiment_registry.py",
+                "documents/experiment-registry.md",
+                "experiments/registry.toml",
+            },
+        )
+        guarded_gate = next(
+            gate
+            for gate in payload["predicted_gates"]
+            if gate["gate"] == "experiment_execution_surface_guard"
+        )
+        self.assertIn("check_experiment_registry.py", guarded_gate["command"])
+        self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
+        self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
+        self.assertIn("$test-design", guarded_gate["handoff"])
+
+    def test_parent_agentcanon_experiment_tool_path_keeps_lifecycle_guard(self) -> None:
+        """Parent submodule paths should keep managed experiment execution routing."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "vendor/agent-canon/tools/experiments/run_managed_experiment.py",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("experiment_execution_surface_guard", gates)
+        self.assertIn("agentcanon_tool_source_route", gates)
+
     def test_changed_mode_uses_git_status_when_no_paths_are_given(self) -> None:
         """Changed mode should produce pass when a new repo has no changed files."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -3,6 +3,7 @@
 # responsibility Declares marker contracts consumed by convention compliance checks.
 # upstream design ../../agents/skills/small-change-routing.md small change routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
 # downstream implementation ./check_convention_compliance.py loads marker contracts
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
@@ -108,6 +109,50 @@ markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibilit
 [[contracts.surfaces]]
 path = "documents/tools/README.md"
 markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
+
+[[contracts]]
+id = "experiment_execution_surface_guard"
+description = "Managed experiment execution surfaces route through lifecycle and test-design validation before runner or registry semantics change."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/tool_rejection_preflight.py"
+markers = ["EXPERIMENT_EXECUTION_SURFACE_PATHS", "experiment_execution_surface_guard", "experiment_execution_surface_path", "check_experiment_registry.py", "test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/experiment-lifecycle/SKILL.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "$test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/experiment-lifecycle.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "documents/experiment-registry.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts]]
+id = "branch_worktree_creation_guard"
+description = "Branch and worktree creation stay routed through the active checkout policy and critical PreToolUse guard."
+
+[[contracts.surfaces]]
+path = ".codex/hooks/branch_worktree_guard.py"
+markers = ["BRANCH_WORKTREE_CREATION_GUARD=block", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "user_request", "agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON", "git worktree add", "git switch -c/-C", "git checkout -b/-B/--orphan", "git branch <name>/-c/-C/-f/--force"]
+
+[[contracts.surfaces]]
+path = ".codex/hooks/hook_dispatcher.py"
+markers = ["branch_worktree_guard.py", "CRITICAL_BLOCKING_CHILD_HOOKS", "PreToolUse"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["Branch Reuse Default", "branch_worktree_guard.py", "user が別 branch を明示", "AgentCanon branch / PR workflow", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/worktree-health/SKILL.md"
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+
+[[contracts.surfaces]]
+path = "agents/skills/worktree-health.md"
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
 
 [[contracts]]
 id = "solid_coding_contract"

@@ -21,6 +21,7 @@
 # upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
 # upstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs unattended runtime log archive sync
 # upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
+# upstream implementation ../../.codex/hooks/branch_worktree_guard.py blocks unconfirmed branch/worktree creation
 # upstream implementation ../../.codex/hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
@@ -67,6 +68,7 @@ SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 CODEX_RUNTIME_SUMMARY_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
 RUNTIME_LOG_AUTO_SYNC = PROJECT_ROOT / ".codex" / "hooks" / "runtime_log_auto_sync.py"
 LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
+BRANCH_WORKTREE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "branch_worktree_guard.py"
 DIRECT_RG_CONTEXT_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "direct_rg_context_guard.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
@@ -472,6 +474,7 @@ class CodexHooksTest(unittest.TestCase):
             pre_tool_scripts,
             [
                 "log_archive_mount_warning.py",
+                "branch_worktree_guard.py",
                 "direct_rg_context_guard.py",
                 "cause_investigation_guard.py",
             ],
@@ -826,6 +829,60 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("reference_capture_guard.py", cast(str, payload["systemMessage"]))
         self.assertIn("register the reference", cast("list[str]", payload["remediation"]))
 
+    def test_hook_dispatcher_preserves_branch_worktree_guard_blocks(self) -> None:
+        """Dispatcher should preserve the branch/worktree creation stop."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            for script_name in (
+                "log_archive_mount_warning.py",
+                "branch_worktree_guard.py",
+                "direct_rg_context_guard.py",
+                "cause_investigation_guard.py",
+            ):
+                output = (
+                    {"decision": "block", "reason": "branch worktree stop"}
+                    if script_name == "branch_worktree_guard.py"
+                    else None
+                )
+                output_json = json.dumps(output) if output else ""
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            f"output = {output_json!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "git switch -c topic"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                },
+            )
+
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["reason"], "branch worktree stop")
+
     def test_hook_dispatcher_child_launch_failure_warns_after_later_hooks(self) -> None:
         """Dispatcher should fail open on child hook failures after later hooks run."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1041,6 +1098,137 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
+
+    def test_branch_worktree_guard_blocks_unconfirmed_creation(self) -> None:
+        """Branch and worktree creation should require explicit route evidence."""
+        commands = [
+            "git switch -c topic/one",
+            "git switch -ctopic/one-short",
+            "git checkout -b topic/two",
+            "git checkout -btopic/two-short",
+            "git branch topic/three",
+            "git branch -f topic/force main",
+            "git branch --force topic/long-force main",
+            "git -C vendor/agent-canon switch -C topic/four",
+            "bash -lc 'git worktree add ../topic topic/five'",
+            "git worktree add ../topic topic/six",
+            "git worktree -v add ../topic topic/seven",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(BRANCH_WORKTREE_GUARD)],
+                    cwd=PROJECT_ROOT,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+                payload = cast("dict[str, object]", json.loads(result.stdout))
+                self.assertEqual(payload["decision"], "block")
+                self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", cast(str, payload["reason"]))
+                self.assertEqual(
+                    payload["next_action"],
+                    "reuse_current_checkout_or_record_branch_worktree_reason",
+                )
+
+    def test_branch_worktree_guard_allows_diagnostics_and_confirmed_creation(self) -> None:
+        """Branch/worktree diagnostics and confirmed creation should stay quiet."""
+        cases: list[tuple[str, dict[str, str]]] = [
+            ("git branch --show-current", {}),
+            ("git branch --list topic/*", {}),
+            ("git branch -D topic/stale", {}),
+            ("git branch -m topic/old topic/new", {}),
+            ("git worktree list --porcelain", {}),
+        ]
+        for command, extra_env in cases:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(BRANCH_WORKTREE_GUARD)],
+                    cwd=PROJECT_ROOT,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, **extra_env},
+                )
+
+                self.assertEqual(result.stdout, "")
+
+    def test_branch_worktree_guard_blocks_missing_authority(self) -> None:
+        """A reason without authority should still block creation."""
+        result = subprocess.run(
+            [sys.executable, str(BRANCH_WORKTREE_GUARD)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": "git switch -c topic/missing-authority"},
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "AGENT_CANON_BRANCH_WORKTREE_REASON": "workflow-internal branch request",
+            },
+        )
+
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        self.assertEqual(payload["decision"], "block")
+
+    def test_branch_worktree_guard_allows_authorized_creation(self) -> None:
+        """Authorized branch creation should require route authority and reason."""
+        cases: list[tuple[str, dict[str, str]]] = [
+            (
+                "git switch -c topic/confirmed",
+                {
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON": "explicit user branch request",
+                },
+            ),
+            (
+                "git switch -c agent-canon/update-route",
+                {
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "agent_canon_workflow",
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon branch PR workflow",
+                },
+            ),
+        ]
+        for command, extra_env in cases:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(BRANCH_WORKTREE_GUARD)],
+                    cwd=PROJECT_ROOT,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, **extra_env},
+                )
+
+                self.assertEqual(result.stdout, "")
 
     def test_direct_rg_context_guard_warns_on_broad_line_search(self) -> None:
         """Broad `rg -n` should warn before dumping repository matches."""
@@ -1326,6 +1514,12 @@ class CodexHooksTest(unittest.TestCase):
             "sed --in-place=.bak -n '1,120p' .codex/hooks.json",
             "git branch -D main",
             "git branch --list --delete main",
+            "git switch -c topic/one",
+            "git switch -ctopic/one-short",
+            "git checkout -b topic/two",
+            "git checkout -btopic/two-short",
+            "git worktree add ../topic topic/three",
+            "git worktree -v add ../topic topic/four",
             "git remote add x y",
             "git diff --output=/tmp/out",
             "git diff -o/tmp/out",

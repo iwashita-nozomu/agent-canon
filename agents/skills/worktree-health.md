@@ -28,6 +28,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `notes/guardrails/README.md`
 - `notes/failures/README.md`
 - `notes/worktrees/README.md`
+- `.codex/hooks/branch_worktree_guard.py`
 - `tools/agent_tools/worktree_scope_lint.py`
 - `tools/docs/check_worktree_scopes.sh`
 - `tools/agent_tools/validate_role_write_scope.py`
@@ -48,6 +49,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `python3 tools/agent_tools/worktree_scope_lint.py --current` が placeholder や stale kickoff field を出していない
 - `notes/guardrails/README.md` と `notes/failures/README.md` の relevant item が未対応のまま残っていない
 - `git worktree list --porcelain` で duplicate / stale worktree が無いか確認している
+- branch / worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と `branch_worktree_guard.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
 - carry-over すべき note、report、result の置き場が消える前提になっていない
 
 ## Default Sequence
@@ -55,6 +57,7 @@ upstream design ../canonical/skills.md skill canon registry
 1. `reports/agents/.active_run`、run-local `work_log.md`、必要なら branch summary を読み、authority と carry-over 先を確認します。
 1. legacy cleanup が scope に入る場合だけ `python3 tools/agent_tools/worktree_scope_lint.py --current` を流し、古い scope 文書の placeholder と stale field を拾います。
 1. `git status --short --branch`、`git diff --name-only`、`git worktree list --porcelain` を見て drift を洗います。
+1. branch / worktree 作成が必要に見える場合は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default を参照し、この skill では `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と対応箇所の有無だけを確認します。
 1. `notes/guardrails/README.md` と `notes/failures/README.md` を見直し、今回の drift や cleanup risk と関連する既知項目がないか確認します。
 1. legacy cleanup が scope に入る場合だけ `bash tools/docs/check_worktree_scopes.sh` で repo 内の worktree scope 配置を確認します。
 1. specialist run bundle を伴う場合は、必要に応じて `validate_role_write_scope.py` で write policy 逸脱を見ます。
@@ -64,10 +67,12 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `git status --short --branch`
 - `git diff --name-only`
+- `git branch --show-current`
 - `git worktree list --porcelain`
 - `python3 tools/agent_tools/validate_role_write_scope.py --report-dir reports/agents/<run-id> --workspace-root . --role <role-id>`
 
 ## Boundary
 
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断には `worktree-start` を使います。新規作業の worktree 初期化には使いません。
+- branch/worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` を正本にします。
 - repo 全体レビューや再編は `comprehensive-development` を使います。

@@ -310,6 +310,7 @@ def validate_project_hooks() -> None:
     for hook_script in (
         "log_archive_mount_warning.py",
         "prompt_secret_guard.py",
+        "branch_worktree_guard.py",
         "goal_completion_guard.py",
         "oop_readability_guard.py",
         "log_surface_inventory_guard.py",

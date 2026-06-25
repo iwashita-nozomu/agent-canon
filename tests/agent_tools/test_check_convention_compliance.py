@@ -18,8 +18,10 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
     FALLBACK_EXIT_POLICY_MARKERS,
     IMPLEMENTATION_GUARDRAIL_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
@@ -112,6 +114,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
         "import_responsibility.py\n"
     ),
+    "documents/experiment-registry.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "check_experiment_registry.py tests/tools/test_run_managed_experiment.py\n"
+    ),
     "documents/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
         "structure_contract=skipped Review Finding Issue Routing issue_route "
@@ -164,7 +170,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/agent_tools/tool_rejection_preflight.py": (
         "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
-        "protecting_tools gate=\"responsibility_scope\"\n"
+        "protecting_tools gate=\"responsibility_scope\" "
+        "EXPERIMENT_EXECUTION_SURFACE_PATHS experiment_execution_surface_guard "
+        "experiment_execution_surface_path check_experiment_registry.py "
+        "test_run_managed_experiment.py\n"
     ),
     "agents/COMMUNICATION_PROTOCOL.md": (
         "responsibility_scope responsibility-scope.toml owner class protecting tools "
@@ -182,6 +191,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "compatibility-preservation drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
+        "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
+        "AgentCanon branch / PR workflow "
+        "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -267,6 +282,20 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "contract-only wrapper static contract validation canonical command evidence "
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+    ),
+    ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
+        "experiment-lifecycle",
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "$test-design check_experiment_registry.py "
+        "tests/tools/test_run_managed_experiment.py\n",
+    ),
+    ".agents/skills/worktree-health/SKILL.md": skill_fixture(
+        "worktree-health",
+        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "branch_worktree_guard.py "
+        "branch_creation_reason=<reason> "
+        "worktree_creation_reason=<reason> git worktree list --porcelain "
+        "git branch --show-current\n",
     ),
     ".agents/skills/computational-optimization/SKILL.md": skill_fixture(
         "computational-optimization",
@@ -357,6 +386,18 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "contract-only wrapper static contract validation canonical command evidence "
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+    ),
+    "agents/skills/experiment-lifecycle.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "test-design check_experiment_registry.py "
+        "tests/tools/test_run_managed_experiment.py\n"
+    ),
+    "agents/skills/worktree-health.md": (
+        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "branch_worktree_guard.py "
+        "branch_creation_reason=<reason> "
+        "worktree_creation_reason=<reason> git worktree list --porcelain "
+        "git branch --show-current\n"
     ),
     "agents/skills/computational-optimization.md": (
         "mathematical necessity gate iteration map stopping scalar failure semantics\n"
@@ -532,7 +573,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".codex/hooks/hook_dispatcher.py": (
         "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
-        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py\n"
+        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py "
+        "branch_worktree_guard.py PreToolUse\n"
+    ),
+    ".codex/hooks/branch_worktree_guard.py": (
+        "BRANCH_WORKTREE_CREATION_GUARD=block "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY user_request agent_canon_workflow "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON "
+        "git worktree add git switch -c/-C git checkout -b/-B/--orphan "
+        "git branch <name>/-c/-C/-f/--force\n"
     ),
     ".codex/hooks/direct_rg_context_guard.py": (
         "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
@@ -1137,6 +1186,69 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in RESPONSIBILITY_PREFLIGHT_GATE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_experiment_execution_surface_guard_requires_markers(self) -> None:
+        """Experiment execution surfaces keep lifecycle preflight markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "experiment-lifecycle" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "experiment_execution_surface_guard",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("experiment_execution_surface_guard", result.stdout)
+            self.assertIn(
+                "missing-marker:experiment_execution_surface_guard",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_experiment_execution_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every experiment execution surface."""
+        missing = sorted(
+            path
+            for path in EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_branch_worktree_creation_guard_requires_markers(self) -> None:
+        """Branch/worktree creation stays connected to the critical guard."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            dispatcher = root / ".codex" / "hooks" / "hook_dispatcher.py"
+            dispatcher.write_text(
+                dispatcher.read_text(encoding="utf-8").replace(
+                    "branch_worktree_guard.py",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("branch_worktree_creation_guard", result.stdout)
+            self.assertIn("missing-marker:branch_worktree_guard.py", result.stdout)
+
+    def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every branch/worktree guard surface."""
+        missing = sorted(
+            path
+            for path in BRANCH_WORKTREE_CREATION_GUARD_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

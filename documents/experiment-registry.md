@@ -5,6 +5,7 @@ contract reference
 responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 downstream implementation ../tools/ci/check_experiment_registry.py validates registry schema
+downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts managed execution surface guardrails
 @dependency-end
 -->
 
@@ -126,3 +127,13 @@ make experiment-check
 
 この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
 registered command から `{config_path}` が欠ける場合も fail します。
+
+実験実行面の変更では、`tool_rejection_preflight.py` の
+`experiment_execution_surface_guard` を patch 前の routing evidence にします。
+対象は managed runner、registry checker、この registry contract、experiment
+workflow、project `experiments/registry.toml` です。検証は
+project `experiments/registry.toml` がある checkout では
+`python3 tools/ci/check_experiment_registry.py` を実行し、
+runner / registry checker behavior は
+`python3 -m pytest tests/tools/test_run_managed_experiment.py -q` を標準にし、
+formal run は実験計画の実行段階で扱います。
