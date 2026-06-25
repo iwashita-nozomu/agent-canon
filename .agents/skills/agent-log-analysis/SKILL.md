@@ -42,7 +42,14 @@ python3 tools/agent_tools/runtime_log_archive_git.py sync
 python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
-1. Complete log analysis and task closeout after `check-clean` reports `RUNTIME_LOG_ARCHIVE_CLEAN=yes`. If it reports `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes`, resolve the listed foreign repo-key logs before returning to the user.
+1. Use this archive hygiene sequence: `sync`, `check-clean`, dashboard
+   generation, final `sync`. Preferred closed state is
+   `RUNTIME_LOG_ARCHIVE_CLEAN=yes`. When `check-clean` reports only
+   current-repo live hook files after the immediately preceding command, with
+   `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`, record those paths as
+   `live_hook_tail_dirty`, continue to dashboard generation, and close the task
+   after the final `sync` reports `RUNTIME_LOG_ARCHIVE_SYNC=pass`. Foreign dirty
+   keys remain archive hygiene repair targets before closeout.
 1. Call the AgentCanon source dashboard tool from the source repository root.
    The tool resolves the AgentCanon root and the mounted log archive; keep
    `<source-root>` as the repository being analyzed:

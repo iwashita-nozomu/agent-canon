@@ -319,17 +319,20 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_skill_tool_call_coverage_to_log_analysis(self) -> None:
         """Toolcall and Skillcall coverage requests should route to runtime log analysis."""
-        result = self.run_route(
-            "--prompt",
+        prompts = (
             "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
-            "--format",
-            "json",
+            "ログを確認して，スキル修正",
         )
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("agent-log-analysis", decision["skills"])
-        self.assertIn("agent-log-analysis", decision["matched_skills"])
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("agent-log-analysis", decision["skills"])
+                self.assertIn("agent-log-analysis", decision["matched_skills"])
+                self.assertIn("agent-log-analysis", decision["active_skills"])
 
     def test_prompt_routes_adaptive_improvement_loop_from_iterative_work(self) -> None:
         """Iterative execution and tuning prompts should activate adaptive loop routing."""
