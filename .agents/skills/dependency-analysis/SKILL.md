@@ -11,6 +11,8 @@ upstream design ../../../documents/dependency-manifest-design.md defines manifes
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ../../../agents/skills/dependency-analysis.md documents the human-facing skill
 upstream design ../../../agents/workflows/hypothesis-validation-workflow.md separates code and header dependency evidence
+upstream implementation ../../../tools/agent_tools/scan_code_dependencies.sh extracts file-level code dependency evidence
+upstream implementation ../../../tools/agent_tools/helper_function_inventory.py extracts Python function-level call graph context
 upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
@@ -49,6 +51,16 @@ Execute the required and task-matching conditional commands that the packet prin
 ```bash
 bash tools/agent_tools/scan_code_dependencies.sh --changed
 ```
+
+1. For Python code changes, add function-level dependency evidence:
+
+```bash
+python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json
+```
+
+   Treat `HELPER_INVENTORY_FILES=0` as scope evidence when the changed Python
+   file count is zero. For changed Python files, carry direct caller / callee
+   context into the `Change Impact Packet`.
 
 1. Keep code dependency evidence separate from header dependency evidence. Do not merge import/include/source edges with manifest upstream/downstream graph edges.
 1. For changed human-authored text files, run:
@@ -103,8 +115,9 @@ python3 tools/agent_tools/check_design_doc_claims.py \
    dependency evidence as separate sections, then unify them only in the
    planning packet. The packet must include:
    - `requested_target`: `path:start-end:qualname`, file, or finding id
-   - `code_dependency_surface`: imports/includes/source edges and direct
-     callees/callers that are visible to static analysis
+   - `code_dependency_surface`: imports/includes/source edges and function or
+     public-entrypoint direct callees/callers that are visible to static
+     analysis
    - `header_dependency_surface`: upstream/downstream design, test,
      environment, and workflow edges
    - `search_surface`: `rg -l` hits and `dependency_edit_scope.txt` paths when

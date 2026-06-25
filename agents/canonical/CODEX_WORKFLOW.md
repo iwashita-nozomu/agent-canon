@@ -10,6 +10,7 @@ downstream design ../workflows/token-efficient-codex-workflow.md token-aware run
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
 upstream design ../../documents/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
+upstream design ../../documents/BRANCH_SCOPE.md commit correctness and push contract
 upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
@@ -631,6 +632,7 @@ cost を無視して review coverage を優先する run では、research-drive
 #### Completion Readiness
 
 - repo に残す差分がある task では、validation 後に commit を作る
+- commit は `documents/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - user-facing final report は、`verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked`、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` の状態で出す
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する
