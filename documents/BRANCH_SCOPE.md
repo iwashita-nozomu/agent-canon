@@ -3,6 +3,9 @@
 contract workflow
 responsibility Documents Branch Scope と Git ワークフロー for this repository.
 upstream design README.md durable document index
+downstream design ../agents/canonical/CODEX_WORKFLOW.md consumes commit correctness closeout contract
+downstream design ../agents/skills/codex-task-workflow.md exposes commit correctness workflow guidance
+downstream design ../.agents/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
 @dependency-end
 -->
 
@@ -35,6 +38,16 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 ## 4. コミット・プッシュ
 
 - commit は branch の責務に収まる差分だけを含めます。
+
+### Commit Correctness Contract
+
+Git 上の code が正しく動くとは、fresh checkout の tracked tree から選択した
+validation route を同じ entrypoint で再実行できることを指します。
+
+- commit は Git 上の runnable unit です。`git checkout <commit>` と submodule 初期化で得られる tracked tree だけで、選択した validation route が再実行できる状態にします。
+- validation が読んだ source、config、schema、fixture、文書、tool entrypoint は、その commit の tracked tree に含めます。ignored / generated runtime output は artifact、cache、log、result のどれかに分類して evidence に残します。
+- code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
+- commit evidence には branch、commit SHA、submodule SHA、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
 - `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。

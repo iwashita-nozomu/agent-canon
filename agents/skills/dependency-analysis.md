@@ -7,6 +7,8 @@ responsibility Documents dependency-analysis for this repository.
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest format and tools
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
+upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts file-level code dependency evidence
+upstream implementation ../../tools/agent_tools/helper_function_inventory.py extracts Python function-level call graph context
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
@@ -23,6 +25,7 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - dependency edge、reverse edge、kind、cycle の問題を診断したい
 - closeout 前に dependency manifest evidence を揃えたい
 - 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
+- code 変更の commit evidence として、file-level dependency と関数 / public entrypoint 単位の call-site evidence を揃えたい
 - repo-wide search の responsibility-based candidate と bounded `rg` hit から、どの file を編集・確認すべきか dependency graph で展開したい
 - design document の implementation-backed claim、DSL / standard-form assumption、parent-doc alignment を dependency header evidence と比較したい
 - requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
@@ -34,6 +37,12 @@ Code dependency surface:
 
 ```bash
 bash tools/agent_tools/scan_code_dependencies.sh --changed
+```
+
+Function-level Python dependency surface:
+
+```bash
+python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json
 ```
 
 Changed-file gate:
@@ -107,6 +116,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ## Interpretation
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。
+- Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
 - 修正箇所を選ぶ task では、先に `scan_code_dependencies.sh` で実コード依存を抜き、次に header dependency graph で読むべき design / docs / tests を確認します。
 - コード改善の修正箇所を選ぶ task では、`agents/workflows/hypothesis-validation-workflow.md` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
 - 実装後は `Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
@@ -133,7 +143,7 @@ Packet には最低限次を含めます。
 
 - `requested_target`: `path:start-end:qualname`、file、または finding id
 - `code_dependency_surface`: static に見える import / include / source edge、
-  direct callees、direct callers、re-export / public import surface
+  function / public entrypoint 単位の direct callees、direct callers、re-export / public import surface
 - `header_dependency_surface`: dependency manifest の upstream / downstream
   design、implementation、environment、test、workflow edge
 - `search_surface`: responsibility-based context、text search が seed の場合の
