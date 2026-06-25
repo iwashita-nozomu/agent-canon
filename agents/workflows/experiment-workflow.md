@@ -42,7 +42,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 
 ### 1. 準備
 
-実装や run に入る前に、最初に実験名 `<topic>` を固定します。
+実装や run に入る前に、実験名 `<topic>` を固定します。
 新規 topic は AgentCanon template path
 `vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーして始めます。
 
@@ -79,13 +79,13 @@ cp -r vendor/agent-canon/experiments/_template experiments/<topic>
 - `Registry Plan:`
   - `experiments/registry.toml` の topic entry、canonical entrypoint、formal command、必要なら `active_branch` を先に固定します。
 - `Config Snapshot Plan:`
-  - checked-in 正本は `experiments/<topic>/config.yaml` に置き、`result/<run_name>/config.json` または `config.yaml` snapshot に書き出す設定 dictionary を先に固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象は Python closure や notebook state に閉じ込めません。
+  - checked-in 正本は `experiments/<topic>/config.yaml` に置き、runner が `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` に残す設定 snapshot の key を固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を artifact から辿れる形にします。
 - `Make Target Plan:`
   - `make experiment-smoke TOPIC=<topic>`、`make experiment-formal TOPIC=<topic>`、または topic 固有 alias を先に固定します。正式 run の exact command を chat や notebook だけに残しません。
 - `Execution Plan:`
   - formal run は `main` source checkout で進めます。隔離が必要な実験だけ短期 branch を使い、その場合も生成結果の保存先は専用 result branch にします。
 - `Server Run Surface:`
-  - main server host で formal run を回す場合、`tools/experiments/run_managed_experiment.py` を使うか、同等の metadata capture を topic README に固定します。
+  - main server host で formal run を回す場合、`tools/experiments/run_managed_experiment.py` を使い、`command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を topic README の artifact plan に固定します。
 
 次に、隔離の要否を決めます。
 
@@ -123,9 +123,17 @@ top-level の `reports/` は project-wide な review、automation、management r
   - `result/<run_name>/summary.json`
   - `result/<run_name>/cases.jsonl`
   - `result/<run_name>/config.json`
+  - `result/<run_name>/config_source.yaml`
   - `result/<run_name>/run_manifest.json`
+  - `result/<run_name>/eval_manifest.json`
+  - `result/<run_name>/artifact_manifest.json`
+  - `result/<run_name>/command.json`
+  - `result/<run_name>/environment.json`
+  - `result/<run_name>/source_snapshot.json`
   - `result/<run_name>/run.log`
-  - `result/<run_name>/logs/`
+  - `result/<run_name>/logs/startup.jsonl`
+  - `result/<run_name>/logs/stdout.log`
+  - `result/<run_name>/logs/stderr.log`
   - 図を出力する場合は `result/<run_name>/figures/`
 - 可視化 notebook
   - `visualize.ipynb`
@@ -232,8 +240,8 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - 出力 schema
   - `summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
 - 設定 schema
-  - `--config experiments/<topic>/config.yaml` または同等の入口があり、実験 script が YAML config を読めることを確認する。
-  - managed runner 経由の `config.json` snapshot から run 条件を復元できることを確認する。
+  - 実験 script が `--config {config_path}` で runner 生成の `config.json` を読めることを確認する。
+  - managed runner 経由の `config.json` と `config_source.yaml` から run 条件を復元できることを確認する。
 
 静的チェックの段階では、まだ正式な benchmark conclusion を出しません。
 ここでの目的は「長時間 run を始めても、型・import・引数の破綻で止まらない状態」にすることです。
@@ -242,8 +250,8 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 pickle 可否、JAX import 後の env 汚染、GPU visibility の実際の反映は静的チェックだけでは分かりません。
 それらは次の実行段階で smoke / verified として確認します。
 
-server 実行の formal run では、少なくとも `run_manifest.json`、`run.log`、exact command、host 情報、commit 情報が残ることを確認します。
-追加ログがある場合は、正式 run 前に `result/<run_name>/logs/` に出ることも確認します。
+server 実行の formal run では、`run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` が残ることを確認します。
+topic 固有の追加ログは `result/<run_name>/logs/` に出ることも確認します。
 
 ### 4. 実験実行
 
@@ -281,7 +289,7 @@ server 実行の formal run では、少なくとも `run_manifest.json`、`run.
 - workers per GPU
 - allocator 方針
 - 出力先
-- `config.json` に固定した設定 dictionary
+- `config.json` と `config_source.yaml` に固定した設定 snapshot
 
 は run 開始前に固定し、途中で script を書き換えながら継ぎ足しません。
 
@@ -292,8 +300,8 @@ make experiment-formal TOPIC=<topic>
 ```
 
 この Make target は内側で `tools/experiments/run_managed_experiment.py` を呼びます。
-wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
-各 run では `result/<run_name>/logs/` も初期化されます。
+wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`config_source.yaml`、`command.json`、`environment.json`、`source_snapshot.json`、`run_manifest.json`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
+run 終了時に `eval_manifest.json` と `artifact_manifest.json` も更新されます。
 
 formal run の完了後、生成物を source checkout から専用 result branch へ保存します。
 checkout は `main` のまま保ち、保存対象は `result/<run_name>/` と
@@ -334,9 +342,17 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 - `summary.json`
 - `cases.jsonl`
 - `config.json`
+- `config_source.yaml`
 - `run_manifest.json`
+- `eval_manifest.json`
+- `artifact_manifest.json`
+- `command.json`
+- `environment.json`
+- `source_snapshot.json`
 - `run.log`
-- `logs/`
+- `logs/startup.jsonl`
+- `logs/stdout.log`
+- `logs/stderr.log`
 - `visualize.ipynb`
 - report へのリンク
 - `Result Summary:`
@@ -460,7 +476,8 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - `result/<run_name>/` の所在
 - `result/<run_name>/logs/` の所在
 - 可視化 notebook の所在
-- `config.json` の所在と主要 key
+- `config.json` と `config_source.yaml` の所在と主要 key
+- `command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json` の所在
 - report の所在
 - 置き場と命名規則の変更有無
 - `Critical Review:`

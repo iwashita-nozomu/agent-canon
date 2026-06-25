@@ -556,7 +556,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 847,
+      "line": 899,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -564,7 +564,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "systemMessage",
-      "line": 779,
+      "line": 823,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -2324,7 +2324,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 131,
+      "line": 136,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2332,7 +2332,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 132,
+      "line": 137,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2340,7 +2340,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 129,
+      "line": 134,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2348,7 +2348,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 128,
+      "line": 133,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2356,7 +2356,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_summary_artifact",
-      "line": 130,
+      "line": 135,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2364,7 +2364,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 127,
+      "line": 132,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -4420,7 +4420,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 589,
+      "line": 590,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -4428,7 +4428,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 600,
+      "line": 601,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -4436,7 +4436,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 602,
+      "line": 603,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -4540,7 +4540,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 602,
+      "line": 603,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -4684,7 +4684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_UPDATE_TODO_ACKNOWLEDGED",
-      "line": 782,
+      "line": 783,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -4692,46 +4692,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_UPDATE_TODO_INIT",
-      "line": 740,
-      "path": "tools/agent_tools/agent_canon_update_todos.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_MARKED",
-      "line": 641,
-      "path": "tools/agent_tools/agent_canon_update_todos.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_MARKED_STATUS",
-      "line": 642,
-      "path": "tools/agent_tools/agent_canon_update_todos.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_NEXT",
-      "line": 787,
-      "path": "tools/agent_tools/agent_canon_update_todos.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_REASON",
-      "line": 786,
-      "path": "tools/agent_tools/agent_canon_update_todos.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_STATE",
       "line": 741,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
@@ -4739,15 +4699,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_STATUS",
-      "line": 785,
+      "field": "AGENT_CANON_UPDATE_TODO_MARKED",
+      "line": 642,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_TARGET_COMMIT",
+      "field": "AGENT_CANON_UPDATE_TODO_MARKED_STATUS",
       "line": 643,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
@@ -4755,8 +4715,48 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_UPDATE_TODO_TARGET_COMMIT",
+      "field": "AGENT_CANON_UPDATE_TODO_NEXT",
+      "line": 788,
+      "path": "tools/agent_tools/agent_canon_update_todos.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_UPDATE_TODO_REASON",
+      "line": 787,
+      "path": "tools/agent_tools/agent_canon_update_todos.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_UPDATE_TODO_STATE",
       "line": 742,
+      "path": "tools/agent_tools/agent_canon_update_todos.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_UPDATE_TODO_STATUS",
+      "line": 786,
+      "path": "tools/agent_tools/agent_canon_update_todos.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_UPDATE_TODO_TARGET_COMMIT",
+      "line": 644,
+      "path": "tools/agent_tools/agent_canon_update_todos.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_UPDATE_TODO_TARGET_COMMIT",
+      "line": 743,
       "path": "tools/agent_tools/agent_canon_update_todos.py",
       "surface": "tool"
     },
@@ -5508,7 +5508,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 1331,
+      "line": 1363,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -9668,7 +9668,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 602,
+      "line": 609,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9676,7 +9676,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 602,
+      "line": 609,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9684,7 +9684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "imports",
-      "line": 602,
+      "line": 609,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9692,7 +9692,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 602,
+      "line": 609,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9700,7 +9700,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 482,
+      "line": 489,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9708,7 +9708,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY",
-      "line": 594,
+      "line": 601,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9716,7 +9716,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FILES",
-      "line": 591,
+      "line": 598,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9732,7 +9732,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FINDINGS",
-      "line": 593,
+      "line": 600,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9740,7 +9740,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_IMPORTS",
-      "line": 592,
+      "line": 599,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -11100,7 +11100,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 699,
+      "line": 760,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11108,7 +11108,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 717,
+      "line": 778,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11116,7 +11116,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 738,
+      "line": 799,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11124,7 +11124,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 782,
+      "line": 864,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11132,7 +11132,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 738,
+      "line": 799,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11140,7 +11140,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 317,
+      "line": 318,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11148,7 +11148,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 860,
+      "line": 942,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11156,7 +11156,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 840,
+      "line": 922,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -11164,7 +11164,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 847,
+      "line": 929,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -12564,7 +12564,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 389,
+      "line": 410,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12572,7 +12572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "changed_files",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12580,7 +12580,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12588,7 +12588,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 412,
+      "line": 433,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12596,7 +12596,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12604,7 +12604,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 412,
+      "line": 433,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12612,7 +12612,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 389,
+      "line": 410,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12620,7 +12620,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "changed_files",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12628,7 +12628,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12636,7 +12636,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 412,
+      "line": 433,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12644,7 +12644,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 402,
+      "line": 423,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12652,7 +12652,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 412,
+      "line": 433,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12660,7 +12660,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 289,
+      "line": 304,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12668,7 +12668,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_CANONICAL_DOC",
-      "line": 367,
+      "line": 382,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12676,7 +12676,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_FINDING",
-      "line": 130,
+      "line": 135,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12684,7 +12684,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_RUNTIME_SKILL",
-      "line": 366,
+      "line": 381,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12692,7 +12692,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_SKILL",
-      "line": 365,
+      "line": 380,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12700,7 +12700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS",
-      "line": 425,
+      "line": 446,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12708,7 +12708,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_FINDINGS",
-      "line": 424,
+      "line": 445,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12716,7 +12716,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SYNC",
-      "line": 407,
+      "line": 428,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -12724,7 +12724,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SYNC_CHANGED",
-      "line": 404,
+      "line": 425,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15380,7 +15380,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 590,
+      "line": 612,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -15388,7 +15388,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "registry_path",
-      "line": 588,
+      "line": 610,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -15396,7 +15396,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "repo_root",
-      "line": 587,
+      "line": 609,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -16308,7 +16308,39 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 493,
+      "line": 574,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "event",
+      "line": 803,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "run_name",
+      "line": 803,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "timestamp_utc",
+      "line": 803,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "topic",
+      "line": 803,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },

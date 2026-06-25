@@ -197,7 +197,7 @@ second command manual.
 - `tools/experiments/sync_experiment_registry_context.py`
   - registry の branch / worktree metadata を同期します。
 - `tools/experiments/run_managed_experiment.py`
-  - shared managed-runner として server 上の実験 run artifact を初期化します。
+  - shared managed-runner として server 上の実験 run artifact を初期化し、command / environment / source snapshot、artifact manifest、startup / stdout / stderr log を保存します。
 - `tools/experiments/html_artifact_access.py`
   - SSH 越しの HPC / container 上にある HTML artifact を手元 PC のブラウザで見るため、`python3 -m http.server`、SSH tunnel、local URL の command を出します。
 - `tools/run_comprehensive_review.sh`
