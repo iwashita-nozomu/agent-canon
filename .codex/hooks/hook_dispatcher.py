@@ -7,6 +7,7 @@
 # upstream design ../README.md documents dispatcher-based hook wiring.
 # downstream implementation ./codex_runtime_summary_logger.py exports bounded Codex runtime summaries on Stop
 # downstream implementation ./runtime_log_auto_sync.py syncs mounted runtime logs and agent reports on Stop
+# downstream implementation ./branch_worktree_guard.py blocks unconfirmed branch and worktree creation.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch order and hook count.
 # @dependency-end
 
@@ -56,7 +57,7 @@ STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
 # Most policy hooks are advisory by default so a bad guardrail cannot freeze
 # ordinary shell/read/validation work. CI and hook development can opt into
 # strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
-CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py"})
+CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py", "branch_worktree_guard.py"})
 ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
 SAFE_GIT_BRANCH_LIST_OPTIONS = {
@@ -195,6 +196,7 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     ),
     "PreToolUse": (
         HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("branch_worktree_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("direct_rg_context_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS),
     ),

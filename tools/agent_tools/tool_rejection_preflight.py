@@ -7,6 +7,9 @@
 # upstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
 # upstream design ../../agents/skills/small-change-routing.md owns small-change preflight routing
 # upstream design ../../.agents/skills/small-change-routing/SKILL.md exposes small-change preflight routing
+# upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
+# upstream design ../../.agents/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
+# upstream design ../../documents/experiment-registry.md defines managed experiment registry contract
 # upstream design ../../tools/README.md documents tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
@@ -119,6 +122,20 @@ AGENT_PROTOCOL_PATHS = frozenset(
     }
 )
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
+EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
+    {
+        ".agents/skills/experiment-lifecycle/SKILL.md",
+        "agents/skills/experiment-lifecycle.md",
+        "agents/workflows/experiment-workflow.md",
+        "documents/experiment-registry.md",
+        "documents/experiment_runner.md",
+        "experiments/registry.toml",
+        "tools/ci/check_experiment_registry.py",
+        "tools/experiments/publish_result_branch.py",
+        "tools/experiments/registry_lib.py",
+        "tools/experiments/run_managed_experiment.py",
+    }
+)
 LIBRARY_SURFACE_PREFIXES = (
     "vendor/",
     "third_party/",
@@ -405,6 +422,24 @@ AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES = (
         ),
     ),
 )
+EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="experiment_execution_surface_guard",
+        command_template=(
+            "if [ -e experiments/registry.toml ]; then "
+            "python3 tools/ci/check_experiment_registry.py; "
+            "else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; "
+            "fi && "
+            "python3 -m pytest tests/tools/test_run_managed_experiment.py -q"
+        ),
+        handoff=(
+            "route planned edits through $experiment-lifecycle and $test-design; "
+            "preserve the managed runner, registry checker, registry contract, "
+            "and result-branch publication contract with lightweight registry and "
+            "runner validation evidence"
+        ),
+    ),
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -506,6 +541,8 @@ def path_gates(path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...
         templates.extend(GITHUB_GATE_TEMPLATES)
     if path in AGENT_PROTOCOL_PATHS:
         templates.extend(AGENT_PROTOCOL_GATE_TEMPLATES)
+    if experiment_execution_surface_path(path):
+        templates.extend(EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
     if agent_canon_tool_source_path(path):
@@ -583,6 +620,19 @@ def library_surface_path(path: str) -> bool:
     if path == AGENT_CANON_SUBMODULE_PREFIX or path.startswith(AGENT_CANON_SUBMODULE_PREFIX + "/"):
         return False
     return path.startswith(LIBRARY_SURFACE_PREFIXES)
+
+
+def agent_canon_logical_path(path: str) -> str:
+    """Return the AgentCanon logical path for parent-submodule paths."""
+    prefix = AGENT_CANON_SUBMODULE_PREFIX + "/"
+    if path.startswith(prefix):
+        return path.removeprefix(prefix)
+    return path
+
+
+def experiment_execution_surface_path(path: str) -> bool:
+    """Return whether a path owns managed experiment execution semantics."""
+    return agent_canon_logical_path(path) in EXPERIMENT_EXECUTION_SURFACE_PATHS
 
 
 def text_output(gates: tuple[PredictedGate, ...]) -> str:

@@ -371,6 +371,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", python_decision["deferred_skills"])
         self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
 
+    def test_prompt_routes_repo_wide_responsibility_deduplication(self) -> None:
+        """Repo-wide over-splitting and responsibility overlap should route to structure repair."""
+        prompt = "レポ全体をレビューしながら過剰分割，責務重複を排除してください"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        self.assertIn("structure-refactor", python_decision["matched_skills"])
+        self.assertIn("structure-refactor", python_decision["active_skills"])
+        self.assertIn("comprehensive-development", python_decision["matched_skills"])
+        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
+        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
         """All-skill command packet repair should not fall through."""
         prompt = (

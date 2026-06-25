@@ -429,6 +429,12 @@ SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "responsibility_preflight_gate"
 ]
+EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "experiment_execution_surface_guard"
+]
+BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "branch_worktree_creation_guard"
+]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -1774,6 +1780,20 @@ def run_checks(root: Path) -> list[Finding]:
             root,
             "responsibility_preflight_gate",
             RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "experiment_execution_surface_guard",
+            EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "branch_worktree_creation_guard",
+            BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
         )
     )
     findings.extend(check_closeout_readiness(root))

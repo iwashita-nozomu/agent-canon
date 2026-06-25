@@ -35,7 +35,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。追加の `git worktree`、separate worktree、integration worktree は out-of-scope route です。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` に従います。
 - subagent handoff の input packet は role ごとに bounded にし、対象 path list、compact artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡します。
 - fresh subagent は、launch 間の context を parent が更新する capsule artifact に集約し、launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。capsule には objective、request clauses、state snapshot、exact read-before-work paths、compact artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を入れます。

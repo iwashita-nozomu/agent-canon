@@ -10,6 +10,7 @@ upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
+downstream implementation ./hooks/branch_worktree_guard.py blocks unconfirmed branch and worktree creation
 downstream implementation ./hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
 downstream implementation ./hooks/cause_investigation_guard.py warns on code edits without cause investigation evidence
