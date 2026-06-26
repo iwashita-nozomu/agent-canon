@@ -633,6 +633,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - repo に残す差分がある task では、validation 後に commit を作る
 - commit は `documents/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
+- commit / PR の切り方は `documents/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - user-facing final report は、`verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked`、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` の状態で出す
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する

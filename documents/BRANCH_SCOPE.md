@@ -4,8 +4,11 @@ contract workflow
 responsibility Documents Branch Scope と Git ワークフロー for this repository.
 upstream design README.md durable document index
 downstream design ../agents/canonical/CODEX_WORKFLOW.md consumes commit correctness closeout contract
+downstream design ../agents/workflows/agent-canon-pr-workflow.md consumes branch, commit, and PR scope split contract
 downstream design ../agents/skills/codex-task-workflow.md exposes commit correctness workflow guidance
 downstream design ../.agents/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
+downstream design ../agents/skills/pr-processing.md exposes PR merge scope review
+downstream design ../.agents/skills/pr-processing/SKILL.md exposes PR merge scope review
 @dependency-end
 -->
 
@@ -18,6 +21,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 ## 1. 基本方針
 
 - 1 branch = 1 topic に固定します。
+- topic は独立した設計単位として扱い、branch と PR の scope もこの単位に揃えます。
 - branch の責務が広がったら、branch を分けるか `WORKTREE_SCOPE.md` を更新します。
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
 - `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。
@@ -38,6 +42,24 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 ## 4. コミット・プッシュ
 
 - commit は branch の責務に収まる差分だけを含めます。
+
+### 範囲分割契約
+
+コミット範囲と PR 範囲は別々のレビュー単位として扱います。
+
+- コミットは Git 上で再実行できる実行単位です。
+- PR はレビュー担当者が一つの問題、設計意図、正本 owner、振る舞いまたは
+  契約の差分、根拠経路として受け入れられるレビュー単位です。
+- commit または PR 作成 / 更新へ進む前に、差分が複数の問題、canonical
+  owner、behavior or contract delta、validation route にまたがる場合は、
+  run bundle または PR body に範囲表を置きます。範囲表には差分単位、
+  目的、canonical owner、編集 path、validation route、依存する差分単位を
+  書きます。
+- 複数の差分単位を一つの PR に載せる判断は、同じ設計意図と同じレビュー判断で
+  扱える場合に限ります。独立して main に入れられる差分単位は、merge 前に別
+  PR または別 commit に分けます。
+- AgentCanon source 変更と template / derived repo の submodule pin、root view
+  変更は、source merge 後の parent PR / commit として分けます。
 
 ### Commit Correctness Contract
 

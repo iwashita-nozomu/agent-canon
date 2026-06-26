@@ -79,6 +79,10 @@ Execute the required and task-matching conditional commands that the packet prin
    - no blocking review request or requested-change review;
    - PR body, comment, or run bundle includes `PR Essence`, validation
      evidence, and any automation authority lines required by the repo.
+   - PR body, comment, or run bundle shows that the
+     `documents/BRANCH_SCOPE.md` scope-split contract was applied: the PR is one
+     review unit, or it has a scope table plus the split/group decision for
+     every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
    `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
    and the parent PR gate.
