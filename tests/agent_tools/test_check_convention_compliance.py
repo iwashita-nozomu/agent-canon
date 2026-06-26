@@ -72,7 +72,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/06_comments.md": "comments\n",
     "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
     "documents/conventions/python/09_file_roles.md": (
-        "roles 読者順序 公開契約 公開入口 private helper dependency order "
+        "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
         "check_convention_compliance.py\n"
     ),
     "documents/conventions/python/11_naming.md": "naming\n",
@@ -97,7 +97,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "canonical owner caller migration contract-complete implementation "
         "acceptance contract design_issue_blocker implementation shortcut "
         "two-stage refactor forced migration usage-surface repair "
-        "return-gate validation 読者順序 公開契約 公開入口 private helper "
+        "return-gate validation 読者順序 公開契約 公開入口 内部補助関数 "
         "単一公開入口 "
         "check_convention_compliance.py\n"
     ),

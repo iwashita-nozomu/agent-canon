@@ -228,11 +228,11 @@ description = "Python source files keep readable definition order visible in con
 
 [[contracts.surfaces]]
 path = "documents/conventions/python/09_file_roles.md"
-markers = ["読者順序", "公開契約", "公開入口", "private helper", "dependency order", "check_convention_compliance.py"]
+markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check_convention_compliance.py"]
 
 [[contracts.surfaces]]
 path = "documents/coding-conventions-house-style.md"
-markers = ["読者順序", "公開契約", "公開入口", "private helper", "単一公開入口"]
+markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
 
 [[contracts.surfaces]]
 path = "agents/skills/python-review.md"
