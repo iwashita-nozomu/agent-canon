@@ -15,6 +15,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 ## 要約
 
 - 公開境界は module docstring、`__all__`、先頭 `_` の命名で明示します。
+- コードファイル内の定義は、公開契約、公開入口、private helper の読者順序で並べます。
 - 非自明な関数と重要な処理塊には `# 責務:` コメントを付け、1 関数 1 責務を守ります。
 - 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
@@ -47,6 +48,10 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 - 公開 API 名は先頭 `_` を付けてはなりません。
 - 内部 helper、内部状態、暫定実装は先頭 `_` を付けなければなりません。
+- Python file 内の順序は、公開契約、公開入口、共有 private helper、単一公開入口に
+  従う private helper の読者順序で揃えなければなりません。
+- 単一公開入口に従う private helper は、その公開入口の直後に置かなければなりません。
+- 複数入口で共有する private helper は、公開入口群の直後に置かなければなりません。
 - 非自明な関数、メソッド、内部 helper の直前には `# 責務:` コメントを 1 行で置くことを必須にします。
 - 1 つの関数が複数段階の責務を持つことを禁止します。判定、変換、保存、通知を同時に抱え込んではなりません。
 - `util`、`helper`、`misc`、`tmp`、`data` のような責務が読めない名前を公開 API に使うことを禁止します。

@@ -743,6 +743,10 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "solid_coding_contract"
 ]
+
+SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "source_file_definition_order"
+]
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
     r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
@@ -1808,6 +1812,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "source_file_definition_order",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
         )
     )
     findings.extend(check_agentcanon_push_remote_guard(root))

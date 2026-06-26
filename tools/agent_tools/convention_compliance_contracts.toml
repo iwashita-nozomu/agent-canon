@@ -221,3 +221,27 @@ markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
 markers = ["SOLID", "SRP", "OCP", "LSP", "ISP", "DIP", "Single responsibility", "Open/closed", "Liskov", "Interface segregation", "Dependency inversion", "Protocol", "- [\"SOLID\"]", "- [\"SRP\"]", "- [\"Dependency inversion\"]"]
+
+[[contracts]]
+id = "source_file_definition_order"
+description = "Python source files keep readable definition order visible in conventions, routing, and review surfaces."
+
+[[contracts.surfaces]]
+path = "documents/conventions/python/09_file_roles.md"
+markers = ["読者順序", "公開契約", "公開入口", "private helper", "dependency order", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = "documents/coding-conventions-house-style.md"
+markers = ["読者順序", "公開契約", "公開入口", "private helper", "単一公開入口"]
+
+[[contracts.surfaces]]
+path = "agents/skills/python-review.md"
+markers = ["source file definition order", "読者順序", "public entrypoint", "private helper", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/python-review/SKILL.md"
+markers = ["source file definition order", "reader order", "public entrypoint", "private helper", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["コードファイル", "順序", "source file", "definition", "order"]

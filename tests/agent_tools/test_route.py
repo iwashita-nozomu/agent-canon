@@ -334,6 +334,23 @@ class RouteToolTest(unittest.TestCase):
                 self.assertIn("agent-log-analysis", decision["matched_skills"])
                 self.assertIn("agent-log-analysis", decision["active_skills"])
 
+    def test_prompt_routes_source_file_order_feedback(self) -> None:
+        """Source file order feedback should reach small change and Python review routes."""
+        result = self.run_route(
+            "--prompt",
+            "コードファイル内の順序がわかりにくいです",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("small-change-routing", decision["matched_skills"])
+        self.assertIn("small-change-routing", decision["active_skills"])
+        self.assertIn("python-review", decision["matched_skills"])
+        self.assertIn("python-review", decision["deferred_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_routes_adaptive_improvement_loop_from_iterative_work(self) -> None:
         """Iterative execution and tuning prompts should activate adaptive loop routing."""
         prompts = (

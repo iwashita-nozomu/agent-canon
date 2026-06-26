@@ -33,6 +33,7 @@ from tools.agent_tools.check_convention_compliance import (
     REVIEW_ISSUE_ROUTING_MARKERS,
     SMALL_CHANGE_SKILL_READ_MARKERS,
     SOLID_CODING_CONTRACT_MARKERS,
+    SOURCE_FILE_DEFINITION_ORDER_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -70,7 +71,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
     "documents/conventions/python/06_comments.md": "comments\n",
     "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
-    "documents/conventions/python/09_file_roles.md": "roles\n",
+    "documents/conventions/python/09_file_roles.md": (
+        "roles 読者順序 公開契約 公開入口 private helper dependency order "
+        "check_convention_compliance.py\n"
+    ),
     "documents/conventions/python/11_naming.md": "naming\n",
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
@@ -93,7 +97,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "canonical owner caller migration contract-complete implementation "
         "acceptance contract design_issue_blocker implementation shortcut "
         "two-stage refactor forced migration usage-surface repair "
-        "return-gate validation "
+        "return-gate validation 読者順序 公開契約 公開入口 private helper "
+        "単一公開入口 "
         "check_convention_compliance.py\n"
     ),
     "documents/coding-conventions-testing.md": (
@@ -316,7 +321,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "scanned_paths\n",
+        "scanned_paths source file definition order reader order "
+        "public entrypoint private helper check_convention_compliance.py\n",
     ),
     ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
         "oop-readability-check",
@@ -412,7 +418,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "readability.py scanned_paths\n"
+        "readability.py scanned_paths source file definition order 読者順序 "
+        "public entrypoint private helper check_convention_compliance.py\n"
     ),
     "agents/skills/oop-readability-check.md": (
         "SOLID Single responsibility Open/closed Liskov substitution "
@@ -445,7 +452,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "skill catalog routing entry skill format-only docs work "
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
-        "Dependency inversion Protocol\n"
+        "Dependency inversion Protocol コードファイル 順序 source file definition order\n"
         "small-change-routing small repository edit 小規模修正 Scoped Change Lite\n"
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
@@ -1560,6 +1567,56 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in SOLID_CODING_CONTRACT_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_source_file_definition_order_requires_review_markers(self) -> None:
+        """Source definition order guidance stays wired to Python review evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            python_review = root / "agents" / "skills" / "python-review.md"
+            python_review.write_text(
+                python_review.read_text(encoding="utf-8").replace(
+                    "source file definition order",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:source file definition order", result.stdout)
+
+    def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
+        """Source definition order feedback stays visible in deterministic routing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace(
+                    "コードファイル",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:コードファイル", result.stdout)
+
+    def test_minimal_fixture_covers_source_file_definition_order_surfaces(self) -> None:
+        """The minimal fixture includes every source definition order surface."""
+        missing = sorted(
+            path
+            for path in SOURCE_FILE_DEFINITION_ORDER_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 
