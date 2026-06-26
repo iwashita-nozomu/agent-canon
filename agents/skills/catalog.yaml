@@ -49,7 +49,10 @@ skill_families:
       - small-change-routing
       - structure-refactor
       - agent-log-analysis
+      - issue-finding-report
       - tool-finding-report
+      - result-artifact-writeout
+      - agent-learning
     routing:
       stage_policy: active
       reason: skill/tool routing architecture or route contract design is in scope
@@ -77,6 +80,13 @@ skill_families:
         - ["スキル", "分割"]
         - ["スキル", "重い"]
         - ["関連スキル"]
+        - ["関連スキル", "狭"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["スキル", "call"]
+        - ["skill", "called"]
+        - ["skill", "invoke"]
+        - ["skill", "invoked"]
         - ["skill", "split"]
         - ["skill", "granular"]
         - ["related", "skill"]
@@ -313,6 +323,12 @@ skill_families:
         - ["log", "skill", "repair"]
         - ["logs", "skill", "fix"]
         - ["toolcall", "skillcall", "ルーティング"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["適切", "スキル", "呼"]
+        - ["skill", "not", "called"]
+        - ["skill", "not", "invoked"]
+        - ["skill", "missed"]
         - ["runbundle", "agent", "レポート"]
         - ["run bundle", "agent", "report"]
         - ["codex", "レポ"]
@@ -826,5 +842,9 @@ skill_families:
         - ["memory", "feedback"]
         - ["エージェント", "成長"]
         - ["agent", "growth"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["skill", "not", "called"]
+        - ["skill", "not", "invoked"]
         - ["起動コマンド", "ミス"]
         - ["ミス", "多発"]
