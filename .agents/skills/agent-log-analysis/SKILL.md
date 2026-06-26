@@ -1,6 +1,6 @@
 ---
 name: agent-log-analysis
-description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, routing misses, weak skills, or selection gaps; first convert raw logs into a token-light compact summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence.
+description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, narrow related-skill coverage, or selection gaps; first convert raw logs into a token-light compact summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence.
 ---
 <!--
 @dependency-start
@@ -33,6 +33,7 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/agent-log-analysis.md`.
 1. Use the compact dashboard API / Markdown summary as the normal analysis input.
+1. Select this skill when the observed problem is that a skill, tool, workflow, or related-skill candidate was missed, delayed, too narrow, or routed to the wrong follow-up surface, even when the user describes the symptom without explicitly asking for logs.
 1. Resolve or mount the external log archive before dashboard generation:
 
 ```bash

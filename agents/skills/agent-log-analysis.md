@@ -24,6 +24,8 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
+- user が skill が呼ばれない、呼び出しが遅い、関連 skill 候補が狭い、
+  または違う後続 surface に route されるという runtime feedback を出している
 - `.agent-canon/log-archive/**`、`reports/**`、event file を読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
@@ -84,6 +86,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 ## Boundaries
 
 - この skill は log archive API、compact summary、routing miss、selection gap、
+  missed / late skill invocation、narrow related-skill coverage、
   wave execution reconciliation の観測と解釈を所有します。
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。

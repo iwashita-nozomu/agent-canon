@@ -334,6 +334,27 @@ class RouteToolTest(unittest.TestCase):
                 self.assertIn("agent-log-analysis", decision["matched_skills"])
                 self.assertIn("agent-log-analysis", decision["active_skills"])
 
+    def test_prompt_routes_missed_skill_invocation_feedback(self) -> None:
+        """Missed skill feedback should reach routing, log analysis, and learning surfaces."""
+        result = self.run_route(
+            "--prompt",
+            "適切にスキルが呼ばれないです．関連スキルの記述を絞りすぎ",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        for skill in ("task-routing", "agent-log-analysis", "agent-learning"):
+            self.assertIn(skill, decision["matched_skills"])
+            self.assertIn(skill, decision["skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("agent-log-analysis", decision["active_skills"])
+        self.assertIn("agent-learning", decision["deferred_skills"])
+        self.assertIn("issue-finding-report", decision["related_skill_candidates"])
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_routes_source_file_order_feedback(self) -> None:
         """Source file order feedback should reach small change and Python review routes."""
         result = self.run_route(
