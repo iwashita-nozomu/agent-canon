@@ -1,6 +1,6 @@
 ---
 name: python-review
-description: Use when Python code changes need strict review for pyright, pytest, ruff, type boundaries, API behavior, and OOP readability evidence already owned by the Python diff.
+description: Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。
 ---
 <!--
 @dependency-start
@@ -26,21 +26,18 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `agents/skills/python-review.md`.
-1. Fix the changed Python files and related tests before validating.
-1. Run or inspect `pyright`.
-1. Run or inspect `pytest tests/`.
-1. Run or inspect `ruff check python tests --select D,E,F,I,UP --ignore E501`.
-1. For Python diffs that change source file definition order, public entrypoint
-   placement, or private helper placement, run or inspect
-   `python3 tools/agent_tools/check_convention_compliance.py` and verify the
-   source file order contract is visible in review evidence.
-1. Check that changed Python files keep reader order: public contracts, public
-   entrypoints, shared private helpers, then private helpers that belong to one
-   public entrypoint placed next to that entrypoint.
-1. For changed classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction in the Python diff, run or inspect `$oop-readability-check` / `python3 tools/oop/python/readability.py` as downstream evidence and review SOLID principle signal counts.
-   Use the report's Single responsibility, Open/closed, Liskov substitution,
-   Interface segregation, and Dependency inversion signals as review evidence.
-1. For the same changed Python paths, run or inspect `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` and verify the report `scanned_paths` cover the reviewed SOLID-sensitive files.
-1. Check API behavior, type boundaries, and docs/test follow-through.
-1. Report findings before summaries.
+1. `agents/skills/python-review.md` を読みます。
+1. 変更された Python ファイルと関連テストを直してから検証します。
+1. `pyright` を実行または確認します。
+1. `pytest tests/` を実行または確認します。
+1. `ruff check python tests --select D,E,F,I,UP --ignore E501` を実行または確認します。
+1. Python 差分が定義順、公開入口の配置、内部補助関数の配置を変える場合は、
+   `python3 tools/agent_tools/check_convention_compliance.py` を実行または確認し、
+   定義順契約が review evidence に見えていることを確認します。
+1. 変更された Python ファイルが、公開契約、公開入口、共有の内部補助関数、単一公開入口に従う内部補助関数の読者順序を保っていることを確認します。
+1. Python 差分が class、dataclass、`Protocol`、継承、公開 API、型境界、依存方向を持つ場合は、`$oop-readability-check` / `python3 tools/oop/python/readability.py` を下流根拠として実行または確認し、SOLID 原則シグナル数を確認します。
+   レポート内の Single responsibility、Open/closed、Liskov substitution、
+   Interface segregation、Dependency inversion のシグナルを review evidence として使います。
+1. 同じ変更パスに対して `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` を実行または確認し、レポートの `scanned_paths` が確認対象の SOLID 対象ファイルを覆っていることを確認します。
+1. API 挙動、型境界、文書とテストの追随を確認します。
+1. 要約より前に指摘を返します。

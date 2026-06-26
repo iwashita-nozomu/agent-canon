@@ -133,8 +133,8 @@ skill_families:
         - ["one-file", "fix"]
         - ["single-abstraction"]
         - ["コードファイル", "順序"]
+        - ["定義順"]
         - ["コード", "順序", "わかりにく"]
-        - ["source file", "order"]
         - ["typo", "link"]
         - ["format-only"]
         - ["selected_runtime_skill_read"]
@@ -183,7 +183,7 @@ skill_families:
         - ["ruff"]
         - ["pytest", "Python"]
         - ["コードファイル", "順序"]
-        - ["definition", "order"]
+        - ["定義順"]
         - ["関数", "順序"]
         - ["class", "順序"]
   - id: cpp-review
