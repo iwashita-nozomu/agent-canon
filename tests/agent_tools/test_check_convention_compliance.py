@@ -317,12 +317,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/python-review/SKILL.md": skill_fixture(
         "python-review",
-        "SOLID principle signal $oop-readability-check "
+        "SOLID 原則シグナル $oop-readability-check "
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "scanned_paths source file definition order reader order "
-        "public entrypoint private helper check_convention_compliance.py\n",
+        "scanned_paths 定義順 読者順序 "
+        "公開入口 内部補助関数 check_convention_compliance.py\n",
     ),
     ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
         "oop-readability-check",
@@ -414,12 +414,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "typo format-only SKILL.md\n"
     ),
     "agents/skills/python-review.md": (
-        "SOLID principle signal OOP readability report "
+        "SOLID 原則シグナル OOP 可読性レポート "
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "readability.py scanned_paths source file definition order 読者順序 "
-        "public entrypoint private helper check_convention_compliance.py\n"
+        "readability.py scanned_paths 定義順 読者順序 "
+        "公開入口 内部補助関数 check_convention_compliance.py\n"
     ),
     "agents/skills/oop-readability-check.md": (
         "SOLID Single responsibility Open/closed Liskov substitution "
@@ -452,7 +452,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "skill catalog routing entry skill format-only docs work "
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
-        "Dependency inversion Protocol コードファイル 順序 source file definition order\n"
+        "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
         "small-change-routing small repository edit 小規模修正 Scoped Change Lite\n"
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
@@ -1580,7 +1580,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             python_review = root / "agents" / "skills" / "python-review.md"
             python_review.write_text(
                 python_review.read_text(encoding="utf-8").replace(
-                    "source file definition order",
+                    "定義順",
                     "",
                 ),
                 encoding="utf-8",
@@ -1590,7 +1590,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("source_file_definition_order", result.stdout)
-            self.assertIn("missing-marker:source file definition order", result.stdout)
+            self.assertIn("missing-marker:定義順", result.stdout)
 
     def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
         """Source definition order feedback stays visible in deterministic routing."""
