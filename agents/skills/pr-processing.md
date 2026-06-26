@@ -135,6 +135,7 @@ route を短く書きます。
    - required checks pass
    - blocking review なし
    - PR Essence と validation evidence が PR body、comment、または run bundle にある
+   - `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、PR が一つのレビュー単位であること、または複数の差分単位の範囲表と分割判断が PR body、comment、または run bundle にある
    - repo の GitHub automation authority fields が必要なら visible になっている
 1. Issue を処理します。
    - resolved: merge PR / commit / policy reference を書いて close
