@@ -132,6 +132,9 @@ skill_families:
         - ["Scoped Change Lite"]
         - ["one-file", "fix"]
         - ["single-abstraction"]
+        - ["コードファイル", "順序"]
+        - ["コード", "順序", "わかりにく"]
+        - ["source file", "order"]
         - ["typo", "link"]
         - ["format-only"]
         - ["selected_runtime_skill_read"]
@@ -179,6 +182,10 @@ skill_families:
         - ["pyright"]
         - ["ruff"]
         - ["pytest", "Python"]
+        - ["コードファイル", "順序"]
+        - ["definition", "order"]
+        - ["関数", "順序"]
+        - ["class", "順序"]
   - id: cpp-review
     purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
     canonical_doc: agents/skills/cpp-review.md

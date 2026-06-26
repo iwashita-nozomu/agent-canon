@@ -31,6 +31,13 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Run or inspect `pyright`.
 1. Run or inspect `pytest tests/`.
 1. Run or inspect `ruff check python tests --select D,E,F,I,UP --ignore E501`.
+1. For Python diffs that change source file definition order, public entrypoint
+   placement, or private helper placement, run or inspect
+   `python3 tools/agent_tools/check_convention_compliance.py` and verify the
+   source file order contract is visible in review evidence.
+1. Check that changed Python files keep reader order: public contracts, public
+   entrypoints, shared private helpers, then private helpers that belong to one
+   public entrypoint placed next to that entrypoint.
 1. For changed classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction in the Python diff, run or inspect `$oop-readability-check` / `python3 tools/oop/python/readability.py` as downstream evidence and review SOLID principle signal counts.
    Use the report's Single responsibility, Open/closed, Liskov substitution,
    Interface segregation, and Dependency inversion signals as review evidence.
