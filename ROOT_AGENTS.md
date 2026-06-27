@@ -72,6 +72,22 @@ from `task_start.py` or `bootstrap_agent_run.py` provide the active
 `workflow=...`, `skills=...`, `review=...`, source packet, wave plan, and
 validation route.
 
+## Scope Discipline
+
+Default to the smallest action that closes the user request. Owner-map entries,
+skill command packets, validation commands, and CI jobs are routing menus, not
+automatic worklists. Run or read only the item that changes the next decision:
+edit path, fix, validation, PR state, or explicit deferral.
+
+Use parent-direct work for bounded one-file, single-abstraction, focused code,
+routine docs, typo/link/format-only, and explicit small-change tasks. Use
+multi-agent waves only when the user asks for them, or when independent,
+replaceable workstreams can run in parallel without expanding the task.
+
+Do not wait for unrelated passing checks, sync logs repeatedly, or broaden into
+repo-wide audits unless the user asks for that scope or a blocking finding
+requires it.
+
 ## Base Runtime Packet Owner
 
 - `README.md`
