@@ -74,15 +74,19 @@ validation route.
 
 ## Scope Discipline
 
-Default to the smallest action that closes the user request. Owner-map entries,
-skill command packets, validation commands, and CI jobs are routing menus, not
-automatic worklists. Run or read only the item that changes the next decision:
-edit path, fix, validation, PR state, or explicit deferral.
+Default to design-complete, responsibility-bounded work. A task is complete only
+when the changed behavior, design/OOP boundary, ownership boundary, and required
+tests or docs are coherent for the active profile. Do not use "small", "quick",
+or "parent-direct" as a reason to skip needed design.
 
-Use parent-direct work for bounded one-file, single-abstraction, focused code,
-routine docs, typo/link/format-only, and explicit small-change tasks. Use
-multi-agent waves only when the user asks for them, or when independent,
-replaceable workstreams can run in parallel without expanding the task.
+Owner-map entries, skill command packets, validation commands, and CI jobs are
+routing menus, not automatic worklists. Run or read only the item that changes
+the next decision: edit path, fix, validation, PR state, or explicit deferral.
+
+Use parent-direct work when the ownership path and design boundary are clear and
+the work stays inside one replaceable responsibility unit. Use multi-agent waves
+only when the user asks for them, or when independent, replaceable workstreams
+can run in parallel without expanding scope or weakening design responsibility.
 
 Do not wait for unrelated passing checks, sync logs repeatedly, or broaden into
 repo-wide audits unless the user asks for that scope or a blocking finding
