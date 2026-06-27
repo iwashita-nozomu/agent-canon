@@ -40,6 +40,10 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
+1. Treat `agents/COMMUNICATION_PROTOCOL.md` as the single owner of handoff and
+   capsule fields. This skill owns launch timing, role selection, wave ledger,
+   authorization, and closeout mechanics; it does not create a second capsule
+   schema.
 1. For repo-changing tasks, create or inspect a run bundle before implementation.
 1. For goal-driven repo-changing tasks, create a provisional run bundle and start read-only `requirements_organizer` / `explorer` before `/goal` is finalized when the exact objective is not yet fixed.
 1. For goal-driven tasks only, keep write-capable implementation subagents blocked until `goal.md` is parseable, the Codex goal view is mirrored or queued, and Plan-mode evidence mapping exists.
@@ -64,7 +68,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For bounded review, report traceability, and checklist-style review gates, use mini review role TOMLs only when they can run alongside or after the implementation slice without replacing the write-capable handoff.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
 1. Keep every handoff packet bounded after discovery: include dependency-expanded `allowed_paths`, checker or compact artifact paths, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, pass deterministic fallback output as a provisional source-packet seed or record `router_unavailable_blocker` before handoff. Fallback routing reaches `fallback_exit_status` through `canonical_rerun_pass`, `durable_blocker_or_issue`, or `explicit_approval_evidence`.
-1. Treat every spawned subagent as fresh: include the `Fresh Subagent Context Capsule` from `agents/COMMUNICATION_PROTOCOL.md` with objective, request clauses, state snapshot, exact read-before-work paths, compact artifacts, allowed / forbidden paths, expected output schema, validation route, and return contract. Do not rely on accumulated chat history, full transcripts, raw logs, full dashboards, or repo-root scope.
+1. Treat every spawned subagent as fresh: build the `Fresh Subagent Context Capsule` through `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`. The prompt receives selected fields, exact read-before-work sections, compact artifact paths, allowed / forbidden paths, expected output schema, validation route, and return contract. Keep full packets, raw stdout, raw logs, broad chat summaries, and full dashboards in local/tool context by path instead of pasting them into the prompt.
 1. For theorem-driven, algorithm, or implementation handoffs, include the
    capsule's `Target Binding Packet` before spawning: exact target theorem or
    behavior, public root / entrypoint and signature, return projection or call

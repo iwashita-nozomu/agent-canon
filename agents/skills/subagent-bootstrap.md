@@ -95,6 +95,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
+handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
 対象 surface は route seed として扱い、責務検索、再利用確認、stale surface scan、dependency expansion を通して handoff scope へ落とします。
@@ -108,7 +109,7 @@ read-only exploration に切る前に、その質問を所有する checker、ro
 repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切ります。user が coding / implementation / patch work を求めている場合、既定の説明は write-capable handoff first にします。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任を持ちます。bounded review、report traceability、checklist-style review gate は implementation slice と並行できる場合だけ mini review role TOML に切ります。
 実装 slice は Abstract Design Frame から導かれ、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `spark_worker` が runtime capacity または compatibility で起動できない場合は、同じ packet を `worker` に渡して実装 route を継続します。mini role の起動失敗は同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
-command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を含めます。
+command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は `agents/COMMUNICATION_PROTOCOL.md` の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
 command output の `STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit` を確認し、
 各 wave の handoff では `team_manifest.yaml` の
 `run.standard_wave_sequence` に沿って plan artifact、review gate decision、

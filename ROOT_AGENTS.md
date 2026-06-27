@@ -80,6 +80,28 @@ requires it. Hook, archive, or dashboard failures expand the task only when they
 block the selected edit, validation, or PR route; otherwise record a concrete
 deferral.
 
+## Context Construction
+
+Context construction is the primary runtime concern. Keep LLM-visible prompt
+context separate from local tool state and durable memory. Carry only the
+minimum instructions, request clauses, selected source-packet fields, exact file
+sections, and compact evidence needed for the next decision into the prompt.
+Keep raw search output, full dashboards, logs, long histories, and broad
+workflow packets in artifacts or memory notes, and pull them by exact path when
+needed.
+
+Treat AGENTS/root entrypoints as LLM-visible instruction context. Keep them
+routing-only and compact; detailed workflow, checker output, raw reports, and
+historical evidence stay in local/tool context. Do not expand root instructions
+to compensate for missing packet fields.
+
+Subagents are fresh per launch and do not inherit accumulated context. Every
+handoff must use the `Fresh Subagent Context Capsule` in
+`vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md`: objective,
+read-before-work, compact artifacts, allowed/do_not_read, expected output,
+validation route, and return contract. Do not hand off broad chat summaries or
+assume prior subagent context persists.
+
 ## Repository Discovery and Reading
 
 Start from repository structure, dependency headers, and the runtime owner map

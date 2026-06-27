@@ -36,6 +36,24 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 
 run 固有のやり取りは report bundle に残し、repo-wide の正本には持ち込みません。
 
+## Context Visibility Contract
+
+Context is classified before it is handed to an agent.
+
+- `llm_visible_context`: only the minimal instructions, request clauses,
+  selected source-packet fields, exact file sections, and compact evidence
+  needed for the next decision.
+- `local_tool_context`: files, dashboards, raw tool output, generated packets,
+  logs, and search results that remain available by path or tool call, but are
+  not pasted into prompts unless a selected excerpt is required.
+- `durable_memory`: stable repo policy, source packets, issues, reports, and
+  learned feedback stored in owner surfaces; do not rely on chat memory or
+  compaction as the only record.
+
+Handoffs pass paths plus selected excerpts by default. Raw artifacts stay
+local/tool context unless the packet explicitly promotes a bounded excerpt to
+`llm_visible_context`.
+
 ## Handoff Packet
 
 - `from`
@@ -78,11 +96,39 @@ the minimum evidence that repo investigation happened before implementation.
   reason dependency expansion is not applicable
 - `validation_route`: targeted checks and closeout gates derived from the
   packet
+- `llm_visible_context`: selected excerpts or compact evidence that must be in
+  the prompt for the next decision
+- `local_tool_context`: artifact paths, command outputs, raw logs, dashboards,
+  or search results intentionally kept out of the prompt
+- `durable_memory_refs`: stable policy, issue, report, source packet, or memory
+  references that survive chat compaction
 - `open_questions`: only items that cannot be resolved from repo evidence
 
 Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
+
+## Parent-Direct Context Note
+
+For explicit-path, one-file, single-abstraction, Routine docs, Focused code,
+typo/link/format-only, or other bounded parent-direct work, the full
+Pre-Edit Repository Investigation Packet can be replaced by a short
+Parent-Direct Context Note.
+
+The note records:
+
+- `owner`
+- `target_path`
+- `request_clause`
+- `reuse_basis`
+- `design_oop_boundary`
+- `validation_route`
+- `llm_visible_context`
+- `local_tool_context`
+- `durable_memory_refs`
+
+The note is still a context-construction artifact. Raw search hits, nearest
+editable files, and chat context alone are not enough.
 
 ## Fresh Subagent Context Capsule
 
