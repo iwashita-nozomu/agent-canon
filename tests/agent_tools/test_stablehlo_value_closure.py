@@ -1,4 +1,5 @@
 # @dependency-start
+# contract test
 # responsibility Tests scoped StableHLO SSA dependency closure tracing.
 # upstream implementation ../../tools/agent_tools/stablehlo_value_closure.py traces scoped value dependencies.
 # upstream design ../../documents/tools/stablehlo_value_closure.md defines the tool contract.
@@ -8,7 +9,6 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-import types
 from pathlib import Path
 from typing import Protocol, cast
 
