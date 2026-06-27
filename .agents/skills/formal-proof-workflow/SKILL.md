@@ -8,6 +8,7 @@ description: Use when natural-language mathematical claims, JIT-canonical implem
 contract skill
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
+upstream design ../../../agents/skills/lean-algorithm-design.md Lean-first pre-implementation algorithm design workflow
 upstream design ../../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration workflow
 upstream implementation ../../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments
 upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape
@@ -38,6 +39,9 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/formal-proof-workflow.md`.
 1. Read `agents/skills/literature-survey.md` before web or paper search.
+1. For pre-implementation algorithm design claims, use
+   `$lean-algorithm-design` first. Adopt its checked Lean design definitions and
+   theorem targets before connecting the design to production code.
 1. For algorithm-derived claims that require proof-path search, algorithm
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
@@ -85,10 +89,92 @@ Execute the required and task-matching conditional commands that the packet prin
    Do not adopt an unchecked theorem sketch, type-incompatible statement, local
    counterexample, or algorithm suggestion unless it is checked against the same
    public root and theorem surface.
-1. Treat the terminal goal as either proving the target claim or proving that
-   the target cannot be established from the current assumptions and
-   implementation path. `blocked`, `not_run`, and `unverified` are intermediate
-   states, not completion.
+1. Treat implementation-derived terminal goals as a required-check checklist
+   over the public-root theorem. Individual proof-row statuses such as
+   `verified`, `refuted`, `unprovable_under_assumptions`, or checked boundary
+   are check item states, not top-level completion branches. Close the Goal
+   only when every required item passes; otherwise keep the failed items in the
+   same Wave work queue and report `pass` / `fail` only for the checklist.
+   `blocked`, `not_run`, and `unverified` are intermediate states, not
+   completion.
+   For implementation-derived claims, the user-facing unit is `code path ->
+   theorem` plus the checklist state. An unconnected theorem graph edge,
+   `next_witness`, unexpanded generated equation, unconnected generated Lean
+   function, or repairable extractor gap is not an outcome. Keep it in the
+   same Wave as a failed or newly added check item until it is resolved or the
+   checker proves that this item is not on any route required by the target
+   theorem.
+   Before selecting a local witness, build a target-rooted frontier board for
+   the whole theorem: list every active route from the public-root conclusion to
+   its current leaves, classify each row as code-derived, Problem/config-derived,
+   backend-derived, library-derived, circular/projection-only, or actionable
+   frontier, and rank rows by expected impact on the final theorem. Work on a
+   small lemma only when the board shows it is on a highest-impact route or
+   unlocks multiple downstream routes. If a checked local bridge does not pass
+   a required checklist item or remove that item from all target routes, keep it
+   as intermediate evidence and continue to the next globally ranked frontier
+   before reporting.
+   A Wave must start from this board, not from the last edited theorem. Group
+   sibling frontiers by the route they serve, such as returned-value projection,
+   generated tolerance, backend decode, recurrence/ranking, or problem/config
+   witness. The minimum useful progress unit is one complete target route
+   segment or a batch of connected frontier nodes that moves the public-root
+   theorem to the next abstraction boundary. Do not spend a turn on a single
+   local bridge when another reachable frontier on the same target route remains
+   ready to prove, refute, prune as not-required for the selected theorem, or
+   reduce to a checked boundary. If only one node can move, record why every
+   sibling route is blocked, stale, profile-only, or outside the selected public
+   theorem before returning.
+   If the user asks what is missing, where the proof is disconnected, or why a
+   theorem cannot currently be proved, do not return an unconnected edge name,
+   helper lemma name, or "derive this later" statement as the terminal answer.
+   Add or use a required Goal checklist item for the same public-root theorem
+   and reduce that item to verified, refuted, unprovable under assumptions,
+   checked boundary, or pruned from every selected route. The explanation must
+   cite the checked item and its causal path to production code, algorithm
+   choice, Problem/config/solve input, or backend/runtime architecture boundary.
+   The board must also include the theorem-level objective classes, not only the
+   next local edge. For finite-stop / convergence tasks, keep separate rows for
+   the strongest checked sufficient route, the reverse / necessary direction,
+   circular projection candidates, implementation/extractor gaps, and possible
+   algorithm-change routes. Closing a sufficient route is not enough when the
+   user target asks for a necessary-and-sufficient condition or a checked
+   expressivity boundary; immediately continue to the reverse/boundary row and
+   either prove it, refute it, or reduce it to the exact public input,
+   implementation, or backend surface that prevents closure. A user-facing
+   update may summarize a local lemma only after the board-level milestone has
+   changed, such as "sufficient route verified and reverse classified by
+   checker-backed boundary", not merely "one bridge lemma added".
+   Treat the board as a precondition for proof search. Before invoking a tactic,
+   writing a bridge theorem, or accepting a subagent proof result, identify the
+   row and route segment that the step is meant to close. For finite-stop and
+   convergence work, the board rows are: sufficient route, reverse/necessary
+   route, circularity/projection-only route, implementation/extractor route,
+   backend semantics route, public Problem/config expressivity route, and
+   algorithm-change route. If a local theorem does not close its selected row
+   and a sibling frontier on that row is still reachable from the public-root
+   target, continue with that sibling in the same Wave before user-facing
+   reporting. A proof update must report a board-level status transition, not a
+   single theorem count.
+   For convergence and finite-stop targets, proof search begins with a
+   problem-level board pass, not a nearby unsolved lemma. The board pass must
+   identify the final theorem, all viable sufficient and reverse routes, the
+   public return projection consumed by each route, and the current terminal
+   leaf class for each route: code-derived, Problem/config-derived,
+   backend-derived, library-derived, circular/projection-only, algorithmic, or
+   actionable. Select a connected frontier batch for one row and keep re-entering
+   the batch until the row is terminal or checked-boundary. A local theorem that
+   merely advances one edge is internal evidence; it cannot be the user-facing
+   outcome while another sibling edge on the same row remains actionable.
+   Before any user-facing return, require an independent state inspection pass
+   by a read-only subagent or checker tool. Pass the target theorem, public
+   root/signature, return projection, theorem graph board, proof-status table,
+   generated evidence, exit-gate criteria, and current user target. The
+   inspector checks classification only: sufficient-route fragments are not
+   reported as Goal completion, theorem-critical values are not free witnesses,
+   and open frontiers are not mislabeled as checked boundaries. Parent must
+   integrate every finding, regenerate/recheck affected artifacts, and rerun the
+   exit gate before responding.
 1. For algorithm-derived claims, consume the
    `$algorithm-proof-exploration` artifact when available. If it does not
    exist yet, lower the public root into the matching implementation evidence
@@ -215,6 +301,23 @@ Execute the required and task-matching conditional commands that the packet prin
    prove/refute them from generated Lean evidence, checker-facing Lean functions,
    and IR/source facts, then rerun the proof of `P`. A flat candidate inventory
    is only input to this loop, not the proof workflow outcome.
+   Keep at least one alternative route open while the selected route is being
+   reduced. For each iteration, record the current best route, the strongest
+   alternate route, and the reason the chosen frontier has higher global impact
+   than the alternate. This prevents the workflow from overfitting to the first
+   local lemma exposed by `aesop?` or a theorem graph checker.
+   After any local lemma, bridge, or generated-equation proof is checked,
+   immediately rerun the same public-root theorem/profile frontier search before
+   returning or handing off. The next action is selected from the recomputed
+   whole-theorem frontier board, not from the fact that the last local edit
+   succeeded.
+   When the recomputed board still has actionable nodes in the same route
+   segment, select a connected batch rather than another one-off lemma. The
+   batch must include all reachable sibling nodes that share the same missing
+   mechanism, such as generated tolerance decomposition, backend decode,
+   recurrence/ranking, or public Problem/config witness. Report only after the
+   batch changes the row status to verified, refuted,
+   unprovable-under-assumptions, or checked boundary.
    Treat the theorem graph as a directed proposition graph:
    proposition nodes point to the propositions they consume.  For
    implementation-derived proofs, every terminal leaf on the target chain must
@@ -225,6 +328,13 @@ Execute the required and task-matching conditional commands that the packet prin
    code-aligned proof. If a leaf is free prose, an unrooted helper theorem, or a
    proof-only assumption, remove that path or reconnect it to code/argument/
    backend evidence.
+   Leaf-origin checks are not enough for completion: also configure and run a
+   forbidden-reachability check from each target theorem/profile so any
+   reachable `open_frontier`, `frontier`, `unverified`, or equivalent
+   graph-status node is reported directly even when another branch reaches an
+   allowed terminal leaf. Treat those reachable frontier findings as the active
+   Wave worklist until they are verified, refuted, proved
+   `unprovable_under_assumptions`, or reduced to a smaller checked boundary.
    Classify definition-only proof routes before adopting them. If a candidate
    "necessary and sufficient condition" closes by `Iff.rfl`, pure `rfl`, or only
    unfolding the target predicate into the same stop/reachability predicate,
@@ -280,6 +390,17 @@ Execute the required and task-matching conditional commands that the packet prin
    gap is checked as a production code / algorithm issue, a top-level
    `Problem` / config / solve-input issue, or a backend/runtime architecture
    boundary that the current repository and tools cannot advance.
+   For implementation-derived proof tasks, the user-facing unit is always
+   `code path -> theorem`. Do not return a missing auxiliary theorem, bridge
+   lemma, witness name, or "this lemma is needed" list as the terminal result.
+   If the needed theorem follows from the current code path and public inputs,
+   prove it and connect it in the graph in the same run. If it does not, return
+   the checked causal implementation problem instead: the exact production code
+   mechanism, extractor gap, generated Lean function gap, theorem-graph wiring
+   issue, `Problem` / config input condition, or backend boundary that prevents
+   the target theorem from closing. A proposed additional theorem is only an
+   intermediate witness for locating that implementation problem, not the final
+   answer.
 1. Keep runtime `Info` for runtime diagnostics, convergence checks, and logs
    only. Do not add proof-only witness fields to `Info`. Values needed by a
    proof should be reconstructed by the proof extractor or theorem graph from
@@ -309,6 +430,12 @@ Execute the required and task-matching conditional commands that the packet prin
    algorithm's public problem/input object and configuration object;
    implementation trace and backend/runtime semantics are architecture
    assumptions, not problem assumptions.
+   For finite-stop, convergence, residual-bound, or certificate-soundness
+   targets, any accepted problem/config condition must be quantitative and
+   non-circular over the public `Problem` and `InitializeConfig` members, or be
+   proved as a projection from those members plus generated implementation /
+   backend semantics. A locally solved witness over an unconstrained `State_k`,
+   helper residual, or path variable is not an accepted top-level condition.
    For optimization problems, "differentiable" refers to the target `Problem`
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
@@ -374,6 +501,19 @@ Execute the required and task-matching conditional commands that the packet prin
    `unprovable_under_assumptions`, or `unverified_with_next_witness`.
    Bare `unverified` may describe a raw generated node or unchecked generated file, but it is not a
    completed frontier outcome.
+   Frontier choice must be global, not merely adjacent to the last edit. Before
+   proving the next row, recompute the target-rooted frontier board and prefer a
+   row that either closes a full route to the public theorem, removes a
+   circular/projection-only dependency, or converts a broad actionable frontier
+   into a checked code/input/backend/algorithm boundary. A row that only
+   improves an already-sufficient side route is deprioritized unless it is
+   required by the selected public theorem/profile.
+   Treat profile-only and obsolete branches as graph-maintenance work before
+   local proof work: if a branch is no longer consumed by the selected public
+   theorem, update the graph status/edges so it does not appear as an actionable
+   frontier, and prove or cite the selected theorem route that bypasses it.
+   This pruning is not proof progress by itself; it is allowed only when paired
+   with a recomputed frontier board and the next selected route.
 1. For every unverified frontier node, try these routes in order:
    (a) prove the exact implementation algebra or existing algorithm-output
    projection;
@@ -412,15 +552,21 @@ Execute the required and task-matching conditional commands that the packet prin
    node that is supposed to be the independent `Problem` / config condition.
 1. Recursively re-enter the frontier loop on every named
    `unverified_with_next_witness` item until it is verified, refuted, proved
-   unprovable under the current assumptions, or explicitly remains open with a
-   smaller named witness. Do not close out a proof note with an open frontier
-   row whose remaining obligation is empty or only says "unverified".
+   unprovable under the current assumptions, represented as a failed Goal
+   checklist item, or pruned from every selected target route. Do not close out
+   a proof note with an open frontier row whose remaining obligation is empty,
+   only says "unverified", or merely names a smaller witness that can still be
+   re-entered.
    If the smaller named witness is a function-level guarantee whose absence is
    the stated reason a caller-side lemma or target theorem edge is open, do not
    return it to the user. Continue recursively until that function guarantee is
    verified, refuted, proved unprovable under the current assumptions, or
    reduced to an explicit external boundary that no available repository/code/
    tool action can advance.
+   A smaller named witness is the next in-turn work item only; it is not a
+   handoff, completion state, or user-facing boundary for the public-root
+   theorem until the recomputed whole-theorem frontier board shows no actionable
+   sibling frontier remains.
    If the named witness points to a callee function, do not return the function
    name as a blocker. Expand that callee's implementation-derived input/output
    relation, return binding, loop-exit condition, stopping predicate,
@@ -434,6 +580,17 @@ Execute the required and task-matching conditional commands that the packet prin
    `refuted`, `unprovable_under_assumptions`, or be replaced by a strictly
    smaller named frontier witness that is immediately re-entered into the same
    loop.
+   A multi-agent Wave is this same loop executed with adaptive delegation:
+   integrate each wave result, rerun the theorem graph / proof-search checker,
+   turn remaining actionable frontier rows into the next bounded handoff queue,
+   and spawn fresh follow-up agents as needed. Do not treat a fixed one-shot
+   fan-out as Wave completion while the frontier can still be advanced by
+   repository, code, proof-tool, or graph-overlay work.
+   A Wave closeout must include the before/after board counts grouped by route,
+   the selected route segment advanced, and the next highest-impact remaining
+   route. If the before/after difference is only one small local lemma, continue
+   the loop unless that lemma closes the selected route or the board proves no
+   adjacent frontier can be advanced in-repo.
 1. "No proof path works" means no path under the current Algorithm Expansion
    IR, assumption ledger, and adopted generated backend trace coverage gaps. Support that claim with
    a checker-backed countermodel, independence result, or obligation-gap model;
@@ -443,32 +600,125 @@ Execute the required and task-matching conditional commands that the packet prin
    implement the capture/checker/proof-note update before returning progress to
    the user. Return only when the witness genuinely depends on user-owned
    external runs, unavailable tools/authority, or a deliberate external
-   semantics axiom; classify that boundary explicitly as `external_assumption`
-   or with a strictly smaller `next_witness`.
+   semantics axiom; classify that boundary explicitly as a failed or diagnostic
+   Goal checklist item. A smaller named witness is still an in-turn work item
+   unless it is represented in that checklist or pruned from the target route.
 1. If the next lemma, bridge, connection, or witness needed by the target chain
    is already known, do not report it as future work. Generate it, propositionize
    it, run the checker, and update the proof-status artifact in the same turn.
    Only return when that witness is verified, refuted, proved unprovable under
    the current top-level inputs, or reduced to a strictly smaller checked
    frontier that cannot be derived from local code/tool/library evidence.
-1. Before returning user-facing progress, finish every currently selected
-   component proof attempt to a terminal or smaller-frontier state. Each
-   component must be `verified`, `refuted`, `unprovable_under_assumptions`, or
-   `unverified_with_next_witness` with a strictly smaller named witness; do not
-   return after only unchecked generated files or a bare list of unproved
-   items.
-1. If the target claim is not terminal when reporting to the user, return a
-   nonterminal proof packet, not a thin "unproved" summary. Include: exact
-   target claim, current outcome, strongest checked fragments with checker
-   commands, failed/rejected routes, remaining named witnesses, witness owner
-   (`problem_class`, `implementation`, `backend`, `formal_library`, or
-   `algorithm_exploration`), evidence paths, and exact next action. For
-   `refuted`, include the counterexample/model/trace; for
+1. If the frontier exposes a repairable mismatch or gap in production code
+   shape, JIT / StableHLO / LLVM extraction, IR-to-Lean generation, theorem graph
+   wiring, proof-status overlays, or the proof note, treat the finding as a
+   repair-and-rerun work item rather than as a user-facing blocker. Make the
+   smallest responsibility-preserving repair, regenerate the affected JIT,
+   backend, Lean, theorem-graph, and proof-search artifacts, then re-run the same
+   public-root target theorem or theorem profile. You may return only after at least one repair and
+   rerun attempt shows that the remaining frontier is terminal or belongs to a
+   top-level input, backend/runtime boundary, or algorithmic choice. Do not add
+   proof-only fields, diagnostic gates, or runtime proof checks to production
+   code to satisfy this rule.
+   Repeat this repair-and-rerun cycle, not just the analysis, while the next
+   frontier is actionable from repository code, extraction, generated Lean,
+   theorem graph, proof overlay, local proof libraries, or existing checker
+   output. The Wave parent owns the loop: integrate each subagent result,
+   apply or reject concrete repairs, regenerate artifacts, rerun the exact
+   checker route for the same public theorem, and only then decide whether the
+   new frontier is terminal. A `next_witness`, unexpanded generated equation,
+   missing connection, or stale graph edge is never a final answer when the
+   repository can still be changed or regenerated to test it.
+1. Before returning user-facing progress for an implementation-derived Goal,
+   run the Goal checklist. Each selected component proof attempt must either
+   pass its required item, be pruned from every target route, or remain in the
+   same Wave work queue. A strictly smaller named witness is an in-turn work
+   item, not user-facing progress; do not return after only unchecked generated
+   files or a bare list of unproved items.
+1. For implementation-derived claims, every theorem-critical value consumed by
+   the target theorem must be generated from the public root inputs and code
+   path, not supplied as a free witness. KKT components, residual components,
+   stopping tolerance, solver returns, multiplier floors, back-substitution
+   gains, backend decode errors, and upper-bound budgets must have a generated
+   function/projection lemma or a same-public-input uniqueness theorem. A
+   `Nonempty ... values` witness, unconstrained record, or standalone theorem
+   variable is not enough to close the route. If the generated layer cannot
+   provide that binding, classify the issue as extractor/projection/generated
+   Lean/theorem-graph wiring work and repair it before returning.
+1. If the target claim is not closed and the user explicitly asks for interim
+   status, return a checklist packet, not a thin "unproved" summary and not a
+   list of missing helper lemmas. Include: exact target claim, checklist
+   `pass` / `fail`, failed required items, strongest checked fragments with
+   checker commands, failed/rejected routes, boundary class when relevant
+   (`code_shape`, `extractor`, `generated_lean`, `theorem_graph_wiring`,
+   `problem_config_input`, `backend_runtime`, `formal_library`, or
+   `algorithm_choice`), boundary cause, evidence paths, and resume condition.
+   For `refuted`, include the counterexample/model/trace; for
    `unprovable_under_assumptions`, include the witness/model showing current
-   assumptions do not entail the target.
+   assumptions do not entail the row. A named next theorem, bridge, or witness
+   is an in-turn work item unless it is represented as a failed checklist item
+   or pruned from all target routes.
+   Accept a nonterminal checklist packet only as a work item for the same
+   public-root theorem.
+   Forbidden implementation-derived return: "Need theorem X." Accepted boundary
+   return: "`Boundary class=generated_lean`; generated Lean leaves
+   `<source>::<function>` return unconstrained; the public-root theorem consumes
+   that value in `<target edge>`; graph checks show no smaller code-derived
+   equation is available; resume by repairing that extractor edge and rerunning
+   the same theorem."
+1. Enforce the workflow return contract as a hard gate. A user-facing
+   `status=complete` is legal only when the selected public-root Goal checklist
+   passes and the selected theorem graph has no reachable actionable frontier
+   for that theorem. A user-facing `status=interim_status` is legal only when
+   the user explicitly asks for status or current tool/runtime/authority
+   prevents further work now; it must be labeled non-completion and include the
+   failed required check items and exact next automated action. If the selected
+   target reaches `open_frontier`,
+   `unverified`, `unverified_with_next_witness`, `connection_unconnected`,
+   stale generated evidence, a failing proof target that can be repaired
+   locally, or any generated Lean / extractor / theorem-graph mismatch, do not
+   return to the user. Repair, regenerate, recheck, or launch the next bounded
+   Wave. A proof note, theorem-graph report, generated Lean file, or Wave
+   summary with open frontier is evidence, not a workflow return value.
+1. Run an exit gate immediately before any user-facing return. It must verify
+   all of the following:
+   (a) the selected public-root theorem/profile is explicit;
+   (b) every target-chain reachable row is represented by a required checklist
+   item that passes, fails, or is pruned from the selected target route;
+   (c) no reachable row remains as bare `unverified`,
+   `unverified_with_next_witness`, `connection_unconnected`,
+   `guarantee_unconnected`, stale generated evidence, or local-repairable
+   extractor / generated Lean / theorem-graph mismatch;
+   (d) leaf-origin and forbidden-reachability checks agree that no actionable
+   frontier remains outside the failed checklist items;
+   (e) interim returns include boundary class when relevant, causal path,
+   evidence paths, and resume condition;
+   (f) interim status is used only when the user explicitly asks for status or
+   current tool/runtime/authority prevents further work now;
+   (g) theorem-critical return values are fixed by generated functions,
+   projection lemmas, or uniqueness theorems from public inputs and the
+   implementation path, not by free witnesses;
+   (h) independent state inspection has run and every finding has been
+   integrated; and
+   (i) if the user target asks for finite stop, convergence, Goal completion, or
+   necessary/sufficient conditions, a verified sufficient route alone is not
+   reported as `complete`. If the exit gate
+   fails, do not return; re-enter the remaining frontier as the same Wave's
+   work queue.
 1. Use a writing skill when producing reader-facing proof text: `$academic-writing` for symbol-dense proof notes, `$long-form-writing` for long guide/note form, and `$report-writing` for checker-evidence or audit summaries.
 1. Keep each proof topic's theorem target, assumptions, checked fragments, and remaining gaps in one canonical proof note whenever possible; implementation code-path explanation may live in Design docs, but the proof note must link that Design entry and the mathematical proof text must not be split across competing truth surfaces.
-1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
+1. Require a proof status table in every reader-facing proof note, with
+   claim/theorem, implementation surface,
+   `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`,
+   checker evidence, and remaining obligation columns; do not hide proof status
+   in prose. For implementation-derived proof tasks, remaining-obligation cells
+   are internal frontier cells. Before any user-facing progress claim, either
+   re-enter each named witness in the same Wave or add the exact code / input /
+   backend / algorithm boundary as a failed or diagnostic Goal checklist item.
+   A row whose remaining obligation is an unconnected graph edge, missing
+   generated Lean value, generated equation not consumed by the proof graph, or
+   callee guarantee not expanded is not a final row. Expand, repair,
+   regenerate, or reduce it to a checked boundary before returning.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
@@ -620,7 +870,8 @@ algorithm theorem.
    row must state whether the next step is mathematical proof, implementation
    return-value projection, backend evidence binding, or theorem narrowing.
    Do not close out while a frontier row still has bare `unverified` as its
-   only outcome.
+   only outcome, and do not return an open row user-facing unless it is recorded
+   as a failed Goal checklist item or pruned from every selected target route.
 
 ## Initialize-Rooted Proof Expansion
 

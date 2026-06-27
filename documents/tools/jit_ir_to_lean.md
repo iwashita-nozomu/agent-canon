@@ -45,6 +45,18 @@ module and a fuelled Lean operational evaluator:
 - `stepOperational`, a small-step function over generated frames and ops;
 - `runOperationalFuel`, a fuelled evaluator for the generated operational
   program;
+- `StablehloValueState`, `StablehloValueSemantics`, `stepStablehloValue`, and
+  `runStablehloValueFuel`, a value-level recurrence over the same generated
+  function / region / operation graph. The value type is a parameter `α`, so
+  proof themes can instantiate it with real values, rounded-float models, or
+  symbolic terms;
+- `StablehloInputLeaves` and `generatedMainStablehloValueFromLeaves`, connecting
+  public StableHLO argument leaves to the generated value recurrence without
+  injecting theorem-specific values into production code;
+- `SourceValueProblem α`, `sourceValueStablehloInputLeaves`, and
+  `sourceProblemProjectionFromValueProblem`, connecting value-carrying public
+  problem members to the generated StableHLO value recurrence while preserving
+  the separate source-return projection surface;
 - `generatedMainInitialState`, `generatedMainFuel`, and
   `generatedMainSymbolicFuel`, tying the generated entry function to the
   fuelled evaluator;
@@ -59,8 +71,42 @@ module and a fuelled Lean operational evaluator:
 This output is enough to prove that a specific JIT root lowered to a specific
 StableHLO evidence packet, that the generated operational program has no
 unassigned operation rows or unresolved call targets, and that the generated
-function/region/op graph is available as a Lean function parameterized by
-primitive semantics.
+function/region/op graph is available as Lean functions parameterized by
+primitive semantics. The value-level recurrence is generated from StableHLO /
+MLIR SSA rows (`resultNames`, `operandNames`, functions, regions, and expansion
+edges); theorem files choose the semantic model for primitives instead of
+hard-coding algorithm-specific formulas in the generator.
+
+## StableHLO Value Recurrence Boundary
+
+The generated StableHLO value recurrence follows the StableHLO / MLIR
+operational shape and deliberately stops before theorem-specific mathematics:
+
+- function bodies, `while` cond/body regions, `case` branches, calls, returns,
+  and primitive rows are replayed from `OperationalProgram`;
+- primitive values are produced by `StablehloValueSemantics.evalPrimitive`;
+- dynamic control-flow branch selection is supplied by
+  `StablehloValueSemantics.selectWhileBody` and
+  `StablehloValueSemantics.selectCaseBranch`;
+- input leaves are passed through `StablehloInputLeaves`, whose binding names
+  must match the public StableHLO argument leaves;
+- value-carrying public problem leaves can be converted by
+  `sourceValueStablehloInputLeaves`, so theorem routes do not need arbitrary
+  theorem-local input leaf witnesses;
+- return values come from the generated `return` operand list, not from a
+  hand-written theorem path.
+
+The generator may parse MLIR SSA syntax (`%name = ...` and `return %x, ...`) and
+the StableHLO control-region structure because those are implementation syntax
+preserved in the compiler IR. It must not add domain labels such as KKT
+regularity, direction quality, residual decrease, certificate soundness, or
+problem-class assumptions. Those are theorem-graph claims over the generated
+functions.
+
+Reference specifications used by this boundary:
+
+- StableHLO specification: https://openxla.org/stablehlo/spec
+- LLVM Language Reference: https://llvm.org/docs/LangRef.html
 
 If the input JSON omits `backend_trace`, the generated Lean module is HLO-only:
 it does not emit backend, IREE, or LLVM structures and
@@ -113,10 +159,11 @@ without changing the generated control-flow or instruction-order function.
 
 ## Boundary
 
-The command does not currently emit:
+The command does not emit:
 
 - concrete semantics for `stablehlo.add`, `stablehlo.reduce`, tensor memory, or
-  other numeric primitives;
+  other numeric primitives. It emits the recurrence and a semantic hook for
+  them;
 - a concrete LLVM memory model or floating-point rounding model;
 - theorem-specific claims such as progress, regularity, direction quality,
   certificate soundness, or termination.
@@ -127,30 +174,40 @@ reproduction of the JIT-lowered implementation shape and its fuelled
 function/region/op composition. If backend trace data is present, the generated
 LLVM runtime functions replay backend instruction rows as Lean functions.
 Concrete numeric primitive semantics and theorem-specific mathematical claims
-remain separate proof-graph work.
+remain separate proof-graph work. Backend traces and LLVM instruction replay
+provide the implementation witness for floating-point execution; they are not
+used to rewrite the StableHLO recurrence itself.
 
-For source-level public roots, the generated module must not hide shallow
-projection as value expansion. The generator constructs source return
-structures from the JIT public StableHLO return leaves and emits
-`sourceInitialize`, `sourceAlgorithmRun`, `sourceResidualWithinTolerance`, and
-`sourceMain` as Lean definitions. The coverage theorem records public return
-projection separately from value-level expansion:
+For source-level public roots, the generated module separates public return
+projection from value-level StableHLO execution. The generator constructs source
+return structures from the JIT public StableHLO return leaves and emits
+`sourceInitialize`, `sourceAlgorithmRun`, `sourceResidualOperandPathMatches`, and
+`sourceMain` as Lean definitions. It also emits a value-level source run backed
+by `generatedMainStablehloValueFromLeaves`, so proof themes can connect public
+problem values to the generated recurrence without hand-written execution
+adapters. The coverage theorem records both layers:
 
 ```lean
-sourceMainProjectionExpanded = true
-sourceMainValueExpanded = false
+sourceMainProjectionCoverageClosed = true
+sourceMainValueProjectionCoverageClosed = true
 ```
 
-`sourceMainProjectionExpanded = true` means the public root, public argument
+`sourceMainProjectionCoverageClosed = true` means the public root, public argument
 tree, return roots, return leaves, and source call shape are represented.
-`sourceMainValueExpanded = false` means the generated source layer is still a
-return-leaf projection layer, not a decoded numeric semantics layer. Proof
-themes may consume those definitions as projection evidence, but theorem
-specific numerical claims must be supplied by generated operational evaluators,
-backend witnesses, or problem/config-derived mathematical lemmas.
+`sourceMainValueProjectionCoverageClosed = true` means the generator emitted a value-carrying
+route from public problem values to the generated StableHLO recurrence. The
+source return projection is still not itself decoded numeric execution; numeric
+proofs should use the value-level route and explicitly supply or derive the
+primitive semantics needed by the theorem graph.
+For roots with public problem tensor leaves, the generator also emits
+`SourceValueProblem α` and `sourceValueStablehloInputLeaves`. Formal proof
+routes that need numeric conditions over `Problem` members should use that
+value-carrying adapter, then project back to the source-return surface with
+`sourceProblemProjectionFromValueProblem` when a public-return theorem is stated
+over `sourceMain`.
 Visible public-input configuration leaves are also emitted as structured source
 types when they are part of the root data flow. For PDIPM-style roots this
-includes `InitializeConfig.kkt_default_solve_config`: the generated
-`SourceKktSolveConfig` records the public leaves that the implementation
-passes into `SolveConfig.kkt_solve`, instead of leaving the KKT solve config as
+includes `InitializeConfig.default_stopping_config`: the generated
+`SourceStoppingSolveConfig` records the public stopping leaves that the proof
+root projects into `SolveConfig.stopping`, instead of leaving solve policy as
 an opaque proof-only value.

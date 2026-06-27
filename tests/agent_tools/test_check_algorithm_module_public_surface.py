@@ -107,6 +107,25 @@ class AlgorithmModulePublicSurfaceTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("extra_all:solve", result.stdout)
 
+    def test_status_constants_are_allowed(self) -> None:
+        """Bounded status constants are part of the ``Answer.status`` vocabulary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "pdipm.py"
+            source.write_text(
+                STANDARD_MODULE_SOURCE.replace(
+                    '    "initialize",\n]',
+                    '    "initialize",\n    "STATUS_LOCAL_OPTIMAL",\n]',
+                )
+                + "\nSTATUS_LOCAL_OPTIMAL = 1\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("ALGORITHM_PUBLIC_SURFACE=pass", result.stdout)
+
     def test_extra_public_definition_fails(self) -> None:
         """A top-level public helper definition is rejected even outside ``__all__``."""
         with tempfile.TemporaryDirectory() as tmp_dir:

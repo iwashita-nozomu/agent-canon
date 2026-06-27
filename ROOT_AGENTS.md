@@ -79,6 +79,18 @@ semantic-index/local-llm search, and dependency review artifacts.
 - Template-default environment and runtime guidance lives in `docker/`.
 - Repo-wide durable contracts live in `documents/`.
 
+## Implementation Discipline
+
+- Keep production implementations aligned with the active design contract. If a
+  change would deviate from that contract, update the design contract first or
+  report the blocker.
+- Keep algorithm branches, solver choices, tolerances, diagnostics, and runtime
+  paths part of the product contract rather than adding test-only or
+  experiment-only production behavior.
+- When a quick experiment is needed, keep it outside the production code path
+  and label it as experimental evidence. Production code must reflect the
+  approved design, not a temporary workaround.
+
 ## Shared Canon Flow
 
 AgentCanon source changes are made in `vendor/agent-canon/`, reviewed through

@@ -69,6 +69,14 @@ fn usage() -> String {
     "usage: agent-canon jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> [--module-name name] --out <path>".to_string()
 }
 
+fn lean_bool(value: bool) -> &'static str {
+    if value {
+        "true"
+    } else {
+        "false"
+    }
+}
+
 fn run_checked(args: Args) -> Result<(), String> {
     let input = fs::read_to_string(&args.jit_ir)
         .map_err(|error| format!("cannot read {}: {error}", args.jit_ir.display()))?;
@@ -181,7 +189,9 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  textSha256 : String".to_string(),
         "  resultNames : List String".to_string(),
         "  operandNames : List String".to_string(),
+        "  tensorTypes : List String".to_string(),
         "  dtypes : List String".to_string(),
+        "  resultElementCount : Nat".to_string(),
         "  functionName : String".to_string(),
         "  regionId : String".to_string(),
         "  parentOpId : String".to_string(),
@@ -192,6 +202,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
         "  functionId : String".to_string(),
         "  name : String".to_string(),
         "  signature : String".to_string(),
+        "  argumentNames : List String".to_string(),
         "  lineStart : Nat".to_string(),
         "  lineEnd : Nat".to_string(),
         "  bodyRegionId : String".to_string(),
@@ -447,8 +458,10 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
             let operand_names = operation_operand_names(text, &result_names);
             let result_values: Vec<Value> = result_names.into_iter().map(Value::String).collect();
             let operand_values: Vec<Value> = operand_names.into_iter().map(Value::String).collect();
+            let tensor_types = op.get("tensor_types").and_then(Value::as_array);
+            let result_element_count = result_element_count(tensor_types);
             lines.push(format!(
-                "    {{ opId := {}, kind := {}, opcode := {}, line := {}, text := {}, textSha256 := {}, resultNames := {}, operandNames := {}, dtypes := {}, functionName := {}, regionId := {}, parentOpId := {}, callTarget := {} }}{}",
+                "    {{ opId := {}, kind := {}, opcode := {}, line := {}, text := {}, textSha256 := {}, resultNames := {}, operandNames := {}, tensorTypes := {}, dtypes := {}, resultElementCount := {}, functionName := {}, regionId := {}, parentOpId := {}, callTarget := {} }}{}",
                 lean_string(value_field(op, "op_id")),
                 lean_string(value_field(op, "kind")),
                 lean_string(value_field(op, "opcode")),
@@ -457,7 +470,9 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
                 lean_string(value_field(op, "text_sha256")),
                 render_inline_string_list(Some(&result_values)),
                 render_inline_string_list(Some(&operand_values)),
+                render_inline_string_list(tensor_types),
                 render_inline_string_list(op.get("dtypes").and_then(Value::as_array)),
+                result_element_count,
                 lean_string(value_field(op, "function")),
                 lean_string(value_field(op, "region_id")),
                 lean_string(value_field(op, "parent_op_id")),
@@ -488,6 +503,8 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
     lines.push(render_operational_coverage(coverage));
     lines.push(String::new());
     lines.extend(render_operational_evaluator());
+    lines.push(String::new());
+    lines.extend(render_stablehlo_value_evaluator());
     lines.push(String::new());
     lines.push("def publicArgumentRoots : List PublicRoot :=".to_string());
     lines.push(render_public_roots(
@@ -682,7 +699,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
             source_root,
             Some(public_interface),
             Some(operational),
-        ));
+        )?);
         lines.push(String::new());
     }
     lines.push("noncomputable def generatedFunction : JitCanonicalFunction :=".to_string());
@@ -759,7 +776,7 @@ fn render_lean(args: &Args, value: &Value) -> Result<String, String> {
     ));
     lines.push("  rfl".to_string());
     lines.push(String::new());
-    lines.push("theorem generated_function_lowering_coverage_verified :".to_string());
+    lines.push("theorem generated_function_lowering_coverage_closed :".to_string());
     lines.push("    generatedFunction.program.opCount = generatedFunction.ops.length".to_string());
     lines.push(
         "      ∧ generatedFunction.program.regionCount = operationalRegions.length".to_string(),
@@ -928,6 +945,152 @@ fn pattern_nat(pattern: Option<&serde_json::Map<String, Value>>, path: &[&str]) 
         .unwrap_or(0)
 }
 
+fn public_interface_has_initialize_prefix(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    prefix: &str,
+) -> bool {
+    public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array)
+        .is_some_and(|leaves| {
+            leaves.iter().any(|leaf| {
+                value_field(leaf, "root_name") == "initialize_config"
+                    && value_field(leaf, "local_path").starts_with(prefix)
+            })
+        })
+}
+
+#[derive(Debug)]
+struct SourceResidualStopPath {
+    residual_leaf_literal: String,
+    returned_residual_operand: String,
+    stopping_residual_operand: String,
+    tolerance_operand: String,
+    compare_operand: String,
+    compare_op_id: String,
+}
+
+fn infer_source_residual_stop_path(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+    operational: Option<&serde_json::Map<String, Value>>,
+    return_operands: &[String],
+) -> Result<SourceResidualStopPath, String> {
+    let stable_leaves = nested_array(public_interface, &["stablehlo_entry", "return_leaves"])
+        .ok_or_else(|| "missing public_interface.stablehlo_entry.return_leaves".to_string())?;
+    let residual_matches: Vec<(usize, &Value)> = stable_leaves
+        .iter()
+        .enumerate()
+        .filter(|(_index, leaf)| value_field(leaf, "result_info").ends_with("ipm_res_final"))
+        .collect();
+    if residual_matches.len() != 1 {
+        return Err(format!(
+            "expected exactly one StableHLO return leaf ending in ipm_res_final, got {}",
+            residual_matches.len()
+        ));
+    }
+    let (residual_index, residual_leaf) = residual_matches[0];
+    let returned_residual_operand = return_operands
+        .get(residual_index)
+        .filter(|operand| !operand.is_empty())
+        .cloned()
+        .ok_or_else(|| {
+            format!("missing return operand for StableHLO residual leaf index {residual_index}")
+        })?;
+    let ops = operational
+        .and_then(|object| object.get("ops"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| "missing operational_ir.ops array".to_string())?;
+    let mut compare_matches: Vec<(String, String, String, String)> = Vec::new();
+    for op in ops {
+        if value_field(op, "opcode") != "stablehlo.compare" {
+            continue;
+        }
+        let text = value_field(op, "text");
+        if !text.contains("stablehlo.compare LE,") {
+            continue;
+        }
+        let result_names = operation_result_names(text);
+        let operand_names = operation_operand_names(text, &result_names);
+        let compare_operand = result_names.first().cloned().unwrap_or_default();
+        let residual_operand = operand_names.first().cloned().unwrap_or_default();
+        let tolerance_operand = operand_names.get(1).cloned().unwrap_or_default();
+        if compare_operand.is_empty() || residual_operand.is_empty() || tolerance_operand.is_empty()
+        {
+            return Err(format!(
+                "malformed StableHLO compare LE while searching residual stop path: {text}"
+            ));
+        }
+        compare_matches.push((
+            value_field(op, "op_id").to_string(),
+            compare_operand,
+            residual_operand,
+            tolerance_operand,
+        ));
+    }
+    if compare_matches.is_empty() {
+        return Err(
+            "expected at least one StableHLO compare LE for the residual stop path, got 0"
+                .to_string(),
+        );
+    }
+    let (compare_op_id, compare_operand, stopping_residual_operand, tolerance_operand) =
+        compare_matches.remove(0);
+    Ok(SourceResidualStopPath {
+        residual_leaf_literal: render_stablehlo_public_leaf_literal(
+            residual_index,
+            residual_leaf,
+            true,
+        ),
+        returned_residual_operand,
+        stopping_residual_operand,
+        tolerance_operand,
+        compare_operand,
+        compare_op_id,
+    })
+}
+
+fn render_source_residual_stop_path(path: &SourceResidualStopPath) -> Vec<String> {
+    vec![
+        "def sourceStoppingResidualReturnLeaf : StablehloPublicLeaf :=".to_string(),
+        format!("  {}", path.residual_leaf_literal),
+        String::new(),
+        "def sourceStoppingReturnedResidualOperandName : String :=".to_string(),
+        format!("  {}", lean_string(&path.returned_residual_operand)),
+        String::new(),
+        "def sourceStoppingResidualOperandName : String :=".to_string(),
+        format!("  {}", lean_string(&path.stopping_residual_operand)),
+        String::new(),
+        "def sourceStoppingToleranceOperandName : String :=".to_string(),
+        format!("  {}", lean_string(&path.tolerance_operand)),
+        String::new(),
+        "def sourceStoppingCompareOperandName : String :=".to_string(),
+        format!("  {}", lean_string(&path.compare_operand)),
+        String::new(),
+        "def sourceStoppingCompareOpId : String :=".to_string(),
+        format!("  {}", lean_string(&path.compare_op_id)),
+        String::new(),
+        "theorem sourceStoppingCompare_operational_binding :".to_string(),
+        "    sourceStoppingCompareOperandName = sourceStoppingSolveConfig.residualCompareOperand ∧".to_string(),
+        "      sourceStoppingResidualOperandName = sourceStoppingSolveConfig.residualOperand ∧".to_string(),
+        "      sourceStoppingToleranceOperandName = sourceStoppingSolveConfig.toleranceOperand := by".to_string(),
+        "  constructor".to_string(),
+        "  · rfl".to_string(),
+        "  · constructor".to_string(),
+        "    · rfl".to_string(),
+        "    · rfl".to_string(),
+        String::new(),
+    ]
+}
+
+fn source_pattern_projects_initialize_default_stopping(
+    pattern: Option<&serde_json::Map<String, Value>>,
+) -> bool {
+    pattern_string(
+        pattern,
+        &["algorithm_call", "solve_config", "keywords", "stopping"],
+    ) == "initialize_config.default_stopping_config"
+}
+
 fn render_source_root(value: Option<&serde_json::Map<String, Value>>) -> String {
     let pattern = source_pattern(value)
         .and_then(|object| object.get("pattern"))
@@ -950,15 +1113,41 @@ fn render_source_main_embedding(
     value: Option<&serde_json::Map<String, Value>>,
     public_interface: Option<&serde_json::Map<String, Value>>,
     operational: Option<&serde_json::Map<String, Value>>,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let pattern = source_pattern(value);
     let return_operands = source_main_return_operands(operational);
+    let residual_stop =
+        infer_source_residual_stop_path(public_interface, operational, &return_operands)?;
     let public_argument_leaf_count = public_interface
         .and_then(|object| object.get("argument_leaves"))
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     let stablehlo_argument_count =
         nested_array(public_interface, &["stablehlo_entry", "arguments"]).map_or(0, Vec::len);
+    let uses_runtime_solve_config = value
+        .and_then(|object| object.get("parameters"))
+        .and_then(Value::as_array)
+        .is_some_and(|parameters| {
+            parameters
+                .iter()
+                .any(|parameter| parameter.as_str() == Some("solve_config"))
+        });
+    let has_source_initialize = pattern_value(pattern, &["initialize"]).is_some();
+    let has_inline_stopping_keywords = pattern_value(
+        pattern,
+        &["algorithm_call", "solve_config", "stopping_keywords"],
+    )
+    .is_some();
+    let has_initialize_default_stopping =
+        source_pattern_projects_initialize_default_stopping(pattern)
+            || public_interface_has_initialize_prefix(
+                public_interface,
+                ".default_stopping_config.",
+            );
+    let source_initialize_value_expanded = has_source_initialize;
+    let algorithm_run_value_expanded = true;
+    let residual_predicate_value_expanded = algorithm_run_value_expanded
+        && (has_inline_stopping_keywords || has_initialize_default_stopping);
     let maxiter = pattern_nat(
         pattern,
         &[
@@ -1033,8 +1222,6 @@ fn render_source_main_embedding(
     );
     let mut lines = vec![
         "/-- Source-level values generated from the JIT public return surface. -/".to_string(),
-        "opaque SourceProblem : Type".to_string(),
-        String::new(),
         "structure SourceFloat where".to_string(),
         "  stablehloReturn : StablehloPublicLeaf".to_string(),
         "deriving Repr, DecidableEq".to_string(),
@@ -1055,7 +1242,8 @@ fn render_source_main_embedding(
         "  value.stablehloReturn.leafIndex".to_string(),
         String::new(),
     ];
-    lines.extend(render_source_kkt_solve_config(public_interface));
+    lines.extend(render_source_problem_structure(public_interface));
+    lines.extend(render_source_value_problem_structure(public_interface));
     lines.extend(render_source_return_structures(public_interface));
     lines.extend([
         "structure SourceMainProjectionCoverage where".to_string(),
@@ -1064,13 +1252,13 @@ fn render_source_main_embedding(
         "  stablehloArgumentCount : Nat".to_string(),
         "  sourceInitializeProjected : Bool".to_string(),
         "  algorithmRunProjected : Bool".to_string(),
-        "  residualPredicateProjected : Bool".to_string(),
+        "  residualOperandProjected : Bool".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
         "structure SourceMainValueCoverage where".to_string(),
-        "  sourceInitializeValueExpanded : Bool".to_string(),
-        "  algorithmRunValueExpanded : Bool".to_string(),
-        "  residualPredicateValueExpanded : Bool".to_string(),
+        "  sourceInitializeValueProjected : Bool".to_string(),
+        "  algorithmRunValueProjected : Bool".to_string(),
+        "  residualOperandValueProjected : Bool".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
         "structure SourceReturnOperandEquation where".to_string(),
@@ -1087,21 +1275,30 @@ fn render_source_main_embedding(
         "  squared : Nat".to_string(),
         "  runtimeRtol : String".to_string(),
         "  runtimeAtol : String".to_string(),
+        "  residualOperand : String".to_string(),
+        "  toleranceOperand : String".to_string(),
+        "  residualCompareOperand : String".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourcePcgSolveConfig where".to_string(),
+        "  stopping : SourceStoppingSolveConfig".to_string(),
+        "  preconditionerUpdate : String".to_string(),
+        "  preconditionerKind : String".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
         "structure SourceSolveConfig where".to_string(),
-        "  kktSolve : SourceKktSolveConfig".to_string(),
         "  stopping : SourceStoppingSolveConfig".to_string(),
+        "  cgSolve : SourcePcgSolveConfig".to_string(),
         String::new(),
         "structure SourceInitializeConfig where".to_string(),
-        "  kktDefaultSolveConfig : SourceKktSolveConfig".to_string(),
+        "  defaultStoppingConfig : SourceStoppingSolveConfig".to_string(),
         String::new(),
         "structure SourceAlgorithm where".to_string(),
         "  run : SourceProblem -> SourceState -> SourceSolveConfig -> SourceAnswer × SourceState × SourceInfo".to_string(),
         String::new(),
         "def sourceStoppingSolveConfig : SourceStoppingSolveConfig :=".to_string(),
         format!(
-            "  {{ maxiter := {}, rtol := {}, atol := {}, reference := {}, norm := {}, squared := {}, runtimeRtol := {}, runtimeAtol := {} }}",
+            "  {{ maxiter := {}, rtol := {}, atol := {}, reference := {}, norm := {}, squared := {}, runtimeRtol := {}, runtimeAtol := {}, residualOperand := {}, toleranceOperand := {}, residualCompareOperand := {} }}",
             maxiter,
             lean_string(rtol),
             lean_string(atol),
@@ -1110,10 +1307,13 @@ fn render_source_main_embedding(
             squared,
             lean_string(runtime_rtol),
             lean_string(runtime_atol),
+            lean_string(&residual_stop.stopping_residual_operand),
+            lean_string(&residual_stop.tolerance_operand),
+            lean_string(&residual_stop.compare_operand),
         ),
         String::new(),
         "def sourceSolveConfig (initialize_config : SourceInitializeConfig) : SourceSolveConfig :=".to_string(),
-        "  { kktSolve := initialize_config.kktDefaultSolveConfig, stopping := sourceStoppingSolveConfig }".to_string(),
+        "  { stopping := initialize_config.defaultStoppingConfig, cgSolve := { stopping := sourceStoppingSolveConfig, preconditionerUpdate := \"always\", preconditionerKind := \"identity\" } }".to_string(),
         String::new(),
     ]);
     lines.extend(render_generated_source_return(public_interface));
@@ -1121,6 +1321,8 @@ fn render_source_main_embedding(
         public_interface,
         &return_operands,
     ));
+    lines.extend(render_source_residual_stop_path(&residual_stop));
+    lines.extend(render_public_stablehlo_value_interface(public_interface));
     lines.extend([
         "def sourceAlgorithmRun".to_string(),
         "    (_problem : SourceProblem)".to_string(),
@@ -1128,21 +1330,45 @@ fn render_source_main_embedding(
         "    (_solveConfig : SourceSolveConfig) : SourceAnswer × SourceState × SourceInfo :=".to_string(),
         "  sourceGeneratedReturn".to_string(),
         String::new(),
+        "noncomputable def sourceValueAlgorithmRun {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (problem : SourceValueProblem α)".to_string(),
+        "    (_state : SourceState)".to_string(),
+        "    (_solveConfig : SourceSolveConfig)".to_string(),
+        "    (fuel : Nat) : StablehloValueState α :=".to_string(),
+        "  generatedMainStablehloValueFromLeaves".to_string(),
+        "    semantics".to_string(),
+        "    (sourceValueStablehloInputLeaves problem)".to_string(),
+        "    fuel".to_string(),
+        String::new(),
+        "theorem sourceValueAlgorithmRun_is_generated_from_public_values {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (problem : SourceValueProblem α)".to_string(),
+        "    (state : SourceState)".to_string(),
+        "    (solveConfig : SourceSolveConfig)".to_string(),
+        "    (fuel : Nat) :".to_string(),
+        "    sourceValueAlgorithmRun semantics problem state solveConfig fuel =".to_string(),
+        "      generatedMainStablehloValueFromLeaves".to_string(),
+        "        semantics".to_string(),
+        "        (sourceValueStablehloInputLeaves problem)".to_string(),
+        "        fuel := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
         "def sourceGeneratedAlgorithm : SourceAlgorithm :=".to_string(),
         "  { run := sourceAlgorithmRun }".to_string(),
         String::new(),
         "def sourceInitialize (_initialize_config : SourceInitializeConfig) : SourceAlgorithm × SourceState :=".to_string(),
         "  (sourceGeneratedAlgorithm, sourceGeneratedState)".to_string(),
         String::new(),
-        "def sourceResidualWithinTolerance (value : SourceFloat) (config : SourceStoppingSolveConfig) : Bool :=".to_string(),
-        "  value.stablehloReturn.resultInfo == \"result[1][2].ipm_res_final\"".to_string(),
-        "    && config.maxiter == sourceStoppingSolveConfig.maxiter".to_string(),
-        "    && config.reference == sourceStoppingSolveConfig.reference".to_string(),
-        "    && config.norm == sourceStoppingSolveConfig.norm".to_string(),
+        "def sourceResidualOperandPathMatches (value : SourceFloat) (config : SourceStoppingSolveConfig) : Bool :=".to_string(),
+        "  value.stablehloReturn == sourceStoppingResidualReturnLeaf".to_string(),
+        "    && config.residualOperand == sourceStoppingResidualOperandName".to_string(),
+        "    && config.toleranceOperand == sourceStoppingToleranceOperandName".to_string(),
+        "    && config.residualCompareOperand == sourceStoppingCompareOperandName".to_string(),
         String::new(),
         "def sourceMainProjectionCoverage : SourceMainProjectionCoverage :=".to_string(),
         format!(
-            "  {{ sourceRootPattern := {}, publicArgumentLeafCount := {}, stablehloArgumentCount := {}, sourceInitializeProjected := true, algorithmRunProjected := true, residualPredicateProjected := true }}",
+            "  {{ sourceRootPattern := {}, publicArgumentLeafCount := {}, stablehloArgumentCount := {}, sourceInitializeProjected := true, algorithmRunProjected := true, residualOperandProjected := true }}",
             lean_string(
                 pattern
                     .and_then(|object| object.get("pattern"))
@@ -1154,50 +1380,99 @@ fn render_source_main_embedding(
         ),
         String::new(),
         "def sourceMainValueCoverage : SourceMainValueCoverage :=".to_string(),
-        "  { sourceInitializeValueExpanded := false, algorithmRunValueExpanded := false, residualPredicateValueExpanded := false }".to_string(),
+        format!(
+            "  {{ sourceInitializeValueProjected := {}, algorithmRunValueProjected := {}, residualOperandValueProjected := {} }}",
+            lean_bool(source_initialize_value_expanded),
+            lean_bool(algorithm_run_value_expanded),
+            lean_bool(residual_predicate_value_expanded),
+        ),
         String::new(),
-        "def sourceMainProjectionExpanded : Bool :=".to_string(),
+        "def sourceMainProjectionCoverageClosed : Bool :=".to_string(),
         "  sourceMainProjectionCoverage.sourceInitializeProjected".to_string(),
         "    && sourceMainProjectionCoverage.algorithmRunProjected".to_string(),
-        "    && sourceMainProjectionCoverage.residualPredicateProjected".to_string(),
+        "    && sourceMainProjectionCoverage.residualOperandProjected".to_string(),
         String::new(),
-        "def sourceMainValueExpanded : Bool :=".to_string(),
-        "  sourceMainValueCoverage.sourceInitializeValueExpanded".to_string(),
-        "    && sourceMainValueCoverage.algorithmRunValueExpanded".to_string(),
-        "    && sourceMainValueCoverage.residualPredicateValueExpanded".to_string(),
+        "def sourceMainValueProjectionCoverageClosed : Bool :=".to_string(),
+        "  sourceMainValueCoverage.sourceInitializeValueProjected".to_string(),
+        "    && sourceMainValueCoverage.algorithmRunValueProjected".to_string(),
+        "    && sourceMainValueCoverage.residualOperandValueProjected".to_string(),
         String::new(),
         "/-- Generated source-level Lean embedding of `main.py::main`. -/".to_string(),
         "def sourceMain".to_string(),
         "    (problem : SourceProblem)".to_string(),
-        "    (initialize_config : SourceInitializeConfig) : SourceAnswer × SourceState × SourceInfo :=".to_string(),
+        "    (initialize_config : SourceInitializeConfig)".to_string(),
+        if uses_runtime_solve_config {
+            "    (solve_config : SourceSolveConfig) : SourceAnswer × SourceState × SourceInfo :=".to_string()
+        } else {
+            "    : SourceAnswer × SourceState × SourceInfo :=".to_string()
+        },
         "  let initialized := sourceInitialize initialize_config".to_string(),
         "  let algorithm := initialized.1".to_string(),
         "  let state := initialized.2".to_string(),
-        "  let answer_next_state_info := algorithm.run problem state (sourceSolveConfig initialize_config)".to_string(),
+        if uses_runtime_solve_config {
+            "  let answer_next_state_info := algorithm.run problem state solve_config".to_string()
+        } else {
+            "  let answer_next_state_info := algorithm.run problem state (sourceSolveConfig initialize_config)".to_string()
+        },
         "  answer_next_state_info".to_string(),
         String::new(),
         "theorem sourceMain_embeds_python_main :".to_string(),
         "    sourceRoot.pattern = \"initialize_then_algorithm_call_return_tuple\" := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_projection_coverage_verified :".to_string(),
-        "    sourceMainProjectionExpanded = true := by".to_string(),
+        "theorem sourceMain_projection_coverage_closed :".to_string(),
+        "    sourceMainProjectionCoverageClosed = true := by".to_string(),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_value_expansion_incomplete :".to_string(),
-        "    sourceMainValueExpanded = false := by".to_string(),
+        if source_initialize_value_expanded
+            && algorithm_run_value_expanded
+            && residual_predicate_value_expanded
+        {
+            "theorem sourceMain_value_projection_coverage_closed :".to_string()
+        } else {
+            "theorem sourceMain_value_projection_coverage_open :".to_string()
+        },
+        format!(
+            "    sourceMainValueProjectionCoverageClosed = {} := by",
+            lean_bool(
+                source_initialize_value_expanded
+                    && algorithm_run_value_expanded
+                    && residual_predicate_value_expanded
+            )
+        ),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_initialize_value_not_expanded :".to_string(),
-        "    sourceMainValueCoverage.sourceInitializeValueExpanded = false := by".to_string(),
+        if source_initialize_value_expanded {
+            "theorem sourceMain_initialize_projection_value_present :".to_string()
+        } else {
+            "theorem sourceMain_initialize_projection_value_absent :".to_string()
+        },
+        format!(
+            "    sourceMainValueCoverage.sourceInitializeValueProjected = {} := by",
+            lean_bool(source_initialize_value_expanded)
+        ),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_algorithm_run_value_not_expanded :".to_string(),
-        "    sourceMainValueCoverage.algorithmRunValueExpanded = false := by".to_string(),
+        if algorithm_run_value_expanded {
+            "theorem sourceMain_algorithm_run_projection_value_present :".to_string()
+        } else {
+            "theorem sourceMain_algorithm_run_projection_value_absent :".to_string()
+        },
+        format!(
+            "    sourceMainValueCoverage.algorithmRunValueProjected = {} := by",
+            lean_bool(algorithm_run_value_expanded)
+        ),
         "  rfl".to_string(),
         String::new(),
-        "theorem sourceMain_residual_predicate_value_not_expanded :".to_string(),
-        "    sourceMainValueCoverage.residualPredicateValueExpanded = false := by".to_string(),
+        if residual_predicate_value_expanded {
+            "theorem sourceMain_residual_operand_projection_value_present :".to_string()
+        } else {
+            "theorem sourceMain_residual_operand_projection_value_absent :".to_string()
+        },
+        format!(
+            "    sourceMainValueCoverage.residualOperandValueProjected = {} := by",
+            lean_bool(residual_predicate_value_expanded)
+        ),
         "  rfl".to_string(),
         String::new(),
         "theorem sourceMain_public_argument_lowering_counts :".to_string(),
@@ -1207,26 +1482,48 @@ fn render_source_main_embedding(
         "  · rfl".to_string(),
         "  · rfl".to_string(),
         String::new(),
-        "theorem sourceSolveConfig_uses_initialize_kkt_default".to_string(),
+        "theorem sourceSolveConfig_projects_initialize_default_stopping".to_string(),
         "    (initialize_config : SourceInitializeConfig) :".to_string(),
-        "    (sourceSolveConfig initialize_config).kktSolve = initialize_config.kktDefaultSolveConfig := by".to_string(),
+        "    (sourceSolveConfig initialize_config).stopping = initialize_config.defaultStoppingConfig := by".to_string(),
         "  rfl".to_string(),
         String::new(),
         "theorem sourceMain_is_algorithm_run".to_string(),
         "    (problem : SourceProblem)".to_string(),
-        "    (initialize_config : SourceInitializeConfig) :".to_string(),
-        "    sourceMain problem initialize_config =".to_string(),
+        "    (initialize_config : SourceInitializeConfig)".to_string(),
+        if uses_runtime_solve_config {
+            "    (solve_config : SourceSolveConfig) :".to_string()
+        } else {
+            "    :".to_string()
+        },
+        if uses_runtime_solve_config {
+            "    sourceMain problem initialize_config solve_config =".to_string()
+        } else {
+            "    sourceMain problem initialize_config =".to_string()
+        },
         "      let initialized := sourceInitialize initialize_config".to_string(),
-        "      initialized.1.run problem initialized.2 (sourceSolveConfig initialize_config) := by".to_string(),
+        if uses_runtime_solve_config {
+            "      initialized.1.run problem initialized.2 solve_config := by".to_string()
+        } else {
+            "      initialized.1.run problem initialized.2 (sourceSolveConfig initialize_config) := by".to_string()
+        },
         "  rfl".to_string(),
         String::new(),
         "theorem sourceMain_is_generated_return".to_string(),
         "    (problem : SourceProblem)".to_string(),
-        "    (initialize_config : SourceInitializeConfig) :".to_string(),
-        "    sourceMain problem initialize_config = sourceGeneratedReturn := by".to_string(),
+        "    (initialize_config : SourceInitializeConfig)".to_string(),
+        if uses_runtime_solve_config {
+            "    (solve_config : SourceSolveConfig) :".to_string()
+        } else {
+            "    :".to_string()
+        },
+        if uses_runtime_solve_config {
+            "    sourceMain problem initialize_config solve_config = sourceGeneratedReturn := by".to_string()
+        } else {
+            "    sourceMain problem initialize_config = sourceGeneratedReturn := by".to_string()
+        },
         "  rfl".to_string(),
     ]);
-    lines
+    Ok(lines)
 }
 
 fn render_source_return_structures(
@@ -1264,29 +1561,24 @@ fn render_source_return_structures(
     lines
 }
 
-fn render_source_kkt_solve_config(
+fn render_source_problem_structure(
     public_interface: Option<&serde_json::Map<String, Value>>,
 ) -> Vec<String> {
     let leaves = public_interface
         .and_then(|object| object.get("argument_leaves"))
         .and_then(Value::as_array);
-    let mut lines = vec!["structure SourceKktSolveConfig where".to_string()];
+    let mut lines = vec!["structure SourceProblem where".to_string()];
     let mut field_count = 0usize;
     if let Some(leaves) = leaves {
         for leaf in leaves {
-            if value_field(leaf, "root_name") != "initialize_config" {
+            if value_field(leaf, "root_name") != "problem" {
                 continue;
             }
-            let Some(local_path) =
-                value_field(leaf, "local_path").strip_prefix(".kkt_default_solve_config.")
-            else {
-                continue;
-            };
             field_count += 1;
             lines.push(format!(
                 "  {} : {}",
-                source_field_name(local_path),
-                source_config_leaf_type(leaf),
+                source_field_name(value_field(leaf, "local_path")),
+                source_leaf_type(leaf),
             ));
         }
     }
@@ -1296,6 +1588,96 @@ fn render_source_kkt_solve_config(
     lines.push("deriving Repr, DecidableEq".to_string());
     lines.push(String::new());
     lines
+}
+
+fn render_source_value_problem_structure(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let leaves = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array);
+    let mut lines = vec![
+        "structure SourceValueFloat (α : Type) where".to_string(),
+        "  stablehloArgument : StablehloPublicLeaf".to_string(),
+        "  value : α".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceValueInt (α : Type) where".to_string(),
+        "  stablehloArgument : StablehloPublicLeaf".to_string(),
+        "  value : α".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceValueNat (α : Type) where".to_string(),
+        "  stablehloArgument : StablehloPublicLeaf".to_string(),
+        "  value : α".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceValueVector (α : Type) where".to_string(),
+        "  stablehloArgument : StablehloPublicLeaf".to_string(),
+        "  value : α".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure SourceValueProblem (α : Type) where".to_string(),
+    ];
+    let mut field_count = 0usize;
+    if let Some(leaves) = leaves {
+        for leaf in leaves {
+            if value_field(leaf, "root_name") != "problem"
+                || !public_leaf_is_stablehlo_argument(leaf)
+            {
+                continue;
+            }
+            field_count += 1;
+            lines.push(format!(
+                "  {} : {} α",
+                source_field_name(value_field(leaf, "local_path")),
+                source_value_leaf_type(leaf),
+            ));
+        }
+    }
+    if field_count == 0 {
+        lines.push("  unit : Unit".to_string());
+    }
+    lines.push("deriving Repr, DecidableEq".to_string());
+    lines.push(String::new());
+    lines.extend(render_source_problem_projection_from_value_problem(
+        public_interface,
+    ));
+    lines
+}
+
+fn render_source_problem_projection_from_value_problem(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let leaves = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array);
+    let mut fields = Vec::new();
+    if let Some(leaves) = leaves {
+        for leaf in leaves {
+            if value_field(leaf, "root_name") != "problem"
+                || !public_leaf_is_stablehlo_argument(leaf)
+            {
+                continue;
+            }
+            let field = source_field_name(value_field(leaf, "local_path"));
+            fields.push(format!(
+                "{} := {{ stablehloReturn := problem.{}.stablehloArgument }}",
+                field, field
+            ));
+        }
+    }
+    let body = if fields.is_empty() {
+        "{ unit := () }".to_string()
+    } else {
+        format!("{{ {} }}", fields.join(", "))
+    };
+    vec![
+        "def sourceProblemProjectionFromValueProblem {α : Type}".to_string(),
+        "    (problem : SourceValueProblem α) : SourceProblem :=".to_string(),
+        format!("  {}", body),
+        String::new(),
+    ]
 }
 
 fn render_generated_source_return(
@@ -1405,7 +1787,12 @@ fn source_main_return_operands(
         return Vec::new();
     };
     for op in ops {
-        if value_field(op, "kind") != "Return" || value_field(op, "function") != entry_function {
+        if value_field(op, "kind") != "Return" {
+            continue;
+        }
+        let function_name = value_field(op, "function");
+        let is_entry_region_return = function_name.is_empty() && stablehlo_region_path_len(op) == 1;
+        if function_name != entry_function && !is_entry_region_return {
             continue;
         }
         let text = value_field(op, "text").trim();
@@ -1415,6 +1802,13 @@ fn source_main_return_operands(
         return parse_return_operands(text);
     }
     Vec::new()
+}
+
+fn stablehlo_region_path_len(op: &Value) -> usize {
+    op.get("region_path")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0)
 }
 
 fn parse_return_operands(text: &str) -> Vec<String> {
@@ -1428,6 +1822,16 @@ fn parse_return_operands(text: &str) -> Vec<String> {
         .filter(|operand| !operand.is_empty())
         .map(ToString::to_string)
         .collect()
+}
+
+fn function_argument_names(signature: &str) -> Vec<String> {
+    let Some((_before_args, after_open)) = signature.split_once('(') else {
+        return Vec::new();
+    };
+    let Some((args, _after_args)) = after_open.split_once(')') else {
+        return Vec::new();
+    };
+    extract_percent_names(args)
 }
 
 fn operation_result_names(text: &str) -> Vec<String> {
@@ -1534,7 +1938,9 @@ fn render_stablehlo_return_leaf_for_public_leaf(
     let suffix = local_path.trim_start_matches('.');
     if let Some(stable_leaves) = stable_leaves {
         for (index, stable_leaf) in stable_leaves.iter().enumerate() {
-            if !stablehlo_result_indexes_match(stable_leaf, &[1, root_index]) {
+            if !stablehlo_result_indexes_match(stable_leaf, &[1, root_index])
+                && !stablehlo_result_indexes_match(stable_leaf, &[root_index])
+            {
                 continue;
             }
             let result_info = value_field(stable_leaf, "result_info");
@@ -1585,19 +1991,61 @@ fn source_leaf_type(leaf: &Value) -> &'static str {
     }
 }
 
-fn source_config_leaf_type(leaf: &Value) -> &'static str {
-    let python_type = value_field(leaf, "python_type");
+fn source_value_leaf_type(leaf: &Value) -> &'static str {
+    let local_path = value_field(leaf, "local_path");
+    if local_path == ".step_count" || local_path.ends_with(".step_count") {
+        return "SourceValueNat";
+    }
     let dtype = value_field(leaf, "dtype");
-    if python_type == "str" || dtype.is_empty() {
-        return "String";
-    }
+    let shape = value_field(leaf, "shape");
     if dtype.starts_with("int") || dtype.starts_with("uint") {
-        "SourceInt"
-    } else if value_field(leaf, "shape") == "()" {
-        "SourceFloat"
+        "SourceValueInt"
+    } else if shape == "()" {
+        "SourceValueFloat"
     } else {
-        "SourceVector"
+        "SourceValueVector"
     }
+}
+
+fn public_leaf_is_stablehlo_argument(leaf: &Value) -> bool {
+    !value_field(leaf, "dtype").is_empty() && !value_field(leaf, "shape").is_empty()
+}
+
+fn source_leaf_encoder_name(leaf: &Value) -> &'static str {
+    match source_leaf_type(leaf) {
+        "SourceFloat" => "encodeFloat",
+        "SourceInt" => "encodeInt",
+        "SourceNat" => "encodeNat",
+        "SourceVector" => "encodeVector",
+        _ => "encodeVector",
+    }
+}
+
+fn source_argument_leaf_access(leaf: &Value) -> String {
+    let root_name = value_field(leaf, "root_name");
+    let local_path = value_field(leaf, "local_path");
+    if root_name == "problem" {
+        return format!("problem.{}", source_field_name(local_path));
+    }
+    if root_name == "initialize_config" {
+        return format!("initializeConfig.{}", source_field_name(local_path));
+    }
+    format!(
+        "unsupportedPublicArgument.{}",
+        source_field_name(local_path)
+    )
+}
+
+fn source_value_argument_leaf_access(leaf: &Value) -> String {
+    let root_name = value_field(leaf, "root_name");
+    let local_path = value_field(leaf, "local_path");
+    if root_name == "problem" {
+        return format!("problem.{}.value", source_field_name(local_path));
+    }
+    format!(
+        "unsupportedPublicValueArgument.{}.value",
+        source_field_name(local_path)
+    )
 }
 
 fn source_field_name(local_path: &str) -> String {
@@ -1706,11 +2154,17 @@ fn render_operational_functions(values: Option<&Vec<Value>>) -> String {
             .get("line_end")
             .and_then(Value::as_u64)
             .unwrap_or(0);
+        let argument_names: Vec<Value> =
+            function_argument_names(value_field(function, "signature"))
+                .into_iter()
+                .map(Value::String)
+                .collect();
         format!(
-            "{{ functionId := {}, name := {}, signature := {}, lineStart := {}, lineEnd := {}, bodyRegionId := {} }}",
+            "{{ functionId := {}, name := {}, signature := {}, argumentNames := {}, lineStart := {}, lineEnd := {}, bodyRegionId := {} }}",
             lean_string(value_field(function, "function_id")),
             lean_string(value_field(function, "name")),
             lean_string(value_field(function, "signature")),
+            render_inline_string_list(Some(&argument_names)),
             line_start,
             line_end,
             lean_string(value_field(function, "body_region_id"))
@@ -1822,6 +2276,34 @@ fn value_nat_field(value: &Value, key: &str) -> u64 {
 
 fn value_bool_field(value: &serde_json::Map<String, Value>, key: &str) -> bool {
     value.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn tensor_type_element_count(value: &str) -> u64 {
+    let Some((shape, _dtype)) = value.rsplit_once('x') else {
+        return 1;
+    };
+    let mut product = 1_u64;
+    let mut saw_dimension = false;
+    for part in shape.split('x') {
+        let Ok(dimension) = part.parse::<u64>() else {
+            return 1;
+        };
+        product = product.saturating_mul(dimension);
+        saw_dimension = true;
+    }
+    if saw_dimension {
+        product
+    } else {
+        1
+    }
+}
+
+fn result_element_count(values: Option<&Vec<Value>>) -> u64 {
+    values
+        .and_then(|items| items.last())
+        .and_then(Value::as_str)
+        .map(tensor_type_element_count)
+        .unwrap_or(1)
 }
 
 fn render_public_roots(
@@ -1992,6 +2474,9 @@ fn render_operational_evaluator() -> Vec<String> {
         "  functionName : String".to_string(),
         "  regionId : String".to_string(),
         "  remainingOpIds : List String".to_string(),
+        "  callerResultNames : List String".to_string(),
+        "  callerBindingDepth : Nat".to_string(),
+        "  callOpId : String".to_string(),
         "deriving Repr, DecidableEq".to_string(),
         String::new(),
         "structure OperationalRuntimeState where".to_string(),
@@ -2053,7 +2538,7 @@ fn render_operational_evaluator() -> Vec<String> {
         String::new(),
         "def frameForRegion (functionName regionId : String) : Option OperationalFrame :=".to_string(),
         "  match findOperationalRegion regionId with".to_string(),
-        "  | some region => some { functionName := functionName, regionId := regionId, remainingOpIds := region.opIds }".to_string(),
+        "  | some region => some { functionName := functionName, regionId := regionId, remainingOpIds := region.opIds, callerResultNames := [], callerBindingDepth := 0, callOpId := \"\" }".to_string(),
         "  | none => none".to_string(),
         String::new(),
         "def pushFrame (frame : OperationalFrame) (state : OperationalRuntimeState) : OperationalRuntimeState :=".to_string(),
@@ -2137,6 +2622,557 @@ fn render_operational_evaluator() -> Vec<String> {
         String::new(),
         "theorem generatedMainFuel_zero (semantics : OperationalPrimitiveSemantics) :".to_string(),
         "    generatedMainFuel semantics 0 = { generatedMainInitialState with fuelExhausted := generatedMainInitialState.frames != [] } := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+    ]
+}
+
+fn render_stablehlo_value_evaluator() -> Vec<String> {
+    vec![
+        "/-- Value-level evaluator for StableHLO/MLIR SSA rows.".to_string(),
+        "The generated control-flow and SSA wiring are fixed by `OperationalOp`; primitive".to_string(),
+        "numeric meaning is supplied by `StablehloValueSemantics`, so proof themes can".to_string(),
+        "instantiate it with real numbers, rounded floats, or symbolic terms without".to_string(),
+        "changing the generated recurrence. -/".to_string(),
+        "structure StablehloValueBinding (α : Type) where".to_string(),
+        "  name : String".to_string(),
+        "  value : α".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure StablehloValueState (α : Type) where".to_string(),
+        "  bindings : List (StablehloValueBinding α)".to_string(),
+        "  frames : List OperationalFrame".to_string(),
+        "  returns : List α".to_string(),
+        "  executedOpIds : List String".to_string(),
+        "  missingOpIds : List String".to_string(),
+        "  missingFunctionNames : List String".to_string(),
+        "  missingRegionIds : List String".to_string(),
+        "  missingValueNames : List String".to_string(),
+        "  arityMismatchOpIds : List String".to_string(),
+        "  fuelExhausted : Bool".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure StablehloValueSemantics (α : Type) where".to_string(),
+        "  evalPrimitive : OperationalOp -> List α -> List α".to_string(),
+        "  selectWhileBody : OperationalOp -> StablehloValueState α -> Bool".to_string(),
+        "  selectCaseBranch : OperationalOp -> StablehloValueState α -> Nat".to_string(),
+        String::new(),
+        "inductive StablehloConcreteValue (α : Type) where".to_string(),
+        "  | scalar (value : α)".to_string(),
+        "  | vector (values : List α)".to_string(),
+        "  | boolScalar (value : Bool)".to_string(),
+        "  | boolVector (values : List Bool)".to_string(),
+        "  | intScalar (value : Int)".to_string(),
+        "  | intVector (values : List Int)".to_string(),
+        "  | unknown (reason : String)".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "structure StablehloScalarOps (α : Type) where".to_string(),
+        "  constant : OperationalOp -> StablehloConcreteValue α".to_string(),
+        "  convert : OperationalOp -> α -> α".to_string(),
+        "  add : α -> α -> α".to_string(),
+        "  sub : α -> α -> α".to_string(),
+        "  mul : α -> α -> α".to_string(),
+        "  div : α -> α -> α".to_string(),
+        "  abs : α -> α".to_string(),
+        "  max : α -> α -> α".to_string(),
+        "  neg : α -> α".to_string(),
+        "  compare : String -> α -> α -> Bool".to_string(),
+        String::new(),
+        "structure StablehloControlSemantics (α : Type) where".to_string(),
+        "  selectWhileBody : OperationalOp -> StablehloValueState (StablehloConcreteValue α) -> Bool".to_string(),
+        "  selectCaseBranch : OperationalOp -> StablehloValueState (StablehloConcreteValue α) -> Nat".to_string(),
+        String::new(),
+        "def stablehloZipWith {α β γ : Type} (f : α -> β -> γ) : List α -> List β -> List γ".to_string(),
+        "  | a :: as, b :: bs => f a b :: stablehloZipWith f as bs".to_string(),
+        "  | _, _ => []".to_string(),
+        String::new(),
+        "def stablehloConcreteUnary {α : Type} (label : String) (f : α -> α) : StablehloConcreteValue α -> StablehloConcreteValue α".to_string(),
+        "  | StablehloConcreteValue.scalar value => StablehloConcreteValue.scalar (f value)".to_string(),
+        "  | StablehloConcreteValue.vector values => StablehloConcreteValue.vector (values.map f)".to_string(),
+        "  | _ => StablehloConcreteValue.unknown label".to_string(),
+        String::new(),
+        "def stablehloConcreteBinary {α : Type} (label : String) (f : α -> α -> α) (left right : StablehloConcreteValue α) : StablehloConcreteValue α :=".to_string(),
+        "  match left, right with".to_string(),
+        "  | StablehloConcreteValue.scalar a, StablehloConcreteValue.scalar b => StablehloConcreteValue.scalar (f a b)".to_string(),
+        "  | StablehloConcreteValue.vector as, StablehloConcreteValue.vector bs => StablehloConcreteValue.vector (stablehloZipWith f as bs)".to_string(),
+        "  | StablehloConcreteValue.vector as, StablehloConcreteValue.scalar b => StablehloConcreteValue.vector (as.map (fun a => f a b))".to_string(),
+        "  | StablehloConcreteValue.scalar a, StablehloConcreteValue.vector bs => StablehloConcreteValue.vector (bs.map (fun b => f a b))".to_string(),
+        "  | _, _ => StablehloConcreteValue.unknown label".to_string(),
+        String::new(),
+        "def stablehloConcreteBroadcast {α : Type} (count : Nat) : StablehloConcreteValue α -> StablehloConcreteValue α".to_string(),
+        "  | StablehloConcreteValue.scalar value => StablehloConcreteValue.vector (List.replicate count value)".to_string(),
+        "  | StablehloConcreteValue.boolScalar value => StablehloConcreteValue.boolVector (List.replicate count value)".to_string(),
+        "  | StablehloConcreteValue.intScalar value => StablehloConcreteValue.intVector (List.replicate count value)".to_string(),
+        "  | value => value".to_string(),
+        String::new(),
+        "def stablehloConcreteRealValues {α : Type} : StablehloConcreteValue α -> List α".to_string(),
+        "  | StablehloConcreteValue.scalar value => [value]".to_string(),
+        "  | StablehloConcreteValue.vector values => values".to_string(),
+        "  | _ => []".to_string(),
+        String::new(),
+        "def stablehloConcreteConcatValues {α : Type} : List (StablehloConcreteValue α) -> List α".to_string(),
+        "  | [] => []".to_string(),
+        "  | value :: values => stablehloConcreteRealValues value ++ stablehloConcreteConcatValues values".to_string(),
+        String::new(),
+        "def stablehloConcreteConcat {α : Type} (values : List (StablehloConcreteValue α)) : StablehloConcreteValue α :=".to_string(),
+        "  StablehloConcreteValue.vector (stablehloConcreteConcatValues values)".to_string(),
+        String::new(),
+        "def stablehloFoldMax {α : Type} (ops : StablehloScalarOps α) (init : α) : List α -> α".to_string(),
+        "  | [] => init".to_string(),
+        "  | value :: values => stablehloFoldMax ops (ops.max init value) values".to_string(),
+        String::new(),
+        "def stablehloConcreteReduceMax {α : Type} (ops : StablehloScalarOps α) : List (StablehloConcreteValue α) -> StablehloConcreteValue α".to_string(),
+        "  | [StablehloConcreteValue.vector values, StablehloConcreteValue.scalar init] => StablehloConcreteValue.scalar (stablehloFoldMax ops init values)".to_string(),
+        "  | [StablehloConcreteValue.scalar value, StablehloConcreteValue.scalar init] => StablehloConcreteValue.scalar (ops.max init value)".to_string(),
+        "  | _ => StablehloConcreteValue.unknown \"stablehlo.reduce\"".to_string(),
+        String::new(),
+        "def stablehloConcreteCompare {α : Type} (ops : StablehloScalarOps α) (text : String) (left right : StablehloConcreteValue α) : StablehloConcreteValue α :=".to_string(),
+        "  match left, right with".to_string(),
+        "  | StablehloConcreteValue.scalar a, StablehloConcreteValue.scalar b => StablehloConcreteValue.boolScalar (ops.compare text a b)".to_string(),
+        "  | StablehloConcreteValue.vector as, StablehloConcreteValue.vector bs => StablehloConcreteValue.boolVector (stablehloZipWith (ops.compare text) as bs)".to_string(),
+        "  | StablehloConcreteValue.vector as, StablehloConcreteValue.scalar b => StablehloConcreteValue.boolVector (as.map (fun a => ops.compare text a b))".to_string(),
+        "  | StablehloConcreteValue.scalar a, StablehloConcreteValue.vector bs => StablehloConcreteValue.boolVector (bs.map (fun b => ops.compare text a b))".to_string(),
+        "  | _, _ => StablehloConcreteValue.unknown \"stablehlo.compare\"".to_string(),
+        String::new(),
+        "def stablehloConcreteBoolBinary (label : String) (f : Bool -> Bool -> Bool) {α : Type} (left right : StablehloConcreteValue α) : StablehloConcreteValue α :=".to_string(),
+        "  match left, right with".to_string(),
+        "  | StablehloConcreteValue.boolScalar a, StablehloConcreteValue.boolScalar b => StablehloConcreteValue.boolScalar (f a b)".to_string(),
+        "  | StablehloConcreteValue.boolVector as, StablehloConcreteValue.boolVector bs => StablehloConcreteValue.boolVector (stablehloZipWith f as bs)".to_string(),
+        "  | StablehloConcreteValue.boolVector as, StablehloConcreteValue.boolScalar b => StablehloConcreteValue.boolVector (as.map (fun a => f a b))".to_string(),
+        "  | StablehloConcreteValue.boolScalar a, StablehloConcreteValue.boolVector bs => StablehloConcreteValue.boolVector (bs.map (fun b => f a b))".to_string(),
+        "  | _, _ => StablehloConcreteValue.unknown label".to_string(),
+        String::new(),
+        "def stablehloConcreteBoolUnary (label : String) (f : Bool -> Bool) {α : Type} : StablehloConcreteValue α -> StablehloConcreteValue α".to_string(),
+        "  | StablehloConcreteValue.boolScalar value => StablehloConcreteValue.boolScalar (f value)".to_string(),
+        "  | StablehloConcreteValue.boolVector values => StablehloConcreteValue.boolVector (values.map f)".to_string(),
+        "  | _ => StablehloConcreteValue.unknown label".to_string(),
+        String::new(),
+        "def stablehloConcreteSelect {α : Type} : List (StablehloConcreteValue α) -> StablehloConcreteValue α".to_string(),
+        "  | [StablehloConcreteValue.boolScalar true, whenTrue, _whenFalse] => whenTrue".to_string(),
+        "  | [StablehloConcreteValue.boolScalar false, _whenTrue, whenFalse] => whenFalse".to_string(),
+        "  | _ => StablehloConcreteValue.unknown \"stablehlo.select\"".to_string(),
+        String::new(),
+        "def stablehloConcreteEvalPrimitive {α : Type} (ops : StablehloScalarOps α) (op : OperationalOp) (operands : List (StablehloConcreteValue α)) : List (StablehloConcreteValue α) :=".to_string(),
+        "  match op.opcode, operands with".to_string(),
+        "  | \"stablehlo.constant\", _ => [ops.constant op]".to_string(),
+        "  | \"stablehlo.convert\", [value] => [stablehloConcreteUnary \"stablehlo.convert\" (ops.convert op) value]".to_string(),
+        "  | \"stablehlo.add\", [a, b] => [stablehloConcreteBinary \"stablehlo.add\" ops.add a b]".to_string(),
+        "  | \"stablehlo.subtract\", [a, b] => [stablehloConcreteBinary \"stablehlo.subtract\" ops.sub a b]".to_string(),
+        "  | \"stablehlo.multiply\", [a, b] => [stablehloConcreteBinary \"stablehlo.multiply\" ops.mul a b]".to_string(),
+        "  | \"stablehlo.divide\", [a, b] => [stablehloConcreteBinary \"stablehlo.divide\" ops.div a b]".to_string(),
+        "  | \"stablehlo.maximum\", [a, b] => [stablehloConcreteBinary \"stablehlo.maximum\" ops.max a b]".to_string(),
+        "  | \"stablehlo.abs\", [value] => [stablehloConcreteUnary \"stablehlo.abs\" ops.abs value]".to_string(),
+        "  | \"stablehlo.negate\", [value] => [stablehloConcreteUnary \"stablehlo.negate\" ops.neg value]".to_string(),
+        "  | \"stablehlo.broadcast_in_dim\", [value] => [stablehloConcreteBroadcast op.resultElementCount value]".to_string(),
+        "  | \"stablehlo.reshape\", [value] => [value]".to_string(),
+        "  | \"stablehlo.concatenate\", _ => [stablehloConcreteConcat operands]".to_string(),
+        "  | \"stablehlo.reduce\", _ => [stablehloConcreteReduceMax ops operands]".to_string(),
+        "  | \"stablehlo.compare\", [a, b] => [stablehloConcreteCompare ops op.text a b]".to_string(),
+        "  | \"stablehlo.and\", [a, b] => [stablehloConcreteBoolBinary \"stablehlo.and\" (fun left right => left && right) a b]".to_string(),
+        "  | \"stablehlo.or\", [a, b] => [stablehloConcreteBoolBinary \"stablehlo.or\" (fun left right => left || right) a b]".to_string(),
+        "  | \"stablehlo.not\", [value] => [stablehloConcreteBoolUnary \"stablehlo.not\" not value]".to_string(),
+        "  | \"stablehlo.select\", _ => [stablehloConcreteSelect operands]".to_string(),
+        "  | _, _ => [StablehloConcreteValue.unknown op.opcode]".to_string(),
+        String::new(),
+        "def stablehloConcreteSemantics {α : Type} (ops : StablehloScalarOps α) (control : StablehloControlSemantics α) : StablehloValueSemantics (StablehloConcreteValue α) :=".to_string(),
+        "  { evalPrimitive := stablehloConcreteEvalPrimitive ops".to_string(),
+        "    selectWhileBody := control.selectWhileBody".to_string(),
+        "    selectCaseBranch := control.selectCaseBranch }".to_string(),
+        String::new(),
+        "def emptyStablehloValueState {α : Type} : StablehloValueState α :=".to_string(),
+        "  { bindings := [], frames := [], returns := [], executedOpIds := [], missingOpIds := [], missingFunctionNames := [], missingRegionIds := [], missingValueNames := [], arityMismatchOpIds := [], fuelExhausted := false }".to_string(),
+        String::new(),
+        "def lookupStablehloValue {α : Type} (name : String) : List (StablehloValueBinding α) -> Option α".to_string(),
+        "  | [] => none".to_string(),
+        "  | binding :: rest => if binding.name == name then some binding.value else lookupStablehloValue name rest".to_string(),
+        String::new(),
+        "def stablehloOperandValues {α : Type} (state : StablehloValueState α) (names : List String) : List α :=".to_string(),
+        "  names.filterMap (fun name => lookupStablehloValue name state.bindings)".to_string(),
+        String::new(),
+        "def stablehloMissingOperandNames {α : Type} (state : StablehloValueState α) (names : List String) : List String :=".to_string(),
+        "  names.filter (fun name => (lookupStablehloValue name state.bindings).isNone)".to_string(),
+        String::new(),
+        "def bindStablehloValue {α : Type} (name : String) (value : α) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  if name == \"\" then state else { state with bindings := { name := name, value := value } :: state.bindings }".to_string(),
+        String::new(),
+        "def bindStablehloResultValues {α : Type} : List String -> List α -> StablehloValueState α -> StablehloValueState α".to_string(),
+        "  | [], [], state => state".to_string(),
+        "  | name :: names, value :: values, state => bindStablehloResultValues names values (bindStablehloValue name value state)".to_string(),
+        "  | _names, _values, state => state".to_string(),
+        String::new(),
+        "def bindStablehloValuePairs {α : Type} : List String -> List α -> StablehloValueState α -> StablehloValueState α".to_string(),
+        "  | [], [], state => state".to_string(),
+        "  | name :: names, value :: values, state => bindStablehloValuePairs names values (bindStablehloValue name value state)".to_string(),
+        "  | _names, _values, state => state".to_string(),
+        String::new(),
+        "def stablehloBindingsAtDepth {α : Type} (depth : Nat) (bindings : List (StablehloValueBinding α)) : List (StablehloValueBinding α) :=".to_string(),
+        "  bindings.drop (bindings.length - depth)".to_string(),
+        String::new(),
+        "def markStablehloArityMismatch {α : Type} (op : OperationalOp) (values : List α) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  if op.resultNames.length == values.length then state else { state with arityMismatchOpIds := op.opId :: state.arityMismatchOpIds }".to_string(),
+        String::new(),
+        "def pushStablehloValueFrame {α : Type} (frame : OperationalFrame) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  { state with frames := frame :: state.frames }".to_string(),
+        String::new(),
+        "def popStablehloValueFrame {α : Type} (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match state.frames with".to_string(),
+        "  | [] => state".to_string(),
+        "  | _frame :: rest => { state with frames := rest }".to_string(),
+        String::new(),
+        "def pushStablehloValueRegionFrame {α : Type} (functionName regionId : String) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match frameForRegion functionName regionId with".to_string(),
+        "  | some frame => pushStablehloValueFrame frame state".to_string(),
+        "  | none => { state with missingRegionIds := regionId :: state.missingRegionIds }".to_string(),
+        String::new(),
+        "def pushStablehloValueFunctionFrame {α : Type} (functionName : String) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match functionBodyRegionId functionName with".to_string(),
+        "  | some regionId => pushStablehloValueRegionFrame functionName regionId state".to_string(),
+        "  | none => { state with missingFunctionNames := functionName :: state.missingFunctionNames }".to_string(),
+        String::new(),
+        "def pushStablehloValueCallFrame {α : Type} (op : OperationalOp) (fn : OperationalFunction) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match frameForRegion fn.name fn.bodyRegionId with".to_string(),
+        "  | some frame =>".to_string(),
+        "      let missing := stablehloMissingOperandNames state op.operandNames".to_string(),
+        "      let operands := stablehloOperandValues state op.operandNames".to_string(),
+        "      let withMissing := { state with missingValueNames := missing ++ state.missingValueNames }".to_string(),
+        "      let callFrame := { frame with callerResultNames := op.resultNames, callerBindingDepth := state.bindings.length, callOpId := op.opId }".to_string(),
+        "      let withArgs := bindStablehloValuePairs fn.argumentNames operands withMissing".to_string(),
+        "      let withFrame := pushStablehloValueFrame callFrame withArgs".to_string(),
+        "      if fn.argumentNames.length == operands.length then withFrame else { withFrame with arityMismatchOpIds := op.opId :: withFrame.arityMismatchOpIds }".to_string(),
+        "  | none => { state with missingRegionIds := fn.bodyRegionId :: state.missingRegionIds }".to_string(),
+        String::new(),
+        "def recordStablehloExecutedOp {α : Type} (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  { state with executedOpIds := state.executedOpIds ++ [op.opId] }".to_string(),
+        String::new(),
+        "def executeStablehloPrimitiveOp {α : Type} (semantics : StablehloValueSemantics α) (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  let missing := stablehloMissingOperandNames state op.operandNames".to_string(),
+        "  let operands := stablehloOperandValues state op.operandNames".to_string(),
+        "  let values := semantics.evalPrimitive op operands".to_string(),
+        "  let withMissing := { state with missingValueNames := missing ++ state.missingValueNames }".to_string(),
+        "  bindStablehloResultValues op.resultNames values (markStablehloArityMismatch op values withMissing)".to_string(),
+        String::new(),
+        "def executeStablehloCallOp {α : Type} (semantics : StablehloValueSemantics α) (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  if op.callTarget == \"\" then".to_string(),
+        "    executeStablehloPrimitiveOp semantics op state".to_string(),
+        "  else".to_string(),
+        "    match findOperationalFunction op.callTarget with".to_string(),
+        "    | some fn => pushStablehloValueCallFrame op fn state".to_string(),
+        "    | none => { state with missingFunctionNames := op.callTarget :: state.missingFunctionNames }".to_string(),
+        String::new(),
+        "def executeStablehloReturnOp {α : Type} (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  let missing := stablehloMissingOperandNames state op.operandNames".to_string(),
+        "  let values := stablehloOperandValues state op.operandNames".to_string(),
+        "  let returnedState := { state with returns := values, missingValueNames := missing ++ state.missingValueNames }".to_string(),
+        "  match state.frames with".to_string(),
+        "  | [] => returnedState".to_string(),
+        "  | frame :: rest =>".to_string(),
+        "      if frame.callerResultNames == [] then".to_string(),
+        "        { returnedState with frames := rest }".to_string(),
+        "      else".to_string(),
+        "        let callerState := { returnedState with frames := rest, bindings := stablehloBindingsAtDepth frame.callerBindingDepth returnedState.bindings }".to_string(),
+        "        let withResults := bindStablehloResultValues frame.callerResultNames values callerState".to_string(),
+        "        if frame.callerResultNames.length == values.length then withResults else { withResults with arityMismatchOpIds := frame.callOpId :: withResults.arityMismatchOpIds }".to_string(),
+        String::new(),
+        "def executeStablehloWhileOp {α : Type} (semantics : StablehloValueSemantics α) (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match firstExpansionTarget \"while_cond\" op.opId, firstExpansionTarget \"while_do\" op.opId with".to_string(),
+        "  | some condRegionId, some bodyRegionId =>".to_string(),
+        "      let withBody := if semantics.selectWhileBody op state then pushStablehloValueRegionFrame op.functionName bodyRegionId state else state".to_string(),
+        "      pushStablehloValueRegionFrame op.functionName condRegionId withBody".to_string(),
+        "  | none, some bodyRegionId =>".to_string(),
+        "      { state with missingRegionIds := (\"while_cond:\" ++ op.opId) :: bodyRegionId :: state.missingRegionIds }".to_string(),
+        "  | some condRegionId, none =>".to_string(),
+        "      { state with missingRegionIds := condRegionId :: (\"while_do:\" ++ op.opId) :: state.missingRegionIds }".to_string(),
+        "  | none, none =>".to_string(),
+        "      { state with missingRegionIds := (\"while_cond:\" ++ op.opId) :: (\"while_do:\" ++ op.opId) :: state.missingRegionIds }".to_string(),
+        String::new(),
+        "def executeStablehloCaseOp {α : Type} (semantics : StablehloValueSemantics α) (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match listGetAt? (expansionTargets \"case_branch\" op.opId) (semantics.selectCaseBranch op state) with".to_string(),
+        "  | some regionId => pushStablehloValueRegionFrame op.functionName regionId state".to_string(),
+        "  | none => { state with missingRegionIds := (\"case_branch:\" ++ op.opId) :: state.missingRegionIds }".to_string(),
+        String::new(),
+        "def executeStablehloValueOp {α : Type} (semantics : StablehloValueSemantics α) (op : OperationalOp) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  let tracedState := recordStablehloExecutedOp op state".to_string(),
+        "  if op.kind == \"Call\" then".to_string(),
+        "    executeStablehloCallOp semantics op tracedState".to_string(),
+        "  else if op.kind == \"While\" then".to_string(),
+        "    executeStablehloWhileOp semantics op tracedState".to_string(),
+        "  else if op.kind == \"Case\" then".to_string(),
+        "    executeStablehloCaseOp semantics op tracedState".to_string(),
+        "  else if op.kind == \"Return\" then".to_string(),
+        "    executeStablehloReturnOp op tracedState".to_string(),
+        "  else if op.kind == \"Primitive\" then".to_string(),
+        "    executeStablehloPrimitiveOp semantics op tracedState".to_string(),
+        "  else".to_string(),
+        "    tracedState".to_string(),
+        String::new(),
+        "noncomputable def stepStablehloValue {α : Type} (semantics : StablehloValueSemantics α) (state : StablehloValueState α) : StablehloValueState α :=".to_string(),
+        "  match state.frames with".to_string(),
+        "  | [] => state".to_string(),
+        "  | frame :: rest =>".to_string(),
+        "      match frame.remainingOpIds with".to_string(),
+        "      | [] => { state with frames := rest }".to_string(),
+        "      | opId :: remaining =>".to_string(),
+        "          let advancedState := { state with frames := { frame with remainingOpIds := remaining } :: rest }".to_string(),
+        "          match findOperationalOp opId with".to_string(),
+        "          | some op => executeStablehloValueOp semantics op advancedState".to_string(),
+        "          | none => { advancedState with missingOpIds := opId :: advancedState.missingOpIds }".to_string(),
+        String::new(),
+        "noncomputable def runStablehloValueFuel {α : Type} (semantics : StablehloValueSemantics α) : Nat -> StablehloValueState α -> StablehloValueState α".to_string(),
+        "  | 0, state => { state with fuelExhausted := state.frames != [] }".to_string(),
+        "  | fuel + 1, state =>".to_string(),
+        "      if state.frames == [] then state else runStablehloValueFuel semantics fuel (stepStablehloValue semantics state)".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStablehloValueInitialState {α : Type} (inputBindings : List (StablehloValueBinding α)) : StablehloValueState α :=".to_string(),
+        "  pushStablehloValueFunctionFrame operationalProgram.entryFunction { emptyStablehloValueState with bindings := inputBindings }".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStablehloValueFuel {α : Type} (semantics : StablehloValueSemantics α) (inputBindings : List (StablehloValueBinding α)) (fuel : Nat) : StablehloValueState α :=".to_string(),
+        "  runStablehloValueFuel semantics fuel (generatedMainStablehloValueInitialState inputBindings)".to_string(),
+        String::new(),
+        "theorem generatedMainStablehloValueFuel_zero {α : Type} (semantics : StablehloValueSemantics α) (inputBindings : List (StablehloValueBinding α)) :".to_string(),
+        "    generatedMainStablehloValueFuel semantics inputBindings 0 = { generatedMainStablehloValueInitialState inputBindings with fuelExhausted := (generatedMainStablehloValueInitialState inputBindings).frames != [] } := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+    ]
+}
+
+fn render_public_stablehlo_value_interface(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let mut lines = vec![
+        "def stablehloEntryInputNames : List String :=".to_string(),
+        "  publicStablehloArguments.map (fun leaf => \"%\" ++ leaf.name)".to_string(),
+        String::new(),
+        "def stablehloEntryReturnOperandNames : List String :=".to_string(),
+        "  sourceMainReturnOperands".to_string(),
+        String::new(),
+        "structure StablehloInputLeaves (α : Type) where".to_string(),
+        "  bindings : List (StablehloValueBinding α)".to_string(),
+        "deriving Repr, DecidableEq".to_string(),
+        String::new(),
+        "def stablehloInputLeafNames {α : Type} (leaves : StablehloInputLeaves α) : List String :=".to_string(),
+        "  leaves.bindings.map (fun binding => binding.name)".to_string(),
+        String::new(),
+        "def stablehloInputLeavesMatchPublic {α : Type} (leaves : StablehloInputLeaves α) : Bool :=".to_string(),
+        "  stablehloInputLeafNames leaves == stablehloEntryInputNames".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStablehloValueFromLeaves {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) : StablehloValueState α :=".to_string(),
+        "  generatedMainStablehloValueFuel semantics leaves.bindings fuel".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStablehloValueStateAtFuel {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) : StablehloValueState α :=".to_string(),
+        "  generatedMainStablehloValueFromLeaves semantics leaves fuel".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStablehloValueLookupAtFuel {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat)".to_string(),
+        "    (name : String) : Option α :=".to_string(),
+        "  lookupStablehloValue name".to_string(),
+        "    (generatedMainStablehloValueStateAtFuel semantics leaves fuel).bindings".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStoppingResidualValueAtFuel {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) : Option α :=".to_string(),
+        "  generatedMainStablehloValueLookupAtFuel".to_string(),
+        "    semantics".to_string(),
+        "    leaves".to_string(),
+        "    fuel".to_string(),
+        "    sourceStoppingResidualOperandName".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStoppingToleranceValueAtFuel {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) : Option α :=".to_string(),
+        "  generatedMainStablehloValueLookupAtFuel".to_string(),
+        "    semantics".to_string(),
+        "    leaves".to_string(),
+        "    fuel".to_string(),
+        "    sourceStoppingToleranceOperandName".to_string(),
+        String::new(),
+        "noncomputable def generatedMainStoppingCompareValueAtFuel {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) : Option α :=".to_string(),
+        "  generatedMainStablehloValueLookupAtFuel".to_string(),
+        "    semantics".to_string(),
+        "    leaves".to_string(),
+        "    fuel".to_string(),
+        "    sourceStoppingCompareOperandName".to_string(),
+        String::new(),
+        "theorem generatedMainStablehloValueStateAtFuel_is_generated_from_leaves {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) :".to_string(),
+        "    generatedMainStablehloValueStateAtFuel semantics leaves fuel =".to_string(),
+        "      generatedMainStablehloValueFromLeaves semantics leaves fuel := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem generatedMainStablehloValueLookupAtFuel_def {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat)".to_string(),
+        "    (name : String) :".to_string(),
+        "    generatedMainStablehloValueLookupAtFuel semantics leaves fuel name =".to_string(),
+        "      lookupStablehloValue name".to_string(),
+        "        (generatedMainStablehloValueFromLeaves semantics leaves fuel).bindings := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem generatedMainStoppingResidualValueAtFuel_def {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) :".to_string(),
+        "    generatedMainStoppingResidualValueAtFuel semantics leaves fuel =".to_string(),
+        "      lookupStablehloValue sourceStoppingResidualOperandName".to_string(),
+        "        (generatedMainStablehloValueFromLeaves semantics leaves fuel).bindings := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem generatedMainStoppingToleranceValueAtFuel_def {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) :".to_string(),
+        "    generatedMainStoppingToleranceValueAtFuel semantics leaves fuel =".to_string(),
+        "      lookupStablehloValue sourceStoppingToleranceOperandName".to_string(),
+        "        (generatedMainStablehloValueFromLeaves semantics leaves fuel).bindings := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem generatedMainStoppingCompareValueAtFuel_def {α : Type}".to_string(),
+        "    (semantics : StablehloValueSemantics α)".to_string(),
+        "    (leaves : StablehloInputLeaves α)".to_string(),
+        "    (fuel : Nat) :".to_string(),
+        "    generatedMainStoppingCompareValueAtFuel semantics leaves fuel =".to_string(),
+        "      lookupStablehloValue sourceStoppingCompareOperandName".to_string(),
+        "        (generatedMainStablehloValueFromLeaves semantics leaves fuel).bindings := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+        "theorem stablehlo_entry_input_names_match_public_count :".to_string(),
+        "    stablehloEntryInputNames.length = publicStablehloArguments.length := by".to_string(),
+        "  simp [stablehloEntryInputNames]".to_string(),
+        String::new(),
+        "theorem stablehlo_entry_return_operand_names_match_public_count :".to_string(),
+        "    stablehloEntryReturnOperandNames.length = publicStablehloReturnLeaves.length := by".to_string(),
+        "  native_decide".to_string(),
+        String::new(),
+    ];
+    lines.extend(render_source_stablehlo_input_leaves(public_interface));
+    lines.extend(render_source_value_stablehlo_input_leaves(public_interface));
+    lines
+}
+
+fn render_source_stablehlo_input_leaves(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let argument_leaves = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array);
+    let stablehlo_arguments = nested_array(public_interface, &["stablehlo_entry", "arguments"]);
+    let mut entries = Vec::new();
+    let mut stable_index = 0usize;
+    if let Some(argument_leaves) = argument_leaves {
+        for leaf in argument_leaves {
+            if value_field(leaf, "dtype").is_empty() && value_field(leaf, "shape").is_empty() {
+                continue;
+            }
+            let stable_name = stablehlo_arguments
+                .and_then(|arguments| arguments.get(stable_index))
+                .map(|argument| format!("%{}", value_field(argument, "name")))
+                .unwrap_or_else(|| format!("%arg{stable_index}"));
+            let encoder = source_leaf_encoder_name(leaf);
+            let access = source_argument_leaf_access(leaf);
+            entries.push(format!(
+                "{{ name := {}, value := {} {} }}",
+                lean_string(stable_name),
+                encoder,
+                access,
+            ));
+            stable_index += 1;
+        }
+    }
+    let binding_list = if entries.is_empty() {
+        "[]".to_string()
+    } else {
+        format!("[{}]", entries.join(", "))
+    };
+    vec![
+        "/-- Public-root input leaves converted into StableHLO SSA input bindings. -/".to_string(),
+        "def sourceStablehloInputLeaves {α : Type}".to_string(),
+        "    (encodeFloat : SourceFloat -> α)".to_string(),
+        "    (encodeInt : SourceInt -> α)".to_string(),
+        "    (encodeNat : SourceNat -> α)".to_string(),
+        "    (encodeVector : SourceVector -> α)".to_string(),
+        "    (problem : SourceProblem)".to_string(),
+        "    (initializeConfig : SourceInitializeConfig) : StablehloInputLeaves α :=".to_string(),
+        "  let _unusedGenericInputs := (encodeFloat, encodeInt, encodeNat, encodeVector, initializeConfig)".to_string(),
+        format!("  {{ bindings := {} }}", binding_list),
+        String::new(),
+        "theorem sourceStablehloInputLeaves_match_public {α : Type}".to_string(),
+        "    (encodeFloat : SourceFloat -> α)".to_string(),
+        "    (encodeInt : SourceInt -> α)".to_string(),
+        "    (encodeNat : SourceNat -> α)".to_string(),
+        "    (encodeVector : SourceVector -> α)".to_string(),
+        "    (problem : SourceProblem)".to_string(),
+        "    (initializeConfig : SourceInitializeConfig) :".to_string(),
+        "    stablehloInputLeavesMatchPublic".to_string(),
+        "      (sourceStablehloInputLeaves".to_string(),
+        "        encodeFloat".to_string(),
+        "        encodeInt".to_string(),
+        "        encodeNat".to_string(),
+        "        encodeVector".to_string(),
+        "        problem".to_string(),
+        "        initializeConfig) = true := by".to_string(),
+        "  rfl".to_string(),
+        String::new(),
+    ]
+}
+
+fn render_source_value_stablehlo_input_leaves(
+    public_interface: Option<&serde_json::Map<String, Value>>,
+) -> Vec<String> {
+    let argument_leaves = public_interface
+        .and_then(|object| object.get("argument_leaves"))
+        .and_then(Value::as_array);
+    let stablehlo_arguments = nested_array(public_interface, &["stablehlo_entry", "arguments"]);
+    let mut entries = Vec::new();
+    let mut stable_index = 0usize;
+    if let Some(argument_leaves) = argument_leaves {
+        for leaf in argument_leaves {
+            if !public_leaf_is_stablehlo_argument(leaf) {
+                continue;
+            }
+            let stable_name = stablehlo_arguments
+                .and_then(|arguments| arguments.get(stable_index))
+                .map(|argument| format!("%{}", value_field(argument, "name")))
+                .unwrap_or_else(|| format!("%arg{stable_index}"));
+            let access = source_value_argument_leaf_access(leaf);
+            entries.push(format!(
+                "{{ name := {}, value := {} }}",
+                lean_string(stable_name),
+                access,
+            ));
+            stable_index += 1;
+        }
+    }
+    let binding_list = if entries.is_empty() {
+        "[]".to_string()
+    } else {
+        format!("[{}]", entries.join(", "))
+    };
+    vec![
+        "/-- Public-root input values converted into StableHLO SSA input bindings. -/".to_string(),
+        "def sourceValueStablehloInputLeaves {α : Type}".to_string(),
+        "    (problem : SourceValueProblem α) : StablehloInputLeaves α :=".to_string(),
+        format!("  {{ bindings := {} }}", binding_list),
+        String::new(),
+        "theorem sourceValueStablehloInputLeaves_match_public {α : Type}".to_string(),
+        "    (problem : SourceValueProblem α) :".to_string(),
+        "    stablehloInputLeavesMatchPublic".to_string(),
+        "      (sourceValueStablehloInputLeaves problem) = true := by".to_string(),
         "  rfl".to_string(),
         String::new(),
     ]
@@ -2385,8 +3421,8 @@ mod tests {
                     "leaf_index": 0,
                     "root_index": 1,
                     "root_name": "initialize_config",
-                    "path": "initialize_config.kkt_default_solve_config.solver_solve.stopping.runtime_rtol",
-                    "local_path": ".kkt_default_solve_config.solver_solve.stopping.runtime_rtol",
+                    "path": "initialize_config.default_stopping_config.runtime_rtol",
+                    "local_path": ".default_stopping_config.runtime_rtol",
                     "python_type": "str",
                     "shape": "",
                     "dtype": ""
@@ -2395,8 +3431,8 @@ mod tests {
                     "leaf_index": 1,
                     "root_index": 1,
                     "root_name": "initialize_config",
-                    "path": "initialize_config.kkt_default_solve_config.primal_regularization",
-                    "local_path": ".kkt_default_solve_config.primal_regularization",
+                    "path": "initialize_config.default_stopping_config.runtime_atol",
+                    "local_path": ".default_stopping_config.runtime_atol",
                     "python_type": "str",
                     "shape": "",
                     "dtype": ""
@@ -2461,16 +3497,40 @@ mod tests {
                 }
             ],
             "stablehlo_entry": {
-                "signature": "func.func public @main(%arg0: tensor<2xf32>) -> (tensor<f32> {jax.result_info = \"result[0].objective_value\"})",
+                "signature": "func.func public @main(%arg0: tensor<2xf32>) -> (tensor<f32> {jax.result_info = \"result[1][0].objective_value\"}, tensor<i32> {jax.result_info = \"result[1][0].status\"}, tensor<2xf32> {jax.result_info = \"result[1][1].x\"}, tensor<i32> {jax.result_info = \"result[1][2].step_count\"}, tensor<f32> {jax.result_info = \"result[1][2].ipm_res_final\"})",
                 "arguments": [
                     {"index": 0, "name": "arg0", "stablehlo_type": "tensor<2xf32>"}
                 ],
                 "return_leaves": [
                     {
                         "leaf_index": 0,
-                        "result_info": "result[0].objective_value",
+                        "result_info": "result[1][0].objective_value",
                         "stablehlo_type": "tensor<f32>",
-                        "result_indexes": [0]
+                        "result_indexes": [1, 0]
+                    },
+                    {
+                        "leaf_index": 1,
+                        "result_info": "result[1][0].status",
+                        "stablehlo_type": "tensor<i32>",
+                        "result_indexes": [1, 0]
+                    },
+                    {
+                        "leaf_index": 2,
+                        "result_info": "result[1][1].x",
+                        "stablehlo_type": "tensor<2xf32>",
+                        "result_indexes": [1, 1]
+                    },
+                    {
+                        "leaf_index": 3,
+                        "result_info": "result[1][2].step_count",
+                        "stablehlo_type": "tensor<i32>",
+                        "result_indexes": [1, 2]
+                    },
+                    {
+                        "leaf_index": 4,
+                        "result_info": "result[1][2].ipm_res_final",
+                        "stablehlo_type": "tensor<f32>",
+                        "result_indexes": [1, 2]
                     }
                 ]
             },
@@ -2480,7 +3540,7 @@ mod tests {
                 "return_root_count": 3,
                 "return_leaf_count": 5,
                 "stablehlo_argument_count": 1,
-                "stablehlo_return_leaf_count": 1,
+                "stablehlo_return_leaf_count": 5,
                 "has_answer_state_info_return": true
             }
         })
@@ -2525,12 +3585,12 @@ mod tests {
                         "args": [
                             "problem",
                             "state",
-                            "pdipm.SolveConfig(kkt_solve=initialize_config.kkt_default_solve_config)"
+                            "pdipm.SolveConfig(stopping=initialize_config.default_stopping_config)"
                         ],
                         "solve_config": {
                             "constructor": "pdipm.SolveConfig",
                             "keywords": {
-                                "kkt_solve": "initialize_config.kkt_default_solve_config"
+                                "stopping": "initialize_config.default_stopping_config"
                             },
                             "stopping_constructor": "stopping.SolveConfig",
                             "stopping_keywords": {
@@ -2563,6 +3623,45 @@ mod tests {
                         "region_id": "region_00000",
                         "parent_op_id": "",
                         "call_target": ""
+                    },
+                    {
+                        "op_id": "op_00001",
+                        "kind": "Primitive",
+                        "opcode": "stablehlo.constant",
+                        "line": 2,
+                        "text": "%tol = stablehlo.constant dense<1.000000e-04> : tensor<f32>",
+                        "text_sha256": "tol-digest",
+                        "dtypes": ["f32"],
+                        "function": "main",
+                        "region_id": "region_00001",
+                        "parent_op_id": "",
+                        "call_target": ""
+                    },
+                    {
+                        "op_id": "op_00002",
+                        "kind": "Primitive",
+                        "opcode": "stablehlo.compare",
+                        "line": 3,
+                        "text": "%cmp = stablehlo.compare LE, %res, %tol, FLOAT : (tensor<f32>, tensor<f32>) -> tensor<i1>",
+                        "text_sha256": "cmp-digest",
+                        "dtypes": ["f32", "i1"],
+                        "function": "main",
+                        "region_id": "region_00001",
+                        "parent_op_id": "",
+                        "call_target": ""
+                    },
+                    {
+                        "op_id": "op_00003",
+                        "kind": "Return",
+                        "opcode": "func.return",
+                        "line": 4,
+                        "text": "return %obj, %status, %state, %step, %res : tensor<f32>, tensor<i32>, tensor<2xf32>, tensor<i32>, tensor<f32>",
+                        "text_sha256": "return-digest",
+                        "dtypes": ["f32", "i32"],
+                        "function": "main",
+                        "region_id": "region_00001",
+                        "parent_op_id": "",
+                        "call_target": ""
                     }
                 ],
                 "functions": [
@@ -2571,7 +3670,7 @@ mod tests {
                         "name": "main",
                         "signature": "func.func @main()",
                         "line_start": 1,
-                        "line_end": 3,
+                        "line_end": 4,
                         "body_region_id": "region_00001"
                     }
                 ],
@@ -2583,8 +3682,8 @@ mod tests {
                         "parent_op_id": "",
                         "depth": 0,
                         "line_start": 1,
-                        "line_end": 3,
-                        "op_ids": ["op_00000"]
+                        "line_end": 4,
+                        "op_ids": ["op_00000", "op_00001", "op_00002", "op_00003"]
                     }
                 ],
                 "expansion_edges": [
@@ -2599,7 +3698,7 @@ mod tests {
                     "function_count": 1,
                     "region_count": 1,
                     "expansion_edge_count": 1,
-                    "op_count": 1,
+                    "op_count": 4,
                     "unassigned_op_count": 0,
                     "max_region_depth": 0,
                     "while_count": 0,
@@ -2700,11 +3799,14 @@ mod tests {
         assert!(rendered.contains("def stepOperational"));
         assert!(rendered.contains("def runOperationalFuel"));
         assert!(rendered.contains("noncomputable def generatedMainFuel"));
+        assert!(rendered.contains("structure StablehloValueSemantics"));
+        assert!(rendered.contains("def stepStablehloValue"));
+        assert!(rendered.contains("def runStablehloValueFuel"));
+        assert!(rendered.contains("noncomputable def generatedMainStablehloValueFromLeaves"));
         assert!(rendered.contains("structure SourceRoot"));
         assert!(rendered.contains("def sourceRoot : SourceRoot"));
-        assert!(rendered.contains("structure SourceKktSolveConfig where"));
-        assert!(rendered.contains("solverSolveStoppingRuntimeRtol : String"));
-        assert!(rendered.contains("primalRegularization : String"));
+        assert!(!rendered.contains("structure SourceKktSolveConfig where"));
+        assert!(!rendered.contains("kktDefaultSolveConfig"));
         assert!(rendered.contains("structure SourceAnswer where"));
         assert!(rendered.contains("objectiveValue : SourceFloat"));
         assert!(rendered.contains("status : SourceInt"));
@@ -2715,10 +3817,21 @@ mod tests {
         assert!(rendered.contains("ipmResFinal : SourceFloat"));
         assert!(rendered.contains("def sourceGeneratedReturn"));
         assert!(rendered.contains("def sourceAlgorithmRun"));
+        assert!(rendered.contains("noncomputable def sourceValueAlgorithmRun"));
+        assert!(rendered.contains("sourceValueAlgorithmRun_is_generated_from_public_values"));
         assert!(rendered.contains("def sourceMain"));
-        assert!(rendered.contains("sourceMainProjectionExpanded = true"));
-        assert!(rendered.contains("sourceMainValueExpanded = false"));
+        assert!(rendered.contains("sourceMainProjectionCoverageClosed = true"));
+        assert!(rendered.contains("sourceMainValueProjectionCoverageClosed = true"));
         assert!(rendered.contains("sourceSolveConfig initialize_config"));
+        assert!(rendered.contains("residualOperand : String"));
+        assert!(rendered.contains("toleranceOperand : String"));
+        assert!(rendered.contains("residualCompareOperand : String"));
+        assert!(rendered.contains("def sourceStoppingResidualReturnLeaf"));
+        assert!(rendered.contains("def sourceStoppingReturnedResidualOperandName : String"));
+        assert!(rendered.contains("def sourceStoppingResidualOperandName : String"));
+        assert!(rendered.contains("def sourceStoppingToleranceOperandName : String"));
+        assert!(rendered.contains("def sourceStoppingCompareOperandName : String"));
+        assert!(rendered.contains("sourceStoppingCompare_operational_binding"));
         assert!(rendered.contains("def publicAnswerLeafPaths : List String"));
         assert!(rendered.contains("answer.objective_value"));
         assert!(rendered.contains("answer.status"));
@@ -2802,6 +3915,9 @@ mod tests {
         assert!(rendered.contains("def stepOperational"));
         assert!(rendered.contains("def runOperationalFuel"));
         assert!(rendered.contains("noncomputable def generatedMainFuel"));
+        assert!(rendered.contains("structure StablehloValueSemantics"));
+        assert!(rendered.contains("def stepStablehloValue"));
+        assert!(rendered.contains("def runStablehloValueFuel"));
         assert!(rendered.contains("stablehloSha256"));
         assert!(rendered.contains("generatedFunction_root"));
     }

@@ -9,8 +9,9 @@
 
 Production files that import ``algorithm_module_protocol`` are expected to be
 algorithm modules unless they are package exports, canon registries, or tests.
-Algorithm modules must expose exactly the standard public names and must not
-keep additional top-level public definitions.
+Algorithm modules must expose the standard public names. Result-status constants
+are allowed under the ``STATUS_`` prefix because they are the stable vocabulary
+for ``Answer.status``; other top-level public definitions are rejected.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ EXPECTED_PUBLIC_NAMES = (
 )
 EXPECTED_PUBLIC_NAME_SET = frozenset(EXPECTED_PUBLIC_NAMES)
 EXPECTED_PUBLIC_NAMES_AS_SET: set[str] = set(EXPECTED_PUBLIC_NAMES)
+ALLOWED_EXTRA_PUBLIC_PREFIXES = ("STATUS_",)
 DEFAULT_EXCLUDES = (
     ".git",
     ".ruff_cache",
@@ -185,6 +187,11 @@ def is_public_assignment(name: str) -> bool:
     return not name.startswith("_") and name != "__all__"
 
 
+def is_allowed_extra_public_name(name: str) -> bool:
+    """Return true for bounded public constants outside the standard surface."""
+    return any(name.startswith(prefix) for prefix in ALLOWED_EXTRA_PUBLIC_PREFIXES)
+
+
 def is_allowed_non_algorithm_import(relative: str) -> bool:
     """Return true for protocol imports that are not algorithm modules."""
     return any(
@@ -279,6 +286,8 @@ def analyze_file(root: Path, path: Path) -> tuple[ModuleReport | None, list[Find
 
     all_name_set = set(all_names)
     for name in sorted(all_name_set - EXPECTED_PUBLIC_NAME_SET):
+        if is_allowed_extra_public_name(name):
+            continue
         findings.append(
             Finding(
                 path=relative,
@@ -300,6 +309,8 @@ def analyze_file(root: Path, path: Path) -> tuple[ModuleReport | None, list[Find
         )
     for name, line in sorted(definitions.items()):
         if name not in EXPECTED_PUBLIC_NAME_SET:
+            if is_allowed_extra_public_name(name):
+                continue
             findings.append(
                 Finding(
                     path=relative,

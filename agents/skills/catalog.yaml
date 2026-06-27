@@ -777,6 +777,10 @@ skill_families:
     purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .agents/skills/formal-proof-workflow/SKILL.md
+  - id: lean-algorithm-design
+    purpose: Design candidate algorithms directly in Lean before production implementation, prove or refute the mathematical design contract, and hand checked definitions to implementation.
+    canonical_doc: agents/skills/lean-algorithm-design.md
+    shim: .agents/skills/lean-algorithm-design/SKILL.md
   - id: algorithm-proof-exploration
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md

@@ -63,6 +63,11 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - active runtime が explicit user request を spawn 条件にする場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、authorization が揃った時点で spawn します
 - active な subagent 数は spawn budget で縛ります
 - spawn budget は同時 active 数の上限です。parent は Intake Responsibility Wave で requirements / exploration / execution planning を分け、以後の stage wave を workflow family の budget 内で追加します。独立 workstream が複数ある場合は、workstream ごとの stage owner が vertical dynamic wave を起こします
+- Wave は frontier-driven adaptive loop です。parent は checker / graph / review
+  output から次 frontier queue を作り、必要な subagent を適応的に追加し、結果を
+  integrate して同じ validation を再実行します。frontier が
+  `verified`、`refuted`、`unprovable_under_assumptions`、または checked external
+  boundary に縮約された時点で closeout 条件を満たします。
 - multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は subagent type / behavior contract であり、実行単位は `role_type+instance_id` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
 - role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。

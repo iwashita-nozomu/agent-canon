@@ -20,7 +20,10 @@ Python source に対して、OOP 境界が「責務、状態、契約、公開�
 - 責務が見えない class 名: `Manager`、`Helper`、`Util`、`Thing` で終わる class を検出します。
 - 巨大 class / function: 行数が閾値を超え、複数責務が混ざりやすい境界を検出します。
 - public method 過多: class の公開 API が広すぎる場合を検出します。
-- instance state 過多: `self.*` の所有状態が多く、ライフサイクルや invariant が追いにくい class を検出します。
+- instance state 過多: `self.*` の所有状態と class body の型付き field が多く、
+  ライフサイクルや invariant が追いにくい class を検出します。Equinox
+  `Module` のように typed class field が状態・契約を表す境界では、その field を
+  thin-class 判定の state/contract として扱います。
 - static method だけの namespace class: module function で十分な class を検出します。
 - thin class: dataclass、protocol、algorithm contract ではない薄すぎる class を検出します。
 - method が `self` / `cls` を使わない場合: class の凝集度が低い method を検出します。
