@@ -1104,6 +1104,24 @@ entries:
     tests: []
     test_exempt_reason: Orchestrates other tested tools and repo-wide checks.
 
+  - id: run-python-quality-checks
+    summary: Runs the shared Python quality gate used by CI and pre-review wrappers.
+    path: tools/ci/run_python_quality_checks.sh
+    family: ci
+    role: runner
+    status: canonical
+    command: bash tools/ci/run_python_quality_checks.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+    tests:
+      - tests/tools/test_run_all_checks_script.py
+
   - id: check-agent-canon-latest
     summary: Checks whether the AgentCanon pin and source are current and emits the PR-first handoff when shared canon is dirty.
     path: tools/ci/check_agent_canon_latest.sh

@@ -134,7 +134,7 @@ SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
     "exit 86",
 )
 SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS = (
-    "tools/ci/checkout_agent_canon_submodule.sh",
+    ".github/scripts/checkout_agent_canon_submodule.sh",
     "exec bash",
 )
 ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
@@ -576,13 +576,13 @@ def submodule_checkout_script_findings(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     findings.extend(
         require_text(
-            root / "tools" / "ci" / "checkout_agent_canon_submodule.sh",
+            root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
             SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
         )
     )
     findings.extend(
         require_text(
-            root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
+            root / "tools" / "ci" / "checkout_agent_canon_submodule.sh",
             SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS,
         )
     )

@@ -1594,6 +1594,54 @@
     },
     {
       "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE",
+      "line": 19,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE",
+      "line": 25,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE",
+      "line": 168,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_AUTH",
+      "line": 68,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_AUTH",
+      "line": 80,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "GIT_SSH_COMMAND",
+      "line": 76,
+      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "closeout_gate",
       "line": 123,
@@ -11092,7 +11140,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 565,
+      "line": 572,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11100,7 +11148,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 723,
+      "line": 730,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11108,7 +11156,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 723,
+      "line": 730,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11116,7 +11164,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 65,
+      "line": 72,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11124,7 +11172,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_ADDED",
-      "line": 665,
+      "line": 672,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11132,7 +11180,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_BASELINE",
-      "line": 664,
+      "line": 671,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11140,7 +11188,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_DYNAMIC_FIELDS",
-      "line": 682,
+      "line": 689,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11148,7 +11196,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_FIELDS",
-      "line": 681,
+      "line": 688,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11156,7 +11204,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_FILES",
-      "line": 680,
+      "line": 687,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11164,7 +11212,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 663,
+      "line": 670,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11172,7 +11220,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 679,
+      "line": 686,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11180,7 +11228,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "LOG_SURFACE_REMOVED",
-      "line": 666,
+      "line": 673,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11188,30 +11236,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_BASELINE_MISSING",
-      "line": 712,
-      "path": "tools/agent_tools/log_surface_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LOG_SURFACE_INVENTORY",
-      "line": 700,
-      "path": "tools/agent_tools/log_surface_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LOG_SURFACE_INVENTORY",
-      "line": 711,
-      "path": "tools/agent_tools/log_surface_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LOG_SURFACE_INVENTORY",
       "line": 719,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
@@ -11219,8 +11243,32 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "LOG_SURFACE_INVENTORY",
+      "line": 707,
+      "path": "tools/agent_tools/log_surface_inventory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "LOG_SURFACE_INVENTORY",
+      "line": 718,
+      "path": "tools/agent_tools/log_surface_inventory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "LOG_SURFACE_INVENTORY",
+      "line": 726,
+      "path": "tools/agent_tools/log_surface_inventory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY_ERROR",
-      "line": 701,
+      "line": 708,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -11228,7 +11276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY_OUTPUT",
-      "line": 707,
+      "line": 714,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -16418,54 +16466,6 @@
     },
     {
       "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE",
-      "line": 19,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE",
-      "line": 25,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE",
-      "line": 168,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_AUTH",
-      "line": 68,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_AUTH",
-      "line": 80,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "GIT_SSH_COMMAND",
-      "line": 76,
-      "path": "tools/ci/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
       "line": 778,
@@ -19669,6 +19669,7 @@
     ".codex/hooks/skill_usage_logger.py",
     ".codex/hooks/style_checker_guard.py",
     ".codex/hooks/task_authority_schema_guard.py",
+    ".github/scripts/checkout_agent_canon_submodule.sh",
     "agents/skills/README.md",
     "agents/skills/academic-writing.md",
     "agents/skills/adaptive-improvement-loop.md",
