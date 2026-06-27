@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract skill
 responsibility Documents Lean-first algorithm design before implementation.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ./formal-proof-workflow.md checker-backed formal proof workflow

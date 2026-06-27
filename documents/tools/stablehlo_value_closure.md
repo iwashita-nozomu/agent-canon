@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+contract reference
 responsibility Documents tools/agent_tools/stablehlo_value_closure.py.
 upstream implementation ../../tools/agent_tools/stablehlo_value_closure.py traces scoped StableHLO SSA dependencies.
 upstream design jit_canonical_ir.md defines the JIT-canonical operational IR input.
