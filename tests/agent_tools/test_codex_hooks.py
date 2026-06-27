@@ -954,7 +954,7 @@ class CodexHooksTest(unittest.TestCase):
         )
 
     def test_hook_dispatcher_post_tool_failure_is_quiet(self) -> None:
-        """PostToolUse fail-open diagnostics should not emit schema-sensitive stdout."""
+        """Verify PostToolUse fail-open diagnostics do not emit schema-sensitive stdout."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             hook_dir = temp_root / "hooks"
