@@ -22,6 +22,15 @@ The matrix is evidence for workflow design, not proof authority.  A claim is
 verified only when the target Lean file checks without `sorry`, unchecked
 axioms, or an equivalent proof escape hatch.
 
+## Reader Map
+
+Use this matrix to answer which Lean, Mathlib, Aesop, Plausible, search, and
+machine-interface features should be tried for a proof frontier before changing
+an algorithm or returning a blocker. Start with Source Sweep and Capability
+Table, then read Default Lean Attempt Order and Environment Policy for routing.
+Optimization/Solver Mapping and Cleanup Rule cover specialized frontiers and
+retirement of temporary proof paths.
+
 ## Source Sweep
 
 Primary and near-primary sources used for this matrix:

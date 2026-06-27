@@ -8,6 +8,16 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+This routine owns the inner loop for changing one implementation item at a time
+based on experiment evidence. Read `Purpose`, `Use When`, and `Core References`
+to confirm the loop applies, then use `Inputs`, `Outputs`, `Canonical Loop`,
+and `Decision States` while running iterations. `Operating Rules`,
+`Required Records`, `Suggested Templates`, and `Boundary` keep this routine
+separate from literature survey, single-run experiment handling, broader
+research workflow, and adaptive backlog tuning.
+
 ## Purpose
 
 実験結果を根拠に 1 change ずつ改造し、review で `approved` になるまで loop を自律的に回すための運用を定めます。

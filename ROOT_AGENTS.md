@@ -28,6 +28,20 @@ In template or derived repo roots they resolve under
 `vendor/agent-canon/documents/` unless `documents/README.md` lists a
 template-owned active contract.
 
+## Reader Map
+
+- This file owns the template-root runtime entrypoint for Codex and points each
+  runtime contract to its owner surface and checker.
+- Start with the runtime owner map, then use task entry, base runtime packet,
+  template context, shared canon flow, closeout evidence, and validation commands
+  for the current stage.
+- Read it at the beginning of repository work or when resolving whether a rule
+  belongs to the root view, AgentCanon source, a generated task packet, or a
+  checker.
+- This entrypoint routes to owner surfaces; workflow stages, skills, role
+  behavior, validation matrices, and closeout gates are updated in their owner
+  documents first.
+
 ## Runtime Owner Map
 
 | Contract | Owner Surface | Evidence / Checker |

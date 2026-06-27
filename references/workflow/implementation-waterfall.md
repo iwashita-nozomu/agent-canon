@@ -8,6 +8,17 @@ downstream design ../../agents/workflows/implementation-waterfall-workflow.md im
 @dependency-end
 -->
 
+## Reader Map
+
+- Owns the literature note that justifies local waterfall-style implementation
+  gates and handoff packets.
+- Main path: Question, Scope, Search Log, Primary Sources, Supporting Sources,
+  contrary evidence, Known/Contested/Open, and local implications.
+- Read this when revisiting why the local canon separates requirements,
+  design, implementation, and review gates.
+- Boundary: this is rationale and evidence, not the operational workflow
+  definition itself.
+
 ## Question
 
 agent を使う repo の実装プロセスを、どのような段階ゲート付きウォーターフォールとして定義すべきか。

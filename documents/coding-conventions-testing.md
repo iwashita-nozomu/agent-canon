@@ -10,6 +10,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 この文書は、`tests/` 配下のテストを対象にします。
 
+## この文書の読み方
+
+この文書は、test placement、unit test contract、contract-only wrapper gate、実行方法、想定解と標準出力ログ、pytest fixtures、乱数・大規模テスト、禁止事項を説明します。初めての作業では Source Basis とクイックリファレンスを読み、テスト追加時は配置と Unit Test Contract へ進みます。失敗診断や fixture 設計では実行方法、標準出力ログ、fixtures、乱数の章を確認します。
+
 ## Source Basis
 
 この方針は、次の一次資料・公式資料を repo 方針へ翻訳したものです。

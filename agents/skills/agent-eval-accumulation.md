@@ -13,6 +13,17 @@ downstream implementation ../../.agents/skills/agent-eval-accumulation/SKILL.md 
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: accumulates AgentCanon eval evidence through registered producers
+  and log-archive storage instead of hand-written summaries.
+- Use When: eval evidence is missing, stale, failing, or needs family-level
+  accumulation before claims are accepted.
+- Section path: Purpose and Use When define scope; Required Flow is the
+  mandatory checklist; Boundaries limits what this skill may generate or claim.
+- Boundary: do not hand-write eval reports when a registered producer and
+  archive path own the evidence.
+
 ## Purpose
 
 AgentCanon の prompt / role / local-LLM / workflow / report-quality eval を

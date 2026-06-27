@@ -22,6 +22,13 @@ The first lever is reasoning-effort reduction on narrow code-reading and bounded
 implementation roles; only after that should broader profile changes or output caps
 be considered.
 
+## Reader Map
+
+- This overlay owns token-saving modes, context budgets, reduction evidence, escalation triggers, and closeout constraints for Codex repo work.
+- The early sections define runtime profiles and agent modes; the middle sections define context budget and token reduction protocol; the final sections define escalation and closeout.
+- Use `## Runtime Profiles` and `## Agent Modes` before changing how much context or subagent fan-out a task receives.
+- For chunked reading, keep the active mode and evidence target in view, then open only the budget, reduction, escalation, or closeout section needed by the current task phase.
+
 ## Runtime Profiles
 
 Use Codex profiles as parent-session modes. For current Codex CLI behavior,

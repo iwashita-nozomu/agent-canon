@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+- Purpose: reviews Python diffs for type safety, tests, lint, API boundaries,
+  OOP readability, and SOLID evidence.
+- Use When: Python files, pyright findings, public APIs, typing boundaries, or
+  Python reviewer routing are in scope.
+- Section path: Purpose and Use When define triggers; 必須確認, 参照正本,
+  期待される結果, 必須チェックリスト, and 標準順序 are the operational rules;
+  よくある失敗 lists pitfalls.
+- Boundary: this skill reviews Python changes; it does not replace the owning
+  implementation or design route.
+
 ## Purpose
 
 Python 差分を型、テスト、lint、境界設計の観点で厳密に確認します。

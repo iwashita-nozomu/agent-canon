@@ -23,6 +23,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 
 # Formal Proof Workflow
 
+## Reader Map
+
+- Purpose: expose the formal proof workflow to Codex skill discovery and route
+  mathematical or implementation-derived claims into proof obligations.
+- Section path: Tool Commands names the command packet; the numbered rules carry
+  the operational sequence; later sections cover JIT-canonical IR, theorem
+  graph, Frontier Exploration Loop, Initialize-Rooted Proof Expansion, and
+  Nested Iterative Solver Proofs.
+- Use when: a task needs formal-proof scaffolding, generated Lean evidence,
+  theorem targets, or checker-gated proof status.
+- Boundary: this shim points to `agents/skills/formal-proof-workflow.md` for the
+  canonical policy and does not make unchecked sketches proof evidence.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

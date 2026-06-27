@@ -18,6 +18,17 @@ upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py re
 
 # Agent Log Analysis
 
+## Reader Map
+
+- Purpose: runtime skill for compacting AgentCanon log evidence before
+  diagnosing routing misses, weak skills, or workflow drift.
+- Use When: accumulated skill, tool, workflow, hook, eval, or wave logs need
+  analysis.
+- Tool Commands: run this skill's command packet, then read the canonical
+  `agents/skills/agent-log-analysis.md` workflow.
+- Boundary: generate the compact dashboard first; do not start with broad raw
+  log reading.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

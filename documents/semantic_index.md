@@ -24,6 +24,15 @@ The tool is candidate generation, not deletion authority. Strict structure
 hashes, dependency graph analysis, AST equality, and safe removal decisions stay
 in the existing strict analysis tools.
 
+## Reader Map
+
+Use this document to answer how semantic-index cache state is generated, which
+commands expose search or discourse evidence, and where Local LLM, provider,
+eval, and candidate-generation boundaries sit. Start with the evidence ledger,
+generated cache, and Local LLM boundary; then use Commands for operational
+entrypoints. The final sections explain providers, eval scope, and candidate
+generation boundaries so search output is not mistaken for edit authority.
+
 ## Evidence And Assumption Ledger
 
 - Evidence sources:

@@ -20,6 +20,17 @@ This file owns storage classes and retention decisions. External runtime hook
 JSONL and accumulated eval archive branch policy belong to
 `documents/runtime-log-archive.md`.
 
+## Reader Map
+
+- Owns storage classes, bundle shape, visualization rules, retention rules, and
+  closeout evidence for result logs and reports.
+- Main path: Storage Classes, Required Bundle Shape, Visualization Rules,
+  Retention Rules, and Closeout Evidence.
+- Read this before deciding where run artifacts, summaries, images, notebooks,
+  or report evidence should live.
+- Boundary: external runtime hook JSONL and accumulated eval archive branch
+  policy are owned by `documents/runtime-log-archive.md`.
+
 ## Storage Classes
 
 - `reports/agents/<run-id>/` stores source-repo-local agent workflow evidence,

@@ -25,6 +25,14 @@ Domain tools keep their own semantics and pass/fail authority as documented in `
 `../dependency-manifest-design.md`, and
 `../../rust/agent-canon/src/structured_analysis.rs`.
 
+## Reader Map
+
+Use this core contract to answer which graph storage objects are shared across
+structured-analysis adapters and which semantics remain adapter-owned. Start
+with the evidence ledger and mathematical contract, then read Core Object
+Contract, Layer Registry, and Adapter Map for implementation details. The final
+sections define validation, SQLite materialization, and extension rules.
+
 ## Evidence And Assumption Ledger
 
 - Evidence paths:

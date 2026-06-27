@@ -953,6 +953,45 @@ class CodexHooksTest(unittest.TestCase):
             ],
         )
 
+    def test_hook_dispatcher_post_tool_failure_is_quiet(self) -> None:
+        """PostToolUse fail-open diagnostics should not emit schema-sensitive stdout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            for script_name in self._dispatcher_scripts("PostToolUse"):
+                body = (
+                    "raise SystemExit(2)\n"
+                    if script_name == "skill_usage_logger.py"
+                    else ""
+                )
+                (hook_dir / script_name).write_text(
+                    "\n".join(["#!/usr/bin/env python3", body]),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                        "tool_input": {"patch": "*** Begin Patch\n*** End Patch\n"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                },
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
     def test_hook_dispatcher_combines_non_blocking_visible_outputs(self) -> None:
         """Dispatcher should not drop later non-blocking child diagnostics."""
         with tempfile.TemporaryDirectory() as temp_dir:

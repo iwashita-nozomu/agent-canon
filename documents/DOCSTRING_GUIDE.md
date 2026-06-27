@@ -12,6 +12,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 このドキュメントは、docstring 欠落と `__all__` 定義の不統一を改善するための正本ガイドです。
 
+## この文書の読み方
+
+この guide は、module / class / function docstring と `__all__` の実装パターン、良い例、checklist、自動チェック、CI/CD、改善段階を説明します。まず概要と Docstring 実装ガイドで目的を確認し、実装時はパターンごとの template を使います。公開面の整理では `__all__` 定義ガイドとチェックリストを読み、検証には自動チェックと CI/CD の章を使います。
+
 ## 📝 Docstring 実装ガイド
 
 ### なぜ docstring が重要なのか？

@@ -20,6 +20,19 @@ downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md ex
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: formalize mathematical, proof-sketch, and implementation-derived
+  claims into checker-backed proof or refutation routes.
+- Section path: start with Purpose, Use When, Core References, and Mandatory
+  Checklist; then use Canonical Flow, Required Outputs, Proof Status Table,
+  JIT-canonical IR, Lemma Dependency Graph, Frontier Exploration Loop, and the
+  proof-expansion sections for operational detail.
+- Use when: a claim needs Lean/Isabelle/Coq/SMT evidence, proof-search
+  scaffolding, theorem-graph routing, or generated implementation evidence.
+- Boundary: natural-language proof text, unchecked theorem files, and
+  `blocked` / `unverified` states are not final proof evidence.
+
 ## Purpose
 
 自然言語の数学的主張、証明スケッチ、設計上の lemma、または

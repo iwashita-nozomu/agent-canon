@@ -50,6 +50,10 @@ agent/worktree helper、review / validation runner、docs-check helper、contain
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
 実行する tool は [Runtime Profiles And Check Matrix](../runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
 
+## この文書の読み方
+
+この文書は、AgentCanon tool docs の reader-facing hub です。まず Where To Start で構造化 catalog、tool docs map、docs check、tool drift、dependency tool、graph visualization の入口を選びます。次に Tool Catalog と Tool Detail Notes で tool ごとの責務を確認し、Evidence / Assumption Ledger、置き場所の固定ルール、よく使うもの、結果ログと可視化へ進みます。正確な tool registry は prose ではなく `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を優先します。
+
 ## Where To Start
 
 This file explains the tool documentation surface. It is not a duplicate

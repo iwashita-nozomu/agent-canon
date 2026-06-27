@@ -15,6 +15,18 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: process GitHub PR and Issue queues with authority, validation,
+  evidence, and AgentCanon source/parent-pin separation.
+- Section path: Purpose, Use When, and Boundary define scope; Processing Graph
+  shows the high-level flow; PR Log Report Contract and Procedure define
+  operational evidence; AgentCanon Queue covers source/pin coordination.
+- Use when: a user asks to inventory, repair, merge, publish, ready, or triage
+  PRs/issues with durable run-bundle and PR Essence evidence.
+- Boundary: this skill fixes PR/Issue order and evidence; code repair is routed
+  to the relevant implementation or review skill.
+
 ## Purpose
 
 GitHub PR と Issue queue を、権限・検証・証跡を省いた直接 merge ではなく、

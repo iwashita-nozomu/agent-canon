@@ -11,6 +11,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 この文書は、この template を日常利用する host の前提条件をまとめます。
 対象は Linux と WSL2 です。macOS や純 Windows native は正本対象にしません。
 
+## この文書の読み方
+
+この文書は、Linux / WSL2 host の対象、必須条件、推奨設定、WSL2 rule、Docker / container、VS Code、GPU、Codex / agent、初期確認、置き場の原則を説明します。新しい host を準備するときは対象と必須から読み、devcontainer や GPU を使う場合は該当章へ進みます。macOS と純 Windows native の手順はこの文書の正本対象外です。
+
 ## 1. 対象
 
 - Ubuntu などの Linux host

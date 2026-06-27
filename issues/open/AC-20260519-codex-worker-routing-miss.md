@@ -26,6 +26,16 @@ required_action: Add a routing evidence step that makes Codex cite why implement
 close_condition: A workflow, skill, or eval gate fails or flags implementation delegation when a narrow design-traced slice skips the configured spark_worker role without an explicit alternate route reason.
 github_issue: pending
 
+## Reader Map
+
+- Owns the open issue record for Codex implementation-role routing evidence
+  misses.
+- Main path: Finding, Impact, Required Fix, and Evidence.
+- Read this before repairing or reviewing spark_worker/worker selection evidence
+  in workflow or skill surfaces.
+- Boundary: the issue records the defect and target surfaces; it does not itself
+  change Codex subagent routing policy.
+
 ## Finding
 
 On 2026-05-19, a narrow implementation cleanup for the demand-site experiment

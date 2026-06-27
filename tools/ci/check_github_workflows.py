@@ -133,6 +133,10 @@ SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
     "untrusted PR context",
     "exit 86",
 )
+SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS = (
+    "tools/ci/checkout_agent_canon_submodule.sh",
+    "exec bash",
+)
 ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "Synced to /.github/workflows/agent-coordination.yml",
     "Edit vendor/agent-canon/.github/workflows/agent-coordination.yml",
@@ -569,10 +573,20 @@ def submodule_checkout_script_findings(root: Path) -> list[Finding]:
     """Return findings for template-mode private submodule checkout script docs."""
     if not is_template_or_derived_repo(root):
         return []
-    return require_text(
-        root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
-        SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
+    findings: list[Finding] = []
+    findings.extend(
+        require_text(
+            root / "tools" / "ci" / "checkout_agent_canon_submodule.sh",
+            SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
+        )
     )
+    findings.extend(
+        require_text(
+            root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
+            SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS,
+        )
+    )
+    return findings
 
 
 def check_github_support_surfaces(root: Path) -> list[Finding]:

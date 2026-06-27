@@ -12,6 +12,17 @@ downstream implementation ../../.agents/skills/result-artifact-writeout/SKILL.md
 -->
 
 
+## Reader Map
+
+- Purpose: explains how to preserve tool, hook, eval, experiment, review, and
+  CI results as reusable artifacts instead of chat-only summaries.
+- Use When: result saving, export, report generation, accumulated evals, or
+  experiment evidence needs durable placement.
+- Section path: Purpose and Use When define scope; Output Contract,
+  Destination Rules, and Required Shape give the operational rules; Closeout
+  Tokens names completion evidence.
+- Boundary: generated reports are evidence artifacts, not policy truth.
+
 ## Purpose
 
 tool、hook、eval、experiment、review、CI の結果を、あとから再利用できる

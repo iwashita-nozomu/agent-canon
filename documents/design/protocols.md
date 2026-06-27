@@ -12,6 +12,13 @@ downstream design ../object-oriented-design.md consumes Protocol boundary rules
 この文書は、repo における `Protocol`、`TypeAlias`、契約 family の置き方と依存方向を定める設計正本です。
 実装詳細ではなく、どの層にどの契約を置くか、どこまでを共有契約にするかを固定します。
 
+## この文書の読み方
+
+- この文書は、`Protocol`、`TypeAlias`、契約 family の配置と依存方向を定めます。
+- 主な順路は、要約、規約、禁止事項、例外です。
+- shared/domain/runner の型契約をどの層に置くか決める前に読みます。
+- 境界: 具象実装の設計ではなく、契約 surface と依存方向の設計正本です。
+
 ## 要約
 
 - 共有契約は最下位の共有レイヤにある `protocols.py` または `typing.py` に集約します。

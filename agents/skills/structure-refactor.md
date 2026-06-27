@@ -19,6 +19,19 @@ downstream implementation ../../.agents/skills/structure-refactor/SKILL.md expos
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: route repository layout, responsibility-map, root-view, and
+  directory README changes through a structure contract.
+- Section path: start with Purpose, Evidence Sources, Use When, Pre-Task
+  Structure Repair Contract, Required Structure Contract, and Structure Review
+  Gate; use Default Sequence, Move Rules, Multi-Agent Review, and Closeout
+  Tokens for execution.
+- Use when: repo structure, path ownership, AgentCanon root views, `.codex` /
+  `.agents` boundaries, or directory responsibility evidence must change.
+- Boundary: this skill classifies and validates structure surfaces; generic
+  behavior-preserving mechanics belong to `refactor-loop`.
+
 ## Purpose
 
 `structure-refactor` is the skill for changing or repairing repository

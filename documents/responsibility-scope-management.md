@@ -22,6 +22,17 @@ The source of truth is a top-level `responsibility-scope.toml` in the repository
 being checked. AgentCanon owns the validator and starter template; it does not
 own the responsibility map for template-derived repositories.
 
+## Reader Map
+
+- Owns responsibility-scope owner classes, tool contracts, issue/GitHub sync,
+  and eval evidence expectations.
+- Main path: Owner Classes, Tool Contract, Issue And GitHub Sync, and Eval
+  Evidence.
+- Read this before changing responsibility-scope tooling, owner labels, or
+  protecting-tool evidence.
+- Boundary: it defines scope-management contracts, not task-specific ownership
+  decisions for a single run.
+
 Each scope declares:
 
 - `owner`: who owns the surface.

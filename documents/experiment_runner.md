@@ -28,6 +28,10 @@ upstream design README.md durable document index
 - completion の正本は `ExecutionResult` だけです。
 - legacy な `int exit_code` 契約や複数 scheduler を新設することを禁止します。
 
+## この文書の読み方
+
+この設計方針は、`experiment_runner` を採用する実験側 module layout と責務境界を説明します。まず実験側が実装する `task`、`cases`、環境初期化、結果出力、topic 公開入口を読みます。次に runner 側責務、標準構成、`ExecutionResult`、resource scheduler、禁止事項、monitor、非目標へ進み、実験コードに process 管理や alternate runner を混ぜない境界を確認します。
+
 ## 1. 実験側が実装するもの
 
 `experiment_runner` を使う実験コードは、実質的に次の 5 点だけを実装します。

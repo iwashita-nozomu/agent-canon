@@ -15,6 +15,17 @@ downstream design agent-eval-accumulation.md repairs missing accumulated eval fa
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: turns accumulated AgentCanon logs into compact dashboard evidence
+  before interpreting routing misses, skill gaps, or workflow behavior.
+- Use When: analyzing skill, tool, workflow, hook, eval, wave, or subagent logs
+  for repeated misses or selection gaps.
+- Section path: Purpose and Use When define the trigger; Required Flow is the
+  mandatory checklist; Boundaries and Finding Route Packet define what may be
+  claimed and handed off.
+- Boundary: do not read raw logs broadly before generating the compact summary.
+
 ## Purpose
 
 skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tree

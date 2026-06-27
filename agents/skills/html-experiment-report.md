@@ -16,6 +16,18 @@ downstream implementation ../../tools/agent_tools/semantic_provider_html_report.
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: routes experiment or Eval evidence into a browser-readable HTML
+  report with a first-figure plan and bounded rendering workflow.
+- Use When: the user asks for an HTML report, dashboard, browser view, or
+  visual inspection artifact for experiment, benchmark, Eval, or workflow logs.
+- Section path: Purpose and Use When set scope; Required Order is the mandatory
+  checklist; Primary Figure Contract and Semantic Provider Report Path capture
+  report-specific obligations; Closeout Tokens lists completion evidence.
+- Boundary: raw artifact storage, experiment scheduling, and domain decisions
+  stay with the owning skills or tools.
+
 ## Purpose
 
 `html-experiment-report` is the skill for turning an experiment or Eval artifact

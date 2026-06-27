@@ -11,6 +11,12 @@ upstream design README.md memory surface index
 この file は、agent の作業哲学、対話から得た学習、repo-wide な判断原則を逐次追記する append-first note です。
 `AGENTS.md` や workflow 正本へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
+## この文書の読み方
+
+- この note は、agent 自身の作業哲学、判断癖、対話上の再発防止、retrospective を集める append-first surface です。
+- `Use` で追記対象と昇格前の扱いを確認し、`Working Principles` と `Interaction Observations` で蓄積された観測を読みます。
+- 安定化した候補を確認するときは `Promotion Candidates`、未解決の論点を見るときは `Open Questions` を読みます。
+
 ## Use
 
 - user preference は `memory/USER_PREFERENCES.md` に残します。
@@ -338,6 +344,18 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: 2026-06-22 user feedback that PR essence tends to be absent from documentation
 
+- 2026-06-27 | interaction-observation | For repository investigation, start from declared repository structure and owner maps before broad text search; use text search only after narrowing by AGENTS.md, README, responsibility scope, task packets, or structure contracts.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback: initial rg-first search was wrong; search from repo structure instead.
+
+- 2026-06-27 | interaction-observation | 分割は差し替え可能な単位に限る。数理的に差し替えが発生しない境界、記法だけの境界、同じ oracle を共有する連続導出は同じ packet と owner scope に残し、過剰な subagent / document split を避ける。
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-27 user feedback: 分割が過剰がち。数理的に差し替えが発生しない境界を分割する必要はない。
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
@@ -389,6 +407,12 @@ upstream design README.md memory surface index
   - scope: validation-policy numerical-tests gpu-runtime
   - confidence: likely
   - evidence: User feedback on 2026-06-16: prohibit doing computation tests on CPU.
+
+- 2026-06-27 | failure-avoidance | Full CI is a confidence gate, not the default evidence for narrow docs, prompt-only, or focused changes; select validation by runtime profile and risk class, and record targeted evidence instead of escalating automatically to make ci.
+  - source: chat
+  - scope: agent-runtime-validation
+  - confidence: stable
+  - evidence: User feedback on 2026-06-27: CI may be excessive.
 
 ## Open Questions
 

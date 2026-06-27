@@ -13,6 +13,18 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 このディレクトリは、public Codex skill 文書の人間向け正本です。
 機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にします。
 
+## Reader Map
+
+- Purpose: index the public skill canon and explain the split between
+  human-facing skill docs and runtime discovery shims.
+- Section path: Rules and Skill Visibility Naming define naming and ownership;
+  Public Skill Surface is the main catalog table; Internal Review And Runtime
+  Routines, Official System Skill Delegation, Codex Defaults, and Updating
+  Skills define boundaries and maintenance.
+- Use when: adding, routing, reviewing, or explaining public AgentCanon skills.
+- Boundary: long skill behavior belongs in each `agents/skills/<skill>.md` and
+  runtime discovery belongs in `.agents/skills/<skill>/SKILL.md`.
+
 ## Rules
 
 - skill の目的、使う場面、関連正本は `agents/skills/` に書きます。
@@ -25,15 +37,14 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 
 ## Skill Visibility Naming
 
-User-facing skill names use plain hyphen-case, such as `research-workflow`.
-They are catalog-backed, documented in this directory, exposed through
-`.agents/skills/<skill>/SKILL.md`, and enabled from `.codex/config.toml`.
+ユーザー向け skill 名は `research-workflow` のような plain hyphen-case を使います。
+catalog に登録し、この directory に文書化し、`.agents/skills/<skill>/SKILL.md`
+から公開し、`.codex/config.toml` で有効化します。
 
-Runtime-internal skill shims use a leading underscore, such as
-`_runtime-helper`. Their owner surface is the calling workflow, role, or public
-skill rather than the public catalog, public table, or `.codex/config.toml`.
-Use this lane when a Codex runtime shim is genuinely needed; workflow-only
-material belongs in `agents/internal-routines/`.
+runtime-internal skill shim は `_runtime-helper` のように先頭 underscore を使います。
+owner surface は public catalog、public table、`.codex/config.toml` ではなく、呼び出し元の
+workflow、role、public skill です。Codex runtime shim が必要な場合はこの lane を使い、
+workflow-only material は `agents/internal-routines/` に置きます。
 
 ## Public Skill Surface
 

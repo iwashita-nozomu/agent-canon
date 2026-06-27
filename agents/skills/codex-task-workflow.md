@@ -13,6 +13,17 @@ downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: gives Codex a context-independent repository task execution path
+  from intake through validation and closeout.
+- Use When: a repo-changing task needs artifact placement, implementation
+  routing, validation, reviews, or closeout evidence.
+- Section path: Purpose, Use When, and Core Reference orient the route; Stages
+  gives the operational flow; Required Output names the completion packet.
+- Boundary: task-specific behavior still comes from the user-request clauses,
+  source packet, selected skills, and validation route.
+
 ## Purpose
 
 Codex が会話コンテキストに依存せず、毎回同じ順序で task を進めるための標準フローです。
@@ -44,14 +55,18 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 ## Required Output
 
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
+- `task_start.py` / `bootstrap_agent_run.py` が出す `REPO_TOOL_ROUTING_SEQUENCE`、
+  `REPO_TOOL_ROUTING_NEXT_COMMAND`、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を
+  run-local packet として扱い、`team_manifest.yaml` の
+  `run.repo_tool_routing_policy` を handoff に渡す
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
 - `Scoped Change Lite` では cheap local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では、実装前に parent-direct route と targeted validation が固定された場合に parent-direct を使う
-- repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。小規模修正は `$small-change-routing` に流し、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す
-- ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理・allowed_paths 固定・write scope 固定・validation route 固定・`tool_rejection_preflight` 固定後に `spark_worker` / `worker` を起動してから実装へ進む
+- repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。小規模修正は `$small-change-routing` に流し、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す。小規模修正は routing と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導く
+- ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、`spark_worker` / `worker` を起動してから実装へ進む
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
-- ユーザー向けの作業報告と最終報告は自然な文章にします。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
+- ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
 - AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
 - commit / push の前に `documents/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
@@ -67,6 +82,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、各 implementation slice と downstream side effect が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
 - 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きで処理してはいけない
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、`Implementation Source Packet`、validation route を結び、要求を縮める implementation shortcut を見つけたら `design_issue_blocker` と evidence を記録して design review へ戻る
+- task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、validation profile を選ぶ signal として扱います。実装 behavior は request clauses、acceptance contract、implementation source packet、design trace、dependency-expanded scope、validation route、review gate から導きます。
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱う
 - class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る implementation slice は `$oop-readability-check` を validation route に入れ、SOLID principle signal、OOP dimension、finding kind、`tools/oop/shared/readability_core.py` の mapping を design artifact に結びます。
 - SOLID-sensitive な Python slice は `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` で、OOP readability report の `scanned_paths` が changed path を覆うことを確認します。
@@ -77,7 +93,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - fresh subagent に渡す prompt は chat history 依存にしない。`Fresh Subagent Context Capsule` に objective、request clauses、state snapshot、exact read-before-work paths、compact artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を詰める。full transcript、raw logs、full dashboard、repo root 全体を context として渡さない
 - runtime/tool gate が write-capable spawn を阻害する場合は `WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker を記録し、slice を `fallback_exit_status` に接続する。継続 route は canonical gate rerun による `canonical_rerun_pass`、`durable_blocker_or_issue`、または `explicit_approval_evidence` 付き revised workflow route とする
 - tool / checker / hook / reviewer / subagent feedback から実装へ入る場合は `tool-finding-report` で finding packet を作り、write-capable subagent handoff に artifact path、structured findings、prompt feedback decision を渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` が出た場合は、次の write-capable subagent を起動する前に handoff prompt、skill、workflow、または task catalog prompt を修正する
-- prompt/config drift が shared canon surface をまたぐ場合は、親がその場で prose を増やす前に `prompt_config_reviewer` で audit し、この workflow はその監査結果を消費して最小差分だけ適用する
+- prompt/config drift が shared canon surface をまたぐ場合は、親がその場で prose を増やす前に `prompt_config_reviewer` で audit し、この workflow はその監査結果と契約から導かれる差分を適用する
 - nontrivial document creation / revision では `prose-reasoning-graph` と `structure-planning` を構造先行 gate として通し、その後に `long-form-writing` / `paper-writing` / `academic-writing` へ渡す。typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残す
 - closeout 前に `check_dependency_headers.py --changed`、`scan_dependency_headers.sh --changed --fail-missing`、`check_dependency_header_format.sh --changed --require-header` を通す
 - dependency edge を変更した場合は `check_dependency_graph.sh --print-edges` の結果、または移行中 baseline と今回差分で新規 graph error を増やしていない evidence を残す

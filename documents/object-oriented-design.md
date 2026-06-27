@@ -25,6 +25,10 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 [Python コーディング規約](./coding-conventions-python.md) と
 [Protocol 設計](./design/protocols.md) を併読します。
 
+## この文書の読み方
+
+この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Backlog への変換、例外は、checker finding や設計 review の扱いを決めるときに使います。
+
 ## 要約
 
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。

@@ -14,6 +14,13 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+## Reader Map
+
+- This template owns the closeout evidence ledger that decides when user-facing completion may be unlocked.
+- The top sections record gate status and unlock rules; the evidence sections then cover dependency manifests, static analysis, AgentCanon sync, spec coverage, review integration, document structure, tool warnings, subagent lifecycle, diff-check, tree-head, report placement, evaluation, logs, and final evidence.
+- Verifiers and auditors should start with `## Gate Status` and `## Unlock Rule`, then fill only the evidence sections activated by the current run profile.
+- For chunked reading, keep the status keys as the checklist anchor and open each evidence section only when its corresponding key is still pending.
+
 ## Gate Status
 
 - verifier_status: pending
@@ -57,9 +64,9 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - unfinished_tasks_absent: yes
 - dependency_headers_complete: yes
 - repo_wide_dependency_tools_complete: yes
-- repo_wide_static_analysis_complete: yes
+- `repo_wide_static_analysis_complete`: `yes` for full static analysis, or `profile_selected` when the runtime profile selected targeted validation
 - agent_canon_latest_complete: yes
-- make_ci_status: pass
+- `make_ci_status`: `pass`, `targeted`, or `not_applicable` according to the active risk profile
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -87,11 +94,11 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Repo-Wide Static Analysis Evidence
 
-<!-- Before user-facing completion, run full-repo static analysis. Preferred evidence is `make ci` because it includes pyright and ruff without quick-mode skips. If environment constraints prevent `make ci`, record full-repo `python3 -m pyright` and `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` evidence and the toolchain repair performed. Do not unlock closeout with only `make ci-quick`. -->
+<!-- Before user-facing completion, select static-analysis evidence from the active runtime profile and risk class. Use `make ci` or equivalent full-repo pyright/ruff evidence when the profile requires a full local confidence gate, such as Large delivery, explicit user-requested comprehensive validation, or an AgentCanon PR gate that defines full CI as equivalent evidence. For Routine docs, prompt/prose-only edits, and Focused code slices, record the targeted commands that match the changed paths, set `repo_wide_static_analysis_complete: profile_selected`, and set `make_ci_status: targeted` or `not_applicable` as appropriate. `make ci-quick` alone is not a substitute when the selected profile requires full CI. -->
 
 ## AgentCanon Latest And CI Gate Evidence
 
-<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass`; documented environment/toolchain issues require environment repair before user-facing completion. -->
+<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push. For AgentCanon update-surface changes, commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` when main must be merged in, open or update the AgentCanon PR, and rerun `make agent-canon-ensure-latest`. Rerun `make ci` only when the active risk profile selects full CI; otherwise record the profile-selected targeted validation and set `make_ci_status: targeted` or `not_applicable`. Documented environment/toolchain issues still require environment repair before user-facing completion when the selected validation cannot run. -->
 
 - agent_canon_latest_command:
 - agent_canon_latest_status:

@@ -11,6 +11,18 @@ downstream design ../../.agents/skills/oop-readability-check/SKILL.md Codex disc
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: run the OOP readability checker and keep mechanical results separate
+  from optional agent interpretation.
+- Section path: Purpose and Use When identify triggers; Modes, Default Command,
+  Scope Rules, and Mechanical Result define execution; Agent Analysis, Timing
+  Token, and Boundary describe interpretation and limits.
+- Use when: a user asks for OOP, SOLID, readability, class responsibility,
+  inheritance, protocol, API-width, or dependency-inversion evidence.
+- Boundary: language-specific review skills consume this evidence for changed
+  code; this skill owns the mechanical report and optional separated analysis.
+
 ## Purpose
 
 Run the OOP readability checker and, when requested, interpret its result.

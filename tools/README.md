@@ -59,6 +59,18 @@ view with `bash tools/sync_agent_canon.sh link-root`. When a command or test log
 mentions `tools/...`, read it as the root execution path for AgentCanon-owned
 tooling unless the path is explicitly project-owned elsewhere.
 
+## Reader Map
+
+- Owns the shared AgentCanon tool surface, placement rules, audience split, and
+  catalog/documentation relationship for `tools/`.
+- Main path: Tool Catalog, Tool Audience And Placement, Evidence And Assumption
+  Ledger, included/excluded tool families, update path, repo-local import
+  policy, result/log/eval/search helpers, proof/IR tools, and related docs.
+- Read this before adding, moving, documenting, or invoking shared tools from a
+  template or derived repository.
+- Boundary: project-specific automation belongs outside root `tools/` unless it
+  is reusable AgentCanon capability.
+
 ## Tool Catalog
 
 `tools/catalog.yaml` is the structured AgentCanon tool catalog. It separates

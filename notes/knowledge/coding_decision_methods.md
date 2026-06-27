@@ -7,6 +7,18 @@ upstream design README.md notes lifecycle index
 @dependency-end
 -->
 
+## Reader Map
+
+- This note owns reusable coding-decision heuristics for implementation,
+  planning, review follow-up, and closeout judgment.
+- Read scope and known construction principles first, then use the coding task
+  decision ladder, architecture/design decisions, code review decision rules,
+  repo use, and practical commands as needed.
+- Use it when a coding or technical-doc task needs explicit requirements,
+  reuse, quality-attribute, verification, review, or closeout reasoning.
+- It is durable guidance for decisions, not a substitute for task-specific
+  `user_request_contract.md`, approved design packets, or validation evidence.
+
 
 ## Scope
 

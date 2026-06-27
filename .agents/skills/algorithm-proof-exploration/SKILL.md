@@ -18,6 +18,19 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
 
 # Algorithm Proof Exploration
 
+## Reader Map
+
+- Purpose: expose theorem-driven algorithm exploration to Codex and connect it
+  to formal proof adoption.
+- Section path: Tool Commands gives the command packet; the numbered rules hold
+  the required sequence; Outputs defines the return surface.
+- Use when: proof obligations require JIT-canonical IR, theorem dependency
+  graphs, algorithmic blockers, numerical witnesses, or algorithm-change
+  guidance.
+- Boundary: `$formal-proof-workflow` owns final checker-backed proof,
+  refutation, or unprovability; this shim owns discovery and operational
+  routing.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

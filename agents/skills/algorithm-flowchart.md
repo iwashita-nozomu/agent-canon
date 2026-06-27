@@ -12,6 +12,18 @@ downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md expo
 
 # algorithm-flowchart
 
+## Reader Map
+
+- Purpose: renders implemented algorithm and proof-state evidence into Mermaid
+  flowcharts from JIT-canonical IR, Lean evidence, and theorem graphs.
+- Use When: a task needs a visual algorithm/proof overlay for generated Lean
+  evidence, theorem graphs, or canonical IR records.
+- Section path: Purpose and Use When define scope; Canonical Flow is the
+  mandatory checklist; Interpretation and Guardrails define what the diagram may
+  claim.
+- Boundary: diagrams visualize existing evidence; they do not replace proof or
+  implementation validation.
+
 ## Purpose
 
 `algorithm-flowchart` は、JIT-canonical IR、生成済み Lean evidence module、theorem

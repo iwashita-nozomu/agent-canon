@@ -43,6 +43,17 @@ reader-state transitions, subtopics, and argument blocks are projection views
 over that same graph. The durable boundary is canonical graph versus projection
 view, not one prose layer versus another.
 
+## Reader Map
+
+Use this specification to answer what the prose graph DSL owns, which graph
+objects and relation vocabulary are valid, and how projections, diagnostics,
+edit operations, explanations, adapters, and validation fit together. Start
+with Normative Scope, Linguistic Grounding, and the responsibility contracts for
+authority boundaries; then read the object model, layer registry, identifiers,
+relation kinds, and projection sections for implementation work. The final
+sections cover visualization, handoff profiles, verification routes,
+diagnostics, edit packets, explanation, adapter behavior, and validation.
+
 ## Normative Scope
 
 This specification is binding for:

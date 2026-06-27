@@ -19,6 +19,13 @@ downstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability
 この workflow は、大規模 repo で「全体を把握しきれないまま局所修正を重ねる」失敗を避けるための refactor 専用 overlay です。
 primary family は `Large Delivery` または `Comprehensive Development` とし、実装順序は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) に従います。
 
+## この文書の読み方
+
+- この文書は、大規模 refactor の責務境界、OOP 方針、静的解析、実装分割、review / closeout overlay を所有します。
+- `Gate A-B` は設計と OOP 境界、`Gate C` は解析 tool と合格点、`Gate D-E` は分割実装と closeout を扱います。
+- refactor planner は `## Gate A. 設計見直し` から responsibility map と behavior contract を固定し、実装者は `Gate D` まで進む前に semantic delta の禁止条件を確認します。
+- chunked reading では、現在の refactor gate を単位にし、path mapping、allowed structural delta、forbidden semantic delta を同じ chunk で読むようにします。
+
 ## 目的
 
 - 実装前に設計境界を見直し、repo 全体の責務分解を固定する。

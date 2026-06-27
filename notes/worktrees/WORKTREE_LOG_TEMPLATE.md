@@ -37,11 +37,11 @@ upstream design README.md notes lifecycle index
 
 ## Observations
 
-- 
+- <observation>
 
 ## Carry-Over Targets
 
-- 
+- <carry-over-target>
 
 ## Quick References
 

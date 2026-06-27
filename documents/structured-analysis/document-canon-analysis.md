@@ -15,6 +15,17 @@ upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust s
 この文書は、文書の正本候補、runtime mirror、generated report、closed issue history、
 stale name、duplicate heading を structured analysis に取り込む adapter contract を定義する。
 
+## Reader Map
+
+- Owns document-canon and duplicate-document analysis as a structured-analysis
+  adapter.
+- Main path: Evidence And Assumption Ledger, Rust CLI, Finding Kinds,
+  Historical Records, DB Mapping, and Query Surface.
+- Read this before importing document inventory or canon-cleanup findings into
+  the structured-analysis DB.
+- Boundary: this adapter classifies document records and findings; cleanup
+  decisions still follow the document-canon workflow.
+
 ## Evidence And Assumption Ledger
 
 - Evidence sources:

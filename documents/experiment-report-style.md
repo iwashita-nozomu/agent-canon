@@ -31,6 +31,10 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 
 これは外部の学術 writing guide を、この repo の `experiments/` と `notes/` の運用に合わせて再構成したものです。以下の「carry-over」や `summary.json` の扱いなどは repo 向けの推論です。
 
+## この文書の読み方
+
+この文書は、実験レポートの置き場、標準構成、図表、sweep 設計、repo 用見出し、実験ログとの違いを説明します。まず基本方針と標準構成を読み、Title から Report Review Gate までを report skeleton として使います。図表や sweep の扱いは結果提示前に確認し、最後の章は実験ログや参考 source との境界確認に使います。
+
 ## 1. 基本方針
 
 - レポートは「実行ログ」ではなく「読んで判断できる文書」として書きます。

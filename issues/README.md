@@ -20,6 +20,12 @@ mirror created or updated by explicit sync tooling.
 It is not a run-bundle scratchpad.
 Use it when a user, reviewer, runtime check, CI failure, or agent retrospective exposes a workflow defect that should survive beyond the current run.
 
+## Reader Map
+
+- This README owns the durable local issue-file convention for AgentCanon operational findings.
+- `Directory Contract`, `File Naming`, and `Required Fields` define where issue files live and what metadata they carry; the search, PR gate, and GitHub sync sections describe the workflow around them.
+- Read it before opening, updating, closing, or mirroring an AgentCanon operational issue.
+
 ## Directory Contract
 
 - `issues/open/`: active operational findings that still need workflow, tool, documentation, or policy changes.

@@ -12,6 +12,16 @@ upstream design README.md durable document index
 研究の問い、数式、比較対象、逐次改造の記録方法は `agents/workflows/research-workflow.md` を正本とします。
 準備、実装、静的チェック、実行、結果レポートの標準手順は `agents/workflows/experiment-workflow.md` を参照してください。
 
+## この文書の読み方
+
+- この文書は、実験ディレクトリ構成、実行原則、設定 snapshot、
+  Make target、禁止事項、report/notes、branch 方針を定めます。
+- 主な順路は、対象、ディレクトリ構成、実行原則、設定 snapshot、
+  Make target と実行入口、禁止事項、report と notes、branch 方針です。
+- 実験を追加、実行、整理、closeout するときに読みます。
+- 境界: 研究 workflow と実験 workflow の正本は、冒頭で参照している
+  `agents/workflows/` 側の文書です。
+
 ## 1. 対象
 
 - 実験コード

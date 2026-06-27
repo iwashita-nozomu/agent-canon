@@ -17,6 +17,10 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 新規 repo と移行済み repo では submodule pin を標準にし、legacy subtree repo は移行完了まで互換 path として扱います。
 ファイル名に `subtree-migration` が残っているのは既存リンク互換のためです。通常運用の正本タイトルと本文は submodule-first です。
 
+## この文書の読み方
+
+この文書は、AgentCanon submodule 更新、legacy subtree 移行、root view 同期、PR 運用の境界を説明します。目的、固定構成、所有境界、編集ルール、同期ルールを先に読み、通常作業では GitHub canonical remote、PR ルール、完了条件、標準運用を使います。wrapper、worktree / submodule pin、移行フェーズ、リスク、legacy subtree appendix は、互換運用や移行判断が必要なときだけ読みます。
+
 ## 目的
 
 - `git clone <template>` 後に submodule init で shared canon を使える状態を保つ

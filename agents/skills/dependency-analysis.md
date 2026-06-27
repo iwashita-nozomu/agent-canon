@@ -13,6 +13,18 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py valid
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: collect dependency-header, graph, code-dependency, and
+  change-impact evidence before choosing or validating edit scope.
+- Section path: Purpose and Use When explain the trigger; Required Commands
+  lists the operational tool surface; Interpretation, Change Impact Packet, and
+  Core References define how outputs feed planning and handoff.
+- Use when: dependency manifests, changed-file gates, graph edges, reverse
+  edges, design-claim evidence, or repair-planning packets are needed.
+- Boundary: code dependency evidence and dependency-header evidence remain
+  separate until summarized in a token-light Change Impact Packet.
+
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。

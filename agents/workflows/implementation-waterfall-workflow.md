@@ -19,6 +19,13 @@ README、workflow、guide、migration、specification など file responsibility
 論文、thesis chapter、scholarly note のような学術文章では、`agents/workflows/academic-writing-workflow.md` を優先 overlay として使います。
 原因考察、修正箇所選定、複数候補比較が必要な変更では、`agents/workflows/hypothesis-validation-workflow.md` を overlay として使います。
 
+## この文書の読み方
+
+- この文書は、repo に持ち帰る code / docs / environment change の実装 gate を所有します。
+- 前半は目的、適用範囲、標準ゲート、反復 cycle を固定し、後半は差し戻し、prototype、family 別 route、reuse-first、closeout、convention gate を扱います。
+- 実装担当者は `## 4. 標準ゲート` と `## 4A. 反復サイクル` から読み、reviewer は差し戻しと closeout の節を合わせて確認します。
+- chunked reading では、まずこの map と `## 4. 標準ゲート` を読み、必要な overlay だけを `## 7. Family ごとの使い分け` から辿ります。
+
 ## 1. 目的
 
 - stage ごとに適切な subagent / specialist を explicit に立てる
@@ -63,7 +70,7 @@ README、workflow、guide、migration、specification など file responsibility
 
 ## 4. 標準ゲート
 
-この workflow では、最小でも次の stage を順に通します。
+この workflow では、契約完全性を満たす標準 stage として次を順に通します。
 
 1. subagent bootstrap
 1. 要件整理
@@ -411,7 +418,7 @@ exit 条件:
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
 - refactor pass では move / rename / split と挙動保存境界が文書だけで追える
-- 包括 refactor では設計見直し、OOP 的な最小実装方針、解析 baseline / target score が文書だけで追える
+- 包括 refactor では設計見直し、OOP 的な契約完全実装方針、解析 baseline / target score が文書だけで追える
 
 ### Gate 6. 詳細設計レビュー
 

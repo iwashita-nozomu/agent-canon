@@ -14,6 +14,10 @@ downstream implementation ../tools/agent_tools/convention_compliance_contracts.t
 
 この文書は、テンプレート repo 全体に共通する高レベル方針をまとめます。
 
+## この文書の読み方
+
+この文書は、repo 全体の対象、directory responsibility、文書運用、開発環境、環境依存 tool 導入、Docker 更新、legacy forwarder、運用境界、テストとレビュー、実験、branch、規約文、checker contract surface を説明します。まず対象とディレクトリの考え方を読み、変更種別に応じて文書運用、開発環境、テスト、実験、branch の章へ進みます。規約文と checker contract は、正本文書や validation rule を更新するときに確認します。
+
 ## 1. 対象
 
 - 対象は repo 全体です。
@@ -43,6 +47,9 @@ downstream implementation ../tools/agent_tools/convention_compliance_contracts.t
 - 実装由来 claim は `program contract` として public entrypoint、入力 schema、
   runtime profile、return projection、observable effect、assumptions / preconditions、
   validation command を示します。
+- 長めの reader-facing Markdown は、先頭付近に文書内容、主な章のまとまり、
+  読むべき場面、誤用を避ける境界を示す reader map を置きます。詳細は
+  `documents/conventions/common/05_docs.md` を正本にします。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。

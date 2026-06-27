@@ -9,6 +9,18 @@ upstream design ../../issues/README.md durable issue and GitHub mirror policy
 -->
 
 
+## Reader Map
+
+- Purpose: reviews code, docs, or generated diffs with findings first,
+  prioritizing regressions, missing tests, and broken assumptions.
+- Use When: a change needs review before acceptance, especially after AI
+  generation, implementation slices, or documentation updates.
+- Section path: Purpose, Use When, and Core Reference orient scope; Expected
+  Outcome, Mandatory Checklist, Default Sequence, and Findings Buckets are the
+  operational review rules; Boundary limits review authority.
+- Boundary: review findings must be grounded in changed files and validation
+  evidence, not broad style preference.
+
 ## Purpose
 
 diff を findings-first で読み、回帰、欠落テスト、古い文書を洗います。

@@ -14,6 +14,13 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 
 この文書は、agent-to-agent handoff と review の正本です。
 
+## Reader Map
+
+- This document owns the artifact-level communication contracts for handoff, pre-edit investigation, fresh subagent capsules, review packets, write scope, and escalation.
+- The first sections define common rules and communication surfaces; the packet sections then specify exactly what must be handed between parent, subagents, reviewers, and implementers.
+- Use `## Pre-Edit Repository Investigation Packet` before selecting edit paths, and `## Fresh Subagent Context Capsule` before launching or reusing any run-local subagent.
+- For chunked reading, start from the packet type required by the current transition and read only the fields needed to make that transition auditable.
+
 ## 基本ルール
 
 - 次の role が判断に使う情報は artifact に残します。

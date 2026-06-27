@@ -26,6 +26,15 @@ header makes this directory the source-controlled evidence contract. Runtime
 outputs stay in the mounted archive, and `agents/evals/` remains only a legacy
 path resolver.
 
+## Reader Map
+
+Use this README to answer which source-controlled eval manifests live under
+`evidence/agent-evals/`, which producer owns each eval family, and how closeout
+uses prompt and behavior eval evidence. Read the manifest table first, then the
+extension order before adding a new eval domain. The closeout and protocol
+sections explain how source manifests connect to accumulated runtime evidence
+without storing run outputs here.
+
 | Manifest or producer | Scope |
 | --- | --- |
 | `skill_workflow_prompt_eval.toml` | all discoverable skill shims, human-facing skill docs, and workflow docs. |

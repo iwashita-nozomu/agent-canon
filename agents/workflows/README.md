@@ -12,6 +12,13 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 primary にし、どの overlay を重ねるか」を決めます。workflow 読順の入口も
 この file に一本化し、後からこの file へ戻ってくる前提の read order にはしません。
 
+## この文書の読み方
+
+- この文書は、`agents/workflows/` 配下の workflow catalog、routing guide、read order を所有します。
+- 前半は使い方、quick routing、recommended read order を扱い、後半は implementation / research / writing / maintenance の workflow map と maintainer path を扱います。
+- task 開始時は `## Quick Routing` で primary workflow と overlay を選び、次に `## Recommended Read Order` で読む順序を固定します。
+- chunked reading では、この file を workflow 選択の入口に限定し、詳細手順は選んだ workflow 文書へ移動します。
+
 ## 使い方
 
 - まず 1 つの primary workflow を選びます。

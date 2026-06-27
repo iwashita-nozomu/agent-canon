@@ -26,6 +26,16 @@ repository mounted at `.agent-canon/log-archive/`. AgentCanon source keeps
 reader-facing documentation, schemas, and tool tests, but no
 `agents/evals/results/` result tree.
 
+## Reader Map
+
+- Owns the procedure for migrating old in-tree hook JSONL and eval reports into
+  the external runtime log archive.
+- Main path: Required Migration Steps, Current Migration Evidence, and Failure
+  Handling.
+- Read this during one-time or occasional archive migration work.
+- Boundary: steady-state archive ownership and retention policy stay in
+  `runtime-log-archive.md` and `result-log-retention-and-visualization.md`.
+
 ## Required Migration Steps
 
 Run the commands from the AgentCanon repository root.

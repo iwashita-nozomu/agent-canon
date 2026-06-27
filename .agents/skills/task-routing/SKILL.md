@@ -34,4 +34,5 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Route host-provided system-skill work to `$openai-docs`, `$skill-creator`, `$skill-installer`, `$imagegen`, or `$plugin-creator`; keep AgentCanon changes to local routing, evidence, and owner-surface contracts.
 1. Use `python3 tools/agent_tools/route.py --area <area> --changed <paths...>` to select the compact route for surface, profile, checks, environment, remote, AgentCanon update, MCP, goal, runtime, token, skill, agent, closeout, dependency, convention, docs, logs, or tool catalog decisions.
 1. Prefer the returned short `COMMANDS` and `NEXT_ACTION` over reading or repeating long workflow prose.
+1. When `task_start.py` or `bootstrap_agent_run.py` has emitted `run.repo_tool_routing_policy`, execute the selected skill tool route in manifest order: `show_skill_packet`, `required_commands`, task-matching conditional commands, then validation commands. If a related skill becomes active later, regenerate that skill packet before handoff.
 1. Create a new tool or skill only when the candidate is unknown and cannot fit an existing route area.

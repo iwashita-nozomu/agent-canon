@@ -21,6 +21,13 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 この文書は、Codex でこの repo を扱うときの標準フローです。
 毎回同じ順序と repo evidence で進められるようにします。
 
+## Reader Map
+
+- This document owns the Codex task execution path from intake through completion, including routing, profile selection, implementation flow, and closeout.
+- The early sections define startup reads and intake sweep; the middle sections classify tasks, completion bars, skills, and execution flow; the final section captures Codex-specific runtime rules.
+- Start at `## Start Here` for any task, then jump to `## Required Intake Sweep` for repo state, `## Task Classification` for workflow selection, and `## Execution Flow` before implementation.
+- For chunked reading, keep this map and `## Start Here` as the anchor, then load only the active profile or rule section named by the current run bundle.
+
 ## Start Here
 
 1. `AGENTS.md` を読む
@@ -125,7 +132,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`m
 
 raw text search の hit だけで編集対象を決めません。
 large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
-small changes でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。
+small changes でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。small change は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
 rg -l "topic keywords" <responsibility-scoped dirs> \
@@ -162,8 +169,35 @@ inspection は GitHub inspection として扱います。
 
 local repo state 確認、file edit、validation、PR / issue mutation、local CI
 実行、または実装作業へ切り替わった時点で repository task として扱い、
-切り替えを user-facing update で明示してから通常の workflow gate に入り
+切り替えをユーザー向け update で明示してから通常の workflow gate に入り
 ます。
+
+### ユーザー向け言語
+
+ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、
+reader-facing docs は日本語で書きます。機械可読の key、command、path、
+role id、schema は正本表記を保ちます。
+
+repo-changing run では `team_manifest.yaml` の
+`run.user_facing_language_policy` を handoff packet に含め、subagent と reviewer
+が同じ方針を参照できる状態で渡します。`task_start.py` と
+`bootstrap_agent_run.py` の `USER_FACING_LANGUAGE=ja` を起動時 evidence として
+扱います。
+
+### 契約完全実装
+
+実装 behavior は request clauses、acceptance contract、
+`Implementation Source Packet`、`Design-To-Implementation Trace`、
+dependency-expanded scope、validation route、review gate から導きます。
+task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、
+validation profile を選ぶ signal です。
+
+repo-changing run では `team_manifest.yaml` の
+`run.contract_complete_implementation_policy` を handoff packet に含めます。
+`task_start.py` と `bootstrap_agent_run.py` の
+`IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete` を起動時 evidence として
+扱います。contract gap、責務境界、API shape、依存方向、runtime contract の不足は
+`design_issue_blocker` として Gate 5-6 に戻します。
 
 ### Codex Goals Feature Preflight
 
@@ -274,7 +308,7 @@ dependency surface は task に応じて次を見ます。
 1. manifest が無い checkable file を編集する場合は、同じ差分で `@dependency-start` block を追加する
 1. downstream edge を持つ file を編集した場合は、差分後に downstream target を確認する
 1. 新しい dependency edge を足す場合は、同じ変更で reverse edge も足すか、migration 中で足せない理由を review artifact に記録する
-1. subagent handoff には `dependency_manifest_plan` と dependency header graph の再帰展開結果を含め、編集対象ごとの upstream / downstream edge、`dependency_edit_scope.txt` / `dependency_graph.tsv`、読む順序を固定する
+1. subagent handoff には `dependency_manifest_plan` と dependency header graph の再帰展開結果を含め、編集対象ごとの upstream / downstream edge、`dependency_edit_scope.txt` / `dependency_graph.tsv`、読む順序を handoff packet に載せる
 
 closeout 前に、少なくとも次を実行します。
 
@@ -342,12 +376,20 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と `diff_check_agent_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
 
-## Minimal Skill Set
+## Contract-Required Skill Set
 
-Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から必要最小限の skill だけ選びます。
+Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から current stage と contract に必要な skill を選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `python3 tools/agent_tools/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は handoff / wave が ready になった stage で追加します。
+`task_start.py` と `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
+skill を追加し、選択済み skill ごとの repo tool route を
+`run.repo_tool_routing_policy` に出します。repo tool route は skill ごとに
+`show_skill_packet`、`required_commands`、
+`task_matching_conditional_commands`、`validation_commands` の順で扱います。
+後続 wave で関連 skill が active になった場合は、同じ
+`skill_tool_commands.py show --skill <skill> --format text` を再生成してから
+handoff に入ります。
 
 Before a capability gap claim about an existing API, dependency, config,
 or extension point, the implementation plan includes the
@@ -446,6 +488,22 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer`、`test_designer` を標準構成とします。
 lite scoped route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
 Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`spark_worker`、`worker` を workflow family に応じて stage ごとに明示します。
+Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
+`team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
+plan artifact、review gate decision、edit handoff evidence をこの順で
+`schedule.md` と `workflow_monitoring.md` に記録します。
+bootstrap は `run.pre_handoff_scope_policy` も出します。implementation
+surface route は source packet seed であり、responsibility search、reuse
+survey、stale-surface scan、dependency expansion を通してから
+`allowed_paths`、`do_not_read`、`write_scope`、`validation_route`、
+`review_gate` の handoff scope にします。
+`task_start.py` と `bootstrap_agent_run.py` は
+`run.default_quality_check_policy` も出します。この policy は active な
+`test_designer`、`change_reviewer`、`docs_workflow_steward`、
+`python_reviewer`、`cpp_reviewer` と、それらから展開される Codex
+`agent_type`、task-default / changed-path / manual enable / review-pack
+provenance、軽量 static check command を記録します。review と edit の
+handoff はこの policy を含めます。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
@@ -458,7 +516,7 @@ default の model / reasoning split は `.codex/agents/*.toml` を正本にし�
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 
-最小コマンド:
+標準コマンド:
 
     python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
@@ -564,7 +622,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
+- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame から導かれ、design trace、naming、test plan、dependency-expanded handoff scope が揃った低リスク slice を `spark_worker` へ先に渡す
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
@@ -574,7 +632,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `spark_worker` に渡す実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
-- `spark_worker` は design trace で固定済みの narrow implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
+- `spark_worker` は design trace と dependency-expanded handoff scope が揃った narrow implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
 - repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
@@ -613,7 +671,7 @@ cost を無視して review coverage を優先する run では、research-drive
   request clause, expected signal, runtime / resource budget, stop condition,
   artifact path, and owner.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
-- Shared canon、Large delivery、高 risk 変更では user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Routine docs / Focused code は active profile の targeted checks を evidence にできる
+- Large delivery、explicit comprehensive validation、高 risk 変更では user-facing completion 前に `make ci` または同等の full local confidence gate を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Shared canon 変更では active profile が指定する `make agent-canon-pr-check` または等価な AgentCanon PR gate を使い、Routine docs / Focused code は active profile の targeted checks を evidence にできる
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
 - Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
 - Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を parent 直編集の work log または write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
@@ -640,7 +698,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断の完了状態を示す
 - `closeout_gate.md` の `dependency_headers_complete=yes` で、作成・編集した text file の依存 file header coverage を示す
 - Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
-- Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` とともに、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence を残す。Routine docs / Focused code は active profile の targeted static evidence を残す
+- Full local confidence gate が選択された変更では `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` とともに、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence を残す。Routine docs / Focused code / profile-specific gate は `repo_wide_static_analysis_complete=profile_selected` と targeted static evidence を残し、`make_ci_status` を `targeted` または `not_applicable` にする
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` で、仕様 coverage と review finding disposition を示す
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` で、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を構造化 loop evidence として残す
 - `closeout_gate.md` の `subagents_closed=yes` で、run-local subagent の close と fresh lifecycle evidence を示す
@@ -676,7 +734,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は別 instance にする
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
 - 論文 draft では `citation_evidence_reviewer` も別 instance にする
-- 包括的開発では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定します
+- 包括的開発では、parent が dependency order、wave plan、dependency-expanded disjoint write scope、integration order、review gate を handoff packet に載せます
 - 複数 writer を要する場合は、衝突 target を先行 / 後続 wave に分けます。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します
 - writer ごとの path / directory / object は `team_manifest.yaml` の write policy で管理します
 - required review を resolved にしてから `worker` 相当の実装を始める

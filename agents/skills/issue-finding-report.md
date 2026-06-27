@@ -15,6 +15,19 @@ downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes thi
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: turn accumulated runtime, prompt, hook, skill, tool, workflow, and
+  eval evidence into durable AgentCanon operational issue candidates.
+- Section path: Purpose and Use When set the route; Inputs and Abstract Cause
+  Taxonomy define evidence and grouping; Multi-Agent Partition, Issue Candidate
+  Contract, Output Packet, and Validation define production and checks.
+- Use when: repeated agent behavior, routing misses, workflow evidence, or log
+  dashboard signals should become issue-backed repair work.
+- Boundary: compact analysis comes from `agent-log-analysis`; this skill writes
+  issue candidates or finding packets without replacing PR processing or tool
+  finding ownership.
+
 ## Purpose
 
 Convert accumulated prompt, run-bundle, hook, skill, tool, workflow, and eval

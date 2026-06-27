@@ -16,6 +16,17 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 {{>findings_area_table}}
 
+## Reader Map
+
+This template owns review of a detailed design before implementation. Work
+through document completeness, reuse/style, cross-doc coverage, upstream
+requirements, abstract design frame, evidence, assumptions, parent-doc
+alignment, source packet, side effects, canonical tree head, naming,
+design-to-implementation trace, and readiness before deciding approve, revise,
+or escalate. Top-down reader flow is reviewed separately by the document-flow
+review artifact; this template checks whether implementation can proceed
+without hidden assumptions.
+
 ## Document Completeness Review
 
 <!-- Check whether the design document is concrete enough for implementation without hidden assumptions. -->

@@ -12,6 +12,19 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 -->
 
 
+## Reader Map
+
+- Purpose: manage large refactors as behavior-preserving reorganizations with
+  explicit scope, deltas, and review gates.
+- Section path: Purpose, Use When, and Core References lead into Required
+  Contract; later sections cover Canonicalization-First Refactors,
+  Dependency-Guided Repair Slice Loop, Finding Packet And Prompt Feedback,
+  Refactor Orchestration Plan, Subagent Routing, and Review Emphasis.
+- Use when: file splits, renames, module boundaries, dependency direction, or
+  implementation replacement require a controlled refactor loop.
+- Boundary: feature additions and API-shaping choices need explicit contracts;
+  structure surface classification belongs to `structure-refactor`.
+
 ## Purpose
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。

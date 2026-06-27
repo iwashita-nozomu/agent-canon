@@ -23,6 +23,13 @@ upstream design README.md workflow catalog
 
 agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `agents/templates/experiment_change_loop.md` です。
 
+## この文書の読み方
+
+- この文書は、repo 内実験の準備、実装、静的チェック、実行、結果レポートの実務入口を所有します。
+- `## 1. この文書の役割` は関連正本への分岐、`## 2. 段階別手順` は実験 run の手順、後半は log-derived 禁止事項、反復 workflow、個別 README、references を扱います。
+- experimenter は `## 2. 段階別手順` から topic / run layout を固定し、research-driven task では `research-workflow.md` と合わせて読みます。
+- chunked reading では、まずこの map と `## 1. この文書の役割` で責務を確認し、実行段階ごとの subsection だけを開きます。
+
 ## 1. この文書の役割
 
 この文書は実験実務の入口です。詳細は次に分けます。

@@ -9,6 +9,18 @@ downstream implementation ../../tools/agent_tools/route.py selects short routing
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: chooses short AgentCanon tool, skill, profile, check, runtime,
+  closeout, or evidence routes from long candidate lists.
+- Use When: a prompt, changed area, or broad routing surface needs compact
+  active/deferred skill selection or official system-skill delegation.
+- Section path: Purpose and Use When define triggers; Standard Command gives
+  the operational entrypoint; Outputs and Official System Skill Delegation
+  describe route products.
+- Boundary: this skill selects routes; the selected skills still own execution
+  rules and validation.
+
 ## Purpose
 
 短い tool / skill 名で、task に必要な profile、check、runtime、closeout、
@@ -63,6 +75,13 @@ route is genuinely reusable.
 Runtime skill command packets are owned by `skill_tool_commands.py`. Use
 `python3 tools/agent_tools/skill_tool_commands.py check` when changing
 `.agents/skills/*/SKILL.md` files.
+Run bootstrap surfaces publish the selected-skill command packets under
+`run.repo_tool_routing_policy`. The sequential order is:
+`show_skill_packet`, `required_commands`, `task_matching_conditional_commands`,
+`validation_commands`. Related skill candidates remain dynamic triggers; when a
+candidate becomes active, regenerate that skill's command packet with
+`python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
+before continuing the handoff.
 
 ## Official System Skill Delegation
 

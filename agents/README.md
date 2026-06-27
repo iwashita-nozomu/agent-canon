@@ -14,11 +14,12 @@ upstream design ../README.md shared canon overview
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
 skill を user-facing に明示するときは `$skill-name` を使います。
 
-## Reader Position
+## Reader Map
 
-全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、
-agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
-`agents/canonical/README.md` は layout appendix であり、最初の hub ではありません。
+- この文書は、AgentCanon の人間向け agent hub として workflow、skill、subagent、runtime entrypoint への入口を所有します。
+- `## Hub Routes` は目的別入口、`## Runtime Entry Points` と `## Skills And Subagents` は runtime surface、`## Team Shape` 以降は role と startup / command contract を扱います。
+- 全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
+- chunked reading では、まず `## Hub Routes` で入口を選び、`agents/canonical/README.md` は layout appendix として必要時だけ参照します。
 
 ## Hub Routes
 

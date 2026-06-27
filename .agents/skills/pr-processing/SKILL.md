@@ -19,6 +19,17 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 
 # PR Processing
 
+## Reader Map
+
+- Purpose: runtime skill for GitHub PR and issue queue processing, including
+  inventory, conflict handling, ordered merges, and stale issue triage.
+- Use When: summarizing, triaging, reviewing, merging, or preserving PR/issue
+  evidence through the GitHub workflow.
+- Tool Commands: run this skill's command packet, then read the canonical
+  `agents/skills/pr-processing.md` route before using GitHub commands.
+- Boundary: merge authority and branch protection evidence must come from the
+  PR-processing route, not ad hoc local state.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

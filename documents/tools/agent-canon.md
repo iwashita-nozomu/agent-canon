@@ -21,6 +21,16 @@ Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
 examples in a compact text block.
 
+## Reader Map
+
+- Owns the documented command families for the unified Rust `agent-canon`
+  wrapper, especially docs checks and test-design diagnostics.
+- Main path: Commands and Legacy Entrypoints.
+- Read this before using `agent-canon docs` or deciding whether a legacy
+  Python entrypoint should forward to the Rust wrapper.
+- Boundary: prompt-to-skill routing remains owned by
+  `python3 tools/agent_tools/route.py --prompt`.
+
 ## Commands
 
 ```bash

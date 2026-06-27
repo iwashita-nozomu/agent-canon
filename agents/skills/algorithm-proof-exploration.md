@@ -13,6 +13,20 @@ downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: explore algorithm choices and implementation changes under proof
+  obligations before handing terminal proof work to `$formal-proof-workflow`.
+- Section path: read Purpose, Use When, Relationship To
+  `$formal-proof-workflow`, Numerical Iteration Boundary, and Completion
+  Condition before Canonical Flow, Artifact Contract, and Guardrails.
+- Use when: convergence, stopping, finite-precision, certificate, or solver
+  handoff claims need IR, theorem graph, blocker frontier, and algorithm-change
+  evidence.
+- Boundary: blocker summaries and algorithm guidance are intermediate; terminal
+  outcomes remain checker-backed proof, refutation, or
+  `unprovable_under_assumptions`.
+
 ## Purpose
 
 `algorithm-proof-exploration` は、証明義務を入力にしてアルゴリズムを探索・修正する

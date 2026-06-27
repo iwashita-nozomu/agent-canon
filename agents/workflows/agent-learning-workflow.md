@@ -13,6 +13,13 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 
 この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。
 
+## Reader Map
+
+- This document owns the workflow for turning task observations, feedback, and agent run evaluation into durable AgentCanon learning surfaces.
+- The early sections define purpose, literature basis, external evaluation basis, canonical notes, and logging commands; the later sections cover run evaluation, workflow monitoring, operational issue capture, kind definitions, closeout, and promotion.
+- Use `## Logging Rule` when recording a concrete observation, and `## Agent Run Evaluation` / `## Workflow Monitoring` during closeout or behavior feedback repair.
+- For chunked reading, first decide whether the input is a user preference, agent philosophy observation, workflow defect, or eval feedback, then read the matching recording and promotion section.
+
 ## Purpose
 
 - user preference と agent philosophy を混同しない

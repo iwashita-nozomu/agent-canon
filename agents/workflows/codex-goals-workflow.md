@@ -17,6 +17,13 @@ This workflow defines how to use the Codex `goals` feature in this repository.
 The feature is a session/runtime aid; it does not replace the repo-owned goal
 contract.
 
+## Reader Map
+
+- This document owns the boundary between Codex `goals`, repo-local `goal.md`, and the mechanical `goal_loop.py` gates.
+- The early sections split durable and session state, preflight goal tooling, autonomous goal drafting, and pre-goal fan-out; the later sections cover plan-mode entry, TUI commands, goal creation, iteration, efficiency, and closeout.
+- Use `## Preflight` before relying on a goal, then read `## Autonomous Goal Draft` when the user gives goal-driven intent without exact criteria.
+- For chunked reading, keep `goal.md` as the durable state anchor and open only the section matching the current phase: setup, plan-mode entry, iteration, or closeout.
+
 ## Role Split
 
 - `goal.md` is the durable source of truth for Objective, Exit Criteria,

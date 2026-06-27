@@ -14,6 +14,20 @@ downstream implementation ../../.agents/skills/code-visualization/SKILL.md expos
 
 # code-visualization
 
+## Reader Map
+
+- Purpose: choose the right visualization family, source evidence owner, and
+  renderer for code, repository, workflow, proof, or document-embedded diagrams.
+- Section path: Purpose and Context Diagnosis classify the reader question;
+  Visualization Selection Record and Question-To-Diagram Projection define the
+  choice; Document Embedded Diagrams, Source Evidence Routes, Renderer Choice,
+  Handoff Packet, and Closeout cover execution.
+- Use when: a task asks to visualize code, dependencies, runtime behavior,
+  state, data movement, types, proof status, or repository structure.
+- Boundary: this skill selects and routes visualizations; source facts stay with
+  owner skills such as `dependency-analysis`, `structure-refactor`,
+  `algorithm-flowchart`, and `prose-reasoning-graph`.
+
 ## Purpose
 
 `code-visualization` は、コードや repository を図示するときに、ユーザーや文書の

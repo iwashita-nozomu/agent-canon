@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+- Purpose: records agent-side lessons and recurrence-prevention notes without
+  mixing task-local observations into user preferences.
+- Use When: feedback concerns agent behavior, routing misses, retrospectives,
+  repeated workflow mistakes, or skill invocation gaps.
+- Section path: Purpose, Use When, and Core References set scope; Mandatory
+  Checklist and Default Commands contain operational rules; Boundary defines
+  what must not become memory.
+- Boundary: durable user preference sync belongs to the preference route, not
+  this learning log route.
+
 ## Purpose
 
 agent の作業哲学、対話から得た学習、task retrospective を `memory/AGENT_PHILOSOPHY.md` に蓄積し、stable な項目だけを workflow や `AGENTS.md` へ昇格します。

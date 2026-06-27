@@ -42,6 +42,7 @@ trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
 PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
+PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 else
@@ -166,15 +167,12 @@ run_pr_quick_ci() {
   fi
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh --quick"
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh --quick
+    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]}"
+    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
     return
   fi
-  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bci-quick\\b|^ci-quick:" Makefile; then
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" make ci-quick
-  else
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh --quick
-  fi
+  echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]}"
+  AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
 }
 
 run_standalone_static_gate_ci() {

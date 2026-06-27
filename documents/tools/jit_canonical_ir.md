@@ -13,6 +13,15 @@ downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs consumes 
 writes machine evidence for proof themes. It is an AgentCanon tool. Topic-local
 proof directories may call it, but they do not own the tool contract.
 
+## Reader Map
+
+- Owns the command, output contract, and boundary for JIT-canonical IR capture.
+- Main path: Command, Output Contract, and Boundary.
+- Read this before extracting StableHLO/JAX runtime traces into the thin
+  operational IR shape.
+- Boundary: this file documents capture and evidence shape; Lean rendering and
+  C++ source routes are owned by their own tool docs.
+
 ## Command
 
 ```bash

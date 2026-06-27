@@ -17,6 +17,18 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
 
 # Refactor Loop
 
+## Reader Map
+
+- Purpose: expose the behavior-preserving refactor loop to Codex skill
+  discovery and enforce dependency-expanded refactor planning.
+- Section path: Tool Commands gives the command packet; the numbered rules hold
+  dependency analysis, orchestration planning, structural deltas, API migration,
+  finding-packet feedback, and review routing.
+- Use when: large refactors need path mapping, semantic-delta controls, repair
+  batches, and strong review gates.
+- Boundary: this shim points to `agents/skills/refactor-loop.md` for the
+  canonical human-facing contract and does not authorize feature additions.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

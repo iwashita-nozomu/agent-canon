@@ -10,6 +10,16 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 この template で C++ を使うときは、build layout を次で固定します。
 
+## この文書の読み方
+
+- この文書は、template-derived repo の C++ source/build directory と CMake
+  entrypoint 配置を定めます。
+- 主な順路は、Source Of Truth、Default Build Directories、Optional
+  jax.export Flow、Reuse Policy、Recommended Profiles、Header-Only Default です。
+- C++ 実装や build profile を追加する前に読みます。
+- 境界: C++ algorithm-to-proof route は tool docs が扱い、この文書は build
+  layout と配置を扱います。
+
 ## Source Of Truth
 
 - root `CMakeLists.txt`

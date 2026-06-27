@@ -12,6 +12,19 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 -->
 
 
+## Reader Map
+
+- Purpose: fix mathematical and validation contracts for numerical
+  optimization, solvers, derivatives, constraints, convergence, and benchmarks.
+- Section path: Purpose and Use When define scope; Boundary separates research,
+  experiments, tests, and review; Optimization Contract, Workflow, Validation
+  Rules, Review Route, and Outputs hold the operational rules.
+- Use when: optimizer, solver, preconditioner, KKT, residual, derivative,
+  tolerance, convergence, NaN/Inf, or numerical benchmark work is in scope.
+- Boundary: this skill owns the optimization contract and validation contract;
+  experiments, adaptive improvement, and language-specific review stay with
+  their owner skills.
+
 ## Purpose
 
 数値最適化、非線形 solver、線形 solver、preconditioner、制約条件、収束判定、gradient / Jacobian / Hessian、KKT 条件を含む変更を、数学仕様、実装責務、検証責務に分けて扱います。
