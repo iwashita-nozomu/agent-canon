@@ -32,15 +32,65 @@ template-owned active contract.
 
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
-- Start with the runtime owner map, then use task entry, base runtime packet,
-  template context, shared canon flow, closeout evidence, and validation commands
-  for the current stage.
+- Start with Scope Discipline, then use the runtime owner map only to find the
+  surface that owns the next decision. Task entry, base runtime packet, shared
+  canon flow, closeout evidence, and validation commands are selected by the
+  active profile or touched surface; they are not a default checklist.
 - Read it at the beginning of repository work or when resolving whether a rule
   belongs to the root view, AgentCanon source, a generated task packet, or a
   checker.
 - This entrypoint routes to owner surfaces; workflow stages, skills, role
   behavior, validation matrices, and closeout gates are updated in their owner
   documents first.
+
+## Scope Discipline
+
+Scope Discipline takes precedence over this file's owner map and command lists.
+If an owner surface names required evidence for its own workflow, apply that
+requirement only after the active task, profile, or touched surface selects that
+workflow.
+
+Default to design-complete, responsibility-bounded work for substantive
+changes. Completion is proportional to the changed surface: behavior or code
+changes must have coherent behavior, design/OOP boundary, ownership boundary,
+and required tests or docs; doc-only, format-only, and explicit small-scope
+changes need the owner/path/design-boundary note and validation that exercises
+that surface. Do not use "small", "quick", or "parent-direct" as a reason to
+skip needed design.
+
+Design-complete does not mean repo-wide. Find the owning abstraction and finish
+the requested behavior inside that replaceable responsibility unit; stop before
+unrelated audits, historical cleanup, or adjacent workflow repair unless the
+user asked for that scope or a blocking finding makes it necessary.
+
+Owner-map entries, skill command packets, validation commands, and CI jobs are
+routing menus, not automatic worklists. Run or read only the item that changes
+the next decision: edit path, fix, validation, PR state, or explicit deferral.
+
+Use parent-direct work when the ownership path and design boundary are clear and
+the work stays inside one replaceable responsibility unit. Use multi-agent waves
+only when the user asks for them, or when independent, replaceable workstreams
+can run in parallel without expanding scope or weakening design responsibility.
+Parallelism authorizes split execution, not split responsibility; do not create
+subagents that repeat the same deterministic read, checker, or search.
+
+Do not wait for unrelated passing checks, sync logs repeatedly, or broaden into
+repo-wide audits unless the user asks for that scope or a blocking finding
+requires it. Hook, archive, or dashboard failures expand the task only when they
+block the selected edit, validation, or PR route; otherwise record a concrete
+deferral.
+
+## Repository Discovery and Reading
+
+Start from repository structure, dependency headers, and the runtime owner map
+before text search. In this repository, do not default to `rg`; use `find`,
+`git grep`, or targeted `grep` from known owner directories after the structure
+route is clear.
+
+For long documents, read the reader map and section outline first. Split reads
+only at stable semantic boundaries such as headings, tables, generated blocks,
+or independent records. Do not split a mathematical derivation, OOP abstraction,
+proof obligation, or replacement unit merely because a chunk would be long.
 
 ## Runtime Owner Map
 
@@ -57,12 +107,13 @@ template-owned active contract.
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
 | branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
-| report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | closeout gate |
+| report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
 
-This entrypoint routes the reader to owner surfaces. Stage rules, skill
-selection, role behavior, validation matrices, and closeout gates are updated in
-their owner surfaces first.
+This map is a routing index, not a checklist. Stage rules, skill selection, role
+behavior, validation matrices, and closeout gates are updated in their owner
+surfaces first, but the evidence/checker column is used only when the active
+profile, touched surface, or blocking finding selects it.
 
 ## Task Entry
 
@@ -72,25 +123,10 @@ from `task_start.py` or `bootstrap_agent_run.py` provide the active
 `workflow=...`, `skills=...`, `review=...`, source packet, wave plan, and
 validation route.
 
-## Scope Discipline
-
-Default to design-complete, responsibility-bounded work. A task is complete only
-when the changed behavior, design/OOP boundary, ownership boundary, and required
-tests or docs are coherent for the active profile. Do not use "small", "quick",
-or "parent-direct" as a reason to skip needed design.
-
-Owner-map entries, skill command packets, validation commands, and CI jobs are
-routing menus, not automatic worklists. Run or read only the item that changes
-the next decision: edit path, fix, validation, PR state, or explicit deferral.
-
-Use parent-direct work when the ownership path and design boundary are clear and
-the work stays inside one replaceable responsibility unit. Use multi-agent waves
-only when the user asks for them, or when independent, replaceable workstreams
-can run in parallel without expanding scope or weakening design responsibility.
-
-Do not wait for unrelated passing checks, sync logs repeatedly, or broaden into
-repo-wide audits unless the user asks for that scope or a blocking finding
-requires it.
+Do not create a task packet or run bundle solely because repository files will
+change. Use those tools when the user asks for kickoff/run-bundle evidence, the
+task needs wave coordination, or the selected workflow cannot be tracked with a
+short owner/design/validation note.
 
 ## Base Runtime Packet Owner
 
@@ -103,7 +139,9 @@ requires it.
 - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
 
 Task-specific packet expansion is owned by the generated task packet,
-semantic-index/local-llm search, and dependency review artifacts.
+semantic-index/local-llm search, and dependency review artifacts when those
+routes are selected. The base packet is not a required reading list for every
+task.
 
 ## Template Context
 
@@ -124,14 +162,33 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+Run these commands when AgentCanon source, the submodule pin, or shared root
+views changed or appear stale. Do not run shared-canon sync as a generic
+closeout ritual for unrelated edits.
+
 ## Closeout Evidence
 
-Closeout cites the generated run bundle, validation outputs, dependency review,
-subagent lifecycle evidence, shared-canon sync evidence, and PR / commit
-evidence required by the active runtime profile. Mechanical readiness is owned by
-`task_close.py` and `report_artifact_checks.py`.
+Closeout cites only evidence required by the active runtime profile and touched
+surfaces. Do not create run bundles, dependency reviews, subagent lifecycle
+records, log archive syncs, shared-canon syncs, or full validation evidence
+solely because this section names them.
 
-## Validation Commands
+If no subagents were used, do not manufacture subagent lifecycle evidence; a
+short parent-direct/no-subagents note is enough when closeout evidence is
+selected.
+
+For CI and hook failures, first decide whether the failure belongs to the
+changed surface or blocks the requested PR/update. Stale, duplicated, or legacy
+check items are refactor findings; do not run both the old path and the
+canonical shared script unless the refactor itself requires comparing them.
+Mechanical readiness is owned by `task_close.py` and
+`report_artifact_checks.py` when a run bundle closeout is selected.
+
+## Validation Command Menu
+
+These are common commands, not a default checklist. Select the narrowest command
+that validates the changed responsibility unit, active profile, or blocking
+finding.
 
 - `python3 vendor/agent-canon/tools/agent_tools/check_agent_runtime_alignment.py`
 - `python3 vendor/agent-canon/tools/agent_tools/repo_structure_contract.py --root vendor/agent-canon --contract vendor/agent-canon/documents/repo-structure-contract.toml`
