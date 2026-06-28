@@ -414,6 +414,12 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User feedback on 2026-06-27: CI may be excessive.
 
+- 2026-06-28 | failure-avoidance | Conflict repair must be semantic integration: inspect base/current/incoming intent, owning contract, and validation surface before choosing clauses; never mark a conflict resolved by mechanical ours/theirs selection.
+  - source: chat
+  - scope: pr-processing merge-conflict-resolution
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: コンフリクト解決が下手です.
+
 ## Open Questions
 
 - まだなし

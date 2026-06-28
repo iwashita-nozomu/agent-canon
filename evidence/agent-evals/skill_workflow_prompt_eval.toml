@@ -1579,7 +1579,7 @@ description = "Codex subagent canon must require structured context capsules for
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
 description = "Requires exact bounded context fields for fresh subagent launches."
-required_regex = ["Fresh Subagent Context Capsule", "context_artifacts", "allowed_paths", "do_not_read", "return_contract", "protocol-owned", "schema を再定義しません"]
+required_regex = ["Fresh Subagent Context Capsule", "context_artifacts", "allowed_paths", "do_not_read", "return_contract", "protocol-owned", "schema の定義は同文書だけ"]
 
 [[evals]]
 id = "slide-production-workflow"

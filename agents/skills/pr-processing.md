@@ -138,6 +138,9 @@ route を短く書きます。
    - `git fetch origin`
    - `git switch <head-branch>`
    - `git merge origin/<base>` または repo の標準 update route
+   - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
+   - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
+   - 各 side から保持する clause、書き換える clause、意図的に捨てる clause と理由を PR log または run bundle に記録する
    - conflict file を最小差分で直し、対象 validation を rerun する
    - force push は explicit authority がある場合だけ使う
 1. Merge gate を確認します。

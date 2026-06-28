@@ -83,6 +83,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Resolve conflicts on the PR head branch, then rerun the smallest validation
    that covers the touched surface. Do not resolve conflicts by discarding user
    changes or force-pushing without explicit authority.
+   Conflict repair is semantic integration, not "ours/theirs" selection: inspect
+   the merge base, current branch intent, incoming branch intent, owning
+   contract, and validation surface; record which clauses from each side are
+   preserved, rewritten, or intentionally rejected before marking the conflict
+   resolved.
 1. Before merging a PR, require:
    - open, non-draft PR;
    - mergeable state;

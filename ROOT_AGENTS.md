@@ -55,10 +55,10 @@ changes. Completion is proportional to the changed surface: behavior or code
 changes must have coherent behavior, design/OOP boundary, ownership boundary,
 and required tests or docs; doc-only, format-only, and explicit small-scope
 changes need the owner/path/design-boundary note and validation that exercises
-that surface. Do not use "small", "quick", or "parent-direct" as a reason to
-skip needed design.
+that surface. Use "small", "quick", or "parent-direct" only as routing labels;
+needed design still comes from the changed surface.
 
-Design-complete does not mean repo-wide. Find the owning abstraction and finish
+Design-complete stays scoped to the owning abstraction. Find that abstraction and finish
 the requested behavior inside that replaceable responsibility unit; stop before
 unrelated audits, historical cleanup, or adjacent workflow repair unless the
 user asked for that scope or a blocking finding makes it necessary.
@@ -71,12 +71,13 @@ Use parent-direct work when the ownership path and design boundary are clear and
 the work stays inside one replaceable responsibility unit. Use multi-agent waves
 only when the user asks for them, or when independent, replaceable workstreams
 can run in parallel without expanding scope or weakening design responsibility.
-Parallelism authorizes split execution, not split responsibility; do not create
-subagents that repeat the same deterministic read, checker, or search.
+Parallelism authorizes split execution while parent responsibility remains
+single-owner; use subagents for distinct decisions instead of repeating the same
+deterministic read, checker, or search.
 
-Do not wait for unrelated passing checks, sync logs repeatedly, or broaden into
-repo-wide audits unless the user asks for that scope or a blocking finding
-requires it. Hook, archive, or dashboard failures expand the task only when they
+Proceed after the selected evidence passes, and reserve repeated sync logs or
+repo-wide audits for explicit user scope or blocking findings. Hook, archive, or
+dashboard failures expand the task only when they
 block the selected edit, validation, or PR route; otherwise record a concrete
 deferral.
 
@@ -94,20 +95,21 @@ artifact path. Raw search output, full dashboards, logs, long histories, and
 broad workflow packets stay in local/tool context until selected.
 
 Treat AGENTS/root entrypoints as routing and context-construction guidance.
-Do not expand root instructions to compensate for missing packet fields, hand
-off broad chat summaries, or assume subagent context persists across launches.
+Keep missing packet fields in the owning packet, hand off structured context
+capsules instead of broad chat summaries, and treat each subagent launch as
+fresh.
 
 ## Repository Discovery and Reading
 
 Start from repository structure, dependency headers, and the runtime owner map
-before text search. In this repository, do not default to `rg`; use `find`,
+before text search. In this repository, start with `find`,
 `git grep`, or targeted `grep` from known owner directories after the structure
 route is clear.
 
 For long documents, read the reader map and section outline first. Split reads
 only at stable semantic boundaries such as headings, tables, generated blocks,
-or independent records. Do not split a mathematical derivation, OOP abstraction,
-proof obligation, or replacement unit merely because a chunk would be long.
+or independent records. Keep a mathematical derivation, OOP abstraction,
+proof obligation, or replacement unit together even when the chunk is long.
 
 ## Runtime Owner Map
 
@@ -140,9 +142,8 @@ from `task_start.py` or `bootstrap_agent_run.py` provide the active
 `workflow=...`, `skills=...`, `review=...`, source packet, wave plan, and
 validation route.
 
-Do not create a task packet or run bundle solely because repository files will
-change. Use those tools when the user asks for kickoff/run-bundle evidence, the
-task needs wave coordination, or the selected workflow cannot be tracked with a
+Create a task packet or run bundle when the user asks for kickoff/run-bundle evidence, the
+task needs wave coordination, or the selected workflow requires more than a
 short owner/design/validation note.
 
 ## Base Runtime Packet Owner
@@ -180,24 +181,23 @@ bash tools/sync_agent_canon.sh check
 ```
 
 Run these commands when AgentCanon source, the submodule pin, or shared root
-views changed or appear stale. Do not run shared-canon sync as a generic
-closeout ritual for unrelated edits.
+views changed or appear stale. Reserve shared-canon sync for changed or stale
+shared surfaces.
 
 ## Closeout Evidence
 
 Closeout cites only evidence required by the active runtime profile and touched
-surfaces. Do not create run bundles, dependency reviews, subagent lifecycle
-records, log archive syncs, shared-canon syncs, or full validation evidence
-solely because this section names them.
+surfaces. Create run bundles, dependency reviews, subagent lifecycle records,
+log archive syncs, shared-canon syncs, or full validation evidence only when the
+selected route requires them.
 
-If no subagents were used, do not manufacture subagent lifecycle evidence; a
-short parent-direct/no-subagents note is enough when closeout evidence is
-selected.
+When the task used no subagents, close with a short
+parent-direct/no-subagents note when closeout evidence is selected.
 
 For CI and hook failures, first decide whether the failure belongs to the
 changed surface or blocks the requested PR/update. Stale, duplicated, or legacy
-check items are refactor findings; do not run both the old path and the
-canonical shared script unless the refactor itself requires comparing them.
+check items are refactor findings; run the canonical shared script, and compare
+old and new paths only when the refactor itself requires that comparison.
 Mechanical readiness is owned by `task_close.py` and
 `report_artifact_checks.py` when a run bundle closeout is selected.
 
