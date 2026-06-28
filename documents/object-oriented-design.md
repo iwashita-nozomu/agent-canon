@@ -47,7 +47,7 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
 投影の正本は `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
 
-- Single responsibility: class / function の肥大化、曖昧名、state 過多、副作用混在、不要 wrapper を同じ責務境界の risk として読む。
+- Single responsibility: 曖昧名、state 過多、副作用混在、不要 wrapper、責務語彙の広がりを同じ責務境界の risk として読む。
 - Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、variant や entrypoint の増設で表す候補として読む。
 - Liskov substitution: base class 過多を、置換可能な契約として読める継承かどうかの確認対象にする。
 - Interface segregation: public method / field / parameter 過多を、利用側が必要とする最小契約へ分ける候補として読む。
@@ -57,7 +57,7 @@ SOLID signal は設計レビューの入口です。最終判断では機械 fin
 
 | Principle | Source-informed meaning | Local implementation contract | Static risk route |
 |---|---|---|---|
-| Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `function_lines`、`class_lines`、`mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket` |
+| Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket`、`instance_attributes`、`public_methods` |
 | Open/closed | 安定した policy を extension point で拡張可能にする。 | 予測済み variant は branch cascade ではなく `Protocol`、registry、adapter、variant value、別 entrypoint へ置く。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
 | Liskov substitution | subtype は supertype の証明済み性質を保存する。 | 継承は置換可能な契約の特殊化に限定し、入力条件、戻り値、例外、invariant、history property を保存する。 | `base_classes` と type checker / shared behavior contract |
 | Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの小さい contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
@@ -210,9 +210,9 @@ public state owner や domain contract のない wrapper の finding とは区�
 
 score は設計判断の補助であり、pass / fail の主判定ではありません。
 `OOP_READABILITY` は error / gate / review の signal class で決めます。
-`class_lines`、`function_lines`、`public_methods`、`parameters`、
-`cognitive_complexity` のような size / surface finding は boundary review
-signal として扱い、数値だけで split / extract を要求しません。
+`public_methods`、`parameters`、`instance_attributes`、`public_fields`、
+`cognitive_complexity` のような surface / control-flow finding は boundary
+review signal として扱い、数値だけで split / extract を要求しません。
 `--min-score 0` は survey 用に finding を出し切る pass mode として扱い、
 default は signal 判定を使います。明示的に default より高い score floor を
 指定した場合だけ strict score gate として扱います。分割は caller contract、
@@ -249,7 +249,7 @@ false positive / allowed warning は reviewer の推測ではなく、機械 fin
 
 `tools/oop/*/readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
 
-- `function_lines` / `cognitive_complexity`: まず関数を decision、pure transform、effect boundary、formatting の単位へ分ける。
+- `cognitive_complexity`: まず分岐の意味を named decision、variant、entrypoint、または flatten できる条件へ分ける。
 - `parameters`: stable な入力集合を dataclass / typed request object / existing value object へ寄せる。
 - `optional_boundary` / `none_runtime_branch`: `None` sentinel ではなく、別 entrypoint、variant、Protocol、validated value object のいずれかへ寄せる。
 - `mixed_morphism_effect`: 戻り値を作る純粋変換と file / process / mutation / print などの effect を分離する。
