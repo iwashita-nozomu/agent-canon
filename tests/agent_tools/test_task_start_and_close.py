@@ -1977,7 +1977,15 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 lifecycle_policy["new_task_reuse"],
                 "forbidden_spawn_fresh_run",
             )
-            self.assertTrue(handoff_context_policy["compact_artifacts_first"])
+            self.assertTrue(handoff_context_policy["context_artifacts_first"])
+            self.assertEqual(
+                handoff_context_policy["context_goal"],
+                "correct_shape_owner_traceability_not_smallness",
+            )
+            self.assertEqual(
+                handoff_context_policy["legacy_compact_artifacts_key"],
+                "compact_artifacts",
+            )
             self.assertTrue(handoff_context_policy["require_allowed_paths"])
             self.assertTrue(handoff_context_policy["require_do_not_read"])
             self.assertEqual(

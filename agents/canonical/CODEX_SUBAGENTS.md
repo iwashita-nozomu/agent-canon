@@ -46,9 +46,9 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
 - writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` に従います。
-- subagent handoff の input packet は role ごとに bounded にし、route seed と調査結果から展開した対象 path list、compact artifacts、allowed / forbidden paths を渡します。
-- reviewer には対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は、launch 間の context を parent が更新する capsule artifact に集約し、launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。capsule には objective、request clauses、state snapshot、exact read-before-work paths、compact artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を入れます。
+- subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
+- reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
+- fresh subagent は、launch 間の context を parent が更新する capsule artifact に集約し、launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。capsule には objective、request clauses、state snapshot、exact read-before-work paths、context artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を入れます。
 - theorem-driven、algorithm、implementation handoff では capsule の `Target Binding Packet` も必須です。target theorem / behavior、public root / entrypoint、return projection / call path、identifier naming plan、accepted / forbidden assumptions、current generated evidence、completion condition、validation commands、unchecked-output policy が揃った状態で spawn します。unchecked theorem sketch、到達未証明の local counterexample、または code suggestion は、親が同じ public root に対して checker / validation を通した後に採用対象へ進みます。
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
@@ -94,13 +94,13 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を user-facing completion の readiness evidence にします
 
-## Handoff Context Budget
+## Handoff Context Contract
 
-Subagent の context budget は correctness gate です。parent は handoff prompt ごとに次を run bundle evidence から導出します。
+Subagent の context は correctness gate です。parent は handoff prompt ごとに次を run bundle evidence から導出します。
 
 - `role_scope`: その role が判断する subdomain、stage、risk class。
 - `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` は workspace identity として扱い、編集候補、検索 hit、checker finding、changed path を seed にし、responsibility search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
-- `required_artifacts`: checker output、compact dashboard、dependency-expanded scope、design / implementation packet、または review packet。compact artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
+- `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
 - `canon_refs`: 必要な AgentCanon / project canon の節。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
@@ -116,7 +116,7 @@ role 分割が妥当でも input packet が広すぎる場合は routing defect 
 
 ## Wave Plan Contract
 
-Every subagent wave must be recorded with the same compact contract across
+Every subagent wave must be recorded with the same structured contract across
 `team_manifest.yaml`, `schedule.md`, `workflow_monitoring.md`, and
 `closeout_gate.md`: `wave_id`, `owner`, `spawn_authority`,
 `spawned_roles`, `role_instances`,
@@ -261,11 +261,11 @@ boundary に沿って subagent packet を作ります。
 
 | Evidence Surface | Owning Skill | Subagent Responsibility Split |
 | --- | --- | --- |
-| log archive API、compact dashboard、routing miss、selection gap、wave execution reconciliation | `agent-log-analysis` | parent が compact artifact を生成し、`prompt_config_reviewer` は prompt / config drift、`docs_workflow_steward` は workflow / skill wording、`project_reviewer` は repo-wide operational risk を別 packet で見る |
+| log archive API、structured dashboard、routing miss、selection gap、wave execution reconciliation | `agent-log-analysis` | parent が context artifact を生成し、`prompt_config_reviewer` は prompt / config drift、`docs_workflow_steward` は workflow / skill wording、`project_reviewer` は repo-wide operational risk を別 packet で見る |
 | repository layout、root shared view、responsibility scope、directory README、import boundary、project `.codex` / `.agents` view と personal `~/.codex` の境界 | `structure-refactor` | `explorer` は responsibility graph と stale surface、`execution_planner` は move / validation order、write-capable agent は disjoint path mapping、document-flow reviewer は reader route を見る |
 | run bundle、spawn authorization、wave ledger、handoff capsule、fresh lifecycle、same-role instance identity | `subagent-bootstrap` | parent は launch mechanics を所有し、stage owner は `role_type+instance_id`、input packet、remaining budget、validation route、review gate を持つ child wave だけを起こす |
 
-Skill を連鎖させる場合は、前 skill が作った compact artifact、handoff
+Skill を連鎖させる場合は、前 skill が作った context artifact、handoff
 packet、または structure contract を次 skill の input にします。境界は
 `allowed_paths`、`do_not_read`、`expected_output`、`validation_route`、
 `review_gate` を含む artifact path で渡します。
@@ -487,8 +487,8 @@ Activation Conditions:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の詳細条件は `.codex/agents/*.toml` に集約します
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。`Fresh Subagent Context Capsule` には必要な selected fields、exact read-before-work sections、compact artifact paths だけを入れます。packet stdout や full artifact はそのまま prompt に貼りません
-- fresh launch の prompt は `Fresh Subagent Context Capsule` の path と compact artifacts を正本にします。context が増えたら capsule artifact を更新して再配送します
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。`Fresh Subagent Context Capsule` には必要な selected fields、exact read-before-work sections、context artifact paths を入れます。packet stdout や full artifact はそのまま prompt に貼りません
+- fresh launch の prompt は `Fresh Subagent Context Capsule` の path と context artifacts を正本にします。context が増えたら capsule artifact を更新して再配送します
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します

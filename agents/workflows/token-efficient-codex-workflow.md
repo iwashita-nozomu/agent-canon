@@ -24,8 +24,8 @@ be considered.
 
 ## Reader Map
 
-- This overlay owns token-saving modes, context budgets, reduction evidence, escalation triggers, and closeout constraints for Codex repo work.
-- The early sections define runtime profiles and agent modes; the middle sections define context budget and token reduction protocol; the final sections define escalation and closeout.
+- This overlay owns token-saving modes, context shaping, reduction evidence, escalation triggers, and closeout constraints for Codex repo work.
+- The early sections define runtime profiles and agent modes; the middle sections define context shaping and token reduction protocol; the final sections define escalation and closeout.
 - Use `## Runtime Profiles` and `## Agent Modes` before changing how much context or subagent fan-out a task receives.
 - For chunked reading, keep the active mode and evidence target in view, then open only the budget, reduction, escalation, or closeout section needed by the current task phase.
 

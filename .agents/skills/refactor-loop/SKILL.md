@@ -48,7 +48,7 @@ Execute the required and task-matching conditional commands that the packet prin
    tests/docs that own observable behavior or reader-facing contracts. Narrow
    implementation only after mapping exact target functions, methods, and
    classes inside that expanded scope.
-1. Use `$dependency-analysis` to create a token-light `Change Impact Packet`
+1. Use `$dependency-analysis` to create a structured `Change Impact Packet`
    manifest before choosing targets, writing the refactor orchestration plan,
    or launching a write-capable subagent. The packet is the unified
    repair-planning input; raw findings, raw search hits, and single filenames

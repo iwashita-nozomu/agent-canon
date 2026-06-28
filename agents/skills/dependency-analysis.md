@@ -23,12 +23,12 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py valid
 - Use when: dependency manifests, changed-file gates, graph edges, reverse
   edges, design-claim evidence, or repair-planning packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
-  separate until summarized in a token-light Change Impact Packet.
+  separate until summarized in a structured Change Impact Packet.
 
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
-code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を token-light な `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM context には必要最小限だけを載せます。
+code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を structured `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM-visible context には planning に必要な selected excerpt、summary、artifact path を載せます。
 
 ## Use When
 
@@ -144,10 +144,10 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ## Change Impact Packet
 
 `dependency-analysis` は、依存 evidence を集めるだけでなく、修正計画の入力になる
-token-light な `Change Impact Packet` manifest の正本です。これは LLM が依存
+structured `Change Impact Packet` manifest の正本です。これは LLM が依存
 graph 全体を prose 化する場所ではありません。tool output は JSON / TSV /
 Markdown artifact として保存し、packet には path、count、object id、現在の
-repair batch に必要な最小 excerpt だけを載せます。`refactor-loop`、
+repair batch に必要な selected excerpt と structured summary を載せます。`refactor-loop`、
 implementation handoff、原因仮説の fix-surface 選定では、raw `rg` hit、raw
 finding、単一 file 名だけを subagent に渡しません。
 

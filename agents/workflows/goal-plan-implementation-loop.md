@@ -43,7 +43,7 @@ of returning a partial status as completion.
 
 ## Planning Checkpoint
 
-Planning produces only the minimum packet needed to implement the next slice:
+Planning produces the initial owned packet needed to implement the next slice:
 
 - `Goal Contract`: objective, non-goals, constraints, and active clauses.
 - `Slice Selection`: the `GW*` rows that will move together.

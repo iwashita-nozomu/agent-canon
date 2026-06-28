@@ -82,25 +82,31 @@ deferral.
 
 ## Context Construction
 
-Context construction is the primary runtime concern. Keep LLM-visible prompt
-context separate from local tool state and durable memory. Carry only the
-minimum instructions, request clauses, selected source-packet fields, exact file
-sections, and compact evidence needed for the next decision into the prompt.
-Keep raw search output, full dashboards, logs, long histories, and broad
-workflow packets in artifacts or memory notes, and pull them by exact path when
-needed.
+Context construction is the primary runtime concern. Build context for correct
+shape, ownership, and traceability; do not optimize for smallness by itself.
+LLM-visible prompt context may be large when the next decision requires it, but
+it must be structured and tied to an owner, source packet, artifact path, or
+request clause.
 
-Treat AGENTS/root entrypoints as LLM-visible instruction context. Keep them
-routing-only and compact; detailed workflow, checker output, raw reports, and
-historical evidence stay in local/tool context. Do not expand root instructions
-to compensate for missing packet fields.
+Keep LLM-visible prompt context separate from local tool state and durable
+memory. Move into the prompt the instructions, request clauses,
+source-packet fields, exact file sections, and evidence needed for the next
+decision. Keep raw search output, full dashboards, logs, long histories, and
+broad workflow packets in artifacts or memory notes until a selected excerpt or
+structured summary is needed.
+
+Treat AGENTS/root entrypoints as LLM-visible instruction context. Keep them as
+routing and context-construction guidance; detailed workflow, checker output,
+raw reports, and historical evidence stay in local/tool context until selected
+for a concrete decision. Do not expand root instructions to compensate for
+missing packet fields.
 
 Subagents are fresh per launch and do not inherit accumulated context. Every
 handoff must use the `Fresh Subagent Context Capsule` in
 `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md`: objective,
-read-before-work, compact artifacts, allowed/do_not_read, expected output,
-validation route, and return contract. Do not hand off broad chat summaries or
-assume prior subagent context persists.
+read-before-work, context artifacts, allowed/do_not_read, expected output,
+validation route, and return contract. Do not hand off broad chat summaries as
+a substitute for owned context, or assume prior subagent context persists.
 
 ## Repository Discovery and Reading
 

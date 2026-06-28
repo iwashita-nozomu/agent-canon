@@ -136,10 +136,10 @@ Use `documents/tools/README.md` for reader-facing tool-family guidance and
 `tools/catalog.yaml` for the complete structured registry. Do not expand this
 table into a second catalog.
 
-For agent-facing diagnostics, prefer compact artifact options over detailed
+For agent-facing diagnostics, prefer structured artifact options over detailed
 stdout: `evaluate_skill_workflow_prompts.py --compact-out <path>.json`,
 `evaluate_codex_agent_roles.py --compact-out <path>.json`, and
-`eval_accumulation_check.py --compact-out <path>.json` write bounded summary
+`eval_accumulation_check.py --compact-out <path>.json` write structured summary
 statistics for the agent to read before drilling into full reports.
 
 `tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
@@ -577,7 +577,7 @@ labels, eval report families, and open/closed issue counts. The standalone
 AgentCanon GitHub Actions workflow publishes the dashboard to the workflow Step
 Summary and uploads it as an artifact; template and derived repositories do not
 publish their own runtime dashboard copies. Pass `--compact-out` to also write
-a token-light summary for agent log analysis. Agents should use that compact
+a structured summary for agent log analysis. Agents should use that structured
 summary and its generated evidence drilldowns as the normal analysis input; if
 the summary lacks a needed detail, extend or rerun the dashboard tool for a more
 specific generated summary. Token-use questions should use recent moving
@@ -807,7 +807,7 @@ project-owned artifact.
 
 `goal_loop.py` manages a top-level `goal.md` contract and repeats a command until explicit exit criteria are checked and `goal_status: achieved` is set.
 The default `goal.md` and `goal_loop.py init` include mandatory criteria for dependency review, code dependency extraction, OOP/readability analysis, repo-wide static analysis or CI, and objective-specific evidence.
-The default Backlog is a minimum first-iteration packet, not a single tiny TODO.
+The default Backlog is an initial first-iteration packet, not a single tiny TODO.
 It requires a prompt-to-artifact checklist, reuse / consolidation / deletion survey,
 one cohesive implementation slice, task-relevant validation, and immediate continuation
 when `NEXT_ACTION=run_next_iteration` remains.

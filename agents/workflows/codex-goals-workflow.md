@@ -255,7 +255,7 @@ When starting a goal-driven task:
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
 1. Run `goal_loop.py plan --goal-file goal.md --report-out <run>/goal_work_breakdown.md`.
-   Confirm the generated Backlog contains the minimum first-iteration packet
+   Confirm the generated Backlog contains the initial first-iteration packet
    rather than only one tiny "next item" task.
 1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
    implementation edit.

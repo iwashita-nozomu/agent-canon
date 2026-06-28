@@ -281,6 +281,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "subagent_lifecycle_policy",
     "cross_cutting_document_packet",
     "role_document_packet",
+    "context_artifacts",
     "compact_artifacts",
     "allowed_paths",
     "do_not_read",
@@ -1209,7 +1210,7 @@ def format_subagent_wave(agent_types: tuple[str, ...]) -> str:
 
 
 def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
-    """Render follow-up waves in a machine-readable compact form."""
+    """Render follow-up waves in a machine-readable summary form."""
     return ";".join(
         f"WAVE-{index + 2}={format_subagent_wave(wave)}"
         for index, wave in enumerate(waves)
@@ -1219,7 +1220,7 @@ def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
 def format_subagent_role_instance_wave_chunks(
     waves: tuple[tuple[SubagentWaveSlot, ...], ...],
 ) -> str:
-    """Render follow-up role-instance waves in a compact machine-readable form."""
+    """Render follow-up role-instance waves in a machine-readable summary form."""
     return ";".join(
         f"WAVE-{index + 2}="
         + ",".join(
@@ -1746,7 +1747,9 @@ def manifest_run_lines(
         "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
         "send_input; scope changes spawn a fresh wave.'",
         "  handoff_context_policy:",
-        "    compact_artifacts_first: true",
+        "    context_artifacts_first: true",
+        "    context_goal: correct_shape_owner_traceability_not_smallness",
+        "    legacy_compact_artifacts_key: compact_artifacts",
         "    require_allowed_paths: true",
         "    require_do_not_read: true",
         "    require_expected_output_schema: true",
@@ -2396,10 +2399,10 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "do not edit repository files"
     )
     return (
-        f"You are the {role.id} role for {family_name}. Start from compact artifacts and the "
-        "bounded role_document_packet named in the handoff; load cross_cutting_document_packet "
+        f"You are the {role.id} role for {family_name}. Start from structured context artifacts and the "
+        "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
-        f"them not_applicable. Use allowed_paths and do_not_read as hard context bounds. {write_scope}. "
+        f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
         "Carry run.repo_tool_routing_policy tool_route, tool_commands, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
@@ -2412,7 +2415,7 @@ def compact_role_prompt_contract(
     role: Role,
     workflow_family: dict[str, object] | None,
 ) -> str:
-    """Return a compact manifest copy of the role prompt contract."""
+    """Return a short manifest copy of the role prompt contract."""
     family_name = (
         str(workflow_family["name"])
         if workflow_family is not None
@@ -2422,7 +2425,7 @@ def compact_role_prompt_contract(
         "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
     )
     return (
-        f"{role.id} for {family_name}; {write_scope}; use compact artifacts, "
+        f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
         "role-specific packet, common packet only when active, allowed paths, "
         "repo tool route fields, and the listed output fields."
     )

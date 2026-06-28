@@ -38,21 +38,24 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 
 ## Context Visibility Contract
 
-Context is classified before it is handed to an agent.
+Context is classified before it is handed to an agent. The goal is correct
+shape, ownership, and traceability, not minimizing token count.
 
-- `llm_visible_context`: only the minimal instructions, request clauses,
-  selected source-packet fields, exact file sections, and compact evidence
-  needed for the next decision.
+- `llm_visible_context`: instructions, request clauses, selected
+  source-packet fields, exact file sections, and evidence that the agent must
+  reason over for the next decision. It may be large when required, but it must
+  be structured and tied to an owner, path, source packet, or request clause.
 - `local_tool_context`: files, dashboards, raw tool output, generated packets,
   logs, and search results that remain available by path or tool call, but are
-  not pasted into prompts unless a selected excerpt is required.
+  not pasted into prompts unless a selected excerpt or structured summary is
+  required.
 - `durable_memory`: stable repo policy, source packets, issues, reports, and
   learned feedback stored in owner surfaces; do not rely on chat memory or
   compaction as the only record.
 
-Handoffs pass paths plus selected excerpts by default. Raw artifacts stay
-local/tool context unless the packet explicitly promotes a bounded excerpt to
-`llm_visible_context`.
+Handoffs pass paths, selected excerpts, and structured summaries by default.
+Raw artifacts stay local/tool context unless the packet explicitly promotes a
+selected excerpt or structured summary to `llm_visible_context`.
 
 ## Handoff Packet
 
@@ -77,8 +80,9 @@ local/tool context unless the packet explicitly promotes a bounded excerpt to
 ## Pre-Edit Repository Investigation Packet
 
 Before selecting edit paths, direct parent edits, or write-capable subagent
-handoff, the parent records a bounded pre-edit investigation packet. This is
-the minimum evidence that repo investigation happened before implementation.
+handoff, the parent records a pre-edit investigation packet with explicit owner
+and scope. This is the required evidence that repo investigation happened
+before implementation.
 
 - `request_clause_ids`: user clauses covered by the edit
 - `workflow_and_skills`: selected workflow, active skills, deferred dynamic
@@ -86,7 +90,7 @@ the minimum evidence that repo investigation happened before implementation.
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
-- `responsibility_search`: compact semantic-index / local-LLM / tool-catalog
+- `responsibility_search`: structured semantic-index / local-LLM / tool-catalog
   result paths, not broad raw `rg` dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected
@@ -96,8 +100,8 @@ the minimum evidence that repo investigation happened before implementation.
   reason dependency expansion is not applicable
 - `validation_route`: targeted checks and closeout gates derived from the
   packet
-- `llm_visible_context`: selected excerpts or compact evidence that must be in
-  the prompt for the next decision
+- `llm_visible_context`: selected excerpts, structured summaries, or evidence
+  that must be in the prompt for the next decision
 - `local_tool_context`: artifact paths, command outputs, raw logs, dashboards,
   or search results intentionally kept out of the prompt
 - `durable_memory_refs`: stable policy, issue, report, source packet, or memory
@@ -133,17 +137,19 @@ editable files, and chat context alone are not enough.
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
-handoff therefore includes a compact context capsule that is self-contained
-enough to execute the role, but bounded enough to avoid broad repo reading.
+handoff therefore includes a structured context capsule that is self-contained
+enough to execute the role and owned enough to avoid unrelated repo reading.
 
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
 - `state_snapshot`: branch, relevant commit or run-id, current stage, and
   parent integration owner
-- `read_before_work`: exact files or sections to read, capped to role-owned
+- `read_before_work`: exact files or sections to read within role-owned
   surfaces
-- `compact_artifacts`: router output, dashboard summary, checker finding
+- `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
+- `compact_artifacts`: legacy alias for `context_artifacts`; compact means a
+  canonical artifact reference, not a requirement to minimize prompt context
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use

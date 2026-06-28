@@ -52,7 +52,7 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
    します。実装対象は、その展開済み scope 内で関数、method、class 単位に
    絞り込んでから決めます。
 1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff
-   の前に、`dependency-analysis` で token-light な `Change Impact Packet:`
+   の前に、`dependency-analysis` で structured `Change Impact Packet:`
    manifest を作ります。この packet は code dependency、header dependency、
    search surface、structural finding、tests / docs / config / log / Info
    surface、unknown dynamic edge をまとめた修正計画の入力ですが、full graph を
@@ -150,7 +150,7 @@ repair-slice loop で 1 slice ずつ進めます。
    Python structural duplicate では次を既定入口にします。
    `python-structure-hash` -> `python-structure-hash-report`
 1. `tool-finding-report` の結果はそのまま実装者へ配らず、`dependency-analysis`
-   に渡して token-light な `Change Impact Packet` manifest を作ります。ここで code dependency、
+   に渡して structured `Change Impact Packet` manifest を作ります。ここで code dependency、
    header dependency、search scope、structural finding、tests / docs / config /
    log / Info surface、unknown dynamic edge を統合し、tool-generated
    `impact_blocks`、`repair_batches`、`subagent_handoff_context` を固定します。

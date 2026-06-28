@@ -33,10 +33,10 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. `AGENTS.md` を読む
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
-1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の compact output を取る
+1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
 1. AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。親 repo の無関係な dirty state は evidence として記録し、clean な submodule branch checkout と stale parent gitlink の mismatch は warning/evidence として扱い、dirty / detached / unpushed / divergent source state を fail-closed blocker にする
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
-1. Cross-Cutting Packet は選択 route、review gate、または compact tool finding が必要にした slice を読む
+1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
@@ -111,7 +111,7 @@ Use only the active profile for the task. Mark inactive profiles as
 実装、設計変更、文書改訂、実験計画の前に、repo evidence を根拠にします。
 context sweep は bounded packet reading です。先に task topic、runtime
 profile、implementation surface router、semantic-index / context-pack、dependency review
-の compact output で責務 bucket を絞り、選ばれなかった profile / document bucket は
+の structured output で責務 bucket を絞り、選ばれなかった profile / document bucket は
 `not_applicable` として扱います。Large delivery / Shared canon でも、まず bounded
 responsibility route を残してから必要 slice だけを読む。
 
@@ -536,7 +536,7 @@ bundle 出力には少なくとも次が含まれます。
 - task id / fan-out budget / active role evidence
 
 parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、bounded packet routing を維持します。
-handoff には `allowed_paths`、`do_not_read`、compact artifact path、expected output schema、
+handoff には `allowed_paths`、`do_not_read`、context artifact path、expected output schema、
 `PRIMARY_PATHS` / `FORBIDDEN_PATHS`、reuse ledger、pre-edit rejection prediction を含めます。
 `cross_cutting_document_packet` は利用可能な reference list であり、role ごとの必要 slice を選ぶために使います。
 

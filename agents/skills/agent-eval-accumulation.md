@@ -40,7 +40,7 @@ checker output と archive 側 accumulated report に残します。
 
 - `eval_accumulation_check.py` が `no-*-eval-reports`、duplicate run id、
   missing run id、legacy source-tree result などを返した
-- `$agent-log-analysis` が compact dashboard / API の後に eval family gap を見つけた
+- `$agent-log-analysis` が structured dashboard / API の後に eval family gap を見つけた
 - skill、workflow、subagent role、router、report-writing、local LLM routing を直した後、
   accumulated eval evidence を PR / closeout gate に戻す必要がある
 - 過去 run の反復課題を skill / workflow / role prompt に還元する前に、どの eval

@@ -69,7 +69,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `result-artifact-writeout` | tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す | `agents/skills/result-artifact-writeout.md` | `.agents/skills/result-artifact-writeout/SKILL.md` |
 | `tool-finding-report` | tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る | `agents/skills/tool-finding-report.md` | `.agents/skills/tool-finding-report/SKILL.md` |
 | `issue-finding-report` | prompt / run bundle / hook / routing / eval evidence を抽象原因でまとめ、durable skill issue 候補に変換する | `agents/skills/issue-finding-report.md` | `.agents/skills/issue-finding-report/SKILL.md` |
-| `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
+| `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを structured summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
 | `agent-eval-accumulation` | missing / stale な AgentCanon eval family を registered producer と checker で append-only evidence に戻す | `agents/skills/agent-eval-accumulation.md` | `.agents/skills/agent-eval-accumulation/SKILL.md` |
 | `agent-canon-update` | AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する | `agents/skills/agent-canon-update.md` | `.agents/skills/agent-canon-update/SKILL.md` |
 | `pr-processing` | PR / Issue queue を inventory、authority、conflict、validation、merge、Issue triage、closeout evidence の順に処理する | `agents/skills/pr-processing.md` | `.agents/skills/pr-processing/SKILL.md` |
@@ -158,8 +158,8 @@ in the Codex host runtime.
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
 - tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
-- skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に compact summary を生成して読みます。
-- compact summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
+- skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に structured summary を生成して読みます。
+- structured summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
 - accumulated eval family が missing / stale / fail のときは `agent-eval-accumulation` を使い、registered producer、compact checker、log archive sync の順に戻します。eval report を手で生成しません。
 - PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは `pr-processing` を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
 - AgentCanon source、`vendor/agent-canon` pin、root runtime view、parent update TODO を更新するときは `agent-canon-update` を使い、source PR と parent pin 更新を分けます。
