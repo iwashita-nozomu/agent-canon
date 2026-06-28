@@ -29,7 +29,7 @@ upstream design README.md durable document index
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
-- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`run.log`、`logs/` を残します。追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
+- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
 
 ## 3. 実行原則
 
@@ -38,24 +38,24 @@ upstream design README.md durable document index
 - 比較条件は run 開始前に固定します。
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置きます。
 - 実験設定は Python object の暗黙状態ではなく、YAML で管理し、run 開始時に再現可能な artifact として snapshot します。
-- formal run では `result/<run_name>/config.json` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に書き出します。
-- 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の互換ログとして残し、topic 固有の追加ログは `logs/` 配下へ分けます。
+- formal run では `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に辿れるようにします。
+- 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の統合ログとして残し、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、topic 固有の追加ログは `logs/` 配下へ分けます。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
-- formal / server-side run は必ず `tools/experiments/run_managed_experiment.py`、または同等に `run_manifest.json`、`config` snapshot、`run.log`、exit status を保存する wrapper から起動します。
+- formal / server-side run は `tools/experiments/run_managed_experiment.py` から起動します。標準 runner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、exit status を保存します。
 - 可視化 notebook は run 後に `summary.json`、`cases.jsonl`、必要な `logs/` artifact を読むだけにし、notebook の hidden state を正式 evidence にしません。
 - `experiment_runner` を使う実験で、process 管理、GPU 割当、timeout、signal cleanup を実験本体に実装しません。
 
 ## 3.1 設定 snapshot
 
-- 実験 script は `--config <path>` または同等の引数で、topic の YAML config を読めるようにします。
-- `experiments/<topic>/config.yaml` は human-authored な設定正本です。default 値を Python module global や notebook cell state だけに閉じ込めることを禁止します。
-- `tools/experiments/run_managed_experiment.py` を使う run では、wrapper が `result/<run_name>/config.json` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
-- YAML を正本にする topic では、Make target が `config.yaml` を run 用 snapshot へ変換するか、inner command が `config.yaml` を読み、`result/<run_name>/config.yaml` と digest を保存します。いずれの場合も `run_manifest.json` から設定正本を辿れるようにします。
+- 実験 script は `--config <path>` 引数で、runner が生成した `config.json` を読めるようにします。
+- `experiments/<topic>/config.yaml` は human-authored な設定正本です。default 値は `config.yaml`、`config.json`、`config_source.yaml`、`run_manifest.json` から辿れる形にします。
+- `tools/experiments/run_managed_experiment.py` を使う run では、runner が `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
+- YAML を正本にする topic では、`experiments/<topic>/config.yaml` を編集し、runner が run 用 snapshot を保存します。`run_manifest.json` から設定正本と run 用 snapshot を辿れるようにします。
 - `experiments/registry.toml` の `smoke_inner_command` と `formal_inner_command` は `{config_path}` を含めます。
 - `summary.json` には、少なくとも `config_path` または config digest / config key list を残します。
-- 実験中に Python closure、module global、notebook cell state、環境変数だけで条件を変えた場合、その run は正式 evidence にしません。
+- 実験中に Python closure、module global、notebook cell state、環境変数で条件を変える場合、その値を run artifact に反映します。
 
 ## 3.2 Make target と実行入口
 
@@ -71,22 +71,16 @@ experiment-smoke:
   python3 tools/experiments/run_managed_experiment.py \
     --topic $(TOPIC) \
     --variant smoke \
-    --config-json experiments/$(TOPIC)/config.json \
     --use-registered-command smoke
 
 experiment-formal:
   python3 tools/experiments/run_managed_experiment.py \
     --topic $(TOPIC) \
     --variant formal \
-    --config-json experiments/$(TOPIC)/config.json \
     --use-registered-command formal
 ```
 
-YAML を checked-in 正本にする repo では、上の `--config-json` は
-project-local helper で `experiments/$(TOPIC)/config.yaml` から生成した
-snapshot JSON に置き換えます。重要なのは、手元だけの ad hoc command ではなく、
-`make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>`
-で同じ runner 経路を再実行できることです。
+`experiments/<topic>/config.yaml` が checked-in 正本です。Make target は正式な入口として、`make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` で同じ runner 経路を再実行できるようにします。
 
 topic 固有の target 名を置く場合も、内側では同じ managed runner を呼びます。
 

@@ -249,6 +249,9 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - AgentCanon source commit と template parent gitlink / root copy commit を分けます。
 - template 側では `vendor/agent-canon` の gitlink、`.gitmodules`、root copy / link spec の変更だけを commit します。
 - unrelated change を同じ commit に混ぜません。
+- `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、commit は実行単位、PR はレビュー単位として扱います。
+- 複数の問題、canonical owner、behavior or contract delta、validation route が同じ PR に入る場合は、run bundle または PR body に範囲表を置きます。
+- 独立して main に入れられる差分単位は、merge 前に別 PR または別 commit に分けます。
 
 6. PR を作る
 

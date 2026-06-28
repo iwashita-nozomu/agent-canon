@@ -429,6 +429,12 @@ SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "responsibility_preflight_gate"
 ]
+EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "experiment_execution_surface_guard"
+]
+BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "branch_worktree_creation_guard"
+]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_COMMAND_RE = re.compile(
@@ -736,6 +742,10 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
 }
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "solid_coding_contract"
+]
+
+SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "source_file_definition_order"
 ]
 PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?.*(?:"
@@ -1776,6 +1786,20 @@ def run_checks(root: Path) -> list[Finding]:
             RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
         )
     )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "experiment_execution_surface_guard",
+            EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "branch_worktree_creation_guard",
+            BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
+        )
+    )
     findings.extend(check_closeout_readiness(root))
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
@@ -1788,6 +1812,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "source_file_definition_order",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
         )
     )
     findings.extend(check_agentcanon_push_remote_guard(root))

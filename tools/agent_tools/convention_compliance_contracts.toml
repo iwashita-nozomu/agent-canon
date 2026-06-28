@@ -3,6 +3,7 @@
 # responsibility Declares marker contracts consumed by convention compliance checks.
 # upstream design ../../agents/skills/small-change-routing.md small change routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
 # downstream implementation ./check_convention_compliance.py loads marker contracts
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
@@ -110,6 +111,50 @@ path = "documents/tools/README.md"
 markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
 
 [[contracts]]
+id = "experiment_execution_surface_guard"
+description = "Managed experiment execution surfaces route through lifecycle and test-design validation before runner or registry semantics change."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/tool_rejection_preflight.py"
+markers = ["EXPERIMENT_EXECUTION_SURFACE_PATHS", "experiment_execution_surface_guard", "experiment_execution_surface_path", "check_experiment_registry.py", "test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/experiment-lifecycle/SKILL.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "$test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/experiment-lifecycle.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "documents/experiment-registry.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts]]
+id = "branch_worktree_creation_guard"
+description = "Branch and worktree creation stay routed through the active checkout policy and critical PreToolUse guard."
+
+[[contracts.surfaces]]
+path = ".codex/hooks/branch_worktree_guard.py"
+markers = ["BRANCH_WORKTREE_CREATION_GUARD=block", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "user_request", "agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON", "git worktree add", "git switch -c/-C", "git checkout -b/-B/--orphan", "git branch <name>/-c/-C/-f/--force"]
+
+[[contracts.surfaces]]
+path = ".codex/hooks/hook_dispatcher.py"
+markers = ["branch_worktree_guard.py", "CRITICAL_BLOCKING_CHILD_HOOKS", "PreToolUse"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["Branch Reuse Default", "branch_worktree_guard.py", "user が別 branch を明示", "AgentCanon branch / PR workflow", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/worktree-health/SKILL.md"
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+
+[[contracts.surfaces]]
+path = "agents/skills/worktree-health.md"
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+
+[[contracts]]
 id = "solid_coding_contract"
 description = "SOLID guidance stays routed to OOP readability checker evidence instead of prose-only review."
 
@@ -135,11 +180,11 @@ markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", 
 
 [[contracts.surfaces]]
 path = "agents/skills/python-review.md"
-markers = ["SOLID principle signal", "OOP readability report", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
+markers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/python-review/SKILL.md"
-markers = ["SOLID principle signal", "$oop-readability-check", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "scanned_paths"]
+markers = ["SOLID 原則シグナル", "$oop-readability-check", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "scanned_paths"]
 
 [[contracts.surfaces]]
 path = "agents/skills/change-review.md"
@@ -176,3 +221,27 @@ markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
 markers = ["SOLID", "SRP", "OCP", "LSP", "ISP", "DIP", "Single responsibility", "Open/closed", "Liskov", "Interface segregation", "Dependency inversion", "Protocol", "- [\"SOLID\"]", "- [\"SRP\"]", "- [\"Dependency inversion\"]"]
+
+[[contracts]]
+id = "source_file_definition_order"
+description = "Python source files keep readable definition order visible in conventions, routing, and review surfaces."
+
+[[contracts.surfaces]]
+path = "documents/conventions/python/09_file_roles.md"
+markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = "documents/coding-conventions-house-style.md"
+markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
+
+[[contracts.surfaces]]
+path = "agents/skills/python-review.md"
+markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/python-review/SKILL.md"
+markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["コードファイル", "順序", "定義順", "関数", "class"]

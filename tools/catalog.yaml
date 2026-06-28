@@ -221,6 +221,23 @@ entries:
     tests:
       - tests/agent_tools/test_render_dependency_manifest_graph.py
 
+  - id: git-dependency-diff-summary
+    summary: Summarizes Git diff paths, line counts, code dependency edges, and dependency-header edit-scope artifacts.
+    path: tools/agent_tools/git_dependency_diff_summary.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/git_dependency_diff_summary.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/git_dependency_diff_summary.md
+      - documents/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_git_dependency_diff_summary.py
+
   - id: classify-path-risk
     summary: Classifies changed paths into runtime profiles and targeted validation checks.
     path: tools/agent_tools/classify_path_risk.py

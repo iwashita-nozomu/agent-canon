@@ -3,9 +3,11 @@
 # contract agent-runtime
 # responsibility Dispatches Codex lifecycle hook events to the configured guard scripts.
 # upstream implementation ../hooks.json invokes this dispatcher once per active hook event.
+# upstream implementation ../../tools/agent_tools/runtime_log_paths.py owns Codex trace environment names.
 # upstream design ../README.md documents dispatcher-based hook wiring.
 # downstream implementation ./codex_runtime_summary_logger.py exports bounded Codex runtime summaries on Stop
 # downstream implementation ./runtime_log_auto_sync.py syncs mounted runtime logs and agent reports on Stop
+# downstream implementation ./branch_worktree_guard.py blocks unconfirmed branch and worktree creation.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch order and hook count.
 # @dependency-end
 
@@ -23,6 +25,12 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
+if TOOLS_DIR.is_dir():
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from runtime_log_paths import CODEX_TRACE_ENV_NAMES  # noqa: E402
 
 DISPATCHER_DIR_ENV = "AGENT_CANON_HOOK_DISPATCHER_DIR"
 GIT_ROOT_TIMEOUT_SECONDS = 5
@@ -49,7 +57,7 @@ STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
 # Most policy hooks are advisory by default so a bad guardrail cannot freeze
 # ordinary shell/read/validation work. CI and hook development can opt into
 # strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
-CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py"})
+CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py", "branch_worktree_guard.py"})
 ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
 SAFE_GIT_BRANCH_LIST_OPTIONS = {
@@ -127,6 +135,13 @@ SCRIPT_MIN_TOKENS = 2
 SCRIPT_PATH_INDEX = 1
 SCRIPT_SUBCOMMAND_MIN_TOKENS = 3
 SCRIPT_SUBCOMMAND_INDEX = 2
+CODEX_TRACE_PAYLOAD_FIELDS = (
+    "codex_trace_key",
+    "codex_thread_id",
+    "thread_id",
+    "session_id",
+    "conversation_id",
+)
 
 
 @dataclass(frozen=True)
@@ -181,6 +196,7 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     ),
     "PreToolUse": (
         HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("branch_worktree_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("direct_rg_context_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS),
     ),
@@ -244,6 +260,34 @@ def json_payload(raw_payload: bytes) -> dict[str, object]:
     except json.JSONDecodeError:
         return {}
     return loaded if isinstance(loaded, dict) else {}
+
+
+def payload_trace_key(payload: dict[str, object]) -> str:
+    """Return the Codex trace key carried by one hook payload."""
+    for field in CODEX_TRACE_PAYLOAD_FIELDS:
+        value = payload.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def child_hook_environment(payload: dict[str, object]) -> dict[str, str]:
+    """Return the environment shared by child hooks."""
+    env = os.environ.copy()
+    canonical_trace_env = CODEX_TRACE_ENV_NAMES[0]
+    if env.get(canonical_trace_env, "").strip():
+        return env
+    trace_key = payload_trace_key(payload) or next(
+        (
+            env.get(name, "").strip()
+            for name in CODEX_TRACE_ENV_NAMES[1:]
+            if env.get(name, "").strip()
+        ),
+        "",
+    )
+    if trace_key:
+        env[canonical_trace_env] = trace_key
+    return env
 
 
 def tool_name(payload: dict[str, object]) -> str:
@@ -568,6 +612,7 @@ def run_hook_command(
     raw_payload: bytes,
     root: Path,
     hooks_dir: Path,
+    env: dict[str, str],
 ) -> HookResult:
     """Run one child hook script with the original payload."""
     script = hooks_dir / spec.script
@@ -578,6 +623,7 @@ def run_hook_command(
             cwd=root,
             check=False,
             capture_output=True,
+            env=env,
             timeout=spec.timeout,
         )
     except OSError as exc:
@@ -784,10 +830,18 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     """Run every child hook for one event and emit the highest-priority output."""
     if bypass_child_guards_payload(raw_payload):
         return 0
+    payload = json_payload(raw_payload)
+    child_env = child_hook_environment(payload)
     root = repo_root()
     hooks_dir = hook_directory()
     results = [
-        run_hook_command(spec, raw_payload=raw_payload, root=root, hooks_dir=hooks_dir)
+        run_hook_command(
+            spec,
+            raw_payload=raw_payload,
+            root=root,
+            hooks_dir=hooks_dir,
+            env=child_env,
+        )
         for spec in EVENT_COMMANDS[event]
     ]
     blocking = next((result for result in results if result.blocks()), None)

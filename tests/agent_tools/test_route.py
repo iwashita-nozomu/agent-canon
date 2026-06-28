@@ -116,6 +116,52 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
+    def test_prompt_routes_related_skill_candidates_without_activating(self) -> None:
+        """Related skill metadata should guide later waves without expanding active skills."""
+        result = self.run_route(
+            "--prompt",
+            "スキルが重いので分割し、関連スキルを明示して実行時に適切なスキルを使う",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("small-change-routing", decision["related_skill_candidates"])
+        self.assertNotIn("small-change-routing", decision["active_skills"])
+        self.assertIn("task-routing", decision["related_skills"])
+        self.assertIn("small-change-routing", decision["related_skills"]["task-routing"])
+
+    def test_prompt_routes_code_visualization_selection(self) -> None:
+        """Code visualization prompts should enter the diagram selector skill."""
+        prompts = (
+            (
+                "コードの可視化にはフローチャート、コールグラフ、制御フローグラフ、"
+                "シーケンス図、状態遷移図、データフロー図、依存関係図、"
+                "タイミング図など色々な図示があるので適切に選択して"
+            ),
+            "HTML dashboardでコードの依存グラフを見たい",
+            "文書に埋め込む図も文脈から適切に選んで",
+            "READMEのvisual_planにMermaid図を入れる",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("code-visualization", decision["matched_skills"])
+                self.assertIn("code-visualization", decision["active_skills"])
+                self.assertIn("dependency-analysis", decision["related_skill_candidates"])
+                self.assertIn("structure-planning", decision["related_skill_candidates"])
+                self.assertIn("algorithm-flowchart", decision["related_skill_candidates"])
+                self.assertIn("html-output", decision["related_skill_candidates"])
+                self.assertIn("md-style-check", decision["related_skill_candidates"])
+                self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
         prompt = "スキルとツールのルーティングが遅すぎるので改善して"
@@ -145,6 +191,39 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("document-canon-cleanup", decision["matched_skills"])
         self.assertIn("document-canon-cleanup", decision["active_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_codex_report_document_repo_optimization(self) -> None:
+        """Codex report and document based repo optimization should not fall through."""
+        result = self.run_route(
+            "--prompt",
+            "Codexのレポとか文書とか見ながら，ここのレポの最適化を行ってください",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        for skill in ("agent-log-analysis", "document-canon-cleanup", "structure-refactor"):
+            self.assertIn(skill, decision["matched_skills"])
+            self.assertIn(skill, decision["active_skills"])
+        self.assertIn("report-writing", decision["related_skill_candidates"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_explicit_reader_report_to_report_writing(self) -> None:
+        """Explicit reader-facing report requests should activate report-writing."""
+        result = self.run_route(
+            "--prompt",
+            "評価レポートを作り，source packet と limitations を含めて",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("report-writing", decision["matched_skills"])
+        self.assertIn("report-writing", decision["active_skills"])
+        self.assertIn("structure-planning", decision["related_skill_candidates"])
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
 
     def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
         """The shell wrapper must not preserve a local-llm route-skill alias."""
@@ -240,17 +319,58 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_skill_tool_call_coverage_to_log_analysis(self) -> None:
         """Toolcall and Skillcall coverage requests should route to runtime log analysis."""
+        prompts = (
+            "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
+            "ログを確認して，スキル修正",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("agent-log-analysis", decision["skills"])
+                self.assertIn("agent-log-analysis", decision["matched_skills"])
+                self.assertIn("agent-log-analysis", decision["active_skills"])
+
+    def test_prompt_routes_missed_skill_invocation_feedback(self) -> None:
+        """Missed skill feedback should reach routing, log analysis, and learning surfaces."""
         result = self.run_route(
             "--prompt",
-            "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
+            "適切にスキルが呼ばれないです．関連スキルの記述を絞りすぎ",
             "--format",
             "json",
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("agent-log-analysis", decision["skills"])
-        self.assertIn("agent-log-analysis", decision["matched_skills"])
+        for skill in ("task-routing", "agent-log-analysis", "agent-learning"):
+            self.assertIn(skill, decision["matched_skills"])
+            self.assertIn(skill, decision["skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("agent-log-analysis", decision["active_skills"])
+        self.assertIn("agent-learning", decision["deferred_skills"])
+        self.assertIn("issue-finding-report", decision["related_skill_candidates"])
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_source_file_order_feedback(self) -> None:
+        """Source file order feedback should reach small change and Python review routes."""
+        result = self.run_route(
+            "--prompt",
+            "コードファイル内の順序がわかりにくいです",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("small-change-routing", decision["matched_skills"])
+        self.assertIn("small-change-routing", decision["active_skills"])
+        self.assertIn("python-review", decision["matched_skills"])
+        self.assertIn("python-review", decision["deferred_skills"])
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_adaptive_improvement_loop_from_iterative_work(self) -> None:
         """Iterative execution and tuning prompts should activate adaptive loop routing."""
@@ -318,6 +438,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", python_decision["active_skills"])
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertIn("agent-learning", python_decision["deferred_skills"])
+        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_repo_wide_responsibility_deduplication(self) -> None:
+        """Repo-wide over-splitting and responsibility overlap should route to structure repair."""
+        prompt = "レポ全体をレビューしながら過剰分割，責務重複を排除してください"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        python_decision = json.loads(python_result.stdout)
+        self.assertIn("structure-refactor", python_decision["matched_skills"])
+        self.assertIn("structure-refactor", python_decision["active_skills"])
+        self.assertIn("comprehensive-development", python_decision["matched_skills"])
+        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
@@ -522,6 +655,37 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("SKILL_ROUTER_ERROR=duplicate skill catalog id: task-routing", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_prompt_route_unknown_related_skill_fails_structured(self) -> None:
+        """Related skill metadata should reference public catalog entries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_families:",
+                        "  - id: task-routing",
+                        "    related_skills:",
+                        "      - missing-skill",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "routing",
+                "--format",
+                "json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("task-routing.related_skills unknown skill: missing-skill", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_routes_formatter_adjacent_checks_to_markdown_style(self) -> None:

@@ -119,6 +119,7 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_UPDATE_TODO_INIT=created", result.stdout)
             state_path = root / ".agent-canon" / "update-state.toml"
             state_text = state_path.read_text(encoding="utf-8")
+            self.assertIn("# contract data", state_text)
             self.assertIn(target, state_text)
             self.assertIn(
                 "../vendor/agent-canon/documents/agent-canon-update-tasks.toml",

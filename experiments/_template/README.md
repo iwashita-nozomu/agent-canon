@@ -45,7 +45,10 @@ topic 作成後は次の順に編集する。
 
 ## Run Contract
 
-- 実行 command は `/usr/bin/python /workspace/experiments/<topic>/run.py` だけです。
-- `run.py` は `result/run_<timestamp>/` を自動生成します。
+- formal run は `tools/experiments/run_managed_experiment.py --topic <topic> --use-registered-command formal` で起動します。
+- registered command は topic-local `run.py` に `{run_dir}` と `{config_path}` を渡します。
+- managed runner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を作ります。
+- `config.yaml` は managed runner の起動前提です。`source_snapshot.json` は topic source、registry、command source、runner source、dirty source file の digest と git status を持ちます。
+- `run.py` を直接実行する経路は topic 実装中の局所確認用です。正式結果に使う run は managed runner を通し、`EXPERIMENT_RUN_DIR` が指す run directory へ artifact を書きます。
 - `run.py` は `visualize.ipynb` を実行し、notebook 実行時は `EXPERIMENT_RUN_DIR` が run directory を指します。
-- template が生成する artifact は `visualize_executed.ipynb` だけです。
+- template の topic 実装が最初に追加する domain artifact は `summary.json`、`cases.jsonl`、必要な `logs/` artifact、`visualize_executed.ipynb` です。

@@ -6,6 +6,7 @@ responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
+downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed branch and worktree creation
 @dependency-end
 -->
 
@@ -42,6 +43,7 @@ repositories consume it through `vendor/agent-canon/` and root runtime views.
 | public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
 | internal routine placement | `agents/internal-routines/README.md`; `documents/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
+| branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
 | shared-canon update | `tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; `agents/workflows/agent-canon-pr-workflow.md` | AgentCanon PR gate |

@@ -24,6 +24,8 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
+- user が skill が呼ばれない、呼び出しが遅い、関連 skill 候補が狭い、
+  または違う後続 surface に route されるという runtime feedback を出している
 - `.agent-canon/log-archive/**`、`reports/**`、event file を読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
@@ -43,7 +45,15 @@ python3 tools/agent_tools/runtime_log_archive_git.py sync
 python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
-1. `check-clean` が `RUNTIME_LOG_ARCHIVE_CLEAN=yes` を返すまで、分析や closeout を完了扱いにしません。`RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=yes` の場合は、別 repo_key の log が現在 branch に混入しているので、該当 repo_key の sync / migration を先に解消します。
+1. archive hygiene は `sync`、`check-clean`、dashboard 生成、final `sync`
+   の順で扱います。望ましい閉じ状態は
+   `RUNTIME_LOG_ARCHIVE_CLEAN=yes` です。直前 command の runtime hook が
+   current repo key の live hook file だけを追記し、
+   `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no` の場合は、その path を
+   `live_hook_tail_dirty` として記録し、dashboard 生成へ進みます。closeout
+   では final `sync` の `RUNTIME_LOG_ARCHIVE_SYNC=pass`、foreign dirty
+   なし、live hook tail path を evidence にします。foreign dirty key がある場合は
+   該当 repo_key の sync / migration を先に解消します。
 1. source repo root から AgentCanon source dashboard tool を呼びます。tool が
    AgentCanon root と mounted log archive を解決するため、`<source-root>` は
    解析対象 repo の root とします。
@@ -76,6 +86,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 ## Boundaries
 
 - この skill は log archive API、compact summary、routing miss、selection gap、
+  missed / late skill invocation、narrow related-skill coverage、
   wave execution reconciliation の観測と解釈を所有します。
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。

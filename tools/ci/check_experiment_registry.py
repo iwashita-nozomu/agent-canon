@@ -18,7 +18,21 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
+MANAGED_RUN_ARTIFACTS = frozenset(
+    {
+        "run_manifest.json",
+        "eval_manifest.json",
+        "run.log",
+        "artifact_manifest.json",
+        "command.json",
+        "config_source.yaml",
+        "environment.json",
+        "source_snapshot.json",
+        "logs/startup.jsonl",
+        "logs/stdout.log",
+        "logs/stderr.log",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -223,7 +237,7 @@ def validate_eval_patterns(
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must not target reserved top-level managed "
+                    f"{scope_name}: {key} must not target reserved managed "
                     f"artifacts: {pattern}",
                 )
             )
@@ -347,6 +361,14 @@ def validate_topic(
                     "error",
                     f"{topic_name}: {command_kind}_inner_command must mention "
                     f"canonical_entrypoint {entrypoint_raw}",
+                )
+            )
+        if "{config_path}" not in command_text:
+            findings.append(
+                Finding(
+                    "error",
+                    f"{topic_name}: {command_kind}_inner_command must include "
+                    "{config_path} so managed runs consume the saved config snapshot",
                 )
             )
         if (

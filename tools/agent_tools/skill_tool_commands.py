@@ -5,6 +5,8 @@
 # upstream design ../../agents/canonical/skills.md skill canon registry
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
 # upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
+# upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
+# upstream implementation ../../tools/agent_tools/route.py parses and validates the public skill catalog
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
 # downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and sync
@@ -19,6 +21,8 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from route import load_skill_related_map
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SKILL_ROOT = Path(".agents/skills")
@@ -112,6 +116,7 @@ class SkillCommandPacket:
     skill: str
     runtime_skill: str
     canonical_doc: str
+    related_skills: tuple[str, ...]
     required_commands: tuple[str, ...]
     discovered_commands: tuple[str, ...]
     validation_commands: tuple[str, ...]
@@ -247,14 +252,24 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
         "python3 tools/agent_tools/skill_tool_commands.py check",
     )
+    related_skills = related_skills_for(root, skill)
     return SkillCommandPacket(
         skill=skill,
         runtime_skill=repo_relative(root, runtime_path),
         canonical_doc=repo_relative(root, canon_path),
+        related_skills=related_skills,
         required_commands=required,
         discovered_commands=discovered,
         validation_commands=validation,
     )
+
+
+def related_skills_for(root: Path, skill: str) -> tuple[str, ...]:
+    """Return related skills from the public catalog when that catalog exists."""
+    catalog_path = root / HUMAN_SKILL_ROOT / "catalog.yaml"
+    if not catalog_path.is_file():
+        return ()
+    return load_skill_related_map(root).get(skill, ())
 
 
 def skill_pair_text(root: Path, skill: str) -> str:
@@ -365,6 +380,12 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
         f"SKILL_TOOL_COMMANDS_SKILL={packet.skill}",
         f"SKILL_TOOL_COMMANDS_RUNTIME_SKILL={packet.runtime_skill}",
         f"SKILL_TOOL_COMMANDS_CANONICAL_DOC={packet.canonical_doc}",
+        "SKILL_TOOL_COMMANDS_RELATED_SKILLS="
+        + (
+            ",".join(f"${skill}" for skill in packet.related_skills)
+            if packet.related_skills
+            else "-"
+        ),
         "SKILL_TOOL_COMMANDS_REQUIRED:",
     ]
     lines.extend(f"- {command}" for command in packet.required_commands)

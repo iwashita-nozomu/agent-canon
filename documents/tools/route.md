@@ -38,7 +38,9 @@ COMMANDS=make check-matrix
 Prompt skill routing is owned by the Python fast path
 `route.py --prompt`. It returns the full selected `SKILLS` list plus
 `ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS` for dynamic wave
-triggers.
+triggers. It also returns `RELATED_SKILL_CANDIDATES` and `RELATED_SKILLS` from
+the public skill catalog; use those as next-stage candidates after matching
+evidence appears, not as extra initial reads.
 
 Japanese or English prompts about unnecessary numerical tests, heavy tests,
 test brittleness, tolerance-based tests, or test-design gaps route to

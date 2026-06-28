@@ -14,7 +14,8 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ## 要約
 
-- 公開境界は module docstring、`__all__`、先頭 `_` の命名で明示します。
+- 公開境界はモジュール docstring、`__all__`、先頭 `_` の命名で明示します。
+- コードファイル内の定義は、公開契約、公開入口、内部補助関数の読者順序で並べます。
 - 非自明な関数と重要な処理塊には `# 責務:` コメントを付け、1 関数 1 責務を守ります。
 - 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
@@ -25,7 +26,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - 実装 slice は contract-complete implementation として request clause、acceptance contract、source packet、validation route を結びます。
 - 構造 refactor は two-stage refactor とし、forced migration の後に usage-surface repair を行い、return-gate validation でまとめて確認します。
 - JAX を使う場合、trace 対象では `jax.lax.*` と配列演算を使い、Python 制御や暗黙変換を混ぜません。
-- 正本文書は日本語で書き、`## 要約`、`## 規約`、`## 禁止事項`、`## 例外` を使い分けます。
+- 正本文書は日本語で書き、コード識別子、コマンド、パス、設定キー、API 名、外部規格名だけを原語で残します。
 
 ## 規約
 
@@ -37,8 +38,8 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ### 1. モジュール入口
 
-- 公開モジュールと package `__init__.py` には module docstring を必須にします。
-- module docstring では責務、主要な公開要素、必要なら参照文書を明記しなければなりません。
+- 公開モジュールと package `__init__.py` にはモジュール docstring を必須にします。
+- モジュール docstring では責務、主要な公開要素、必要なら参照文書を明記しなければなりません。
 - Python 実装ファイルでは `from __future__ import annotations` を先頭に置くことを必須にします。
 - package `__init__.py` では `__all__` による公開 API の明示を必須にします。
 - `from X import *` は禁止します。例外は package `__init__.py` だけとし、その場合でも直後に `__all__` で公開名を絞り込まなければなりません。
@@ -46,8 +47,12 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 ### 2. 名前と責務
 
 - 公開 API 名は先頭 `_` を付けてはなりません。
-- 内部 helper、内部状態、暫定実装は先頭 `_` を付けなければなりません。
-- 非自明な関数、メソッド、内部 helper の直前には `# 責務:` コメントを 1 行で置くことを必須にします。
+- 内部補助関数、内部状態、暫定実装は先頭 `_` を付けなければなりません。
+- Python ファイル内の順序は、公開契約、公開入口、共有の内部補助関数、単一公開入口に
+  従う内部補助関数の読者順序で揃えなければなりません。
+- 単一公開入口に従う内部補助関数は、その公開入口の直後に置かなければなりません。
+- 複数入口で共有する内部補助関数は、公開入口群の直後に置かなければなりません。
+- 非自明な関数、メソッド、内部補助関数の直前には `# 責務:` コメントを 1 行で置くことを必須にします。
 - 1 つの関数が複数段階の責務を持つことを禁止します。判定、変換、保存、通知を同時に抱え込んではなりません。
 - `util`、`helper`、`misc`、`tmp`、`data` のような責務が読めない名前を公開 API に使うことを禁止します。
 
@@ -116,6 +121,8 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 ### 8. 文書
 
 - 正本文書の主言語は日本語を必須にします。
+- コード識別子、コマンド、パス、設定キー、API 名、ライブラリ名、外部規格名は原語のまま inline code または正式名で書きます。
+- 原語の専門語を本文で使う場合は、日本語ラベルを先に置き、必要な場合だけ原語を括弧または inline code で添えます。
 - 各 Markdown 文書にはタイトル、短い導入、`##` 見出しごとの本文を必須にします。
 - 規約文書には `## 要約` と `## 規約` を必須にします。
 - 禁止事項がある場合は `## 禁止事項` を置くことを必須にします。

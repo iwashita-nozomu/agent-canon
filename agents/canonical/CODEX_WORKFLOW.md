@@ -10,6 +10,7 @@ downstream design ../workflows/token-efficient-codex-workflow.md token-aware run
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
 upstream design ../../documents/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
+upstream design ../../documents/BRANCH_SCOPE.md commit correctness and push contract
 upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
@@ -76,11 +77,11 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 
 ### Branch Reuse Default
 
-既存 branch / PR が現在の task、追加 user instruction、または小さな follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch 作成は ownership lane、review isolation、protected surface、dirty / divergent state、または user 指示で必要なときに使います。
+既存 branch / PR が現在の task、追加 user instruction、または小さな follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch / worktree 作成 route は、作成前に route authority と理由を記録する 1 gate に集約します。
 
-- 新しい branch を切ってよいのは、現在の branch が merged / closed / unpushable、別 ownership lane が必要、review isolation が明示的に必要、protected surface の衝突で同時に扱えない、dirty / divergent state が既存 branch 継続では安全に説明できない、または user が別 branch を明示した場合だけです。
+- 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「小さな追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
-- 新しい branch が必要な場合は、branch 作成前に run bundle、work log、または PR body に `branch_creation_reason=<reason>` と、既存 branch / PR を継続できない理由を記録します。
+- branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。shell 実行では `branch_worktree_guard.py` の PreToolUse gate に `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` または `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow` と `AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>` を渡します。
 - AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
 
 ### Runtime Profile And Risk Selection
@@ -631,6 +632,8 @@ cost を無視して review coverage を優先する run では、research-drive
 #### Completion Readiness
 
 - repo に残す差分がある task では、validation 後に commit を作る
+- commit は `documents/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
+- commit / PR の切り方は `documents/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - user-facing final report は、`verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked`、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` の状態で出す
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する

@@ -73,6 +73,10 @@ path = "../.agents/skills/codex-task-workflow/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/code-visualization/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/comprehensive-development/SKILL.md"
 enabled = true
 

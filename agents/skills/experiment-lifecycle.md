@@ -6,6 +6,7 @@ responsibility Documents experiment-lifecycle for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable experiment and report structure contract
 upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics overlay
+downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts managed execution surface guardrails
 @dependency-end
 -->
 
@@ -44,15 +45,27 @@ upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics
 - 新規 topic は最初に実験名を固定し、AgentCanon template path `vendor/agent-canon/experiments/_template/` を project-root `experiments/<topic>/` へコピーして始めます。
 - コピー後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - main server host で formal run を回す場合は、`run_manifest.json` と `run.log` を残す wrapper を優先します。
-- 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config.json` または YAML snapshot として保存します。
+- 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config.json` と `config_source.yaml` として保存します。
 - topic README は、実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を固定する入口です。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置き、formal run の起動や設定正本にはしません。
 - 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の互換ログとして残し、追加ログは `logs/` に分けます。
+- managed runner の標準 run artifact は `command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に rerun または明示的な limitation を残します。
 - smoke / formal の入口は project `Makefile` に置き、内側で `tools/experiments/run_managed_experiment.py` を呼びます。
 - registered command は `{config_path}` を受け取ります。
 - formal run は source checkout、既定では `main` で実行し、run 完了後に
   `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`
   で結果と report を専用 result branch へ保存します。
+- managed experiment execution surface を変更する task は、patch 前に
+  `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`
+  を実行し、`experiment_execution_surface_guard` の handoff を解決します。
+  対象 surface は `tools/experiments/run_managed_experiment.py`、
+  `tools/ci/check_experiment_registry.py`、`documents/experiment-registry.md`、
+  `agents/workflows/experiment-workflow.md`、`experiments/registry.toml` です。
+  この場合は `test-design` を併用します。project `experiments/registry.toml`
+  がある checkout では `python3 tools/ci/check_experiment_registry.py` を実行し、
+  runner / registry checker behavior は
+  `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` で確認します。
+  formal experiment run は明示された run plan の実行段階で扱います。
 - result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
 - experiment plan / report の paragraph order、causal transition、evidence-to-claim transition が非自明な場合は、`structure-planning` 側で `agent-canon semantic-index discourse-relations --profile experiment-report` または `--profile methods-protocol` を使い、discourse edge を構造 evidence として保存します。

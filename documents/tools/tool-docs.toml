@@ -108,6 +108,13 @@ language = "python"
 summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]
+id = "git-dependency-diff-summary"
+tool = "tools/agent_tools/git_dependency_diff_summary.py"
+doc = "documents/tools/git_dependency_diff_summary.md"
+language = "python"
+summary = "Git diff and dependency expansion summary documentation."
+
+[[tool]]
 id = "check-design-doc-claims"
 tool = "tools/agent_tools/check_design_doc_claims.py"
 doc = "documents/tools/check_design_doc_claims.md"

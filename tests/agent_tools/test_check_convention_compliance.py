@@ -18,8 +18,10 @@ from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
+    BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
     FALLBACK_EXIT_POLICY_MARKERS,
     IMPLEMENTATION_GUARDRAIL_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
@@ -31,6 +33,7 @@ from tools.agent_tools.check_convention_compliance import (
     REVIEW_ISSUE_ROUTING_MARKERS,
     SMALL_CHANGE_SKILL_READ_MARKERS,
     SOLID_CODING_CONTRACT_MARKERS,
+    SOURCE_FILE_DEFINITION_ORDER_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -68,7 +71,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
     "documents/conventions/python/06_comments.md": "comments\n",
     "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
-    "documents/conventions/python/09_file_roles.md": "roles\n",
+    "documents/conventions/python/09_file_roles.md": (
+        "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
+        "check_convention_compliance.py\n"
+    ),
     "documents/conventions/python/11_naming.md": "naming\n",
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
@@ -91,7 +97,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "canonical owner caller migration contract-complete implementation "
         "acceptance contract design_issue_blocker implementation shortcut "
         "two-stage refactor forced migration usage-surface repair "
-        "return-gate validation "
+        "return-gate validation 読者順序 公開契約 公開入口 内部補助関数 "
+        "単一公開入口 "
         "check_convention_compliance.py\n"
     ),
     "documents/coding-conventions-testing.md": (
@@ -111,6 +118,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Liskov substitution Interface segregation Dependency inversion "
         "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
         "import_responsibility.py\n"
+    ),
+    "documents/experiment-registry.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "check_experiment_registry.py tests/tools/test_run_managed_experiment.py\n"
     ),
     "documents/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
@@ -164,7 +175,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/agent_tools/tool_rejection_preflight.py": (
         "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
-        "protecting_tools gate=\"responsibility_scope\"\n"
+        "protecting_tools gate=\"responsibility_scope\" "
+        "EXPERIMENT_EXECUTION_SURFACE_PATHS experiment_execution_surface_guard "
+        "experiment_execution_surface_path check_experiment_registry.py "
+        "test_run_managed_experiment.py\n"
     ),
     "agents/COMMUNICATION_PROTOCOL.md": (
         "responsibility_scope responsibility-scope.toml owner class protecting tools "
@@ -182,6 +196,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "compatibility-preservation drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
+        "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
+        "AgentCanon branch / PR workflow "
+        "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -268,6 +288,20 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
     ),
+    ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
+        "experiment-lifecycle",
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "$test-design check_experiment_registry.py "
+        "tests/tools/test_run_managed_experiment.py\n",
+    ),
+    ".agents/skills/worktree-health/SKILL.md": skill_fixture(
+        "worktree-health",
+        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "branch_worktree_guard.py "
+        "branch_creation_reason=<reason> "
+        "worktree_creation_reason=<reason> git worktree list --porcelain "
+        "git branch --show-current\n",
+    ),
     ".agents/skills/computational-optimization/SKILL.md": skill_fixture(
         "computational-optimization",
         "mathematical necessity gate iteration map stopping scalar failure semantics\n",
@@ -283,11 +317,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/python-review/SKILL.md": skill_fixture(
         "python-review",
-        "SOLID principle signal $oop-readability-check "
+        "SOLID 原則シグナル $oop-readability-check "
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "scanned_paths\n",
+        "scanned_paths 定義順 読者順序 "
+        "公開入口 内部補助関数 check_convention_compliance.py\n",
     ),
     ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
         "oop-readability-check",
@@ -358,6 +393,18 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
     ),
+    "agents/skills/experiment-lifecycle.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "test-design check_experiment_registry.py "
+        "tests/tools/test_run_managed_experiment.py\n"
+    ),
+    "agents/skills/worktree-health.md": (
+        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "branch_worktree_guard.py "
+        "branch_creation_reason=<reason> "
+        "worktree_creation_reason=<reason> git worktree list --porcelain "
+        "git branch --show-current\n"
+    ),
     "agents/skills/computational-optimization.md": (
         "mathematical necessity gate iteration map stopping scalar failure semantics\n"
     ),
@@ -367,11 +414,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "typo format-only SKILL.md\n"
     ),
     "agents/skills/python-review.md": (
-        "SOLID principle signal OOP readability report "
+        "SOLID 原則シグナル OOP 可読性レポート "
         "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "readability.py scanned_paths\n"
+        "readability.py scanned_paths 定義順 読者順序 "
+        "公開入口 内部補助関数 check_convention_compliance.py\n"
     ),
     "agents/skills/oop-readability-check.md": (
         "SOLID Single responsibility Open/closed Liskov substitution "
@@ -404,7 +452,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "skill catalog routing entry skill format-only docs work "
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
-        "Dependency inversion Protocol\n"
+        "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
         "small-change-routing small repository edit 小規模修正 Scoped Change Lite\n"
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
@@ -532,7 +580,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".codex/hooks/hook_dispatcher.py": (
         "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
-        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py\n"
+        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py "
+        "branch_worktree_guard.py PreToolUse\n"
+    ),
+    ".codex/hooks/branch_worktree_guard.py": (
+        "BRANCH_WORKTREE_CREATION_GUARD=block "
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY user_request agent_canon_workflow "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON "
+        "git worktree add git switch -c/-C git checkout -b/-B/--orphan "
+        "git branch <name>/-c/-C/-f/--force\n"
     ),
     ".codex/hooks/direct_rg_context_guard.py": (
         "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
@@ -1142,6 +1198,69 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
+    def test_experiment_execution_surface_guard_requires_markers(self) -> None:
+        """Experiment execution surfaces keep lifecycle preflight markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "experiment-lifecycle" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "experiment_execution_surface_guard",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("experiment_execution_surface_guard", result.stdout)
+            self.assertIn(
+                "missing-marker:experiment_execution_surface_guard",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_experiment_execution_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every experiment execution surface."""
+        missing = sorted(
+            path
+            for path in EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_branch_worktree_creation_guard_requires_markers(self) -> None:
+        """Branch/worktree creation stays connected to the critical guard."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            dispatcher = root / ".codex" / "hooks" / "hook_dispatcher.py"
+            dispatcher.write_text(
+                dispatcher.read_text(encoding="utf-8").replace(
+                    "branch_worktree_guard.py",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("branch_worktree_creation_guard", result.stdout)
+            self.assertIn("missing-marker:branch_worktree_guard.py", result.stdout)
+
+    def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every branch/worktree guard surface."""
+        missing = sorted(
+            path
+            for path in BRANCH_WORKTREE_CREATION_GUARD_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
     def test_document_claim_grounding_requires_markers(self) -> None:
         """Canonical docs must keep prose-claim grounding markers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1448,6 +1567,56 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in SOLID_CODING_CONTRACT_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_source_file_definition_order_requires_review_markers(self) -> None:
+        """Source definition order guidance stays wired to Python review evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            python_review = root / "agents" / "skills" / "python-review.md"
+            python_review.write_text(
+                python_review.read_text(encoding="utf-8").replace(
+                    "定義順",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:定義順", result.stdout)
+
+    def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
+        """Source definition order feedback stays visible in deterministic routing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace(
+                    "コードファイル",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:コードファイル", result.stdout)
+
+    def test_minimal_fixture_covers_source_file_definition_order_surfaces(self) -> None:
+        """The minimal fixture includes every source definition order surface."""
+        missing = sorted(
+            path
+            for path in SOURCE_FILE_DEFINITION_ORDER_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

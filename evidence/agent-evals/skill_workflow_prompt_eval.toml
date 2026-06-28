@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 49
+expected_count = 50
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -40,7 +40,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 50
+expected_count = 51
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -418,6 +418,54 @@ id = "STRUCTURE-PLANNING-DOC-5"
 critical = true
 description = "Documents Mermaid as the default visual plan for nontrivial reader-facing process, dependency, ownership, routing, state, review-gate, or handoff structure."
 required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
+
+[[evals]]
+id = "code-visualization-skill"
+target = ".agents/skills/code-visualization/SKILL.md"
+kind = "skill"
+description = "Code visualization must select diagram kind, source evidence, owner skill or tool, and renderer before drawing."
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-1"
+critical = true
+description = "Requires a selection record before rendering."
+required_regex = ["Visualization Selection", "context_question", "embedding_context", "precision_need", "visualization_kind", "source_evidence", "owner_skill_or_tool", "renderer", "output_path"]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-2"
+critical = true
+description = "Covers the major code visualization forms."
+required_regex = [
+  "flowchart",
+  "call graph",
+  "control-flow graph",
+  "sequence diagram",
+  "state-transition diagram",
+  "data-flow diagram",
+  "dependency graph",
+  "timing diagram",
+  "concurrency sequence diagram",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-3"
+critical = true
+description = "Delegates fact authority to existing owners and tools."
+required_regex = [
+  "\\$structure-planning",
+  "\\$md-style-check",
+  "\\$algorithm-flowchart",
+  "check_dependency_graph\\.sh --changed --print-edges",
+  "scan_code_dependencies\\.sh --changed",
+  "helper_function_inventory\\.py --changed --all-functions --format json",
+  "route\\.py --prompt",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-4"
+critical = true
+description = "Routes document-embedded diagrams through context and visual-plan selection."
+required_regex = ["Document Embedded Diagrams", "visual_plan", "section claim", "reader", "Mermaid"]
 
 [[evals]]
 id = "literature-survey-source-record-shim"
