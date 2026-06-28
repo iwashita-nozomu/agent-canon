@@ -60,7 +60,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - eval / hook / skill feedback の結果を書き出すときは `result-artifact-writeout` を使い、raw evidence、summary、manifest、unique artifact path を分ける
 - `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
 - 利用中に得られた user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、skill prompt、workflow prompt、eval、memory のどれへ還元したかを残す
-- feedback が利用中の skill の弱さ、浅さ、遅さ、routing miss、または修正不足を指摘している場合は、active skill set を first-class target とする。対象 skill の discoverable runtime `SKILL.md` と canonical `agents/skills/<skill>.md` を先に直し、対応する prompt eval を更新または確認する。memory-only は、skill owner が対象外である evidence がある場合だけ完了扱いにする
+- feedback が利用中の skill の弱さ、浅さ、遅さ、routing miss、または修正不足を指摘している場合は、active skill set を first repair candidate として owner を確認する。固定する前の calibration step では、指摘をどの強さで反映するかを決める。単発の観測は scoped guidance や example に留められるかを先に見る。hard rule は invariant、checker-backed、または反復観測された失敗に限る。skill prompt を変える場合は、discoverable runtime `SKILL.md` と canonical `agents/skills/<skill>.md` をそろえ、対応する prompt eval を更新または確認する
 - active skill feedback で `skill_improvement_decision=applied` と記録できるのは、対象 skill prompt または eval anchor を実際に変更し、対応 validation を rerun した場合です。memory-only や issue 化だけの場合は `recorded` にする
 - behavior eval は `evidence/agent-evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる
 - `memory/` への追記を template local artifact や submodule dirty state だけで終わらせず、`persist_agent_memory.py` で shared canon commit / push と template pin 更新まで closeout する

@@ -432,6 +432,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: PR取り込み時に差分を修正するというのを忘れないようにスキル修正.
 
+- 2026-06-28 | failure-avoidance | When codifying feedback into skills or workflow rules, calibrate the durable form first; prefer scoped guidance or examples over hard rules unless the failure is invariant, checker-backed, or repeatedly observed.
+  - source: chat
+  - scope: agent-learning skill-repair-calibration
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 固定するときに言い過ぎ，過剰固定が目立ちます.
+
 ## Open Questions
 
 - まだなし
