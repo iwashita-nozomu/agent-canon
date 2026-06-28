@@ -2109,3 +2109,27 @@ id = "AGENT-CANON-UPDATE-DOC-2"
 critical = true
 description = "Documents source PR and parent pin boundaries."
 required_regex = ["AgentCanon branch/PR", "parent-repo pin", "canon-pin", "standalone AgentCanon branch"]
+
+[[evals]]
+id = "pr-processing-diff-intake-runtime"
+target = ".agents/skills/pr-processing/SKILL.md"
+kind = "skill"
+description = "The runtime PR processing skill must require diff intake and repair before ready, merge, or dependent pin sync."
+
+[[evals.checklist]]
+id = "PR-PROCESSING-DIFF-INTAKE-RUNTIME-1"
+critical = true
+description = "Requires PR diff intake against PR Essence before merge gates."
+required_regex = ["diff intake", "PR Essence", "missing, stale, unintended, or over-broad", "PR head branch", "parent pin"]
+
+[[evals]]
+id = "pr-processing-diff-intake-doc"
+target = "agents/skills/pr-processing.md"
+kind = "skill-doc"
+description = "The human PR processing skill must require fixing required diffs while incorporating PRs."
+
+[[evals.checklist]]
+id = "PR-PROCESSING-DIFF-INTAKE-DOC-1"
+critical = true
+description = "Requires PR diff intake and head-branch repair before incorporation."
+required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "Parent pin / root-view diff"]

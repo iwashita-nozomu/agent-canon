@@ -129,6 +129,12 @@ route を短く書きます。
    - `review-blocked`: requested changes / review request が残っている
    - `dependent-pin`: source PR merge 後の parent pin / root view PR
    - `stale`: base、目的、Issue、既存 main との差分を再判定する
+1. PR diff intake を固定し、必要な差分修正を取り込み前に行います。
+   - target base に対する head diff を確認する
+   - diff を PR Essence、user request、canonical owner、validation route と照合する
+   - missing、stale、unintended、over-broad な diff entry は head branch 上で修正する
+   - 修正した path、保持した差分、取り込まない差分と理由を PR log または run bundle に記録する
+   - parent pin PR では source PR 取り込み後の pin / root-view 差分も同じ diff intake に通す
 1. Merge order を決めます。
    - shared source PR を先に処理する
    - AgentCanon source PR は parent pin PR より先に merge する
@@ -178,6 +184,7 @@ AgentCanon source PR と template / derived PR が連動している場合は、
 1. Source PR を merge する。
 1. Parent repo で `make agent-canon-ensure-latest` を実行する。
 1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
+1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
 1. Parent pin / root-view PR を作るか更新する。
 1. Parent PR gate を通してから ready / merge 判断を行う。
 

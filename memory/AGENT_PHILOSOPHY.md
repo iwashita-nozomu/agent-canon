@@ -426,6 +426,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: 利用中のスキル修正が甘いです.
 
+- 2026-06-28 | failure-avoidance | When incorporating a PR, perform diff intake against the target base and repair required head-branch changes before ready/merge/pin sync; PR processing is not complete from metadata or checks alone.
+  - source: chat
+  - scope: pr-processing diff-intake
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: PR取り込み時に差分を修正するというのを忘れないようにスキル修正.
+
 ## Open Questions
 
 - まだなし
