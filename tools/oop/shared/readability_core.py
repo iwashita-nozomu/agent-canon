@@ -97,11 +97,6 @@ DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
 GIT_BASELINE_TIMEOUT_SECONDS = 20
 MAX_READABILITY_SCORE = 100
-ERROR_SCORE_PENALTY = 25
-WARN_SCORE_PENALTY = 5
-INFO_SCORE_PENALTY = 2
-REVIEW_SIGNAL_WARN_SCORE_PENALTY = 1
-UNKNOWN_SEVERITY_SCORE_PENALTY = 3
 UNKNOWN_SEVERITY_FINDING_RANK = 9
 KLOC_NORMALIZER = 1000
 MILLISECONDS_PER_SECOND = 1000
@@ -197,6 +192,11 @@ LANGUAGE_SUFFIXES = {
     "python": PYTHON_SUFFIXES,
     "cpp": CPP_SUFFIXES,
 }
+SIGNAL_CLASS_ERROR = "error"
+SIGNAL_CLASS_GATE = "gate"
+SIGNAL_CLASS_REVIEW = "review"
+STATUS_PASS = "pass"
+STATUS_FAIL = "fail"
 REVIEW_SIGNAL_KINDS = frozenset(
     {
         "class_lines",
@@ -3662,23 +3662,75 @@ def add_cpp_function_type_findings(
         )
 
 
-def finding_score_penalty(finding: Finding) -> int:
-    """Return the score penalty for one finding."""
+def finding_signal_class(finding: Finding) -> str:
+    """Return the decision class for one finding."""
     if finding.severity == "error":
-        return ERROR_SCORE_PENALTY
-    if finding.kind in REVIEW_SIGNAL_KINDS and finding.severity == "warn":
-        return REVIEW_SIGNAL_WARN_SCORE_PENALTY
-    weights = {
-        "warn": WARN_SCORE_PENALTY,
-        "info": INFO_SCORE_PENALTY,
-    }
-    return weights.get(finding.severity, UNKNOWN_SEVERITY_SCORE_PENALTY)
+        return SIGNAL_CLASS_ERROR
+    if finding.kind in REVIEW_SIGNAL_KINDS:
+        return SIGNAL_CLASS_REVIEW
+    return SIGNAL_CLASS_GATE
+
+
+def signal_counts(findings: Sequence[Finding]) -> Counter[str]:
+    """Return decision signal counts for findings."""
+    return Counter(finding_signal_class(finding) for finding in findings)
+
+
+def status_from_signal_counts(counts: Counter[str]) -> tuple[str, str]:
+    """Return pass/fail status and a stable reason from signal classes."""
+    if counts.get(SIGNAL_CLASS_ERROR, 0):
+        return STATUS_FAIL, "error-signal"
+    if counts.get(SIGNAL_CLASS_GATE, 0):
+        return STATUS_FAIL, "gate-signal"
+    if counts.get(SIGNAL_CLASS_REVIEW, 0):
+        return STATUS_PASS, "review-only"
+    return STATUS_PASS, "clean"
+
+
+def status_from_score_and_signals(
+    counts: Counter[str],
+    final_score: int,
+    min_score: int,
+) -> tuple[str, str]:
+    """Return status using signal classes, with explicit survey and strict-score modes."""
+    if min_score <= 0:
+        return STATUS_PASS, "survey-score-floor"
+    if min_score > DEFAULT_MIN_SCORE and final_score < min_score:
+        return STATUS_FAIL, "score-floor"
+    return status_from_signal_counts(counts)
+
+
+def score_floor_status(final_score: int, min_score: int) -> str:
+    """Return whether the diagnostic score clears the requested floor."""
+    return STATUS_PASS if final_score >= min_score else STATUS_FAIL
 
 
 def score(findings: list[Finding]) -> int:
-    """Calculate a 0-100 review score without treating every size signal as a gate."""
-    penalty = sum(finding_score_penalty(finding) for finding in findings)
-    return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
+    """Calculate a diagnostic signal score independent of pass/fail status."""
+    counts = signal_counts(findings)
+    if not findings:
+        return MAX_READABILITY_SCORE
+    review_kinds = {
+        finding.kind
+        for finding in findings
+        if finding_signal_class(finding) == SIGNAL_CLASS_REVIEW
+    }
+    gate_kinds = {
+        finding.kind
+        for finding in findings
+        if finding_signal_class(finding) == SIGNAL_CLASS_GATE
+    }
+    hotspot_count = len({finding.path for finding in findings})
+    if counts.get(SIGNAL_CLASS_ERROR, 0):
+        base = 40
+        penalty = counts[SIGNAL_CLASS_ERROR] * 10 + len(gate_kinds) * 4 + hotspot_count
+    elif counts.get(SIGNAL_CLASS_GATE, 0):
+        base = 80
+        penalty = counts[SIGNAL_CLASS_GATE] * 4 + len(gate_kinds) * 3 + len(review_kinds)
+    else:
+        base = 95
+        penalty = counts[SIGNAL_CLASS_REVIEW] + len(review_kinds) * 2 + hotspot_count
+    return max(0, base - min(base, penalty))
 
 
 def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, str, str]:
@@ -3800,8 +3852,15 @@ def summarize_findings(
             continue
     severity_counts = Counter(finding.severity for finding in findings)
     kind_counts = Counter(finding.kind for finding in findings)
-    review_signal_count = sum(1 for finding in findings if finding.kind in REVIEW_SIGNAL_KINDS)
-    gate_signal_count = len(findings) - review_signal_count
+    decision_counts = signal_counts(findings)
+    status, status_reason = status_from_score_and_signals(
+        decision_counts,
+        final_score,
+        min_score,
+    )
+    review_signal_count = decision_counts.get(SIGNAL_CLASS_REVIEW, 0)
+    gate_signal_count = decision_counts.get(SIGNAL_CLASS_GATE, 0)
+    error_signal_count = decision_counts.get(SIGNAL_CLASS_ERROR, 0)
     dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
     solid_counts = Counter(
         principle
@@ -3829,14 +3888,18 @@ def summarize_findings(
         "findings": len(findings),
         "score": final_score,
         "min_score": min_score,
+        "score_status": score_floor_status(final_score, min_score),
         "excluded_patterns": list(exclude_patterns or []),
-        "status": "pass" if final_score >= min_score else "fail",
+        "status": status,
+        "status_reason": status_reason,
         "mechanical_grade": grade,
         "warn_or_error_per_kloc": round(per_kloc, 2),
         "severity_counts": dict(severity_counts),
         "kind_counts": dict(kind_counts),
         "review_signal_findings": review_signal_count,
         "gate_signal_findings": gate_signal_count,
+        "error_signal_findings": error_signal_count,
+        "signal_counts": dict(decision_counts),
         "dimension_counts": dict(dimension_counts),
         "solid_counts": dict(solid_counts),
         "top_files": [
@@ -3885,12 +3948,15 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         "## Summary",
         "",
         f"- status: `{summary['status']}`",
+        f"- status_reason: `{summary['status_reason']}`",
         f"- mechanical_grade: `{summary['mechanical_grade']}`",
-        f"- score: `{summary['score']}` / min `{summary['min_score']}`",
+        f"- score: `{summary['score']}` / floor `{summary['min_score']}`",
+        f"- score_status: `{summary['score_status']}`",
         f"- files: `{summary['files']}`",
         f"- scanned_paths: `{', '.join(scanned_paths) or 'none'}`",
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
+        f"- error_signal_findings: `{summary['error_signal_findings']}`",
         f"- gate_signal_findings: `{summary['gate_signal_findings']}`",
         f"- review_signal_findings: `{summary['review_signal_findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
@@ -4022,9 +4088,9 @@ def main(argv: Sequence[str] | None = None, *, default_language: str = "all") ->
     emit_report(run, args)
     if args.review_prompt_out:
         write_review_prompt(Path(args.review_prompt_out), "")
-    status = "pass" if run.final_score >= args.min_score else "fail"
+    status = str(run.summary["status"])
     append_workflow_monitor_timing(root, args, status, started_at)
-    return 0 if status == "pass" else 1
+    return 0 if status == STATUS_PASS else 1
 
 
 def append_workflow_monitor_timing(
@@ -4297,7 +4363,7 @@ def emit_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
     if args.format == "markdown":
         emit_markdown_report(run, args)
         return
-    emit_text_report(run, args.min_score)
+    emit_text_report(run)
 
 
 def emit_json_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
@@ -4331,18 +4397,21 @@ def emit_markdown_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
     )
 
 
-def emit_text_report(run: AnalyzerRun, min_score: int) -> None:
+def emit_text_report(run: AnalyzerRun) -> None:
     """Print line-oriented text output."""
     for finding in sorted(run.findings, key=lambda item: (item.path, item.line, item.kind)):
         print(finding.render())
     print(f"OOP_READABILITY_FILES={len(run.files)}")
     print(f"OOP_READABILITY_FINDINGS={len(run.findings)}")
     print(f"OOP_READABILITY_SCORE={run.final_score}")
+    print(f"OOP_READABILITY_SCORE_STATUS={run.summary['score_status']}")
     print(f"OOP_READABILITY_GRADE={run.summary['mechanical_grade']}")
+    print(f"OOP_READABILITY_STATUS_REASON={run.summary['status_reason']}")
     print(f"OOP_READABILITY_WARN_OR_ERROR_PER_KLOC={run.summary['warn_or_error_per_kloc']}")
+    print(f"OOP_READABILITY_ERROR_SIGNAL_FINDINGS={run.summary['error_signal_findings']}")
     print(f"OOP_READABILITY_GATE_SIGNAL_FINDINGS={run.summary['gate_signal_findings']}")
     print(f"OOP_READABILITY_REVIEW_SIGNAL_FINDINGS={run.summary['review_signal_findings']}")
-    print(f"OOP_READABILITY={'pass' if run.final_score >= min_score else 'fail'}")
+    print(f"OOP_READABILITY={run.summary['status']}")
 
 
 if __name__ == "__main__":

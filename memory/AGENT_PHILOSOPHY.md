@@ -444,6 +444,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: 分割の仕方が不自然; OOPチェッカがまだ悪さして; 判定の仕方を見直してほしい.
 
+- 2026-06-28 | failure-avoidance | For OOP readability, do not let a numeric score become the design decision; classify findings by signal class and use score only as a diagnostic index.
+  - source: chat
+  - scope: oop-readability scoring
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 点数化の仕方が下手.
+
 ## Open Questions
 
 - まだなし

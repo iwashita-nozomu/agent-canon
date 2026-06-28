@@ -443,6 +443,8 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("parameters:process_items", result.stdout)
             self.assertIn("OOP_READABILITY_GATE_SIGNAL_FINDINGS=0", result.stdout)
             self.assertIn("OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=2", result.stdout)
+            self.assertIn("OOP_READABILITY_SCORE_STATUS=fail", result.stdout)
+            self.assertIn("OOP_READABILITY_STATUS_REASON=review-only", result.stdout)
             self.assertIn("OOP_READABILITY=pass", result.stdout)
 
     def test_python_optional_none_boundary_is_flagged(self) -> None:

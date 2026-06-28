@@ -208,11 +208,16 @@ terminal identity morphism、compact numeric scalar wrapper を意図的な境�
 これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
-score は設計判断の補助です。`class_lines`、`function_lines`、`public_methods`、
-`parameters`、`cognitive_complexity` のような size / surface finding は
-boundary review signal として軽く採点し、数値だけで split / extract を要求しません。
-分割は caller contract、state ownership、既存責務語彙、または周辺 source shape から
-安定した境界が読める場合だけ行います。
+score は設計判断の補助であり、pass / fail の主判定ではありません。
+`OOP_READABILITY` は error / gate / review の signal class で決めます。
+`class_lines`、`function_lines`、`public_methods`、`parameters`、
+`cognitive_complexity` のような size / surface finding は boundary review
+signal として扱い、数値だけで split / extract を要求しません。
+`--min-score 0` は survey 用に finding を出し切る pass mode として扱い、
+default は signal 判定を使います。明示的に default より高い score floor を
+指定した場合だけ strict score gate として扱います。分割は caller contract、
+state ownership、既存責務語彙、または周辺 source shape から安定した境界が
+読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
 重要な変更では、機械 report を正本にします。
 

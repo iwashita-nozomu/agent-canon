@@ -2236,7 +2236,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "tool_call",
-      "line": 183,
+      "line": 186,
       "path": "agents/skills/oop-readability-check.md",
       "surface": "skill"
     },
@@ -17428,7 +17428,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 4311,
+      "line": 4382,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17436,7 +17436,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 4311,
+      "line": 4382,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17444,7 +17444,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 4311,
+      "line": 4382,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17452,7 +17452,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 4311,
+      "line": 4382,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17460,7 +17460,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1641,
+      "line": 1646,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17468,7 +17468,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2914,
+      "line": 2919,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17476,7 +17476,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "OOP_READABILITY_FINDING",
-      "line": 418,
+      "line": 423,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17484,7 +17484,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "construct",
-      "line": 475,
+      "line": 480,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17492,7 +17492,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "construct",
-      "line": 546,
+      "line": 551,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17500,7 +17500,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 4345,
+      "line": 4419,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "OOP_READABILITY_ERROR_SIGNAL_FINDINGS",
+      "line": 4416,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17508,7 +17516,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 4338,
+      "line": 4409,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17516,7 +17524,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 4339,
+      "line": 4410,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17524,7 +17532,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GATE_SIGNAL_FINDINGS",
-      "line": 4343,
+      "line": 4417,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17532,7 +17540,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 4341,
+      "line": 4413,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17540,7 +17548,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_REVIEW_SIGNAL_FINDINGS",
-      "line": 4344,
+      "line": 4418,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17548,7 +17556,23 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 4340,
+      "line": 4411,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "OOP_READABILITY_SCORE_STATUS",
+      "line": 4412,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "OOP_READABILITY_STATUS_REASON",
+      "line": 4414,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -17556,7 +17580,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 4342,
+      "line": 4415,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
