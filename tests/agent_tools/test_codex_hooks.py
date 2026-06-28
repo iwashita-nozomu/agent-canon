@@ -3184,11 +3184,11 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("OOP readability hook", reason)
         self.assertIn("warning", reason)
         self.assertIn("--min-score 95", reason)
-        self.assertNotIn("--baseline-ref HEAD", reason)
+        self.assertIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
-        self.assertEqual(log_entry["mode"], "full")
-        self.assertEqual(log_entry["baseline_ref"], "")
+        self.assertEqual(log_entry["mode"], "diff")
+        self.assertEqual(log_entry["baseline_ref"], "HEAD")
         self.assertEqual(log_entry["min_score"], OOP_READABILITY_MIN_SCORE)
         self.assertEqual(log_entry["failed_count"], 1)
 
@@ -3261,7 +3261,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(len(durable_logs), 1)
         self.assertTrue(durable_log_exists)
         self.assertEqual(log_entry["status"], "warn")
-        self.assertEqual(log_entry["mode"], "full")
+        self.assertEqual(log_entry["mode"], "diff")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
 
     def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
@@ -3348,25 +3348,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("hook_run_id", log_entry)
         self.assertIn("payload_fingerprint", log_entry)
 
-    def test_oop_readability_guard_warns_preexisting_findings_by_default(self) -> None:
-        """OOP guard should warn on current changed-source findings by default."""
+    def test_oop_readability_guard_allows_preexisting_findings_by_default(self) -> None:
+        """OOP guard should default to diff mode and allow preexisting findings."""
         payload, log_entry = self._run_oop_guard_with_preexisting_finding()
-
-        self.assertEqual(payload["decision"], "approve")
-        self.assertEqual(log_entry["status"], "warn")
-        self.assertEqual(log_entry["mode"], "full")
-        self.assertEqual(log_entry["baseline_ref"], "")
-        self.assertEqual(log_entry["failed_count"], 1)
-        commands = cast(list[dict[str, object]], log_entry["commands"])
-        command = commands[0]
-        output_snippet = cast(str, command["output_snippet"])
-        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
-
-    def test_oop_readability_guard_allows_preexisting_findings_in_diff_mode(self) -> None:
-        """OOP guard should use baseline filtering only when explicitly requested."""
-        payload, log_entry = self._run_oop_guard_with_preexisting_finding(
-            extra_env={"AGENT_CANON_OOP_HOOK_MODE": "diff"}
-        )
 
         self.assertEqual(payload, {})
         self.assertEqual(log_entry["status"], "pass")
@@ -3380,6 +3364,24 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("--baseline-ref", command_args)
         self.assertIn("HEAD", command_args)
         self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
+
+    def test_oop_readability_guard_warns_preexisting_findings_in_full_mode(self) -> None:
+        """OOP guard should retain full-mode behavior when explicitly requested."""
+        payload, log_entry = self._run_oop_guard_with_preexisting_finding(
+            extra_env={"AGENT_CANON_OOP_HOOK_MODE": "full"}
+        )
+
+        self.assertEqual(payload["decision"], "approve")
+        self.assertEqual(log_entry["status"], "warn")
+        self.assertEqual(log_entry["mode"], "full")
+        self.assertEqual(log_entry["baseline_ref"], "")
+        self.assertEqual(log_entry["failed_count"], 1)
+        commands = cast(list[dict[str, object]], log_entry["commands"])
+        command = commands[0]
+        command_args = cast(list[str], command["command"])
+        output_snippet = cast(str, command["output_snippet"])
+        self.assertNotIn("--baseline-ref", command_args)
+        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
     def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
         """Bash tool names alone should not re-run OOP checks for read-only commands."""

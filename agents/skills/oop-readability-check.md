@@ -152,6 +152,10 @@ Only include this section in `analyze-existing` or `run-and-analyze` mode.
 
 - Keep "tool reported" separate from "agent judgment".
 - Prioritize by design risk and user relevance, not count alone.
+- Treat size, public-surface, parameter-count, and complexity findings as
+  boundary review signals, not automatic split/extract instructions. Recommend
+  a boundary change only after caller contracts, ownership, or surrounding
+  source shape show a stable split point.
 - Treat test-only files, generated files, value objects, protocol contracts,
   and adapter functions as likely false-positive candidates until code reading
   says otherwise.

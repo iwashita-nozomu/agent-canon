@@ -68,5 +68,9 @@ Execute the required and task-matching conditional commands that the packet prin
    result. Prioritize by risk and leverage, identify likely false positives,
    group by SOLID principle signals, cite mechanical evidence, and read hotspot
    files only when needed.
+   Treat size, public-surface, parameter-count, and complexity findings as
+   boundary review signals, not automatic split/extract instructions. Only
+   recommend a boundary change after reading the caller contract, ownership, or
+   surrounding source shape that makes the split stable.
 1. When a run bundle is active, record timing as a behavior event:
    `tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths>`.

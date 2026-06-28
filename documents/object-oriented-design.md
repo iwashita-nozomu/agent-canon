@@ -208,7 +208,11 @@ terminal identity morphism、compact numeric scalar wrapper を意図的な境�
 これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
-score は設計判断の補助です。
+score は設計判断の補助です。`class_lines`、`function_lines`、`public_methods`、
+`parameters`、`cognitive_complexity` のような size / surface finding は
+boundary review signal として軽く採点し、数値だけで split / extract を要求しません。
+分割は caller contract、state ownership、既存責務語彙、または周辺 source shape から
+安定した境界が読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
 重要な変更では、機械 report を正本にします。
 

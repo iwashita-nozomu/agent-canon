@@ -438,6 +438,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: 固定するときに言い過ぎ，過剰固定が目立ちます.
 
+- 2026-06-28 | failure-avoidance | When OOP checker findings drive design action, treat size, public-surface, parameter-count, and complexity findings as boundary review signals; split only when caller contracts, ownership, or source shape show a stable boundary.
+  - source: chat
+  - scope: oop-readability judgement
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 分割の仕方が不自然; OOPチェッカがまだ悪さして; 判定の仕方を見直してほしい.
+
 ## Open Questions
 
 - まだなし

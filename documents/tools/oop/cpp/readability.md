@@ -76,4 +76,7 @@ python3 tools/oop/python/readability.py --language all --format markdown python 
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
-既定は `--min-score 95` で、単発の軽い adapter signal は review 補助に残しつつ、複合 smell が残る状態を pass にしません。
+既定は `--min-score 95` です。size / public surface / parameter count /
+complexity は boundary review signal として軽く採点し、数値だけで分割を要求しません。
+`nullptr` routing、public state owner、不要 wrapper、継承境界などの gate signal と
+分けて読みます。accepted boundary、false positive、改善方針は review artifact に残します。
