@@ -19,6 +19,17 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 
 # PR Processing
 
+## Reader Map
+
+- Purpose: runtime skill for GitHub PR and issue queue processing, including
+  inventory, conflict handling, ordered merges, and stale issue triage.
+- Use When: summarizing, triaging, reviewing, merging, or preserving PR/issue
+  evidence through the GitHub workflow.
+- Tool Commands: run this skill's command packet, then read the canonical
+  `agents/skills/pr-processing.md` route before using GitHub commands.
+- Boundary: merge authority and branch protection evidence must come from the
+  PR-processing route, not ad hoc local state.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -64,6 +75,12 @@ Execute the required and task-matching conditional commands that the packet prin
    - for each candidate PR, inspect `gh pr view` and `gh pr checks`.
 1. Classify each PR as `ready`, `behind`, `conflicting`, `draft`,
    `checks-failing`, `review-blocked`, `stale`, or `dependent-pin`.
+1. Before marking a PR ready, merging it, or syncing a dependent parent pin,
+   perform diff intake against the target base. Compare the head diff with the
+   PR Essence, user request, canonical owner, and validation route; repair
+   missing, stale, unintended, or over-broad diff entries on the PR head branch
+   before the merge gate. Record the diff intake decision and repaired paths in
+   the PR log or run bundle.
 1. Plan merge order from dependency and conflict evidence:
    - source / library / AgentCanon PRs before parent pin or template PRs;
    - PRs touching shared root/runtime surfaces before dependent docs-only PRs;
@@ -72,6 +89,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Resolve conflicts on the PR head branch, then rerun the smallest validation
    that covers the touched surface. Do not resolve conflicts by discarding user
    changes or force-pushing without explicit authority.
+   Conflict repair is semantic integration, not "ours/theirs" selection: inspect
+   the merge base, current branch intent, incoming branch intent, owning
+   contract, and validation surface; record which clauses from each side are
+   preserved, rewritten, or intentionally rejected before marking the conflict
+   resolved.
 1. Before merging a PR, require:
    - open, non-draft PR;
    - mergeable state;
@@ -85,7 +107,7 @@ Execute the required and task-matching conditional commands that the packet prin
      every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
    `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
-   and the parent PR gate.
+   diff intake / repair, and the parent PR gate.
 1. Process issues with the same evidence rule:
    - close only resolved, duplicate, obsolete, or intentionally not-planned
      issues with a concrete PR, commit, or policy reference;

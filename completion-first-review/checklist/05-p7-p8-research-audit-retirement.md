@@ -11,6 +11,14 @@ upstream design ../../agents/workflows/agent-learning-workflow.md learning promo
 @dependency-end
 -->
 
+## Reader Map
+
+Use this checklist after completion judgment, evidence tooling, MCP honesty,
+self-growth, surface ownership, and workflow contracts are in place. Read Scope
+first, then P7 for research, experiment, claim, and documentation rigor. P8
+covers audit, metrics, and retirement, and the final done condition states when
+these late-layer checks are complete.
+
 ## Scope
 
 P7 and P8 come after completion judgment, mechanical evidence, MCP honesty, self-growth, surface ownership, and workflow/skill contracts. They focus on durable claims, experiment rigor, long-form documentation consistency, and canon retirement.

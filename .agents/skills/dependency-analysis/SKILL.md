@@ -19,6 +19,18 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py va
 
 # Dependency Analysis
 
+## Reader Map
+
+- Purpose: expose dependency-analysis routing to Codex for manifests, graphs,
+  code dependency evidence, and repair-planning handoffs.
+- Section path: Tool Commands gives the command packet; the numbered rules
+  choose the smallest mode and list changed-file, graph, search, design-claim,
+  and Change Impact Packet operations.
+- Use when: a task must validate dependency headers, expand fix scope, compare
+  code/header dependency evidence, or prepare a subagent handoff.
+- Boundary: this shim defines runtime sequencing; the canonical explanation
+  lives in `agents/skills/dependency-analysis.md`.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -44,7 +56,7 @@ Execute the required and task-matching conditional commands that the packet prin
    - dependency edge change: include graph validation
    - repo-wide search triage: run responsibility-based search first, then use bounded `rg -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
    - design-document evidence: run `check_design_doc_claims.py` on changed or newly authored design docs
-   - repair planning or subagent handoff: build a token-light `Change Impact
+   - repair planning or subagent handoff: build a structured `Change Impact
      Packet` manifest before selecting implementation targets
 1. For code dependency evidence, run:
 
@@ -107,11 +119,11 @@ python3 tools/agent_tools/check_design_doc_claims.py \
    available.
 
 1. When a task changes one requested object/file/finding, or when a parent will
-   hand work to a write-capable subagent, produce a token-light
+   hand work to a write-capable subagent, produce a structured
    `Change Impact Packet` manifest instead of passing raw hits, raw findings,
    or pasted dependency dumps. Tool outputs stay on disk as JSON/TSV/Markdown
-   artifacts; the packet stores paths, counts, object ids, and only the minimal
-   excerpts needed for planning. Keep code dependency evidence and header
+   artifacts; the packet stores paths, counts, object ids, selected excerpts,
+   and structured summaries needed for planning. Keep code dependency evidence and header
    dependency evidence as separate sections, then unify them only in the
    planning packet. The packet must include:
    - `requested_target`: `path:start-end:qualname`, file, or finding id

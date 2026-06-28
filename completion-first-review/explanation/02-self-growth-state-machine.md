@@ -24,6 +24,14 @@ Observe -> Diagnose -> Repair -> Evaluate -> Replay -> Promote -> Retire
 
 Each step must have an artifact. If a step is skipped, the task is not complete under the `self_growth` closeout profile.
 
+## Reader Map
+
+Use this document to answer how observed agent failures become verified
+self-growth repairs. Read Purpose first for the state sequence, then S1 through
+S7 in order: Observe, Diagnose, Repair, Evaluate, Replay, Promote, Retire. The
+last sections define the repair manifest, completion gate, and invariant that
+prevents vague prompt additions from counting as complete repair.
+
 ## S1: Observe
 
 Observation records what happened.

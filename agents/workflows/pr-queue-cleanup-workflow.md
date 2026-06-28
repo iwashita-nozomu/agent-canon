@@ -23,6 +23,15 @@ The normal example is:
 1. The next useful action is to merge or replace the source PR, then realign
    the template pin to AgentCanon `main`.
 
+## Reader Map
+
+This workflow owns cleanup order for a named AgentCanon source PR and its
+dependent template or derived pin PRs. Read `Authority` before touching the
+queue, then follow `Cleanup Order`, stop on any `Stop Conditions`, and use
+`Goal Integration` only when `goal.md` is part of the queue state. The boundary
+is narrow PR-queue maintenance: this document does not grant branch deletion,
+review dismissal, bypass, force-merge, or unrelated PR mutation authority.
+
 ## Authority
 
 PR queue cleanup is narrower than general PR mutation authority.

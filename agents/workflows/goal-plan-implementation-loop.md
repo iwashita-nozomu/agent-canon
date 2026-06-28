@@ -14,6 +14,15 @@ This workflow prevents goal-driven work from spending too long in planning.
 The goal loop should alternate between a short planning checkpoint and a
 concrete implementation slice until `goal_loop.py status` allows closeout.
 
+## Reader Map
+
+This workflow owns the fast loop for goal-driven implementation once a durable
+goal exists. Read `Core Rule` and `Timebox` to keep the loop bounded, then use
+`Planning Checkpoint`, `Implementation Checkpoint`, `Evidence Checkpoint`, and
+`Next-Action Checkpoint` as the repeated sequence. Its boundary is goal-loop
+execution: broader design expansion, unproven goal completion, and closeout
+decisions remain gated by the named evidence and `goal_loop.py status`.
+
 ## Core Rule
 
 Use a `plan -> implementation -> evidence -> next-action` loop.
@@ -34,7 +43,7 @@ of returning a partial status as completion.
 
 ## Planning Checkpoint
 
-Planning produces only the minimum packet needed to implement the next slice:
+Planning produces the initial owned packet needed to implement the next slice:
 
 - `Goal Contract`: objective, non-goals, constraints, and active clauses.
 - `Slice Selection`: the `GW*` rows that will move together.

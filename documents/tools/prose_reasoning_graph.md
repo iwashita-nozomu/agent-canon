@@ -20,6 +20,10 @@ SQLite-backed prose reasoning graph に変換する文章解析ツールです�
 この文書は Graph DSL Core や prose adapter DSL を再定義せず、tool の責務、
 command surface、result surface、verification route、skill handoff を説明します。
 
+## この文書の読み方
+
+この tool reference は、Prose Reasoning Graph の根拠 surface、読者と責務境界、graph visualization owner、graph contract、runtime flow、command surface、result surface、document responsibility check、profiles、verification route、skill handoff、writing loop を順に説明します。実行入口を探すときは Command Surface へ進み、出力や責務境界を確認するときは Graph Contract と Result Surface を先に読みます。DSL の正本は `documents/prose-reasoning-graph/dsl-spec.md` です。
+
 ## 根拠 Surface
 
 - DSL と graph contract:

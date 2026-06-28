@@ -15,6 +15,13 @@ upstream design README.md workflow catalog
 この workflow は外部の writing guide を、そのまま転載せず repo 向けに再構成したものです。
 とくに `summary statement`、`roadmap`、`reverse outline`、`higher-order concerns`、`scannable content` は外部資料に基づく概念で、ここでの `section contract` と reviewer routing は repo 向けの推論です。
 
+## この文書の読み方
+
+- この文書は、README、guide、workflow、migration、specification など一般説明 prose の構造設計と review route を所有します。
+- 前半は use case、core principles、standard flow を扱い、後半は review outcomes、repo interpretation、external basis、convention gate を扱います。
+- 文書作成者は `## Standard Flow` で summary statement、roadmap、reader-order draft、reverse outline、higher-order revision、mandatory review の順を確認します。
+- chunked reading では、今の作業が構造設計、draft、review 反映、validation のどれかを固定し、対応する subsection だけを開きます。
+
 ## Use When
 
 - 新しい README、guide、workflow 文書を書く

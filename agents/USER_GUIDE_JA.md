@@ -9,6 +9,14 @@ upstream design README.md agent canon overview
 # エージェント利用ガイド
 
 
+## この文書の読み方
+
+この文書は、AgentCanon を使う読者向けの入口案内です。まず
+`どこから読むか` と `入口の使い分け` で runtime ごとの入口を選び、
+`skill の使い方` で task 形状に合う skill を確認します。repo-changing task や
+複数 agent を使う場合は `subagent の使い方` を読みます。この文書は利用案内であり、
+workflow family、role behavior、validation gate の正本はリンク先の owner surface です。
+
 ## どこから読むか
 
 1. [agents/README.md](README.md)

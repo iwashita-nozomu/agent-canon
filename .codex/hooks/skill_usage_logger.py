@@ -1077,7 +1077,7 @@ def save_workflow_context(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(context, sort_keys=True) + "\n", encoding="utf-8")
-    except OSError:
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return
 
 
@@ -1108,7 +1108,7 @@ def _log_append_log(root: Path, entry: dict[str, object]) -> None:
     try:
         context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
         context.append(entry)
-    except OSError:
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return
 
 

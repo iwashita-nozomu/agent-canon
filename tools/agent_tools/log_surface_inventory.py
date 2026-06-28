@@ -41,7 +41,14 @@ SKILL_PATTERNS = (
     "agents/skills/*.md",
 )
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")
-TOOL_PATTERNS = ("tools/*.py", "tools/*.sh", "tools/**/*.py", "tools/**/*.sh", "tools/**/*.bash")
+TOOL_PATTERNS = (
+    ".github/scripts/*.sh",
+    "tools/*.py",
+    "tools/*.sh",
+    "tools/**/*.py",
+    "tools/**/*.sh",
+    "tools/**/*.bash",
+)
 RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20

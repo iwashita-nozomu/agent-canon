@@ -19,6 +19,15 @@ records. For C++ template source roots, use `cpp_template_to_lean.py`, which
 runs source expansion, complete-coverage checking, and Lean rendering as one
 canonical tool operation.
 
+## Reader Map
+
+- Owns the generic renderer from already-expanded thin operational IR records
+  to Lean evidence definitions.
+- Main path: Command, Output Contract, and Boundary.
+- Read this when rendering an existing operational IR record into Lean.
+- Boundary: C++ template source roots should use `cpp_template_to_lean.py`
+  rather than manually chaining lower-level tools.
+
 ## Command
 
 ```bash

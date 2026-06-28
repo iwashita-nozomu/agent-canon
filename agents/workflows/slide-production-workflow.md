@@ -16,6 +16,15 @@ text, equations, generated images, and references stay aligned across runs.
 Use it when the task is to author or revise a slide deck, presentation draft,
 or markdown deck that is intended to become a presentation asset.
 
+## Reader Map
+
+This workflow owns slide-deck production when a fixed presentation template is
+part of the task. Read `Scope` to confirm the template and layout boundary,
+`Required Source Packet` before drafting, `Workflow` for the slot-based order,
+and `Gates` plus `Closeout Checklist` before accepting the deck. It does not
+define general report writing or experiment interpretation; those stay with the
+source packet and reporting workflows.
+
 ## Scope
 
 - Choose one canonical PPT template at task start.

@@ -18,6 +18,15 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 
 目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
 
+## Reader Map
+
+Use this reference to answer where Codex configuration lives, which source owns
+each setting, and how repo-scoped `.codex/config.toml` relates to CLI overrides,
+subagents, MCP servers, hooks, skills, AGENTS.md, profiles, and local state.
+Read Primary Sources and Configuration Surfaces first, then use the coverage
+matrix and per-key inventory for edits. The later sections group settings by
+runtime surface and end with the practical change checklist and stability notes.
+
 ## Primary Sources
 
 - `$openai-docs` is the canonical source route for Codex product docs, Codex

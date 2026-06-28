@@ -14,6 +14,13 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 
 この文書は、agent-to-agent handoff と review の正本です。
 
+## Reader Map
+
+- This document owns the artifact-level communication contracts for handoff, pre-edit investigation, fresh subagent capsules, review packets, write scope, and escalation.
+- The first sections define common rules and communication surfaces; the packet sections then specify exactly what must be handed between parent, subagents, reviewers, and implementers.
+- Use `## Pre-Edit Repository Investigation Packet` before selecting edit paths, and `## Fresh Subagent Context Capsule` before launching or reusing any run-local subagent.
+- For chunked reading, start from the packet type required by the current transition and read only the fields needed to make that transition auditable.
+
 ## 基本ルール
 
 - 次の role が判断に使う情報は artifact に残します。
@@ -28,6 +35,17 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 1. `team_manifest.yaml`
 
 run 固有のやり取りは report bundle に残し、repo-wide の正本には持ち込みません。
+
+## Context Visibility Contract
+
+Context is classified before it is handed to an agent. The goal is correct
+shape, ownership, and traceability, not token minimization.
+
+| Context Class | Contents | Rule |
+| --- | --- | --- |
+| `llm_visible_context` | Instructions, request clauses, selected source-packet fields, exact file sections, and evidence needed for the next decision. | May be large when required, but every item is tied to an owner, path, source packet, or request clause. |
+| `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
+| `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
 
 ## Handoff Packet
 
@@ -52,8 +70,9 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 ## Pre-Edit Repository Investigation Packet
 
 Before selecting edit paths, direct parent edits, or write-capable subagent
-handoff, the parent records a bounded pre-edit investigation packet. This is
-the minimum evidence that repo investigation happened before implementation.
+handoff, the parent records a pre-edit investigation packet with explicit owner
+and scope. This is the required evidence that repo investigation happened
+before implementation.
 
 - `request_clause_ids`: user clauses covered by the edit
 - `workflow_and_skills`: selected workflow, active skills, deferred dynamic
@@ -61,7 +80,7 @@ the minimum evidence that repo investigation happened before implementation.
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
-- `responsibility_search`: compact semantic-index / local-LLM / tool-catalog
+- `responsibility_search`: structured semantic-index / local-LLM / tool-catalog
   result paths, not broad raw `rg` dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected
@@ -71,25 +90,53 @@ the minimum evidence that repo investigation happened before implementation.
   reason dependency expansion is not applicable
 - `validation_route`: targeted checks and closeout gates derived from the
   packet
+- `llm_visible_context`: selected excerpts, structured summaries, or evidence
+  that must be in the prompt for the next decision
+- `local_tool_context`: artifact paths, command outputs, raw logs, dashboards,
+  or search results intentionally kept out of the prompt
+- `durable_memory_refs`: stable policy, issue, report, source packet, or memory
+  references that survive chat compaction
 - `open_questions`: only items that cannot be resolved from repo evidence
 
 Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
 
+## Parent-Direct Context Note
+
+For explicit-path, one-file, single-abstraction, Routine docs, Focused code,
+typo/link/format-only, or other bounded parent-direct work, the full
+Pre-Edit Repository Investigation Packet can be replaced by a short
+Parent-Direct Context Note.
+
+The note records:
+
+- `owner`
+- `target_path`
+- `request_clause`
+- `reuse_basis`
+- `design_oop_boundary`
+- `validation_route`
+- `llm_visible_context`
+- `local_tool_context`
+- `durable_memory_refs`
+
+The note is still a context-construction artifact. Raw search hits, nearest
+editable files, and chat context alone are not enough.
+
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
-handoff therefore includes a compact context capsule that is self-contained
-enough to execute the role, but bounded enough to avoid broad repo reading.
+handoff therefore includes a structured context capsule that is self-contained
+enough to execute the role and owned enough to avoid unrelated repo reading.
 
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
 - `state_snapshot`: branch, relevant commit or run-id, current stage, and
   parent integration owner
-- `read_before_work`: exact files or sections to read, capped to role-owned
+- `read_before_work`: exact files or sections to read within role-owned
   surfaces
-- `compact_artifacts`: router output, dashboard summary, checker finding
+- `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary

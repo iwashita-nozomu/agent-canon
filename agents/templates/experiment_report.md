@@ -13,6 +13,14 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Owner: {\{OWNER}}
 - Created At (UTC): {\{CREATED_AT}}
 
+## Reader Map
+
+This template owns the structure of a single experiment report. Fill the
+question, protocol, results, interpretation, limitations, reproducibility
+record, artifacts, and critical review in that order, while writing the
+abstract last. Use it for run-scoped empirical evidence; do not use it as the
+place to promote durable policy, workflow changes, or unsupported conclusions.
+
 ## Abstract
 
 <!-- Write last. 4-7 sentences with question, protocol, strongest result with numbers, meaning, and limitation. -->

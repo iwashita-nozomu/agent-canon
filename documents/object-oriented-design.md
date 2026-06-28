@@ -25,6 +25,10 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 [Python コーディング規約](./coding-conventions-python.md) と
 [Protocol 設計](./design/protocols.md) を併読します。
 
+## この文書の読み方
+
+この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Backlog への変換、例外は、checker finding や設計 review の扱いを決めるときに使います。
+
 ## 要約
 
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
@@ -204,7 +208,16 @@ terminal identity morphism、compact numeric scalar wrapper を意図的な境�
 これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
-score は設計判断の補助です。
+score は設計判断の補助であり、pass / fail の主判定ではありません。
+`OOP_READABILITY` は error / gate / review の signal class で決めます。
+`class_lines`、`function_lines`、`public_methods`、`parameters`、
+`cognitive_complexity` のような size / surface finding は boundary review
+signal として扱い、数値だけで split / extract を要求しません。
+`--min-score 0` は survey 用に finding を出し切る pass mode として扱い、
+default は signal 判定を使います。明示的に default より高い score floor を
+指定した場合だけ strict score gate として扱います。分割は caller contract、
+state ownership、既存責務語彙、または周辺 source shape から安定した境界が
+読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
 重要な変更では、機械 report を正本にします。
 

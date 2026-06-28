@@ -11,6 +11,10 @@ upstream implementation ../.codex/config.toml current shared template Codex conf
 
 このスライドは `documents/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/workflows/slide-production-workflow.md` に従い、固定 template と layout review を優先します。
 
+## この文書の読み方
+
+この deck は、Codex 設定の全体像、根拠、設定 surface、template の現在値、未設定項目、CLI override、主要 key、subagents、MCP、hooks、skills、AGENTS.md discovery を順に説明します。発表や説明資料を作るときは前半の全体像から読み、設定変更の根拠確認には詳細 reference である `codex-configuration-reference.md` に戻ります。この文書自体は slide 派生物であり、設定正本ではありません。
+
 ---
 
 # Codex 設定の全体像

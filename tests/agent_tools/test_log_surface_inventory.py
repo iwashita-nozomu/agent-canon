@@ -56,6 +56,9 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             )
             shell = root / "tools" / "sample.sh"
             shell.write_text("echo TOOL_STATUS=pass\n", encoding="utf-8")
+            github_shell = root / ".github" / "scripts" / "sample.sh"
+            github_shell.parent.mkdir(parents=True)
+            github_shell.write_text("echo GITHUB_SCRIPT_STATUS=pass\n", encoding="utf-8")
             rust_tool = root / "rust" / "agent-canon" / "src" / "sample.rs"
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
@@ -76,6 +79,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     "json",
                     ".codex",
                     "tools",
+                    ".github",
                     "rust",
                     ".agents",
                 ],
@@ -93,6 +97,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         self.assertIn("status", fields)
         self.assertIn("hook_run_id", fields)
         self.assertIn("TOOL_STATUS", fields)
+        self.assertIn("GITHUB_SCRIPT_STATUS", fields)
         self.assertIn("RUST_TOOL_STATUS", fields)
         self.assertIn("SKILL_RESULT", fields)
 

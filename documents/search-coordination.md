@@ -42,6 +42,15 @@ AgentCanon coordinated search has six provider classes:
   Local LLM output is advisory, matching the local LLM runtime boundary in the
   upstream design.
 
+## Reader Map
+
+Use this document to answer how AgentCanon coordinates exact text, TF-IDF,
+local semantic cards, tool catalog matches, dependency headers, and code facts.
+Read the provider list and evidence ledger first, then Local LLM Boundary and
+Responsibility-First Search Order before choosing search output as edit-scope
+evidence. Generated Search State and Semantic-Index Evidence explain cache and
+embedding boundaries.
+
 Use `agent-canon local-llm search` when the user gives a purpose rather than an
 exact symbol:
 

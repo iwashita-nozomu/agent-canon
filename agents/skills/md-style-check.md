@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: keeps Markdown style, headings, links, math, Mermaid, and formatter
+  output aligned with repository documentation rules.
+- Use When: editing Markdown, fixing docs-check findings, running docs format,
+  or validating link, heading, math, or Mermaid drift.
+- Section path: Purpose, Use When, Required Checks, and Core References orient
+  the route; Expected Outcome, Mandatory Checklist, Default Sequence, Boundary,
+  and Final Guard are the operational rules.
+- Boundary: substantive document structure or responsibility changes require
+  structure-planning and prose-reasoning before this style gate.
+
 ## Purpose
 
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。

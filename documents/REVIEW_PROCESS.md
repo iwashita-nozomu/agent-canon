@@ -13,6 +13,10 @@ downstream design ./algorithm-implementation-boundary.md algorithm math-to-code 
 この文書は、コード、文書、workflow、環境設定の変更を main-first 運用で安全に閉じるための review 手順を定めます。
 現行の agent canon、skill canon、artifact placement に合わせて、必要な review family と evidence の残し方を固定します。
 
+## この文書の読み方
+
+この文書は、変更前に固定する scope / clause / validation、review family の選び方、実行チェック、review flow、merge 条件、evidence 保存、禁止事項、finding routing を説明します。まず適用範囲と変更前に固定することを読み、次に review family と実行チェックで必要な reviewer と validation を選びます。後半は review artifact、merge、finding issue 化、関連正本を確認するときに使います。
+
 ## 適用範囲
 
 - 既定の統合先は `main` です。

@@ -13,6 +13,13 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 
 この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。
 
+## Reader Map
+
+- This document owns the workflow for turning task observations, feedback, and agent run evaluation into durable AgentCanon learning surfaces.
+- The early sections define purpose, literature basis, external evaluation basis, canonical notes, and logging commands; the later sections cover run evaluation, workflow monitoring, operational issue capture, kind definitions, closeout, and promotion.
+- Use `## Logging Rule` when recording a concrete observation, and `## Agent Run Evaluation` / `## Workflow Monitoring` during closeout or behavior feedback repair.
+- For chunked reading, first decide whether the input is a user preference, agent philosophy observation, workflow defect, or eval feedback, then read the matching recording and promotion section.
+
 ## Purpose
 
 - user preference と agent philosophy を混同しない
@@ -129,13 +136,18 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 `run_repo_dependency_review.sh --report-dir <run>` は dependency review の evidence を追記します。
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
+feedback が「利用中の skill 修正が甘い」「skill が弱い」「呼び出しが遅い」「routing が外れた」のように active skill の挙動を指す場合は、active skill set を first repair candidate とします。active skill set は、直近の `skills=...` 宣言、読了した runtime `SKILL.md`、run bundle の selected skill evidence、または `workflow_monitoring.md` の skill invocation event から決めます。
+prompt を固定する前に calibration step を置き、指摘をどの強さで反映するかを決めます。単発 feedback は scoped guidance、example、issue、memory で足りるかを先に見ます。hard rule は invariant、checker-backed、または反復観測された失敗に限ります。prompt rule にする場合は、適用条件、scope、例外または owner decision を短く添えます。
 
 ### Runtime Feedback Closure Loop
 
 user / reviewer が agent の動き、routing、自己改善、tool 化、prompt の弱さを指摘した場合、parent はその場で `$agent-learning` を有効化します。指摘を chat 上の反省で終わらせず、次の順で閉じます。
 
 1. `workflow_monitor.py --runtime-feedback` で `source=... target=... action=... evidence=...` を記録する
-1. 指摘の反映先を `skill prompt`、`workflow prompt`、`tool/checker`、`eval rubric`、`memory`、`issue`、`no_op` のどれかに分類する
+1. 指摘の反映先を `skill prompt`、`workflow prompt`、`tool/checker`、`eval rubric`、`memory`、`issue`、`no_op` のどれかに分類する。active skill の挙動に対する feedback は、該当 skill の runtime `SKILL.md` と canonical `agents/skills/<skill>.md` を first repair candidate にする
+1. calibration step で反映の強さを決め、過剰固定を避ける。hard rule は invariant、checker-backed、または反復観測された失敗に限り、prompt rule にする場合は適用条件、owner、validation または例外条件を短く添える
+1. `skill prompt` を修正する場合は、discoverable runtime `SKILL.md`、canonical skill doc、関連 workflow / handoff surface の順に owner を確認し、必要な prompt eval entry を更新または引用してから rerun する
+1. active skill feedback を memory-only で閉じる場合は、feedback が観測メモに留まる理由、または skill owner を変更しない理由を `target=<skill> action=no_op` か durable issue に記録する。単なる observation 追記だけでは `skill_improvement_decision=applied` にしない
 1. `action=no_op` 以外では、`skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` の少なくとも 1 つを `applied` または `recorded` にする
 1. prompt / tool / eval を更新した場合は、対応する test、checker、prompt eval、または workflow eval を同じ run で再実行する
 1. memory に残す場合は `log_agent_learning.py` で短い observation に圧縮し、raw chat を貼らない

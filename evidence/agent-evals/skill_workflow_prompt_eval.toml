@@ -267,13 +267,13 @@ description = "Subagent bootstrap must not spend subagent tokens on deterministi
 id = "SUBAGENT-TOOL-FIRST-1"
 critical = true
 description = "Requires canonical checker/router/dashboard before read-only exploration."
-required_regex = ["Before assigning read-only exploration", "canonical checker", "compact tool artifacts", "not to repeat deterministic tool checks"]
+required_regex = ["Before assigning read-only exploration", "canonical checker", "structured tool artifacts", "not to repeat deterministic tool checks"]
 
 [[evals.checklist]]
 id = "SUBAGENT-FRESH-CAPSULE-1"
 critical = true
 description = "Requires the fresh context capsule fields in handoff prompts."
-required_regex = ["Treat every spawned subagent as fresh", "Fresh Subagent Context Capsule", "exact read-before-work paths", "compact artifacts", "return contract"]
+required_regex = ["Treat every spawned subagent as fresh", "Fresh Subagent Context Capsule", "Context Visibility Contract", "protocol-owned"]
 
 [[evals]]
 id = "md-style-check-human-doc-unified-rust-docs"
@@ -1140,19 +1140,19 @@ required_regex = ["Intake Responsibility Wave", "dynamic expansion waves", "vert
 id = "ORCH-TOOL-FIRST-1"
 critical = true
 description = "Uses tool pass/finding output as the authority before broad reading or subagents."
-required_regex = ["canonical tool", "call the tool before prose review", "trust its compact pass/finding output", "read only the exact file slice"]
+required_regex = ["canonical tool", "call the tool before prose review", "trust its structured pass/finding output", "read only the exact file slice"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-2"
 critical = true
-description = "Routes deterministic tool coverage through compact artifacts and repairs the tool contract when abstraction is missing."
-required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "compact tool artifacts", "extend or repair the tool contract"]
+description = "Routes deterministic tool coverage through structured artifacts and repairs the tool contract when abstraction is missing."
+required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "structured tool artifacts", "extend or repair the tool contract"]
 
 [[evals.checklist]]
 id = "ORCH-PRE-EDIT-PACKET-1"
 critical = true
 description = "Requires evidence-backed pre-edit investigation before edit path selection."
-required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "reuse survey", "stale surface scan", "dependency scope"]
+required_regex = ["Pre-Edit Repository Investigation Packet", "agents/COMMUNICATION_PROTOCOL.md", "task risk", "Parent-Direct Context Note", "raw search hits"]
 
 [[evals.checklist]]
 id = "REPORT-ROUTING-SKILL-1"
@@ -1230,13 +1230,13 @@ required_regex = ["check_convention_compliance\\.py", "before closeout", "select
 id = "CODEX-TASK-PRE-EDIT-PACKET-1"
 critical = true
 description = "Requires the communication-protocol pre-edit packet before edits."
-required_regex = ["Pre-Edit Repository Investigation Packet", "implementation surface route", "reuse survey", "stale surface scan", "dependency scope"]
+required_regex = ["protocol-owned", "Pre-Edit Repository Investigation Packet", "agents/COMMUNICATION_PROTOCOL.md", "missing or shallow"]
 
 [[evals.checklist]]
 id = "CODEX-TASK-FRESH-CAPSULE-1"
 critical = true
-description = "Requires compact fresh subagent context capsules instead of chat history."
-required_regex = ["Fresh Subagent Context Capsule", "exact paths and compact artifacts", "chat history", "repo-root scope"]
+description = "Requires fresh subagent context capsules instead of chat history."
+required_regex = ["protocol-owned", "Fresh Subagent Context Capsule", "agents/COMMUNICATION_PROTOCOL.md", "chat history", "repo-root scope"]
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"
@@ -1549,7 +1549,7 @@ required_regex = [
 id = "TOKEN-TOOL-FIRST-1"
 critical = true
 description = "Calls tools first and treats pass/finding output as authority for covered properties."
-required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand compact tool artifacts to subagents"]
+required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand structured tool artifacts to subagents"]
 
 [[evals]]
 id = "communication-protocol-pre-edit-context"
@@ -1567,19 +1567,19 @@ required_regex = ["Pre-Edit Repository Investigation Packet", "implementation_su
 id = "COMM-FRESH-CAPSULE-1"
 critical = true
 description = "Defines fresh subagent context capsules without chat-history or raw-log dependence."
-required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "compact_artifacts", "allowed_paths", "do_not_read", "return_contract"]
+required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "context_artifacts", "allowed_paths", "do_not_read", "return_contract"]
 
 [[evals]]
 id = "codex-subagents-fresh-context"
 target = "agents/canonical/CODEX_SUBAGENTS.md"
 kind = "workflow"
-description = "Codex subagent canon must require compact context capsules for fresh launches."
+description = "Codex subagent canon must require structured context capsules for fresh launches."
 
 [[evals.checklist]]
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
 description = "Requires exact bounded context fields for fresh subagent launches."
-required_regex = ["Fresh Subagent Context Capsule", "launch 間の context", "exact read-before-work paths", "compact artifacts", "return contract"]
+required_regex = ["Fresh Subagent Context Capsule", "context_artifacts", "allowed_paths", "do_not_read", "return_contract", "protocol-owned", "schema の定義は同文書だけ"]
 
 [[evals]]
 id = "slide-production-workflow"
@@ -1844,7 +1844,7 @@ required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feed
 id = "ALS-BEHAVIOR-3"
 critical = true
 description = "Requires runtime feedback to be routed to update surfaces."
-required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair"]
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "active skill", "calibrate"]
 
 [[evals]]
 id = "agent-learning-human-skill-behavior-eval"
@@ -1868,7 +1868,13 @@ required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
 id = "ALH-BEHAVIOR-3"
 critical = true
 description = "Documents runtime feedback capture and prompt/eval/memory routing."
-required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record"]
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record", "active skill set", "calibration step", "hard rule"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-6"
+critical = true
+description = "Requires active-skill feedback to calibrate prompt repair strength before memory-only closure."
+required_regex = ["active skill set", "first repair candidate", "calibration step", "hard rule", "skill_improvement_decision=applied"]
 
 [[evals]]
 id = "evals-readme-behavior-eval"
@@ -2103,3 +2109,27 @@ id = "AGENT-CANON-UPDATE-DOC-2"
 critical = true
 description = "Documents source PR and parent pin boundaries."
 required_regex = ["AgentCanon branch/PR", "parent-repo pin", "canon-pin", "standalone AgentCanon branch"]
+
+[[evals]]
+id = "pr-processing-diff-intake-runtime"
+target = ".agents/skills/pr-processing/SKILL.md"
+kind = "skill"
+description = "The runtime PR processing skill must require diff intake and repair before ready, merge, or dependent pin sync."
+
+[[evals.checklist]]
+id = "PR-PROCESSING-DIFF-INTAKE-RUNTIME-1"
+critical = true
+description = "Requires PR diff intake against PR Essence before merge gates."
+required_regex = ["diff intake", "PR Essence", "missing, stale, unintended, or over-broad", "PR head branch", "parent pin"]
+
+[[evals]]
+id = "pr-processing-diff-intake-doc"
+target = "agents/skills/pr-processing.md"
+kind = "skill-doc"
+description = "The human PR processing skill must require fixing required diffs while incorporating PRs."
+
+[[evals.checklist]]
+id = "PR-PROCESSING-DIFF-INTAKE-DOC-1"
+critical = true
+description = "Requires PR diff intake and head-branch repair before incorporation."
+required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "Parent pin / root-view diff"]

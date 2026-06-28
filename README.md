@@ -20,6 +20,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 
 ## First Read Path
 
+この README は、AgentCanon source tree の役割、構造モデル、目的別 route、runtime profile、検索導線、保守ルールを扱います。
 人がこの repo を読む入口は次の順で固定します。
 
 1. `README.md`
@@ -32,6 +33,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 `documents/` の索引、`agents/README.md` は workflow / skill / runtime hub、
 `agents/workflows/README.md` は workflow selector です。
 `agents/canonical/README.md` は layout appendix として扱い、最初の hub にはしません。
+AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope を確認するときにこの README を読みます。
 
 ## このディレクトリの役割
 

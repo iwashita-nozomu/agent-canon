@@ -20,6 +20,19 @@ downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md ex
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: formalize mathematical, proof-sketch, and implementation-derived
+  claims into checker-backed proof or refutation routes.
+- Section path: start with Purpose, Use When, Core References, and Mandatory
+  Checklist; then use Canonical Flow, Required Outputs, Proof Status Table,
+  JIT-canonical IR, Lemma Dependency Graph, Frontier Exploration Loop, and the
+  proof-expansion sections for operational detail.
+- Use when: a claim needs Lean/Isabelle/Coq/SMT evidence, proof-search
+  scaffolding, theorem-graph routing, or generated implementation evidence.
+- Boundary: natural-language proof text, unchecked theorem files, and
+  `blocked` / `unverified` states are not final proof evidence.
+
 ## Purpose
 
 自然言語の数学的主張、証明スケッチ、設計上の lemma、または
@@ -90,10 +103,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   `Info` の静的 field、または theorem graph が実装 path から再構成する値として
   扱います。
 - formal proof work を subagent に渡す場合は、`agents/COMMUNICATION_PROTOCOL.md`
-  の `Target Binding Packet` を handoff に含めます。target theorem、public root と
-  signature、return projection、identifier naming plan、accepted top-level
-  assumptions、forbidden assumptions、current generated evidence、completion
-  condition、validation commands、unchecked-output policy が最低限必要です。file list
+  が所有する `Target Binding Packet` を handoff に含めます。file list
   だけで「証明を見て」「blocker を探して」と渡してはいけません。unchecked theorem
   sketch、型が合っていない statement、public root への到達が示されていない local
   counterexample、algorithm suggestion は、同じ public root と theorem surface に対する

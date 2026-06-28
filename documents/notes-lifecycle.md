@@ -11,6 +11,15 @@ upstream design README.md durable document index
 この文書は、`notes/` を使うほど充実する形に保つための正本です。
 action log、実験メモ、知識メモ、theme note、failure note を別々に持ちつつ、closeout ごとに昇格先を決めます。
 
+## この文書の読み方
+
+- この文書は、`notes/` の実行中メモ、review/closeout 昇格、promotion
+  rules、最小 closeout questions、template を定めます。
+- 主な順路は、Purpose、Default Flow、Promotion Rules、
+  Minimum Closeout Questions、Templates です。
+- run-local 観測を repo-wide knowledge へ昇格するか判断するときに読みます。
+- 境界: notes の lifecycle 正本であり、個別 task の action log そのものではありません。
+
 ## Purpose
 
 - worktree 中の局所ログを、`main` から辿れる再利用知識へ育てる

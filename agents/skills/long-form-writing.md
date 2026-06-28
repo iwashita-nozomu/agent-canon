@@ -11,6 +11,18 @@ upstream design formal-proof-workflow.md mathematical claim proof-obligation rou
 -->
 
 
+## Reader Map
+
+- Purpose: adapts a structure contract or reasoning graph into reader-facing
+  prose for README, workflow, guide, migration, or specification documents.
+- Use When: the file responsibility is explanatory prose and the reader path,
+  claim support, or section projection must be written clearly.
+- Section path: Purpose, Use When, and Core References set scope; Mandatory
+  Checklist and Default Sequence are operational rules; Boundary limits prose
+  ownership.
+- Boundary: this skill projects approved structure into prose; it does not
+  create the structure contract itself.
+
 ## Purpose
 
 README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書を

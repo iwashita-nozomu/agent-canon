@@ -9,6 +9,14 @@ upstream design 01-p-minus-one-completion-gate.md completion gate checklist
 @dependency-end
 -->
 
+## Reader Map
+
+Use this checklist to convert completion false negatives into replayable
+fixtures. Read Purpose and Fixture requirements first to understand the fixture
+schema, then use Required fixture categories to choose the matching negative
+case. Fixture lifecycle and the completion-first invariant explain how cases
+move from warning to regression evidence.
+
 ## Purpose
 
 A violation case is not only a warning. It should become a fixture that the repo can run. This checklist converts false-negative cases into regression tests for AgentCanon behavior.

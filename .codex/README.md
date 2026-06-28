@@ -23,6 +23,12 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。
 
+## この文書の読み方
+
+- この文書は、`.codex/` の project-scoped 設定、subagent 定義、hook、runtime cap、model 設定の入口です。
+- `Layout` と `Shared Canon` で設定 file と shared canon への接続を確認し、goal、token profile、spawn limit、hook context、agents、smoke test は目的別に読みます。
+- Codex runtime の設定確認、hook や subagent inventory の確認、project-local Codex smoke test の前に読みます。
+
 ## Layout
 
 - `config.toml`
@@ -143,7 +149,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を continuation context として返します。
 - `Stop` でも `hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば closeout repair context を返します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
-- dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。
+- dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。`PostToolUse` は runtime の post-tool output schema を壊さないため、非 blocking finding や child failure を stdout に返さず、hook log、明示 validation、closeout evidence の対象にします。
 - `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:` のいずれかで明示されます。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` でテスト・debug 用の出力先を差し替えられます。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。

@@ -11,6 +11,16 @@ downstream design ./result-log-retention-and-visualization.md defines retention 
 
 この文書は、数値計算およびテストのログ出力を対象にします。
 
+## この文書の読み方
+
+- この文書は、ログ/デバッグ出力の対象、JSON key、保存方針、directory 名、
+  禁止事項、JAX 注意点、検証を定めます。
+- 主な順路は、対象と目的、基本方針、JSON キー規約、保存方針、
+  ディレクトリ名規約、禁止事項、JAX 向けの注意、検証です。
+- 数値計算、テスト、HLO 解析のログ形式や保存先を決める前に読みます。
+- 境界: retention、summary、可視化 artifact は
+  `result-log-retention-and-visualization.md` が正本です。
+
 ## 1. 対象と目的
 
 - 対象は、数値計算・テスト・HLO 解析のログ出力です。

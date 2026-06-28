@@ -13,6 +13,15 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 この文書は、`experiments/registry.toml` を使って experiment topic を集中管理する契約を定めます。
 server 上でどの実験コードを正式に実行するかを、topic ごとに 1 か所へ固定するのが目的です。
 
+## この文書の読み方
+
+- この文書は、experiment topic の正本 entrypoint、実行 command、成果物入口を
+  `experiments/registry.toml` に集約する契約を扱います。
+- 主な順路は、役割、正本ファイル、branch-only topics、branch / worktree
+  metadata、update rule、server 実行ルール、validation です。
+- 実験 topic を追加、移動、正式実行するときに読みます。
+- 境界: branch 名は補助情報であり、topic 名と registry entry が正本です。
+
 ## 役割
 
 - experiment topic の正本 entrypoint を固定する

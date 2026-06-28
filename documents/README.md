@@ -29,6 +29,17 @@ second agent hub.
 `documents/README.md` stays repo-local after template clone. AgentCanon may seed
 this file, but derived repositories own their local index.
 
+## Reader Map
+
+- Owns the root `documents/` index and the split between AgentCanon-owned,
+  template-owned, project-owned, and generated documentation.
+- Main path: Ownership Matrix, Reader Routes, Coding Policy References,
+  Template-Owned Active Contracts, and Tooling And Artifact References.
+- Read this after the top-level `README.md` when deciding which document owns a
+  repository policy or guide.
+- Boundary: workflow, skill, and runtime routing belong to `agents/README.md`,
+  not this document index.
+
 ## Ownership Matrix
 
 | Class | Examples | Edit source |

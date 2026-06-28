@@ -17,6 +17,15 @@ frontend. It is the internal source envelope producer and diagnostic record
 tool behind `cpp_template_to_lean.py`; it is not the canonical user-facing C++
 to Lean route.
 
+## Reader Map
+
+- Owns the diagnostic C++ source-canonical IR extraction contract.
+- Main path: Command, Output Contract, and Boundary.
+- Read this when inspecting or debugging the C++ source envelope behind
+  `cpp_template_to_lean.py`.
+- Boundary: this is not the canonical user-facing C++ to Lean route; use
+  `cpp_template_to_lean.py` for full expansion and Lean output.
+
 ## Command
 
 ```bash

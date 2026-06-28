@@ -16,6 +16,17 @@ Use this skill when the task is about bringing AgentCanon itself, a vendored
 `vendor/agent-canon` pin, root runtime views, or parent-repo AgentCanon update
 TODO state up to date.
 
+## Reader Map
+
+- Purpose: describes the route for updating AgentCanon itself, parent submodule
+  pins, shared root views, and AgentCanon update TODOs.
+- Use When: the task touches `vendor/agent-canon/`, AgentCanon pins, root view
+  repair, or latest-state update checks.
+- Section path: Use When identifies triggers; Core References lists owner
+  documents; Route contains the operational rules; Closeout Evidence names the
+  required validation and PR evidence.
+- Boundary: parent pin updates must not hide dirty AgentCanon source changes.
+
 ## Use When
 
 - The user asks to update, latest, refresh, or sync AgentCanon.

@@ -11,6 +11,15 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py current moni
 @dependency-end
 -->
 
+## Reader Map
+
+Use this document to answer which evidence classes can support completion-first
+closeout and which evidence is too weak to unlock completion. Read the evidence
+hierarchy first, then the closeout verifier chain and artifact schema examples
+for implementation shape. The final sections explain why preset closeout tokens
+are dangerous, how completion reports are generated, which failures must be
+rejected, minimum artifacts by profile, and the invariant.
+
 ## Why evidence needs a hierarchy
 
 A completion system fails if it treats all evidence as equal. A checkbox, a pass token, a pasted command output, and a command-backed artifact should not have the same weight.

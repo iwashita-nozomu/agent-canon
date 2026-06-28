@@ -212,7 +212,10 @@ class HookLogContext:
 
     def append(self, entry: dict[str, object]) -> None:
         """Append one JSONL entry."""
-        self.ensure_archive_branch()
+        try:
+            self.ensure_archive_branch()
+        except (OSError, RuntimeError, subprocess.SubprocessError):
+            return
         path = self.result_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         source_root = self.source_root()

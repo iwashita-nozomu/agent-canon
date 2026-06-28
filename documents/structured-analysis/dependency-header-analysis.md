@@ -18,6 +18,17 @@ upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extrac
 adapter contract を定義する。目的は、report 内の claim、設計文書、実装 surface、
 dependency header の整合を同じ検証面で扱えるようにすることである。
 
+## Reader Map
+
+- Owns how dependency-header graph evidence enters structured prose and report
+  analysis.
+- Main path: Inputs, Adapter Boundary, Import Mapping, Report Trace,
+  Diagnostics, Presentation Recommendations, and Extraction Notes.
+- Read this before joining dependency headers, dependency graph TSVs, code
+  evidence, and report claims in structured analysis.
+- Boundary: dependency headers are artifact context contracts, not prose
+  sentence nodes or code dependency edges.
+
 ## Inputs
 
 | Input | Source | Meaning |

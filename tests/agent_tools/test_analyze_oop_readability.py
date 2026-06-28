@@ -413,6 +413,40 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("OOP_READABILITY_SCORE=", result.stdout)
             self.assertIn("OOP_READABILITY=fail", result.stdout)
 
+    def test_python_review_signal_findings_do_not_fail_default_gate(self) -> None:
+        """Boundary review signals should not force a split-only default failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "workflow.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        (
+                            "def process_items("
+                            "a: int, b: int, c: int, d: int, "
+                            "e: int, f: int, g: int"
+                            ") -> int:"
+                        ),
+                        "    total = a + b + c + d + e + f + g",
+                        *(["    total += 1"] * 85),
+                        "    return total",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("function_lines:process_items", result.stdout)
+            self.assertIn("parameters:process_items", result.stdout)
+            self.assertIn("OOP_READABILITY_GATE_SIGNAL_FINDINGS=0", result.stdout)
+            self.assertIn("OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=2", result.stdout)
+            self.assertIn("OOP_READABILITY_SCORE_STATUS=fail", result.stdout)
+            self.assertIn("OOP_READABILITY_STATUS_REASON=review-only", result.stdout)
+            self.assertIn("OOP_READABILITY=pass", result.stdout)
+
     def test_python_optional_none_boundary_is_flagged(self) -> None:
         """Optional public boundaries and None routing are reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:

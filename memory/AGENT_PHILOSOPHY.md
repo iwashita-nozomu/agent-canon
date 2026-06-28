@@ -11,6 +11,12 @@ upstream design README.md memory surface index
 この file は、agent の作業哲学、対話から得た学習、repo-wide な判断原則を逐次追記する append-first note です。
 `AGENTS.md` や workflow 正本へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
+## この文書の読み方
+
+- この note は、agent 自身の作業哲学、判断癖、対話上の再発防止、retrospective を集める append-first surface です。
+- `Use` で追記対象と昇格前の扱いを確認し、`Working Principles` と `Interaction Observations` で蓄積された観測を読みます。
+- 安定化した候補を確認するときは `Promotion Candidates`、未解決の論点を見るときは `Open Questions` を読みます。
+
 ## Use
 
 - user preference は `memory/USER_PREFERENCES.md` に残します。
@@ -272,7 +278,7 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: 2026-06-13 user feedback: code edits are too conservative
 
-- 2026-06-13 | interaction-observation | Before editing, repo investigation must be fixed as a packet with implementation surface route, responsibility search, reuse survey, stale-surface scan, dependency scope, and validation route; fresh subagents need a compact context capsule because they do not retain context across launches.
+- 2026-06-13 | interaction-observation | Before editing, repo investigation must be fixed as a packet with implementation surface route, responsibility search, reuse survey, stale-surface scan, dependency scope, and validation route; fresh subagents need a structured context capsule because they do not retain context across launches.
   - source: chat
   - scope: shared-canon
   - confidence: likely
@@ -338,6 +344,18 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: 2026-06-22 user feedback that PR essence tends to be absent from documentation
 
+- 2026-06-27 | interaction-observation | For repository investigation, start from declared repository structure and owner maps before broad text search; use text search only after narrowing by AGENTS.md, README, responsibility scope, task packets, or structure contracts.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback: initial rg-first search was wrong; search from repo structure instead.
+
+- 2026-06-27 | interaction-observation | 分割は差し替え可能な単位に限る。数理的に差し替えが発生しない境界、記法だけの境界、同じ oracle を共有する連続導出は同じ packet と owner scope に残し、過剰な subagent / document split を避ける。
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-06-27 user feedback: 分割が過剰がち。数理的に差し替えが発生しない境界を分割する必要はない。
+
 ## Task Retrospectives
 
 - 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
@@ -354,7 +372,7 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User reported that AgentCanon memory is not accumulating; root memory is a symlink into vendor/agent-canon, but log tools only appended files without persistence.
 
-- 2026-06-16 | failure-avoidance | Subagent handoffs for proof or implementation work must carry a semantic target lock: exact target theorem or behavior, public root, projections, accepted and forbidden assumptions, current evidence, completion condition, and validation route; file lists and broad objectives alone lead to broken implementation.
+- 2026-06-16 | failure-avoidance | Subagent handoffs for proof or implementation work must carry the protocol-owned `Target Binding Packet`; file lists and broad objectives alone lead to broken implementation.
   - source: chat
   - scope: subagent-handoff formal-proof implementation
   - confidence: likely
@@ -389,6 +407,54 @@ upstream design README.md memory surface index
   - scope: validation-policy numerical-tests gpu-runtime
   - confidence: likely
   - evidence: User feedback on 2026-06-16: prohibit doing computation tests on CPU.
+
+- 2026-06-27 | failure-avoidance | Full CI is a confidence gate, not the default evidence for narrow docs, prompt-only, or focused changes; select validation by runtime profile and risk class, and record targeted evidence instead of escalating automatically to make ci.
+  - source: chat
+  - scope: agent-runtime-validation
+  - confidence: stable
+  - evidence: User feedback on 2026-06-27: CI may be excessive.
+
+- 2026-06-28 | failure-avoidance | Conflict repair must be semantic integration: inspect base/current/incoming intent, owning contract, and validation surface before choosing clauses; never mark a conflict resolved by mechanical ours/theirs selection.
+  - source: chat
+  - scope: pr-processing merge-conflict-resolution
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: コンフリクト解決が下手です.
+
+- 2026-06-28 | failure-avoidance | When feedback arrives while a skill is active, repair the active skill prompt and its eval anchor first; memory-only learning is insufficient for skill-behavior feedback.
+  - source: chat
+  - scope: agent-learning active-skill-repair
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 利用中のスキル修正が甘いです.
+
+- 2026-06-28 | failure-avoidance | When incorporating a PR, perform diff intake against the target base and repair required head-branch changes before ready/merge/pin sync; PR processing is not complete from metadata or checks alone.
+  - source: chat
+  - scope: pr-processing diff-intake
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: PR取り込み時に差分を修正するというのを忘れないようにスキル修正.
+
+- 2026-06-28 | failure-avoidance | When codifying feedback into skills or workflow rules, calibrate the durable form first; prefer scoped guidance or examples over hard rules unless the failure is invariant, checker-backed, or repeatedly observed.
+  - source: chat
+  - scope: agent-learning skill-repair-calibration
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 固定するときに言い過ぎ，過剰固定が目立ちます.
+
+- 2026-06-28 | failure-avoidance | When OOP checker findings drive design action, treat size, public-surface, parameter-count, and complexity findings as boundary review signals; split only when caller contracts, ownership, or source shape show a stable boundary.
+  - source: chat
+  - scope: oop-readability judgement
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 分割の仕方が不自然; OOPチェッカがまだ悪さして; 判定の仕方を見直してほしい.
+
+- 2026-06-28 | failure-avoidance | For OOP readability, do not let a numeric score become the design decision; classify findings by signal class and use score only as a diagnostic index.
+  - source: chat
+  - scope: oop-readability scoring
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 点数化の仕方が下手.
+
+- 2026-06-28 | failure-avoidance | When closeout already has enough local validation and PR metadata, do not spend user time watching long remote CI unless the user asked for it or the result can change the next action.
+  - source: chat
+  - scope: closeout-validation
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback after PR closeout: 余計な確認をした結果，時間を無駄にしています
 
 ## Open Questions
 

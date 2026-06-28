@@ -11,6 +11,12 @@ upstream design README.md notes lifecycle index
 この note は、template repo で Git mirror を組むときの確認観点をまとめたものです。
 特定 repo の URL や bare path を正本にせず、再利用できる運用パターンだけを残します。
 
+## この文書の読み方
+
+- この note は、template repo で Git mirror を使うときの構成、確認先、失敗例、確認手順をまとめます。
+- `想定する構成` と `どこを見るか` で remote / bare repo / hook の確認先を押さえ、失敗時は `典型的な失敗` と `mirror が遅れているときの通し方` を読みます。
+- mirror push の遅れ、認証不備、bare hook 経由の同期確認を切り分けるときに使います。
+
 ## 想定する構成
 
 - 通常の push 先は `origin`

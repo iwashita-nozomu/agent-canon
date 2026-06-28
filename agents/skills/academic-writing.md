@@ -12,6 +12,18 @@ downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex s
 -->
 
 
+## Reader Map
+
+- Purpose: routes scholarly prose through notation, logic, and reader-flow
+  review before drafting or revising.
+- Use When: drafting or revising papers, thesis chapters, scholarly notes, or
+  academic documents outside a narrower paper-submission route.
+- Section path: Purpose, Use When, and Core References set scope; Mandatory
+  Checklist, Default Sequence, and Standard Command are the operational rules;
+  TeX Output Boundary and Boundary limit the surface.
+- Boundary: submission-paper ownership goes through `paper-writing` when that
+  narrower route applies.
+
 ## Purpose
 
 file / document responsibility が academic prose、scholarly note、thesis chapter、

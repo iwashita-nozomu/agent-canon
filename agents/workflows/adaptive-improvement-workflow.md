@@ -14,6 +14,13 @@ upstream design README.md workflow catalog
 repo-level の長期 loop では top-level `goal.md` を正本にし、`python3 tools/agent_tools/goal_loop.py` で状態確認、iteration 実行、criteria 更新を行います。
 Codex `goals` feature が有効な runtime では [codex-goals-workflow.md](codex-goals-workflow.md) を overlay とし、Codex goals を `goal.md` の session view として同期します。
 
+## この文書の読み方
+
+- この文書は、探索的改善、実験、調査、tuning、prompt / workflow repair を backlog-driven outer loop として回す workflow を所有します。
+- 前半は位置づけ、対象、基本ルール、canonical outer loop を扱い、後半は iteration backlog、decision states、roles、他 workflow との関係、close conditions を扱います。
+- loop owner は `## 3. 基本ルール` と `## 4. Canonical Outer Loop` から入り、各 extension の実装は `implementation-waterfall-workflow.md` に戻します。
+- chunked reading では、`goal.md`、backlog、decision state のどれを更新しているかを固定し、その節だけを開いて closeout 条件と照合します。
+
 ## 1. 位置づけ
 
 - 通常の実装:

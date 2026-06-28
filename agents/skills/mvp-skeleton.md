@@ -9,6 +9,18 @@ downstream implementation ../../.agents/skills/mvp-skeleton/SKILL.md exposes thi
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: keeps MVP, prototype, skeleton, or thin-slice work runnable without
+  overbuilding architecture, UI, tests, or features.
+- Use When: the request asks for MVP作成, prototype, 最小実装, core runnable path,
+  or scope-creep control.
+- Section path: Purpose and MVP Contract define the contract; Scope Sort,
+  Overbuild Tripwires, and Frontend Rule are operational rules; Closeout states
+  completion evidence.
+- Boundary: MVP scope is a routing and sequencing control, not permission to
+  leave the core path unrunnable.
+
 ## Purpose
 
 `mvp-skeleton` keeps MVP work shaped around a skeletal product slice. It owns

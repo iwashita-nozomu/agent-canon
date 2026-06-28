@@ -13,6 +13,16 @@ downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirm
 This tree is the standalone AgentCanon source of truth. Template and derived
 repositories consume it through `vendor/agent-canon/` and root runtime views.
 
+## Reader Map
+
+This repository entrypoint maps agents working inside the standalone
+AgentCanon source tree to the canonical owner surfaces. Use `Read First` for
+the initial document path, `Scope` to identify the source area, `Runtime Owner
+Map` to find the owner of runtime contracts, `Task Entry` to start
+repo-changing work, and `Validation` before closeout. This file routes readers;
+the detailed workflow, skill, role, profile, and closeout rules remain in the
+owner surfaces it names.
+
 ## Read First
 
 - `README.md`

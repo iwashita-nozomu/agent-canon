@@ -14,6 +14,10 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 特定 package 名や過去 project の前提は持ち込まず、template で再利用できる共通部分だけを残します。
 厳格な実装と文書の書きぶりは `documents/coding-conventions-house-style.md` を併読してください。
 
+## この文書の読み方
+
+この入口文書は、Python 実装で最初に確認する scope、型注釈、アルゴリズム境界、OOP、配置、命名、数値リテラル、pyright / pytest の導線をまとめます。まずクイックスタートで関連規約へ飛び、よくある間違いと Docstring テンプレートで公開境界の最小形を確認します。後半は行長、import と責務境界、helper-first 禁止、SOLID、目次、変更後チェックを読むための索引です。
+
 ## クイックスタート
 
 | ステップ | 内容 | 詳細 |

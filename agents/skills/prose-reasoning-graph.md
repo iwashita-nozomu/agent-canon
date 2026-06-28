@@ -13,6 +13,18 @@ downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI u
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: analyze prose as a typed graph before rewriting, reviewing, or
+  handing it to writing and research skills.
+- Section path: Purpose defines the graph boundary table; Use When selects the
+  task shape; Standard Sequence gives the operational flow; Runtime Tool Result
+  Contract, Required Outputs, and Literature Boundary define outputs and limits.
+- Use when: section order, reader path, claim support, split/merge/bridge
+  decisions, logic holes, or graph-backed rewrite packets need evidence.
+- Boundary: graph artifacts preserve source truth and prepare handoff; they do
+  not replace the receiving writing, research, proof, or review skill.
+
 ## Purpose
 
 `prose-reasoning-graph` is the overlay skill for analyzing prose as a typed

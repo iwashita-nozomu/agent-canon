@@ -30,6 +30,13 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 この文書は、AgentCanon source change と template submodule pin change を PR に乗せるときの正本です。
 standalone AgentCanon repo、template repo 側の branch、PR、merge、submodule pin 更新を 1 本の手順で扱います。
 
+## この文書の読み方
+
+- この文書は、AgentCanon source PR、template pin PR、GitHub write、sync、security baseline の maintenance route を所有します。
+- 前半は対象、固定ルール、freshness gate、issues / findings gate、branch / push ルールを扱い、後半は標準手順、派生 repo、repo-local tool PR、PR body、完了条件、禁止事項、入口を扱います。
+- maintainer は `## Freshness Gate Route` と `## 標準手順` を先に読み、PR evidence 作成時は `## PR Body Examples` と `## PR 完了条件` を確認します。
+- chunked reading では、現在の state が freshness、issues、branch、PR publish、closeout のどれかを先に決め、その節だけを手順正本として開きます。
+
 ## 対象
 
 - `vendor/agent-canon/` 配下の変更

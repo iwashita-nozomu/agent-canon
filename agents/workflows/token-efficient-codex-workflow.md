@@ -11,9 +11,11 @@ downstream design README.md workflow catalog references this overlay
 
 # Token-Efficient Codex Workflow
 
-This overlay keeps repo work rigorous while reducing unnecessary context,
-subagent fan-out, and tool-output token load. Use it when the user asks to save
-tokens, when a task is small, or when the current session is already long.
+This overlay keeps repo work rigorous while reducing unnecessary subagent
+fan-out and tool-output token load. Use it when the user asks to save tokens,
+when a task is small, or when the current session is already long. Context
+construction is owned by `agents/COMMUNICATION_PROTOCOL.md`; this overlay only
+chooses when to load, reference, or hand off that context.
 
 Token reduction is treated as a measurable claim: compare a baseline session footprint
 against the candidate slice, record the ratio, and keep only the changes that preserve
@@ -21,6 +23,13 @@ skill accuracy while cutting total tokens by at least half for the same eval env
 The first lever is reasoning-effort reduction on narrow code-reading and bounded
 implementation roles; only after that should broader profile changes or output caps
 be considered.
+
+## Reader Map
+
+- This overlay owns token-saving modes, fan-out choices, reduction evidence, escalation triggers, and closeout constraints for Codex repo work.
+- The early sections define runtime profiles and agent modes; the middle sections point back to the context protocol and define token reduction evidence; the final sections define escalation and closeout.
+- Use `## Runtime Profiles` and `## Agent Modes` before changing subagent fan-out or tool-output limits.
+- For chunked reading, keep the active mode and evidence target in view, then open only the protocol, reduction, escalation, or closeout section needed by the current task phase.
 
 ## Runtime Profiles
 
@@ -80,30 +89,22 @@ Mode selection rules:
   in the run artifact and keep the parent slice narrow. Token efficiency does
   not permit fabricating specialist review evidence.
 
-## Context Budget Rules
+## Context Protocol Use
 
+- Follow `agents/COMMUNICATION_PROTOCOL.md` for context visibility, repository
+  investigation packets, parent-direct notes, and fresh subagent capsules.
 - For tool-covered questions, call the canonical checker, router, semantic
-  index, dashboard, or compact report before reading prose or spawning
-  subagents. Treat pass/finding output as the authority for that covered
-  property.
-- Read exact paths, lines, dependency headers, and named upstream files only
-  after the tool output identifies a repair or ambiguity that needs context.
-- Prefer `rg -l`, bounded `sed -n`, `git diff --stat`, and MCP status tools
-  over bulk file dumps. Direct match output must use a small path scope,
-  `--max-count`, or a pipeline that stores results in an artifact and prints
-  only the count or first screen of paths.
-- Summarize long artifacts into the run bundle before handing them to another
-  agent.
-- Hand compact tool artifacts to subagents; do not ask them to re-run
-  deterministic checks by reading the same documents.
-- Pass file paths, clause IDs, and section names to subagents instead of chat
-  summaries.
-- Cap each subagent prompt to the packet it needs for the current stage; do not
-  include all workflow docs in every handoff.
-- Use `goal.md`, `team_manifest.yaml`, `schedule.md`, `work_log.md`, and
-  `verification.txt` as durable memory instead of repeating long chat context.
-- Use `tool_output_token_limit` profiles to keep large command output from
-  flooding the session; rerun targeted commands when exact lines are needed.
+  index, dashboard, or structured report before prose review or subagent
+  handoff. Treat pass/finding output as the authority for that covered property.
+- Read exact owner paths, dependency headers, and named upstream files after a
+  tool artifact or protocol packet identifies the needed context.
+- Hand structured tool artifacts to subagents through path references in the
+  protocol-owned capsule; do not ask them to re-run deterministic checks by
+  reading the same documents.
+- Store long raw outputs in the run bundle and pass their artifact paths,
+  clause IDs, and section names instead of chat summaries.
+- Use `tool_output_token_limit` profiles to keep command output reviewable;
+  rerun targeted commands when exact lines are needed.
 - If a canonical tool lacks the abstraction needed for routing, extend the tool
   or record the tool-contract gap instead of compensating with broad manual
   reading.

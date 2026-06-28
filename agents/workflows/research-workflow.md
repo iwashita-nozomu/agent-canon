@@ -16,6 +16,13 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を参照してください。
 数理境界と実装境界の対応表は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) を正本にします。
 
+## この文書の読み方
+
+- この文書は、数式を伴う研究、比較実験、段階的改造、claim 更新の research-driven workflow を所有します。
+- 前半は目的、基本ルール、canonical loop、外部規範、標準 workflow を扱い、後半は multi-agent 実験 loop、記録項目、集計、補助 workflow、配置、references を扱います。
+- researcher / experimenter は `## 2.5 Research-Driven Change の canonical loop` と `## 4. 標準 workflow` から入り、claim や数式境界がある場合は `## 10. 数式と実装の対応の取り方` へ進みます。
+- chunked reading では、問い・比較設計・実装 iteration・report のどの段階かを先に決め、該当する step と review 節だけを読みます。
+
 ## 1. 目的
 
 - 数式、仮定、比較対象を曖昧なまま実装に入らない

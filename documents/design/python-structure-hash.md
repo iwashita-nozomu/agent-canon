@@ -16,6 +16,15 @@ downstream implementation ../../rust/agent-canon/src/python_structure_hash_scope
 This document is the canonical design for AgentCanon's Python structural
 duplicate analysis.
 
+## Reader Map
+
+Use this design to answer what `python-structure-hash` detects, which structural
+identity rules it applies, and how findings become refactor planning evidence.
+Read Purpose, Analysis Population, Structural Identity, and Single-Caller
+Ownership before interpreting reports. The later sections cover wrapper
+findings, mechanical problem clusters, change-impact scope planning, module
+groups, validation, dependency graphs, priority order, and impact diffs.
+
 ## Purpose
 
 `python-structure-hash` finds structurally duplicated Python functions,

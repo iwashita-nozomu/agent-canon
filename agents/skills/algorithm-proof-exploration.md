@@ -13,6 +13,20 @@ downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: explore algorithm choices and implementation changes under proof
+  obligations before handing terminal proof work to `$formal-proof-workflow`.
+- Section path: read Purpose, Use When, Relationship To
+  `$formal-proof-workflow`, Numerical Iteration Boundary, and Completion
+  Condition before Canonical Flow, Artifact Contract, and Guardrails.
+- Use when: convergence, stopping, finite-precision, certificate, or solver
+  handoff claims need IR, theorem graph, blocker frontier, and algorithm-change
+  evidence.
+- Boundary: blocker summaries and algorithm guidance are intermediate; terminal
+  outcomes remain checker-backed proof, refutation, or
+  `unprovable_under_assumptions`.
+
 ## Purpose
 
 `algorithm-proof-exploration` は、証明義務を入力にしてアルゴリズムを探索・修正する
@@ -57,12 +71,9 @@ backend を top-level profile input、generated backend witness、coverage evide
 両者は必ず接続します。アルゴリズム由来の証明 task では、この skill がアルゴリズム候補と
 実装変更候補を作り、それを `$formal-proof-workflow` が checker-backed に評価します。
 この skill から formal-proof subagent へ渡す `formal_proof_handoff` は、
-`agents/COMMUNICATION_PROTOCOL.md` の `Target Binding Packet` を必ず含めます。
-target theorem、public root / entrypoint と signature、theorem-visible return
-projection、identifier naming plan、generated evidence artifacts、accepted top-level
-assumptions、forbidden assumptions、completion condition、validation commands、
-unchecked-output policy を埋められない場合は、曖昧な blocker summary を渡さず、
-IR、theorem graph、または source packet を先に再生成・修復します。
+`agents/COMMUNICATION_PROTOCOL.md` が所有する `Target Binding Packet` を必ず含めます。
+packet を埋められない場合は、曖昧な blocker summary を渡さず、IR、theorem graph、または
+source packet を先に再生成・修復します。
 
 ## Numerical Iteration Boundary
 
@@ -391,10 +402,7 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
    - add problem-class or backend evidence witnesses
 1. Formal proof handoff:
    - pass exact theorem variables, proof artifacts, checked fragments, and remaining obligations to `$formal-proof-workflow`
-   - include the complete `Target Binding Packet`: target theorem, public root,
-     return projection, identifier naming plan, generated evidence, accepted /
-     forbidden assumptions, completion condition, validation commands, and
-     unchecked-output policy
+   - include the protocol-owned `Target Binding Packet`
    - do not mark a graph path verified unless checker-backed proof nodes cover the target chain
 
 ## Artifact Contract

@@ -21,6 +21,17 @@ This policy was derived from the parent-repo audit artifact
 `template_agent_canon_tool_skillization_500_candidates.md`; that source is run
 evidence, not an AgentCanon product dependency.
 
+## Reader Map
+
+- Owns the policy for keeping public tool and skill routing short while
+  retaining compatibility aliases.
+- Main path: Naming Rule, Canonical Short Surface, Refactor Boundary, and
+  Ownership Layout.
+- Read this before renaming tools, adding route helpers, or exposing new public
+  skill names.
+- Boundary: it is routing/refactor policy, not a full skill catalog or runtime
+  workflow definition.
+
 ## Naming Rule
 
 - Public tool names stay short: one or two words before `.py` when possible.

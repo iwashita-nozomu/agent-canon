@@ -12,6 +12,13 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 primary にし、どの overlay を重ねるか」を決めます。workflow 読順の入口も
 この file に一本化し、後からこの file へ戻ってくる前提の read order にはしません。
 
+## この文書の読み方
+
+- この文書は、`agents/workflows/` 配下の workflow catalog、routing guide、read order を所有します。
+- 前半は使い方、quick routing、recommended read order を扱い、後半は implementation / research / writing / maintenance の workflow map と maintainer path を扱います。
+- task 開始時は `## Quick Routing` で primary workflow と overlay を選び、次に `## Recommended Read Order` で読む順序を固定します。
+- chunked reading では、この file を workflow 選択の入口に限定し、詳細手順は選んだ workflow 文書へ移動します。
+
 ## 使い方
 
 - まず 1 つの primary workflow を選びます。
@@ -23,7 +30,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、`goal_loop.py status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
-- token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context budget、escalation trigger を先に決めます。
+- token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context shaping、escalation trigger を先に決めます。
 
 ## Quick Routing
 
@@ -96,7 +103,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - `codex-goals-workflow.md`
   - Codex goals feature、top-level `goal.md`、Plan-mode entry、`goal_loop.py status` の責務境界と同期手順
 - `token-efficient-codex-workflow.md`
-  - Codex parent profile、agent mode、context budget、token-saving escalation trigger
+  - Codex parent profile、agent mode、context shaping、token-saving escalation trigger
 
 ### Research And Experiment
 

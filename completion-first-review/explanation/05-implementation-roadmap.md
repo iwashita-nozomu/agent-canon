@@ -9,6 +9,15 @@ upstream design 03-evidence-and-closeout.md closeout evidence design
 @dependency-end
 -->
 
+## Reader Map
+
+Use this roadmap to answer which completion-first improvements should be built
+in which phase and how report-only checks graduate to strict gates. Read the
+roadmap principle first, then the sprint sections in order from completion
+definition through audit and retirement. The final sections identify suggested
+first PRs and the migration rule that keeps completion evidence ahead of
+runtime tuning.
+
 ## Roadmap principle
 
 Do not turn every proposal into a hard gate immediately. Introduce each mechanical check in three phases:

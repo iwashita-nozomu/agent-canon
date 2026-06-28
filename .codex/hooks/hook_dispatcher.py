@@ -844,6 +844,8 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         )
         for spec in EVENT_COMMANDS[event]
     ]
+    if event == "PostToolUse":
+        return 0
     blocking = next((result for result in results if result.blocks()), None)
     failure = next((result for result in results if result.failed()), None)
     visible_payload = visible_output_payload(event, results)

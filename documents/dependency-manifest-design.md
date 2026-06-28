@@ -24,6 +24,16 @@ downstream design ./structured-analysis/dependency-header-analysis.md maps manif
 旧 `Dependency Files:` block は廃止方向です。
 この設計では `@dependency-start` / `@dependency-end` marker による line-oriented DSL を正とします。
 
+## Reader Map
+
+Use this design to answer what dependency headers must express, how manifest
+blocks are parsed, and how dependency graphs drive edit-scope and validation
+tools. Read Goals, Non-Goals, and the evidence contract first; then use Manifest
+Block, Dependency Kinds, Contract Kinds, and Comment Wrapping for authoring.
+The later sections cover graph artifacts, responsibility-first expansion,
+consistency checks, isolated manifests, tool split, migration, and open design
+questions.
+
 ## Goals
 
 - 変更前に読むべき upstream context を、file から相対 path で取得できる

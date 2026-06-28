@@ -9,6 +9,14 @@ upstream design ../explanation/01-priority-layers.md priority layer explanation
 @dependency-end
 -->
 
+## Reader Map
+
+Use this checklist after P-1 has defined completion profiles and initial
+Definition of Done surfaces. Read Scope first, then work through P0 runtime
+invariants, P1 evidence and verifier tooling, and P2 MCP / goal-loop completion
+connections. The done condition states when this mechanical foundation is ready
+for later completion-first layers.
+
 ## Scope
 
 This checklist starts only after P-1 has at least a draft Definition of Done and closeout profiles. P0-P2 make those completion profiles executable through agent settings, evidence tools, and MCP/goal-loop status.

@@ -11,6 +11,13 @@ upstream design ../README.md notes lifecycle index
 `notes/` は、長く残したい知見、比較、要約、補助メモを置く場所です。
 規約や設計の一次情報は `documents/` に残し、ここではそれに昇格させる前の知見や、run をまたいで残したい判断を扱います。
 
+## この文書の読み方
+
+- この文書は、`notes/` のカテゴリ、置くもの、置かないもの、carry-over、growth、action log、書き方を説明します。
+- まずカテゴリで置き場所を選び、次に置くもの / 置かないもの、main carry-over、growth、action log、書き方を確認します。
+- run をまたいで残す知見、実験要約、guardrail、failure、例外 branch / worktree の記録先を選ぶときに読みます。
+- `notes/` は一次 policy の置き場ではなく、正本ルールや設計は `documents/` に残します。
+
 ## カテゴリ
 
 - [`experiments/`](./experiments/README.md)

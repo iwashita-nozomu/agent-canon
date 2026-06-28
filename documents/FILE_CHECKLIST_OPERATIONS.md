@@ -12,6 +12,15 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 この文書は、テンプレで繰り返し出る典型作業の最小チェックリストをまとめます。
 長い説明より、作業前後に確認すべき点を短く揃えるためのものです。
 
+## この文書の読み方
+
+- この文書は、作業種別ごとの最小チェック項目をまとめる運用 checklist です。
+- 主な順路は、Worktree 開始、Python 実装変更、文書変更、Docker / 環境変更、
+  closeout です。
+- 作業開始時や closeout 前に、該当作業の確認漏れを減らすために読みます。
+- 境界: 詳細な workflow 正本や validation matrix はリンク先の runtime/canon
+  文書が所有します。
+
 ## 1. Worktree 開始
 
 前提:

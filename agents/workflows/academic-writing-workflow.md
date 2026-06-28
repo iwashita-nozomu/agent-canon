@@ -16,6 +16,13 @@ upstream design ../skills/academic-writing.md Academic Writing skill contract an
 この workflow は、Purdue OWL、Cornell Knight Institute、MIT OpenCourseWare、PLOS Computational Biology の writing guide を repo 向けに再構成したものです。
 ここでの `claim contract`、`notation ledger`、`paragraph claim map`、`logic-gap review` は local interpretation です。
 
+## この文書の読み方
+
+- この文書は、論文以外も含む学術文章の claim、notation、evidence、logic review workflow を所有します。
+- 前半は use case、core principles、standard flow を扱い、後半は mandatory review outcomes、repo interpretation、external basis、convention gate を扱います。
+- academic-writing 担当者は `## Standard Flow` から claim contract、evidence map、notation ledger、paragraph map の順に読みます。
+- chunked reading では、文書種別が paper-like なら `paper-writing-workflow.md` も開き、notation / logic / review の現在段階だけをこの文書から参照します。
+
 ## Use When
 
 - 論文 draft、thesis chapter、technical note、method note を書く
