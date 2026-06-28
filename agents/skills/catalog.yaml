@@ -749,6 +749,40 @@ skill_families:
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
     shim: .agents/skills/experiment-lifecycle/SKILL.md
+  - id: gpu-execution
+    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
+    canonical_doc: agents/skills/gpu-execution.md
+    shim: .agents/skills/gpu-execution/SKILL.md
+    related_skills:
+      - experiment-lifecycle
+      - computational-optimization
+      - result-artifact-writeout
+      - environment-maintenance
+      - test-design
+    routing:
+      stage_policy: active
+      reason: GPU/CUDA/JAX/XLA execution, ExperimentRunner Python execution, or preallocation-disabled validation is in scope
+      triggers:
+        - ["gpu", "実行"]
+        - ["gpu", "利用"]
+        - ["gpu", "検証"]
+        - ["cuda", "実行"]
+        - ["cuda", "backend"]
+        - ["jax", "gpu"]
+        - ["xla", "gpu"]
+        - ["iree", "gpu"]
+        - ["nvidia-smi"]
+        - ["cuda_visible_devices"]
+        - ["gpu_validation_blocker"]
+        - ["experimentrunner"]
+        - ["experiment_runner"]
+        - ["python", "experimentrunner"]
+        - ["python", "実行", "experimentrunner"]
+        - ["preallocation", "disable"]
+        - ["preallocate", "false"]
+        - ["xla_python_client_preallocate"]
+        - ["先取", "無効"]
+        - ["先取り", "無効"]
   - id: computational-optimization
     purpose: Fix mathematical and validation contracts for numerical optimization, solvers, preconditioners, convergence, derivatives, KKT conditions, tolerances, and optimization benchmarks.
     canonical_doc: agents/skills/computational-optimization.md

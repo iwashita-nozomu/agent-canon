@@ -89,6 +89,7 @@ Execute the required and task-matching conditional commands that the packet prin
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
      - optimizer, solver, preconditioner, gradient, Jacobian, Hessian, KKT, convergence, tolerance, numerical benchmark, or numerical-test diagnosis -> `$computational-optimization`
+     - GPU / CUDA / JAX / XLA / IREE execution, `CUDA_VISIBLE_DEVICES`, `nvidia-smi`, ExperimentRunner Python execution, preallocation-disabled JAX runs, or GPU validation blockers -> `$gpu-execution`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, multi-candidate comparison, change-impact packet creation, or repair-planning/subagent handoff context -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay when a cause hypothesis is involved
      - Markdown file edits, docs lint/link/heading repair, Mermaid/math drift, formatter adjacent checks, `agent-canon docs`, docs-check failures, or Markdown style drift -> `$md-style-check`; pair substantive document edits with `$prose-reasoning-graph` and `$structure-planning`.
      - accumulated skill/tool/workflow/hook/eval log analysis, routing misses, selection gaps, or weak-skill diagnosis -> `$agent-log-analysis`
