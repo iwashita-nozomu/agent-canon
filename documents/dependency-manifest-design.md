@@ -254,7 +254,7 @@ visible as review debt instead of silently blocking unrelated PR work.
 ## Responsibility-First Search-To-Edit-Scope Expansion
 
 Repo-wide search must run responsibility-based context first and must feed
-dependency triage instead of stopping at raw `rg` hits. When the responsibility
+dependency triage instead of stopping at raw text-search hits. When the responsibility
 pass and bounded text search find relevant files or folders, pass those hit
 paths to the graph checker:
 
@@ -265,7 +265,7 @@ agent-canon semantic-index context-pack \
   --max-cells 12 \
   --format text \
   > reports/search_responsibility_context.txt
-rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
+git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt

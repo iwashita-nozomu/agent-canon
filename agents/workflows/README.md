@@ -97,7 +97,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - `main-integration-workflow.md`
   - file 構成変更を含む branch を `main` に戻す手順
 - `comprehensive-refactoring-workflow.md`
-  - 大規模 refactor の設計見直し、OOP 的な最小実装方針、静的解析 score gate
+  - 大規模 refactor の設計見直し、OOP 的な責務境界方針、静的解析 score gate
 - `hypothesis-validation-workflow.md`
   - code dependency と header dependency を別々に抽出し、仮説と修正箇所妥当性を検証してから実装する overlay
 - `codex-goals-workflow.md`

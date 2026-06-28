@@ -190,7 +190,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
-        "small changes selected_runtime_skill_read small_change_skill_read SKILL.md\n"
+        "bounded route selected_runtime_skill_read small_change_skill_read SKILL.md\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
         "compatibility-preservation drift duplicate implementation canonical owner "
@@ -453,7 +453,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
-        "small-change-routing small repository edit 小規模修正 Scoped Change Lite\n"
+        "small-change-routing owner-bounded targeted validation Scoped Change Lite\n"
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
         "- [\"Dependency inversion\"]\n"
@@ -1131,7 +1131,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-marker:selected_runtime_skill_read", result.stdout)
 
     def test_minimal_fixture_covers_small_change_skill_read_surfaces(self) -> None:
-        """The minimal test fixture includes every small change skill-read surface."""
+        """The fixture includes every owner-bounded skill-read surface."""
         missing = sorted(
             path
             for path in SMALL_CHANGE_SKILL_READ_MARKERS
@@ -1141,13 +1141,13 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_small_change_routing_requires_catalog_trigger_marker(self) -> None:
-        """Small change route stays discoverable from the skill catalog."""
+        """Owner-bounded route stays discoverable from the skill catalog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             catalog = root / "agents" / "skills" / "catalog.yaml"
             catalog.write_text(
-                catalog.read_text(encoding="utf-8").replace("小規模修正", ""),
+                catalog.read_text(encoding="utf-8").replace("owner-bounded", ""),
                 encoding="utf-8",
             )
 
@@ -1155,10 +1155,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("small_change_skill_read", result.stdout)
-            self.assertIn("missing-marker:小規模修正", result.stdout)
+            self.assertIn("missing-marker:owner-bounded", result.stdout)
 
     def test_small_change_marker_contract_is_manifest_backed(self) -> None:
-        """Small change marker surfaces are loaded from the manifest contract."""
+        """Owner-bounded marker surfaces are loaded from the manifest contract."""
         self.assertIn(
             ".agents/skills/small-change-routing/SKILL.md",
             SMALL_CHANGE_SKILL_READ_MARKERS,

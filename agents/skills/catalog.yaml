@@ -132,7 +132,7 @@ skill_families:
       - result-artifact-writeout
       - change-review
   - id: small-change-routing
-    purpose: Route small repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
+    purpose: Route owner-bounded repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
     canonical_doc: agents/skills/small-change-routing.md
     shim: .agents/skills/small-change-routing/SKILL.md
     related_skills:
@@ -141,17 +141,13 @@ skill_families:
       - change-review
     routing:
       stage_policy: active
-      reason: small repository edit needs a minimal skill-read and targeted-validation route
+      reason: owner-bounded repository edit needs a visible skill-read and targeted-validation route
       triggers:
-        - ["小規模修正"]
-        - ["小規模", "修正"]
-        - ["軽微", "修正"]
-        - ["小さい", "変更"]
-        - ["small", "change"]
-        - ["small repository edit"]
+        - ["owner-bounded"]
+        - ["bounded", "route"]
+        - ["bounded", "edit"]
+        - ["targeted", "validation"]
         - ["Scoped Change Lite"]
-        - ["one-file", "fix"]
-        - ["single-abstraction"]
         - ["コードファイル", "順序"]
         - ["定義順"]
         - ["コード", "順序", "わかりにく"]

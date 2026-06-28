@@ -1,19 +1,19 @@
 ---
 name: small-change-routing
-description: Use for narrow repository edits, one-file or single-abstraction fixes, typo/link/format-only edits, and Scoped Change Lite work where Codex still needs to read the selected runtime skill, record small_change_skill_read evidence, keep validation targeted, and avoid escalating to broad workflow prose.
+description: Use for narrow repository edits after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior/schema expansion; also use for typo/link/format-only edits and Scoped Change Lite work where Codex still needs to read the selected runtime skill, record small_change_skill_read evidence, keep validation targeted, and avoid escalating to broad workflow prose.
 ---
 <!--
 @dependency-start
 contract skill
-responsibility Documents Small Change Routing runtime skill for this repository.
+responsibility Documents Owner-Bounded Change Routing runtime skill for this repository.
 upstream design ../../../agents/skills/small-change-routing.md documents the human-facing route
 upstream design ../../../agents/task_catalog.yaml owns Scoped Change Lite workflow identity
 upstream design ../../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
-downstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
+downstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares owner-bounded marker contract
 @dependency-end
 -->
 
-# Small Change Routing
+# Owner-Bounded Change Routing
 
 ## Tool Commands
 
@@ -28,9 +28,11 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 1. Read `agents/skills/small-change-routing.md`.
-1. Use this route after `$agent-orchestration` when the change is one file,
-   one abstraction unit, typo/link/format-only, Routine docs, Focused code, or
-   `Scoped Change Lite`.
+1. Use this route after `$agent-orchestration` only when evidence already
+   fixes the owner boundary, replaceable unit, targeted validation route, and
+   public behavior / schema impact. Typo/link/format-only, Routine docs,
+   Focused code, and `Scoped Change Lite` may use this route when those facts
+   are known. Do not select it from apparent file count alone.
 1. Record `selected_runtime_skill_read` and `small_change_skill_read` with the
    selected runtime `SKILL.md` path before patching.
 1. Read only the selected task-shape skill and directly related owner surface.

@@ -5,8 +5,8 @@
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream design ../../agents/skills/codex-task-workflow.md owns implementation preflight routing
 # upstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
-# upstream design ../../agents/skills/small-change-routing.md owns small-change preflight routing
-# upstream design ../../.agents/skills/small-change-routing/SKILL.md exposes small-change preflight routing
+# upstream design ../../agents/skills/small-change-routing.md owns owner-bounded preflight routing
+# upstream design ../../.agents/skills/small-change-routing/SKILL.md exposes owner-bounded preflight routing
 # upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
 # upstream design ../../.agents/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
 # upstream design ../../documents/experiment-registry.md defines managed experiment registry contract

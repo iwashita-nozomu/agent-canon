@@ -409,7 +409,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_source_file_order_feedback(self) -> None:
-        """Source file order feedback should reach small change and Python review routes."""
+        """Source file order feedback should reach bounded and Python review routes."""
         result = self.run_route(
             "--prompt",
             "コードファイル内の順序がわかりにくいです",

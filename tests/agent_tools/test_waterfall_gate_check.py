@@ -102,7 +102,7 @@ def design_brief_lines(
         "# Detailed Design Brief",
         "",
         "## Goals",
-        "Implement the approved small change.",
+        "Implement the approved bounded change.",
         "## Existing Code And Docs To Reuse",
         "Mirror `tools/agent_tools/task_close.py`.",
     ]

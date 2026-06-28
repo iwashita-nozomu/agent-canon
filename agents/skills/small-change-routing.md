@@ -7,16 +7,17 @@ responsibility Documents small-change-routing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../task_catalog.yaml owns Scoped Change Lite workflow identity
 upstream design ../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
-downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares small change marker contract
+downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares owner-bounded marker contract
 downstream implementation ../../.agents/skills/small-change-routing/SKILL.md exposes this route as a runtime skill
 @dependency-end
 -->
 
 ## Purpose
 
-小規模な repo-changing 修正で、広い workflow prose を読み足さずに、選択済み
-runtime skill の読了、軽量 preflight、targeted validation、closeout evidence を
-固定します。
+owner boundary、差し替え可能な単位、targeted validation route、public behavior /
+schema impact が evidence で閉じている repo-changing 修正で、広い workflow prose を
+読み足さずに、選択済み runtime skill の読了、軽量 preflight、targeted validation、
+closeout evidence を固定します。
 
 この skill は `Scoped Change Lite`、Routine docs、Focused code、
 typo / link / format-only の薄い実行面を担当します。workflow family、
@@ -25,12 +26,13 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 
 ## Use When
 
-- 1 file または 1 abstraction unit の局所修正を行う
+- owner boundary、差し替え可能な単位、targeted validation route、public impact
+  boundary が evidence で閉じている局所修正を行う
 - typo / link / format-only の Markdown 修正を行う
-- 小規模修正でも selected runtime `SKILL.md` を読む必要がある
-- user request が「小規模修正」「軽微な修正」「small change」
-  「Scoped Change Lite」を示す
+- owner-bounded route でも selected runtime `SKILL.md` を読む必要がある
+- user request が bounded route または `Scoped Change Lite` を示す
 - broad design review より先に targeted validation で閉じられるかを判定する
+- file 数や抽象の数は補助 signal に留め、それだけではこの route を固定しない
 
 ## Route Contract
 
@@ -44,7 +46,7 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
    選択前に記録します。
 1. typo / link / format-only では `$md-style-check` を併用し、
    `structure_contract=skipped` と理由を残します。
-1. code の小規模修正では、changed-file dependency checks、該当 static checker、
+1. owner-bounded code 修正では、changed-file dependency checks、該当 static checker、
    型 / lint / OOP readability などの owner checker、直接関連 test を validation
    route に置きます。
 1. public behavior、dependency direction、document responsibility、claim grounding、

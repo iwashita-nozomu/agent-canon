@@ -244,7 +244,7 @@ repo default を一律に重くするより、確認済み model ID を profile 
 agent へ寄せます。
 
 - design / review: `$openai-docs` で選んだ frontier model + `reasoning_effort="high"`
-- bounded implementation: task sizeに応じて medium/high
+- bounded implementation: owner boundary、impact surface、validation route に応じて medium/high
 - trivial run: default profile
 - plan mode: `plan_mode_reasoning_effort` を別管理
 

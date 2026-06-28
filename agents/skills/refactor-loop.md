@@ -58,7 +58,7 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
    surface、unknown dynamic edge をまとめた修正計画の入力ですが、full graph を
    LLM prose 化する場所ではありません。raw artifact は path と count で参照し、
    current repair batch に必要な excerpt だけを載せます。raw finding、raw
-   `rg` hit、単一 file 名だけから実装計画を作ってはいけません。
+   raw text-search hit、単一 file 名だけから実装計画を作ってはいけません。
 1. refactor pass では `Behavior Contract:` を先に固定します。
 1. file moves、module boundary、repair slice、path mapping、responsibility map が非自明な場合は `structure-planning` で構造 contract を先に固定します。
 1. `Allowed Structural Delta:` と `Forbidden Semantic Delta:` を分けて書きます。

@@ -126,10 +126,9 @@ AgentCanon PR の前に、運用 finding を durable storage に残すかを必�
 1. Durable surfaces を検索する
 
 ```bash
-rg -l "topic keywords" \
+git grep -l "topic keywords" -- \
   issues/open issues/closed memory notes/failures documents agents \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
-  2>/dev/null | sed -n '1,200p' > reports/search_hits.txt
+  | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 ```
 
@@ -145,7 +144,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ```
 
 `dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を、issue または PR body の edit-scope evidence に残します。
-raw `rg` hit だけで「どの file を編集・確認するか」を決めません。
+raw text-search hit だけで「どの file を編集・確認するか」を決めません。
 
 3. 新しい workflow defect がある場合は issue file を作る
 

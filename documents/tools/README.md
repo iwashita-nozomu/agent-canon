@@ -277,7 +277,7 @@ second command manual.
   - `goal_loop.py plan` は未完了の exit criteria / backlog を `Goal Work Breakdown` として `GW*` work unit へ展開します。implementation 前にこの行を run bundle `schedule.md` へ移し、bare objective から直接実装へ入らないようにします。
 - `tools/agent_tools/vector_search.py`
   - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
-  - exact symbol / path / error message は `rg` を優先し、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
+  - exact symbol / path / error message は `git grep` または直接 path 確認を使い、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
   - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
   - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
   - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
@@ -338,7 +338,7 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
   - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
 - `tools/agent_tools/review_backlog_scan.sh`
   - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
-  - goal / maintainer / audit profile の tool であり、通常の small change では required gate にしません。
+  - goal / maintainer / audit profile の tool であり、通常の owner-bounded route では required gate にしません。
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
   - 既定で `agent-canon semantic-index` も実行し、responsibility-scoped merge candidates、thin docs、任意の long-query search を review artifact として JSONL 保存し、`eval-output` の JSON report も残します。LLM embedding provider が明示された場合だけ provider-comparison report も保存します。
   - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。

@@ -59,16 +59,16 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Removal and Caller Migration Plan:` compatibility-preservation drift と duplicate implementation を残さず、旧 entry、旧 alias、alternate route の caller migration と削除順序を固定する。
 
 設計見直しは、既存コードを読まずに始めません。
-`rg`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
+構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
 
-## Gate B. OOP 的な最小実装方針
+## Gate B. OOP 的な責務境界方針
 
 OOP は、実装行数を増やすためではなく、責務を短く保つために使います。
 [object-oriented-design.md](../../documents/object-oriented-design.md) を正本とし、次を design artifact に書きます。
 
 - `Value Objects:` immutable data、validated input、result、config。
 - `State Owners:` mutable state を保持する object と lifecycle。
-- `Protocols:` 差し替えが必要な最小振る舞い契約。
+- `Protocols:` 差し替えが必要な振る舞い契約。
 - `Services / Functions:` state を持たない処理として残す function。
 - `Adapters:` IO、CLI、serialization、external framework boundary。
 - `Rejected Abstractions:` 作らない class / Protocol / layer と、その理由。

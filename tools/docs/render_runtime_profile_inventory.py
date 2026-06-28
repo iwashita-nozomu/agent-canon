@@ -14,7 +14,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 DEFAULT_INVENTORY = Path("documents/runtime-profiles-and-check-matrix.json")
 DEFAULT_DOC = Path("documents/runtime-profiles-and-check-matrix.md")
 
@@ -125,11 +124,11 @@ def collect_risk_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
     for item in items:
         risk = require_string(item.get("risk"), "risk_classes.risk")
         examples = require_string(item.get("examples"), "risk_classes.examples")
-        minimum_validation = require_string(
-            item.get("minimum_validation"),
-            "risk_classes.minimum_validation",
+        required_validation = require_string(
+            item.get("required_validation"),
+            "risk_classes.required_validation",
         )
-        risk_rows.append([risk, examples, minimum_validation])
+        risk_rows.append([risk, examples, required_validation])
     return risk_rows
 
 
@@ -189,7 +188,7 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
 
     output.append("## Risk Classes\n\n")
     risk_rows = collect_risk_class_rows(risk_classes)
-    output.append(render_table(["Risk", "Examples", "Minimum validation"], risk_rows) + "\n")
+    output.append(render_table(["Risk", "Examples", "Required validation"], risk_rows) + "\n")
 
     output.append(render_paragraph(risk_note) + "\n\n")
 

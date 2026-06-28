@@ -49,14 +49,14 @@ workflow_families:
   - id: scoped_change_lite
     name: Scoped Change Lite
     subagent_prompt:
-      purpose: Prompt packet for one-file or single-abstraction fixes with cheap-first triage and local validation.
+      purpose: Prompt packet for owner-bounded fixes whose replaceable unit, public-impact boundary, and local validation route are already evidenced.
       prompt_preamble:
         - Treat this as a local bounded fix; upgrade to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
         - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
         - Use `explorer`, `test_designer`, `spark_worker`, and language-specific reviewers before high-cost generic review.
-        - Keep this route only when the run's abstract responsibility frame derives a one-file or one-abstraction implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation.
+        - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation. File count is not enough to select or keep this route.
         - Omit document-flow and broad design review unless reader-facing docs, new terms, public APIs, or workflow surfaces changed.
         - Escalate to `scoped_change` when the fix surface is non-obvious, validation is cross-module, or the cheap reviewer returns escalate.
       reviewer_prompt:

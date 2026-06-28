@@ -1,7 +1,7 @@
 # @dependency-start
 # contract tool
 # responsibility Declares marker contracts consumed by convention compliance checks.
-# upstream design ../../agents/skills/small-change-routing.md small change routing skill contract
+# upstream design ../../agents/skills/small-change-routing.md owner-bounded routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
 # downstream implementation ./check_convention_compliance.py loads marker contracts
@@ -12,7 +12,7 @@ schema_version = 1
 
 [[contracts]]
 id = "small_change_skill_read"
-description = "Small repository edits keep selected runtime skill reading visible and route through the small-change skill surface."
+description = "Owner-bounded repository edits keep selected runtime skill reading visible and route through the small-change skill surface."
 
 [[contracts.surfaces]]
 path = ".agents/skills/agent-orchestration/SKILL.md"
@@ -60,7 +60,7 @@ markers = ["small-change-routing", "selected_runtime_skill_read", "small_change_
 
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
-markers = ["small-change-routing", "small repository edit", "小規模修正", "Scoped Change Lite"]
+markers = ["small-change-routing", "owner-bounded", "targeted validation", "Scoped Change Lite"]
 
 [[contracts.surfaces]]
 path = ".codex/config.toml"
@@ -68,7 +68,7 @@ markers = ["../.agents/skills/small-change-routing/SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "small changes", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "small_change_skill_read", "bounded route", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/USER_GUIDE_JA.md"

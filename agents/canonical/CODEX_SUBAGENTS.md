@@ -175,8 +175,9 @@ request clauses、acceptance contract、`Implementation Source Packet`、
 `Design-To-Implementation Trace`、dependency-expanded scope、validation route、
 review gate から導きます。
 
-task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、
-validation profile を選ぶ signal です。contract gap、責務境界、API shape、
+見た目の広さ、`Scoped Change Lite`、MVP、thin slice は暫定的な routing、
+wave、validation profile の signal に留めます。owner boundary や impact surface が
+違うと分かった時点で route を更新します。contract gap、責務境界、API shape、
 依存方向、runtime contract の不足が見えた場合は `design_issue_blocker` として
 Gate 5-6 に戻します。
 
@@ -529,7 +530,7 @@ workflow docs、task catalog は agent TOML を参照します。
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、dependency-expanded handoff scope が揃っていることです
 - 明示 spawn 許可がある repo-changing task では、coding / implementation / patch work の implementation critical path を pre-handoff investigation packet で作ってから、並行可能な独立検証を mini read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を支える mini review wave に切ります。
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、mini read-only wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、completion route は write-capable handoff、integration、review、validation で構成します。
-- `spark_worker` eligible な実装は、1 file または単一抽象ユニット、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです
+- `spark_worker` eligible な実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。eligibility は design trace と dependency-expanded handoff scope で判断します。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます
 - `reviewer` は broad diff / cross-surface / clause coverage に上げる role とし、Python-only / C++-only / narrow diff では `python_reviewer`、`cpp_reviewer`、`diff_triage_reviewer` を entry reviewer にします

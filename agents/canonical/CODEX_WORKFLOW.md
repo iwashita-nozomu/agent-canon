@@ -131,12 +131,11 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
-small changes でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。small change は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている場合だけ parent-direct route を使います。
+bounded route でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
-rg -l "topic keywords" <responsibility-scoped dirs> \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \
@@ -189,8 +188,9 @@ repo-changing run では `team_manifest.yaml` の
 実装 behavior は request clauses、acceptance contract、
 `Implementation Source Packet`、`Design-To-Implementation Trace`、
 dependency-expanded scope、validation route、review gate から導きます。
-task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、
-validation profile を選ぶ signal です。
+見た目の広さ、`Scoped Change Lite`、MVP、thin slice は暫定的な routing、
+wave、validation profile の signal に留めます。owner boundary や impact surface が
+違うと分かった時点で route を更新します。
 
 repo-changing run では `team_manifest.yaml` の
 `run.contract_complete_implementation_policy` を handoff packet に含めます。
@@ -629,7 +629,7 @@ cost を無視して review coverage を優先する run では、research-drive
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
 - 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は mini role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
-- `spark_worker` に渡す実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする
+- `spark_worker` に渡す実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。適格性は design trace と dependency-expanded handoff scope で判断します。
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
 - `spark_worker` は design trace と dependency-expanded handoff scope が揃った narrow implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す

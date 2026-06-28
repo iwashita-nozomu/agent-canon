@@ -180,7 +180,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   `generated_function_lowering_coverage_verified` を checker で通し、generic
   operational IR renderer では generator が complete coverage を既定で要求し、
   `coverageComplete = true` の generated evidence を出したことを evidence に含めます。生成名の
-  `rg` 確認や prose inspection だけを coverage evidence として採用してはいけません。
+  text-search 確認や prose inspection だけを coverage evidence として採用してはいけません。
   proof graph は proposition と theorem dependency edge を持ちます。`theorem X by A, B, f`
   のような route は、`A` と `B` が proof premise、`f` が JIT-generated code graph
   上の implementation function / trace、または generic operational evidence から

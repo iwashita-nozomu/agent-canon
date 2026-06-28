@@ -292,7 +292,7 @@ python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path> 
    Each README gets its own `--out-dir`; do not merge diagnostics for unrelated
    directories into one evidence folder.
 
-1. Propose the smallest responsibility-preserving path mapping.
+1. Propose a responsibility-preserving path mapping.
 1. Before the first edit and again before closeout, run the Structure Review
    Gate. Do not approve a structure refactor whose packet is missing recursive
    responsibility evidence, source/view boundary classification, path mapping,

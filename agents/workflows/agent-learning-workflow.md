@@ -207,8 +207,7 @@ user、reviewer、runtime、CI が workflow defect を指摘した場合は、ru
 workflow defect の affected surface を探すときは、raw search hit を dependency graph に通します。
 
 ```bash
-rg -l "topic keywords" <responsibility-scoped dirs> \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \

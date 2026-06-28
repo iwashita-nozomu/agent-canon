@@ -14,7 +14,7 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/small-change-routing.md small change routing skill
+# upstream design ../../agents/skills/small-change-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
