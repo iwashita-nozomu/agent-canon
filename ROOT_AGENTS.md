@@ -78,6 +78,10 @@ semantic-index/local-llm search, and dependency review artifacts.
 - Template-default implementation lives in `python/`.
 - Template-default environment and runtime guidance lives in `docker/`.
 - Repo-wide durable contracts live in `documents/`.
+- Experiment GPU allocation belongs to the scheduler or caller environment. Do
+  not reduce available GPUs or force single-GPU / serial
+  execution from topic code or checked-in config unless the user explicitly
+  requests serial debugging or a recorded environment limit requires it.
 
 ## Shared Canon Flow
 
