@@ -82,31 +82,20 @@ deferral.
 
 ## Context Construction
 
-Context construction is the primary runtime concern. Build context for correct
-shape, ownership, and traceability; do not optimize for smallness by itself.
-LLM-visible prompt context may be large when the next decision requires it, but
-it must be structured and tied to an owner, source packet, artifact path, or
-request clause.
+Context construction is the primary runtime concern. Use
+`vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` as the schema owner for
+context visibility, pre-edit investigation packets, and fresh subagent
+capsules.
 
-Keep LLM-visible prompt context separate from local tool state and durable
-memory. Move into the prompt the instructions, request clauses,
-source-packet fields, exact file sections, and evidence needed for the next
-decision. Keep raw search output, full dashboards, logs, long histories, and
-broad workflow packets in artifacts or memory notes until a selected excerpt or
-structured summary is needed.
+Build prompt context for shape, ownership, and traceability, not smallness.
+LLM-visible context may be large when the next decision requires it, but each
+piece must tie to a request clause, owner, source packet, exact file section, or
+artifact path. Raw search output, full dashboards, logs, long histories, and
+broad workflow packets stay in local/tool context until selected.
 
-Treat AGENTS/root entrypoints as LLM-visible instruction context. Keep them as
-routing and context-construction guidance; detailed workflow, checker output,
-raw reports, and historical evidence stay in local/tool context until selected
-for a concrete decision. Do not expand root instructions to compensate for
-missing packet fields.
-
-Subagents are fresh per launch and do not inherit accumulated context. Every
-handoff must use the `Fresh Subagent Context Capsule` in
-`vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md`: objective,
-read-before-work, context artifacts, allowed/do_not_read, expected output,
-validation route, and return contract. Do not hand off broad chat summaries as
-a substitute for owned context, or assume prior subagent context persists.
+Treat AGENTS/root entrypoints as routing and context-construction guidance.
+Do not expand root instructions to compensate for missing packet fields, hand
+off broad chat summaries, or assume subagent context persists across launches.
 
 ## Repository Discovery and Reading
 

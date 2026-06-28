@@ -39,23 +39,13 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 ## Context Visibility Contract
 
 Context is classified before it is handed to an agent. The goal is correct
-shape, ownership, and traceability, not minimizing token count.
+shape, ownership, and traceability, not token minimization.
 
-- `llm_visible_context`: instructions, request clauses, selected
-  source-packet fields, exact file sections, and evidence that the agent must
-  reason over for the next decision. It may be large when required, but it must
-  be structured and tied to an owner, path, source packet, or request clause.
-- `local_tool_context`: files, dashboards, raw tool output, generated packets,
-  logs, and search results that remain available by path or tool call, but are
-  not pasted into prompts unless a selected excerpt or structured summary is
-  required.
-- `durable_memory`: stable repo policy, source packets, issues, reports, and
-  learned feedback stored in owner surfaces; do not rely on chat memory or
-  compaction as the only record.
-
-Handoffs pass paths, selected excerpts, and structured summaries by default.
-Raw artifacts stay local/tool context unless the packet explicitly promotes a
-selected excerpt or structured summary to `llm_visible_context`.
+| Context Class | Contents | Rule |
+| --- | --- | --- |
+| `llm_visible_context` | Instructions, request clauses, selected source-packet fields, exact file sections, and evidence needed for the next decision. | May be large when required, but every item is tied to an owner, path, source packet, or request clause. |
+| `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
+| `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
 
 ## Handoff Packet
 

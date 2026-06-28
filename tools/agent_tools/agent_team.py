@@ -1746,11 +1746,6 @@ def manifest_run_lines(
         "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
         "send_input; scope changes spawn a fresh wave.'",
         "  handoff_context_policy:",
-        "    context_artifacts_first: true",
-        "    context_goal: correct_shape_owner_traceability_not_smallness",
-        "    require_allowed_paths: true",
-        "    require_do_not_read: true",
-        "    require_expected_output_schema: true",
         "    inactive_profile_docs: not_applicable",
         "    broad_cross_cutting_packet: available_not_default_read",
         "  implementation_gate_defaults:",

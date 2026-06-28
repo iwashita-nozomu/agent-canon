@@ -89,11 +89,8 @@ Execute the required and task-matching conditional commands that the packet prin
    proof-only arguments, trace handles, op ids, binding ids, or proof-only
    state/config. If a theorem needs a value, expose it through the public return
    schema or reconstruct it in the theorem graph from the implementation path.
-1. When handing proof work to a subagent, include the `Target Binding Packet` from
-   `agents/COMMUNICATION_PROTOCOL.md`: exact target theorem, public root and
-   signature, return projection, identifier naming plan, accepted top-level
-   assumptions, forbidden assumptions, current generated evidence, completion
-   condition, validation commands, and unchecked-output policy. Do not ask a
+1. When handing proof work to a subagent, include the protocol-owned
+   `Target Binding Packet` from `agents/COMMUNICATION_PROTOCOL.md`. Do not ask a
    subagent to "look at the proof" or "find blockers" from a file list alone.
    Do not adopt an unchecked theorem sketch, type-incompatible statement, local
    counterexample, or algorithm suggestion unless it is checked against the same

@@ -103,10 +103,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   `Info` の静的 field、または theorem graph が実装 path から再構成する値として
   扱います。
 - formal proof work を subagent に渡す場合は、`agents/COMMUNICATION_PROTOCOL.md`
-  の `Target Binding Packet` を handoff に含めます。target theorem、public root と
-  signature、return projection、identifier naming plan、accepted top-level
-  assumptions、forbidden assumptions、current generated evidence、completion
-  condition、validation commands、unchecked-output policy が最低限必要です。file list
+  が所有する `Target Binding Packet` を handoff に含めます。file list
   だけで「証明を見て」「blocker を探して」と渡してはいけません。unchecked theorem
   sketch、型が合っていない statement、public root への到達が示されていない local
   counterexample、algorithm suggestion は、同じ public root と theorem surface に対する

@@ -654,6 +654,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             return
         prompt_contract = cast("dict[str, object]", role["prompt_contract"])
         self.assertIsInstance(prompt_contract, dict)
+        self.assertEqual(
+            prompt_contract["common_prompt_must_include_ref"],
+            "run.handoff_context_policy.common_prompt_must_include",
+        )
         run = cast("dict[str, object]", manifest["run"])
         context_policy = cast("dict[str, object]", run["handoff_context_policy"])
         common_fields = cast(
@@ -1977,13 +1981,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 lifecycle_policy["new_task_reuse"],
                 "forbidden_spawn_fresh_run",
             )
-            self.assertTrue(handoff_context_policy["context_artifacts_first"])
-            self.assertEqual(
-                handoff_context_policy["context_goal"],
-                "correct_shape_owner_traceability_not_smallness",
-            )
-            self.assertTrue(handoff_context_policy["require_allowed_paths"])
-            self.assertTrue(handoff_context_policy["require_do_not_read"])
+            common_prompt_fields = handoff_context_policy["common_prompt_must_include"]
+            self.assertIn("context_artifacts", common_prompt_fields)
+            self.assertIn("allowed_paths", common_prompt_fields)
+            self.assertIn("do_not_read", common_prompt_fields)
+            self.assertIn("expected_output_schema", common_prompt_fields)
+            for role in cast("list[object]", manifest["roles"]):
+                role_map = cast("dict[str, object]", role)
+                prompt_contract = cast(
+                    "dict[str, object]", role_map["prompt_contract"]
+                )
+                self.assertEqual(
+                    prompt_contract["common_prompt_must_include_ref"],
+                    "run.handoff_context_policy.common_prompt_must_include",
+                )
             self.assertEqual(
                 repo_tool_routing_policy["route_basis"],
                 "selected_public_skills",

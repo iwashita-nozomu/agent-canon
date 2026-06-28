@@ -278,7 +278,7 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: 2026-06-13 user feedback: code edits are too conservative
 
-- 2026-06-13 | interaction-observation | Before editing, repo investigation must be fixed as a packet with implementation surface route, responsibility search, reuse survey, stale-surface scan, dependency scope, and validation route; fresh subagents need a compact context capsule because they do not retain context across launches.
+- 2026-06-13 | interaction-observation | Before editing, repo investigation must be fixed as a packet with implementation surface route, responsibility search, reuse survey, stale-surface scan, dependency scope, and validation route; fresh subagents need a structured context capsule because they do not retain context across launches.
   - source: chat
   - scope: shared-canon
   - confidence: likely
@@ -372,7 +372,7 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User reported that AgentCanon memory is not accumulating; root memory is a symlink into vendor/agent-canon, but log tools only appended files without persistence.
 
-- 2026-06-16 | failure-avoidance | Subagent handoffs for proof or implementation work must carry a semantic target lock: exact target theorem or behavior, public root, projections, accepted and forbidden assumptions, current evidence, completion condition, and validation route; file lists and broad objectives alone lead to broken implementation.
+- 2026-06-16 | failure-avoidance | Subagent handoffs for proof or implementation work must carry the protocol-owned `Target Binding Packet`; file lists and broad objectives alone lead to broken implementation.
   - source: chat
   - scope: subagent-handoff formal-proof implementation
   - confidence: likely

@@ -52,12 +52,9 @@ Execute the required and task-matching conditional commands that the packet prin
    `$formal-proof-workflow` owns proof-route exploration, formal proof adoption,
    final checker-backed proof, refutation, or unprovability claims.
 1. Every `formal_proof_handoff` produced by this skill must include the
-   `Target Binding Packet` required by `agents/COMMUNICATION_PROTOCOL.md`:
-   target theorem, public root / entrypoint and signature, theorem-visible return
-   projection, identifier naming plan, generated evidence artifacts, accepted
-   top-level assumptions, forbidden assumptions, completion condition,
-   validation commands, and unchecked-output policy. If the current algorithm
-   frontier cannot fill those fields, the next action is to regenerate / repair
+   protocol-owned `Target Binding Packet` from
+   `agents/COMMUNICATION_PROTOCOL.md`. If the current algorithm frontier cannot
+   fill that packet, the next action is to regenerate / repair
    the IR, theorem graph, or source packet; do not pass a vague blocker summary
    to a proof subagent.
 1. Fix the whole target theorem first, rooted at the JIT-canonical public
@@ -364,7 +361,8 @@ Execute the required and task-matching conditional commands that the packet prin
    note. A valid connected path is structure evidence, not proof completion.
 1. Hand terminal proof obligations to `$formal-proof-workflow`: checked theorem
    statements, counterexamples, unprovable-under-assumptions witnesses, existing
-   proof search packets, checker commands, and the complete `Target Binding Packet`.
+   proof search packets, checker commands, and the protocol-owned
+   `Target Binding Packet`.
 
 ## Outputs
 

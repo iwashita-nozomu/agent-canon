@@ -67,19 +67,15 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For coding / implementation / patch requests, describe the default route as write-capable handoff first. Once route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet, schedule or launch `spark_worker` / `worker`; parent owns the handoff packet, integration order, review gate, and final responsibility.
 1. For bounded review, report traceability, and checklist-style review gates, use mini review role TOMLs only when they can run alongside or after the implementation slice without replacing the write-capable handoff.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, checker or context artifact paths, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, pass deterministic fallback output as a provisional source-packet seed or record `router_unavailable_blocker` before handoff. Fallback routing reaches `fallback_exit_status` through `canonical_rerun_pass`, `durable_blocker_or_issue`, or `explicit_approval_evidence`.
-1. Treat every spawned subagent as fresh: build the `Fresh Subagent Context Capsule` through `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`. The prompt receives selected fields, exact read-before-work sections, context artifact paths, allowed / forbidden paths, expected output schema, validation route, and return contract. Keep full packets, raw stdout, raw logs, broad chat summaries, and full dashboards in local/tool context by path instead of pasting them into the prompt.
+1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, pass deterministic fallback output as a provisional source-packet seed or record `router_unavailable_blocker` before handoff. Fallback routing reaches `fallback_exit_status` through `canonical_rerun_pass`, `durable_blocker_or_issue`, or `explicit_approval_evidence`.
+1. Treat every spawned subagent as fresh: build the `Fresh Subagent Context Capsule` through `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`. Keep full packets, raw stdout, raw logs, broad chat summaries, and full dashboards in local/tool context by path instead of pasting them into the prompt.
 1. For theorem-driven, algorithm, or implementation handoffs, include the
-   capsule's `Target Binding Packet` before spawning: exact target theorem or
-   behavior, public root / entrypoint and signature, return projection or call
-   path, identifier naming plan, accepted top-level assumptions, forbidden
-   assumptions, current generated/checker evidence, completion condition,
-   validation commands, and unchecked-output policy. If any field is missing,
-   do not spawn a subagent;
-   repair the capsule or source packet first. A subagent's unchecked theorem
-   sketch, type-incompatible formula, local counterexample, or code suggestion is
-   not an implementation instruction until the parent has run the stated
-   checker / validation route and confirmed it targets the same public root.
+   protocol-owned `Target Binding Packet` in the capsule before spawning. If the
+   packet is incomplete, repair the capsule or source packet first. A subagent's
+   unchecked theorem sketch, type-incompatible formula, local counterexample, or
+   code suggestion is not an implementation instruction until the parent has run
+   the stated checker / validation route and confirmed it targets the same public
+   root.
 1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
 1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent using that role TOML's `model` and `model_reasoning_effort` before escalating to the parent or a frontier role.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.

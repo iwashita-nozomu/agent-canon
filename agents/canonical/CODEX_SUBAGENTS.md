@@ -48,8 +48,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は、launch 間の context を parent が更新する capsule artifact に集約し、launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。capsule には objective、request clauses、state snapshot、exact read-before-work paths、context artifacts、allowed / forbidden paths、expected output schema、validation route、return contract を入れます。
-- theorem-driven、algorithm、implementation handoff では capsule の `Target Binding Packet` も必須です。target theorem / behavior、public root / entrypoint、return projection / call path、identifier naming plan、accepted / forbidden assumptions、current generated evidence、completion condition、validation commands、unchecked-output policy が揃った状態で spawn します。unchecked theorem sketch、到達未証明の local counterexample、または code suggestion は、親が同じ public root に対して checker / validation を通した後に採用対象へ進みます。
+- fresh subagent は launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。`context_artifacts`、`allowed_paths`、`do_not_read`、`return_contract` などの protocol-owned capsule key は同文書を正本にし、この文書では schema を再定義しません。
+- theorem-driven、algorithm、implementation handoff では、protocol-owned capsule に `Target Binding Packet` が必須です。欠けている場合は spawn せず、unchecked output は親が同じ public root に対して checker / validation を通した後だけ採用対象へ進みます。
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
 - 論文 draft では `citation_evidence_reviewer` も別の subagent で行う
@@ -487,8 +487,8 @@ Activation Conditions:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の詳細条件は `.codex/agents/*.toml` に集約します
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。`Fresh Subagent Context Capsule` には必要な selected fields、exact read-before-work sections、context artifact paths を入れます。packet stdout や full artifact はそのまま prompt に貼りません
-- fresh launch の prompt は `Fresh Subagent Context Capsule` の path と context artifacts を正本にします。context が増えたら capsule artifact を更新して再配送します
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
+- context が増えたら capsule artifact を更新して再配送します
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
