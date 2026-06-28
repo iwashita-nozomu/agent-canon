@@ -1567,7 +1567,7 @@ required_regex = ["Pre-Edit Repository Investigation Packet", "implementation_su
 id = "COMM-FRESH-CAPSULE-1"
 critical = true
 description = "Defines fresh subagent context capsules without chat-history or raw-log dependence."
-required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "compact_artifacts", "allowed_paths", "do_not_read", "return_contract"]
+required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "context_artifacts", "allowed_paths", "do_not_read", "return_contract"]
 
 [[evals]]
 id = "codex-subagents-fresh-context"

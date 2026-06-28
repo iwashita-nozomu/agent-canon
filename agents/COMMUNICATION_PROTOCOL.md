@@ -148,8 +148,6 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
-- `compact_artifacts`: legacy alias for `context_artifacts`; compact means a
-  canonical artifact reference, not a requirement to minimize prompt context
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use
