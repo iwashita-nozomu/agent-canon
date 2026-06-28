@@ -1844,7 +1844,7 @@ required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feed
 id = "ALS-BEHAVIOR-3"
 critical = true
 description = "Requires runtime feedback to be routed to update surfaces."
-required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair"]
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "active skill"]
 
 [[evals]]
 id = "agent-learning-human-skill-behavior-eval"
@@ -1868,7 +1868,13 @@ required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
 id = "ALH-BEHAVIOR-3"
 critical = true
 description = "Documents runtime feedback capture and prompt/eval/memory routing."
-required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record"]
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record", "active skill set", "memory-only"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-6"
+critical = true
+description = "Requires active-skill feedback to repair the active skill before memory-only closure."
+required_regex = ["active skill set", "runtime `SKILL\\.md`", "canonical `agents/skills/<skill>\\.md`", "memory-only", "skill_improvement_decision=applied"]
 
 [[evals]]
 id = "evals-readme-behavior-eval"

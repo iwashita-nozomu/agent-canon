@@ -420,6 +420,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: コンフリクト解決が下手です.
 
+- 2026-06-28 | failure-avoidance | When feedback arrives while a skill is active, repair the active skill prompt and its eval anchor first; memory-only learning is insufficient for skill-behavior feedback.
+  - source: chat
+  - scope: agent-learning active-skill-repair
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback: 利用中のスキル修正が甘いです.
+
 ## Open Questions
 
 - まだなし
