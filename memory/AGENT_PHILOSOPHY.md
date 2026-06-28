@@ -450,6 +450,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback: 点数化の仕方が下手.
 
+- 2026-06-28 | failure-avoidance | When closeout already has enough local validation and PR metadata, do not spend user time watching long remote CI unless the user asked for it or the result can change the next action.
+  - source: chat
+  - scope: closeout-validation
+  - confidence: likely
+  - evidence: 2026-06-28 user feedback after PR closeout: 余計な確認をした結果，時間を無駄にしています
+
 ## Open Questions
 
 - まだなし
