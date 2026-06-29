@@ -80,6 +80,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
 - request clauses から `requested_scope` を先に固定し、その後に owner boundary、dependency evidence、validation route から `work_scope` を導く。限定された `work_scope` は実装段階の packet としてだけ使えます。broader request を閉じるには `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を明示し、要求された surface を勝手に外していないことを示します。
+- `documents/`、`notes/`、`references/`、local implementation directories を広く読む前に、`agents/COMMUNICATION_PROTOCOL.md` の `Structure Intake Packet` を作るか引用します。構造読み込み artifact を owner、document、implementation surface 選択の入口にし、exact prose excerpt は次の判断に効くと packet で分かった後に昇格します。
 - 編集手段は、手編集で責務を追える差分では patch-based edit、機械生成・一括変換では repo script / formatter の順に選ぶ
 - sweep と原因調査は、次の具体的な作業に結び付けます。各結果は、実装経路、再利用判断、古い面の修復、依存範囲、検証経路、Issue、または担当者付きの保留のどれかを更新します。更新先が同じ根拠は記録内の短い引用に圧縮し、現在の作業へ戻ります。
 - 検証は静的解析・読み取り evidence を主証跡にします。静的解析、依存確認、
