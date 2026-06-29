@@ -55,11 +55,13 @@ Execute the required and task-matching conditional commands that the packet prin
 1. In the first work update, declare `workflow=<provisional-or-final-family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list, and present apparent breadth only as provisional routing context.
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
 1. Treat `run.repo_tool_routing_policy` from `task_start.py` or `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
-1. For repo-changing edits, read the full body of every selected runtime
-   `SKILL.md`. The selected_runtime_skill_read contract applies to
-   `Owner-Bounded Change`, Routine docs, Focused code, typo/link/format-only, and
-   parent-direct routes; route owner-bounded edits through `$owner-bounded-routing` and record owner_bounded_skill_read evidence with skill
-   names and paths ahead of patching.
+1. For repo-changing edits, existing tool execution and owner-bounded patching
+   proceed from tool-owned evidence. Runtime `SKILL.md` reading is optional
+   follow-up context after the existing tool or selected command packet runs for
+   the covered property. Read only the owner surface needed to interpret or
+   repair the tool result. Route owner-bounded edits through
+   `$owner-bounded-routing` and record owner, existing-tool route, and
+   targeted-validation evidence.
 1. ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書く。内部の field name、enum value、role key、helper 風の語は、command、path、table、正確な evidence reference に閉じる。専門語が必要な場合は、既存の repository term または外部標準 term を使い、自然文で説明する。
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.

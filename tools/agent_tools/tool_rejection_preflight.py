@@ -382,17 +382,17 @@ TOOL_CATALOG_GATE_TEMPLATES = (
         ),
     ),
 )
-AGENT_CANON_TOOL_SOURCE_ROUTE_GATE_TEMPLATES = (
+AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES = (
     GateTemplate(
-        gate="agentcanon_tool_source_route",
+        gate="agentcanon_new_tool_source_route",
         command_template=(
             "git -C vendor/agent-canon status --short --branch && "
             "git submodule status vendor/agent-canon"
         ),
         handoff=(
-            "treat this planned path as AgentCanon-owned tool source: edit on "
-            "an AgentCanon branch/PR under vendor/agent-canon, then update the "
-            "parent submodule pin; do not create a parent-local tools implementation"
+            "treat this planned path as new AgentCanon-owned tool source: add it "
+            "on an AgentCanon branch/PR under vendor/agent-canon, then update "
+            "the parent submodule pin; do not create a parent-local tools implementation"
         ),
     ),
 )
@@ -509,11 +509,11 @@ def predict_gates(root: Path, paths: tuple[str, ...]) -> tuple[PredictedGate, ..
     scope_report = validate_responsibility_scope(root, "responsibility-scope.toml")
     gates: set[PredictedGate] = set()
     for path in paths:
-        gates.update(path_gates(path, scope_report))
+        gates.update(path_gates(root, path, scope_report))
     return tuple(sorted(gates))
 
 
-def path_gates(path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...]:
+def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
     templates: list[GateTemplate] = []
@@ -532,8 +532,8 @@ def path_gates(path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...
         templates.extend(HOOK_RUNTIME_GATE_TEMPLATES)
     if path.startswith(LOG_SURFACE_PREFIXES):
         templates.extend(LOG_SURFACE_GATE_TEMPLATES)
-    if agent_canon_tool_source_path(path):
-        templates.extend(AGENT_CANON_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
+    if agent_canon_new_tool_source_path(root, path):
+        templates.extend(AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
         templates.extend(AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES)
     if path.startswith(SKILL_SURFACE_PREFIXES):
         templates.extend(SKILL_MIRROR_GATE_TEMPLATES)
@@ -596,6 +596,16 @@ def agent_canon_tool_source_path(path: str) -> bool:
     return path == AGENT_CANON_TOOL_SOURCE_ROOT or path.startswith(
         AGENT_CANON_TOOL_SOURCE_ROOT + "/"
     )
+
+
+def agent_canon_new_tool_source_path(root: Path, path: str) -> bool:
+    """Return whether a planned path would create a new AgentCanon tool source."""
+    if not agent_canon_tool_source_path(path):
+        return False
+    if (root / path).exists():
+        return False
+    source_relative = path.removeprefix(AGENT_CANON_SUBMODULE_PREFIX + "/")
+    return not (root / source_relative).exists()
 
 
 def dependency_gate_templates(path: str) -> tuple[GateTemplate, ...]:

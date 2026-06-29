@@ -60,7 +60,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
 | `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
-| `owner-bounded-routing` | owner-bounded 修正で selected runtime skill 読了、軽量 preflight、targeted validation を固定する | `agents/skills/owner-bounded-routing.md` | `.agents/skills/owner-bounded-routing/SKILL.md` |
+| `owner-bounded-routing` | owner-bounded 修正で existing tool の直接利用、軽量 preflight、targeted validation を固定する | `agents/skills/owner-bounded-routing.md` | `.agents/skills/owner-bounded-routing/SKILL.md` |
 | `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
@@ -153,7 +153,7 @@ in the Codex host runtime.
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、notebook readiness を確認するときは `experiment-review` を使います。
 - observable behavior、regression risk、または test contract を変える code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
-- owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、typo / link / format-only、Routine docs、Focused code では `owner-bounded-routing` を使い、selected_runtime_skill_read、owner_bounded_skill_read、targeted validation を evidence に残します。file 数だけでは route を固定しません。
+- owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、typo / link / format-only、Routine docs、Focused code では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。file 数だけでは route を固定しません。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
 - 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。

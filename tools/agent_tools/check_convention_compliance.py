@@ -423,8 +423,8 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "DOCUMENT_STRUCTURE_REQUIRED",
     ),
 }
-SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "owner_bounded_skill_read"
+OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "owner_bounded_tool_route"
 ]
 RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "responsibility_preflight_gate"
@@ -1776,7 +1776,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_document_structure_routing(root))
     findings.extend(
         collect_marker_contract_findings(
-            root, "owner_bounded_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
+            root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
         )
     )
     findings.extend(

@@ -137,7 +137,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`m
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている場合だけ parent-direct route を使います。
-bounded route でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に owner_bounded_skill_read、skill 名、path を残します。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
