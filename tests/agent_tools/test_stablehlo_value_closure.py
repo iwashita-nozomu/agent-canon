@@ -5,6 +5,8 @@
 # upstream design ../../documents/tools/stablehlo_value_closure.md defines the tool contract.
 # @dependency-end
 
+"""Tests for scoped StableHLO SSA dependency closure tracing."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -38,6 +40,7 @@ def _load_module() -> _ClosureModule:
 
 
 def test_closure_keeps_callee_constants_scoped_to_callee() -> None:
+    """Trace callee constants without crossing same-name caller constants."""
     tool = _load_module()
     ir = {
         "schema": "agent-canon.thin-operational-ir.v2",
@@ -106,12 +109,14 @@ def test_closure_keeps_callee_constants_scoped_to_callee() -> None:
 
 
 def test_while_operands_ignore_region_argument_aliases() -> None:
+    """Treat StableHLO while operands as incoming values, not region aliases."""
     tool = _load_module()
     op = "%r:2 = stablehlo.while(%iterArg = %x, %iterArg_0 = %y) : tensor<f32>, tensor<f32>"
     assert tool.operand_names(op, ["%r#0", "%r#1", "%r"]) == ["%x", "%y"]
 
 
 def test_closure_reports_constant_payloads_and_convert_ops() -> None:
+    """Report machine-readable constant payloads and scalar convert rows."""
     tool = _load_module()
     ir = {
         "schema": "agent-canon.thin-operational-ir.v2",

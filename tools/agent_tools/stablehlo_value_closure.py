@@ -23,8 +23,11 @@ import sys
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
+JsonObject = dict[str, object]
+
+DEFAULT_MAX_NODES = 1000
 PERCENT_NAME_RE = re.compile(r"%[A-Za-z0-9_#.]+(?::[0-9]+)?")
 CONSTANT_RE = re.compile(
     r"(?P<result>%[A-Za-z0-9_#.]+)\s*=\s*stablehlo\.constant\s+"
@@ -119,16 +122,16 @@ def function_argument_names(signature: str) -> list[str]:
     return percent_names(args)
 
 
-def load_operational_ir(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text())
+def load_operational_ir(path: Path) -> JsonObject:
+    value = cast(JsonObject, json.loads(path.read_text()))
     if "operational_ir" in value:
-        value = value["operational_ir"]
+        value = cast(JsonObject, value["operational_ir"])
     if value.get("schema") != "agent-canon.thin-operational-ir.v2":
         raise SystemExit(f"{path}: unsupported or missing operational_ir schema")
     return value
 
 
-def normalize_op(raw: dict[str, Any]) -> dict[str, Any]:
+def normalize_op(raw: JsonObject) -> JsonObject:
     text = str(raw.get("text", ""))
     results = list(raw.get("result_names") or raw.get("resultNames") or result_names(text))
     operands = list(raw.get("operand_names") or raw.get("operandNames") or operand_names(text, results))
@@ -156,7 +159,7 @@ def scalar_dtype(tensor_type: str) -> str:
     return text
 
 
-def constant_payload_row(op: dict[str, Any]) -> dict[str, Any] | None:
+def constant_payload_row(op: JsonObject) -> JsonObject | None:
     """Return a machine-readable dense constant payload row for one op."""
     if op.get("opcode") != "stablehlo.constant":
         return None
@@ -178,7 +181,7 @@ def constant_payload_row(op: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def convert_op_row(op: dict[str, Any]) -> dict[str, Any] | None:
+def convert_op_row(op: JsonObject) -> JsonObject | None:
     """Return a machine-readable StableHLO scalar convert row for one op."""
     if op.get("opcode") != "stablehlo.convert":
         return None
@@ -202,17 +205,17 @@ def convert_op_row(op: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def region_index(ir: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def region_index(ir: JsonObject) -> dict[str, JsonObject]:
     return {str(region.get("region_id")): region for region in ir.get("regions", [])}
 
 
-def function_index(ir: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def function_index(ir: JsonObject) -> dict[str, JsonObject]:
     return {str(fn.get("name")): fn for fn in ir.get("functions", [])}
 
 
-def op_index(ir: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str, str], list[dict[str, Any]]]]:
-    by_id: dict[str, dict[str, Any]] = {}
-    by_value: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+def op_index(ir: JsonObject) -> tuple[dict[str, JsonObject], dict[tuple[str, str, str], list[JsonObject]]]:
+    by_id: dict[str, JsonObject] = {}
+    by_value: dict[tuple[str, str, str], list[JsonObject]] = {}
     for raw in ir.get("ops", []):
         op = normalize_op(raw)
         by_id[op["op_id"]] = op
@@ -221,14 +224,14 @@ def op_index(ir: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[tuple[
     return by_id, by_value
 
 
-def function_body_region(functions: dict[str, dict[str, Any]], function: str) -> str:
+def function_body_region(functions: dict[str, JsonObject], function: str) -> str:
     fn = functions.get(function)
     if not fn:
         return ""
     return str(fn.get("body_region_id") or fn.get("bodyRegionId") or "")
 
 
-def function_args(functions: dict[str, dict[str, Any]], function: str) -> list[str]:
+def function_args(functions: dict[str, JsonObject], function: str) -> list[str]:
     fn = functions.get(function)
     if not fn:
         return []
@@ -239,7 +242,7 @@ def function_args(functions: dict[str, dict[str, Any]], function: str) -> list[s
     return function_argument_names(str(fn.get("signature", "")))
 
 
-def region_ancestors(regions: dict[str, dict[str, Any]], region_id: str) -> list[str]:
+def region_ancestors(regions: dict[str, JsonObject], region_id: str) -> list[str]:
     path = []
     current = region_id
     seen = set()
@@ -260,11 +263,11 @@ def region_ancestors(regions: dict[str, dict[str, Any]], region_id: str) -> list
 
 
 def resolve_definition(
-    by_value: dict[tuple[str, str, str], list[dict[str, Any]]],
-    regions: dict[str, dict[str, Any]],
+    by_value: dict[tuple[str, str, str], list[JsonObject]],
+    regions: dict[str, JsonObject],
     value: ScopedValue,
     before_line: int | None = None,
-) -> dict[str, Any] | None:
+) -> JsonObject | None:
     for region_id in region_ancestors(regions, value.region_id):
         candidates = by_value.get((value.function, region_id, value.name), [])
         if before_line is not None:
@@ -274,7 +277,7 @@ def resolve_definition(
     return None
 
 
-def callee_return_ops(ops: dict[str, dict[str, Any]], functions: dict[str, dict[str, Any]], target: str) -> list[dict[str, Any]]:
+def callee_return_ops(ops: dict[str, JsonObject], functions: dict[str, JsonObject], target: str) -> list[JsonObject]:
     body_region = function_body_region(functions, target)
     return sorted(
         [
@@ -286,14 +289,14 @@ def callee_return_ops(ops: dict[str, dict[str, Any]], functions: dict[str, dict[
     )
 
 
-def trace_closure(ir: dict[str, Any], root: ScopedValue, max_nodes: int) -> dict[str, Any]:
+def trace_closure(ir: JsonObject, root: ScopedValue, max_nodes: int) -> JsonObject:
     functions = function_index(ir)
     regions = region_index(ir)
     ops, by_value = op_index(ir)
     queue: deque[tuple[ScopedValue, dict[str, ScopedValue], str | None]] = deque([(root, {}, None)])
     seen_values: set[str] = set()
-    op_rows: dict[str, dict[str, Any]] = {}
-    leaves: dict[str, dict[str, Any]] = {}
+    op_rows: dict[str, JsonObject] = {}
+    leaves: dict[str, JsonObject] = {}
     edges: list[dict[str, str]] = []
 
     while queue and len(seen_values) < max_nodes:
@@ -417,7 +420,7 @@ def trace_closure(ir: dict[str, Any], root: ScopedValue, max_nodes: int) -> dict
     }
 
 
-def render_text(report: dict[str, Any]) -> str:
+def render_text(report: JsonObject) -> str:
     lines = [
         f"STABLEHLO_VALUE_CLOSURE_ROOT={report['root']['function']}:{report['root']['region_id']}:{report['root']['name']}",
         f"STABLEHLO_VALUE_CLOSURE_VALUES={report['value_count']}",
@@ -482,7 +485,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--function", required=True, help="Root function name, for example main")
     parser.add_argument("--region-id", default="", help="Root region id; defaults to the function body region")
     parser.add_argument("--value", required=True, help="SSA value name, for example %%276")
-    parser.add_argument("--max-nodes", type=int, default=1000)
+    parser.add_argument("--max-nodes", type=int, default=DEFAULT_MAX_NODES)
     parser.add_argument("--format", choices=["text", "json"], default="text")
     return parser.parse_args(argv)
 
