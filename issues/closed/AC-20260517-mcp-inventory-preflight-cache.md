@@ -30,7 +30,7 @@ resolved_at: 2026-06-07
 AgentCanon currently instructs agents to run
 `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server`
 for repository tasks. That keeps MCP setup fail-closed, but it also creates
-visible repetition when a user is sending a sequence of bounded repo-related
+visible repetition when a user is sending a sequence of small repo-related
 messages in the same working session.
 
 The bad user experience is not the existence of the check. The problem is that
@@ -46,7 +46,7 @@ the policy does not distinguish these cases:
 - Define session-scoped or run-scoped MCP inventory evidence.
 - Keep the default fail-closed behavior when `repo_mcp_server` is missing,
   disabled, or not launched by the canonical `.codex/config.toml` command.
-- Avoid requiring every bounded follow-up repository message to execute and print
+- Avoid requiring every small follow-up repository message to execute and print
   the same inventory check when no relevant runtime surface changed.
 - Record cache invalidation triggers, such as changes to `.codex/config.toml`,
   `mcp/`, `tools/agent_tools/check_mcp_inventory.py`, or the active run bundle.

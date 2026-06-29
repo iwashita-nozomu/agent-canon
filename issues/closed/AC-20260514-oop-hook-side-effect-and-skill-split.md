@@ -21,7 +21,7 @@ github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/250
 affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
 edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
 required_action: Keep OOP tool execution and agent analysis in one public skill while preventing hook evidence writes from making simple tool checks look like broad repo-changing work.
-close_condition: A simple user request for OOP checking can invoke one bounded skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and append hook evidence to the AgentCanon-owned hook result chronology.
+close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and append hook evidence to the AgentCanon-owned hook result chronology.
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/31
 resolved_at: 2026-05-14
 resolution_summary: OOP readability checks append run-bundle timing tokens with tool_call, duration_ms, status, scope, and output_path. Follow-up correction restores AgentCanon-owned `agents/evals/results/hook-runs/` as the default hook JSONL source of truth; `reports/hooks/` is override-only temporary output.
@@ -33,7 +33,7 @@ the work into a broad workflow-shaped action:
 
 - MCP and goal-loop preflight were run as required by runtime policy.
 - Agent orchestration material was loaded even though the requested operation was
-  a bounded tool invocation.
+  a narrow tool invocation.
 - The OOP readability tool was run against both AgentCanon full tree and PR
   source-diff scopes, and in both Markdown and JSON forms.
 - A Markdown report was hand-built from the mechanical output.
@@ -68,7 +68,7 @@ The core failure was a boundary collapse between three distinct activities:
    - Keep judgments separate from the mechanical check result.
 
 Because there was no explicit skill for the first two operations, the agent
-treated a simple tool request as a bounded repository task. The result was more
+treated a simple tool request as a small repository task. The result was more
 careful than necessary, slower than necessary, and harder for the user to
 control.
 
@@ -182,7 +182,7 @@ The hook evidence policy should distinguish three modes:
   `.agents/skills/`, `.claude/skills/`, `agents/skills/README.md`, and
   `agents/skills/catalog.yaml`.
 - Prompt/eval expected counts are updated for the single public skill surface.
-- A bounded OOP check can be run with one command and no agent-authored report
+- A narrow OOP check can be run with one command and no agent-authored report
   unless explicitly requested.
 - A report request produces mechanical tables from one tool output, not an
   expanded full workflow unless the user asks for it.
