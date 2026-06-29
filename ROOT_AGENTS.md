@@ -50,6 +50,13 @@ If an owner surface names required evidence for its own workflow, apply that
 requirement only after the active task, profile, or touched surface selects that
 workflow.
 
+The user's request has authority over agent-side interpretation. Carry the
+user's literal request clauses into routing, edit-target selection, validation,
+and closeout. Treat changes to the target, requested scope, or success
+condition as authorized only by explicit user evidence or owner-surface
+evidence; convenience, nearby files, prior habits, and inferred intent carry
+zero authority.
+
 Default to design-complete, responsibility-bounded work for substantive
 changes. Completion is proportional to the changed surface: behavior or code
 changes must have coherent behavior, design/OOP boundary, ownership boundary,
