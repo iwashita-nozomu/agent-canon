@@ -62,6 +62,16 @@ Execute the required and task-matching conditional commands that the packet prin
    repair the tool result. Route owner-bounded edits through
    `$owner-bounded-routing` and record owner, existing-tool route, and
    targeted-validation evidence.
+1. For research-backed implementation, benchmark, external-research change,
+   prior-art adoption, official-docs method claims, or literature-derived design
+   decisions, the emitted `skills=...` / run-bundle skill call sequence calls
+   `$literature-survey` before `$research-workflow`, before design, and before
+   implementation. Carry the durable source packet into the
+   `Implementation Source Packet` with source class, limitation, contrary or
+   narrowing evidence, and adoption/exclusion decisions. Implementation,
+   benchmark, report, and owner-bounded follow-up branches may not close a
+   literature-backed claim from transient browser context or post-hoc citation
+   cleanup.
 1. ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書く。内部の field name、enum value、role key、helper 風の語は、command、path、table、正確な evidence reference に閉じる。専門語が必要な場合は、既存の repository term または外部標準 term を使い、自然文で説明する。
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.

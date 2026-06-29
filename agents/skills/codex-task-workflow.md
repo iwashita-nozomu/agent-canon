@@ -63,6 +63,14 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - owner-bounded route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では、実装前に parent-direct route と targeted validation が固定された場合に parent-direct を使う
 - repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。owner boundary、差し替え可能な単位、targeted validation route、public impact boundary が evidence で閉じた修正は `$owner-bounded-routing` に流し、owner boundary、existing-tool route、targeted validation を evidence に残す。外形的な作業量や file 数だけでは route を固定しません。実装 behavior は契約完全実装ポリシーから導く
+- research-backed implementation、benchmark、external research、prior art、
+  公式 docs、文献由来の design decision によって code、protocol、report claim、
+  design を変える場合は、`skills=...` / run bundle の skill call sequence で
+  `literature-survey` を `research-workflow`、設計、implementation より先に
+  呼びます。durable source packet、source class、
+  limitation、contrary / narrowing evidence、adoption/exclusion decision を
+  `Implementation Source Packet` に接続し、post-hoc citation cleanup や一時的な
+  browser context から実装 claim を閉じません。
 - ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、`spark_worker` / `worker` を起動してから実装へ進む
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない

@@ -70,7 +70,7 @@ Execute the required and task-matching conditional commands that the packet prin
    - add `$codex-task-workflow` when repo-changing execution starts
    - add `$subagent-bootstrap` only when an explicit handoff/wave is ready or the task shape requires subagent bootstrap evidence
    - add the task-shape skill set required by the current stage and contract:
-     - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
+     - research-backed implementation, benchmark, or external-research change -> the skill call sequence is `$literature-survey` before `$research-workflow`; carry the durable source packet, source class, limitation, contrary evidence, and adoption/exclusion decisions into design, implementation, benchmark, and report claims
      - nontrivial or substantive document creation/addition/revision where section order, reader path, claim support, source map, canonical route, or document responsibility changes -> `$prose-reasoning-graph` as the common structure graph/DSL gate and `$structure-planning` as the structure contract gate; for typo/link/format-only edits, use `$md-style-check` and record `structure_contract=skipped` with the reason.
      - README, workflow, guide, migration, or other general explanatory reader-facing docs -> `$long-form-writing` as the DSL-to-prose projection adapter; select by document responsibility and reader contract, with length as a secondary signal.
      - submission paper or thesis-chapter draft -> `$paper-writing`
@@ -102,6 +102,15 @@ Execute the required and task-matching conditional commands that the packet prin
    covered property. Open only the owner surface or nearby context needed to
    interpret the result. `Owner-Bounded Change` records owner, existing-tool
    route, and targeted-validation evidence.
+1. When a task can change code, benchmark protocol, report claims, or design
+   from papers, prior art, official docs, external research, or source-backed
+   method claims, emit and execute the skill call sequence with
+   `$literature-survey` before `$research-workflow`, `$structure-planning`,
+   design review, implementation, experiment, or report writing. No branch of
+   Research-Driven Change, owner-bounded implementation, benchmark repair, or
+   document/report follow-up may close without source packet evidence, source
+   limitation, contrary or narrowing evidence, and adoption/exclusion decisions
+   for the claims used in implementation.
 1. Keep the advisory branch non-mutating. If the request is `routing-only/advisory`, defer repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, and repo-changing-only skills until explicit repo-changing intent is provided. In the interim, keep consultation, brainstorming, and explanation turns conversational until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation execution.
 1. Choose the starter command with explicit precedence:
    - if the request is `repo-changing execution`, or the user asks for the startup command / run bundle, prefer `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"`

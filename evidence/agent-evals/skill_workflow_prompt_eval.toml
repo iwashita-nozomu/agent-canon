@@ -1149,6 +1149,12 @@ description = "Routes deterministic tool coverage through structured artifacts a
 required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "structured tool artifacts", "extend or repair the tool contract"]
 
 [[evals.checklist]]
+id = "ORCH-LITERATURE-FIRST-1"
+critical = true
+description = "Requires source-backed implementation skill call order to put literature-survey before research workflow and implementation branches."
+required_regex = ["\\$literature-survey", "before `\\$research-workflow`", "source packet", "adoption/exclusion", "implementation"]
+
+[[evals.checklist]]
 id = "ORCH-PRE-EDIT-PACKET-1"
 critical = true
 description = "Requires evidence-backed pre-edit investigation before edit path selection."
@@ -1237,6 +1243,12 @@ id = "CODEX-TASK-FRESH-CAPSULE-1"
 critical = true
 description = "Requires fresh subagent context capsules instead of chat history."
 required_regex = ["protocol-owned", "Fresh Subagent Context Capsule", "agents/COMMUNICATION_PROTOCOL.md", "chat history", "repo-root scope"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-LITERATURE-FIRST-1"
+critical = true
+description = "Requires literature survey source packets in the skill call order before research workflow, design, and implementation for source-backed claims."
+required_regex = ["\\$literature-survey", "\\$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"

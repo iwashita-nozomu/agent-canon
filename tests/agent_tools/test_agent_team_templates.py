@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from agent_team import render_template  # noqa: E402
+from agent_team import render_template, suggested_public_skills  # noqa: E402
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -56,6 +56,17 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("## Decision", rendered)
         self.assertIn("<!-- Record approve, revise, or escalate. -->", rendered)
         self.assertEqual(rendered.count("@dependency-start"), 1)
+
+    def test_research_driven_skill_calls_literature_survey_first(self) -> None:
+        """Research-driven run bundles should call literature-survey before research-workflow."""
+        skills = suggested_public_skills(None, "research_driven_change")
+
+        self.assertIn("$literature-survey", skills)
+        self.assertIn("$research-workflow", skills)
+        self.assertLess(
+            skills.index("$literature-survey"),
+            skills.index("$research-workflow"),
+        )
 
 
 if __name__ == "__main__":

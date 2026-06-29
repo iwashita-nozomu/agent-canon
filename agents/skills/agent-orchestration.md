@@ -133,7 +133,12 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合、または primary figure / table / ponchi-e / slide / section / slice、source map、source-to-slide map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
 - tool、checker、hook、static analysis を走らせて問題を探す、full finding packet と mechanical priority order を作る、implementation / refactor planning に渡す場合は `tool-finding-report` を使います。before / after impact 比較は明示された場合だけ追加します。raw result を保存する場合は `result-artifact-writeout`、reader-facing narrative を作る場合は `report-writing` も併用します。reader-facing narrative が非自明な finding packet、priority policy、metric / count contract、source map を持つ場合は `structure-planning` も併用します
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
-- research-backed implementation や比較改善では `research-workflow` を使います
+- research-backed implementation、benchmark、external research、prior art、公式
+  docs、文献由来の method claim を使って code、protocol、report claim、design を
+  変える場合は、`skills=...` / run bundle の skill call sequence で
+  `literature-survey` を `research-workflow` より前に呼び、その source packet、
+  limitation、contrary evidence、adoption/exclusion decision を固定してから
+  `research-workflow` に進みます
 - large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
 - directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
 - task 開始前に expected AgentCanon repo structure、root view、`vendor/agent-canon/`、`.gitmodules`、または canonical path の欠落 / 移動 / stale state が疑われる場合は、通常 task の前に `structure-refactor` の pre-task structure repair route を使います。AgentCanon-owned root view / submodule drift なら `agent-canon-update` も併用します
@@ -157,6 +162,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - family に応じた reviewer / specialist stack まで出します
 - `Research-Driven Change` では research / report / reproducibility / benchmark / artifact 系 reviewer を落としません
+- `Research-Driven Change` のどの分岐でも、文献・一次資料に基づく実装 claim は
+  `literature-survey` の source packet から design、implementation、benchmark、
+  report へ trace します。`literature-survey` を `research-workflow` の後段や
+  report-only cleanup に回して source claim を実装後に補う skill call sequence
+  にはしません。
 - 一般説明 prose adapter を使う docs では、docs-impact がある場合に `document_flow_reviewer` と docs completeness review を使います
 - academic/paper work では notation / logic review を落とさず、paper draft では `citation_evidence_reviewer` も追加します
 
