@@ -21,6 +21,19 @@ downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md ex
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: formalize mathematical, proof-sketch, and implementation-derived
+  claims into checker-backed proof or refutation routes.
+- Section path: start with Purpose, Use When, Core References, and Mandatory
+  Checklist; then use Canonical Flow, Required Outputs, Proof Status Table,
+  JIT-canonical IR, Lemma Dependency Graph, Frontier Exploration Loop, and the
+  proof-expansion sections for operational detail.
+- Use when: a claim needs Lean/Isabelle/Coq/SMT evidence, proof-search
+  scaffolding, theorem-graph routing, or generated implementation evidence.
+- Boundary: natural-language proof text, unchecked theorem files, and
+  `blocked` / `unverified` states are not final proof evidence.
+
 ## Purpose
 
 自然言語の数学的主張、証明スケッチ、設計上の lemma、または
@@ -103,10 +116,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   `Info` の静的 field、または theorem graph が実装 path から再構成する値として
   扱います。
 - formal proof work を subagent に渡す場合は、`agents/COMMUNICATION_PROTOCOL.md`
-  の `Target Binding Packet` を handoff に含めます。target theorem、public root と
-  signature、return projection、identifier naming plan、accepted top-level
-  assumptions、forbidden assumptions、current generated evidence、completion
-  condition、validation commands、unchecked-output policy が最低限必要です。file list
+  が所有する `Target Binding Packet` を handoff に含めます。file list
   だけで「証明を見て」「blocker を探して」と渡してはいけません。unchecked theorem
   sketch、型が合っていない statement、public root への到達が示されていない local
   counterexample、algorithm suggestion は、同じ public root と theorem surface に対する
@@ -159,7 +169,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   witness として採用する段階を担当します。
 - 実装前のアルゴリズム設計 claim では、先に `$lean-algorithm-design` を使います。
   この skill は、そこで checker-backed に検証された Lean 定義、target theorem、
-  refutation、または narrowed problem class を proof artifact として採用する段階を
+  refutation、または restricted problem class を proof artifact として採用する段階を
   担当します。
 - アルゴリズム由来の claim では、局所証明を選ぶ前に root algorithm を
   選択済み route の機械抽出 evidence として保持します。JIT route では
@@ -178,7 +188,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   しません。証明はまず `z_init = Init(Problem, InitializeConfig)` という
   code-selected initializer として正規化し、IR の code fact が本当に zero initializer を
   示す場合だけその特殊化を使います。zero が単なる現在の実装選択であり theorem を
-  狭めているなら、problem-class witness または algorithmic choice として
+  制限ているなら、problem-class witness または algorithmic choice として
   `$algorithm-proof-exploration` に戻します。
 - 実装由来 IR は、JIT route では `python3 tools/agent_tools/jit_canonical_ir.py`、
   C++ source route では `python3 tools/agent_tools/cpp_template_to_lean.py`
@@ -206,7 +216,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   `generated_function_lowering_coverage_verified` を checker で通し、generic
   operational IR renderer では generator が complete coverage を既定で要求し、
   `coverageComplete = true` の generated evidence を出したことを evidence に含めます。生成名の
-  `rg` 確認や prose inspection だけを coverage evidence として採用してはいけません。
+  text-search 確認や prose inspection だけを coverage evidence として採用してはいけません。
   proof graph は proposition と theorem dependency edge を持ちます。`theorem X by A, B, f`
   のような route は、`A` と `B` が proof premise、`f` が JIT-generated code graph
   上の implementation function / trace、または generic operational evidence から
@@ -264,7 +274,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   `open_frontier`、`frontier`、`unverified`、または同等の status / kind node に
   到達できる場合、終端 leaf が許可 origin に落ちていても未完了です。その reachable
   frontier を Wave の作業リストとして、`verified`、`refuted`、
-  `unprovable_under_assumptions`、またはより小さい checker 済み boundary まで
+  `unprovable_under_assumptions`、または下位 checker 済み boundary まで
   再帰的に進めます。
 - backend / dtype / IREE / finite-precision semantics は production code や
   `InitializeConfig` へ proof-only field として足さず、JIT-canonical IR の
@@ -365,7 +375,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   未解決 goal / missing hypothesis を読みます。その gap を bridge candidate に翻訳し、
   generated Lean evidence、checker-facing Lean 関数、IR/source fact から
   証明または反証できるか確認し、再び `P` の証明を走らせます。
-  `P` が証明・反証・現仮定下での非導出証明・より小さい witness への縮約のいずれかに達するまで
+  `P` が証明・反証・現仮定下での非導出証明・下位 witness への縮約のいずれかに達するまで
   ループします。平坦な候補一覧はこのループの入力であり、最終成果ではありません。
 - 実装されている反復法と証明状態を人間が一目で確認する必要がある場合は、
   `$algorithm-flowchart` で IR、theorem graph、
@@ -399,15 +409,15 @@ checked boundary を top-level 分岐として返してはいけません。個�
   例: 現在の recurrence / initializer / line-search / inner-solver policy を置き換える、
   acceptance rule を数学的に sound な algorithm rule として修正する、problem-class
   witness を top-level theorem assumption として明示する、theorem を
-  warm-start/selected local scope に狭める、globalization / Phase-I を足す。
+  warm-start/selected local scope に制限る、globalization / Phase-I を足す。
   これは proof guidance であり、proof-only field、diagnostic gate、runtime proof check を
   production code へ足す口実ではありません。
 - `unverified_with_next_witness` を書いたらそこで止めず、named witness / next frontier を
   同じ loop へ再投入します。`verified`、`refuted`、
   `unprovable_under_assumptions`、failed Goal checklist item、または selected
-  route から pruned された状態まで到達するまで、proof note を closeout しては
-  いけません。より小さい
-  named witness を持つ open row は active frontier です。
+  route から pruned された状態、または下位 named witness を持つ open row へ縮約するまで、
+  proof note を closeout してはいけません。下位 named witness を持つ open row は
+  active frontier です。
 - Multi-agent Wave を使う場合、この再投入 loop を parent が実行します。各 wave の
   checked / rejected / next_witness 出力を graph overlay に integrate し、同じ
   theorem graph checker と proof search を再実行し、残った actionable frontier から
@@ -417,7 +427,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   開始します。frontier を returned-value projection、generated tolerance、backend
   decode、recurrence / ranking、problem / config witness などの route segment に
   グループ化し、1 回の実行単位では 1 つの route segment 全体、または同じ segment 上の
-  connected frontier batch を閉じます。小さい local bridge を 1 つ追加しただけで、
+  connected frontier batch を閉じます。局所 bridge を 1 つ追加しただけで、
   同じ theorem route に進められる sibling frontier が残る場合は返答せず、board を再計算して
   次の frontier へ進みます。profile-only / obsolete branch は、選択した public theorem
   から消費されないことを graph status と edge で明示してから、次の route を選びます。
@@ -433,7 +443,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   十分条件 route を閉じただけでは、必要十分条件または expressivity boundary を求める
   user target は終わりません。その場合は同じ Wave で reverse / boundary 行へ進み、
   checker-backed に証明・反証するか、closure を妨げる public input、実装、backend
-  surface を最小境界として示します。local lemma の報告は、board-level milestone
+  surface を直接境界として示します。local lemma の報告は、board-level milestone
   が変化した後だけ許可します。
   board は proof search の前提です。tactic 実行、bridge theorem 作成、subagent proof
   result 採用の前に、その step が閉じる board 行と route segment を特定します。
@@ -453,18 +463,18 @@ checked boundary を top-level 分岐として返してはいけません。個�
   その後、一つの board 行に対する connected frontier batch を選び、行が terminal
   または checked boundary になるまで同じ batch を再投入します。単一 edge の proof は
   内部 evidence であり、同じ行の sibling edge が残る場合は成果として返しません。
-- より小さい named witness が、caller lemma または target theorem edge を止めている
+- 下位 named witness が、caller lemma または target theorem edge を止めている
   関数単位の保証である場合は、それを user-facing に返してはいけません。
   同一 turn 内で callee 展開、IR / Lean 関数生成の改善、bridge proposition の変更、
   counterexample 探索、または algorithm exploration に戻し、その関数保証が
   `verified`、`refuted`、`unprovable_under_assumptions`、または現在の
   repo / tool 環境では進められない checked external boundary に到達するまで続けます。
-- より小さい named witness が connection-level guarantee、すなわち code fact から
+- 下位 named witness が connection-level guarantee、すなわち code fact から
   theorem variable への binding、backend profile の instance 化、solver return から
   caller 単位への変換、または bridge lemma edge である場合も同じ扱いです。
   その接続は次の in-turn work item であり、`external_assumption` として返す前に、
   入力引数境界、production code 境界、または backend/runtime 境界まで再帰的に
-  分解し、最小 frontier であることを proof-path analyzer、graph slice、または
+  分解し、直接 frontier であることを proof-path analyzer、graph slice、または
   checker-backed model で示します。
 - named witness が callee 関数を指す場合は、関数名を blocker として返さず、
   その callee の実装由来 input/output relation、return binding、loop exit 条件、
@@ -477,8 +487,8 @@ checked boundary を top-level 分岐として返してはいけません。個�
   user-facing な終端 outcome ではありません。各 frontier row は
   `verified`、`refuted`、`unprovable_under_assumptions`、または
   failed Goal checklist item へ落とすか、selected route から pruned されたことを
-  checker-backed に示します。小さい witness が出た場合も直ちに同じ loop へ
-  再投入します。
+  checker-backed に示すか、strict に下位 named witness を持つ open row へ落とします。
+  下位 witness が出た場合も直ちに同じ loop へ再投入します。
 - 「どの証明 path でも証明できない」と言う場合は、絶対的な不可証明ではなく、
   現在の JIT-canonical IR、assumption ledger、生成済み backend trace coverage の
   もとで target conclusion が導けないことを、反例 model、independence result、
@@ -502,7 +512,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
 - user-facing に進捗を返す前に、現在選択した部品証明をすべて Goal checklist で
   処理します。部品証明ごとに `verified`、`refuted`、
   `unprovable_under_assumptions`、failed checklist item、または selected route
-  から pruned された状態へ到達させます。より小さい
+  から pruned された状態へ到達させます。下位
   named witness を持つ `unverified_with_next_witness` は同一 Wave の作業項目であり、
   それだけでは user-facing 進捗ではありません。単なる未検査の生成物作成、
   「未証明」の列挙だけで返してはいけません。
@@ -512,7 +522,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   現在の repository / tool 環境でそれ以上進められない境界または user が明示的に求めた
   interim status です。最低限、target claim、非終端 status、通った
   checker-backed fragment、失敗した route、boundary class、boundary cause、
-  必要性 status、minimality evidence、証拠 path、再開条件を示します。
+  必要性 status、boundary-completeness evidence、証拠 path、再開条件を示します。
   残る named witness が repository code、抽出器、generated Lean、theorem graph、
   proof overlay、local proof library、または checker output で処理可能なら、
   その witness は user-facing packet ではなく同一 Wave の work item です。
@@ -553,19 +563,19 @@ checked boundary を top-level 分岐として返してはいけません。個�
   exit gate が失敗した場合は、返答せず、残った frontier を同じ Wave の work item として
   再投入します。
 - user-facing に返す blocker は、選択した theorem/profile の proof graph 上で
-  frontier-minimal であることを示します。すなわち、返した blocker より手前の
+  frontier-reduced であることを示します。すなわち、返した blocker より手前の
   target-chain node は `verified` / `refuted` /
   `unprovable_under_assumptions` / external assumption として処理済みであり、
-  返した blocker の下にさらに小さい未処理 target-chain witness が残っていないことを、
-  proof-path analyzer、lemma graph slice、または checker-backed minimality lemma で
+  返した blocker の下にさらに下位の未処理 target-chain witness が残っていないことを、
+  proof-path analyzer、lemma graph slice、または checker-backed boundary-completeness lemma で
   示します。高レベルな「局所収束が未証明」「KKT が未証明」だけを blocker として
   返してはいけません。
 - route-specific な十分 witness、探索候補、または現在の theorem route で
   消費している変数を、数学的に必要な仮定として書いてはいけません。
-  必要性は checker-backed な refutation / independence / minimality theorem が
+  必要性は checker-backed な refutation / independence / boundary-completeness theorem が
   ある場合だけ `necessary_proven` とし、それ以外は `route_sufficient`、
   `candidate`、または `unknown` と明示します。必要性が未証明なら、命題を
-  消さずに必要性主張だけを落とすのが proof-status 上の最小修正です。
+  消さずに必要性主張だけを落とすのが proof-status 上の直接修正です。
 - `Condition ↔ Target` が `Condition := Target` の定義展開としてだけ成立する場合、
   その route は `necessary_proven` ではなく `circularity_check` です。
   これは語彙検査ではなく graph 検査で行います。target / conclusion 側から
@@ -618,11 +628,11 @@ checked boundary を top-level 分岐として返してはいけません。個�
   それを user-facing な「次の課題」として返してはいけません。同じ turn で
   生成、命題化、checker 実行、proof-status 更新まで進めます。閉じられない場合だけ、
   その witness が top-level 入力、code path、backend 境界、または
-  algorithmic choice のどこで最小に失敗したかを checker evidence 付きで返します。
+  algorithmic choice のどこで直接失敗したかを checker evidence 付きで返します。
 - frontier が、実装 code shape、JIT / StableHLO / LLVM 抽出器、IR-to-Lean 生成、
   theorem graph、proof-status overlay、または proof note の不整合・不足で止まった場合、
   その finding は user-facing blocker ではなく修正対象です。詰まっている箇所を特定したら、
-  最小の責務 surface を修正し、JIT / backend / Lean / theorem graph / proof-search artifact を
+  直接の責務 surface を修正し、JIT / backend / Lean / theorem graph / proof-search artifact を
   再生成し、同じ public-root target theorem / theorem profile へ戻って checker を再実行します。
   修正と再実行を少なくとも一度行ってからでなければ、`unverified_with_next_witness`、
   `unprovable_under_assumptions`、または algorithmic blocker として返してはいけません。
@@ -777,7 +787,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
    - informal proof sketch を assistant-checkable lemmas に分ける
 1. Automation:
    - Lean では Mathlib/Aesop/Plausible/LeanSearchClient を標準 automation / theorem-search / counterexample route とし、`aesop?` / `aesop`、Lean/mathlib tactic search、Plausible counterexample probes、Isabelle Sledgehammer、CoqHammer、SMT solver などを bounded subgoal に使う
-   - automation result は再構成・最小化・checker log まで確認する
+   - automation result は再構成・境界化・checker log まで確認する
 1. Verification:
    - generated command か project-specific command を実行する
    - log が pass した file / theorem だけを verified にする
@@ -847,7 +857,7 @@ proof_nonterminal_return=<path-or-section-anchor|none>
 agent must keep working in the same Wave: repair, regenerate, recheck, or reduce
 the frontier to a checked boundary before responding. `proof_actionable_frontier`
 must be `none` for `complete`; for `boundary_reached` it must point only to the
-checked minimal boundary, not to an unconnected helper theorem.
+checked direct boundary, not to an unconnected helper theorem.
 
 ## Proof Status Table
 
@@ -881,7 +891,7 @@ definition, library, or implementation fact prevents progress.
 For frontier rows in a proof note, prefer `unverified_with_next_witness` over
 bare `unverified`, and fill the remaining-obligation cell with the named
 theorem variable, existing algorithm-output projection, backend evidence, problem-class witness,
-or theorem narrowing needed next. A bare `unverified` frontier row is not a
+or theorem restriction needed next. A bare `unverified` frontier row is not a
 closeout state.
 For implementation-derived proof tasks, `Remaining obligation` is an internal
 frontier cell, not a user-facing final answer. A row with a named theorem
@@ -920,9 +930,9 @@ lemmas. Use this shape:
 | Boundary class              | `code_shape`, `extractor`, `generated_lean`, `theorem_graph_wiring`, `problem_config_input`, `backend_runtime`, `formal_library`, or `algorithm_choice` |
 | Boundary cause              | The exact production mechanism, public input condition, backend/runtime surface, tool absence, or algorithmic choice that blocks the target theorem      |
 | Necessity status            | `necessary_proven`, `route_sufficient`, `candidate`, `unknown`, or `algorithmic_blocker_proven`; do not imply necessity from a selected proof route      |
-| Minimality evidence         | Target-chain/frontier evidence showing no smaller actionable blocker remains under this returned row                                                     |
+| Boundary evidence         | Target-chain/frontier evidence showing no lower-level actionable blocker remains under this returned row                                                     |
 | Evidence path               | Proof status row, lemma graph node, Lean file, source packet, log, or code path                                                                          |
-| Resume condition            | Exact local change, external evidence, user-owned input, tool availability, or theorem narrowing needed before the same target can continue              |
+| Resume condition            | Exact local change, external evidence, user-owned input, tool availability, or theorem restriction needed before the same target can continue              |
 
 If the result is `unprovable_under_assumptions`, include the witness/model that
 satisfies the assumptions while falsifying the entailment. If the result is
@@ -931,9 +941,9 @@ that falsifies the target conclusion. If the result is nonterminal, state why
 local recursion, IR / graph regeneration, proof search, and algorithm
 exploration cannot currently advance it. A selected route may be a useful
 sufficient condition without being necessary; mark that distinction explicitly.
-If a returned boundary cannot be shown frontier-minimal, do not return it.
+If a returned boundary cannot be shown frontier-reduced, do not return it.
 Decompose it once more, repair the graph/extractor when possible, or state the
-tool/checker limitation that prevents the minimality check.
+tool/checker limitation that prevents the boundary-completeness check.
 
 Forbidden implementation-derived return:
 
@@ -945,7 +955,7 @@ Accepted boundary return:
 - `Boundary class=generated_lean`: generated Lean leaves
   `python/solver.py::solve_direction` return vector unconstrained; the public
   root theorem consumes that vector in the residual-decrease edge; extractor
-  coverage and forbidden-reachability checks show no smaller code-derived
+  coverage and forbidden-reachability checks show no lower-level code-derived
   equation is available. Resume by repairing that extractor edge and rerunning
   the same public-root theorem.
 
@@ -1078,13 +1088,13 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
    checker-backed に示した場合だけ採用します。
 1. 弱い命題だけが証明できた場合は、その弱い命題から target theorem へ何が不足するかを
    bridge edge として残します。強い route が refuted の場合は、refutation を残し、
-   theorem narrowing または algorithm change を書きます。
+   theorem restriction または algorithm change を書きます。
 1. blocker が algorithmic choice にある場合は、変更候補を proof obligation として
    書き出し、実装変更後に IR / lemma graph を再生成して同じ loop へ戻します。
    algorithm-change guidance だけで target theorem の作業を終えません。
 1. proof status table と proof note を同じ pass で更新します。open row は active
    frontier であり、次が数学証明、implementation return-value projection、
-   backend evidence binding、theorem narrowing のどれかを必ず示します。user-facing
+   backend evidence binding、theorem restriction のどれかを必ず示します。user-facing
    に返せる途中状態は、その row が failed / diagnostic Goal checklist item として
    記録されている場合だけです。
 

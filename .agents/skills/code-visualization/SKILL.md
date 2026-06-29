@@ -17,6 +17,17 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md shared graph pro
 
 # Code Visualization
 
+## Reader Map
+
+- Purpose: runtime skill for selecting the right diagram or visualization route
+  for code, repository structure, runtime behavior, proof state, or data flow.
+- Use When: a task asks to visualize code, dependencies, state transitions,
+  architecture, proofs, or document-embedded diagrams.
+- Tool Commands: run this skill's command packet, then read the canonical
+  `agents/skills/code-visualization.md` selection rules.
+- Boundary: visualization must be based on the owning evidence source; diagrams
+  do not replace implementation, proof, or dependency checks.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

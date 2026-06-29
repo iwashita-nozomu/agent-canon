@@ -314,10 +314,6 @@ copy_path() {
   local source="$2"
   local abs_path="$ROOT_DIR/$path"
   local abs_source="$ROOT_DIR/$source"
-  if copy_source_is_optional_missing "$path" "$source"; then
-    rm -rf "$abs_path"
-    return 0
-  fi
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
@@ -338,13 +334,6 @@ regular_path() {
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
   cp -a "$abs_source" "$abs_path"
-}
-
-copy_source_is_optional_missing() {
-  local path="$1"
-  local source="$2"
-  [ "$path" = ".github/scripts/checkout_agent_canon_submodule.sh" ] \
-    && [ ! -e "$ROOT_DIR/$source" ]
 }
 
 path_is_tracked() {
@@ -486,11 +475,6 @@ cmd_check() {
     local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
     local abs_source="$ROOT_DIR/$source"
-    if copy_source_is_optional_missing "$path" "$source"; then
-      [ ! -e "$abs_path" ] || echo "copy[$path]=drift" >&2
-      [ ! -e "$abs_path" ] || failed=1
-      continue
-    fi
     if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
       continue
     fi
@@ -552,10 +536,6 @@ stage_sync_paths() {
 
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if [[ "$spec" == .github/scripts/checkout_agent_canon_submodule.sh:* ]] \
-      && [ ! -e "$ROOT_DIR/${spec#*:}" ]; then
-      continue
-    fi
     git -C "$ROOT_DIR" add -A -- "${spec%%:*}"
   done < <(
     {
@@ -1307,14 +1287,6 @@ cmd_status() {
     local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
     local abs_source="$ROOT_DIR/$source"
-    if copy_source_is_optional_missing "$path" "$source"; then
-      if [ -e "$abs_path" ]; then
-        echo "copy[$path]=drift"
-      else
-        echo "copy[$path]=skipped"
-      fi
-      continue
-    fi
     if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
       echo "copy[$path]=ok"
     elif [ -e "$abs_path" ]; then

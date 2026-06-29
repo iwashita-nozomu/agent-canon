@@ -29,6 +29,15 @@ container image 公開、model weight 共有を行う前に、該当 version の
 package metadata、upstream license、distro copyright file、model card を再確認
 してください。
 
+## Reader Map
+
+Use this document to answer which dependency-related tools and external runtime
+tools AgentCanon summarizes for readers, and where license evidence must be
+rechecked. Start with Source Relationship and Verification Policy, then read
+Staleness Risk before relying on a snapshot. The remaining sections group
+AgentCanon-owned dependency tools, runtime/environment tools, Rust crate
+snapshots, boundaries, and upstream license evidence.
+
 ## Source Relationship
 
 この図は、文書がどの正本を読者向けの一覧へ射影しているかを示します。

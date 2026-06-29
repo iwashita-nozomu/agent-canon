@@ -14,6 +14,20 @@ downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: explore algorithm choices and implementation changes under proof
+  obligations before handing terminal proof work to `$formal-proof-workflow`.
+- Section path: read Purpose, Use When, Relationship To
+  `$formal-proof-workflow`, Numerical Iteration Boundary, and Completion
+  Condition before Canonical Flow, Artifact Contract, and Guardrails.
+- Use when: convergence, stopping, finite-precision, certificate, or solver
+  handoff claims need IR, theorem graph, blocker frontier, and algorithm-change
+  evidence.
+- Boundary: blocker summaries and algorithm guidance are intermediate; terminal
+  outcomes remain checker-backed proof, refutation, or
+  `unprovable_under_assumptions`.
+
 ## Purpose
 
 `algorithm-proof-exploration` は、証明義務を入力にしてアルゴリズムを探索・修正する
@@ -62,12 +76,9 @@ backend を top-level profile input、generated backend witness、coverage evide
 Lean 定義と設計定理を checked にしてから、この skill で production entrypoint への
 refinement / realization を扱います。
 この skill から formal-proof subagent へ渡す `formal_proof_handoff` は、
-`agents/COMMUNICATION_PROTOCOL.md` の `Target Binding Packet` を必ず含めます。
-target theorem、public root / entrypoint と signature、theorem-visible return
-projection、identifier naming plan、generated evidence artifacts、accepted top-level
-assumptions、forbidden assumptions、completion condition、validation commands、
-unchecked-output policy を埋められない場合は、曖昧な blocker summary を渡さず、
-IR、theorem graph、または source packet を先に再生成・修復します。
+`agents/COMMUNICATION_PROTOCOL.md` が所有する `Target Binding Packet` を必ず含めます。
+packet を埋められない場合は、曖昧な blocker summary を渡さず、IR、theorem graph、または
+source packet を先に再生成・修復します。
 
 ## Numerical Iteration Boundary
 
@@ -112,7 +123,7 @@ formal-proof handoff の明確化は中間成果です。これらだけでは�
 `unverified_with_next_witness` は formal-proof 側へ戻す探索 queue であり、
 アルゴリズム探索の完了ではありません。証明 path が閉じない場合は、
 current IR / assumption ledger から導けないことを checker-backed に示してから、
-最小の algorithm change、problem-class witness、または generated backend coverage boundary として
+直接の algorithm change、problem-class witness、または generated backend coverage boundary として
 採用します。
 connection / bridge / profile binding / witness instantiation が開いている場合も
 終了ではありません。その接続が caller lemma または target theorem edge を止めているなら、
@@ -143,7 +154,7 @@ Wave は全体 theorem board から開始し、frontier を initializer / recurr
 scalar、nested solver return、generated tolerance、backend decode、problem / config
 witness などの route segment に分けます。1 回の batch は、同じ segment 上の connected
 frontier をまとめて検証・反証・剪定し、public-root theorem が次の抽象境界へ進んだことを
-示すまで続けます。小さい local bridge だけで止まる場合は、その bridge が選択 route を
+示すまで続けます。下位 local bridge だけで止まる場合は、その bridge が選択 route を
 閉じたか、全 sibling frontier が checked boundary / profile-only / obsolete / refuted
 であることを board で示します。
 board は報告用の飾りではなく、作業開始の gate です。証明編集、algorithm 編集、
@@ -152,7 +163,7 @@ necessary / reverse route、circularity / projection-only route、実装 / extra
 backend route、public Problem / config expressivity route、algorithm-change route の
 現在状態を書きます。選択する作業は、どの board 行のどの route segment を閉じるのかを
 明示できる必要があります。明示できない場合は、最後に触った局所 theorem から始めず、
-board / graph extraction を先に直します。smaller witness、local lemma、one-shot wave
+board / graph extraction を先に直します。lower-level witness、local lemma、one-shot wave
 summary は queue item であり、それが属する board 行が terminal または checked boundary
 に達し、actionable sibling row が残らない場合だけ user-facing progress になります。
 収束 / finite-stop task では、各 Wave の最初に問題全体の board pass を行い、
@@ -202,7 +213,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
    - finite-precision floor
    - solver-chain reachability
    - infeasibility / unboundedness certificate
-   - problem-class narrowing
+   - problem-class restriction
 1. Root algorithm:
    - public `main` / run function
    - public `initialize` only as part of that run function's expansion
@@ -285,7 +296,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      bridge candidates, check whether current Lean functions / generated IR
      facts prove or refute each candidate, and rerun the proof of `P`. Repeat
      until `P` is proved, refuted, shown unprovable under the current top-level
-     assumptions, or reduced to a checked boundary. A strictly smaller named
+     assumptions, or reduced to a checked boundary. A lower-level named
      witness becomes the next loop input; it is not an algorithmic completion
      state. A flat candidate list is only input to this loop.
      For active implementation roots, run tactic search as a bounded matrix on
@@ -321,7 +332,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      returned proof outcome to decide whether an algorithm change is needed
   - when formal-proof returns a missing witness or assumption-insufficiency
     result, decide whether that gap is better solved by changing the algorithmic
-    recurrence, deriving a numerical convergence witness, narrowing the problem
+    recurrence, deriving a numerical convergence witness, restricting the problem
     class, or leaving an external assumption boundary
   - frontier を、対象アルゴリズム入力と無関係な仮定注入で閉じてはいけません。
     固定された algorithm では、数学的仮定は theorem top level の
@@ -356,7 +367,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
     quotient / projection、上界補題、selected-scope bound、finite-prefix
     ranking / contraction witness、same-units conversion、既存の algorithm return
     fact の projection を試します。ほしい条件を独立仮定に昇格してはいけません。どの導出 route も
-    閉じない場合だけ、最小 blocker を top-level Problem/config property の不足、
+    閉じない場合だけ、直接 blocker を top-level Problem/config property の不足、
     external architecture evidence の不足、または変更すべき algorithmic choice として返します。
   - if formal-proof returns only `unverified_with_next_witness`, feed that
     named witness back to formal-proof before classifying an algorithmic
@@ -379,7 +390,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
       a solver-return unit conversion, a backend profile instance, or a bridge
       lemma edge. Do not classify it as algorithmic progress until the connection
       is verified, refuted, proved unprovable under current top-level assumptions,
-      or reduced to a minimal code/input/backend boundary with checker evidence
+      or reduced to a direct code/input/backend boundary with checker evidence
     - if the recursion identifies a repairable extractor / IR / generated-Lean /
       theorem-graph / proof-overlay gap, repair that surface, regenerate the
       generated artifacts, and rerun `$formal-proof-workflow` on the same target
@@ -392,16 +403,16 @@ frontier を checked boundary と誤分類していないかを検査するこ�
       existing checker output. Wave output is integrated by the parent and is
       not terminal until the public-root theorem is verified, refuted, proved
       unprovable under current top-level assumptions, or reduced to a checked
-      minimal code / input / backend / algorithm boundary.
+      direct code / input / backend / algorithm boundary.
     - current algorithmic choice を blocker と分類する前に、target theorem に効く
       algorithm block をすべて `$formal-proof-workflow` 側で命題化させます。
     initializer、stopping scalar、step length / acceptance selection、
     direction construction、nested solver certificate、state update、
     residual / merit recomputation、final scalar binding の返却値が theorem に影響するなら、
     route call や unconstrained theorem variable のまま blocker にしてはいけません。
-    その場合は user-facing には返さず、workflow 内の次 frontier として
-    `$formal-proof-workflow` に戻します。algorithmic blocker として返せるのは、
-    残る穴が missing contraction、missing residual-merit selection、
+    その場合は user-facing には返さず、workflow 内の次 frontier または下位
+    formal-proof witness として `$formal-proof-workflow` に戻します。algorithmic
+    blocker として返せるのは、残る穴が missing contraction、missing residual-merit selection、
     missing problem-class bound、missing backend boundary、checker-backed refutation などの
     semantic mechanism まで縮約された場合だけです。
     証明不能時の user-facing 出力は「追加定理が必要」ではなく、実装上の問題です。
@@ -409,7 +420,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
     そのまま報告せず、current code path から証明できるなら証明して接続します。
     証明できないなら、どの production 実装機構、抽出器、generated Lean 関数、
     theorem graph wiring、`Problem` / config 入力条件、または backend 境界が
-    target theorem を止めるのかを最小の因果鎖にします。algorithmic blocker は
+    target theorem を止めるのかを直接の因果鎖にします。algorithmic blocker は
     その因果鎖が checker-backed に code / input / backend / algorithm boundary へ
     縮約された場合だけ返します。
 1. Algorithmic blocker exploration:
@@ -432,7 +443,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      caller-visible output and failed downstream lemma can be named.
      A callee name is never itself the algorithmic blocker. Before reporting an
      algorithmic blocker, expand the callee's generated equations into the
-     smallest relevant function predicates: input/output relation, return
+     directly relevant function predicates: input/output relation, return
      binding, loop-exit reason, stopping predicate, breakdown / exception
      predicate, and nested solver / callback output relation. Only after those
      predicates are verified, refuted, proved unprovable under the current
@@ -464,7 +475,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      caller-side lemma or target theorem edge is open.  Re-enter the recursive
      function frontier immediately: generate the next callee/function property,
      prove it, refute it, prove it unprovable under the current top-level
-     assumptions, or change the algorithm and regenerate IR/graphs.  A smaller
+     assumptions, or change the algorithm and regenerate IR/graphs.  A lower-level
      named witness is not a user-facing stopping point for this class of gap;
      it is the next in-turn work item.
    - the same rule applies to `connection_unconnected`: bridge edges, profile
@@ -486,7 +497,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      code facts before returning to the user. Code-visible initial point,
      epigraph, slack/multiplier floor, initial residual, and child-state facts
      are not acceptable user-facing blockers
-   - if it is algorithmic, enumerate the smallest implementation degrees of
+   - if it is algorithmic, enumerate the directly relevant implementation degrees of
      freedom that could make the theorem provable and translate each candidate
      into a proof obligation before editing code
      - after any algorithm change, regenerate IR/graphs and re-enter the same
@@ -497,7 +508,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
        target theorem once before classifying the blocker as insufficient
        assumptions or algorithmic change guidance. The exploration loop ends
        only with a checker-backed theorem, refutation, unprovability result, or
-       a minimal checked boundary that no repository/tool action can advance.
+       a direct checked boundary that no repository/tool action can advance.
      - keep the implemented trace as the operational assumption. New bounds,
        ranking/contraction witnesses, and projection lemmas must be derived from
      the extracted code path and theorem variables, not from proof-only
@@ -507,7 +518,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      algorithm route と選択済み repair / regeneration / recheck の後に pass した
      場合だけ許可します。failed checklist item は top-level outcome ではなく、
      user が明示的に interim status を求めない限り、次の Wave work item です。
-     proposed algorithm change、smaller witness、
+     proposed algorithm change、lower-level witness、
      missing bridge、unconnected function guarantee、one-shot Wave summary、
      open frontier を持つ graph report は戻り値ではありません。justified な
      algorithm change / repair を行い、JIT / backend / Lean / theorem-graph artifact を
@@ -524,16 +535,16 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      remaining proof obligation is on `Init(Problem, InitializeConfig)` or on a
      stronger Phase-I/globalization algorithm
    - add Phase I / globalization when the theorem needs basin entry
-   - narrow a theorem to selected local scope / warm-start assumptions
+   - restrict a theorem to selected local scope / warm-start assumptions
    - add problem-class or backend evidence witnesses
 1. Formal proof handoff:
    - pass exact theorem variables, proof artifacts, checked fragments, and
      remaining obligations to `$formal-proof-workflow`; remaining obligations
      are internal frontier inputs, not user-facing terminal blockers
-   - include the complete `Target Binding Packet`: target theorem, public root,
-     return projection, identifier naming plan, generated evidence, accepted /
-     forbidden assumptions, completion condition, validation commands, and
-     unchecked-output policy
+   - include the complete protocol-owned `Target Binding Packet`: target theorem,
+     public root, return projection, identifier naming plan, generated evidence,
+     accepted / forbidden assumptions, completion condition, validation commands,
+     and unchecked-output policy
    - do not mark a graph path verified unless checker-backed proof nodes cover the target chain
 
 ## Artifact Contract

@@ -10,6 +10,17 @@ upstream design ../../agents/workflows/adaptive-improvement-workflow.md adaptive
 @dependency-end
 -->
 
+## Reader Map
+
+- Owns the P3 checklist for AgentCanon self-growth and runtime feedback
+  improvement.
+- Main path: Scope defines when P3 starts, Checklist enumerates required
+  capabilities, and P3 done condition states completion.
+- Read this when implementing or reviewing self-growth, feedback taxonomy, or
+  adaptive improvement evidence.
+- Boundary: this checklist records completion criteria; detailed workflows live
+  in the linked agent-learning and adaptive-improvement docs.
+
 ## Scope
 
 P3 makes AgentCanon able to improve itself without turning every observation into permanent prose. It starts after completion profiles, evidence schemas, and MCP/goal status are defined.

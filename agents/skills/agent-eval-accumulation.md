@@ -13,6 +13,17 @@ downstream implementation ../../.agents/skills/agent-eval-accumulation/SKILL.md 
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: accumulates AgentCanon eval evidence through registered producers
+  and log-archive storage instead of hand-written summaries.
+- Use When: eval evidence is missing, stale, failing, or needs family-level
+  accumulation before claims are accepted.
+- Section path: Purpose and Use When define scope; Required Flow is the
+  mandatory checklist; Boundaries limits what this skill may generate or claim.
+- Boundary: do not hand-write eval reports when a registered producer and
+  archive path own the evidence.
+
 ## Purpose
 
 AgentCanon の prompt / role / local-LLM / workflow / report-quality eval を
@@ -29,7 +40,7 @@ checker output と archive 側 accumulated report に残します。
 
 - `eval_accumulation_check.py` が `no-*-eval-reports`、duplicate run id、
   missing run id、legacy source-tree result などを返した
-- `$agent-log-analysis` が compact dashboard / API の後に eval family gap を見つけた
+- `$agent-log-analysis` が structured dashboard / API の後に eval family gap を見つけた
 - skill、workflow、subagent role、router、report-writing、local LLM routing を直した後、
   accumulated eval evidence を PR / closeout gate に戻す必要がある
 - 過去 run の反復課題を skill / workflow / role prompt に還元する前に、どの eval

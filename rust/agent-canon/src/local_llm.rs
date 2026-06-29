@@ -1234,7 +1234,7 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
     if candidates.is_empty() {
         candidates.push(SurfaceCandidate {
             surface: "needs_responsibility_survey".to_string(),
-            owner: "Route unknown until responsibility search narrows the surface".to_string(),
+            owner: "Route unknown until responsibility search selects the surface".to_string(),
             score: 0,
             rationale: vec!["no_keyword_surface_match".to_string()],
             canonical_paths: vec![
@@ -1246,7 +1246,7 @@ fn implementation_surface_candidates(request: &str) -> Vec<SurfaceCandidate> {
             ],
             required_checks: vec![
                 "agent-canon local-llm search --purpose <request> --providers llm,tool,header-deps,code-deps,vector --format text".to_string(),
-                "bounded rg -l only after the responsibility route narrows candidate paths".to_string(),
+                "bounded rg -l only after the responsibility route selects candidate paths".to_string(),
             ],
         });
     }

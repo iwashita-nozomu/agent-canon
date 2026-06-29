@@ -13,13 +13,23 @@ upstream design ../../documents/dependency-manifest-design.md dependency evidenc
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+## Reader Map
+
+This template owns the implementation-facing detailed design packet. Fill the
+goal, abstract design frame, evidence ledger, reuse survey, requirement packet,
+implementation source packet, side-effect map, reader path, clause mapping,
+file-by-file design, trace, naming plan, validation, rollback, and risks before
+handoff. The implementation worker should use this as the approved source
+packet; unresolved responsibility, naming, validation, or API-shape gaps belong
+back in design review rather than local implementation judgment.
+
 ## Goals
 
 <!-- Describe the design goal in implementation-facing terms. The goal is to produce the design document that implementation will follow. -->
 
 ## Abstract Design Frame
 
-<!-- Before narrowing to files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
+<!-- Before selecting files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
 
 - Responsibility model:
 - Concept or layer model:

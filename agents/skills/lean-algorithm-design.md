@@ -61,7 +61,7 @@ implementation or implementation-derived proof workflows.
    - acceptance / restoration / line-search predicates
    - inner-solver input-output contracts
    - returned certificate predicates
-1. Prove small structural theorems first, but only when they feed the design
+1. Prove local structural theorems first, but only when they feed the design
    target. Examples: epigraph equivalence, filter-progress implication,
    restoration acceptance, inner-solver contract composition, ranking decrease.
 1. State the target theorem over the Lean design API, not over production
@@ -77,7 +77,7 @@ implementation or implementation-derived proof workflows.
    - inner-solver contract is insufficient
    - Lean model is missing a required algorithm component
 1. Iterate on the algorithm, not production code, until the design target is
-   proved, refuted, or narrowed to a checked problem class.
+   proved, refuted, or restricted to a checked problem class.
 1. Only after Lean design checks pass, write an implementation handoff:
    - Lean definitions that are the source design
    - checked theorem names and `lake build` command
@@ -88,13 +88,13 @@ implementation or implementation-derived proof workflows.
 ## Rules
 
 - Do not use existing production helpers as the design model. The design model
-  is mathematical and small; production code is added later.
+  is mathematical and local; production code is added later.
 - Do not add proof-only fields to production `Info`, config, or state.
 - Do not accept a theorem that closes only by defining the condition as the
   target itself; run graph or dependency checks for circularity when a problem
   class is claimed.
 - Do not report a list of missing lemmas as completion. Either prove/refute the
-  design target or return a checked minimal design boundary.
+  design target or return a checked direct design boundary.
 - For optimization algorithms, keep feasibility, objective progress, local
   optimality, infeasibility, and unboundedness certificates separate.
 - For nested solvers, keep inner-solver contracts parametric in quantities the

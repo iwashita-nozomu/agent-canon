@@ -10,6 +10,14 @@ upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared runtime surfac
 @dependency-end
 -->
 
+## Reader Map
+
+Use this checklist after P-1 through P3 have established completion judgment,
+mechanical evidence, MCP status, and self-growth repair. Read P4 for surface
+ownership and AgentCanon sync, P5 for workflow and skill contracts, and P6 for
+template bootstrap, Docker, CI, and PR evidence. The done condition defines
+when shared-canon propagation and contract checks are ready for later layers.
+
 ## P4: surface ownership and AgentCanon sync
 
 ### [ ] P4-001: changed path surface classification

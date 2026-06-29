@@ -10,6 +10,14 @@ upstream implementation ../../tools/agent_tools/task_close.py current closeout e
 @dependency-end
 -->
 
+## Reader Map
+
+Use this document to answer why completion judgment must precede agent settings,
+workflow changes, prompt evals, MCP routing, and self-growth loops. Read Core
+correction and Revised priority order first, then use the P-1, manual unlock,
+evidence hierarchy, Definition of Done, runtime-configuration, self-growth, and
+invariant sections to trace the completion-first argument.
+
 ## Core correction
 
 The first priority is not agent settings. The first priority is the set of rules and tools that decide whether a task is complete.

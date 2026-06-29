@@ -10,6 +10,13 @@ upstream design README.md notes lifecycle index
 
 この note は、repo-wide に何度も読み返す avoid list を短く固定します。
 
+## この文書の読み方
+
+- この note は、repo-wide に繰り返し避けるべき実装、設計、文書、workflow、実験運用の pattern を短く固定します。
+- `## Avoid` が本体で、根拠は `## Source`、読み直すタイミングは `## When To Re-Read` にあります。
+- 新しい worktree、Docker / CI / dependency 更新、実験 loop closeout、repo-wide workflow 整理の前に読み返します。
+- avoid list は guardrail であり、正本 policy や task-specific design packet の代替ではありません。
+
 ## Avoid
 
 - 会話だけを根拠に実装、設計変更、文書改訂へ進める
@@ -69,7 +76,7 @@ upstream design README.md notes lifecycle index
 - export worker に live Python object reference を渡す。cross-process 境界では serializable manifest と reconstruction recipe を使う
 - runtime materialization を compile DAG node として扱う。`LoadedProgram` は runtime vertex / lifetime scope に属する
 - external runner が process model を持つのに、bridge-local な追加 process spawn を足す
-- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
+- toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
 - 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にする
 - failure-onset dimension を記録せず、implementation bug と真の frontier limit を混同する
 - `notes/` に置くべき一時メモを `documents/` へ混ぜる

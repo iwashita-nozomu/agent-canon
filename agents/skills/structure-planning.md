@@ -12,6 +12,20 @@ downstream design html-output.md consumes structure contracts for explicit HTML 
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: create a structure contract before reports, experiments, documents,
+  presentations, HTML pages, or refactors are drafted, rendered, run, or edited.
+- Section path: Purpose and Use When classify the task; Structure Contract and
+  Default Sequence define the required planning fields; Relationships and
+  Closeout Tokens show consuming skills and evidence.
+- Use when: section order, first artifact, source map, invalid interpretations,
+  slide/storyboard order, experiment slice, or refactor slice must be fixed
+  before execution.
+- Boundary: this skill owns structure shape, not raw result storage, experiment
+  execution, report prose, HTML rendering, or behavior-preserving
+  implementation.
+
 ## Purpose
 
 `structure-planning` is the skill for building a structure contract before

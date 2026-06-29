@@ -12,6 +12,15 @@ upstream design ./template-github-remote.md template GitHub canonical remote pol
 
 この文書は、`git clone <template>` 直後に新しい repo を使い始めるときの最短 runbook です。
 
+## この文書の読み方
+
+- この文書は、template clone 直後の初期化、受け入れ確認、開発環境、
+  作業開始までの最短 runbook を扱います。
+- 主な順路は、Clone 直後、初期化、受け入れ確認、開発環境、作業開始です。
+- 新しい template-derived repo を作るときに読みます。
+- 境界: GitHub remote policy や shared runtime surface の詳細はリンク先の
+  documents が正本です。
+
 ## 1. Clone 直後
 
 ```bash

@@ -36,7 +36,9 @@ class RouteToolTest(unittest.TestCase):
 
     def test_area_outputs_short_tool_and_skill(self) -> None:
         """Area routing should keep names short and machine-readable."""
-        result = self.run_route("--area", "checks", "--risk", "focused", "--changed", "README.md")
+        result = self.run_route(
+            "--area", "checks", "--risk", "focused", "--changed", "README.md"
+        )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ROUTE=task-routing", result.stdout)
@@ -129,10 +131,31 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("small-change-routing", decision["related_skill_candidates"])
-        self.assertNotIn("small-change-routing", decision["active_skills"])
+        self.assertIn("owner-bounded-routing", decision["related_skill_candidates"])
+        self.assertNotIn("owner-bounded-routing", decision["active_skills"])
         self.assertIn("task-routing", decision["related_skills"])
-        self.assertIn("small-change-routing", decision["related_skills"]["task-routing"])
+        self.assertIn(
+            "owner-bounded-routing", decision["related_skills"]["task-routing"]
+        )
+
+    def test_prompt_routes_repo_owned_tool_routing_feedback(self) -> None:
+        """Repo-owned tool routing feedback should activate task-routing."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "レポ内の自作ツールへの自動ルーティングが全くされません。"
+                "ツールを逐次呼ぶこととスキルの動的ルーティングも直して。"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("tool-finding-report", decision["related_skill_candidates"])
+        self.assertIn("agent-log-analysis", decision["related_skill_candidates"])
 
     def test_prompt_routes_code_visualization_selection(self) -> None:
         """Code visualization prompts should enter the diagram selector skill."""
@@ -155,12 +178,20 @@ class RouteToolTest(unittest.TestCase):
                 decision = json.loads(result.stdout)
                 self.assertIn("code-visualization", decision["matched_skills"])
                 self.assertIn("code-visualization", decision["active_skills"])
-                self.assertIn("dependency-analysis", decision["related_skill_candidates"])
-                self.assertIn("structure-planning", decision["related_skill_candidates"])
-                self.assertIn("algorithm-flowchart", decision["related_skill_candidates"])
+                self.assertIn(
+                    "dependency-analysis", decision["related_skill_candidates"]
+                )
+                self.assertIn(
+                    "structure-planning", decision["related_skill_candidates"]
+                )
+                self.assertIn(
+                    "algorithm-flowchart", decision["related_skill_candidates"]
+                )
                 self.assertIn("html-output", decision["related_skill_candidates"])
                 self.assertIn("md-style-check", decision["related_skill_candidates"])
-                self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+                self.assertNotEqual(
+                    decision["evidence"], "mode=repo-changing;matched=none"
+                )
 
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
@@ -175,7 +206,9 @@ class RouteToolTest(unittest.TestCase):
                 "json",
             )
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertEqual(python_decision["schema"], "agent_canon.route.skill_route.v1")
         self.assertIn("task-routing", python_decision["active_skills"])
@@ -184,13 +217,31 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_old_tool_document_cleanup(self) -> None:
         """Old tool and document cleanup requests should enter document-canon cleanup."""
-        result = self.run_route("--prompt", "古いツール，文書の掃除を", "--format", "json")
+        result = self.run_route(
+            "--prompt", "古いツール，文書の掃除を", "--format", "json"
+        )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertIn("document-canon-cleanup", decision["matched_skills"])
         self.assertIn("document-canon-cleanup", decision["active_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
+
+    def test_prompt_routes_gpu_execution(self) -> None:
+        """GPU execution prompts should activate the managed GPU execution skill."""
+        result = self.run_route(
+            "--prompt",
+            "Python実行はExperimentRunnerに移譲し，GPU利用では先取無効を追加して実行",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("gpu-execution", decision["matched_skills"])
+        self.assertIn("gpu-execution", decision["active_skills"])
+        self.assertIn("experiment-lifecycle", decision["related_skill_candidates"])
+        self.assertIn("computational-optimization", decision["related_skill_candidates"])
 
     def test_prompt_routes_codex_report_document_repo_optimization(self) -> None:
         """Codex report and document based repo optimization should not fall through."""
@@ -203,7 +254,11 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        for skill in ("agent-log-analysis", "document-canon-cleanup", "structure-refactor"):
+        for skill in (
+            "agent-log-analysis",
+            "document-canon-cleanup",
+            "structure-refactor",
+        ):
             self.assertIn(skill, decision["matched_skills"])
             self.assertIn(skill, decision["active_skills"])
         self.assertIn("report-writing", decision["related_skill_candidates"])
@@ -228,7 +283,15 @@ class RouteToolTest(unittest.TestCase):
     def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
         """The shell wrapper must not preserve a local-llm route-skill alias."""
         result = subprocess.run(
-            [str(AGENT_CANON_CLI), "local-llm", "route-skill", "--prompt", "x", "--format", "json"],
+            [
+                str(AGENT_CANON_CLI),
+                "local-llm",
+                "route-skill",
+                "--prompt",
+                "x",
+                "--format",
+                "json",
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -237,7 +300,9 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertEqual(result.stdout, "")
-        self.assertIn("LOCAL_LLM_CLI_ERROR=unknown local-llm command route-skill", result.stderr)
+        self.assertIn(
+            "LOCAL_LLM_CLI_ERROR=unknown local-llm command route-skill", result.stderr
+        )
 
     def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
         """Underscore-prefixed skills are private and stay out of public routing."""
@@ -293,12 +358,16 @@ class RouteToolTest(unittest.TestCase):
             "json",
         )
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertEqual(python_decision["mode"], "repo-changing")
         self.assertIn("task-routing", python_decision["matched_skills"])
         self.assertIn("task-routing", python_decision["active_skills"])
-        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertNotEqual(
+            python_decision["evidence"], "mode=repo-changing;matched=none"
+        )
 
     def test_prompt_routes_agent_learning_and_oop_readability(self) -> None:
         """Weak historical skill surfaces should be recommended from contextual prompts."""
@@ -356,7 +425,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_source_file_order_feedback(self) -> None:
-        """Source file order feedback should reach small change and Python review routes."""
+        """Source file order feedback should reach bounded and Python review routes."""
         result = self.run_route(
             "--prompt",
             "コードファイル内の順序がわかりにくいです",
@@ -366,8 +435,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("small-change-routing", decision["matched_skills"])
-        self.assertIn("small-change-routing", decision["active_skills"])
+        self.assertIn("owner-bounded-routing", decision["matched_skills"])
+        self.assertIn("owner-bounded-routing", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
         self.assertIn("python-review", decision["deferred_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
@@ -393,9 +462,15 @@ class RouteToolTest(unittest.TestCase):
                 )
                 python_decision = json.loads(python_result.stdout)
                 self.assertIn("adaptive-improvement-loop", python_decision["skills"])
-                self.assertIn("adaptive-improvement-loop", python_decision["matched_skills"])
-                self.assertIn("adaptive-improvement-loop", python_decision["active_skills"])
-                self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+                self.assertIn(
+                    "adaptive-improvement-loop", python_decision["matched_skills"]
+                )
+                self.assertIn(
+                    "adaptive-improvement-loop", python_decision["active_skills"]
+                )
+                self.assertNotEqual(
+                    python_decision["evidence"], "mode=repo-changing;matched=none"
+                )
 
     def test_prompt_routes_root_design_followup_to_task_routing(self) -> None:
         """Broad follow-up redesign prompts should not fall through to matched=none."""
@@ -422,7 +497,9 @@ class RouteToolTest(unittest.TestCase):
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         for skill in (
             "task-routing",
@@ -438,20 +515,26 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", python_decision["active_skills"])
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertIn("agent-learning", python_decision["deferred_skills"])
-        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertNotEqual(
+            python_decision["evidence"], "mode=repo-changing;matched=none"
+        )
 
     def test_prompt_routes_repo_wide_responsibility_deduplication(self) -> None:
         """Repo-wide over-splitting and responsibility overlap should route to structure repair."""
         prompt = "レポ全体をレビューしながら過剰分割，責務重複を排除してください"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertIn("structure-refactor", python_decision["matched_skills"])
         self.assertIn("structure-refactor", python_decision["active_skills"])
         self.assertIn("comprehensive-development", python_decision["matched_skills"])
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
-        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertNotEqual(
+            python_decision["evidence"], "mode=repo-changing;matched=none"
+        )
 
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
         """All-skill command packet repair should not fall through."""
@@ -461,18 +544,29 @@ class RouteToolTest(unittest.TestCase):
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
-        for skill in ("task-routing", "structure-refactor", "comprehensive-development", "agent-learning"):
+        for skill in (
+            "task-routing",
+            "structure-refactor",
+            "comprehensive-development",
+            "agent-learning",
+        ):
             self.assertIn(skill, python_decision["matched_skills"])
             self.assertIn(skill, python_decision["skills"])
         self.assertIn("task-routing", python_decision["active_skills"])
         self.assertIn("structure-refactor", python_decision["active_skills"])
         self.assertIn("comprehensive-development", python_decision["deferred_skills"])
         self.assertIn("agent-learning", python_decision["deferred_skills"])
-        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertNotEqual(
+            python_decision["evidence"], "mode=repo-changing;matched=none"
+        )
 
-    def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(self) -> None:
+    def test_prompt_routes_repo_refactor_and_personal_codex_to_structure_refactor(
+        self,
+    ) -> None:
         """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
         result = self.run_route(
             "--prompt",
@@ -496,7 +590,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
         slash_result = self.run_route("--name", "repo/refactor")
-        self.assertEqual(slash_result.returncode, 0, slash_result.stdout + slash_result.stderr)
+        self.assertEqual(
+            slash_result.returncode, 0, slash_result.stdout + slash_result.stderr
+        )
         self.assertIn("CANONICAL_AREA=structure", slash_result.stdout)
 
     def test_structure_review_routes_to_structure_refactor(self) -> None:
@@ -515,7 +611,11 @@ class RouteToolTest(unittest.TestCase):
 
     def test_structure_review_name_alias_routes_to_structure_area(self) -> None:
         """Structure-review aliases should resolve to the structure area."""
-        for alias in ("structure-review", "structure-review-skill", "structural-review"):
+        for alias in (
+            "structure-review",
+            "structure-review-skill",
+            "structural-review",
+        ):
             with self.subTest(alias=alias):
                 result = self.run_route("--name", alias)
 
@@ -523,7 +623,9 @@ class RouteToolTest(unittest.TestCase):
                 self.assertIn("CANONICAL_AREA=structure", result.stdout)
                 self.assertIn("CANONICAL_TOOL=route.py --area structure", result.stdout)
 
-    def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(self) -> None:
+    def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(
+        self,
+    ) -> None:
         """Routing-context redesign prompts should activate the broader review stack."""
         result = self.run_route(
             "--prompt",
@@ -544,7 +646,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("change-review", decision["matched_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
-    def test_prompt_does_not_route_standalone_toolcall_work_to_log_analysis(self) -> None:
+    def test_prompt_does_not_route_standalone_toolcall_work_to_log_analysis(
+        self,
+    ) -> None:
         """Standalone ToolCall implementation text should not imply log analysis."""
         result = self.run_route(
             "--prompt",
@@ -654,7 +758,9 @@ class RouteToolTest(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 2)
-        self.assertIn("SKILL_ROUTER_ERROR=duplicate skill catalog id: task-routing", result.stderr)
+        self.assertIn(
+            "SKILL_ROUTER_ERROR=duplicate skill catalog id: task-routing", result.stderr
+        )
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_route_unknown_related_skill_fails_structured(self) -> None:
@@ -685,7 +791,9 @@ class RouteToolTest(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 2)
-        self.assertIn("task-routing.related_skills unknown skill: missing-skill", result.stderr)
+        self.assertIn(
+            "task-routing.related_skills unknown skill: missing-skill", result.stderr
+        )
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_routes_formatter_adjacent_checks_to_markdown_style(self) -> None:
@@ -752,29 +860,39 @@ class RouteToolTest(unittest.TestCase):
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         for skill in ("task-routing", "pr-processing", "refactor-loop"):
             self.assertIn(skill, python_decision["matched_skills"])
             self.assertIn(skill, python_decision["active_skills"])
-        self.assertNotEqual(python_decision["evidence"], "mode=repo-changing;matched=none")
+        self.assertNotEqual(
+            python_decision["evidence"], "mode=repo-changing;matched=none"
+        )
 
     def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
         """Unneeded numerical-test complaints should activate test-design routing."""
         prompt = "不要な数値テストを入れるのをやめさせてください"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertIn("test-design", python_decision["matched_skills"])
         self.assertIn("test-design", python_decision["active_skills"])
 
-    def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(self) -> None:
+    def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(
+        self,
+    ) -> None:
         """English unneeded numerical-test prompts should route to test design."""
         prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertIn("test-design", python_decision["matched_skills"])
         self.assertIn("test-design", python_decision["active_skills"])
@@ -787,7 +905,9 @@ class RouteToolTest(unittest.TestCase):
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(python_result.returncode, 0, python_result.stdout + python_result.stderr)
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
         python_decision = json.loads(python_result.stdout)
         self.assertEqual(python_decision["schema"], "agent_canon.route.skill_route.v1")
         self.assertEqual(python_decision["route"], "skill-selection")
@@ -803,10 +923,14 @@ class RouteToolTest(unittest.TestCase):
 
     def test_unknown_markdown_does_not_suggest_skill(self) -> None:
         """Markdown output should not imply a canonical skill for unknown names."""
-        result = self.run_route("--name", "unknown_super_router.py", "--format", "markdown")
+        result = self.run_route(
+            "--name", "unknown_super_router.py", "--format", "markdown"
+        )
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("| `unknown_super_router.py` | `unknown` | `` | `` | `` |", result.stdout)
+        self.assertIn(
+            "| `unknown_super_router.py` | `unknown` | `` | `` | `` |", result.stdout
+        )
 
     def test_json_list_is_parseable(self) -> None:
         """JSON list output should be usable by other tools."""

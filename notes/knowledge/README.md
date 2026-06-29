@@ -23,7 +23,7 @@ upstream design ../README.md notes lifecycle index
 
 ## Template
 
-- [KNOWLEDGE_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
+- [KNOWLEDGE_NOTE_TEMPLATE.md](KNOWLEDGE_NOTE_TEMPLATE.md)
 
 ## 典型トピック
 

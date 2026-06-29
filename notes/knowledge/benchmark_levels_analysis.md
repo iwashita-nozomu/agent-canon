@@ -26,4 +26,4 @@ benchmark は、重さの異なる層を明示しておくと運用しやすく�
 
 ## Related
 
-- [Benchmark vs Experiment](/mnt/l/workspace/project_template/notes/knowledge/benchmark_vs_experiment.md)
+- [Benchmark vs Experiment](benchmark_vs_experiment.md)

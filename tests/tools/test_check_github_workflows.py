@@ -565,7 +565,17 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 relative == ".github/scripts/checkout_agent_canon_submodule.sh"
                 and not source.exists()
             ):
-                source = REPO_ROOT / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    'script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"\n'
+                    'repo_root="$(cd "${script_dir}/../.." && pwd -P)"\n'
+                    'exec bash "${repo_root}/tools/ci/checkout_agent_canon_submodule.sh" "$@"\n',
+                    encoding="utf-8",
+                )
+                continue
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             if source.is_symlink():

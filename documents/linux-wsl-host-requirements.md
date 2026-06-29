@@ -11,6 +11,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 この文書は、この template を日常利用する host の前提条件をまとめます。
 対象は Linux と WSL2 です。macOS や純 Windows native は正本対象にしません。
 
+## この文書の読み方
+
+この文書は、Linux / WSL2 host の対象、必須条件、推奨設定、WSL2 rule、Docker / container、VS Code、GPU、Codex / agent、初期確認、置き場の原則を説明します。新しい host を準備するときは対象と必須から読み、devcontainer や GPU を使う場合は該当章へ進みます。macOS と純 Windows native の手順はこの文書の正本対象外です。
+
 ## 1. 対象
 
 - Ubuntu などの Linux host
@@ -44,7 +48,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   `AGENT_CANON_SECRET_DIR` で dev container へ渡す
 - SSH agent を使う場合は `SSH_AUTH_SOCK` が現在の shell で有効な socket を指す
 - `git config user.name` と `git config user.email` を設定する
-- `rg` を入れる
+- repository 検索には Git 標準の path / `git grep` を使える状態にする
 - VS Code を使う場合は AgentCanon-managed `.vscode/extensions.json` の推奨拡張を入れる
 
 ## 4. WSL2 Rule

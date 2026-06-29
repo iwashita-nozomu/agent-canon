@@ -14,11 +14,12 @@ upstream design ../README.md shared canon overview
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
 skill を user-facing に明示するときは `$skill-name` を使います。
 
-## Reader Position
+## Reader Map
 
-全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、
-agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
-`agents/canonical/README.md` は layout appendix であり、最初の hub ではありません。
+- この文書は、AgentCanon の人間向け agent hub として workflow、skill、subagent、runtime entrypoint への入口を所有します。
+- `## Hub Routes` は目的別入口、`## Runtime Entry Points` と `## Skills And Subagents` は runtime surface、`## Team Shape` 以降は role と startup / command contract を扱います。
+- 全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
+- chunked reading では、まず `## Hub Routes` で入口を選び、`agents/canonical/README.md` は layout appendix として必要時だけ参照します。
 
 ## Hub Routes
 
@@ -91,7 +92,7 @@ $adaptive-improvement-loop
 $paper-writing
 ```
 
-repo-changing task の最小 bundle:
+repo-changing task の基本 bundle:
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
@@ -150,7 +151,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - workflow family 選択はこの hub と `workflows/README.md` を正本にし、`canonical/README.md` を第二の hub にしません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
-- 実行環境固有の都合がある場合だけ、`AGENTS.md` に最小限の差分を持たせます。
+- 実行環境固有の都合がある場合だけ、`AGENTS.md` にその環境で必要な差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/`、dependency surface、local implementation を先に探索します。
 - reuse sweep をせずに新しい file や module を増やしません。
 - 既存実装を使えるか、導入済みライブラリを拡張できるか、既存では足りない理由が何かを artifact に残さずに新規実装へ進めません。

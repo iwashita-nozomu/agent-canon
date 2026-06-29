@@ -12,6 +12,19 @@ downstream implementation ../../.agents/skills/html-output/SKILL.md exposes this
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: produce browser-readable HTML artifacts with layout, asset,
+  preview-server, and publication evidence.
+- Section path: Purpose and Use When decide whether HTML is in scope; Required
+  Order defines the build sequence; Browser Server Commands, Layout Quality
+  Gate, and Closeout Tokens define preview and validation.
+- Use when: the user explicitly asks for HTML, a browser view, dashboard,
+  external URL, local preview server, or polished HTML report artifact.
+- Boundary: reports default to Markdown unless HTML is explicit; claims, raw
+  evidence, experiment execution, and domain decisions stay with their owner
+  skills.
+
 ## Purpose
 
 `html-output` is the skill for producing polished browser-readable HTML

@@ -6,6 +6,7 @@
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""
+
 from __future__ import annotations
 
 import hashlib
@@ -376,7 +377,9 @@ def append_mid_task_wave_checkpoint(
         f"{extra_fields}"
     )
     monitoring_path.write_text(
-        monitoring_text.replace("\n## Tool Warnings", f"\n{actual_event}\n\n## Tool Warnings"),
+        monitoring_text.replace(
+            "\n## Tool Warnings", f"\n{actual_event}\n\n## Tool Warnings"
+        ),
         encoding="utf-8",
     )
 
@@ -591,26 +594,38 @@ class TaskStartAndCloseTest(unittest.TestCase):
             same_role_policy["required_fields"],
         )
         self.assertLessEqual(
-            {"role_type", "instance_id", "input_packet", "allowed_paths", "do_not_read"},
+            {
+                "role_type",
+                "instance_id",
+                "input_packet",
+                "allowed_paths",
+                "do_not_read",
+            },
             {str(field) for field in raw_same_role_fields},
         )
 
     def assert_initial_wave_execution_gate(self, report_dir: Path) -> None:
         """Assert generated run bundles expose the parent wave execution gate."""
         schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
-        monitoring_text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+        monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+            encoding="utf-8"
+        )
         expected_schedule = (
             "| WAVE-1 | parent | parent_runtime_authority_required | "
             "bootstrap_initial_intake_wave |"
         )
         self.assertIn(expected_schedule, schedule_text)
-        self.assertIn("requirements_organizer,explorer,execution_planner", schedule_text)
+        self.assertIn(
+            "requirements_organizer,explorer,execution_planner", schedule_text
+        )
         self.assertIn("Role Instances", schedule_text)
         self.assertIn("role_instances=none", monitoring_text)
         self.assertIn("blocked_authority_required", schedule_text)
         self.assertIn("wave_event=recorded wave_id=WAVE-1", monitoring_text)
         self.assertIn("event_kind=authority_blocker", monitoring_text)
-        self.assertIn("spawn_authority=parent_runtime_authority_required", monitoring_text)
+        self.assertIn(
+            "spawn_authority=parent_runtime_authority_required", monitoring_text
+        )
         self.assertIn("status=blocked_authority_required", monitoring_text)
         self.assertIn(
             "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation",
@@ -639,14 +654,22 @@ class TaskStartAndCloseTest(unittest.TestCase):
             return
         prompt_contract = cast("dict[str, object]", role["prompt_contract"])
         self.assertIsInstance(prompt_contract, dict)
+        self.assertEqual(
+            prompt_contract["common_prompt_must_include_ref"],
+            "run.handoff_context_policy.common_prompt_must_include",
+        )
         run = cast("dict[str, object]", manifest["run"])
         context_policy = cast("dict[str, object]", run["handoff_context_policy"])
-        common_fields = cast("list[object]", context_policy["common_prompt_must_include"])
+        common_fields = cast(
+            "list[object]", context_policy["common_prompt_must_include"]
+        )
         role_fields = cast("list[object]", prompt_contract["role_prompt_must_include"])
         prompt_fields = {str(field) for field in (*common_fields, *role_fields)}
         self.assertTrue(required_fields.issubset(prompt_fields), role_id)
 
-    def assert_abstract_design_prompt_contracts(self, manifest: dict[str, object]) -> None:
+    def assert_abstract_design_prompt_contracts(
+        self, manifest: dict[str, object]
+    ) -> None:
         """Assert ADF prompt contracts for generated design and review roles."""
         expected = {
             "designer": {
@@ -706,12 +729,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout
+            )
             self.assertIn(
                 "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon-parent-repo-latest-checklist.md",
                 result.stdout,
             )
-            self.assertIn("AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
+            )
 
     def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
         """Dirty shared-canon surfaces should not point only to commit-or-stash."""
@@ -799,7 +826,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_CHECKLIST=vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
                 result.stdout,
             )
-            self.assertIn("AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
+            )
 
     def test_task_start_allows_unrelated_parent_dirty_state_for_submodule_update(
         self,
@@ -848,7 +877,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            (workspace_root / "local-note.md").write_text("unrelated\n", encoding="utf-8")
+            (workspace_root / "local-note.md").write_text(
+                "unrelated\n", encoding="utf-8"
+            )
 
             result = subprocess.run(
                 [
@@ -926,7 +957,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout
+                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest",
+                result.stdout,
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
@@ -944,7 +976,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger",
                 result.stdout,
             )
-            self.assertIn("SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir", result.stdout)
+            self.assertIn(
+                "SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir",
+                result.stdout,
+            )
             self.assertIn("--subagent-wave", result.stdout)
             self.assertIn(
                 "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
@@ -986,8 +1021,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIsNotNone(role_instances_match)
             role_instances = cast(re.Match[str], role_instances_match).group(1)
             self.assertIn("researcher:explorer:researcher_explorer", role_instances)
-            self.assertIn("research_reviewer:reviewer:research_reviewer_reviewer", role_instances)
-            self.assertIn("infra_reviewer:reviewer:infra_reviewer_reviewer", role_instances)
+            self.assertIn(
+                "research_reviewer:reviewer:research_reviewer_reviewer", role_instances
+            )
+            self.assertIn(
+                "infra_reviewer:reviewer:infra_reviewer_reviewer", role_instances
+            )
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -1001,7 +1040,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
-            self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn(
+                "IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout
+            )
             self.assertIn(
                 "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
                 result.stdout,
@@ -1010,28 +1051,131 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
                 result.stdout,
             )
+            self.assertIn(
+                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_SCOPE_SEQUENCE=surface_route_seed,responsibility_search,reuse_survey,stale_surface_scan,dependency_expansion,handoff_scope",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff",
+                result.stdout,
+            )
+            self.assertIn("USER_FACING_LANGUAGE=ja", result.stdout)
+            self.assertIn(
+                "USER_FACING_LANGUAGE_SOURCE=AGENTS.md#Template Context",
+                result.stdout,
+            )
+            self.assertIn(
+                "USER_FACING_LANGUAGE_SCOPE=updates,final_reports,review_summaries,handoff_guidance,reader_facing_docs",
+                result.stdout,
+            )
+            self.assertIn(
+                "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
+                result.stdout,
+            )
+            self.assertIn(
+                "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS=contract_required_behavior",
+                result.stdout,
+            )
+            self.assertIn(
+                "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS=request_clause_ids,acceptance_contract,implementation_source_packet,design_to_implementation_trace,dependency_expanded_scope,validation_route,review_gate",
+                result.stdout,
+            )
+            self.assertIn(
+                "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS=apparent_breadth,owner_bounded_change,mvp,thin_slice",
+                result.stdout,
+            )
+            self.assertIn(
+                "IMPLEMENTATION_COMPLETENESS_ESCALATION=design_issue_blocker_to_gate_5_6",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_POLICY=selected_skill_command_packets",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_EXECUTION_MODE=sequential_by_skill_and_stage",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_SEQUENCE=show_skill_packet,run_required_commands,run_task_matching_conditional_commands,run_validation_commands",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_NEXT_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_DYNAMIC_SKILL_ROUTING_POLICY=related_skill_candidates",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES=$task-routing",
+                result.stdout,
+            )
+            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_SOURCE=agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=test_designer,docs_workflow_steward,python_reviewer,cpp_reviewer,diff_triage_reviewer,reviewer",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_STAGES=review_before_edit_handoff,post_edit_review",
+                result.stdout,
+            )
+            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=active", result.stdout)
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=repo_integration_review",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS=cpp_reviewer",
+                result.stdout,
+            )
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
-            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
+            self.assertIn(
+                "/agents/workflows/implementation-waterfall-workflow.md", result.stdout
+            )
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT=", result.stdout)
-            self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
+            self.assertIn(
+                "START_DECLARATION=workflow=Comprehensive Development", result.stdout
+            )
             self.assertIn(
                 "skills=$agent-orchestration,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("cpp_reviewer", result.stdout)
-            manifest_text = (report_root / "test-task-start" / "team_manifest.yaml").read_text(
+            manifest_text = (
+                report_root / "test-task-start" / "team_manifest.yaml"
+            ).read_text(
                 encoding="utf-8",
             )
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
+            standard_wave_sequence = manifest["run"]["standard_wave_sequence"]
+            pre_handoff_scope_policy = manifest["run"]["pre_handoff_scope_policy"]
+            default_quality_check_policy = manifest["run"][
+                "default_quality_check_policy"
+            ]
             delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
+            handoff_context_policy = manifest["run"]["handoff_context_policy"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             role_topology = spawn_wave_recommendation["role_topology"]
@@ -1046,8 +1190,183 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["dynamic_mid_task_spawn"],
                 "allowed",
             )
-            self.assertEqual(spawn_wave_recommendation["initial_wave_agent_types"], first_wave)
-            self.assertIn("role_instances", spawn_wave_recommendation["dynamic_expansion_waves"][0])
+            self.assertEqual(
+                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+            )
+            self.assertEqual(
+                standard_wave_sequence["gate_order"],
+                "plan_packet,review_gate,edit_handoff",
+            )
+            self.assertTrue(pre_handoff_scope_policy["enabled"])
+            self.assertEqual(
+                pre_handoff_scope_policy["status"],
+                "seed_then_expand_before_handoff",
+            )
+            self.assertEqual(
+                pre_handoff_scope_policy["sequence"],
+                [
+                    "surface_route_seed",
+                    "responsibility_search",
+                    "reuse_survey",
+                    "stale_surface_scan",
+                    "dependency_expansion",
+                    "handoff_scope",
+                ],
+            )
+            self.assertEqual(
+                pre_handoff_scope_policy["source_packet_seed"],
+                "implementation_surface_route",
+            )
+            self.assertIn(
+                "dependency_edit_scope",
+                pre_handoff_scope_policy["expansion_artifacts"],
+            )
+            user_facing_language_policy = manifest["run"]["user_facing_language_policy"]
+            self.assertTrue(user_facing_language_policy["enabled"])
+            self.assertEqual(user_facing_language_policy["language"], "ja")
+            self.assertEqual(
+                user_facing_language_policy["source"],
+                "AGENTS.md#Template Context",
+            )
+            self.assertIn("final_reports", user_facing_language_policy["scope"])
+            self.assertEqual(
+                user_facing_language_policy["machine_fields"],
+                "canonical_keys_commands_paths_role_ids_schemas",
+            )
+            contract_complete_implementation_policy = manifest["run"][
+                "contract_complete_implementation_policy"
+            ]
+            repo_tool_routing_policy = manifest["run"]["repo_tool_routing_policy"]
+            self.assertTrue(contract_complete_implementation_policy["enabled"])
+            self.assertEqual(
+                contract_complete_implementation_policy["scope_basis"],
+                "contract_required_behavior",
+            )
+            self.assertIn(
+                "implementation_source_packet",
+                contract_complete_implementation_policy["required_inputs"],
+            )
+            self.assertIn(
+                "mvp",
+                contract_complete_implementation_policy["route_signals"],
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy["escalation"],
+                "design_issue_blocker_to_gate_5_6",
+            )
+            self.assertTrue(repo_tool_routing_policy["enabled"])
+            self.assertEqual(
+                repo_tool_routing_policy["execution_mode"],
+                "sequential_by_skill_and_stage",
+            )
+            self.assertEqual(
+                repo_tool_routing_policy["sequence"],
+                [
+                    "show_skill_packet",
+                    "run_required_commands",
+                    "run_task_matching_conditional_commands",
+                    "run_validation_commands",
+                ],
+            )
+            self.assertIn(
+                "$task-routing",
+                repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
+            )
+            first_tool_route = repo_tool_routing_policy["sequential_tool_routes"][0]
+            self.assertEqual(first_tool_route["skill"], "agent-orchestration")
+            self.assertIn(
+                'python3 tools/agent_tools/route.py --prompt "<user request>" --format json',
+                first_tool_route["commands"]["task_matching_conditional_commands"],
+            )
+            self.assertIn(
+                "python3 tools/agent_tools/skill_tool_commands.py check",
+                first_tool_route["commands"]["validation_commands"],
+            )
+            self.assertTrue(default_quality_check_policy["enabled"])
+            self.assertEqual(
+                default_quality_check_policy["source"],
+                "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
+            )
+            self.assertEqual(
+                default_quality_check_policy["wave_sequence_ref"],
+                "run.standard_wave_sequence",
+            )
+            self.assertEqual(
+                default_quality_check_policy["stages"],
+                ["review_before_edit_handoff", "post_edit_review"],
+            )
+            self.assertEqual(
+                default_quality_check_policy["roles"],
+                [
+                    "test_designer",
+                    "docs_workflow_steward",
+                    "python_reviewer",
+                    "cpp_reviewer",
+                    "change_reviewer",
+                ],
+            )
+            self.assertEqual(
+                default_quality_check_policy["codex_agent_types"],
+                [
+                    "test_designer",
+                    "docs_workflow_steward",
+                    "python_reviewer",
+                    "cpp_reviewer",
+                    "diff_triage_reviewer",
+                    "reviewer",
+                ],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["default_review_packs"],
+                "active",
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["default_review_pack_ids"],
+                ["repo_integration_review"],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                ["cpp_reviewer"],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["manual_specialists"],
+                [],
+            )
+            self.assertIn(
+                "tools/bin/agent-canon docs check <changed-markdown-paths>",
+                default_quality_check_policy["static_check_commands"],
+            )
+            self.assertIn(
+                "default_quality_check_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertIn(
+                "pre_handoff_scope_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertIn(
+                "user_facing_language_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertIn(
+                "contract_complete_implementation_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertIn(
+                "repo_tool_routing_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertEqual(
+                spawn_wave_recommendation["standard_sequence_ref"],
+                "run.standard_wave_sequence",
+            )
+            self.assertEqual(
+                spawn_wave_recommendation["initial_wave_agent_types"], first_wave
+            )
+            self.assertIn(
+                "role_instances",
+                spawn_wave_recommendation["dynamic_expansion_waves"][0],
+            )
             self.assertIn("implementation", role_topology["role_families"])
             self.assertIn("review", role_topology["role_families"])
             self.assertEqual(
@@ -1058,7 +1377,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 same_role_instances["identity_key"],
                 "role_type+instance_id",
             )
-            self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
+            self.assertFalse(
+                same_role_instances["runtime_threads_are_cardinality_source"]
+            )
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assert_current_checkout_write_policy(write_scope_policy, 4)
             self.assert_same_role_runtime_policy(delegated_spawn_policy)
@@ -1104,7 +1425,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(dynamic_waves_match)
             dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
-            self.assertLess(dynamic_waves.index("report_reviewer"), dynamic_waves.index("ship_reviewer"))
+            self.assertLess(
+                dynamic_waves.index("report_reviewer"),
+                dynamic_waves.index("ship_reviewer"),
+            )
             self.assertLess(
                 dynamic_waves.index("citation_evidence_reviewer"),
                 dynamic_waves.index("ship_reviewer"),
@@ -1124,7 +1448,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(role_instances_match)
             role_instances = cast(re.Match[str], role_instances_match).group(1)
-            self.assertIn("research_reviewer:reviewer:research_reviewer_reviewer", role_instances)
+            self.assertIn(
+                "research_reviewer:reviewer:research_reviewer_reviewer", role_instances
+            )
             self.assertIn(
                 "citation_evidence_reviewer:citation_evidence_reviewer:"
                 "citation_evidence_reviewer_citation_evidence_reviewer",
@@ -1136,8 +1462,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest = yaml.safe_load(manifest_text)
             wave_ids = [
                 wave["wave_id"]
-                for wave in manifest["run"]["spawn_wave_recommendation"]["dynamic_expansion_waves"]
-                if any("citation_evidence_reviewer" in item for item in wave["role_instances"])
+                for wave in manifest["run"]["spawn_wave_recommendation"][
+                    "dynamic_expansion_waves"
+                ]
+                if any(
+                    "citation_evidence_reviewer" in item
+                    for item in wave["role_instances"]
+                )
             ]
             self.assertEqual(wave_ids, ["WAVE-6"])
 
@@ -1244,20 +1575,28 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
-            self.assertIn(f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}", result.stdout)
+            self.assertIn(
+                f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}", result.stdout
+            )
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
             self.assertTrue((report_dir / "task_authority.yaml").is_file())
             self.assertTrue((report_dir / "task_authority.yaml.sha256").is_file())
-            self.assertTrue((workspace_root / "reports" / "agents" / ".active_run.sha256").is_file())
+            self.assertTrue(
+                (workspace_root / "reports" / "agents" / ".active_run.sha256").is_file()
+            )
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
-            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
+            self.assertIn(
+                "/agents/workflows/implementation-waterfall-workflow.md", result.stdout
+            )
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
-            manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("cross_cutting_document_packet:", manifest_text)
             self.assertIn("document_packet:", manifest_text)
             self.assertNotIn("subagent_prompt_packet:", manifest_text)
@@ -1266,9 +1605,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertNotIn("/docker/README.md", manifest_text)
-            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
+            self.assertIn(
+                "/agents/workflows/implementation-waterfall-workflow.md", manifest_text
+            )
 
-    def test_bootstrap_custom_report_root_writes_active_run_baseline_there(self) -> None:
+    def test_bootstrap_custom_report_root_writes_active_run_baseline_there(
+        self,
+    ) -> None:
         """Custom report-root mode should baseline the active pointer it writes."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1300,8 +1643,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((report_root / ".active_run").is_file())
             self.assertTrue((report_root / ".active_run.sha256").is_file())
-            self.assertFalse((workspace_root / "reports" / "agents" / ".active_run.sha256").exists())
-            self.assertTrue((report_root / run_id / "task_authority.yaml.sha256").is_file())
+            self.assertFalse(
+                (workspace_root / "reports" / "agents" / ".active_run.sha256").exists()
+            )
+            self.assertTrue(
+                (report_root / run_id / "task_authority.yaml.sha256").is_file()
+            )
 
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
         """bootstrap_agent_run should emit runtime and workflow spawn limits for machine use."""
@@ -1348,7 +1695,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events",
                 result.stdout,
             )
-            self.assertIn("SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir", result.stdout)
+            self.assertIn(
+                "SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir",
+                result.stdout,
+            )
             self.assertIn("--subagent-wave", result.stdout)
             self.assertIn(
                 "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
@@ -1368,6 +1718,35 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
                 result.stdout,
             )
+            self.assertIn(
+                "PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff",
+                result.stdout,
+            )
+            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_ROLES=test_designer,docs_workflow_steward,python_reviewer,change_reviewer",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_POLICY=selected_skill_command_packets",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_ROUTING_SEQUENCE=show_skill_packet,run_required_commands,run_task_matching_conditional_commands,run_validation_commands",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_DYNAMIC_SKILL_ROUTING_NEXT=add_skill_then_regenerate_repo_tool_routes",
+                result.stdout,
+            )
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
             self.assertIn("PLANNED_ACTIVE_ROLE_COUNT=", result.stdout)
             self.assertIn(
@@ -1375,7 +1754,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending", result.stdout)
-            self.assertIn("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation", result.stdout)
+            self.assertIn(
+                "TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation",
+                result.stdout,
+            )
             self.assertIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout)
             self.assertIn("AGENT_REPORT_COLLECTION_STATUS=available", result.stdout)
             self.assertIn(
@@ -1392,14 +1774,22 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
+            standard_wave_sequence = manifest["run"]["standard_wave_sequence"]
+            pre_handoff_scope_policy = manifest["run"]["pre_handoff_scope_policy"]
+            default_quality_check_policy = manifest["run"][
+                "default_quality_check_policy"
+            ]
             delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             role_topology = spawn_wave_recommendation["role_topology"]
             same_role_instances = role_topology["same_role_parallel_instances"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
             handoff_context_policy = manifest["run"]["handoff_context_policy"]
-            implementation_gate_defaults = manifest["run"]["implementation_gate_defaults"]
+            implementation_gate_defaults = manifest["run"][
+                "implementation_gate_defaults"
+            ]
             agent_report_collection = manifest["run"]["agent_report_collection"]
+            repo_tool_routing_policy = manifest["run"]["repo_tool_routing_policy"]
             self.assertEqual(spawn_budget["active_subagents"], 10)
             self.assertEqual(spawn_budget["max_write_subagents"], 2)
             self.assertGreater(
@@ -1432,10 +1822,61 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 same_role_instances["identity_key"],
                 "role_type+instance_id",
             )
-            self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
+            self.assertFalse(
+                same_role_instances["runtime_threads_are_cardinality_source"]
+            )
             self.assertIn("implementation", role_topology["role_families"])
             self.assertIn("review", role_topology["role_families"])
-            self.assertEqual(delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed")
+            self.assertEqual(
+                delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed"
+            )
+            self.assertEqual(
+                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+            )
+            self.assertEqual(
+                pre_handoff_scope_policy["status"],
+                "seed_then_expand_before_handoff",
+            )
+            self.assertEqual(
+                write_scope_policy["scope_source_ref"],
+                "run.pre_handoff_scope_policy",
+            )
+            self.assertEqual(
+                write_scope_policy["handoff_scope_status"],
+                "seed_then_expand_before_handoff",
+            )
+            self.assertEqual(
+                default_quality_check_policy["roles"],
+                [
+                    "test_designer",
+                    "docs_workflow_steward",
+                    "python_reviewer",
+                    "change_reviewer",
+                ],
+            )
+            self.assertEqual(
+                default_quality_check_policy["codex_agent_types"],
+                [
+                    "test_designer",
+                    "docs_workflow_steward",
+                    "python_reviewer",
+                    "cpp_reviewer",
+                    "diff_triage_reviewer",
+                    "reviewer",
+                ],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["default_review_packs"],
+                "active",
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["default_review_pack_ids"],
+                [],
+            )
+            self.assertEqual(
+                spawn_wave_recommendation["standard_sequence_ref"],
+                "run.standard_wave_sequence",
+            )
             self.assertEqual(
                 delegated_spawn_policy["delegated_child_spawn"],
                 "allowed_with_bounded_packet",
@@ -1461,6 +1902,37 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "run delegated_spawn_policy.wave_record_command after any actual parent or delegated child spawn; delegated child waves must include remaining_spawn_budget",
                 delegated_spawn_policy["required_before_spawn"],
             )
+            self.assertIn(
+                "plan artifact, review gate decision, and edit handoff evidence following run.standard_wave_sequence",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                "include run.default_quality_check_policy in review and edit handoff packets",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                "include run.pre_handoff_scope_policy and dependency-expanded handoff scope evidence",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                "include run.repo_tool_routing_policy selected-skill command sequence, dynamic skill candidates, and tool evidence in every handoff packet",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                "tool_route", delegated_spawn_policy["handoff_required_fields"]
+            )
+            self.assertIn(
+                "tool_commands", delegated_spawn_policy["handoff_required_fields"]
+            )
+            self.assertIn(
+                "tool_evidence", delegated_spawn_policy["handoff_required_fields"]
+            )
+            self.assertIn(
+                "plan_artifact", delegated_spawn_policy["handoff_required_fields"]
+            )
+            self.assertIn(
+                "edit_handoff", delegated_spawn_policy["handoff_required_fields"]
+            )
             first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
             self.assertEqual(
                 first_wave,
@@ -1474,9 +1946,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("max_write_subagents: 2", manifest_text)
             self.assertIn("runtime_max_threads: 24", manifest_text)
             self.assertIn("runtime_max_depth: 2", manifest_text)
+            self.assertIn("standard_wave_sequence:", manifest_text)
+            self.assertIn(
+                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit", result.stdout
+            )
             self.assertIn("spawn_wave_recommendation:", manifest_text)
             self.assertIn("delegated_spawn_policy:", manifest_text)
-            self.assertIn("max_write_subagents_scope: 'write-capable subagents only'", manifest_text)
+            self.assertIn(
+                "max_write_subagents_scope: 'write-capable subagents only'",
+                manifest_text,
+            )
             self.assertIn("write_scope_policy:", manifest_text)
             self.assertIn("parent_managed: true", manifest_text)
             self.assertIn("workflow_family:", manifest_text)
@@ -1502,9 +1981,40 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 lifecycle_policy["new_task_reuse"],
                 "forbidden_spawn_fresh_run",
             )
-            self.assertTrue(handoff_context_policy["compact_artifacts_first"])
-            self.assertTrue(handoff_context_policy["require_allowed_paths"])
-            self.assertTrue(handoff_context_policy["require_do_not_read"])
+            common_prompt_fields = handoff_context_policy["common_prompt_must_include"]
+            self.assertIn("context_artifacts", common_prompt_fields)
+            self.assertIn("allowed_paths", common_prompt_fields)
+            self.assertIn("do_not_read", common_prompt_fields)
+            self.assertIn("expected_output_schema", common_prompt_fields)
+            for role in cast("list[object]", manifest["roles"]):
+                role_map = cast("dict[str, object]", role)
+                prompt_contract = cast(
+                    "dict[str, object]", role_map["prompt_contract"]
+                )
+                self.assertEqual(
+                    prompt_contract["common_prompt_must_include_ref"],
+                    "run.handoff_context_policy.common_prompt_must_include",
+                )
+            self.assertEqual(
+                repo_tool_routing_policy["route_basis"],
+                "selected_public_skills",
+            )
+            self.assertEqual(
+                repo_tool_routing_policy["dynamic_skill_routing"]["next"],
+                "add_skill_then_regenerate_repo_tool_routes",
+            )
+            self.assertIn(
+                "$task-routing",
+                repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
+            )
+            self.assertEqual(
+                repo_tool_routing_policy["sequential_tool_routes"][0]["commands"][
+                    "show_skill_packet"
+                ],
+                [
+                    "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text"
+                ],
+            )
             self.assertEqual(
                 implementation_gate_defaults["tool_reuse_ledger_status"],
                 "required_before_custom_implementation",
@@ -1595,8 +2105,37 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest_text = (
                 report_root / "test-bootstrap-missing-task-id" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
+            manifest = yaml.safe_load(manifest_text)
+            user_facing_language_policy = manifest["run"]["user_facing_language_policy"]
+            contract_complete_implementation_policy = manifest["run"][
+                "contract_complete_implementation_policy"
+            ]
+            default_quality_check_policy = manifest["run"][
+                "default_quality_check_policy"
+            ]
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn("subagent_lifecycle_policy", manifest_text)
+            self.assertEqual(user_facing_language_policy["language"], "ja")
+            self.assertEqual(
+                contract_complete_implementation_policy["scope_basis"],
+                "contract_required_behavior",
+            )
+            self.assertEqual(
+                default_quality_check_policy["roles"],
+                ["test_designer", "change_reviewer"],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["task_default_specialists"],
+                [],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                [],
+            )
+            self.assertEqual(
+                default_quality_check_policy["provenance"]["default_review_pack_ids"],
+                [],
+            )
 
     def test_all_task_ids_bootstrap_with_prompt_packet(self) -> None:
         """Every catalog task should create a workflow-specific subagent prompt packet."""
@@ -1660,7 +2199,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "init"], cwd=workspace_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=workspace_root, check=True, capture_output=True
+            )
 
             result = subprocess.run(
                 [
@@ -1683,7 +2224,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "init"], cwd=workspace_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=workspace_root, check=True, capture_output=True
+            )
 
             result = subprocess.run(
                 [
@@ -1860,6 +2403,90 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
+        """task_close should allow targeted static analysis selected by the risk profile."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-targeted-static-analysis"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_text = closeout_path.read_text(encoding="utf-8")
+            closeout_text = closeout_text.replace(
+                "- repo_wide_static_analysis_complete: yes",
+                "- repo_wide_static_analysis_complete: profile_selected",
+            )
+            closeout_text = closeout_text.replace(
+                "- make_ci_status: pass",
+                "- make_ci_status: targeted",
+            )
+            closeout_text = closeout_text.replace(
+                "- mechanical_loop_static_analysis_status: pass",
+                "- mechanical_loop_static_analysis_status: targeted",
+            )
+            closeout_path.write_text(closeout_text, encoding="utf-8")
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn("MAKE_CI_STATUS=targeted", result.stdout)
+
+    def test_task_close_rejects_pending_profile_selected_static_analysis(self) -> None:
+        """task_close should not treat targeted routing as a waiver for pending checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-pending-targeted-static-analysis"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_text = closeout_path.read_text(encoding="utf-8")
+            closeout_text = closeout_text.replace(
+                "- repo_wide_static_analysis_complete: yes",
+                "- repo_wide_static_analysis_complete: profile_selected",
+            )
+            closeout_text = closeout_text.replace(
+                "- make_ci_status: pass",
+                "- make_ci_status: targeted",
+            )
+            closeout_text = closeout_text.replace(
+                "- mechanical_loop_static_analysis_status: pass",
+                "- mechanical_loop_static_analysis_status: pending",
+            )
+            closeout_path.write_text(closeout_text, encoding="utf-8")
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("mechanical_loop_static_analysis_status", result.stdout)
 
     def test_task_close_rejects_open_tool_warning(self) -> None:
         """task_close should fail while workflow monitoring has open tool warnings."""
@@ -2100,7 +2727,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             "not-approved": "not approved",
         }
         for case_id, decision in cases.items():
-            with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(case_id=case_id),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 report_root = Path(tmp_dir) / "reports"
                 run_id = f"test-task-close-negative-final-review-{case_id}"
                 report_dir = report_root / run_id
@@ -2373,7 +3003,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "diff_check_artifact_latest_diff_ref",
             ),
             ("read-only-no", {"read_only": "no"}, "diff_check_artifact_read_only"),
-            ("independent-no", {"independent": "no"}, "diff_check_artifact_independent"),
+            (
+                "independent-no",
+                {"independent": "no"},
+                "diff_check_artifact_independent",
+            ),
             (
                 "findings-unresolved",
                 {"findings_status": "unresolved"},
@@ -2450,7 +3084,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("mechanical_loop_validation_status", result.stdout)
 
-    def test_task_close_rejects_markdown_change_without_structure_evidence(self) -> None:
+    def test_task_close_rejects_markdown_change_without_structure_evidence(
+        self,
+    ) -> None:
         """Changed source Markdown paths require document structure evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2510,7 +3146,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
             self.assertIn("document_structure_evidence", result.stdout)
 
-    def test_task_close_rejects_markdown_change_with_mismatched_structure_paths(self) -> None:
+    def test_task_close_rejects_markdown_change_with_mismatched_structure_paths(
+        self,
+    ) -> None:
         """Document structure evidence must cover the changed Markdown paths."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2566,10 +3204,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("DOCUMENT_STRUCTURE_CHANGED_MARKDOWN=README.md", result.stdout)
+            self.assertIn(
+                "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN=README.md", result.stdout
+            )
             self.assertIn("document_structure_paths_recorded", result.stdout)
 
-    def test_task_close_rejects_complete_structure_route_with_skip_contract(self) -> None:
+    def test_task_close_rejects_complete_structure_route_with_skip_contract(
+        self,
+    ) -> None:
         """A complete document structure route requires a real structure contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2731,7 +3373,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-            (workspace_root / "new-untracked.md").write_text("new file\n", encoding="utf-8")
+            (workspace_root / "new-untracked.md").write_text(
+                "new file\n", encoding="utf-8"
+            )
 
             result = subprocess.run(
                 [
@@ -2846,7 +3490,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             old_run = workspace_root / "reports" / "agents" / "old-run"
             old_run.mkdir(parents=True, exist_ok=True)
-            (old_run / "workflow_monitoring.md").write_text("# old run\n", encoding="utf-8")
+            (old_run / "workflow_monitoring.md").write_text(
+                "# old run\n", encoding="utf-8"
+            )
             run_id = "test-task-close-current-run-only"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -2868,7 +3514,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn("reports/agents/old-run/workflow_monitoring.md", result.stdout)
+            self.assertIn(
+                "reports/agents/old-run/workflow_monitoring.md", result.stdout
+            )
 
     def test_task_close_rejects_tracked_other_agent_run_reports(self) -> None:
         """Tracked old agent run bundles are not durable source canon."""
@@ -2884,7 +3532,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             old_run = workspace_root / "reports" / "agents" / "old-run"
             old_run.mkdir(parents=True, exist_ok=True)
-            (old_run / "workflow_monitoring.md").write_text("# old run\n", encoding="utf-8")
+            (old_run / "workflow_monitoring.md").write_text(
+                "# old run\n", encoding="utf-8"
+            )
             subprocess.run(
                 ["git", "add", "reports/agents/old-run/workflow_monitoring.md"],
                 cwd=workspace_root,
@@ -2928,7 +3578,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
             self.assertIn("report_artifact_tracked_outside_current_run", result.stdout)
-            self.assertIn("reports/agents/old-run/workflow_monitoring.md", result.stdout)
+            self.assertIn(
+                "reports/agents/old-run/workflow_monitoring.md", result.stdout
+            )
 
     def test_task_close_rejects_ignored_reports_outside_run_bundle(self) -> None:
         """Ignored generated report roots are still closeout blockers."""
@@ -2993,7 +3645,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn("reports/dependency-review/ignored-run/workflow_monitoring.md", result.stdout)
+            self.assertIn(
+                "reports/dependency-review/ignored-run/workflow_monitoring.md",
+                result.stdout,
+            )
 
     def test_task_close_allows_ignored_old_agent_run_reports(self) -> None:
         """Ignored agent run bundles are local log cache, not source-tree leakage."""
@@ -3030,7 +3685,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             old_run = workspace_root / "reports" / "agents" / "old-run"
             old_run.mkdir(parents=True, exist_ok=True)
-            (old_run / "workflow_monitoring.md").write_text("# old run\n", encoding="utf-8")
+            (old_run / "workflow_monitoring.md").write_text(
+                "# old run\n", encoding="utf-8"
+            )
             run_id = "test-task-close-ignored-old-agent-run"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -3068,7 +3725,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
             durable_report = workspace_root / "reports" / "project" / "report.md"
             durable_report.parent.mkdir(parents=True, exist_ok=True)
             durable_report.write_text("# Durable Report\n", encoding="utf-8")
-            subprocess.run(["git", "add", "reports/project/report.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                ["git", "add", "reports/project/report.md"],
+                cwd=workspace_root,
+                check=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -3173,7 +3834,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn("workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout)
+            self.assertIn(
+                "workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout
+            )
             self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
 
     def test_task_close_rejects_comment_only_actual_wave_event(self) -> None:
@@ -3254,7 +3917,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn("workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout)
+            self.assertIn(
+                "workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout
+            )
             self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
 
     def test_task_close_accepts_mid_task_user_input_wave_checkpoint(self) -> None:
@@ -3366,7 +4031,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             report_dir = report_root / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             fresh_wave_evidence = report_dir / "fresh_wave_evidence.md"
-            fresh_wave_evidence.write_text("fresh follow-up wave completed\n", encoding="utf-8")
+            fresh_wave_evidence.write_text(
+                "fresh follow-up wave completed\n", encoding="utf-8"
+            )
             write_ready_closeout_bundle(report_dir, run_id)
             append_mid_task_wave_checkpoint(
                 report_dir,
@@ -3400,7 +4067,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
         """Fresh-wave evidence should be scoped to the current run bundle."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             unrelated_evidence = Path(tmp_dir) / "unrelated-wave.md"
-            unrelated_evidence.write_text("not a current-run wave artifact\n", encoding="utf-8")
+            unrelated_evidence.write_text(
+                "not a current-run wave artifact\n", encoding="utf-8"
+            )
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-scope-change-unrelated-fresh-wave"
             report_dir = report_root / run_id

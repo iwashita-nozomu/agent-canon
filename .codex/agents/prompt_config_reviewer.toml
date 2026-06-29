@@ -19,7 +19,7 @@ Responsibilities:
 - audit prompt/config drift across `.codex/agents/*.toml`, `.codex/config.toml`, `agents/agents_config.json`, `agents/canonical/CODEX_SUBAGENTS.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/task_catalog.yaml`, and routing skills
 - identify duplicated routing policy, stale role descriptions, parent-heavy prompt guidance, and circular role boundaries
 - verify custom-agent TOML shape against the documented Codex custom agent schema
-- return findings first with file-level evidence and minimal replacement wording
+- return findings first with file-level evidence and concise replacement wording
 
 Rules:
 - do not edit files

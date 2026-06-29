@@ -16,13 +16,25 @@ downstream implementation ../../tools/agent_tools/semantic_provider_html_report.
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: routes experiment or Eval evidence into a browser-readable HTML
+  report with a first-figure plan and bounded rendering workflow.
+- Use When: the user asks for an HTML report, dashboard, browser view, or
+  visual inspection artifact for experiment, benchmark, Eval, or workflow logs.
+- Section path: Purpose and Use When set scope; Required Order is the mandatory
+  checklist; Primary Figure Contract and Semantic Provider Report Path capture
+  report-specific obligations; Closeout Tokens lists completion evidence.
+- Boundary: raw artifact storage, experiment scheduling, and domain decisions
+  stay with the owning skills or tools.
+
 ## Purpose
 
 `html-experiment-report` is the skill for turning an experiment or Eval artifact
 into a browser-readable HTML report. It owns the display workflow: decide the
-first figure, plan the experiment from that figure, reuse existing assets, add
-only a minimal renderer or experiment adapter when needed, run it, and publish a
-bounded HTML artifact.
+first figure, plan the experiment from that figure, reuse existing assets, add a
+report-specific renderer or experiment adapter when needed, run it, and publish
+a bounded HTML artifact.
 
 For the first figure and report shape, call `structure-planning` before writing
 renderer code or running follow-up experiments. This keeps figure choice,
@@ -62,8 +74,8 @@ for the actual candidate logic.
    external browser URL, and HTTP validation command.
 1. Experiment plan: derive the commands, inputs, report path, success criteria,
    blocked-provider behavior, and validation gates from the figure contract.
-1. Minimal implementation: reuse existing data producers and write only the
-   smallest renderer or adapter needed to produce the HTML.
+1. Renderer implementation: reuse existing data producers and write a
+   report-specific renderer or adapter only when needed to produce the HTML.
 1. Execution: run the producer and renderer, storing generated JSON, SQLite,
    and HTML under an ignored run artifact path such as `reports/agents/<run-id>/`.
 1. Reader report: put the primary figure first, then source packet, observations,

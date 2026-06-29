@@ -262,7 +262,7 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
 
     def write_fixture(self, root: Path) -> None:
-        """Write a small responsibility-scope fixture."""
+        """Write a bounded responsibility-scope fixture."""
         self.write_file(
             root,
             "responsibility-scope.toml",

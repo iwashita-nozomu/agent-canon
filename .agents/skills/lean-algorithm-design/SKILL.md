@@ -62,7 +62,7 @@ Execute the required and task-matching conditional commands that the packet prin
 ## Completion Gate
 
 - A design task is complete only when the Lean design target is checked,
-  checker-refuted, or narrowed to a checked problem class.
+  checker-refuted, or restricted to a checked problem class.
 - A missing lemma, open frontier, or unchecked algorithm idea is not completion.
 - A production implementation may start only after the checked design handoff
   exists.

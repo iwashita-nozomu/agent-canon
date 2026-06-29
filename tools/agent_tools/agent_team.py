@@ -4,6 +4,7 @@
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
+# upstream implementation ./skill_tool_commands.py builds selected skill command packets.
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -19,6 +20,12 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
+from route import decide_skills, load_skill_route_rules
+from skill_tool_commands import (
+    PROMPT_PLACEHOLDER,
+    SkillCommandPacket,
+    packet_for_skill,
+)
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -81,6 +88,127 @@ INITIAL_INTAKE_AGENT_TYPES = (
     "explorer",
     "execution_planner",
 )
+STANDARD_AGENT_WAVE_SEQUENCE = ("plan", "review", "edit")
+STANDARD_AGENT_WAVE_SEQUENCE_SOURCE = (
+    "agents/canonical/CODEX_SUBAGENTS.md#Wave Plan Contract"
+)
+STANDARD_AGENT_WAVE_SEQUENCE_GATE = "plan_packet,review_gate,edit_handoff"
+USER_FACING_LANGUAGE_POLICY_SOURCE = "AGENTS.md#Template Context"
+USER_FACING_LANGUAGE = "ja"
+USER_FACING_LANGUAGE_SCOPE = (
+    "updates",
+    "final_reports",
+    "review_summaries",
+    "handoff_guidance",
+    "reader_facing_docs",
+)
+USER_FACING_MACHINE_FIELDS = "canonical_keys_commands_paths_role_ids_schemas"
+USER_FACING_LANGUAGE_RULE = (
+    "人間が読む説明、作業更新、最終報告、レビュー要約、handoff guidance、"
+    "reader-facing docs は日本語を使う。機械可読の key、command、path、"
+    "role id、schema は正本表記を保つ。"
+)
+CONTRACT_COMPLETE_IMPLEMENTATION_POLICY_SOURCE = (
+    "agents/canonical/CODEX_WORKFLOW.md#Implementation"
+)
+CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS = "contract_required_behavior"
+CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS = (
+    "request_clause_ids",
+    "acceptance_contract",
+    "implementation_source_packet",
+    "design_to_implementation_trace",
+    "dependency_expanded_scope",
+    "validation_route",
+    "review_gate",
+)
+CONTRACT_COMPLETE_IMPLEMENTATION_ROUTE_SIGNALS = (
+    "apparent_breadth",
+    "owner_bounded_change",
+    "mvp",
+    "thin_slice",
+)
+CONTRACT_COMPLETE_IMPLEMENTATION_ESCALATION = "design_issue_blocker_to_gate_5_6"
+CONTRACT_COMPLETE_IMPLEMENTATION_RULE = (
+    "実装 behavior は request clauses、acceptance contract、"
+    "Implementation Source Packet、Design-To-Implementation Trace、"
+    "dependency-expanded scope、validation route、review gate から導く。"
+    "見た目の広さ、Owner-Bounded Change、MVP、thin slice は暫定的な routing、"
+    "wave、validation profile の選択 signal に留め、owner boundary や "
+    "impact surface が違うと分かった時点で route を更新する。contract gap、"
+    "責務境界、API shape、依存方向、runtime contract の不足は "
+    "design_issue_blocker として Gate 5-6 へ戻す。"
+)
+REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
+REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"
+REPO_TOOL_ROUTING_STATUS = "selected_skill_command_packets"
+REPO_TOOL_ROUTING_ROUTE_BASIS = "selected_public_skills"
+REPO_TOOL_ROUTING_EXECUTION_MODE = "sequential_by_skill_and_stage"
+REPO_TOOL_ROUTING_SEQUENCE = (
+    "show_skill_packet",
+    "run_required_commands",
+    "run_task_matching_conditional_commands",
+    "run_validation_commands",
+)
+REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE = (
+    "python3 tools/agent_tools/skill_tool_commands.py show "
+    "--skill <skill> --format text"
+)
+REPO_TOOL_ROUTING_CHECK_COMMAND = (
+    "python3 tools/agent_tools/skill_tool_commands.py check"
+)
+REPO_TOOL_ROUTING_STAGE_FIELDS = (
+    "required_commands",
+    "conditional_commands",
+    "validation_commands",
+)
+REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
+REPO_DYNAMIC_SKILL_ROUTING_COMMAND = (
+    'python3 tools/agent_tools/route.py --prompt "<user request>" --format json'
+)
+REPO_DYNAMIC_SKILL_AREA_COMMAND = (
+    "python3 tools/agent_tools/route.py --area skills --changed <paths...>"
+)
+REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_regenerate_repo_tool_routes"
+PRE_HANDOFF_SCOPE_POLICY_SOURCE = (
+    "agents/COMMUNICATION_PROTOCOL.md#Pre-Edit Repository Investigation Packet"
+)
+PRE_HANDOFF_SCOPE_SEQUENCE = (
+    "surface_route_seed",
+    "responsibility_search",
+    "reuse_survey",
+    "stale_surface_scan",
+    "dependency_expansion",
+    "handoff_scope",
+)
+PRE_HANDOFF_SCOPE_STATUS = "seed_then_expand_before_handoff"
+PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
+    "allowed_paths と write_scope は surface-route seed、responsibility search、"
+    "reuse survey、stale-surface scan、dependency expansion から導く handoff 制約"
+)
+DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
+    "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
+)
+DEFAULT_QUALITY_CHECK_ROLE_IDS = (
+    "test_designer",
+    "docs_workflow_steward",
+    "python_reviewer",
+    "cpp_reviewer",
+    "change_reviewer",
+)
+DEFAULT_QUALITY_CHECK_STAGES = (
+    "review_before_edit_handoff",
+    "post_edit_review",
+)
+DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
+    "python3 tools/agent_tools/check_convention_compliance.py",
+    "python3 tools/agent_tools/check_dependency_headers.py --changed",
+    "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
+    "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
+    "python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD",
+    "python3 tools/oop/python/readability.py --root . --min-score 95 <changed-python-paths>",
+    "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
+    "tools/bin/agent-canon docs check <changed-markdown-paths>",
+)
 DYNAMIC_EXPANSION_ROLE_STAGE_WAVES = (
     (
         "manager_reviewer",
@@ -135,27 +263,33 @@ SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
 )
 SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
     "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
-    "--subagent-wave \"wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> "
+    '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
     "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
     "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
     "spawned_roles=<roles-or-none> role_instances=<role:instance:packet> "
     "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
     "write_scope=<scope> validation_route=<route> review_gate=<gate> "
-    "handoff_artifacts=<artifacts> status=<status>\""
+    'handoff_artifacts=<artifacts> status=<status>"'
 )
 COMMON_PROMPT_MUST_INCLUDE = (
     "request_clause_ids",
     "run_report_dir",
     "team_manifest_path",
+    "user_facing_language_policy",
+    "contract_complete_implementation_policy",
+    "standard_wave_sequence",
+    "pre_handoff_scope_policy",
+    "default_quality_check_policy",
     "subagent_lifecycle_policy",
     "cross_cutting_document_packet",
     "role_document_packet",
-    "compact_artifacts",
+    "context_artifacts",
     "allowed_paths",
     "do_not_read",
     "expected_output_artifacts",
     "expected_output_schema",
     "implementation_surface_route",
+    "repo_tool_routing_policy",
     "tool_reuse_ledger",
     "pre_edit_rejection_prediction",
     "dependency_files_header_plan",
@@ -163,6 +297,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
 )
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
+    "$task-routing",
     "$research-workflow",
     "$environment-maintenance",
     "$comprehensive-development",
@@ -193,7 +328,12 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         "notes": "Design review checks the same upstream packet and the resulting design brief.",
     },
     "test_designer": {
-        "artifact_keys": ["user_request_contract", "schedule", "design_brief", "design_review"],
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+        ],
         "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
         "notes": "Test design derives cases from the approved design packet.",
     },
@@ -277,7 +417,9 @@ def resolve_report_root(
     workspace_root: Path | None = None,
 ) -> Path:
     """Resolve the report root relative to the active workspace by default."""
-    base_root = workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    base_root = (
+        workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    )
     if report_root is None:
         return (base_root / DEFAULT_REPORT_ROOT).resolve()
     candidate = Path(report_root)
@@ -354,7 +496,9 @@ class RoleDocumentPacket:
     notes: str
 
 
-def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[DocumentPacketEntry, ...]:
+def resolve_cross_cutting_document_packet(
+    workspace_root: Path,
+) -> tuple[DocumentPacketEntry, ...]:
     """Resolve the common cross-cutting document packet for one workspace."""
     required_entries = tuple(
         DocumentPacketEntry(
@@ -412,14 +556,24 @@ class RunBundleSpec:
     roles: tuple[Role, ...]
     workspace_root: Path
     workflow_family_id: str = ""
+    manual_specialists: tuple[str, ...] = ()
+    task_default_specialists: tuple[str, ...] = ()
+    auto_specialists: tuple[str, ...] = ()
+    default_review_packs_enabled: bool = False
+    default_review_pack_ids: tuple[str, ...] = ()
+    selected_skills: tuple[str, ...] = ()
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
     raw = json.loads(path.read_text(encoding="utf-8"))
     team = dict(raw["team"])
-    always_on_roles = tuple(_parse_role(role, "always") for role in raw["always_on_roles"])
-    specialist_roles = tuple(_parse_role(role, "optional") for role in raw["specialist_roles"])
+    always_on_roles = tuple(
+        _parse_role(role, "always") for role in raw["always_on_roles"]
+    )
+    specialist_roles = tuple(
+        _parse_role(role, "optional") for role in raw["specialist_roles"]
+    )
     handoffs = tuple(dict(item) for item in raw["handoffs"])
     context_policies = tuple(dict(item) for item in raw["context_policies"])
     activation_rules = tuple(dict(item) for item in raw["activation_rules"])
@@ -446,7 +600,9 @@ def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
         raise RuntimeError(f"task catalog must parse as a mapping: {catalog_path}")
     return TaskCatalog(
         raw=raw,
-        workflow_families=_as_mapping_tuple(raw.get("workflow_families"), "workflow_families"),
+        workflow_families=_as_mapping_tuple(
+            raw.get("workflow_families"), "workflow_families"
+        ),
         tasks=_as_mapping_tuple(raw.get("tasks"), "tasks"),
         review_packs=_as_mapping_tuple(raw.get("review_packs"), "review_packs"),
     )
@@ -467,6 +623,229 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
     )
 
 
+def standard_agent_wave_sequence_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for the standard Agent Wave order."""
+    return (
+        f"STANDARD_AGENT_WAVE_SEQUENCE={','.join(STANDARD_AGENT_WAVE_SEQUENCE)}",
+        f"STANDARD_AGENT_WAVE_SEQUENCE_SOURCE={STANDARD_AGENT_WAVE_SEQUENCE_SOURCE}",
+        f"STANDARD_AGENT_WAVE_SEQUENCE_GATE={STANDARD_AGENT_WAVE_SEQUENCE_GATE}",
+    )
+
+
+def pre_handoff_scope_policy_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for scope discovery before handoff."""
+    return (
+        "PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope",
+        f"PRE_HANDOFF_SCOPE_SOURCE={PRE_HANDOFF_SCOPE_POLICY_SOURCE}",
+        f"PRE_HANDOFF_SCOPE_SEQUENCE={','.join(PRE_HANDOFF_SCOPE_SEQUENCE)}",
+        f"PRE_HANDOFF_SCOPE_STATUS={PRE_HANDOFF_SCOPE_STATUS}",
+    )
+
+
+def user_facing_language_policy_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for user-facing language policy."""
+    return (
+        f"USER_FACING_LANGUAGE={USER_FACING_LANGUAGE}",
+        f"USER_FACING_LANGUAGE_SOURCE={USER_FACING_LANGUAGE_POLICY_SOURCE}",
+        f"USER_FACING_LANGUAGE_SCOPE={','.join(USER_FACING_LANGUAGE_SCOPE)}",
+        f"USER_FACING_MACHINE_FIELDS={USER_FACING_MACHINE_FIELDS}",
+    )
+
+
+def contract_complete_implementation_policy_output_lines() -> tuple[str, ...]:
+    """Return stdout lines for contract-complete implementation policy."""
+    return (
+        "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
+        "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS="
+        f"{CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS}",
+        "IMPLEMENTATION_COMPLETENESS_SOURCE="
+        f"{CONTRACT_COMPLETE_IMPLEMENTATION_POLICY_SOURCE}",
+        "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS="
+        f"{','.join(CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS)}",
+        "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS="
+        f"{','.join(CONTRACT_COMPLETE_IMPLEMENTATION_ROUTE_SIGNALS)}",
+        "IMPLEMENTATION_COMPLETENESS_ESCALATION="
+        f"{CONTRACT_COMPLETE_IMPLEMENTATION_ESCALATION}",
+    )
+
+
+def normalized_public_skill_name(skill: str) -> str:
+    """Return one public skill name without runtime sigils."""
+    return skill.strip().removeprefix("$")
+
+
+def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+    """Return selected public skill names in stable first-seen order."""
+    return tuple(
+        dict.fromkeys(
+            skill
+            for raw_skill in selected_skills
+            if (skill := normalized_public_skill_name(raw_skill))
+        )
+    )
+
+
+def skill_tool_packet_command(skill: str) -> str:
+    """Return the canonical command that prints one selected skill tool packet."""
+    return (
+        "python3 tools/agent_tools/skill_tool_commands.py show "
+        f"--skill {skill} --format text"
+    )
+
+
+def selected_skill_command_packets(
+    selected_skills: tuple[str, ...],
+) -> tuple[SkillCommandPacket, ...]:
+    """Build repo tool command packets for selected public skills."""
+    return tuple(
+        packet_for_skill(ROOT, skill) for skill in selected_skill_names(selected_skills)
+    )
+
+
+def conditional_commands_for_packet(packet: SkillCommandPacket) -> tuple[str, ...]:
+    """Return task-matching command candidates for one skill packet."""
+    if packet.discovered_commands:
+        return packet.discovered_commands
+    return (
+        f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json',
+    )
+
+
+def dynamic_skill_candidate_names(
+    selected_skills: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return related public skills that can activate in later waves."""
+    selected = set(selected_skill_names(selected_skills))
+    candidates: list[str] = []
+    for packet in selected_skill_command_packets(selected_skills):
+        for candidate in packet.related_skills:
+            if candidate in selected or candidate in candidates:
+                continue
+            candidates.append(candidate)
+    return tuple(candidates)
+
+
+def format_public_skill_list(skills: tuple[str, ...]) -> str:
+    """Return a machine-readable public skill list."""
+    return ",".join(f"${skill}" for skill in skills) or "-"
+
+
+def repo_tool_routing_policy_output_lines(
+    selected_skills: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return stdout lines for selected-skill repo tool routing."""
+    skill_names = selected_skill_names(selected_skills)
+    packet_commands = tuple(skill_tool_packet_command(skill) for skill in skill_names)
+    first_command = packet_commands[0] if packet_commands else "-"
+    skill_list = format_public_skill_list(skill_names)
+    dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
+    return (
+        f"REPO_TOOL_ROUTING_POLICY={REPO_TOOL_ROUTING_STATUS}",
+        f"REPO_TOOL_ROUTING_SOURCE={REPO_TOOL_ROUTING_POLICY_SOURCE}",
+        f"REPO_TOOL_ROUTING_OWNER={REPO_TOOL_ROUTING_OWNER}",
+        f"REPO_TOOL_ROUTING_ROUTE_BASIS={REPO_TOOL_ROUTING_ROUTE_BASIS}",
+        f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
+        f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
+        f"REPO_TOOL_ROUTING_NEXT_COMMAND={first_command}",
+        f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
+        f"REPO_TOOL_ROUTING_SKILLS={skill_list}",
+        f"REPO_TOOL_ROUTING_PACKET_COUNT={len(packet_commands)}",
+        f"REPO_TOOL_ROUTING_PACKET_COMMANDS={';'.join(packet_commands) or '-'}",
+        f"REPO_TOOL_ROUTING_CHECK={REPO_TOOL_ROUTING_CHECK_COMMAND}",
+        f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
+        f"REPO_DYNAMIC_SKILL_ROUTING_COMMAND={REPO_DYNAMIC_SKILL_ROUTING_COMMAND}",
+        f"REPO_DYNAMIC_SKILL_AREA_COMMAND={REPO_DYNAMIC_SKILL_AREA_COMMAND}",
+        f"REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
+        f"REPO_DYNAMIC_SKILL_ROUTING_NEXT={REPO_DYNAMIC_SKILL_ROUTING_NEXT}",
+    )
+
+
+def default_quality_check_role_ids(roles: tuple[Role, ...]) -> tuple[str, ...]:
+    """Return active role ids that provide the default quality-check path."""
+    active_role_ids = {role.id for role in roles}
+    return tuple(
+        role_id
+        for role_id in DEFAULT_QUALITY_CHECK_ROLE_IDS
+        if role_id in active_role_ids
+    )
+
+
+def default_quality_check_agent_types(roles: tuple[Role, ...]) -> tuple[str, ...]:
+    """Return active Codex agent types that provide the default quality-check path."""
+    roles_by_id = {role.id: role for role in roles}
+    agent_types: list[str] = []
+    for role_id in DEFAULT_QUALITY_CHECK_ROLE_IDS:
+        role = roles_by_id.get(role_id)
+        if role is None:
+            continue
+        for agent_type in role.codex_agents:
+            if agent_type not in agent_types:
+                agent_types.append(agent_type)
+    return tuple(agent_types)
+
+
+def default_quality_check_policy_output_lines(
+    roles: tuple[Role, ...],
+    *,
+    manual_specialists: tuple[str, ...] = (),
+    task_default_specialists: tuple[str, ...] = (),
+    auto_specialists: tuple[str, ...] = (),
+    default_review_packs_enabled: bool = False,
+    default_review_pack_ids: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Return machine-readable stdout lines for default quality-check routing."""
+    review_pack_state = (
+        "active" if default_review_packs_enabled else "route_without_default_packs"
+    )
+    return (
+        "DEFAULT_QUALITY_CHECKS=enabled",
+        f"DEFAULT_QUALITY_CHECK_SOURCE={DEFAULT_QUALITY_CHECK_POLICY_SOURCE}",
+        "DEFAULT_QUALITY_CHECK_ROLES="
+        f"{','.join(default_quality_check_role_ids(roles)) or '-'}",
+        "DEFAULT_QUALITY_CHECK_AGENT_TYPES="
+        f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
+        f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
+        "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
+        f"{','.join(task_default_specialists) or '-'}",
+        "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="
+        f"{','.join(auto_specialists) or '-'}",
+        "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS="
+        f"{','.join(manual_specialists) or '-'}",
+        f"DEFAULT_QUALITY_CHECK_REVIEW_PACKS={review_pack_state}",
+        "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS="
+        f"{','.join(default_review_pack_ids) or '-'}",
+    )
+
+
+def suggested_public_skills(
+    task_id: str | None,
+    workflow_family_id: str | None,
+    task_text: str = "",
+) -> tuple[str, ...]:
+    """Return the public skill set required by the selected route."""
+    selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
+    if workflow_family_id == "research_driven_change":
+        selected.append("$research-workflow")
+    elif workflow_family_id == "platform_and_environment":
+        selected.append("$environment-maintenance")
+    elif workflow_family_id == "comprehensive_development":
+        selected.append("$comprehensive-development")
+    elif workflow_family_id == "adaptive_improvement_loop":
+        selected.append("$adaptive-improvement-loop")
+    if task_id == "T6":
+        selected.append("$refactor-loop")
+    if task_id == "T10":
+        selected.append("$paper-writing")
+    if task_text.strip():
+        decision = decide_skills(
+            task_text,
+            "repo-changing",
+            load_skill_route_rules(ROOT),
+        )
+        selected.extend(f"${skill}" for skill in decision.skills)
+    return tuple(dict.fromkeys(selected))
+
+
 def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") -> str:
     """Return the canonical command for recording a spawned subagent wave."""
     return SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
@@ -475,6 +854,22 @@ def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") ->
 def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
     """Return known review pack ids."""
     return tuple(str(pack["id"]) for pack in catalog.review_packs)
+
+
+def default_review_pack_ids_for_task(
+    catalog: TaskCatalog,
+    task_id: str,
+) -> tuple[str, ...]:
+    """Return review pack ids selected by default for one task."""
+    selected: list[str] = []
+    for pack in catalog.review_packs:
+        default_tasks = _as_string_tuple(
+            pack.get("default_for_tasks"),
+            f"review_packs[{pack['id']}].default_for_tasks",
+        )
+        if task_id in default_tasks:
+            selected.append(str(pack["id"]))
+    return tuple(selected)
 
 
 def enable_choices(config: TeamConfig, catalog: TaskCatalog) -> tuple[str, ...]:
@@ -564,12 +959,18 @@ def auto_language_specialists(
     )
     has_cpp = any(
         Path(normalized).suffix.lower() in CPP_SUFFIXES
-        or any(normalized == marker or normalized.startswith(marker) for marker in CPP_PATH_MARKERS)
+        or any(
+            normalized == marker or normalized.startswith(marker)
+            for marker in CPP_PATH_MARKERS
+        )
         for normalized in normalized_paths
     )
     has_docs_or_runtime = any(
         Path(normalized).suffix.lower() in DOC_SUFFIXES | CONFIG_SUFFIXES
-        or any(normalized == marker or normalized.startswith(marker) for marker in DOC_OR_RUNTIME_PATH_MARKERS)
+        or any(
+            normalized == marker or normalized.startswith(marker)
+            for marker in DOC_OR_RUNTIME_PATH_MARKERS
+        )
         for normalized in normalized_paths
     )
     return tuple(
@@ -604,13 +1005,19 @@ def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, in
     family = resolve_workflow_family(catalog, family_id)
     raw_budget = family.get("spawn_budget")
     if not isinstance(raw_budget, dict):
-        raise RuntimeError(f"workflow family spawn_budget must be a mapping for {family_id}")
+        raise RuntimeError(
+            f"workflow family spawn_budget must be a mapping for {family_id}"
+        )
     active = raw_budget.get("active_subagents")
     max_write = raw_budget.get("max_write_subagents")
     if not isinstance(active, int) or active < 1:
-        raise RuntimeError(f"workflow family active_subagents must be >= 1 for {family_id}")
+        raise RuntimeError(
+            f"workflow family active_subagents must be >= 1 for {family_id}"
+        )
     if not isinstance(max_write, int) or max_write < 1:
-        raise RuntimeError(f"workflow family max_write_subagents must be >= 1 for {family_id}")
+        raise RuntimeError(
+            f"workflow family max_write_subagents must be >= 1 for {family_id}"
+        )
     if max_write > active:
         raise RuntimeError(
             "workflow family max_write_subagents exceeds active_subagents "
@@ -722,7 +1129,9 @@ def recommended_dynamic_expansion_waves(
     """Return executable follow-up stage waves inside the active budget."""
     return tuple(
         tuple(slot.agent_type for slot in wave)
-        for wave in recommended_dynamic_expansion_wave_slots(roles, active_subagents, initial_wave)
+        for wave in recommended_dynamic_expansion_wave_slots(
+            roles, active_subagents, initial_wave
+        )
     )
 
 
@@ -745,7 +1154,9 @@ def recommended_dynamic_expansion_wave_slots(
         for role_id in stage_role_ids
     }
     for stage_role_ids in DYNAMIC_EXPANSION_ROLE_STAGE_WAVES[:-1]:
-        stage_slots = _role_stage_slots(roles_by_id, stage_role_ids, available_agents, used_slots)
+        stage_slots = _role_stage_slots(
+            roles_by_id, stage_role_ids, available_agents, used_slots
+        )
         used_slots.update((slot.role_id, slot.agent_type) for slot in stage_slots)
         waves.extend(_chunk_wave_slots(stage_slots, active_subagents))
     fallback_role_ids = tuple(
@@ -753,9 +1164,13 @@ def recommended_dynamic_expansion_wave_slots(
         for role in roles
         if role.id not in staged_role_ids
         and role.id not in NON_SPAWN_WAVE_ROLE_IDS
-        and any(agent_type not in initial_agent_types for agent_type in role.codex_agents)
+        and any(
+            agent_type not in initial_agent_types for agent_type in role.codex_agents
+        )
     )
-    fallback_slots = _role_stage_slots(roles_by_id, fallback_role_ids, available_agents, used_slots)
+    fallback_slots = _role_stage_slots(
+        roles_by_id, fallback_role_ids, available_agents, used_slots
+    )
     used_slots.update((slot.role_id, slot.agent_type) for slot in fallback_slots)
     waves.extend(_chunk_wave_slots(fallback_slots, active_subagents))
     final_stage_slots = _role_stage_slots(
@@ -770,7 +1185,9 @@ def recommended_dynamic_expansion_wave_slots(
 
 def current_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     """Return public skills to declare for the current stage only."""
-    return tuple(skill for skill in selected_skills if skill in CURRENT_STAGE_SKILLS)
+    active_skills = set(CURRENT_STAGE_SKILLS)
+    active_skills.update(catalog_active_stage_skills())
+    return tuple(skill for skill in selected_skills if skill in active_skills)
 
 
 def deferred_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
@@ -779,13 +1196,22 @@ def deferred_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(skill for skill in selected_skills if skill not in active)
 
 
+def catalog_active_stage_skills() -> tuple[str, ...]:
+    """Return public skills marked active in the skill catalog."""
+    return tuple(
+        f"${rule.skill}"
+        for rule in load_skill_route_rules(ROOT)
+        if rule.stage_policy == "active"
+    )
+
+
 def format_subagent_wave(agent_types: tuple[str, ...]) -> str:
     """Render one wave as a comma-separated agent_type list."""
     return ",".join(agent_types)
 
 
 def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
-    """Render follow-up waves in a machine-readable compact form."""
+    """Render follow-up waves in a machine-readable summary form."""
     return ";".join(
         f"WAVE-{index + 2}={format_subagent_wave(wave)}"
         for index, wave in enumerate(waves)
@@ -795,7 +1221,7 @@ def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
 def format_subagent_role_instance_wave_chunks(
     waves: tuple[tuple[SubagentWaveSlot, ...], ...],
 ) -> str:
-    """Render follow-up role-instance waves in a compact machine-readable form."""
+    """Render follow-up role-instance waves in a machine-readable summary form."""
     return ";".join(
         f"WAVE-{index + 2}="
         + ",".join(
@@ -816,14 +1242,18 @@ def default_specialists_for_task(
     family = resolve_workflow_family(catalog, str(task["family"]))
     family_roles = family.get("roles", {})
     if not isinstance(family_roles, dict):
-        raise RuntimeError(f"workflow family roles must be a mapping for {family['id']}")
+        raise RuntimeError(
+            f"workflow family roles must be a mapping for {family['id']}"
+        )
     family_specialists = _as_string_tuple(
         family_roles.get("specialists"),
         f"workflow_families[{family['id']}].roles.specialists",
     )
     selected: list[str] = []
 
-    for role_id in _as_string_tuple(task.get("specialists"), f"tasks[{task_id}].specialists"):
+    for role_id in _as_string_tuple(
+        task.get("specialists"), f"tasks[{task_id}].specialists"
+    ):
         if role_id not in family_specialists:
             raise RuntimeError(
                 f"task {task_id} specialist {role_id} is not declared in family {family['id']}"
@@ -1110,8 +1540,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         encoding="utf-8",
     )
     authority_roles = {
-        role.id: role.write_policy.mode
-        not in {"read_only", "artifacts_only"}
+        role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
     (spec.report_dir / AUTHORITY_FILE_NAME).write_text(
@@ -1183,7 +1612,10 @@ def initial_wave_gate_fields(
         "write_scope": "read_only_intake_until_parent_updates_wave_row",
         "validation_route": "parent_spawn_or_skip_update_required",
         "review_gate": "parent_execution_gate",
-        "handoff_artifacts": "team_manifest.yaml#run.spawn_wave_recommendation",
+        "handoff_artifacts": (
+            "team_manifest.yaml#run.spawn_wave_recommendation,"
+            "team_manifest.yaml#run.standard_wave_sequence"
+        ),
         "delegated_policy_ref": "team_manifest.yaml#run.delegated_spawn_policy",
         "status": "blocked_authority_required",
     }
@@ -1316,10 +1748,6 @@ def manifest_run_lines(
         "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
         "send_input; scope changes spawn a fresh wave.'",
         "  handoff_context_policy:",
-        "    compact_artifacts_first: true",
-        "    require_allowed_paths: true",
-        "    require_do_not_read: true",
-        "    require_expected_output_schema: true",
         "    inactive_profile_docs: not_applicable",
         "    broad_cross_cutting_packet: available_not_default_read",
         "  implementation_gate_defaults:",
@@ -1328,13 +1756,26 @@ def manifest_run_lines(
         "    tool_reuse_ledger_status: required_before_custom_implementation",
         "    pre_edit_rejection_prediction_status: pending",
         "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
+        "  standard_wave_sequence:",
+        f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
+        "    stages:",
+        *(f"      - {stage}" for stage in STANDARD_AGENT_WAVE_SEQUENCE),
+        f"    gate_order: {STANDARD_AGENT_WAVE_SEQUENCE_GATE!r}",
+        "    edit_handoff_rule: 'write-capable handoff は review gate 後の bounded write scope から開始し、read-only wave は read scope と次の review gate を記録する'",
+        *manifest_user_facing_language_policy_lines(),
+        *manifest_contract_complete_implementation_policy_lines(),
+        *manifest_pre_handoff_scope_policy_lines(),
+        *manifest_repo_tool_routing_policy_lines(spec),
+        *manifest_default_quality_check_policy_lines(spec),
         "  agent_report_collection:",
         "    status_command: 'python3 tools/agent_tools/runtime_log_archive_git.py status'",
         f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
         "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
         "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
     ]
-    insert_index = lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
+    insert_index = (
+        lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
+    )
     lines.insert(insert_index, "    common_prompt_must_include:")
     insert_index += 1
     for field in COMMON_PROMPT_MUST_INCLUDE:
@@ -1342,14 +1783,18 @@ def manifest_run_lines(
         insert_index += 1
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
-        lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
+        lines.append(
+            f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}"
+        )
     if workflow_family is not None:
         active_subagents, max_write_subagents = workflow_spawn_budget(
             load_task_catalog(spec.config),
             spec.workflow_family_id,
         )
         lines.append("  spawn_budget:")
-        lines.append("    source: 'agents/task_catalog.yaml workflow_families[].spawn_budget'")
+        lines.append(
+            "    source: 'agents/task_catalog.yaml workflow_families[].spawn_budget'"
+        )
         lines.append(f"    active_subagents: {active_subagents}")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append(f"    runtime_max_threads: {codex_runtime_max_threads()}")
@@ -1363,7 +1808,10 @@ def manifest_run_lines(
             initial_wave,
         )
         lines.append("  spawn_wave_recommendation:")
-        lines.append("    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'")
+        lines.append(
+            "    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'"
+        )
+        lines.append("    standard_sequence_ref: run.standard_wave_sequence")
         lines.append("    initial_wave_id: WAVE-1")
         lines.append("    initial_wave_agent_types:")
         for agent_type in initial_wave:
@@ -1372,6 +1820,9 @@ def manifest_run_lines(
         if expansion_wave_slots:
             for index, wave in enumerate(expansion_wave_slots, start=2):
                 lines.append(f"      - wave_id: WAVE-{index}")
+                lines.append(
+                    "        standard_sequence_ref: run.standard_wave_sequence"
+                )
                 lines.append("        agent_types:")
                 for slot in wave:
                     lines.append(f"          - {slot.agent_type}")
@@ -1383,6 +1834,7 @@ def manifest_run_lines(
                     )
         else:
             lines.append("      - wave_id: none")
+            lines.append("        standard_sequence_ref: run.standard_wave_sequence")
             lines.append("        agent_types: []")
             lines.append("        role_instances: []")
         lines.extend(render_role_topology(workflow_family, indent="    "))
@@ -1390,10 +1842,16 @@ def manifest_run_lines(
         lines.append("    dynamic_mid_task_spawn: allowed")
         lines.append("    delegated_child_spawn: allowed_with_bounded_packet")
         lines.append("    owner: parent_or_delegated_stage_owner")
-        lines.append("    child_role_budget_inheritance: active_budget_remaining_after_parent_wave")
+        lines.append(
+            "    child_role_budget_inheritance: active_budget_remaining_after_parent_wave"
+        )
         lines.append("    active_budget_source: 'run.spawn_budget.active_subagents'")
-        lines.append("    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'")
-        lines.append("    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'")
+        lines.append(
+            "    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'"
+        )
+        lines.append(
+            "    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'"
+        )
         lines.append(
             f"    wave_record_command: {subagent_wave_record_command(spec.report_dir)!r}"
         )
@@ -1405,7 +1863,9 @@ def manifest_run_lines(
         lines.append("      - blocked_role_replacement")
         lines.append("    same_role_instances:")
         lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
-        lines.append(f"      identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}")
+        lines.append(
+            f"      identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}"
+        )
         lines.append(
             "      parallel_read_only: "
             f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_read_only']}"
@@ -1426,14 +1886,35 @@ def manifest_run_lines(
         lines.append("      - child_role")
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
+        lines.append("      - tool_route")
+        lines.append("      - tool_commands")
+        lines.append("      - tool_evidence")
         lines.append("      - allowed_paths")
         lines.append("      - do_not_read")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
         lines.append("      - validation_route")
         lines.append("      - review_gate")
+        lines.append("      - plan_artifact")
+        lines.append("      - edit_handoff")
         lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
+        lines.append(
+            "      - plan artifact, review gate decision, and edit handoff evidence "
+            "following run.standard_wave_sequence"
+        )
+        lines.append(
+            "      - include run.default_quality_check_policy in review and edit "
+            "handoff packets"
+        )
+        lines.append(
+            "      - include run.pre_handoff_scope_policy and dependency-expanded "
+            "handoff scope evidence"
+        )
+        lines.append(
+            "      - include run.repo_tool_routing_policy selected-skill command sequence, "
+            "dynamic skill candidates, and tool evidence in every handoff packet"
+        )
         lines.append(
             "      - run delegated_spawn_policy.wave_record_command after any "
             "actual parent or delegated child spawn; delegated child waves must "
@@ -1444,13 +1925,23 @@ def manifest_run_lines(
             "budget, runtime ceilings, paths, validation_route, review_gate, "
             "handoff_artifacts, and delegated policy ref"
         )
-        lines.append("      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles")
-        lines.append("      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy")
+        lines.append(
+            "      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles"
+        )
+        lines.append(
+            "      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy"
+        )
         lines.append("    closeout_required_evidence:")
-        lines.append("      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status")
-        lines.append("      - closed run-local agent ids or parent_direct_no_subagents rationale")
+        lines.append(
+            "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
+        )
+        lines.append(
+            "      - closed run-local agent ids or parent_direct_no_subagents rationale"
+        )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
+        lines.append("    scope_source_ref: run.pre_handoff_scope_policy")
+        lines.append("    handoff_scope_status: seed_then_expand_before_handoff")
         lines.append("    disjoint_write_scopes_required: true")
         lines.append("    overlapping_write_scopes: serialize_current_checkout_waves")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
@@ -1463,6 +1954,206 @@ def manifest_run_lines(
     for entry in cross_cutting_packet:
         lines.append(f"    - path: {str(entry.path)!r}")
         lines.append(f"      rationale: {entry.rationale!r}")
+    return lines
+
+
+def manifest_contract_complete_implementation_policy_lines() -> list[str]:
+    """Render contract-complete implementation policy lines."""
+    lines = [
+        "  contract_complete_implementation_policy:",
+        "    enabled: true",
+        f"    source: {CONTRACT_COMPLETE_IMPLEMENTATION_POLICY_SOURCE!r}",
+        f"    scope_basis: {CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS!r}",
+        f"    escalation: {CONTRACT_COMPLETE_IMPLEMENTATION_ESCALATION!r}",
+        f"    rule: {CONTRACT_COMPLETE_IMPLEMENTATION_RULE!r}",
+        "    required_inputs:",
+    ]
+    for field in CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS:
+        lines.append(f"      - {field}")
+    lines.append("    route_signals:")
+    for field in CONTRACT_COMPLETE_IMPLEMENTATION_ROUTE_SIGNALS:
+        lines.append(f"      - {field}")
+    return lines
+
+
+def manifest_user_facing_language_policy_lines() -> list[str]:
+    """Render user-facing language policy lines."""
+    lines = [
+        "  user_facing_language_policy:",
+        "    enabled: true",
+        f"    language: {USER_FACING_LANGUAGE!r}",
+        f"    source: {USER_FACING_LANGUAGE_POLICY_SOURCE!r}",
+        f"    machine_fields: {USER_FACING_MACHINE_FIELDS!r}",
+        f"    rule: {USER_FACING_LANGUAGE_RULE!r}",
+        "    scope:",
+    ]
+    for field in USER_FACING_LANGUAGE_SCOPE:
+        lines.append(f"      - {field}")
+    return lines
+
+
+def manifest_pre_handoff_scope_policy_lines() -> list[str]:
+    """Render scope discovery policy lines."""
+    lines = [
+        "  pre_handoff_scope_policy:",
+        "    enabled: true",
+        f"    source: {PRE_HANDOFF_SCOPE_POLICY_SOURCE!r}",
+        f"    status: {PRE_HANDOFF_SCOPE_STATUS!r}",
+        "    sequence:",
+    ]
+    for stage in PRE_HANDOFF_SCOPE_SEQUENCE:
+        lines.append(f"      - {stage}")
+    lines.extend(
+        [
+            f"    handoff_rule: {PRE_HANDOFF_SCOPE_HANDOFF_RULE!r}",
+            "    source_packet_seed: implementation_surface_route",
+            "    expansion_artifacts:",
+            "      - responsibility_search",
+            "      - reuse_survey",
+            "      - stale_surface_scan",
+            "      - dependency_edit_scope",
+            "      - dependency_graph",
+            "    handoff_fields:",
+            "      - allowed_paths",
+            "      - do_not_read",
+            "      - write_scope",
+            "      - validation_route",
+            "      - review_gate",
+        ]
+    )
+    return lines
+
+
+def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
+    """Render selected-skill repo tool routing policy lines."""
+    selected_skills = spec.selected_skills or suggested_public_skills(
+        None,
+        spec.workflow_family_id or None,
+    )
+    skill_names = selected_skill_names(selected_skills)
+    dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
+    lines = [
+        "  repo_tool_routing_policy:",
+        "    enabled: true",
+        f"    source: {REPO_TOOL_ROUTING_POLICY_SOURCE!r}",
+        f"    owner: {REPO_TOOL_ROUTING_OWNER!r}",
+        f"    route_basis: {REPO_TOOL_ROUTING_ROUTE_BASIS!r}",
+        f"    execution_mode: {REPO_TOOL_ROUTING_EXECUTION_MODE!r}",
+        f"    check_command: {REPO_TOOL_ROUTING_CHECK_COMMAND!r}",
+        "    sequence:",
+    ]
+    for stage in REPO_TOOL_ROUTING_SEQUENCE:
+        lines.append(f"      - {stage}")
+    lines.append("    stage_fields:")
+    for field in REPO_TOOL_ROUTING_STAGE_FIELDS:
+        lines.append(f"      - {field}")
+    lines.append("    selected_skills:")
+    for skill in skill_names:
+        lines.append(f"      - ${skill}")
+    lines.append("    dynamic_skill_routing:")
+    lines.append(f"      status: {REPO_DYNAMIC_SKILL_ROUTING_STATUS!r}")
+    lines.append(f"      prompt_route_command: {REPO_DYNAMIC_SKILL_ROUTING_COMMAND!r}")
+    lines.append(f"      area_route_command: {REPO_DYNAMIC_SKILL_AREA_COMMAND!r}")
+    lines.append(f"      next: {REPO_DYNAMIC_SKILL_ROUTING_NEXT!r}")
+    lines.append("      candidates:")
+    if dynamic_candidates:
+        for candidate in dynamic_candidates:
+            lines.append(f"        - ${candidate}")
+    else:
+        lines.append("        - none")
+    lines.append("    sequential_tool_routes:")
+    for packet in selected_skill_command_packets(selected_skills):
+        lines.extend(manifest_one_skill_tool_route_lines(packet))
+    return lines
+
+
+def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]:
+    """Render one selected skill's sequential tool route."""
+    lines = [
+        f"      - skill: {packet.skill}",
+        f"        runtime_skill: {packet.runtime_skill!r}",
+        f"        canonical_doc: {packet.canonical_doc!r}",
+        f"        packet_command: {skill_tool_packet_command(packet.skill)!r}",
+        "        related_skills:",
+    ]
+    if packet.related_skills:
+        for skill in packet.related_skills:
+            lines.append(f"          - ${skill}")
+    else:
+        lines.append("          - none")
+    lines.append("        commands:")
+    lines.append("          show_skill_packet:")
+    lines.append(f"            - {skill_tool_packet_command(packet.skill)!r}")
+    lines.append("          required_commands:")
+    for command in packet.required_commands:
+        lines.append(f"            - {command!r}")
+    lines.append("          task_matching_conditional_commands:")
+    for command in conditional_commands_for_packet(packet):
+        lines.append(f"            - {command!r}")
+    lines.append("          validation_commands:")
+    for command in packet.validation_commands:
+        lines.append(f"            - {command!r}")
+    return lines
+
+
+def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str]:
+    """Render default quality-check routing policy lines."""
+    role_ids = default_quality_check_role_ids(spec.roles)
+    agent_types = default_quality_check_agent_types(spec.roles)
+    review_pack_state = (
+        "active" if spec.default_review_packs_enabled else "route_without_default_packs"
+    )
+    lines = [
+        "  default_quality_check_policy:",
+        "    enabled: true",
+        f"    source: {DEFAULT_QUALITY_CHECK_POLICY_SOURCE!r}",
+        "    wave_sequence_ref: run.standard_wave_sequence",
+        "    role_topology_ref: 'agents/task_catalog.yaml#role_topology_defaults.role_families.review'",
+        "    stages:",
+    ]
+    for stage in DEFAULT_QUALITY_CHECK_STAGES:
+        lines.append(f"      - {stage}")
+    if role_ids:
+        lines.append("    roles:")
+        for role_id in role_ids:
+            lines.append(f"      - {role_id}")
+    else:
+        lines.append("    roles: []")
+    if agent_types:
+        lines.append("    codex_agent_types:")
+        for agent_type in agent_types:
+            lines.append(f"      - {agent_type}")
+    else:
+        lines.append("    codex_agent_types: []")
+    lines.append("    provenance:")
+    if spec.task_default_specialists:
+        lines.append("      task_default_specialists:")
+        for role_id in spec.task_default_specialists:
+            lines.append(f"        - {role_id}")
+    else:
+        lines.append("      task_default_specialists: []")
+    if spec.auto_specialists:
+        lines.append("      auto_language_reviewers:")
+        for role_id in spec.auto_specialists:
+            lines.append(f"        - {role_id}")
+    else:
+        lines.append("      auto_language_reviewers: []")
+    if spec.manual_specialists:
+        lines.append("      manual_specialists:")
+        for role_id in spec.manual_specialists:
+            lines.append(f"        - {role_id}")
+    else:
+        lines.append("      manual_specialists: []")
+    lines.append(f"      default_review_packs: {review_pack_state}")
+    if spec.default_review_pack_ids:
+        lines.append("      default_review_pack_ids:")
+        for pack_id in spec.default_review_pack_ids:
+            lines.append(f"        - {pack_id}")
+    else:
+        lines.append("      default_review_pack_ids: []")
+    lines.append("    static_check_commands:")
+    for command in DEFAULT_QUALITY_CHECK_STATIC_COMMANDS:
+        lines.append(f"      - {command!r}")
     return lines
 
 
@@ -1518,7 +2209,9 @@ def manifest_prompt_contract_lines(
         "      assignment_prompt_source: "
         "'tools/agent_tools/agent_team.py#role_prompt_contract'"
     )
-    lines.append("      common_prompt_must_include_ref: run.handoff_context_policy.common_prompt_must_include")
+    lines.append(
+        "      common_prompt_must_include_ref: run.handoff_context_policy.common_prompt_must_include"
+    )
     lines.append("      role_prompt_must_include:")
     for item in role_prompt_must_include(role):
         lines.append(f"        - {item!r}")
@@ -1535,7 +2228,9 @@ def manifest_write_policy_lines(spec: RunBundleSpec, role: Role) -> list[str]:
     )
     lines = ["    write_policy:"]
     lines.append(f"      mode: {scope.mode}")
-    lines.append(f"      requires_worktree_scope: {str(scope.requires_worktree_scope).lower()}")
+    lines.append(
+        f"      requires_worktree_scope: {str(scope.requires_worktree_scope).lower()}"
+    )
     if scope.notes:
         lines.append(f"      notes: {scope.notes!r}")
     if scope.worktree_scope_file is not None:
@@ -1566,7 +2261,9 @@ def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]
     if document_packet.notes:
         lines.append(f"      notes: {document_packet.notes!r}")
     lines.append("      common_packet_ref: run.cross_cutting_document_packet")
-    lines.append("      common_packet_read_rule: active_when_route_or_review_gate_requires_it")
+    lines.append(
+        "      common_packet_read_rule: active_when_route_or_review_gate_requires_it"
+    )
     lines.append("      role_specific_read_before_work:")
     for entry in role_specific_document_entries(document_packet):
         lines.append(f"        - path: {str(entry.path)!r}")
@@ -1661,6 +2358,19 @@ def render_subagent_prompt_packet(
     purpose = str(prompt.get("purpose", ""))
     if purpose:
         lines.append(f"{indent}  purpose: {purpose!r}")
+    lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
+    lines.append(
+        f"{indent}  tool_commands: 'run.repo_tool_routing_policy.sequential_tool_routes'"
+    )
+    lines.append(
+        f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
+    )
+    lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
+    lines.append(f"{indent}  required_tool_fields:")
+    lines.append(f"{indent}    - tool_route")
+    lines.append(f"{indent}    - tool_commands")
+    lines.append(f"{indent}    - tool_evidence")
+    lines.append(f"{indent}    - tool_rejection_prediction")
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
         values = prompt.get(key, [])
         if not isinstance(values, list):
@@ -1684,10 +2394,12 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "do not edit repository files"
     )
     return (
-        f"You are the {role.id} role for {family_name}. Start from compact artifacts and the "
-        "bounded role_document_packet named in the handoff; load cross_cutting_document_packet "
+        f"You are the {role.id} role for {family_name}. Start from structured context artifacts and the "
+        "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
-        f"them not_applicable. Use allowed_paths and do_not_read as hard context bounds. {write_scope}. "
+        f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
+        "Carry run.repo_tool_routing_policy tool_route, tool_commands, and tool_evidence into "
+        "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "
         "required gate."
@@ -1698,17 +2410,19 @@ def compact_role_prompt_contract(
     role: Role,
     workflow_family: dict[str, object] | None,
 ) -> str:
-    """Return a compact manifest copy of the role prompt contract."""
+    """Return a short manifest copy of the role prompt contract."""
     family_name = (
         str(workflow_family["name"])
         if workflow_family is not None
         else "the selected workflow"
     )
-    write_scope = "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
+    write_scope = (
+        "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
+    )
     return (
-        f"{role.id} for {family_name}; {write_scope}; use compact artifacts, "
+        f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
         "role-specific packet, common packet only when active, allowed paths, "
-        "and the listed output fields."
+        "repo tool route fields, and the listed output fields."
     )
 
 
@@ -1765,7 +2479,10 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
                 "review_finding_incorporation_trace",
             )
         )
-    if role.id.endswith("_reviewer") or role.id in {"change_reviewer", "final_reviewer"}:
+    if role.id.endswith("_reviewer") or role.id in {
+        "change_reviewer",
+        "final_reviewer",
+    }:
         common.extend(("findings_first_output", "approve_revise_or_escalate_decision"))
     return tuple(common)
 
@@ -1860,12 +2577,16 @@ def collect_changed_files(
             ["diff", "--cached", "--name-only", "--diff-filter=ACDMRTUXB"],
         )
     )
-    changed.update(_git_paths(workspace_root, ["ls-files", "--others", "--exclude-standard"]))
+    changed.update(
+        _git_paths(workspace_root, ["ls-files", "--others", "--exclude-standard"])
+    )
     ignored = tuple(root.resolve() for root in ignored_roots)
     filtered_paths = [
         path.resolve()
         for path in changed
-        if not any(path.resolve() == root or root in path.resolve().parents for root in ignored)
+        if not any(
+            path.resolve() == root or root in path.resolve().parents for root in ignored
+        )
     ]
     return tuple(sorted(filtered_paths, key=str))
 
@@ -1884,7 +2605,9 @@ def validate_role_write_scope(
     role = resolve_role(config, role_name)
     resolved_report_dir = report_dir.resolve()
     resolved_workspace_root = workspace_root.resolve()
-    scope = resolve_role_write_scope(config, role, resolved_report_dir, resolved_workspace_root)
+    scope = resolve_role_write_scope(
+        config, role, resolved_report_dir, resolved_workspace_root
+    )
     resolved_ignored_paths = tuple(path.resolve() for path in ignored_paths)
     if workspace_snapshot is None:
         changed_files = set(
@@ -1911,12 +2634,20 @@ def validate_role_write_scope(
             )
         )
     if report_dir_snapshot is not None:
-        changed_files.update(collect_directory_changes(resolved_report_dir, report_dir_snapshot))
+        changed_files.update(
+            collect_directory_changes(resolved_report_dir, report_dir_snapshot)
+        )
     changed_files.update(path.resolve() for path in (files or ()))
-    violations = tuple(sorted(
-        (path for path in changed_files if not _path_allowed(path.resolve(), scope)),
-        key=str,
-    ))
+    violations = tuple(
+        sorted(
+            (
+                path
+                for path in changed_files
+                if not _path_allowed(path.resolve(), scope)
+            ),
+            key=str,
+        )
+    )
     return scope, violations
 
 
@@ -1938,11 +2669,15 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
     raw_write_policy = dict(raw_role["write_policy"])
     write_policy = WritePolicy(
         mode=str(raw_write_policy["mode"]),
-        allowed_artifacts=tuple(str(item) for item in raw_write_policy["allowed_artifacts"]),
+        allowed_artifacts=tuple(
+            str(item) for item in raw_write_policy["allowed_artifacts"]
+        ),
         allowed_directories=tuple(
             str(item) for item in raw_write_policy.get("allowed_directories", ())
         ),
-        requires_worktree_scope=bool(raw_write_policy.get("requires_worktree_scope", False)),
+        requires_worktree_scope=bool(
+            raw_write_policy.get("requires_worktree_scope", False)
+        ),
         notes=str(raw_write_policy.get("notes", "")),
     )
     return Role(
@@ -1987,7 +2722,9 @@ def load_directory_snapshot(path: Path) -> dict[str, str]:
     """Load a directory snapshot from json."""
     return {
         str(snapshot_path): str(digest)
-        for snapshot_path, digest in json.loads(path.read_text(encoding="utf-8")).items()
+        for snapshot_path, digest in json.loads(
+            path.read_text(encoding="utf-8")
+        ).items()
     }
 
 
@@ -2043,7 +2780,9 @@ def write_workspace_change_snapshot(
     )
 
 
-def collect_directory_changes(root: Path, before_snapshot: dict[str, str]) -> tuple[Path, ...]:
+def collect_directory_changes(
+    root: Path, before_snapshot: dict[str, str]
+) -> tuple[Path, ...]:
     """Return files that changed within one directory since the captured snapshot."""
     after_snapshot = capture_directory_snapshot(root)
     changed_paths = {

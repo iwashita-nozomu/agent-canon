@@ -30,6 +30,13 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 この文書は、AgentCanon source change と template submodule pin change を PR に乗せるときの正本です。
 standalone AgentCanon repo、template repo 側の branch、PR、merge、submodule pin 更新を 1 本の手順で扱います。
 
+## この文書の読み方
+
+- この文書は、AgentCanon source PR、template pin PR、GitHub write、sync、security baseline の maintenance route を所有します。
+- 前半は対象、固定ルール、freshness gate、issues / findings gate、branch / push ルールを扱い、後半は標準手順、派生 repo、repo-local tool PR、PR body、完了条件、禁止事項、入口を扱います。
+- maintainer は `## Freshness Gate Route` と `## 標準手順` を先に読み、PR evidence 作成時は `## PR Body Examples` と `## PR 完了条件` を確認します。
+- chunked reading では、現在の state が freshness、issues、branch、PR publish、closeout のどれかを先に決め、その節だけを手順正本として開きます。
+
 ## 対象
 
 - `vendor/agent-canon/` 配下の変更
@@ -119,10 +126,9 @@ AgentCanon PR の前に、運用 finding を durable storage に残すかを必�
 1. Durable surfaces を検索する
 
 ```bash
-rg -l "topic keywords" \
+git grep -l "topic keywords" -- \
   issues/open issues/closed memory notes/failures documents agents \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
-  2>/dev/null | sed -n '1,200p' > reports/search_hits.txt
+  | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 ```
 
@@ -138,7 +144,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ```
 
 `dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を、issue または PR body の edit-scope evidence に残します。
-raw `rg` hit だけで「どの file を編集・確認するか」を決めません。
+raw text-search hit だけで「どの file を編集・確認するか」を決めません。
 
 3. 新しい workflow defect がある場合は issue file を作る
 

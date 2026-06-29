@@ -17,6 +17,10 @@ downstream design ./algorithm-implementation-boundary.md algorithm boundary revi
 問い、比較対象、逐次改造の流れは [research-workflow.md](../agents/workflows/research-workflow.md) を参照してください。
 数理境界と実装境界の対応は [algorithm-implementation-boundary.md](algorithm-implementation-boundary.md) の Boundary Map で確認します。
 
+## この文書の読み方
+
+この文書は、実験 code、protocol、result、figure、claim を批判的に見るための共通 reviewer guide です。まず目的と役割分担で review 責務を確認し、学術的根拠と主質問で判断軸を固定します。後半は実験コード、レポート、レビュー結果、最小テンプレート、参考文献の順に、実際の review checklist と記録形式を確認します。
+
 ## 1. 目的
 
 批判的レビューの目的は、単に「run が終わった」ことを確認することではありません。
@@ -233,7 +237,7 @@ AI に要約や論点抽出を補助させても、math validity、figure validi
 - `report_rewrite_required`
   - evidence は足りているが、説明順、数値の見せ方、図表導線、結論の書き方が弱い
 - `extra_validation_required`
-  - 同じコードと比較方針のまま、追加 table、追加 figure、追加 narrow run が必要
+  - 同じコードと比較方針のまま、追加 table、追加 figure、追加 bounded run が必要
 - `rerun_required`
   - case set 不一致、条件変更、partial run 混入、protocol 汚染がある
 - `approved`

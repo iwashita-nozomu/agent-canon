@@ -14,6 +14,13 @@ upstream design README.md workflow catalog
 この workflow は `agents/workflows/academic-writing-workflow.md` の paper-specific overlay です。
 記号と論理だけでなく、citation と evidence の対応を独立 reviewer で閉じる点が違いです。
 
+## この文書の読み方
+
+- この文書は、paper-like draft の section contract、citation / evidence trace、notation、paragraph map、multi-agent review を所有します。
+- 前半は use case、required artifacts、standard section contract、standard flow を扱い、後半は closeout、他 workflow との関係、convention gate を扱います。
+- paper writer は `## Required Artifacts` と `## Standard Section Contract` で構造を固定してから `## Standard Flow` の順に進みます。
+- chunked reading では、paper の section role、evidence matrix、review outcome のどれを確認しているかを先に決め、academic-writing の共通規則と重ねて読みます。
+
 ## Use When
 
 - 学会・ジャーナル論文の draft を作る

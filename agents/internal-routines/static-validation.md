@@ -10,7 +10,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Purpose
 
-変更内容に応じて最小限かつ十分な quality gate を選びます。
+変更内容、risk、owner surface に応じて必要な quality gate を選びます。
 
 ## Use When
 

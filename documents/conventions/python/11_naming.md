@@ -10,6 +10,14 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 
 対象: `python/` 配下の checked-in package と module。
 
+## この文書の読み方
+
+- この文書は、Python file、function、class、Protocol、contract family の命名を定めます。
+- 主な順路は、要約、ファイル名、関数名、クラス名・Protocol名、
+  契約 family の命名、例です。
+- checked-in Python package/module の名前を追加または変更する前に読みます。
+- 境界: 実装構造や API boundary の判断は、対応する設計/実装規約文書が所有します。
+
 ## 要約
 
 - **ファイル名**は `snake_case.py`。

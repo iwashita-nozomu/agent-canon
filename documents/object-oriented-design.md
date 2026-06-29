@@ -25,11 +25,15 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 [Python コーディング規約](./coding-conventions-python.md) と
 [Protocol 設計](./design/protocols.md) を併読します。
 
+## この文書の読み方
+
+この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Backlog への変換、例外は、checker finding や設計 review の扱いを決めるときに使います。
+
 ## 要約
 
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
 - まず関数、値オブジェクト、既存 `Protocol`、既存 class を再利用し、新しい class は最後に追加します。
-- 状態を持たない処理は class にせず、関数または小さい module-level helper に保ちます。
+- 状態を持たない処理は class にせず、関数または focused module-level helper に保ちます。
 - helper は極力、使う関数の内側へ局所内包します。public / module-level helper は domain の射として読める名前と型を持つ場合だけ許可します。
 - 不変の設定、結果、通知は `@dataclass(frozen=True)` などの値オブジェクトで表します。
 - 差し替え境界は具象 class ではなく、最小の振る舞い契約で受けます。
@@ -43,7 +47,7 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
 投影の正本は `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
 
-- Single responsibility: class / function の肥大化、曖昧名、state 過多、副作用混在、不要 wrapper を同じ責務境界の risk として読む。
+- Single responsibility: 曖昧名、state 過多、副作用混在、不要 wrapper、責務語彙の広がりを同じ責務境界の risk として読む。
 - Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、variant や entrypoint の増設で表す候補として読む。
 - Liskov substitution: base class 過多を、置換可能な契約として読める継承かどうかの確認対象にする。
 - Interface segregation: public method / field / parameter 過多を、利用側が必要とする最小契約へ分ける候補として読む。
@@ -53,10 +57,10 @@ SOLID signal は設計レビューの入口です。最終判断では機械 fin
 
 | Principle | Source-informed meaning | Local implementation contract | Static risk route |
 |---|---|---|---|
-| Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `function_lines`、`class_lines`、`mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket` |
+| Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket`、`instance_attributes`、`public_methods` |
 | Open/closed | 安定した policy を extension point で拡張可能にする。 | 予測済み variant は branch cascade ではなく `Protocol`、registry、adapter、variant value、別 entrypoint へ置く。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
 | Liskov substitution | subtype は supertype の証明済み性質を保存する。 | 継承は置換可能な契約の特殊化に限定し、入力条件、戻り値、例外、invariant、history property を保存する。 | `base_classes` と type checker / shared behavior contract |
-| Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの小さい contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
+| Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの role-specific contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
 | Dependency inversion | high-level policy と low-level detail は stable abstraction に依存する。 | composition root / factory / adapter で具象生成を閉じ、policy layer は `Protocol`、typed value、stable interface を受ける。 | OOP primary signal は `missing_public_annotations` と `optional_boundary`。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
 
 この表は Martin の SOLID 系 article、Liskov/Wing の behavioral subtyping、
@@ -124,7 +128,7 @@ member が増える場合は、値オブジェクト、state owner、adapter、s
 - 既存設計文書で継承関係が正本として固定されている。
 
 実装共有だけを目的にした深い継承、mixin の多用、親 class の内部状態に依存する subclass を禁止します。
-共通処理は helper function、composition された component、または小さい値オブジェクトへ切り出します。
+共通処理は helper function、composition された component、または focused value object へ切り出します。
 
 ### 6. 境界で検証する
 
@@ -148,7 +152,7 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 
 - public function / method は、入力 domain、出力 codomain、失敗境界が型や名前から読める。
 - 純粋な変換 `A -> B` と、IO / mutation / process 起動のような副作用境界を 1 つの関数に混ぜない。
-- 合成可能な小さい変換を作り、巨大な手続きで複数の射を隠さない。
+- 合成可能な focused 変換を作り、巨大な手続きで複数の射を隠さない。
 - `None` による runtime routing を domain の一部として曖昧にせず、別型、別 constructor、別 entrypoint、`Protocol`、variant で表す。
 - helper は外へ増やすより、合成の内側でしか使わない局所関数や内包に閉じる。
 - 数理的に情報を増やさない identity wrapper、pass-through wrapper、stateless callable class、薄い formatting wrapper は不要構造として扱います。
@@ -204,7 +208,16 @@ terminal identity morphism、compact numeric scalar wrapper を意図的な境�
 これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
-score は設計判断の補助です。
+score は設計判断の補助であり、pass / fail の主判定ではありません。
+`OOP_READABILITY` は error / gate / review の signal class で決めます。
+`public_methods`、`parameters`、`instance_attributes`、`public_fields`、
+`cognitive_complexity` のような surface / control-flow finding は boundary
+review signal として扱い、数値だけで split / extract を要求しません。
+`--min-score 0` は survey 用に finding を出し切る pass mode として扱い、
+default は signal 判定を使います。明示的に default より高い score floor を
+指定した場合だけ strict score gate として扱います。分割は caller contract、
+state ownership、既存責務語彙、または周辺 source shape から安定した境界が
+読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
 重要な変更では、機械 report を正本にします。
 
@@ -236,7 +249,7 @@ false positive / allowed warning は reviewer の推測ではなく、機械 fin
 
 `tools/oop/*/readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
 
-- `function_lines` / `cognitive_complexity`: まず関数を decision、pure transform、effect boundary、formatting の単位へ分ける。
+- `cognitive_complexity`: まず分岐の意味を named decision、variant、entrypoint、または flatten できる条件へ分ける。
 - `parameters`: stable な入力集合を dataclass / typed request object / existing value object へ寄せる。
 - `optional_boundary` / `none_runtime_branch`: `None` sentinel ではなく、別 entrypoint、variant、Protocol、validated value object のいずれかへ寄せる。
 - `mixed_morphism_effect`: 戻り値を作る純粋変換と file / process / mutation / print などの effect を分離する。

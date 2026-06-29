@@ -12,6 +12,15 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 
 この章は、`documents/` の運用と Markdown の体裁に関する共通方針をまとめます。
 
+## この文書の読み方
+
+- この文書は、文書更新、依存関係明示、Markdown 体裁、claim grounding、
+  規範表現、受け入れ条件、検証を定めます。
+- 主な順路は、要約、規約、Claim Grounding、規範表現、受け入れ条件、検証です。
+- `documents/` 配下の正本文書を作成または更新する前に読みます。
+- 境界: 個別文書の責務や正本リンクは、その文書の dependency header と
+  documents index が所有します。
+
 ## 要約
 
 - 変更が入った場合は文書も更新します。
@@ -24,6 +33,9 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 - 変更が入った場合は、該当する `documents/` 内の文書を同時に更新します。
 - モジュールの役割と依存関係は、文書に明示します。
 - 文書は **そのファイル単体で概要と主要判断が読める**ように書きます。
+- 長めの reader-facing Markdown、または分割読みされる可能性が高い Markdown は、
+  先頭付近に reader map を置きます。reader map は、その文書が扱う内容、
+  主な章のまとまり、読むべき場面、誤用を避ける境界を短く示します。
 - `documents/` 内の編成は、参照先の一覧ではなく、責務ごとの分割を優先します。
 - 実装への参照は、実装ファイル名や実装上の制約を明示する必要がある場合に限ります。
 - 各 `.md` ファイルは、タイトル、短い導入、`##` 見出しごとの本文という流れを基本にします。

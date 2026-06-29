@@ -42,6 +42,15 @@ AgentCanon coordinated search has six provider classes:
   Local LLM output is advisory, matching the local LLM runtime boundary in the
   upstream design.
 
+## Reader Map
+
+Use this document to answer how AgentCanon coordinates exact text, TF-IDF,
+local semantic cards, tool catalog matches, dependency headers, and code facts.
+Read the provider list and evidence ledger first, then Local LLM Boundary and
+Responsibility-First Search Order before choosing search output as edit-scope
+evidence. Generated Search State and Semantic-Index Evidence explain cache and
+embedding boundaries.
+
 Use `agent-canon local-llm search` when the user gives a purpose rather than an
 exact symbol:
 
@@ -79,18 +88,19 @@ skill integration rule is:
 
 ## Responsibility-First Search Order
 
-Use `rg` first only when the input is an exact path, symbol, literal error
-message, or short unique token. For every broader search, use this order:
+Use exact `git grep` or direct path inspection only when the input is an exact
+path, symbol, literal error message, or short unique token. For every broader
+search, use this order:
 
 1. Write the current task, reviewer question, or reuse purpose to a run-local
    query file such as `reports/<run-id>/query.txt`.
-1. Run responsibility-based search before `rg` to identify the responsibility
+1. Run responsibility-based search before text search to identify the responsibility
    bucket, dependency-header surface, tool/workflow/document family, and
    candidate source paths.
 1. If directory ownership, README coverage, or source-tree responsibility is
    the question, add the directory responsibility pass before choosing source
    directories.
-1. Use `rg -l` only inside the selected source directories or candidate paths,
+1. Use `git grep -l` only inside the selected source directories or candidate paths,
    or as comparison evidence for search Eval.
 1. Expand bounded hit paths through dependency review before editing.
 
@@ -125,15 +135,15 @@ agent-canon semantic-index responsibility-tree \
 The follow-up dependency expansion is:
 
 ```bash
-rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
+git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```
 
-Because dependency review is the authority for edit-scope expansion, raw `rg`
-hits do not decide the edit surface until dependency review expands and checks
-them.
+Because dependency review is the authority for edit-scope expansion, raw text
+search hits do not decide the edit surface until dependency review expands and
+checks them.
 
 After dependency expansion, cache repair is the alternate route for the responsibility
 pass itself. If the SQLite cache is missing or stale, build it immediately and
@@ -144,13 +154,13 @@ search:
 agent-canon semantic-index build --root .
 ```
 
-Only use bounded `rg -l` as the next route when the build itself fails because
-of toolchain, permission, or embedding-provider availability. Record that
-reason in the run bundle.
+Only use bounded `git grep -l` as the next route when the build itself fails
+because of toolchain, permission, or embedding-provider availability. Record
+that reason in the run bundle.
 
-During search-routing Eval collection, run `rg -l` after the bounded
+During search-routing Eval collection, run `git grep -l` after the bounded
 responsibility result so the two surfaces can be compared. Do not use broad raw
-`rg` output as edit authority.
+text-search output as edit authority.
 
 ## Generated Search State
 
@@ -167,7 +177,7 @@ skills, workflow documents, or code surfaces.
 The LLM provider is advisory. It may use deterministic heuristic cards without
 running a model, or it may refine cards with llama.cpp when `--run-llm` is set.
 Local LLM output can rank ambiguous candidates, but it is not a correctness
-authority and must not replace dependency review, `rg`, tests, or static
+authority and must not replace dependency review, exact text search, tests, or static
 analysis evidence.
 
 The same generated-state boundary applies in template and derived repositories:
@@ -184,7 +194,7 @@ The semantic-index evidence contract is:
 | --- | --- |
 | Command surface | `search`, `similarity`, `merge-candidate`, `thin-document`, provider-comparison, and Eval reports. |
 | Cache location | `~/.cache/agent-canon/semantic-index/<repo-key>/` by default. |
-| Authority | Advisory evidence; it does not replace exact `rg`, dependency review, strict structure analysis, tests, or static analysis evidence. |
+| Authority | Advisory evidence; it does not replace exact text search, dependency review, strict structure analysis, tests, or static analysis evidence. |
 | Prompt handling | Use `--query-file` or `--query-stdin` for long natural-language prompts. |
 | Output handling | Prefer bounded `--top-k` plus `--format text` or `--format jsonl` so agents do not read full JSON payloads or long query echoes unnecessarily. |
 | Provider comparison | The same SQLite index can hold deterministic baseline vectors and LLM-backed embedding vectors; downstream candidate and responsibility-bucket logic is shared. |

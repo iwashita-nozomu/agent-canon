@@ -67,5 +67,9 @@ upstream design README.md notes lifecycle index
 
 ## References
 
-- [Markus Holtz, Sparse Grid Quadrature in High Dimensions with Applications in Finance and Insurance, 2010](/workspace/references/978-3-642-16004-2.pdf)
-- [Adina-Eliza Murarasu, Advanced Optimization Techniques for Sparse Grids on Modern Heterogeneous Systems, 2013](/workspace/references/sparse_grid/Murarasu_2013_PhD_Advanced_Optimization_Techniques_for_Sparse_Grids_on_Modern_Heterogeneous_Systems.pdf)
+この template の `references/` には、上の例で使う PDF 本体は同梱していません。
+外部文献を追加する場合は、`references/README.md` の方針に従って source、取得日、
+利用範囲を記録します。
+
+- Markus Holtz, Sparse Grid Quadrature in High Dimensions with Applications in Finance and Insurance, 2010
+- Adina-Eliza Murarasu, Advanced Optimization Techniques for Sparse Grids on Modern Heterogeneous Systems, 2013

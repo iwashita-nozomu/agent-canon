@@ -5,11 +5,11 @@
 # downstream implementation run.py consumes managed run configuration.
 # @dependency-end
 
-# Defines the experiment case set or sweep space.
+# IMPLEMENT HERE: define the experiment case set or sweep space.
 cases: {}
 
-# Defines the evaluation metric and comparison direction.
+# IMPLEMENT HERE: define the evaluation metric and comparison direction.
 metric: {}
 
-# Defines execution-only controls such as throttling or debug behavior.
+# IMPLEMENT HERE: define execution-only controls such as throttling or debug behavior.
 runtime: {}

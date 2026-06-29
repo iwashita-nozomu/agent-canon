@@ -15,6 +15,13 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 この workflow は、template から作った派生 repo の `vendor/agent-canon/` submodule に差分があるときの入口です。
 目的は、派生 repo の submodule worktree、AgentCanon GitHub branch、shared `agent-canon` main、派生 repo の parent gitlink を順番に揃え、shared canon 差分を未整理のまま残さないことです。
 
+## この文書の読み方
+
+- この文書は、派生 repo の `vendor/agent-canon/` 差分を shared canon PR、main 取り込み、派生 repo pin 更新へ戻す route を所有します。
+- 前半は適用条件、固定ルール、状態固定、差分分類を扱い、後半は AgentCanon branch、shared canon main、派生 repo 復帰、template pin、validation、closeout を扱います。
+- maintainer は `## Stage 0. 状態固定` と `## Stage 1. 差分分類` で route を決めてから、shared-canon candidate の場合だけ `Stage 2` 以降へ進みます。
+- chunked reading では、現在の差分状態を stage 番号に対応させ、root view と submodule worktree の正本境界を同じ chunk で確認します。
+
 ## 適用条件
 
 - `git status --short -- vendor/agent-canon` に差分がある

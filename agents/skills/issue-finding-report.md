@@ -5,25 +5,38 @@
 contract skill
 responsibility Documents issue-finding-report for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design agent-log-analysis.md compact runtime evidence analysis workflow
+upstream design agent-log-analysis.md structured runtime evidence analysis workflow
 upstream design subagent-bootstrap.md multi-agent partition and handoff workflow
 upstream design ../../issues/README.md durable AgentCanon operational issue schema
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits compact log evidence
+upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
 upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue records and GitHub mirrors
 downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: turn accumulated runtime, prompt, hook, skill, tool, workflow, and
+  eval evidence into durable AgentCanon operational issue candidates.
+- Section path: Purpose and Use When set the route; Inputs and Abstract Cause
+  Taxonomy define evidence and grouping; Multi-Agent Partition, Issue Candidate
+  Contract, Output Packet, and Validation define production and checks.
+- Use when: repeated agent behavior, routing misses, workflow evidence, or log
+  dashboard signals should become issue-backed repair work.
+- Boundary: compact analysis comes from `agent-log-analysis`; this skill writes
+  issue candidates or finding packets without replacing PR processing or tool
+  finding ownership.
+
 ## Purpose
 
 Convert accumulated prompt, run-bundle, hook, skill, tool, workflow, and eval
 evidence into durable AgentCanon operational issues. The skill groups repeated
 signals by abstract cause, assigns multi-agent review partitions, and writes
-issue candidates that cite compact evidence.
+issue candidates that cite structured evidence.
 
 This skill is the issue-production follow-up to `agent-log-analysis`. It
-receives compact dashboard artifacts and produces issue records or a finding
+receives structured dashboard artifacts and produces issue records or a finding
 packet while leaving runtime analysis, tool finding packets, and PR processing
 with their owner skills.
 
@@ -31,7 +44,7 @@ with their owner skills.
 
 - User asks to turn logs, prompt history, run bundles, or agent reports into
   skill issues.
-- A compact dashboard exposes repeated skill, workflow, tool, hook, wave, eval,
+- A structured dashboard exposes repeated skill, workflow, tool, hook, wave, eval,
   or token evidence that should survive the current run.
 - Multi-agent review is needed to separate abstract causes before writing
   `issues/open/AC-*.md` files.
@@ -40,7 +53,7 @@ with their owner skills.
 
 ## Inputs
 
-Use compact artifacts as the normal input:
+Use structured artifacts as the normal input:
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
@@ -50,7 +63,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
 
-Required compact fields:
+Required structured fields:
 
 - `unknown_event_count`
 - `status_by_hook_family`
@@ -79,7 +92,7 @@ Assign each cluster to one primary cause and optional secondary causes:
 | `prompt_or_config_drift` | behavior follows prompt, config, or role-policy mismatch | affected prompt/config surface, `prompt_config_reviewer` |
 | `structure_boundary` | evidence points to wrong repo/view/skill/tool boundary | `structure-refactor`, responsibility-scope owner |
 
-Create one issue per abstract recurring cause cluster, with compact evidence
+Create one issue per abstract recurring cause cluster, with structured evidence
 counts and route target.
 
 ## Multi-Agent Partition
@@ -88,7 +101,7 @@ Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:
 
 ```text
 cause: <abstract-cause>
-evidence_cells: <compact dashboard headings or API JSON paths>
+evidence_cells: <structured dashboard headings or API JSON paths>
 instance_partition: <repo_key|hook_family|skill_name|workflow_name|tool_name|issue_id|path_scope>
 candidate_issue_slug: <lowercase-ascii-slug>
 affected_surfaces: <candidate repo paths>
@@ -104,7 +117,7 @@ Recommended review partition:
 - `artifact_reviewer`: raw/structured artifact sufficiency and evidence paths
 
 When several independent clusters exist, spawn same-role instances by
-`instance_partition`. Each instance receives only its packet, compact artifact
+`instance_partition`. Each instance receives only its packet, structured artifact
 paths, allowed issue paths, candidate affected surfaces, validation route, and
 return schema. The parent deduplicates returned candidates before writing files.
 
@@ -115,7 +128,7 @@ Before writing a new issue:
 1. Search existing durable surfaces.
 
    ```bash
-   rg -n "<cause keywords>" issues memory notes/failures documents agents
+   git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
    ```
 
 1. Expand candidate affected surfaces through dependency review.
@@ -137,10 +150,10 @@ Before writing a new issue:
 
 Issue body sections:
 
-- `## Finding`: observed recurring behavior and compact evidence counts
+- `## Finding`: observed recurring behavior and structured evidence counts
 - `## Abstract Cause`: why the cluster belongs to the selected cause
 - `## Required Fix`: skill, workflow, tool, or logging repair expected
-- `## Evidence`: compact dashboard, run bundle, dependency review, or existing
+- `## Evidence`: structured dashboard, run bundle, dependency review, or existing
   issue links
 
 ## Output Packet
@@ -150,7 +163,7 @@ multiple candidates exist, or before spawning subagents:
 
 ```text
 issue_finding_scope: <dashboard|run-bundle|archive|mixed>
-compact_evidence: <paths>
+structured_evidence: <paths>
 candidate_count: <n>
 new_issue_count: <n>
 merged_existing_count: <n>

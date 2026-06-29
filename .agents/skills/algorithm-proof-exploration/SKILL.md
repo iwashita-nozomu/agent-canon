@@ -19,6 +19,19 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
 
 # Algorithm Proof Exploration
 
+## Reader Map
+
+- Purpose: expose theorem-driven algorithm exploration to Codex and connect it
+  to formal proof adoption.
+- Section path: Tool Commands gives the command packet; the numbered rules hold
+  the required sequence; Outputs defines the return surface.
+- Use when: proof obligations require JIT-canonical IR, theorem dependency
+  graphs, algorithmic blockers, numerical witnesses, or algorithm-change
+  guidance.
+- Boundary: `$formal-proof-workflow` owns final checker-backed proof,
+  refutation, or unprovability; this shim owns discovery and operational
+  routing.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -43,19 +56,16 @@ Execute the required and task-matching conditional commands that the packet prin
    first and bring its checked Lean design handoff into this skill only when
    mapping that design to production code.
 1. Every `formal_proof_handoff` produced by this skill must include the
-   `Target Binding Packet` required by `agents/COMMUNICATION_PROTOCOL.md`:
-   target theorem, public root / entrypoint and signature, theorem-visible return
-   projection, identifier naming plan, generated evidence artifacts, accepted
-   top-level assumptions, forbidden assumptions, completion condition,
-   validation commands, and unchecked-output policy. If the current algorithm
-   frontier cannot fill those fields, the next action is to regenerate / repair
+   protocol-owned `Target Binding Packet` from
+   `agents/COMMUNICATION_PROTOCOL.md`. If the current algorithm frontier cannot
+   fill that packet, the next action is to regenerate / repair
    the IR, theorem graph, or source packet; do not pass a vague blocker summary
    to a proof subagent.
 1. Fix the whole target theorem first, rooted at the JIT-canonical public
    entrypoint: normally `main(problem, InitializeConfig, ...) -> Answer / State
    / Info` or the equivalent run function. Local convergence, certificate
    soundness, finite-precision floor, solver-chain reachability, infeasibility
-   certificate, and problem-class narrowing are profiles of that whole theorem,
+   certificate, and problem-class restriction are profiles of that whole theorem,
    not starting points. Do not explore helpers without first stating the
    top-level main theorem they decompose.
    When a checked Lean design handoff exists, add a first target theorem stating
@@ -143,7 +153,7 @@ Execute the required and task-matching conditional commands that the packet prin
    The selected work item must name the board row and the whole route segment
    it will close. If this cannot be stated, first repair the board or graph
    extraction; do not start from the last local theorem touched.
-   Smaller witnesses, local lemmas, and one-shot wave summaries are queue items
+   Lower-level witnesses, local lemmas, and one-shot wave summaries are queue items
    only. They are never user-facing progress unless the board row they serve is
    terminal or reduced to a checked boundary with no actionable sibling row.
    For convergence and finite-stop tasks, run a problem-level board pass at the
@@ -224,7 +234,7 @@ Execute the required and task-matching conditional commands that the packet prin
    check whether current Lean functions / generated IR facts can prove or
    refute those candidates, then rerun the target proof. Repeat until `P` is
    proved, refuted, shown unprovable under the current top-level assumptions, or
-   reduced to a checked boundary. A strictly smaller named witness becomes the
+   reduced to a checked boundary. A lower-level named witness becomes the
    next loop input; it is not an algorithmic completion state, handoff terminal,
    or user-facing result for the public-root theorem.
    When a candidate condition proves `P` only because it is definitionally the
@@ -241,7 +251,7 @@ Execute the required and task-matching conditional commands that the packet prin
    equivalence, existential-lift, or certificate-inclusion edges. Do not accept a
    necessary/sufficient problem class merely because the terms were renamed or
    the proof did not close by a single definitional step.
-   Keep a route portfolio, not a single narrowing path. For every selected
+   Keep a route portfolio, not a single restriction path. For every selected
    frontier row, preserve at least one alternate route or record why no
    alternate remains. If the selected row proves only a side sufficient route
    while the public-root finite-stop theorem still has a broader frontier,
@@ -275,7 +285,7 @@ Execute the required and task-matching conditional commands that the packet prin
    reachability/ranking mechanism, algorithmic choice, external assumption
    binding, or problem-class witness.
    When multiple blockers exist, prefer the one closest to a non-circular
-   public-input condition for the final theorem over a narrow helper-level
+   public-input condition for the final theorem over a helper-level
    convenience lemma. A blocker report is incomplete unless it explains why
    resolving it would advance the whole public-root theorem more than the
    remaining candidate blockers.
@@ -289,14 +299,14 @@ Execute the required and task-matching conditional commands that the packet prin
    selection, direction construction, nested solver certificate, state update,
    residual/merit recomputation, and final scalar binding. If any such block is
    still only a route call or unconstrained theorem variable, send it back as a
-   smaller formal-proof witness. An algorithmic blocker is visible only when
+   lower-level formal-proof witness. An algorithmic blocker is visible only when
    the remaining gap is a semantic mechanism such as missing contraction,
    missing residual-merit selection, missing problem-class bound, missing
    backend boundary, or checker-backed refutation.
 1. When formal-proof returns a missing witness or assumption-insufficiency
    result, classify whether the gap is better solved by changing the algorithm,
    changing the algorithmic recurrence, deriving a numerical convergence
-   witness, narrowing the problem class, or leaving an external assumption
+   witness, restricting the problem class, or leaving an external assumption
    boundary.
 1. Target theorem values must be implementation values, not free witnesses.
    KKT components, residual components, stopping scalars, solver returns,
@@ -323,7 +333,7 @@ Execute the required and task-matching conditional commands that the packet prin
    downstream lemma can be named.
    A callee name is never itself the algorithmic blocker. Before reporting an
    algorithmic blocker, expand the callee's generated equations into the
-   smallest relevant function predicates: input/output relation, return
+   directly relevant function predicates: input/output relation, return
    binding, loop-exit reason, stopping predicate, breakdown or exception
    predicate, and nested solver or callback output relation. Only after those
    predicates are verified, refuted, proved unprovable under the current
@@ -353,7 +363,7 @@ Execute the required and task-matching conditional commands that the packet prin
    caller-side lemma or target theorem edge is open.  Re-enter the recursive
    function frontier immediately: generate the next callee/function property,
    prove it, refute it, prove it unprovable under the current top-level
-   assumptions, or change the algorithm and regenerate IR/graphs.  A smaller
+   assumptions, or change the algorithm and regenerate IR/graphs.  A lower-level
    named witness is not a user-facing stopping point for this class of gap; it
    is the next in-turn work item.
    Apply the same rule to `connection_unconnected`: bridge edges, profile
@@ -397,7 +407,7 @@ Execute the required and task-matching conditional commands that the packet prin
    upper-bound lemmas, selected-scope bounds, finite-prefix ranking/contraction
    witnesses, same-units conversion, or projection of existing algorithm return
    facts. Do not promote the desired condition into an independent
-   assumption. If no derivation route closes, return the minimal blocker as
+   assumption. If no derivation route closes, return the blocker with direct frontier evidence as
    either missing top-level problem/config property, missing external
    architecture evidence, or an algorithmic choice that must change.
 1. For initialization, basin-entry, or selected-scope-entry blockers, normalize the
@@ -409,7 +419,7 @@ Execute the required and task-matching conditional commands that the packet prin
    classify the gap as either a problem-class witness for that initializer or
    an algorithmic choice to add a stronger initializer, Phase I, or
    globalization path.
-1. If the gap is a current algorithmic choice, enumerate the smallest
+1. If the gap is a current algorithmic choice, enumerate the directly relevant
    implementation degrees of freedom that could make the target theorem
    provable and translate each candidate into a proof obligation before editing
    code. After any algorithm change, regenerate IR/graphs and re-enter the same
@@ -429,7 +439,7 @@ Execute the required and task-matching conditional commands that the packet prin
    libraries, or existing checker output. A Wave result is integrated by the
    parent, not returned as a terminal summary, until the current public-root
    theorem is verified, refuted, proved unprovable under the current top-level
-   assumptions, or reduced to a checked minimal code/input/backend/algorithm
+   assumptions, or reduced to a checked direct code/input/backend/algorithm
    boundary.
 1. After changing initialization logic, require `$formal-proof-workflow` to
    consume the newly extracted initialization code facts before returning to
@@ -447,7 +457,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When the code must change for provability, state the algorithm change in
    proof terms first: remove an unsound gate, change the blocking recurrence,
    initializer, line search, inner-solver policy, regularization, Phase I /
-   globalization route, narrow to a local theorem, or add a problem-class
+   globalization route, restrict to a local theorem, or add a problem-class
    witness. A code change for provability means replacing the algorithm with a
    provable numerical mechanism, not embedding the proof check in production
    code.
@@ -465,7 +475,7 @@ Execute the required and task-matching conditional commands that the packet prin
    have been regenerated and rechecked. A failed checklist item is not a
    top-level outcome; it is the next Wave work item unless the user explicitly
    asks for interim status. A
-   proposed algorithm change, smaller witness, missing bridge, unconnected
+   proposed algorithm change, lower-level witness, missing bridge, unconnected
    function guarantee, one-shot Wave summary, or graph report with open
    frontier is not a return value. Treat it as the next work item: repair or
    change the algorithm if justified, regenerate JIT/backend/Lean/theorem-graph
@@ -473,8 +483,8 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Treat `unverified_with_next_witness` as a handoff queue back to
    `$formal-proof-workflow`, not as algorithmic completion. Re-enter that named
    witness until it passes the required checklist item, is removed from all
-   target routes, or yields a strictly smaller frontier witness.
-   If the strictly smaller witness is another function-level guarantee whose
+   target routes, or yields a lower-level frontier witness.
+   If the lower-level witness is another function-level guarantee whose
    absence blocks a caller lemma or target edge, do not return it to the user;
    continue the same recursion until that function guarantee is terminal or no
    repository/code/tool action can advance it.
@@ -523,7 +533,8 @@ Execute the required and task-matching conditional commands that the packet prin
    note. A valid connected path is structure evidence, not proof completion.
 1. Hand terminal proof obligations to `$formal-proof-workflow`: checked theorem
    statements, counterexamples, unprovable-under-assumptions witnesses, existing
-   proof search packets, checker commands, and the complete `Target Binding Packet`.
+   proof search packets, checker commands, and the protocol-owned
+   `Target Binding Packet`.
 
 ## Outputs
 

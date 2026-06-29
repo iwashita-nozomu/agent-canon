@@ -7,6 +7,18 @@ upstream design README.md notes lifecycle index
 @dependency-end
 -->
 
+## Reader Map
+
+- This template owns the expected structure for a topic-first experiment report
+  note.
+- Follow the section path from abstract, question and context, protocol, results,
+  discussion, conclusion, limitations, reproducibility, artifacts, and critical
+  review.
+- Use it when drafting a concise experiment report that must preserve protocol,
+  result, limitation, and carry-over evidence.
+- The template is a report scaffold; it does not define experiment runner
+  behavior or replace the experiment registry contract.
+
 
 ## Abstract
 

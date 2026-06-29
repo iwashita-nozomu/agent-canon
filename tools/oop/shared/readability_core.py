@@ -13,8 +13,8 @@
 """Evaluate OOP readability risks for Python and C++ source files.
 
 The score is a review aid, not a substitute for human design review. It focuses on
-signals that are cheap to compute and aligned with the local OOP policy: small
-responsibility boundaries, explicit state ownership, narrow public surfaces, and
+signals that are fast to compute and aligned with the local OOP policy: focused
+responsibility boundaries, explicit state ownership, role-specific public surfaces, and
 avoiding vague class shapes.
 """
 
@@ -86,8 +86,6 @@ PARAMETER_AGGREGATE_FUNCTIONS = {"add_finding"}
 DEFAULT_MIN_SCORE = 95
 DEFAULT_SNIPPET_CONTEXT_LINES = 2
 DEFAULT_MAX_REPORT_FINDINGS = 80
-DEFAULT_MAX_FUNCTION_LINES = 80
-DEFAULT_MAX_CLASS_LINES = 220
 DEFAULT_MAX_PUBLIC_METHODS = 12
 DEFAULT_MAX_INSTANCE_ATTRIBUTES = 10
 DEFAULT_MAX_PARAMETERS = 6
@@ -97,10 +95,6 @@ DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
 GIT_BASELINE_TIMEOUT_SECONDS = 20
 MAX_READABILITY_SCORE = 100
-ERROR_SCORE_PENALTY = 25
-WARN_SCORE_PENALTY = 5
-INFO_SCORE_PENALTY = 2
-UNKNOWN_SEVERITY_SCORE_PENALTY = 3
 UNKNOWN_SEVERITY_FINDING_RANK = 9
 KLOC_NORMALIZER = 1000
 MILLISECONDS_PER_SECOND = 1000
@@ -196,6 +190,20 @@ LANGUAGE_SUFFIXES = {
     "python": PYTHON_SUFFIXES,
     "cpp": CPP_SUFFIXES,
 }
+SIGNAL_CLASS_ERROR = "error"
+SIGNAL_CLASS_GATE = "gate"
+SIGNAL_CLASS_REVIEW = "review"
+STATUS_PASS = "pass"
+STATUS_FAIL = "fail"
+REVIEW_SIGNAL_KINDS = frozenset(
+    {
+        "cognitive_complexity",
+        "public_methods",
+        "instance_attributes",
+        "parameters",
+        "module_helper_bucket",
+    }
+)
 
 KIND_FACTS: dict[str, tuple[str, str, str]] = {
     "vague_class_name": (
@@ -203,25 +211,15 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
         "The public type name does not expose a domain responsibility.",
         "Rename the boundary around the domain concept it owns.",
     ),
-    "class_lines": (
-        "responsibility size",
-        "The class is large enough that multiple responsibilities may be hidden together.",
-        "Split state ownership, contract, adapter, and orchestration roles.",
-    ),
-    "function_lines": (
-        "operation size",
-        "The operation is long enough that decision, transform, and effect steps are hard to scan.",
-        "Extract named steps while keeping pure transforms and effects separate.",
-    ),
     "cognitive_complexity": (
         "control-flow readability",
         "Nested control flow makes the operation hard to compose mentally.",
-        "Flatten branches or extract named decisions with explicit inputs and outputs.",
+        "Review whether branch meaning can be named or flattened without adding accidental boundaries.",
     ),
     "public_methods": (
         "public surface width",
         "The public API is wide enough to suggest more than one class responsibility.",
-        "Narrow the interface or split independent responsibility surfaces.",
+        "Review caller roles and refine the interface only when responsibilities are independent.",
     ),
     "public_fields": (
         "state ownership",
@@ -236,12 +234,12 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
     "instance_attributes": (
         "state ownership",
         "The object owns enough member state that lifecycle and invariants are hard to audit.",
-        "Extract stable value objects or narrower state owners.",
+        "Review whether the existing state has a stable value object or state-owner boundary.",
     ),
     "parameters": (
         "input boundary",
         "The callable takes enough inputs that the domain shape is not explicit.",
-        "Group stable inputs into a named value object or request object.",
+        "Review whether the inputs form a stable named domain shape before grouping them.",
     ),
     "base_classes": (
         "composition boundary",
@@ -276,7 +274,7 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
     "module_helper_bucket": (
         "helper locality",
         "The module has many helper-shaped public operations.",
-        "Keep helpers local to callers or split domain services.",
+        "Review whether helpers can stay local to callers or whether an existing domain service boundary is missing.",
     ),
     "missing_public_annotations": (
         "typed boundary",
@@ -340,8 +338,6 @@ SOLID_PRINCIPLES = {
 
 SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
     "vague_class_name": ("single_responsibility",),
-    "class_lines": ("single_responsibility",),
-    "function_lines": ("single_responsibility",),
     "cognitive_complexity": ("single_responsibility", "open_closed"),
     "public_methods": ("single_responsibility", "interface_segregation"),
     "public_fields": ("single_responsibility", "interface_segregation"),
@@ -375,8 +371,6 @@ SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
 class Thresholds:
     """Thresholds that turn static observations into findings."""
 
-    max_function_lines: int = DEFAULT_MAX_FUNCTION_LINES
-    max_class_lines: int = DEFAULT_MAX_CLASS_LINES
     max_public_methods: int = DEFAULT_MAX_PUBLIC_METHODS
     max_instance_attributes: int = DEFAULT_MAX_INSTANCE_ATTRIBUTES
     max_parameters: int = DEFAULT_MAX_PARAMETERS
@@ -726,8 +720,6 @@ def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
 
 def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
     """Add analyzer threshold arguments."""
-    parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
-    parser.add_argument("--max-class-lines", type=int, default=DEFAULT_MAX_CLASS_LINES)
     parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
     parser.add_argument(
         "--max-instance-attributes",
@@ -846,11 +838,6 @@ def iter_source_files(
     return sorted(set(files))
 
 
-def line_count(text: str) -> int:
-    """Count visible source lines in a stable way."""
-    return sum(1 for line in text.splitlines() if line.strip())
-
-
 def source_loc(text: str) -> int:
     """Count nonblank noncomment-ish source lines for normalized metrics."""
     count = 0
@@ -860,13 +847,6 @@ def source_loc(text: str) -> int:
             continue
         count += 1
     return count
-
-
-def node_length(node: ast.AST) -> int:
-    """Return source-line length for an AST node."""
-    lineno = getattr(node, "lineno", 0)
-    end_lineno = getattr(node, "end_lineno", lineno)
-    return max(1, end_lineno - lineno + 1)
 
 
 def python_cognitive_complexity(node: ast.AST) -> int:
@@ -2247,23 +2227,8 @@ def add_python_class_size_findings(
     attrs: set[str],
     findings: list[Finding],
 ) -> None:
-    """Record class size, public API, and state findings."""
+    """Record public API and state findings."""
     thresholds = context.thresholds
-    class_lines = node_length(node)
-    if class_lines > thresholds.max_class_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            node.lineno,
-            context.language,
-            "warn",
-            "class_lines",
-            node.name,
-            class_lines,
-            thresholds.max_class_lines,
-            "split-class-by-state-contract-or-adapter-boundary",
-        )
     if len(public_methods) > thresholds.max_public_methods:
         add_finding(
             findings,
@@ -2276,7 +2241,7 @@ def add_python_class_size_findings(
             node.name,
             len(public_methods),
             thresholds.max_public_methods,
-            "narrow-public-api-or-split-responsibilities",
+            "review-caller-roles-before-refining-api",
         )
     if len(attrs) > thresholds.max_instance_attributes:
         add_finding(
@@ -2290,7 +2255,7 @@ def add_python_class_size_findings(
             node.name,
             len(attrs),
             thresholds.max_instance_attributes,
-            "extract-value-object-or-state-owner",
+            "review-stable-value-object-or-state-owner-boundary",
         )
 
 
@@ -2459,7 +2424,6 @@ def analyze_python_function(
 class PythonFunctionShape:
     """Precomputed function metrics used by the Python analyzer."""
 
-    length: int
     parameters: int
     complexity: int
     none_checks: int
@@ -2477,7 +2441,6 @@ def python_function_shape(
     is_top_level = is_top_level_function(node, parents)
     is_method = is_direct_method(node, parents)
     return PythonFunctionShape(
-        length=node_length(node),
         parameters=python_parameter_count(node),
         complexity=python_cognitive_complexity(node),
         none_checks=none_runtime_checks(node),
@@ -2519,22 +2482,8 @@ def add_python_function_shape_findings(
     shape: PythonFunctionShape,
     findings: list[Finding],
 ) -> None:
-    """Record size, parameter, and control-flow findings."""
+    """Record parameter and control-flow findings."""
     thresholds = context.thresholds
-    if shape.length > thresholds.max_function_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            node.lineno,
-            context.language,
-            "warn",
-            "function_lines",
-            node.name,
-            shape.length,
-            thresholds.max_function_lines,
-            "split-decision-transform-and-side-effect-responsibilities",
-        )
     if (
         shape.parameters > thresholds.max_parameters
         and not shape.is_nested
@@ -2551,7 +2500,7 @@ def add_python_function_shape_findings(
             node.name,
             shape.parameters,
             thresholds.max_parameters,
-            "group-stable-inputs-into-value-object",
+            "review-stable-input-domain-shape",
         )
     if shape.complexity > thresholds.max_cognitive_complexity:
         add_finding(
@@ -2565,7 +2514,7 @@ def add_python_function_shape_findings(
             node.name,
             shape.complexity,
             thresholds.max_cognitive_complexity,
-            "flatten-control-flow-and-extract-named-steps",
+            "review-branch-meaning-before-extraction",
         )
 
 
@@ -2739,7 +2688,7 @@ def add_python_module_bucket_finding(
         context.path.name,
         module_bucket_count,
         context.thresholds.max_module_helpers,
-        "inline-local-helpers-or-split-domain-services",
+        "review-helper-locality-or-existing-domain-service",
     )
 
 
@@ -2957,7 +2906,7 @@ def cpp_aggregate_value_object_name(name: str) -> bool:
 
 
 def cpp_preceding_lines(text: str, start: int, line_count: int) -> str:
-    """Return a small source window immediately before an index."""
+    """Return a bounded source window immediately before an index."""
     return "\n".join(text[:start].splitlines()[-line_count:])
 
 
@@ -3242,7 +3191,6 @@ class CppClassShape:
 
     name: str
     line: int
-    class_lines: int
     public_methods: int
     public_fields: int
     base_count: int
@@ -3256,7 +3204,6 @@ class CppFunctionShape:
 
     name: str
     line: int
-    function_lines: int
     parameters: int
     complexity: int
     null_checks: int
@@ -3306,7 +3253,6 @@ def cpp_class_shape(
     return CppClassShape(
         name=name,
         line=line_at(analysis_text, match.start()),
-        class_lines=line_count(analysis_text[match.start() : close_index]),
         public_methods=len(public_methods),
         public_fields=len(public_fields),
         base_count=len([part for part in bases.split(",") if part.strip()]),
@@ -3356,22 +3302,8 @@ def add_cpp_class_surface_findings(
     shape: CppClassShape,
     findings: list[Finding],
 ) -> None:
-    """Record size and public-surface findings for one C++ class."""
+    """Record public-surface findings for one C++ class."""
     thresholds = context.thresholds
-    if shape.class_lines > thresholds.max_class_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            shape.line,
-            context.language,
-            "warn",
-            "class_lines",
-            shape.name,
-            shape.class_lines,
-            thresholds.max_class_lines,
-            "split-class-by-state-contract-or-adapter-boundary",
-        )
     if (
         not shape.scalar_operator_value_object
         and shape.public_methods > thresholds.max_public_methods
@@ -3387,7 +3319,7 @@ def add_cpp_class_surface_findings(
             shape.name,
             shape.public_methods,
             thresholds.max_public_methods,
-            "narrow-public-api-or-split-responsibilities",
+            "review-caller-roles-before-refining-api",
         )
     if (
         not shape.aggregate_value_object
@@ -3489,7 +3421,6 @@ def cpp_function_shape(
     return CppFunctionShape(
         name=name,
         line=line_at(analysis_text, match.start()),
-        function_lines=line_count(analysis_text[match.start() : close_index]),
         parameters=cpp_parameter_count(match.group("params")),
         complexity=cpp_cognitive_complexity(body),
         null_checks=cpp_null_runtime_checks(body),
@@ -3534,22 +3465,8 @@ def add_cpp_function_shape_findings(
     shape: CppFunctionShape,
     findings: list[Finding],
 ) -> None:
-    """Record size, parameter, and control-flow findings for one C++ function."""
+    """Record parameter and control-flow findings for one C++ function."""
     thresholds = context.thresholds
-    if shape.function_lines > thresholds.max_function_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            shape.line,
-            context.language,
-            "warn",
-            "function_lines",
-            shape.name,
-            shape.function_lines,
-            thresholds.max_function_lines,
-            "split-decision-transform-and-side-effect-responsibilities",
-        )
     if shape.parameters > thresholds.max_parameters and not shape.abi_boundary:
         add_finding(
             findings,
@@ -3562,7 +3479,7 @@ def add_cpp_function_shape_findings(
             shape.name,
             shape.parameters,
             thresholds.max_parameters,
-            "group-stable-inputs-into-value-object",
+            "review-stable-input-domain-shape",
         )
     if shape.complexity > thresholds.max_cognitive_complexity:
         add_finding(
@@ -3576,7 +3493,7 @@ def add_cpp_function_shape_findings(
             shape.name,
             shape.complexity,
             thresholds.max_cognitive_complexity,
-            "flatten-control-flow-and-extract-named-steps",
+            "review-branch-meaning-before-extraction",
         )
 
 
@@ -3659,18 +3576,75 @@ def add_cpp_function_type_findings(
         )
 
 
+def finding_signal_class(finding: Finding) -> str:
+    """Return the decision class for one finding."""
+    if finding.severity == "error":
+        return SIGNAL_CLASS_ERROR
+    if finding.kind in REVIEW_SIGNAL_KINDS:
+        return SIGNAL_CLASS_REVIEW
+    return SIGNAL_CLASS_GATE
+
+
+def signal_counts(findings: Sequence[Finding]) -> Counter[str]:
+    """Return decision signal counts for findings."""
+    return Counter(finding_signal_class(finding) for finding in findings)
+
+
+def status_from_signal_counts(counts: Counter[str]) -> tuple[str, str]:
+    """Return pass/fail status and a stable reason from signal classes."""
+    if counts.get(SIGNAL_CLASS_ERROR, 0):
+        return STATUS_FAIL, "error-signal"
+    if counts.get(SIGNAL_CLASS_GATE, 0):
+        return STATUS_FAIL, "gate-signal"
+    if counts.get(SIGNAL_CLASS_REVIEW, 0):
+        return STATUS_PASS, "review-only"
+    return STATUS_PASS, "clean"
+
+
+def status_from_score_and_signals(
+    counts: Counter[str],
+    final_score: int,
+    min_score: int,
+) -> tuple[str, str]:
+    """Return status using signal classes, with explicit survey and strict-score modes."""
+    if min_score <= 0:
+        return STATUS_PASS, "survey-score-floor"
+    if min_score > DEFAULT_MIN_SCORE and final_score < min_score:
+        return STATUS_FAIL, "score-floor"
+    return status_from_signal_counts(counts)
+
+
+def score_floor_status(final_score: int, min_score: int) -> str:
+    """Return whether the diagnostic score clears the requested floor."""
+    return STATUS_PASS if final_score >= min_score else STATUS_FAIL
+
+
 def score(findings: list[Finding]) -> int:
-    """Calculate a conservative 0-100 score."""
-    weights = {
-        "error": ERROR_SCORE_PENALTY,
-        "warn": WARN_SCORE_PENALTY,
-        "info": INFO_SCORE_PENALTY,
-    }
-    penalty = sum(
-        weights.get(finding.severity, UNKNOWN_SEVERITY_SCORE_PENALTY)
+    """Calculate a diagnostic signal score independent of pass/fail status."""
+    counts = signal_counts(findings)
+    if not findings:
+        return MAX_READABILITY_SCORE
+    review_kinds = {
+        finding.kind
         for finding in findings
-    )
-    return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
+        if finding_signal_class(finding) == SIGNAL_CLASS_REVIEW
+    }
+    gate_kinds = {
+        finding.kind
+        for finding in findings
+        if finding_signal_class(finding) == SIGNAL_CLASS_GATE
+    }
+    hotspot_count = len({finding.path for finding in findings})
+    if counts.get(SIGNAL_CLASS_ERROR, 0):
+        base = 40
+        penalty = counts[SIGNAL_CLASS_ERROR] * 10 + len(gate_kinds) * 4 + hotspot_count
+    elif counts.get(SIGNAL_CLASS_GATE, 0):
+        base = 80
+        penalty = counts[SIGNAL_CLASS_GATE] * 4 + len(gate_kinds) * 3 + len(review_kinds)
+    else:
+        base = 95
+        penalty = counts[SIGNAL_CLASS_REVIEW] + len(review_kinds) * 2 + hotspot_count
+    return max(0, base - min(base, penalty))
 
 
 def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, str, str]:
@@ -3792,6 +3766,15 @@ def summarize_findings(
             continue
     severity_counts = Counter(finding.severity for finding in findings)
     kind_counts = Counter(finding.kind for finding in findings)
+    decision_counts = signal_counts(findings)
+    status, status_reason = status_from_score_and_signals(
+        decision_counts,
+        final_score,
+        min_score,
+    )
+    review_signal_count = decision_counts.get(SIGNAL_CLASS_REVIEW, 0)
+    gate_signal_count = decision_counts.get(SIGNAL_CLASS_GATE, 0)
+    error_signal_count = decision_counts.get(SIGNAL_CLASS_ERROR, 0)
     dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
     solid_counts = Counter(
         principle
@@ -3819,12 +3802,18 @@ def summarize_findings(
         "findings": len(findings),
         "score": final_score,
         "min_score": min_score,
+        "score_status": score_floor_status(final_score, min_score),
         "excluded_patterns": list(exclude_patterns or []),
-        "status": "pass" if final_score >= min_score else "fail",
+        "status": status,
+        "status_reason": status_reason,
         "mechanical_grade": grade,
         "warn_or_error_per_kloc": round(per_kloc, 2),
         "severity_counts": dict(severity_counts),
         "kind_counts": dict(kind_counts),
+        "review_signal_findings": review_signal_count,
+        "gate_signal_findings": gate_signal_count,
+        "error_signal_findings": error_signal_count,
+        "signal_counts": dict(decision_counts),
         "dimension_counts": dict(dimension_counts),
         "solid_counts": dict(solid_counts),
         "top_files": [
@@ -3873,12 +3862,17 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         "## Summary",
         "",
         f"- status: `{summary['status']}`",
+        f"- status_reason: `{summary['status_reason']}`",
         f"- mechanical_grade: `{summary['mechanical_grade']}`",
-        f"- score: `{summary['score']}` / min `{summary['min_score']}`",
+        f"- score: `{summary['score']}` / floor `{summary['min_score']}`",
+        f"- score_status: `{summary['score_status']}`",
         f"- files: `{summary['files']}`",
         f"- scanned_paths: `{', '.join(scanned_paths) or 'none'}`",
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
+        f"- error_signal_findings: `{summary['error_signal_findings']}`",
+        f"- gate_signal_findings: `{summary['gate_signal_findings']}`",
+        f"- review_signal_findings: `{summary['review_signal_findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
         f"- excluded_patterns: `{', '.join(excluded_patterns_summary) or 'none'}`",
         "",
@@ -4008,9 +4002,9 @@ def main(argv: Sequence[str] | None = None, *, default_language: str = "all") ->
     emit_report(run, args)
     if args.review_prompt_out:
         write_review_prompt(Path(args.review_prompt_out), "")
-    status = "pass" if run.final_score >= args.min_score else "fail"
+    status = str(run.summary["status"])
     append_workflow_monitor_timing(root, args, status, started_at)
-    return 0 if status == "pass" else 1
+    return 0 if status == STATUS_PASS else 1
 
 
 def append_workflow_monitor_timing(
@@ -4055,8 +4049,6 @@ def append_workflow_monitor_timing(
 def build_thresholds(args: argparse.Namespace) -> Thresholds:
     """Build thresholds from parsed command-line arguments."""
     return Thresholds(
-        max_function_lines=args.max_function_lines,
-        max_class_lines=args.max_class_lines,
         max_public_methods=args.max_public_methods,
         max_instance_attributes=args.max_instance_attributes,
         max_parameters=args.max_parameters,
@@ -4283,7 +4275,7 @@ def emit_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
     if args.format == "markdown":
         emit_markdown_report(run, args)
         return
-    emit_text_report(run, args.min_score)
+    emit_text_report(run)
 
 
 def emit_json_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
@@ -4317,16 +4309,21 @@ def emit_markdown_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
     )
 
 
-def emit_text_report(run: AnalyzerRun, min_score: int) -> None:
+def emit_text_report(run: AnalyzerRun) -> None:
     """Print line-oriented text output."""
     for finding in sorted(run.findings, key=lambda item: (item.path, item.line, item.kind)):
         print(finding.render())
     print(f"OOP_READABILITY_FILES={len(run.files)}")
     print(f"OOP_READABILITY_FINDINGS={len(run.findings)}")
     print(f"OOP_READABILITY_SCORE={run.final_score}")
+    print(f"OOP_READABILITY_SCORE_STATUS={run.summary['score_status']}")
     print(f"OOP_READABILITY_GRADE={run.summary['mechanical_grade']}")
+    print(f"OOP_READABILITY_STATUS_REASON={run.summary['status_reason']}")
     print(f"OOP_READABILITY_WARN_OR_ERROR_PER_KLOC={run.summary['warn_or_error_per_kloc']}")
-    print(f"OOP_READABILITY={'pass' if run.final_score >= min_score else 'fail'}")
+    print(f"OOP_READABILITY_ERROR_SIGNAL_FINDINGS={run.summary['error_signal_findings']}")
+    print(f"OOP_READABILITY_GATE_SIGNAL_FINDINGS={run.summary['gate_signal_findings']}")
+    print(f"OOP_READABILITY_REVIEW_SIGNAL_FINDINGS={run.summary['review_signal_findings']}")
+    print(f"OOP_READABILITY={run.summary['status']}")
 
 
 if __name__ == "__main__":

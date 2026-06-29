@@ -12,6 +12,19 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 -->
 
 
+## Reader Map
+
+- Purpose: manage large refactors as behavior-preserving reorganizations with
+  explicit scope, deltas, and review gates.
+- Section path: Purpose, Use When, and Core References lead into Required
+  Contract; later sections cover Canonicalization-First Refactors,
+  Dependency-Guided Repair Slice Loop, Finding Packet And Prompt Feedback,
+  Refactor Orchestration Plan, Subagent Routing, and Review Emphasis.
+- Use when: file splits, renames, module boundaries, dependency direction, or
+  implementation replacement require a controlled refactor loop.
+- Boundary: feature additions and API-shaping choices need explicit contracts;
+  structure surface classification belongs to `structure-refactor`.
+
 ## Purpose
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
@@ -39,13 +52,13 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
    します。実装対象は、その展開済み scope 内で関数、method、class 単位に
    絞り込んでから決めます。
 1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff
-   の前に、`dependency-analysis` で token-light な `Change Impact Packet:`
+   の前に、`dependency-analysis` で structured `Change Impact Packet:`
    manifest を作ります。この packet は code dependency、header dependency、
    search surface、structural finding、tests / docs / config / log / Info
    surface、unknown dynamic edge をまとめた修正計画の入力ですが、full graph を
    LLM prose 化する場所ではありません。raw artifact は path と count で参照し、
    current repair batch に必要な excerpt だけを載せます。raw finding、raw
-   `rg` hit、単一 file 名だけから実装計画を作ってはいけません。
+   raw text-search hit、単一 file 名だけから実装計画を作ってはいけません。
 1. refactor pass では `Behavior Contract:` を先に固定します。
 1. file moves、module boundary、repair slice、path mapping、responsibility map が非自明な場合は `structure-planning` で構造 contract を先に固定します。
 1. `Allowed Structural Delta:` と `Forbidden Semantic Delta:` を分けて書きます。
@@ -137,7 +150,7 @@ repair-slice loop で 1 slice ずつ進めます。
    Python structural duplicate では次を既定入口にします。
    `python-structure-hash` -> `python-structure-hash-report`
 1. `tool-finding-report` の結果はそのまま実装者へ配らず、`dependency-analysis`
-   に渡して token-light な `Change Impact Packet` manifest を作ります。ここで code dependency、
+   に渡して structured `Change Impact Packet` manifest を作ります。ここで code dependency、
    header dependency、search scope、structural finding、tests / docs / config /
    log / Info surface、unknown dynamic edge を統合し、tool-generated
    `impact_blocks`、`repair_batches`、`subagent_handoff_context` を固定します。
@@ -244,7 +257,7 @@ decision を作ります。
 1. dependency depth、call direction、shared policy / base abstraction の有無から
    `sequential_root_slices` と `parallel_candidate_slices` に分けます。
 1. 各 wave では、同じ責務 group と validation surface に属する mechanically safe
-   target object を repair batch としてまとめます。親 agent は「小さく安全」だけを
+   target object を repair batch としてまとめます。親 agent は「縮めれば安全」だけを
    理由に finding 1 件へ分割せず、分割する場合は関連 target ごとに deferred /
    review_required 理由を書きます。
 1. 依存の根本、共通 helper、shared policy、base abstraction、public contract に
@@ -295,7 +308,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - regression case、nasty case、behavior-preservation assertions を設計し、
      実装 agent へ渡します。
 1. Write-capable implementation agent
-   - 既定は `worker` または小さい slice では `spark_worker` です。
+   - 既定は `worker` です。低遅延で閉じる write scope では `spark_worker` も使えます。
    - write-capable agent は既定 1 体ですが、parent が dependency order、
      wave plan、disjoint write scope、integration order、review gate を明示した
      場合は、複数 writer を同一 wave で並列化できます。衝突する target は禁止

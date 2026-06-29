@@ -15,6 +15,15 @@ downstream implementation ../tools/bin/agent-canon stable shell wrapper
 
 # Rust Agent Tool Migration
 
+## Reader Map
+
+Use this policy to answer which AgentCanon tools should move to Rust, which
+logic should remain in Python, and how the migration is validated. Read Goals
+and DevContainer Setup first, then Runtime Boundary, Canonical Layout, Migration
+Order, and Sequential Migration Policy before changing tool implementations.
+The remaining sections list completed migrations, first targets, Python-only
+surfaces, audit and plan commands, MCP/local-LLM Rust surfaces, and validation.
+
 ## Goals
 
 - Move heavy static-analysis and inventory tooling from Python to Rust.

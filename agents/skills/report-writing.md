@@ -16,6 +16,20 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py val
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: write reader-facing reports from existing evidence while preserving
+  source packets, limitations, quality criteria, and actionability.
+- Section path: Purpose and Use When introduce scope; Source Packet and Report
+  Quality Checklist define inputs and acceptance; Finding Closure Loop,
+  Required Structure, Review Route, Relationship To Other Skills, Closeout
+  Tokens, and provenance sections carry operations.
+- Use when: status, audit, evaluation, experiment, review, decision, or
+  presentation evidence needs human-readable synthesis.
+- Boundary: raw result storage stays with `result-artifact-writeout`; nontrivial
+  structure is fixed first with `structure-planning` and graph-backed handoff
+  when needed.
+
 ## Purpose
 
 `report-writing` is the skill for writing reader-facing reports from existing
@@ -151,8 +165,8 @@ invalid.
 1. Run the applicable graph, review, or report-quality checker.
 1. Classify each finding as `fix-now`, `out-of-scope`, `tool-false-positive`,
    or `prompt-defect`.
-1. Rewrite the smallest section, paragraph, sentence, table, figure caption, or
-   equation needed to remove every `fix-now` finding.
+1. Rewrite the responsible section, paragraph, sentence, table, figure caption,
+   or equation needed to remove every `fix-now` finding.
 1. Rerun the same checker and compare the finding set.
 
 Do not accept a report merely because the loop hit an iteration budget. If the

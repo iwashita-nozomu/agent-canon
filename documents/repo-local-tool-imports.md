@@ -15,6 +15,18 @@ This document records repo-local tools found during the 2026-05-05 consolidation
 pass and how they were handled. Future passes should turn this into a PR
 instead of direct updates.
 
+## Reader Map
+
+- Owns the historical ledger for repo-local tool imports and their canonical
+  disposition.
+- Main path: Source Repositories Checked, Ledger Versus Catalog, Promoted To
+  Canonical Tool Families, Retired Legacy Imports, Explicitly Not Overwritten,
+  and Additional Local Preference Captured.
+- Read this when auditing how local scripts were promoted, retired, or left in
+  source repositories.
+- Boundary: the live machine-readable tool registry is `tools/catalog.yaml`;
+  this file is historical disposition evidence.
+
 ## Source Repositories Checked
 
 - `/mnt/l/workspace/agent-canon`

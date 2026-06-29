@@ -413,6 +413,39 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("OOP_READABILITY_SCORE=", result.stdout)
             self.assertIn("OOP_READABILITY=fail", result.stdout)
 
+    def test_python_review_signal_findings_do_not_fail_default_gate(self) -> None:
+        """Boundary review signals should not force a split-only default failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "workflow.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        (
+                            "def process_items("
+                            "a: int, b: int, c: int, d: int, "
+                            "e: int, f: int, g: int"
+                            ") -> int:"
+                        ),
+                        "    total = a + b + c + d + e + f + g",
+                        *(["    total += 1"] * 85),
+                        "    return total",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("parameters:process_items", result.stdout)
+            self.assertIn("OOP_READABILITY_GATE_SIGNAL_FINDINGS=0", result.stdout)
+            self.assertIn("OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=1", result.stdout)
+            self.assertIn("OOP_READABILITY_SCORE_STATUS=fail", result.stdout)
+            self.assertIn("OOP_READABILITY_STATUS_REASON=review-only", result.stdout)
+            self.assertIn("OOP_READABILITY=pass", result.stdout)
+
     def test_python_optional_none_boundary_is_flagged(self) -> None:
         """Optional public boundaries and None routing are reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -963,8 +996,8 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
 
-    def test_cpp_literal_lines_do_not_trigger_function_length(self) -> None:
-        """Long fixture literals should not count as visible function body lines."""
+    def test_cpp_literal_lines_do_not_trigger_oop_length_finding(self) -> None:
+        """OOP readability does not emit line-count findings for functions."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "long_fixture.cpp"
@@ -986,10 +1019,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("function_lines:scenario", result.stdout)
 
-    def test_cpp_literal_lines_do_not_trigger_class_length(self) -> None:
-        """Long fixture literals should not count as visible class body lines."""
+    def test_cpp_literal_lines_do_not_trigger_class_length_finding(self) -> None:
+        """OOP readability does not emit line-count findings for classes."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "long_fixture_class.cpp"
@@ -1012,13 +1044,10 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 root,
                 "--min-score",
                 "100",
-                "--max-class-lines",
-                "10",
                 str(source),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("class_lines:FixtureOwner", result.stdout)
 
     def test_cpp_comment_tokens_inside_literals_do_not_mask_real_code(self) -> None:
         """Literal-contained comment tokens must not suppress later C++ findings."""

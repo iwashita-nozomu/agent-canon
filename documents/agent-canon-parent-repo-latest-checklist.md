@@ -20,6 +20,14 @@ downstream implementation ../tools/ci/check_agent_canon_latest.sh enforces lates
 legacy subtree / committed snapshot repo は末尾の互換 appendix だけを使い、通常の親 repo 構造として扱いません。
 agent entrypoint は `tools/agent_tools/agent_canon_preflight.py` 経由でこの checklist の存在と freshness preflight を出力します。
 
+## Reader Map
+
+Use this checklist before repo-changing tasks in parent repositories that vendor
+AgentCanon. Start with the expected parent structure, then run the latest-state
+checklist before editing shared surfaces. The later sections explain parent
+update TODO state, the dated GitHub changelog TODO window, task-start rules,
+failure routes, and the legacy compatibility appendix for non-submodule repos.
+
 ## Expected Parent Repo Structure
 
 親 repo は次の構造を持ちます。

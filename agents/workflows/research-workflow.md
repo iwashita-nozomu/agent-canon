@@ -16,6 +16,13 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を参照してください。
 数理境界と実装境界の対応表は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) を正本にします。
 
+## この文書の読み方
+
+- この文書は、数式を伴う研究、比較実験、段階的改造、claim 更新の research-driven workflow を所有します。
+- 前半は目的、基本ルール、canonical loop、外部規範、標準 workflow を扱い、後半は multi-agent 実験 loop、記録項目、集計、補助 workflow、配置、references を扱います。
+- researcher / experimenter は `## 2.5 Research-Driven Change の canonical loop` と `## 4. 標準 workflow` から入り、claim や数式境界がある場合は `## 10. 数式と実装の対応の取り方` へ進みます。
+- chunked reading では、問い・比較設計・実装 iteration・report のどの段階かを先に決め、該当する step と review 節だけを読みます。
+
 ## 1. 目的
 
 - 数式、仮定、比較対象を曖昧なまま実装に入らない
@@ -37,7 +44,7 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 - correctness evidence と performance evidence を混同しません。正しさの parity test は性能の証拠ではなく、速度比較は数式上の正しさの証拠ではありません。
 - runtime success や smoke pass は acceptance の十分条件ではありません。本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と一致しているかを別に確認します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
-- user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで close しません。
+- user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで close しません。
 - 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
   `references/`、`notes/`、`documents/`、topic report に同じ source / claim があるか
   を確認します。既存 source note がある場合は、そこを更新または引用します。
@@ -144,7 +151,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - ordered difficulty 軸は 1 ずつ連続に sweep します。飛び飛びの点だけで frontier や failure onset を判断することを禁止します。
 - raw failure count だけで結論を出すことを禁止します。environment noise、case mix、failure kind、success rate を分離してから解釈します。
 - failure-onset dimension を記録せずに、implementation bug と真の frontier limit を区別した扱いにすることを禁止します。
-- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張することを禁止します。
+- toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張することを禁止します。
 
 ### Step 4. 作業場所と出力先を決める
 
@@ -155,12 +162,12 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 ### Step 5. prototype を作る
 
-- まず小さい prototype または最小ケースで式と実装の対応を確かめます。
+- まず bounded prototype または基準ケースで式と実装の対応を確かめます。
 - 可能なら analytical solution、trusted prototype、corner case、旧実装と比較します。
 - run が通っても `Equation-to-Code Mapping:` とズレるなら prototype 段階で fail とし、大規模 sweep に進みません。
 - prototype 段階で落ちるなら、大規模 sweep に進みません。
 
-### Step 6. 小さく改造する
+### Step 6. 責務単位で改造する
 
 - 1 commit 1 意図にします。
 - 各改造ごとに、次を action log へ残します。

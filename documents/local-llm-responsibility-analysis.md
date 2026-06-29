@@ -32,6 +32,10 @@ HIP / ROCr device を隠します。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は
 `AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` から GPU accelerator を有効化する CMake
 flags を渡した場合も、installer は失敗させます。
 
+## この文書の読み方
+
+この設計は、local LLM がどの reader / agent を支援し、どの責務を持ち、どの system flow と command surface で Prose IR や graph へ接続するかを説明します。読者、設計原則、責務を先に読み、実装や運用では System Flow、Command Surface、Prose IR Contract、Part 分割と Merge、Prompt Contract、Graph 接続へ進みます。Result Surface、Runtime、Prohibited Use、Validation、Compatibility は、出力の扱いと禁止境界を確認するときに使います。
+
 ## 読者
 
 - 実装者:

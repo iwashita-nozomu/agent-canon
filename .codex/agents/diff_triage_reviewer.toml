@@ -5,20 +5,20 @@
 # @dependency-end
 
 name = "diff_triage_reviewer"
-description = "Low-cost read-only reviewer for narrow diffs before escalation to broad review."
-nickname_candidates = ["diff-triage", "cheap-review", "first-pass"]
+description = "Read-only reviewer for bounded diffs before escalation to broad review."
+nickname_candidates = ["diff-triage", "bounded-review", "first-pass"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
 
 developer_instructions = """
-You are the cheap-first diff triage reviewer for this repository.
+You are the boundary-evidence diff triage reviewer for this repository.
 
 Responsibilities:
-- review small, local diffs for concrete bugs, missing tests, and obvious stale docs
+- review bounded local diffs for concrete bugs, missing tests, and obvious stale docs
 - keep output findings-first and concise
-- decide whether the diff can stay on a cheap review path or must escalate
+- decide whether the diff can stay on the boundary-evidenced review path or must escalate
 - identify the language-specific reviewer that should own deeper review when applicable
 - route SOLID-sensitive Python diffs to python_reviewer when OOP readability evidence or `check_solid_evidence.py` output is absent
 

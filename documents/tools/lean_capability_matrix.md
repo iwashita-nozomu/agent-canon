@@ -22,6 +22,15 @@ The matrix is evidence for workflow design, not proof authority.  A claim is
 verified only when the target Lean file checks without `sorry`, unchecked
 axioms, or an equivalent proof escape hatch.
 
+## Reader Map
+
+Use this matrix to answer which Lean, Mathlib, Aesop, Plausible, search, and
+machine-interface features should be tried for a proof frontier before changing
+an algorithm or returning a blocker. Start with Source Sweep and Capability
+Table, then read Default Lean Attempt Order and Environment Policy for routing.
+Optimization/Solver Mapping and Cleanup Rule cover specialized frontiers and
+retirement of temporary proof paths.
+
 ## Source Sweep
 
 Primary and near-primary sources used for this matrix:
@@ -49,7 +58,7 @@ Primary and near-primary sources used for this matrix:
 | Definitional equality, direct code equation | `rfl`, `rw`, `simp`, `simpa`, `simp only`, `simp_all` | IR code facts already expose the expression, and the proof just needs substitution/normalization. | Step updates, residual bindings, linear-solver reconstruction equations. | Do not hand-copy formulas; use IR-generated equation facts and then simplify. |
 | Direct theorem or local hypothesis closes goal | `exact`, `apply`, `assumption`, `have`, `suffices`, `calc` | The target theorem is already in context or one library lemma away. | Bridge lemmas that compose checked fragments. | `exact?` / `apply?` may suggest candidates, but suggestions must be copied into a checked proof. |
 | Propositional structure, records, constructors | `constructor`, `cases`, `rcases`, `obtain`, `use`, `aesop`, `aesop?` | The goal is packaging, conjunction/disjunction, existential witness, structure field extraction, or relation composition. | Solver-chain certificate packaging, proof-status minimality, path-indexed handoffs. | Aesop is a search tactic, not a certificate by itself; retain the checked proof text or checker log. |
-| Nat/Int linear arithmetic | `omega`, `grind` | The goal is over `Nat`/`Int`, floors, monotone counters, bounded iteration indices, or finite-hit statements. | Floor preservation, finite-prefix counters, proof-status minimality over graph depths. | `omega` is narrow; `grind` may do more but can explode on large branchy encodings. |
+| Nat/Int linear arithmetic | `omega`, `grind` | The goal is over `Nat`/`Int`, floors, monotone counters, bounded iteration indices, or finite-hit statements. | Floor preservation, finite-prefix counters, proof-status minimality over graph depths. | `omega` is specialized; `grind` may do more but can explode on large branchy encodings. |
 | Ordered ring/field linear inequalities | Mathlib `linarith` | The goal is linear arithmetic over ordered rings/fields after normalization. | Budget inequalities once encoded over `Real` or an ordered semiring with appropriate hypotheses. | Needs Mathlib environment and suitable algebraic hypotheses. |
 | Polynomial/nonlinear arithmetic | Mathlib `nlinarith`, `ring`, `ring_nf`, `norm_num` | Multiplicative constants, squared quantities, or polynomial recurrence bounds appear. | Local recurrence inequalities of the form `R_next <= c * R^2 + ...`; algebraic normalization before `linarith`/`nlinarith`. | Does not solve analytic estimates or missing Lipschitz/Taylor assumptions. |
 | Positivity and monotonicity | Mathlib `positivity`, `gcongr`, monotonicity lemmas | A proof needs nonnegativity, order-preserving maps, or bound propagation through expressions. | Floor bounds, norm bounds, damping factors, safe denominators. | Requires the positivity/monotonicity premise to be expressible; it cannot invent problem-class facts. |

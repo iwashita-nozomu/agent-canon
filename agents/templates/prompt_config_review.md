@@ -19,8 +19,8 @@ upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent role inventory co
 
 ## Required Prompt Or Role Updates
 
-| Surface | Finding | Recommended Minimal Change | Status |
-| ------- | ------- | -------------------------- | ------ |
+| Surface | Finding | Recommended Policy Repair | Status |
+| ------- | ------- | ------------------------- | ------ |
 
 ## Official Docs Check
 

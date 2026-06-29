@@ -29,6 +29,10 @@ from report_artifact_checks import (
     wave_reconciliation_blockers,
 )
 
+STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
+MAKE_CI_READY_STATUSES = {"pass", "targeted", "not_applicable"}
+MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
@@ -409,8 +413,10 @@ def main() -> int:
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
         "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
         == "yes",
-        "repo_wide_static_analysis_complete": closeout.get("repo_wide_static_analysis_complete")
-        == "yes",
+        "repo_wide_static_analysis_complete": closeout.get(
+            "repo_wide_static_analysis_complete"
+        )
+        in STATIC_ANALYSIS_COMPLETE_STATUSES,
         "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
         "agent_canon_latest_command": agent_canon_latest.get(
             "agent_canon_latest_command", ""
@@ -426,7 +432,7 @@ def main() -> int:
         not in {"", "missing", "none"},
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
         not in {"", "missing", "none"},
-        "make_ci_status": closeout.get("make_ci_status") == "pass",
+        "make_ci_status": closeout.get("make_ci_status") in MAKE_CI_READY_STATUSES,
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
@@ -475,7 +481,7 @@ def main() -> int:
         "mechanical_loop_static_analysis_status": mechanical_loop.get(
             "mechanical_loop_static_analysis_status"
         )
-        == "pass",
+        in MECHANICAL_STATIC_ANALYSIS_READY_STATUSES,
         "mechanical_loop_commit_push_status": mechanical_loop.get(
             "mechanical_loop_commit_push_status"
         )

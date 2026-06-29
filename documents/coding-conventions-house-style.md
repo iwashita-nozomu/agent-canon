@@ -12,6 +12,10 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 この文書は、この template の実装と正本文書に共通する書き方を固定する正本です。
 単なる好みではなく、境界の明確化、型追跡、実行安全性、文書の単独可読性を守るためのルールとして扱います。
 
+## この文書の読み方
+
+この文書は、公開境界、定義順序、責務 comment、入力検証、型契約、OOP 判断、compatibility drift、duplicate implementation、canonical owner、refactor、JAX trace、正本文書 language の house style をまとめます。まず要約で全体規約を確認し、実装時は規約の適用範囲、module entry、公開 API、型、エラー処理、文書運用へ進みます。禁止事項と例外は、既存 code と conflict したときの判断に使います。
+
 ## 要約
 
 - 公開境界はモジュール docstring、`__all__`、先頭 `_` の命名で明示します。

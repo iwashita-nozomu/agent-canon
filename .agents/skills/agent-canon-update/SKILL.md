@@ -17,6 +17,17 @@ upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodu
 
 # AgentCanon Update
 
+## Reader Map
+
+- Purpose: runtime skill for AgentCanon source updates, parent submodule pin
+  refreshes, root-view repair, and latest-state checklist work.
+- Use When: updating `vendor/agent-canon/`, applying AgentCanon update TODOs,
+  or routing local AgentCanon commits through source PRs before parent pins.
+- Tool Commands: run this skill's command packet, then read the canonical
+  update-route and parent latest-state documents.
+- Boundary: do not hide dirty AgentCanon source work inside a parent pin update
+  or create branches without the documented reason.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -55,7 +66,7 @@ git -C vendor/agent-canon push origin HEAD
 ```
 
    Reuse the current AgentCanon source branch / PR when it already owns the
-   shared-canon work. Do not create a fresh branch for a small follow-up,
+   shared-canon work. Do not create a fresh branch for a bounded follow-up,
    mid-task user instruction, dirty-state avoidance, or checklist addendum.
    Record a reason before creating any new branch.
 

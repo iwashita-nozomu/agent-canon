@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+- Purpose: reviews Python diffs for type safety, tests, lint, API boundaries,
+  OOP readability, and SOLID evidence.
+- Use When: Python files, pyright findings, public APIs, typing boundaries, or
+  Python reviewer routing are in scope.
+- Section path: Purpose and Use When define triggers; 必須確認, 参照正本,
+  期待される結果, 必須チェックリスト, and 標準順序 are the operational rules;
+  よくある失敗 lists pitfalls.
+- Boundary: this skill reviews Python changes; it does not replace the owning
+  implementation or design route.
+
 ## Purpose
 
 Python 差分を型、テスト、lint、境界設計の観点で厳密に確認します。
@@ -57,7 +69,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 - 複数入口で共有する内部補助関数が、公開入口群の直後にあることを確認している
 - class、dataclass、`Protocol`、継承、公開 API、型境界、依存方向を持つ Python 差分では、OOP 可読性レポートの SOLID 原則シグナルを下流根拠として確認している
 - SOLID 対象の Python 差分では `check_solid_evidence.py` が変更パスと OOP 可読性レポートの `scanned_paths` を対応付けている
-- 例外処理、default 値、`Any` 境界、型 narrowing の崩れを見ている
+- 例外処理、default 値、`Any` 境界、型 refinement の崩れを見ている
 - Python 実装に追随すべき docstring や文書があれば確認している
 
 ## 標準順序

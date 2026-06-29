@@ -92,7 +92,7 @@ model_reasoning_effort = "high"
 
 ### 追加設定レシピ 117: 軽量lint確認profile
 
-**目的**  小さなlintやtypoの確認を低コストで行い、修正自体は通常の責務・検証手順に戻す。
+**目的**  限定されたlintやtypoの確認を低コストで行い、修正自体は通常の責務・検証手順に戻す。
 
 
 ```toml
@@ -104,7 +104,7 @@ approval_policy = "on-request"
 ```
 
 
-**確認**  小さなbranchでlint確認を試し、出力品質と速度を比較する。
+**確認**  検証用branchでlint確認を試し、出力品質と速度を比較する。
 
 **戻し方**  `service_tier` と `model_reasoning_effort` を削除する。
 

@@ -12,6 +12,14 @@ upstream implementation ../../tools/agent_tools/jit_canonical_ir.py produces the
 `agent-canon jit-ir-to-lean` converts JIT-canonical IR JSON into a generated
 Lean evidence module. It is an AgentCanon Rust CLI command.
 
+## Reader Map
+
+Use this tool note to answer how `agent-canon jit-ir-to-lean` is invoked, what
+Lean evidence it currently emits, and where the command boundary ends. Read
+Command first for required inputs and output path, then Current Lean Output for
+generated definitions and theorem shapes. Boundary states what the generated
+module does not prove or own.
+
 ## Command
 
 ```bash

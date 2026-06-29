@@ -15,6 +15,18 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: process GitHub PR and Issue queues with authority, validation,
+  evidence, and AgentCanon source/parent-pin separation.
+- Section path: Purpose, Use When, and Boundary define scope; Processing Graph
+  shows the high-level flow; PR Log Report Contract and Procedure define
+  operational evidence; AgentCanon Queue covers source/pin coordination.
+- Use when: a user asks to inventory, repair, merge, publish, ready, or triage
+  PRs/issues with durable run-bundle and PR Essence evidence.
+- Boundary: this skill fixes PR/Issue order and evidence; code repair is routed
+  to the relevant implementation or review skill.
+
 ## Purpose
 
 GitHub PR と Issue queue を、権限・検証・証跡を省いた直接 merge ではなく、
@@ -117,6 +129,12 @@ route を短く書きます。
    - `review-blocked`: requested changes / review request が残っている
    - `dependent-pin`: source PR merge 後の parent pin / root view PR
    - `stale`: base、目的、Issue、既存 main との差分を再判定する
+1. PR diff intake を固定し、必要な差分修正を取り込み前に行います。
+   - target base に対する head diff を確認する
+   - diff を PR Essence、user request、canonical owner、validation route と照合する
+   - missing、stale、unintended、over-broad な diff entry は head branch 上で修正する
+   - 修正した path、保持した差分、取り込まない差分と理由を PR log または run bundle に記録する
+   - parent pin PR では source PR 取り込み後の pin / root-view 差分も同じ diff intake に通す
 1. Merge order を決めます。
    - shared source PR を先に処理する
    - AgentCanon source PR は parent pin PR より先に merge する
@@ -126,7 +144,10 @@ route を短く書きます。
    - `git fetch origin`
    - `git switch <head-branch>`
    - `git merge origin/<base>` または repo の標準 update route
-   - conflict file を最小差分で直し、対象 validation を rerun する
+   - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
+   - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
+   - 各 side から保持する clause、書き換える clause、意図的に捨てる clause と理由を PR log または run bundle に記録する
+   - conflict file は両 branch の意図と owning contract を統合して直し、対象 validation を rerun する
    - force push は explicit authority がある場合だけ使う
 1. Merge gate を確認します。
    - PR is open
@@ -163,6 +184,7 @@ AgentCanon source PR と template / derived PR が連動している場合は、
 1. Source PR を merge する。
 1. Parent repo で `make agent-canon-ensure-latest` を実行する。
 1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
+1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
 1. Parent pin / root-view PR を作るか更新する。
 1. Parent PR gate を通してから ready / merge 判断を行う。
 

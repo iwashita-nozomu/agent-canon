@@ -46,22 +46,22 @@ role_topology_defaults: &standard_role_topology
     runtime_threads_are_cardinality_source: false
 
 workflow_families:
-  - id: scoped_change_lite
-    name: Scoped Change Lite
+  - id: owner_bounded_change
+    name: Owner-Bounded Change
     subagent_prompt:
-      purpose: Prompt packet for one-file or single-abstraction fixes with cheap-first triage and local validation.
+      purpose: Prompt packet for owner-bounded fixes whose replaceable unit, public-impact boundary, and local validation route are already evidenced.
       prompt_preamble:
-        - Treat this as a local bounded fix; upgrade to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
+        - Treat this as an owner-bounded fix; route to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
         - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
-        - Use `explorer`, `test_designer`, `spark_worker`, and language-specific reviewers before high-cost generic review.
-        - Keep this route only when the run's abstract responsibility frame derives a one-file or one-abstraction implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation.
+        - Use `explorer`, `test_designer`, `spark_worker`, and language-specific reviewers before broad generic review.
+        - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation. File count is not enough to select or keep this route.
         - Omit document-flow and broad design review unless reader-facing docs, new terms, public APIs, or workflow surfaces changed.
-        - Escalate to `scoped_change` when the fix surface is non-obvious, validation is cross-module, or the cheap reviewer returns escalate.
+        - Escalate to `scoped_change` when the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate.
       reviewer_prompt:
         - Prefer language-specific and diff-triage findings before broad review.
-        - Block completion if validation is missing, request clauses are not mapped, or write scope expanded beyond the lite route.
+        - Block completion if validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
     spawn_budget:
       active_subagents: 4
       max_write_subagents: 2
@@ -85,15 +85,15 @@ workflow_families:
   - id: scoped_change
     name: Scoped Change
     subagent_prompt:
-      purpose: Prompt packet for small repo changes that still need the full staged gate sequence.
+      purpose: Prompt packet for owner-bounded repo changes that still need the full staged gate sequence.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; do not route work to another repository unless the parent explicitly says so.
         - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-        - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates when this full scoped route is active.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Keep the diff tied to the assigned responsibility boundary, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates when this full scoped route is active.
         - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
         - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
@@ -135,8 +135,8 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, research_notes.md or cited sources, and team_manifest.yaml.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
         - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
         - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
@@ -195,8 +195,8 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml.
         - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
         - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
@@ -241,8 +241,8 @@ workflow_families:
         - Start from the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml.
         - State the triggering code requirement, blocked command, source-of-truth surface, rollback path, and validation command in every handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
         - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
         - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
@@ -286,8 +286,8 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml.
         - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Review repo-wide integration risk through compact tool output, dependency-expanded path lists, and bounded canon slices; do not hand agents the whole repository as their read scope.
         - For AgentCanon tasks, classify whether the change is standalone AgentCanon source, template parent gitlink, root shared-surface sync, or derived repo proposal before editing.
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
@@ -340,8 +340,8 @@ workflow_families:
         - Start from the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml.
         - State backlog item, hypothesis, run protocol, success metric, stopping rule, and next decision gate in every handoff.
       workflow_focus:
-        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible narrow implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
-        - Treat a narrow implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Keep the adaptive outer loop separate from one implementation slice; one iteration is not whole-loop completion.
         - Do not mix code change, experiment protocol change, runtime flag change, and claim/report rewrite in one iteration without an explicit clause.
         - Promote only validated lessons into notes or memory; keep failed attempts traceable.
@@ -387,13 +387,13 @@ workflow_families:
 tasks:
   - id: T1
     name: local bug fix
-    family: scoped_change_lite
+    family: owner_bounded_change
     specialists:
       - test_designer
       - python_reviewer
   - id: T2
     name: CI or flaky test fix
-    family: scoped_change_lite
+    family: owner_bounded_change
     specialists:
       - test_designer
       - python_reviewer

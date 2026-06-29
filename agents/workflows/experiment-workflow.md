@@ -23,6 +23,13 @@ upstream design README.md workflow catalog
 
 agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `agents/templates/experiment_change_loop.md` です。
 
+## この文書の読み方
+
+- この文書は、repo 内実験の準備、実装、静的チェック、実行、結果レポートの実務入口を所有します。
+- `## 1. この文書の役割` は関連正本への分岐、`## 2. 段階別手順` は実験 run の手順、後半は log-derived 禁止事項、反復 workflow、個別 README、references を扱います。
+- experimenter は `## 2. 段階別手順` から topic / run layout を固定し、research-driven task では `research-workflow.md` と合わせて読みます。
+- chunked reading では、まずこの map と `## 1. この文書の役割` で責務を確認し、実行段階ごとの subsection だけを開きます。
+
 ## 1. この文書の役割
 
 この文書は実験実務の入口です。詳細は次に分けます。
@@ -269,7 +276,7 @@ topic 固有の追加ログは `result/<run_name>/logs/` に出ることも確�
 
 #### 4.2 verified
 
-本番に近い backend と env で、worker 数を絞って narrow run を行います。
+本番に近い backend と env で、worker 数を絞って bounded run を行います。
 ここで確認するのは次です。
 
 - GPU visibility
@@ -400,10 +407,10 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - correctness evidence と performance evidence を混同しません。
 - raw failure count だけで結論を出しません。environment noise、case mix、failure kind、success rate を分離します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。
-- user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで完了扱いにしません。
+- user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで完了扱いにしません。
 - scope で禁止された runner 変更、function fusion、別経路追加を性能改善のついでに入れません。
 - failure-onset dimension を残さず、implementation bug と真の frontier limit を混同しません。
-- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張しません。
+- toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張しません。
 - 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にしません。
 
 ## 3. コード改造を伴う反復ワークフロー

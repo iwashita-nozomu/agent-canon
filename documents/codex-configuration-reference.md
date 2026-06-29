@@ -18,6 +18,15 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 
 目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
 
+## Reader Map
+
+Use this reference to answer where Codex configuration lives, which source owns
+each setting, and how repo-scoped `.codex/config.toml` relates to CLI overrides,
+subagents, MCP servers, hooks, skills, AGENTS.md, profiles, and local state.
+Read Primary Sources and Configuration Surfaces first, then use the coverage
+matrix and per-key inventory for edits. The later sections group settings by
+runtime surface and end with the practical change checklist and stability notes.
+
 ## Primary Sources
 
 - `$openai-docs` is the canonical source route for Codex product docs, Codex
@@ -571,8 +580,8 @@ Template-specific hook behavior:
   reference capture checks.
 - `PreToolUse` runs `direct_rg_context_guard.py` to emit
   `DIRECT_RG_CONTEXT_RISK=warn` when a shell command uses broad direct
-  `rg -n` output. It does not block the tool call; it asks the agent to replace
-  broad output with `rg -l`, bounded paths, `--max-count`, or exclusions for
+  broad text-search output. It does not block the tool call; it asks the agent to replace
+  broad output with bounded paths, `--max-count`, or exclusions for
   `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl`.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
   module boundary, library implementation, helper inventory, helper-first,

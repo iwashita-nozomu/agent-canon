@@ -9,6 +9,14 @@ upstream design README.md agent canon overview
 # エージェント利用ガイド
 
 
+## この文書の読み方
+
+この文書は、AgentCanon を使う読者向けの入口案内です。まず
+`どこから読むか` と `入口の使い分け` で runtime ごとの入口を選び、
+`skill の使い方` で task 形状に合う skill を確認します。repo-changing task や
+複数 agent を使う場合は `subagent の使い方` を読みます。この文書は利用案内であり、
+workflow family、role behavior、validation gate の正本はリンク先の owner surface です。
+
 ## どこから読むか
 
 1. [agents/README.md](README.md)
@@ -36,7 +44,7 @@ upstream design README.md agent canon overview
 - Markdown 差分では `md-style-check` を使います。
 - 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
 - typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
-- 小規模な repo-changing 差分では `small-change-routing` を使い、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、small_change_skill_read、skill 名、path を evidence に残します。
+- owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じた repo-changing 差分では `owner-bounded-routing` を使い、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、owner_bounded_skill_read、skill 名、path を evidence に残します。
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。
@@ -56,7 +64,7 @@ upstream design README.md agent canon overview
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - `skills=<...>` には `$skill-name` で指定した skill をそのまま並べます。
 - 例: `skills=$research-workflow,$literature-survey,$paper-writing`
-- 既定の流れは workflow family で変わります。明白な 1 file / 単一 abstraction 修正は `Scoped Change Lite`、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
+- 既定の流れは workflow family で変わります。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正は `Owner-Bounded Change`、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
 - observable behavior、regression risk、または test contract を変える code 変更では `test_designer` を別 instance で立て、実装前に nasty case を洗います。contract-only wrapper は static contract validation と canonical command evidence を使います。
