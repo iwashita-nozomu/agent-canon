@@ -426,6 +426,9 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
 OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "owner_bounded_tool_route"
 ]
+STATIC_READ_VALIDATION_POLICY_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "static_read_validation_policy"
+]
 LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "literature_backed_skill_call_order"
 ]
@@ -1780,6 +1783,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
+        )
+    )
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "static_read_validation_policy",
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
         )
     )
     findings.extend(

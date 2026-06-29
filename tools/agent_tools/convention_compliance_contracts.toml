@@ -11,6 +11,34 @@
 schema_version = 1
 
 [[contracts]]
+id = "static_read_validation_policy"
+description = "Validation policy treats static analysis and reading evidence as primary, with operation checks and broad execution only as supplemental evidence for runtime or unresolved risk."
+
+[[contracts.surfaces]]
+path = ".agents/skills/agent-orchestration/SKILL.md"
+markers = ["static/read evidence", "unresolved signal", "operation checks", "smoke runs", "Expensive command"]
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["静的解析・読み取り evidence", "未解決 signal", "動作確認", "smoke run", "重いコマンド"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["static/read evidence", "primary validation evidence", "supplemental evidence", "operation checks", "unresolved static findings"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "動作確認", "未解決 finding"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["静的解析・読み取り", "主証跡", "reading evidence", "動作確認", "broad execution"]
+
+[[contracts.surfaces]]
+path = "documents/runtime-profiles-and-check-matrix.md"
+markers = ["Static analysis and reading evidence", "primary validation evidence", "operation checks", "supplemental evidence", "unresolved static/read findings"]
+
+[[contracts]]
 id = "literature_backed_skill_call_order"
 description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
 
