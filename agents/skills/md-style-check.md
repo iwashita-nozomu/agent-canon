@@ -74,6 +74,8 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 - list、table、code block が読みにくく崩れていない
 - display math は standalone double-dollar delimiter を使い、KaTeX / math
   fence と Markdown display delimiter を二重に重ねていない
+- 文中数式 / inline math は `$...$`（例: `$(式)$`）で囲み、backtick の
+  code span や文中の double-dollar display delimiter にしていない
 - formatter 後に escaped display delimiter や余分な double-dollar delimiter が残っていない
 - table 内の文中数式や inline code が raw `|` で列分割されていない
 - Mermaid fenced block と math delimiter が repo 標準に揃っている
@@ -84,6 +86,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 1. changed Markdown files を固定します。
 1. display math がある file は、double-dollar delimiter を独立行に置き、前後に空行を置きます。KaTeX / math fence の中に Markdown display delimiter を入れません。
+1. 文中数式 / inline math は `$...$`（例: `$(式)$`）で書き、code span や文中の double-dollar display delimiter と混ぜません。
 1. command option や実行例が必要な場合は、実装 file を読む前に `tools/bin/agent-canon docs -h` を見ます。
 1. 文書全体を読む前に `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。`DOCS_CHECK=pass`、`DOCS_CHECK_FINDING=...`、`DOCS_CHECK_REPORT_BEGIN` の structured report は tool-covered property の正本判定として扱います。
 1. finding がある場合だけ、修正に必要な path / line / 近傍 slice を読みます。tool が見た property を subagent や reviewer に再読解させません。
@@ -101,7 +104,8 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 ## Final Guard
 
 - formatter と checker が pass しても、最後に変更箇所の table、文中数式、
-  inline code を確認します。table cell の中に raw `|` を含む数式や code を置くと
+  inline code を確認します。文中数式は `$...$`、code/path/literal は backtick
+  で分けます。table cell の中に raw `|` を含む数式や code を置くと
   Markdown の列として解釈されるため、式を display math へ出す、短い名前へ置換する、
   または table 外の本文へ移してから、`tools/bin/agent-canon docs check <paths...>` を再実行します。
 - format-only として閉じる場合は、`structure_contract=skipped` と理由が
