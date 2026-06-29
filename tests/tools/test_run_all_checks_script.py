@@ -53,7 +53,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
     def test_pr_gate_reuses_quick_ci_without_repeating_parent_gates(self) -> None:
-        """AgentCanon PR gate should not rerun checks it already executed directly."""
+        """The PR gate should not rerun AgentCanon checks it already executed directly."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 

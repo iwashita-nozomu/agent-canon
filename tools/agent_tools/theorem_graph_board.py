@@ -17,8 +17,14 @@ import json
 import sys
 from collections import Counter, defaultdict, deque
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
+
+JsonObject = dict[str, object]
+
+ROUTE_EXAMPLE_LIMIT = 5
+ROUTE_NODE_DISPLAY_LIMIT = 20
 
 TERMINAL_STATUS_TERMS = (
     "verified",
@@ -186,7 +192,19 @@ def reachable(start: str, outgoing: Mapping[str, list[str]]) -> set[str]:
     return seen
 
 
-def board(graph: Mapping[str, object]) -> dict[str, Any]:
+@dataclass
+class RouteAccumulator:
+    """Mutable per-route state before JSON rendering."""
+
+    route: str
+    total: int = 0
+    statuses: Counter[str] = field(default_factory=Counter)
+    open_nodes: list[str] = field(default_factory=list)
+    unknown_nodes: list[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+
+
+def board(graph: Mapping[str, object]) -> JsonObject:
     """Build the board summary."""
     nodes = {str(row["id"]): row for row in rows(graph.get("nodes")) if "id" in row}
     outgoing = active_edges(graph)
@@ -195,36 +213,26 @@ def board(graph: Mapping[str, object]) -> dict[str, Any]:
     if not reachable_ids:
         reachable_ids = set(nodes)
 
-    route_rows: dict[str, dict[str, Any]] = {}
+    route_rows: dict[str, RouteAccumulator] = {}
     for node_id in sorted(reachable_ids):
         node = nodes.get(node_id)
         if node is None:
             continue
         route = classify_route(node)
-        row = route_rows.setdefault(
-            route,
-            {
-                "route": route,
-                "total": 0,
-                "statuses": Counter(),
-                "open_nodes": [],
-                "unknown_nodes": [],
-                "examples": [],
-            },
-        )
+        row = route_rows.setdefault(route, RouteAccumulator(route=route))
         status = node_status(node)
-        row["total"] += 1
-        row["statuses"][status] += 1
+        row.total += 1
+        row.statuses[status] += 1
         if status == "open":
-            row["open_nodes"].append(node_id)
+            row.open_nodes.append(node_id)
         elif status == "unknown":
-            row["unknown_nodes"].append(node_id)
-        if len(row["examples"]) < 5:
-            row["examples"].append(node_id)
+            row.unknown_nodes.append(node_id)
+        if len(row.examples) < ROUTE_EXAMPLE_LIMIT:
+            row.examples.append(node_id)
 
     rows_out = []
     for route, row in sorted(route_rows.items()):
-        statuses = dict(row["statuses"])
+        statuses = dict(row.statuses)
         open_count = int(statuses.get("open", 0))
         unknown_count = int(statuses.get("unknown", 0))
         terminal_count = int(statuses.get("terminal", 0))
@@ -238,13 +246,13 @@ def board(graph: Mapping[str, object]) -> dict[str, Any]:
             {
                 "route": route,
                 "verdict": verdict,
-                "total": row["total"],
+                "total": row.total,
                 "terminal": terminal_count,
                 "open": open_count,
                 "unknown": unknown_count,
-                "open_nodes": row["open_nodes"][:20],
-                "unknown_nodes": row["unknown_nodes"][:20],
-                "examples": row["examples"],
+                "open_nodes": row.open_nodes[:ROUTE_NODE_DISPLAY_LIMIT],
+                "unknown_nodes": row.unknown_nodes[:ROUTE_NODE_DISPLAY_LIMIT],
+                "examples": row.examples,
             }
         )
 
@@ -258,7 +266,7 @@ def board(graph: Mapping[str, object]) -> dict[str, Any]:
     }
 
 
-def render_markdown(summary: Mapping[str, Any]) -> str:
+def render_markdown(summary: Mapping[str, object]) -> str:
     """Render board summary as Markdown."""
     lines = [
         "<!--",
@@ -280,7 +288,7 @@ def render_markdown(summary: Mapping[str, Any]) -> str:
         "| Route | Verdict | Total | Terminal | Open | Unknown | Open Nodes | Unknown Nodes |",
         "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
     ]
-    for row in cast(list[Mapping[str, Any]], summary.get("routes", [])):
+    for row in cast(list[Mapping[str, object]], summary.get("routes", [])):
         open_nodes = ", ".join(f"`{item}`" for item in cast(list[str], row.get("open_nodes", []))) or "None"
         unknown_nodes = ", ".join(f"`{item}`" for item in cast(list[str], row.get("unknown_nodes", []))) or "None"
         lines.append(

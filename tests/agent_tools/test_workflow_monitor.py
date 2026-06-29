@@ -650,7 +650,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
-            self.assertIn("workflow=Scoped Change", text)
+            self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
@@ -688,7 +688,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-task-start" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
-            self.assertIn("workflow=Scoped Change", text)
+            self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
