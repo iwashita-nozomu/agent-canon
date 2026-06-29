@@ -260,7 +260,7 @@ before editing.
 
 ## Required Validation
 
-For container or devcontainer changes, use the narrow checks first and then the
+For container or devcontainer changes, use the targeted checks first and then the
 repository closeout checks.
 
 ```bash

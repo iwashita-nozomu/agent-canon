@@ -42,7 +42,7 @@ layout と build tree の正本は [cpp-build-layout.md](cpp-build-layout.md) �
 ## 3.5 Header-Only Rule
 
 - template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `include/<project>/*.hpp` を既定にします。
-- 小さい helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
+- focused helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
 - `src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
 - `src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
 
@@ -68,7 +68,7 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 ## 5. テスト
 
-- 小さく決定的な入力で検証します。
+- bounded かつ決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
 - `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build build/cpp/<profile> --target <project-cpp-smoke-target>` を通します。
 

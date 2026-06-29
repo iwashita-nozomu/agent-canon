@@ -84,10 +84,10 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 
 ### Branch Reuse Default
 
-既存 branch / PR が現在の task、追加 user instruction、または小さな follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch / worktree 作成 route は、作成前に route authority と理由を記録する 1 gate に集約します。
+既存 branch / PR が現在の task、追加 user instruction、または follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch / worktree 作成 route は、作成前に route authority と理由を記録する 1 gate に集約します。
 
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
-- 「fresh start」「dirty state 回避」「小さな追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
+- 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。shell 実行では `branch_worktree_guard.py` の PreToolUse gate に `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` または `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow` と `AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>` を渡します。
 - AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
 
@@ -109,11 +109,16 @@ Use only the active profile for the task. Mark inactive profiles as
 ### Context Sweep
 
 実装、設計変更、文書改訂、実験計画の前に、repo evidence を根拠にします。
-context sweep は bounded packet reading です。先に task topic、runtime
-profile、implementation surface router、semantic-index / context-pack、dependency review
-の structured output で責務 bucket を絞り、選ばれなかった profile / document bucket は
-`not_applicable` として扱います。Large delivery / Shared canon でも、まず bounded
-responsibility route を残してから必要 slice だけを読む。
+context sweep は `requested_scope` を保存したうえで work packet を作る手順です。
+先に user request から要求された file、workflow、check、doc、PR state を
+`requested_scope` として固定し、task topic、runtime profile、implementation
+surface router、semantic-index / context-pack、dependency review の structured
+output で `work_scope` を段階化します。選ばれなかった profile / document bucket
+は、request に無関係である evidence がある場合だけ `not_applicable` にします。
+Large delivery / Shared canon でも、bounded responsibility route は作業順序を
+決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
+slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfaces`、
+`omitted_surfaces` と理由を残してから進めます。
 
 - `documents/`
 - `issues/`
@@ -131,12 +136,11 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
-small changes でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残します。small change は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている場合だけ parent-direct route を使います。
+bounded route でも、選択済み runtime `SKILL.md` の本文読了を selected_runtime_skill_read として扱い、patch 前の作業 evidence に owner_bounded_skill_read、skill 名、path を残します。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
-rg -l "topic keywords" <responsibility-scoped dirs> \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \
@@ -189,8 +193,9 @@ repo-changing run では `team_manifest.yaml` の
 実装 behavior は request clauses、acceptance contract、
 `Implementation Source Packet`、`Design-To-Implementation Trace`、
 dependency-expanded scope、validation route、review gate から導きます。
-task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、
-validation profile を選ぶ signal です。
+見た目の広さ、owner-bounded route、MVP、thin slice は暫定的な routing、
+wave、validation profile の signal に留めます。owner boundary や impact surface が
+違うと分かった時点で route を更新します。
 
 repo-changing run では `team_manifest.yaml` の
 `run.contract_complete_implementation_policy` を handoff packet に含めます。
@@ -235,7 +240,7 @@ codex -p token-standard
 codex -p token-deep
 ```
 
-- `token-lite` is for narrow diagnosis and low-risk changes. It keeps the
+- `token-lite` is for bounded diagnosis and low-risk changes. It keeps the
   selected required gates active.
 - `token-standard` is the default staged repo-work mode.
 - `token-deep` is for broad architecture, research synthesis, high-risk review,
@@ -255,11 +260,14 @@ active gates are those selected by runtime profile and risk class.
 
 ### Edit Execution Surface
 
-Repo file edits use the narrowest reliable execution surface:
+Repo file edits use the responsibility-preserving execution surface:
 
-1. 通常の小〜中規模編集は patch-based edit を使います。
+1. 手編集で責務を追える編集は patch-based edit を使います。
 1. 機械生成・一括変換・format は repo 内の script / formatter / generator を使います。
-この選択は作業 log / run bundle に必要な粒度で残します。user update では、既定から外れる編集手段を使う場合、tool availability が作業判断に影響する場合、または user が編集手段を質問した場合に説明します。
+この選択は編集手段の選択です。対象範囲の正本は `requested_scope` に残します。
+作業 log / run bundle には、`requested_scope`、選んだ `work_scope`、外した surface
+の理由を必要な粒度で残します。user update では、既定から外れる編集手段を使う場合、
+tool availability が作業判断に影響する場合、または user が編集手段を質問した場合に説明します。
 
 ### Library And Reuse Sweep
 
@@ -358,7 +366,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success だけでなく implementation alignment evidence が review artifact に残っている
-- required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最新 diff 全体に対して再実行している
+- required review の `fix now` findings が実装へ反映され、どの review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最新 diff 全体に対して再実行している
 - deferred findings は今回の completion readiness への影響、理由、escalation を artifact に記録している
 
 `closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
@@ -486,7 +494,7 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - subagent と parent の責務を分けたい
 
 full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer`、`test_designer` を標準構成とします。
-lite scoped route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
+owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
 Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`spark_worker`、`worker` を workflow family に応じて stage ごとに明示します。
 Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
 `team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
@@ -509,7 +517,7 @@ handoff はこの policy を含めます。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
 default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、bounded review / report traceability / checklist gate は mini role TOML、Abstract Design Frame と design trace で完全に切れる狭い実装 slice は `spark_worker` に寄せます。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
-- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
+- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Owner-Bounded Change` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
 - write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は先行 wave の validation と tool rerun 後に後続 wave へ回します。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します。
@@ -535,10 +543,10 @@ bundle 出力には少なくとも次が含まれます。
 - `PRE_EDIT_REJECTION_PREDICTION_STATUS`
 - task id / fan-out budget / active role evidence
 
-parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、bounded packet routing を維持します。
+parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、requested scope を保持した bounded packet routing を維持します。
 handoff には `allowed_paths`、`do_not_read`、context artifact path、expected output schema、
 `PRIMARY_PATHS` / `FORBIDDEN_PATHS`、reuse ledger、pre-edit rejection prediction を含めます。
-`cross_cutting_document_packet` は利用可能な reference list であり、role ごとの必要 slice を選ぶために使います。
+`cross_cutting_document_packet` は利用可能な reference list であり、role ごとの work packet を選ぶために使います。広い request では、packet に含めなかった reference を `omitted_surfaces` として理由付きで残します。
 
 研究・実験つき変更:
 
@@ -629,10 +637,10 @@ cost を無視して review coverage を優先する run では、research-drive
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
 - 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は mini role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
-- `spark_worker` に渡す実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする
+- `spark_worker` に渡す実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。適格性は design trace と dependency-expanded handoff scope で判断します。
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
-- `spark_worker` は design trace と dependency-expanded handoff scope が揃った narrow implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
+- `spark_worker` は design trace と dependency-expanded handoff scope が揃った bounded implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
 - repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
@@ -656,7 +664,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice の preferred candidate は `spark_worker`、execution-only experiment/log work は mini role TOML とする
+- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた bounded slice の preferred candidate は `spark_worker`、execution-only experiment/log work は mini role TOML とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ

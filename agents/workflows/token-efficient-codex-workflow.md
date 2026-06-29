@@ -11,18 +11,19 @@ downstream design README.md workflow catalog references this overlay
 
 # Token-Efficient Codex Workflow
 
-This overlay keeps repo work rigorous while reducing unnecessary subagent
-fan-out and tool-output token load. Use it when the user asks to save tokens,
-when a task is small, or when the current session is already long. Context
-construction is owned by `agents/COMMUNICATION_PROTOCOL.md`; this overlay only
-chooses when to load, reference, or hand off that context.
+This overlay keeps repo work rigorous while measuring subagent fan-out and
+tool-output token load. Use it when the user asks to save tokens, when a task has
+a boundary-evidenced route, or when the current session is already long. Context
+construction is owned by `agents/COMMUNICATION_PROTOCOL.md`; this overlay never
+shrinks requested context. It chooses when to load, reference, or hand off
+already-owned context artifacts.
 
 Token reduction is treated as a measurable claim: compare a baseline session footprint
 against the candidate slice, record the ratio, and keep only the changes that preserve
 skill accuracy while cutting total tokens by at least half for the same eval envelope.
-The first lever is reasoning-effort reduction on narrow code-reading and bounded
-implementation roles; only after that should broader profile changes or output caps
-be considered.
+The first lever is matching reasoning effort to owner-boundary evidence and role
+responsibility; only after that should broader profile changes or output caps be
+considered.
 
 ## Reader Map
 
@@ -37,8 +38,8 @@ Use Codex profiles as parent-session modes. For current Codex CLI behavior,
 define these profiles in user-level config (`~/.codex/config.toml` or
 `$CODEX_HOME/config.toml`), not in the project-local `.codex/config.toml`.
 
-- `token-lite`: narrow tasks, small docs edits, targeted diagnosis, and
-  low-risk follow-up fixes.
+- `token-lite`: boundary-evidenced tasks, targeted diagnosis, and low-risk
+  follow-up fixes.
 - `token-standard`: normal repo work that still needs staged gates, review, and
   validation.
 - `token-deep`: architecture, broad refactor, research synthesis, ambiguous
@@ -72,7 +73,8 @@ Select one mode before spawning subagents:
 
 Mode selection rules:
 
-- Start in `parent-direct` or `scout-only` for narrow diagnosis.
+- Start in `parent-direct` or `scout-only` for bounded diagnosis with a recorded
+  owner boundary.
 - Escalate to `spark-slice` only after the Abstract Design Frame, design trace, and reuse targets are fixed.
 - Escalate to `full-stage` when a task touches multiple durable surfaces,
   introduces public names, changes workflow/config, or has open requirements.
@@ -86,7 +88,8 @@ Mode selection rules:
   authorization, not to treat the parent-only result as equivalent review.
 - If a higher-priority runtime blocks implicit spawn, record
   `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` or `SUBAGENT_AUTHORIZATION=required`
-  in the run artifact and keep the parent slice narrow. Token efficiency does
+  in the run artifact and keep the parent slice tied to the requested scope and
+  owner boundary. Token efficiency does
   not permit fabricating specialist review evidence.
 
 ## Context Protocol Use
@@ -120,8 +123,8 @@ Mode selection rules:
   in `workflow_monitoring.md`.
 - Treat `token_ratio <= 0.5` as the target, but do not accept the reduction if
   the relevant prompt or behavior eval regresses.
-- If a reduction is achieved by narrowing context too far, continue until the
-  skill or behavior evals still pass for the same surface.
+- If a reduction removes context needed for the requested scope, reject it and
+  continue until the skill or behavior evals still pass for the same surface.
 
 ## Escalation Triggers
 
@@ -146,8 +149,8 @@ Token-efficient mode still requires the normal closeout evidence:
 - no unfinished planned work
 - pushed commits when the task changes shared canon or template state
 
-If token savings forced a narrower validation pass, record the omitted checks
-and run the broader gate before user-facing completion.
+If token savings forced a bounded validation pass, record the omitted checks and
+run the broader gate before user-facing completion.
 
 ## Convention Compliance Gate
 

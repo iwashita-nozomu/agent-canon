@@ -94,7 +94,7 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "checks",
         "check plan",
-        "Choose the smallest validation set for the changed paths and risk.",
+        "Choose the validation set that covers the changed paths and risk.",
         "run_selected_checks",
         ("make check-matrix",),
         (

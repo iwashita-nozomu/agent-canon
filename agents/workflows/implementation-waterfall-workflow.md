@@ -86,7 +86,7 @@ README、workflow、guide、migration、specification など file responsibility
 1. 最終受け入れ review
 1. audit / gate close
 
-`Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
+`Scoped Change` のような bounded 差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
 また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 behavior-changing、regression-prone、または high-risk code pass では、実装前に
 `test_designer` を独立に立て、static path と nasty case を test plan として固定します。

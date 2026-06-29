@@ -61,7 +61,7 @@ Execute the required and task-matching conditional commands that the packet prin
    entrypoint: normally `main(problem, InitializeConfig, ...) -> Answer / State
    / Info` or the equivalent run function. Local convergence, certificate
    soundness, finite-precision floor, solver-chain reachability, infeasibility
-   certificate, and problem-class narrowing are profiles of that whole theorem,
+   certificate, and problem-class restriction are profiles of that whole theorem,
    not starting points. Do not explore helpers without first stating the
    top-level main theorem they decompose.
 1. State that top-level theorem over the public root's static argument schema
@@ -219,7 +219,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When formal-proof returns a missing witness or assumption-insufficiency
    result, classify whether the gap is better solved by changing the algorithm,
    changing the algorithmic recurrence, deriving a numerical convergence
-   witness, narrowing the problem class, or leaving an external assumption
+   witness, restricting the problem class, or leaving an external assumption
    boundary.
 1. Function-level blockers must be reported as a causal chain, not as a flat
    missing-lemma inventory.  For each recursive function on the target path,
@@ -326,7 +326,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When the code must change for provability, state the algorithm change in
    proof terms first: remove an unsound gate, change the blocking recurrence,
    initializer, line search, inner-solver policy, regularization, Phase I /
-   globalization route, narrow to a local theorem, or add a problem-class
+   globalization route, restrict to a local theorem, or add a problem-class
    witness. A code change for provability means replacing the algorithm with a
    provable numerical mechanism, not embedding the proof check in production
    code.

@@ -79,7 +79,7 @@ git -C vendor/agent-canon push origin HEAD
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh AgentCanon branch only because the
-   user added an instruction, the diff is a small follow-up, or the parent pin
+   user added an instruction, the diff is a bounded follow-up, or the parent pin
    has not moved yet. A new AgentCanon branch requires a recorded reason such as
    a merged / closed / unpushable current PR, an unrelated ownership surface, a
    required review-isolation boundary, or unsafe divergent state.

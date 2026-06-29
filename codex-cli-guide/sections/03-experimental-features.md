@@ -21,7 +21,7 @@ upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved gene
 
 Codex CLIは更新速度が高く、CLI本体、TUI、設定schema、MCP、Hooks、Subagents、Apps連携、Codex Cloudとの接続が並行して進化する。したがって、実験的機能を理解するには、単に機能名を覚えるよりも、成熟度、feature flag、profile、rollback、監査、チーム共有の流れを決めることが重要である。公式ドキュメント上のFeature Maturityは、機能をStable、Beta、Experimental、Deprecatedのような状態で読むための基準になる。Experimentalは便利でも、設定名、UI、既定値、エラーメッセージ、subcommandの構造が変わる可能性を前提に扱う。
 
-本書では、実験的機能を「開発速度を上げるための候補」と「本番作業に混ぜるとリスクが上がる候補」に分けて扱う。前者にはmulti agent、background terminal、goal追跡、Hooks、Rules、MCP連携、Apps connector、fast modeなどがある。後者には、write権限を増やすもの、外部サービスへ接続するもの、長時間実行するもの、ユーザー確認を減らすものが含まれる。実験機能の導入では、常に小さなprofileで試し、`/debug-config`で有効状態を確認し、`codex features list`で手元のbinaryが認識する機能名を照合する。
+本書では、実験的機能を「開発速度を上げるための候補」と「本番作業に混ぜるとリスクが上がる候補」に分けて扱う。前者にはmulti agent、background terminal、goal追跡、Hooks、Rules、MCP連携、Apps connector、fast modeなどがある。後者には、write権限を増やすもの、外部サービスへ接続するもの、長時間実行するもの、ユーザー確認を減らすものが含まれる。実験機能の導入では、常にbounded profileで試し、`/debug-config`で有効状態を確認し、`codex features list`で手元のbinaryが認識する機能名を照合する。
 
 
 実験機能は「使えるか」ではなく、「どのprofileで、誰が、どのrepositoryで、何日間、どの成功条件で試し、どう戻すか」を決めてから有効化する。
@@ -242,7 +242,7 @@ _運用規則を文書にする。_
 
 ## multi agentとサブエージェントの実験運用
 
-multi agentは、親セッションがすべてを抱え込まず、調査、レビュー、実装、UI再現、ログ解析などを分担する設計である。実験的に導入する場合は、`max_threads`を小さくし、`max_depth = 1`から始める。深いspawnや多数のagentは、費用、文脈、判断の不一致を増やす。親agentは、子agentへ明確な成果物形式を求める。たとえば「関連ファイル一覧」「リスク上位5件」「再現手順」「根拠URL」「未確認事項」を固定すると統合しやすい。
+multi agentは、親セッションがすべてを抱え込まず、調査、レビュー、実装、UI再現、ログ解析などを分担する設計である。実験的に導入する場合は、`max_threads`を制御し、`max_depth = 1`から始める。深いspawnや多数のagentは、費用、文脈、判断の不一致を増やす。親agentは、子agentへ明確な成果物形式を求める。たとえば「関連ファイル一覧」「リスク上位5件」「再現手順」「根拠URL」「未確認事項」を固定すると統合しやすい。
 
 
 ```
@@ -275,7 +275,7 @@ _親は統合役に集中する。_
 
 `同時数` → `費用` → `文脈`
 
-_同時数は小さく始める。_
+_同時数は制御して始める。_
 
 
 #### 図解: max depth
@@ -351,5 +351,4 @@ _環境ごとの差を文書化する。_
 
 
 ---
-
 

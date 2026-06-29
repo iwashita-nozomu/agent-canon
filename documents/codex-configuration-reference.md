@@ -580,8 +580,8 @@ Template-specific hook behavior:
   reference capture checks.
 - `PreToolUse` runs `direct_rg_context_guard.py` to emit
   `DIRECT_RG_CONTEXT_RISK=warn` when a shell command uses broad direct
-  `rg -n` output. It does not block the tool call; it asks the agent to replace
-  broad output with `rg -l`, bounded paths, `--max-count`, or exclusions for
+  broad text-search output. It does not block the tool call; it asks the agent to replace
+  broad output with bounded paths, `--max-count`, or exclusions for
   `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl`.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
   module boundary, library implementation, helper inventory, helper-first,

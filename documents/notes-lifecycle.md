@@ -63,7 +63,7 @@ closeout 前に、action log と report を見て次のどれへ昇格するか�
 ### Promote To `notes/knowledge/`
 
 - 同じ command、path、environment rule、tool behavior を今後も参照しそう
-- 1 topic 1 file の短い practical memo に落とせる
+- 1 topic の短い practical memo に落とせる
 
 ### Promote To `notes/themes/`
 

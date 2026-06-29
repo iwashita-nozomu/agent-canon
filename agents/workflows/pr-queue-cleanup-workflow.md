@@ -29,12 +29,12 @@ This workflow owns cleanup order for a named AgentCanon source PR and its
 dependent template or derived pin PRs. Read `Authority` before touching the
 queue, then follow `Cleanup Order`, stop on any `Stop Conditions`, and use
 `Goal Integration` only when `goal.md` is part of the queue state. The boundary
-is narrow PR-queue maintenance: this document does not grant branch deletion,
+is bounded PR-queue maintenance: this document does not grant branch deletion,
 review dismissal, bypass, force-merge, or unrelated PR mutation authority.
 
 ## Authority
 
-PR queue cleanup is narrower than general PR mutation authority.
+PR queue cleanup is more bounded than general PR mutation authority.
 The current user request must name the PR queue, or a tracked maintainer policy
 must authorize this exact queue. A generic statement that `gh` works is not
 enough.

@@ -17,12 +17,12 @@ downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex s
 - Purpose: routes scholarly prose through notation, logic, and reader-flow
   review before drafting or revising.
 - Use When: drafting or revising papers, thesis chapters, scholarly notes, or
-  academic documents outside a narrower paper-submission route.
+  academic documents outside a more specific paper-submission route.
 - Section path: Purpose, Use When, and Core References set scope; Mandatory
   Checklist, Default Sequence, and Standard Command are the operational rules;
   TeX Output Boundary and Boundary limit the surface.
 - Boundary: submission-paper ownership goes through `paper-writing` when that
-  narrower route applies.
+  more specific route applies.
 
 ## Purpose
 

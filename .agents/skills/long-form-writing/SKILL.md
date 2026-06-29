@@ -34,7 +34,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. If the document is a paper, thesis chapter, scholarly note, or symbol-dense academic manuscript, switch to `academic-writing` instead.
 1. Before substantive document additions or revisions, classify whether section order, responsibility, claim/support, reader path, source map, or canonical route changes. If yes, run the structure-analysis gate before adding prose; if the edit is typo/link/format-only, record that reason and use `$md-style-check` instead.
 1. For typo/link/format-only handoff to `$md-style-check`, keep
-   selected_runtime_skill_read and small_change_skill_read evidence for the
+   selected_runtime_skill_read and owner_bounded_skill_read evidence for the
    selected runtime `SKILL.md` path.
 1. Use `$structure-planning` when section order, reader path, source mapping, first section, or invalid interpretations are nontrivial; use the structure contract before writing prose.
 1. When the document explains workflow, dependency, ownership, routing, state transition, review gate, handoff, or other multi-step flow, ask `$structure-planning` for a `visual_plan` and use Mermaid as the default first visual unless it would duplicate a simple list.

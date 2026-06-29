@@ -55,7 +55,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Search existing durable surfaces before writing a new issue:
 
    ```bash
-   rg -n "<cause keywords>" issues memory notes/failures documents agents
+   git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
    ```
 
 1. Expand candidate affected surfaces with dependency review and record the

@@ -476,7 +476,7 @@ The MVP relation registry includes:
 - `realizes_move`: paragraph realizes a phase or genre move.
 - `requires`: one text unit requires a prior premise, definition, condition,
   or reader-state update.
-- `refines`: one text unit narrows, qualifies, or operationalizes another.
+- `refines`: one text unit specializes, qualifies, or operationalizes another.
 - `generalizes`: one text unit abstracts from examples, evidence, or local
   observations.
 - `concludes`: one text unit states a conclusion or decision that depends on

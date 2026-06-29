@@ -29,7 +29,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/agent-learning.md`.
 1. Read `agents/workflows/agent-learning-workflow.md`.
 1. Treat plain `agent-learning` or `$agent-learning` in a user request as an explicit skill invocation, not only a candidate signal.
-1. Select this skill for user / reviewer feedback about agent behavior, repeated misses, missed skill invocation, overly narrow routing, recurrence prevention, "こういう止まり方", task retrospectives, or agent-side memory updates.
+1. Select this skill for user / reviewer feedback about agent behavior, repeated misses, missed skill invocation, over-constrained routing, recurrence prevention, "こういう止まり方", task retrospectives, or agent-side memory updates.
 1. Separate user preference from agent-side learning.
 1. Record observable behavior with `python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --behavior-event "..."`, including skill invocation, subagent routing, tool gates, prompt evals, review feedback, subagent lifecycle, and diff-check decisions.
 1. Record user or reviewer feedback observed during actual use with `python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op>"`, then update the targeted skill prompt, workflow prompt, eval, or memory note before closeout.

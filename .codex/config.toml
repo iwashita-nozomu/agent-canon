@@ -181,7 +181,7 @@ path = "../.agents/skills/result-artifact-writeout/SKILL.md"
 enabled = true
 
 [[skills.config]]
-path = "../.agents/skills/small-change-routing/SKILL.md"
+path = "../.agents/skills/owner-bounded-routing/SKILL.md"
 enabled = true
 
 [[skills.config]]
@@ -258,7 +258,7 @@ description = "Detailed-design authoring agent for writing implementation-ready 
 config_file = "agents/detailed_designer.toml"
 
 [agents.diff_triage_reviewer]
-description = "Low-cost read-only reviewer for narrow diffs before escalation to broad review."
+description = "Read-only reviewer for bounded diffs before escalation to broad review."
 config_file = "agents/diff_triage_reviewer.toml"
 
 [agents.docs_workflow_steward]
@@ -278,7 +278,7 @@ description = "Execution-planning agent for stage order, subagent assignment, va
 config_file = "agents/execution_planner.toml"
 
 [agents.experiment_runner]
-description = "Low-cost execution-only agent for running bounded experiments and summarizing logs."
+description = "Execution-only agent for running bounded experiments and summarizing logs."
 config_file = "agents/experiment_runner.toml"
 
 [agents.explorer]
@@ -354,7 +354,7 @@ description = "High-assurance read-only reviewer for final clause coverage and r
 config_file = "agents/ship_reviewer.toml"
 
 [agents.spark_worker]
-description = "Low-latency implementation agent for narrow code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace."
+description = "Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace."
 config_file = "agents/spark_worker.toml"
 
 [agents.test_designer]

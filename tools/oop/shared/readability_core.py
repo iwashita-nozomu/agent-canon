@@ -13,8 +13,8 @@
 """Evaluate OOP readability risks for Python and C++ source files.
 
 The score is a review aid, not a substitute for human design review. It focuses on
-signals that are cheap to compute and aligned with the local OOP policy: small
-responsibility boundaries, explicit state ownership, narrow public surfaces, and
+signals that are fast to compute and aligned with the local OOP policy: focused
+responsibility boundaries, explicit state ownership, role-specific public surfaces, and
 avoiding vague class shapes.
 """
 
@@ -86,8 +86,6 @@ PARAMETER_AGGREGATE_FUNCTIONS = {"add_finding"}
 DEFAULT_MIN_SCORE = 95
 DEFAULT_SNIPPET_CONTEXT_LINES = 2
 DEFAULT_MAX_REPORT_FINDINGS = 80
-DEFAULT_MAX_FUNCTION_LINES = 80
-DEFAULT_MAX_CLASS_LINES = 220
 DEFAULT_MAX_PUBLIC_METHODS = 12
 DEFAULT_MAX_INSTANCE_ATTRIBUTES = 10
 DEFAULT_MAX_PARAMETERS = 6
@@ -199,8 +197,6 @@ STATUS_PASS = "pass"
 STATUS_FAIL = "fail"
 REVIEW_SIGNAL_KINDS = frozenset(
     {
-        "class_lines",
-        "function_lines",
         "cognitive_complexity",
         "public_methods",
         "instance_attributes",
@@ -215,16 +211,6 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
         "The public type name does not expose a domain responsibility.",
         "Rename the boundary around the domain concept it owns.",
     ),
-    "class_lines": (
-        "responsibility size",
-        "The class is large enough that multiple responsibilities may be hidden together.",
-        "Review whether state, contract, adapter, and orchestration roles are already explicit before changing boundaries.",
-    ),
-    "function_lines": (
-        "operation size",
-        "The operation is long enough that decision, transform, and effect steps are hard to scan.",
-        "Review the decision, transform, and effect boundaries; extract only when the source already has a stable boundary.",
-    ),
     "cognitive_complexity": (
         "control-flow readability",
         "Nested control flow makes the operation hard to compose mentally.",
@@ -233,7 +219,7 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
     "public_methods": (
         "public surface width",
         "The public API is wide enough to suggest more than one class responsibility.",
-        "Review caller roles and narrow the interface only when responsibilities are independent.",
+        "Review caller roles and refine the interface only when responsibilities are independent.",
     ),
     "public_fields": (
         "state ownership",
@@ -352,8 +338,6 @@ SOLID_PRINCIPLES = {
 
 SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
     "vague_class_name": ("single_responsibility",),
-    "class_lines": ("single_responsibility",),
-    "function_lines": ("single_responsibility",),
     "cognitive_complexity": ("single_responsibility", "open_closed"),
     "public_methods": ("single_responsibility", "interface_segregation"),
     "public_fields": ("single_responsibility", "interface_segregation"),
@@ -387,8 +371,6 @@ SOLID_PRINCIPLES_BY_KIND: dict[str, tuple[str, ...]] = {
 class Thresholds:
     """Thresholds that turn static observations into findings."""
 
-    max_function_lines: int = DEFAULT_MAX_FUNCTION_LINES
-    max_class_lines: int = DEFAULT_MAX_CLASS_LINES
     max_public_methods: int = DEFAULT_MAX_PUBLIC_METHODS
     max_instance_attributes: int = DEFAULT_MAX_INSTANCE_ATTRIBUTES
     max_parameters: int = DEFAULT_MAX_PARAMETERS
@@ -738,8 +720,6 @@ def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
 
 def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
     """Add analyzer threshold arguments."""
-    parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
-    parser.add_argument("--max-class-lines", type=int, default=DEFAULT_MAX_CLASS_LINES)
     parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
     parser.add_argument(
         "--max-instance-attributes",
@@ -858,11 +838,6 @@ def iter_source_files(
     return sorted(set(files))
 
 
-def line_count(text: str) -> int:
-    """Count visible source lines in a stable way."""
-    return sum(1 for line in text.splitlines() if line.strip())
-
-
 def source_loc(text: str) -> int:
     """Count nonblank noncomment-ish source lines for normalized metrics."""
     count = 0
@@ -872,13 +847,6 @@ def source_loc(text: str) -> int:
             continue
         count += 1
     return count
-
-
-def node_length(node: ast.AST) -> int:
-    """Return source-line length for an AST node."""
-    lineno = getattr(node, "lineno", 0)
-    end_lineno = getattr(node, "end_lineno", lineno)
-    return max(1, end_lineno - lineno + 1)
 
 
 def python_cognitive_complexity(node: ast.AST) -> int:
@@ -2250,23 +2218,8 @@ def add_python_class_size_findings(
     attrs: set[str],
     findings: list[Finding],
 ) -> None:
-    """Record class size, public API, and state findings."""
+    """Record public API and state findings."""
     thresholds = context.thresholds
-    class_lines = node_length(node)
-    if class_lines > thresholds.max_class_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            node.lineno,
-            context.language,
-            "warn",
-            "class_lines",
-            node.name,
-            class_lines,
-            thresholds.max_class_lines,
-            "review-state-contract-adapter-boundary",
-        )
     if len(public_methods) > thresholds.max_public_methods:
         add_finding(
             findings,
@@ -2279,7 +2232,7 @@ def add_python_class_size_findings(
             node.name,
             len(public_methods),
             thresholds.max_public_methods,
-            "review-caller-roles-before-narrowing-api",
+            "review-caller-roles-before-refining-api",
         )
     if len(attrs) > thresholds.max_instance_attributes:
         add_finding(
@@ -2462,7 +2415,6 @@ def analyze_python_function(
 class PythonFunctionShape:
     """Precomputed function metrics used by the Python analyzer."""
 
-    length: int
     parameters: int
     complexity: int
     none_checks: int
@@ -2480,7 +2432,6 @@ def python_function_shape(
     is_top_level = is_top_level_function(node, parents)
     is_method = is_direct_method(node, parents)
     return PythonFunctionShape(
-        length=node_length(node),
         parameters=python_parameter_count(node),
         complexity=python_cognitive_complexity(node),
         none_checks=none_runtime_checks(node),
@@ -2522,22 +2473,8 @@ def add_python_function_shape_findings(
     shape: PythonFunctionShape,
     findings: list[Finding],
 ) -> None:
-    """Record size, parameter, and control-flow findings."""
+    """Record parameter and control-flow findings."""
     thresholds = context.thresholds
-    if shape.length > thresholds.max_function_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            node.lineno,
-            context.language,
-            "warn",
-            "function_lines",
-            node.name,
-            shape.length,
-            thresholds.max_function_lines,
-            "review-decision-transform-effect-boundaries",
-        )
     if (
         shape.parameters > thresholds.max_parameters
         and not shape.is_nested
@@ -2960,7 +2897,7 @@ def cpp_aggregate_value_object_name(name: str) -> bool:
 
 
 def cpp_preceding_lines(text: str, start: int, line_count: int) -> str:
-    """Return a small source window immediately before an index."""
+    """Return a bounded source window immediately before an index."""
     return "\n".join(text[:start].splitlines()[-line_count:])
 
 
@@ -3245,7 +3182,6 @@ class CppClassShape:
 
     name: str
     line: int
-    class_lines: int
     public_methods: int
     public_fields: int
     base_count: int
@@ -3259,7 +3195,6 @@ class CppFunctionShape:
 
     name: str
     line: int
-    function_lines: int
     parameters: int
     complexity: int
     null_checks: int
@@ -3309,7 +3244,6 @@ def cpp_class_shape(
     return CppClassShape(
         name=name,
         line=line_at(analysis_text, match.start()),
-        class_lines=line_count(analysis_text[match.start() : close_index]),
         public_methods=len(public_methods),
         public_fields=len(public_fields),
         base_count=len([part for part in bases.split(",") if part.strip()]),
@@ -3359,22 +3293,8 @@ def add_cpp_class_surface_findings(
     shape: CppClassShape,
     findings: list[Finding],
 ) -> None:
-    """Record size and public-surface findings for one C++ class."""
+    """Record public-surface findings for one C++ class."""
     thresholds = context.thresholds
-    if shape.class_lines > thresholds.max_class_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            shape.line,
-            context.language,
-            "warn",
-            "class_lines",
-            shape.name,
-            shape.class_lines,
-            thresholds.max_class_lines,
-            "review-state-contract-adapter-boundary",
-        )
     if (
         not shape.scalar_operator_value_object
         and shape.public_methods > thresholds.max_public_methods
@@ -3390,7 +3310,7 @@ def add_cpp_class_surface_findings(
             shape.name,
             shape.public_methods,
             thresholds.max_public_methods,
-            "review-caller-roles-before-narrowing-api",
+            "review-caller-roles-before-refining-api",
         )
     if (
         not shape.aggregate_value_object
@@ -3492,7 +3412,6 @@ def cpp_function_shape(
     return CppFunctionShape(
         name=name,
         line=line_at(analysis_text, match.start()),
-        function_lines=line_count(analysis_text[match.start() : close_index]),
         parameters=cpp_parameter_count(match.group("params")),
         complexity=cpp_cognitive_complexity(body),
         null_checks=cpp_null_runtime_checks(body),
@@ -3537,22 +3456,8 @@ def add_cpp_function_shape_findings(
     shape: CppFunctionShape,
     findings: list[Finding],
 ) -> None:
-    """Record size, parameter, and control-flow findings for one C++ function."""
+    """Record parameter and control-flow findings for one C++ function."""
     thresholds = context.thresholds
-    if shape.function_lines > thresholds.max_function_lines:
-        add_finding(
-            findings,
-            context.root,
-            context.path,
-            shape.line,
-            context.language,
-            "warn",
-            "function_lines",
-            shape.name,
-            shape.function_lines,
-            thresholds.max_function_lines,
-            "review-decision-transform-effect-boundaries",
-        )
     if shape.parameters > thresholds.max_parameters and not shape.abi_boundary:
         add_finding(
             findings,
@@ -4135,8 +4040,6 @@ def append_workflow_monitor_timing(
 def build_thresholds(args: argparse.Namespace) -> Thresholds:
     """Build thresholds from parsed command-line arguments."""
     return Thresholds(
-        max_function_lines=args.max_function_lines,
-        max_class_lines=args.max_class_lines,
         max_public_methods=args.max_public_methods,
         max_instance_attributes=args.max_instance_attributes,
         max_parameters=args.max_parameters,

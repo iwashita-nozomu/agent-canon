@@ -165,8 +165,8 @@ invalid.
 1. Run the applicable graph, review, or report-quality checker.
 1. Classify each finding as `fix-now`, `out-of-scope`, `tool-false-positive`,
    or `prompt-defect`.
-1. Rewrite the smallest section, paragraph, sentence, table, figure caption, or
-   equation needed to remove every `fix-now` finding.
+1. Rewrite the responsible section, paragraph, sentence, table, figure caption,
+   or equation needed to remove every `fix-now` finding.
 1. Rerun the same checker and compare the finding set.
 
 Do not accept a report merely because the loop hit an iteration budget. If the

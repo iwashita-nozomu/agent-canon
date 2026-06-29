@@ -77,7 +77,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は subagent type / behavior contract であり、実行単位は `role_type+instance_id` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
 - role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。
-- 既定 budget は `Scoped Change Lite` で同時 4 体までです
+- 既定 budget は `Owner-Bounded Change` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
 - 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
@@ -112,7 +112,7 @@ Subagent の context は correctness gate です。parent は handoff prompt ご
   tool packet の結果。
 - `tool_reuse_ledger` と `pre_edit_rejection_prediction`: write-capable `spark_worker` / `worker` には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
 
-role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary を渡します。Python API / typing review は `python_reviewer` に分け、数学 canon は必要 slice に限定します。
+role 分割が妥当でも、coverage map なしに広い `requested_scope` を狭い input packet へ潰す場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、parent は全体の `requested_scope` を持ち続け、各 agent には solver / optimizer / functional などの担当 path list、contract-check summary、`covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を渡します。Python API / typing review は `python_reviewer` に分け、数学 canon は担当 work packet に必要な節と、外した canon 節の理由を添えます。
 
 ## Wave Plan Contract
 
@@ -175,8 +175,9 @@ request clauses、acceptance contract、`Implementation Source Packet`、
 `Design-To-Implementation Trace`、dependency-expanded scope、validation route、
 review gate から導きます。
 
-task size、`Scoped Change Lite`、MVP、thin slice は routing、wave、
-validation profile を選ぶ signal です。contract gap、責務境界、API shape、
+見た目の広さ、`Owner-Bounded Change`、MVP、thin slice は暫定的な routing、
+wave、validation profile の signal に留めます。owner boundary や impact surface が
+違うと分かった時点で route を更新します。contract gap、責務境界、API shape、
 依存方向、runtime contract の不足が見えた場合は `design_issue_blocker` として
 Gate 5-6 に戻します。
 
@@ -286,7 +287,7 @@ hook、code checker、static analysis、CI、review tool の結果が subagent �
 - tool / hook の誤検知や task-local noise で protocol 変更が不要な場合でも、`subagent_protocol_update=not_required` と `protocol_feedback_reason=<short-reason>` を記録します。
 - reviewer role は、最新 diff だけでなく、hook / tool feedback が parent protocol と subagent protocol の判断まで閉じているかを確認します。
 
-subagent protocol feedback の最小 token は次です。
+subagent protocol feedback の必須 token セットは次です。
 
 ```text
 hook_tool_feedback=reviewed
@@ -357,7 +358,7 @@ Activation Conditions:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `spark_worker` preferred for narrow slices derived from the Abstract Design Frame and design trace; `worker` alternate route for broad or ambiguous implementation |
+| `implementer` | `spark_worker` preferred for bounded slices derived from the Abstract Design Frame and design trace; `worker` alternate route for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
@@ -529,10 +530,10 @@ workflow docs、task catalog は agent TOML を参照します。
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、dependency-expanded handoff scope が揃っていることです
 - 明示 spawn 許可がある repo-changing task では、coding / implementation / patch work の implementation critical path を pre-handoff investigation packet で作ってから、並行可能な独立検証を mini read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を支える mini review wave に切ります。
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、mini read-only wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、completion route は write-capable handoff、integration、review、validation で構成します。
-- `spark_worker` eligible な実装は、1 file または単一抽象ユニット、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです
+- `spark_worker` eligible な実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。eligibility は design trace と dependency-expanded handoff scope で判断します。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
-- `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます
-- `reviewer` は broad diff / cross-surface / clause coverage に上げる role とし、Python-only / C++-only / narrow diff では `python_reviewer`、`cpp_reviewer`、`diff_triage_reviewer` を entry reviewer にします
+- `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。code-only owner-bounded change では省略できます
+- `reviewer` は broad diff / cross-surface / clause coverage に上げる role とし、Python-only / C++-only / bounded diff では `python_reviewer`、`cpp_reviewer`、`diff_triage_reviewer` を entry reviewer にします
 
 ## Research Perspective Review Pack
 

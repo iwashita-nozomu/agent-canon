@@ -360,7 +360,7 @@ findings for resilient test planning.
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `evidence/agent-evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `evidence/agent-evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
-  - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning 設定、cheap-first routing、optional runtime metric JSONL を評価します。agent-facing run では `--compact-out` の JSON summary を読み、model matrix と finding detail は artifact へ分離します。
+  - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning 設定、boundary-evidenced routing、optional runtime metric JSONL を評価します。agent-facing run では `--compact-out` の JSON summary を読み、model matrix と finding detail は artifact へ分離します。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
@@ -834,7 +834,7 @@ python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 -
 
 Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
 Before implementation, run `goal_loop.py plan` and copy every open `GW*` row into the run bundle `schedule.md`; this prevents starting from a bare objective with no explicit work units.
-Do not shrink the first iteration to one micro-fix when the objective names multiple surfaces.
+Do not collapse the first iteration to one isolated edit when the objective names multiple surfaces.
 Select a coherent slice that can move the checklist, survey, implementation, and validation backlog items together.
 For efficiency, follow `agents/workflows/goal-plan-implementation-loop.md`: plan only the next implementation-ready slice, implement it, record evidence, refresh `NEXT_ACTION`, and continue immediately when the loop still has open work.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.

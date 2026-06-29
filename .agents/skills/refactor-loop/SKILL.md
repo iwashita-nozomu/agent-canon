@@ -138,7 +138,7 @@ Execute the required and task-matching conditional commands that the packet prin
    changed paths, validation commands, and unresolved blockers. If the subagent
    returns broad prose, unrelated edits, or a file-level implementation without
    target-object trace, classify it as `handoff_prompt_gap`, repair this prompt,
-   and do not launch the next writer until the handoff is narrowed.
+   and do not launch the next writer until the handoff is bounded by target objects.
 1. Keep runtime metrics collection active for every write-capable subagent.
    The active run bundle must be discoverable through
    `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` or `reports/agents/.active_run`
@@ -153,7 +153,7 @@ Execute the required and task-matching conditional commands that the packet prin
    finding as a default smell, not the default plan. If a wave contains one
    target only, record the reason as root-contract risk, semantic risk,
    write-scope conflict, or validation isolation. If no such reason exists,
-   classify the narrow handoff as `handoff_prompt_gap`, batch the related
+   classify the underspecified handoff as `handoff_prompt_gap`, batch the related
    targets, and repair this skill/handoff before launching the next writer.
 1. Run `test_designer` before behavior-changing or regression-prone implementation and keep regression coverage in the same pass. For contract-only wrapper refactors, use static contract validation and canonical command evidence.
 1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.

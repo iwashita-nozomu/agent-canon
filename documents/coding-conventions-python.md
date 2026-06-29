@@ -149,7 +149,7 @@ OOP readability report の `scanned_paths` coverage を照合します。
 | Single responsibility | domain calculation、IO、persistence、rendering、orchestration、reporting を責務語彙で分ける。 | OOP readability の large boundary、mixed effect、vague name、helper bucket、identity/pass-through finding |
 | Open/closed | 予測済み variant は `Protocol`、value object、registry、adapter、別 entrypoint で拡張軸に置く。 | OOP readability の `Optional` / `None` runtime routing、deep variant branch、cognitive complexity signal |
 | Liskov substitution | subtype / subclass / protocol implementation は base contract、入力条件、戻り値、例外、invariant を保存する。 | type checker、shared behavior tests、OOP readability の base class signal |
-| Interface segregation | caller が使う最小 role を `Protocol` または小さい public surface にする。 | OOP readability の public method / field / parameter breadth signal |
+| Interface segregation | caller が使う最小 role を `Protocol` または role-specific public surface にする。 | OOP readability の public method / field / parameter breadth signal |
 | Dependency inversion | high-level policy は stable abstraction、typed dataclass、`Protocol`、composition root へ依存を寄せる。 | OOP readability の annotation / optional boundary signal。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
 
 SOLID / OOP 境界の検証は、pytest wrapper ではなく該当 checker command を validation route に置きます。

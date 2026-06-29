@@ -170,7 +170,7 @@ required_regex = ["python-structure-hash-scope-plan", "impact_blocks", "scope_ca
 [[evals.checklist]]
 id = "TOOL-FINDING-5"
 critical = true
-description = "Defaults tool finding runs to full repository scope and records any narrowed-scope exception."
+description = "Defaults tool finding runs to full repository scope and records any bounded-scope exception."
 required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
 
 [[evals]]
@@ -1127,7 +1127,7 @@ description = "The discoverable agent-orchestration skill must enforce mandatory
 id = "CONVENTION-SKILL-1"
 critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "selected_runtime_skill_read", "small_change_skill_read"]
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "selected_runtime_skill_read", "owner_bounded_skill_read"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]
@@ -1140,7 +1140,7 @@ required_regex = ["Intake Responsibility Wave", "dynamic expansion waves", "vert
 id = "ORCH-TOOL-FIRST-1"
 critical = true
 description = "Uses tool pass/finding output as the authority before broad reading or subagents."
-required_regex = ["canonical tool", "call the tool before prose review", "trust its structured pass/finding output", "read only the exact file slice"]
+required_regex = ["canonical tool", "call the tool before prose review", "trust its structured pass/finding output", "requested_scope", "work packet"]
 
 [[evals.checklist]]
 id = "ORCH-TOOL-FIRST-2"
@@ -1224,7 +1224,7 @@ description = "The discoverable Codex task workflow skill must call convention c
 id = "CONVENTION-SKILL-2"
 critical = true
 description = "Requires convention compliance verifier during repo task closeout."
-required_regex = ["check_convention_compliance\\.py", "before closeout", "selected_runtime_skill_read", "small_change_skill_read"]
+required_regex = ["check_convention_compliance\\.py", "before closeout", "selected_runtime_skill_read", "owner_bounded_skill_read"]
 
 [[evals.checklist]]
 id = "CODEX-TASK-PRE-EDIT-PACKET-1"
@@ -1499,8 +1499,8 @@ required_regex = ["/goal pause", "/goal resume", "/goal clear", "budget-limited"
 [[evals.checklist]]
 id = "CODEX-GOALS-6"
 critical = true
-description = "Prevents Goal setup from shrinking the first iteration to a single micro-fix."
-required_regex = ["minimum first-iteration packet", "prompt-to-artifact checklist", "reuse / consolidation / deletion survey", "one single micro-fix"]
+description = "Prevents Goal setup from collapsing the first iteration into one isolated edit."
+required_regex = ["first-iteration packet", "prompt-to-artifact checklist", "reuse / consolidation / deletion survey", "one isolated edit"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-7"
