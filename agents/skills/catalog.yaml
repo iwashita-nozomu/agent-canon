@@ -754,7 +754,9 @@ skill_families:
       reason: experiment topic review, direct run.py execution, environment ownership, artifact schema, or notebook readiness is in scope
       triggers:
         - ["実験", "レビュー"]
+        - ["実験", "review"]
         - ["experiment", "review"]
+        - ["topic", "review"]
         - ["ExperimentRunner"]
         - ["run.py", "experiment"]
         - ["先取無効"]

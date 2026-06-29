@@ -169,9 +169,10 @@ task.
 - Template-default environment and runtime guidance lives in `docker/`.
 - Repo-wide durable contracts live in `documents/`.
 - Experiment GPU allocation belongs to the scheduler or caller environment. Do
-  not reduce available GPUs or force single-GPU / serial
-  execution from topic code or checked-in config unless the user explicitly
-  requests serial debugging or a recorded environment limit requires it.
+  keep available GPUs visible and keep topic code / checked-in config free of
+  single-GPU or serial execution throttles. Serial debugging or a recorded
+  environment limit is required before narrowing GPU visibility or worker
+  parallelism.
 
 ## Shared Canon Flow
 

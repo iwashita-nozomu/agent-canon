@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 51
+expected_count = 52
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -40,7 +40,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 52
+expected_count = 53
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 

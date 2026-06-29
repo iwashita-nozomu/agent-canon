@@ -66,6 +66,8 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
   `run.py` entrypoint です。
   この場合は `test-design` を併用します。project `experiments/registry.toml`
   がある checkout では `python3 tools/ci/check_experiment_registry.py` を実行します。
+  runner / registry checker behavior を変える場合は
+  `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` で確認します。
   formal experiment run は明示された run plan の実行段階で扱います。
 - result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
