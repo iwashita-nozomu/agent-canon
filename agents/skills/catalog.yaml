@@ -745,6 +745,23 @@ skill_families:
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
     shim: .agents/skills/experiment-lifecycle/SKILL.md
+  - id: experiment-review
+    purpose: Review experiment topics for direct run.py execution, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
+    canonical_doc: agents/skills/experiment-review.md
+    shim: .agents/skills/experiment-review/SKILL.md
+    routing:
+      stage_policy: active
+      reason: experiment topic review, direct run.py execution, environment ownership, artifact schema, or notebook readiness is in scope
+      triggers:
+        - ["実験", "レビュー"]
+        - ["実験", "review"]
+        - ["experiment", "review"]
+        - ["topic", "review"]
+        - ["ExperimentRunner"]
+        - ["run.py", "experiment"]
+        - ["先取無効"]
+        - ["preallocation", "experiment"]
+        - ["notebook", "artifact", "experiment"]
   - id: gpu-execution
     purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
     canonical_doc: agents/skills/gpu-execution.md

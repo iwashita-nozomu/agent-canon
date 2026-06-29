@@ -87,6 +87,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - parent は requirements / planning / design / review / implementation を wave で切り替えます
 - delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
+- running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は close より同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または interrupt による現状報告で、完了済み変更、未完了点、判断理由を回収します。同期できた場合は、その成果を統合し、parent または後続 subagent の作業境界を更新してから作業を続けます。同期不能、長時間停止、または scope 変更で役割が終了した場合だけ、理由と回収済み evidence を `schedule.md`、`workflow_monitoring.md`、または `work_log.md` に残して close します。
 - parent は stage gate を通過したら完了した instance を閉じます
 - 新規 user request では新しい run bundle と fresh subagent を起こします
 - 前 task の文脈は run bundle と artifact path で渡し、新規 task は fresh subagent で開始します

@@ -93,6 +93,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `worktree-start` | stale worktree / `WORKTREE_SCOPE.md` / action log を legacy cleanup evidence として診断し、new worktree kickoff には使わない | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
+| `experiment-review` | 実験 topic の `run.py` 直実行、GPU/JAX 環境所有、artifact / notebook / README 契約を review する | `agents/skills/experiment-review.md` | `.agents/skills/experiment-review/SKILL.md` |
 | `gpu-execution` | GPU / CUDA / JAX / XLA 実行を ExperimentRunner 経由にし、preallocation 無効化と GPU blocker evidence を固定する | `agents/skills/gpu-execution.md` | `.agents/skills/gpu-execution/SKILL.md` |
 | `computational-optimization` | 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約を固定する | `agents/skills/computational-optimization.md` | `.agents/skills/computational-optimization/SKILL.md` |
 | `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
@@ -148,6 +149,7 @@ in the Codex host runtime.
 - paper section まで含む論文 draft では `paper-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
+- 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、notebook readiness を確認するときは `experiment-review` を使います。
 - observable behavior、regression risk、または test contract を変える code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
 - owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、typo / link / format-only、Routine docs、Focused code では `owner-bounded-routing` を使い、selected_runtime_skill_read、owner_bounded_skill_read、targeted validation を evidence に残します。file 数だけでは route を固定しません。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。

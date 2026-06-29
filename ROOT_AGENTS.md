@@ -168,6 +168,11 @@ task.
 - Template-default implementation lives in `python/`.
 - Template-default environment and runtime guidance lives in `docker/`.
 - Repo-wide durable contracts live in `documents/`.
+- Experiment GPU allocation belongs to the scheduler or caller environment. Do
+  keep available GPUs visible and keep topic code / checked-in config free of
+  single-GPU or serial execution throttles. Serial debugging or a recorded
+  environment limit is required before narrowing GPU visibility or worker
+  parallelism.
 
 ## Shared Canon Flow
 

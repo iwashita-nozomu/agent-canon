@@ -434,6 +434,8 @@ checked and cited.
   - `worktree-health`
 - experiment inner loop:
   - `experiment-lifecycle`
+- experiment review:
+  - `experiment-review`
 - tuning / research / experiment の backlog-driven outer loop:
   - `adaptive-improvement-loop`
 - literature and prior art:
