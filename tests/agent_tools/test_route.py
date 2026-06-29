@@ -227,6 +227,22 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("document-canon-cleanup", decision["active_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
+    def test_prompt_routes_gpu_execution(self) -> None:
+        """GPU execution prompts should activate the managed GPU execution skill."""
+        result = self.run_route(
+            "--prompt",
+            "Python実行はExperimentRunnerに移譲し，GPU利用では先取無効を追加して実行",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("gpu-execution", decision["matched_skills"])
+        self.assertIn("gpu-execution", decision["active_skills"])
+        self.assertIn("experiment-lifecycle", decision["related_skill_candidates"])
+        self.assertIn("computational-optimization", decision["related_skill_candidates"])
+
     def test_prompt_routes_codex_report_document_repo_optimization(self) -> None:
         """Codex report and document based repo optimization should not fall through."""
         result = self.run_route(

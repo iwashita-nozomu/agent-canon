@@ -93,6 +93,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `worktree-start` | stale worktree / `WORKTREE_SCOPE.md` / action log を legacy cleanup evidence として診断し、new worktree kickoff には使わない | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
+| `gpu-execution` | GPU / CUDA / JAX / XLA 実行を ExperimentRunner 経由にし、preallocation 無効化と GPU blocker evidence を固定する | `agents/skills/gpu-execution.md` | `.agents/skills/gpu-execution/SKILL.md` |
 | `computational-optimization` | 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約を固定する | `agents/skills/computational-optimization.md` | `.agents/skills/computational-optimization/SKILL.md` |
 | `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
 | `literature-survey` | 先行研究、関連文献、反証候補の整理 | `agents/skills/literature-survey.md` | `.agents/skills/literature-survey/SKILL.md` |
@@ -173,6 +174,7 @@ in the Codex host runtime.
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、primary figure、既存資産調査、責務境界、report-specific renderer、ignored artifact 出力を固定します。
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
+- GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは `gpu-execution` を使い、Python 実行は ExperimentRunner に委譲します。
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。

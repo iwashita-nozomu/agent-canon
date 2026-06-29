@@ -105,6 +105,10 @@ path = "../.agents/skills/computational-optimization/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/gpu-execution/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/formal-proof-workflow/SKILL.md"
 enabled = true
 
