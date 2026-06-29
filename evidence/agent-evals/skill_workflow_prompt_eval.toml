@@ -1126,8 +1126,8 @@ description = "The discoverable agent-orchestration skill must enforce mandatory
 [[evals.checklist]]
 id = "CONVENTION-SKILL-1"
 critical = true
-description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "selected_runtime_skill_read", "owner_bounded_skill_read"]
+description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, existing-tool routing evidence, and convention verifier gate."
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "existing-tool route", "targeted-validation evidence"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
 
 [[evals.checklist]]
@@ -1223,8 +1223,8 @@ description = "The discoverable Codex task workflow skill must call convention c
 [[evals.checklist]]
 id = "CONVENTION-SKILL-2"
 critical = true
-description = "Requires convention compliance verifier during repo task closeout."
-required_regex = ["check_convention_compliance\\.py", "before closeout", "selected_runtime_skill_read", "owner_bounded_skill_read"]
+description = "Requires convention compliance verifier during repo task closeout and owner-bounded tool route evidence."
+required_regex = ["check_convention_compliance\\.py", "before closeout", "existing-tool route", "targeted-validation evidence"]
 
 [[evals.checklist]]
 id = "CODEX-TASK-PRE-EDIT-PACKET-1"

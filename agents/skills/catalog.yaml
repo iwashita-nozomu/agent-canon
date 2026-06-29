@@ -132,7 +132,7 @@ skill_families:
       - result-artifact-writeout
       - change-review
   - id: owner-bounded-routing
-    purpose: Route owner-bounded repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
+    purpose: Route owner-bounded repository edits through existing tool use, lightweight preflight, and targeted validation.
     canonical_doc: agents/skills/owner-bounded-routing.md
     shim: .agents/skills/owner-bounded-routing/SKILL.md
     related_skills:
@@ -141,7 +141,7 @@ skill_families:
       - change-review
     routing:
       stage_policy: active
-      reason: owner-bounded repository edit needs a visible skill-read and targeted-validation route
+      reason: owner-bounded repository edit needs an existing-tool route and targeted-validation evidence
       triggers:
         - ["owner-bounded"]
         - ["bounded", "route"]
@@ -153,8 +153,8 @@ skill_families:
         - ["コード", "順序", "わかりにく"]
         - ["typo", "link"]
         - ["format-only"]
-        - ["selected_runtime_skill_read"]
-        - ["owner_bounded_skill_read"]
+        - ["existing-tool", "route"]
+        - ["tool", "first"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md

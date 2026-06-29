@@ -53,8 +53,8 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
 
-    def test_parent_tools_symlink_routes_to_agentcanon_source_gates(self) -> None:
-        """Parent tools/ views should route shared tool edits to AgentCanon source."""
+    def test_parent_tools_symlink_routes_new_agentcanon_tool_source_gates(self) -> None:
+        """Parent tools/ views should route new shared tool sources to AgentCanon."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source_tools = root / "vendor" / "agent-canon" / "tools"
@@ -89,14 +89,14 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn(
             "vendor/agent-canon/tools/agent_tools/new_shared_checker.py", paths
         )
-        self.assertIn("agentcanon_tool_source_route", gates)
+        self.assertIn("agentcanon_new_tool_source_route", gates)
         self.assertIn("responsibility_scope", gates)
         self.assertIn("tool_catalog", gates)
         self.assertIn("log_surface_inventory_guard", gates)
         self.assertTrue(
             any(
                 "git -C vendor/agent-canon status" in command
-                for command in commands_by_gate["agentcanon_tool_source_route"]
+                for command in commands_by_gate["agentcanon_new_tool_source_route"]
             )
         )
         self.assertTrue(
@@ -384,7 +384,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertIn("experiment_execution_surface_guard", gates)
-        self.assertIn("agentcanon_tool_source_route", gates)
+        self.assertNotIn("agentcanon_new_tool_source_route", gates)
 
     def test_changed_mode_uses_git_status_when_no_paths_are_given(self) -> None:
         """Changed mode should produce pass when a new repo has no changed files."""

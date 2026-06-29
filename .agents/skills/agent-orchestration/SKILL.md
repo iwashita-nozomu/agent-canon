@@ -81,7 +81,7 @@ Execute the required and task-matching conditional commands that the packet prin
      - nontrivial report, experiment plan/report, Eval output, decision brief, presentation/PPT deck, HTML view, document, paper, or refactor structure; primary figure/table/ponchi-e/slide/section/slice choice; source map; source-to-slide map; or invalid interpretation boundary -> `$structure-planning`
      - tool/checker/hook/static-analysis runs to discover problems, create finding packets, compare before/after impact, or feed implementation/refactor planning -> `$tool-finding-report`; if raw results are written, also add `$result-artifact-writeout`; if the output is reader-facing narrative, also add `$report-writing`; if that narrative has a nontrivial finding packet, priority policy, metric/count contract, or source map, also add `$structure-planning`
      - README, workflow, guide, migration, or specification docs keep their domain projection adapter; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
-     - owner-bounded fixes where the replaceable unit, validation route, and public-impact boundary are already evidenced; Routine docs; Focused code; typo/link/format-only edits; or explicit bounded-route requests -> `$owner-bounded-routing`; keep `selected_runtime_skill_read` and `owner_bounded_skill_read` evidence before patching, and keep contract-complete implementation as the completion basis. Apparent file count is only auxiliary context.
+     - owner-bounded fixes where the replaceable unit, validation route, and public-impact boundary are already evidenced; Routine docs; Focused code; typo/link/format-only edits; or explicit bounded-route requests -> `$owner-bounded-routing`; keep owner, existing-tool route, and targeted-validation evidence, and keep contract-complete implementation as the completion basis. Apparent file count is only auxiliary context.
      - large refactor -> `$refactor-loop`
      - directory layout, directory README responsibility, root view, path mapping, responsibility-scope map, or source-tree ownership refactor -> `$structure-refactor` plus `$refactor-loop`
      - expected AgentCanon repo structure, root view, `vendor/agent-canon/`, `.gitmodules`, or canonical path drift before an ordinary task -> `$structure-refactor` pre-task repair route; add `$agent-canon-update` for AgentCanon-owned root-view or submodule drift
@@ -96,11 +96,12 @@ Execute the required and task-matching conditional commands that the packet prin
      - AgentCanon source update, `vendor/agent-canon` submodule latest/pin update, root runtime view repair, parent AgentCanon update TODOs, or `make agent-canon-ensure-latest` / `tools/update_agent_canon.sh` routing -> `$agent-canon-update`; add `$agent-update-branch` only when a parent-repo `canon-pin` branch lane is needed
      - user/reviewer feedback about agent behavior, repeated routing misses, recurrence prevention, task retrospectives, or agent-side memory updates -> `$agent-learning`
    - add only stage-relevant family skills; add neighboring catalog skills only when explicit task evidence requires them.
-1. For repo-changing edits, read the full body of every selected runtime
-   `SKILL.md`. The selected_runtime_skill_read contract applies to
-   `Owner-Bounded Change`, Routine docs, Focused code, typo/link/format-only, and
-   parent-direct routes; use `$owner-bounded-routing` to record owner_bounded_skill_read evidence with skill
-   names and paths ahead of patching.
+1. For repo-changing edits, existing tool execution and owner-bounded patching
+   proceed from tool-owned evidence. Runtime `SKILL.md` reading is optional
+   follow-up context after the canonical tool or command packet runs for the
+   covered property. Open only the owner surface or nearby context needed to
+   interpret the result. `Owner-Bounded Change` records owner, existing-tool
+   route, and targeted-validation evidence.
 1. Keep the advisory branch non-mutating. If the request is `routing-only/advisory`, defer repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, and repo-changing-only skills until explicit repo-changing intent is provided. In the interim, keep consultation, brainstorming, and explanation turns conversational until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation execution.
 1. Choose the starter command with explicit precedence:
    - if the request is `repo-changing execution`, or the user asks for the startup command / run bundle, prefer `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"`

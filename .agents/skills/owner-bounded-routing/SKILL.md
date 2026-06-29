@@ -1,6 +1,6 @@
 ---
 name: owner-bounded-routing
-description: Use for owner-bounded repository edits after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior/schema expansion; also use for typo/link/format-only edits and Owner-Bounded Change work where Codex still needs to read the selected runtime skill, record owner_bounded_skill_read evidence, keep validation targeted, and avoid escalating to broad workflow prose.
+description: Use for owner-bounded repository edits after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior/schema expansion; also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly, record owner/tool/validation evidence, keep validation targeted, and avoid escalating to broad workflow prose.
 ---
 <!--
 @dependency-start
@@ -33,11 +33,13 @@ Execute the required and task-matching conditional commands that the packet prin
    public behavior / schema impact. Typo/link/format-only, Routine docs,
    Focused code, and `Owner-Bounded Change` may use this route when those facts
    are known. Do not select it from apparent file count alone.
-1. Record `selected_runtime_skill_read` and `owner_bounded_skill_read` with the
-   selected runtime `SKILL.md` path before patching.
-1. Read only the selected task-shape skill and directly related owner surface.
-   Add neighboring skills only when a concrete changed path, checker finding,
-   or routing packet names them.
+1. Do not make selected runtime `SKILL.md` reading a prerequisite for existing
+   tool execution or patching. Run the existing tool first when it owns the
+   check, then read only the owner surface or nearby lines needed to interpret
+   or repair its output.
+1. Record the owner boundary, existing tool route, and targeted validation
+   evidence. Add neighboring skills only when a concrete changed path, checker
+   finding, or routing packet names them.
 1. Run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root .
    <planned-edit-paths>` before editing, and keep predicted repair commands in
    the work log or handoff.

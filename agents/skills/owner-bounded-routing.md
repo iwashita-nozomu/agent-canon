@@ -16,7 +16,7 @@ downstream implementation ../../.agents/skills/owner-bounded-routing/SKILL.md ex
 
 owner boundary、差し替え可能な単位、targeted validation route、public behavior /
 schema impact が evidence で閉じている repo-changing 修正で、広い workflow prose を
-読み足さずに、選択済み runtime skill の読了、軽量 preflight、targeted validation、
+読み足さずに、既存 tool の直接利用、軽量 preflight、targeted validation、
 closeout evidence を固定します。
 
 この skill は `Owner-Bounded Change`、Routine docs、Focused code、
@@ -29,7 +29,7 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 - owner boundary、差し替え可能な単位、targeted validation route、public impact
   boundary が evidence で閉じている局所修正を行う
 - typo / link / format-only の Markdown 修正を行う
-- owner-bounded route でも selected runtime `SKILL.md` を読む必要がある
+- owner-bounded route で既存 tool を読了 gate なしに先に使う
 - user request が bounded route または `Owner-Bounded Change` を示す
 - broad design review より先に targeted validation で閉じられるかを判定する
 - file 数や抽象の数は補助 signal に留め、それだけではこの route を固定しない
@@ -37,8 +37,10 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 ## Route Contract
 
 1. `$agent-orchestration` の後にこの skill を選びます。
-1. `selected_runtime_skill_read`、`owner_bounded_skill_read`、skill 名、runtime
-   `SKILL.md` path を作業 evidence に残します。
+1. 既存 tool の実行や patching の前提として runtime `SKILL.md` 読了を要求しません。
+   既存 tool が対象 property を持つ場合は tool を先に使い、出力の解釈や修正に
+   必要な owner surface だけを開きます。
+1. owner boundary、existing-tool route、targeted validation を作業 evidence に残します。
 1. `python3 tools/agent_tools/tool_rejection_preflight.py --root .
    <planned-edit-paths>` を使い、予測される checker / hook / dependency repair
    commands を記録します。
@@ -55,10 +57,9 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 
 ## Evidence
 
-- selected skill: `<skill-name>`
-- selected runtime skill path: `.agents/skills/<skill>/SKILL.md`
-- `selected_runtime_skill_read`: yes
-- `owner_bounded_skill_read`: yes
+- owner boundary and owner path
+- existing tool or command packet used first
+- nearby owner context opened only when needed to interpret or repair tool output
 - route: `Owner-Bounded Change` / Routine docs / Focused code / format-only
 - targeted validation commands and results
 - escalation reason when broader route is selected
