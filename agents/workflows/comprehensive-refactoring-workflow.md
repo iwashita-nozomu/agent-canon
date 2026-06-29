@@ -59,16 +59,16 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Removal and Caller Migration Plan:` compatibility-preservation drift と duplicate implementation を残さず、旧 entry、旧 alias、alternate route の caller migration と削除順序を固定する。
 
 設計見直しは、既存コードを読まずに始めません。
-`rg`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
+構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
 
-## Gate B. OOP 的な最小実装方針
+## Gate B. OOP 的な責務境界方針
 
 OOP は、実装行数を増やすためではなく、責務を短く保つために使います。
 [object-oriented-design.md](../../documents/object-oriented-design.md) を正本とし、次を design artifact に書きます。
 
 - `Value Objects:` immutable data、validated input、result、config。
 - `State Owners:` mutable state を保持する object と lifecycle。
-- `Protocols:` 差し替えが必要な最小振る舞い契約。
+- `Protocols:` 差し替えが必要な振る舞い契約。
 - `Services / Functions:` state を持たない処理として残す function。
 - `Adapters:` IO、CLI、serialization、external framework boundary。
 - `Rejected Abstractions:` 作らない class / Protocol / layer と、その理由。
@@ -130,7 +130,7 @@ python3 tools/oop/cpp/readability.py \
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は score threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。
 score は設計判断の補助であり、behavior correctness の代替ではありません。
-tool が足りない場合は、refactor 対象に合わせて小さい解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
+tool が足りない場合は、refactor 対象に合わせて targeted 解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
 
 外部 repo、bare repo、または派生 template snapshot を調べる場合は、元 repo を編集せず `git archive` などで読み取り専用 snapshot を作り、run bundle に `OOP Analysis Scope:` として次を残します。
 

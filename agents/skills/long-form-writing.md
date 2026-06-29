@@ -45,7 +45,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Mandatory Checklist
 
 - `summary statement` で argument、purpose、reader を先に固定する
-- 実質的な文書追記・修正では、reader-facing prose を足す前に対象文書の responsibility、reader path、section order、source map、上位 / 下位 canon との関係を構造解析する。typo、link、format-only、機械的な表記揺れ修正だけなら `md-style-check` で足りる。この handoff でも selected_runtime_skill_read と small_change_skill_read の evidence に選択済み runtime `SKILL.md` path を残す
+- 実質的な文書追記・修正では、reader-facing prose を足す前に対象文書の responsibility、reader path、section order、source map、上位 / 下位 canon との関係を構造解析する。typo、link、format-only、機械的な表記揺れ修正だけなら `md-style-check` で足りる。この handoff でも selected_runtime_skill_read と owner_bounded_skill_read の evidence に選択済み runtime `SKILL.md` path を残す
 - section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph flow や transition choice が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile general` または `--profile academic-argument` を使う
 - 非自明な一般説明文書の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る。既存 repo Markdown なら `check-document` で prose diagnostics と document-canon diagnostics を同時に出す

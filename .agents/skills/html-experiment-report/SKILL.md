@@ -1,6 +1,6 @@
 ---
 name: html-experiment-report
-description: Use when producing a browser-readable HTML experiment or Eval report; first decide the primary figure, then plan and run a minimal evidence-backed renderer while keeping domain authority in the original tool.
+description: Use when producing a browser-readable HTML experiment or Eval report; first decide the primary figure, then plan and run an evidence-backed report renderer while keeping domain authority in the original tool.
 ---
 <!--
 @dependency-start
@@ -46,8 +46,8 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Derive the experiment plan from that figure: evidence-producing command,
    renderer command, HTML output path, blocked-provider behavior, and validation
    gates.
-1. Reuse existing producers and helpers. Add only the smallest renderer or
-   adapter needed for the HTML artifact.
+1. Reuse existing producers and helpers. Add a report-specific renderer or
+   adapter only when the HTML artifact needs one.
 1. Keep generated SQLite, JSON, and HTML artifacts under ignored run paths such
    as `reports/agents/<run-id>/`; do not make generated HTML a policy truth.
 1. Put the primary figure first in the HTML, followed by source packet,

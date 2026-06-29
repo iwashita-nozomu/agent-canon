@@ -48,7 +48,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   `AGENT_CANON_SECRET_DIR` で dev container へ渡す
 - SSH agent を使う場合は `SSH_AUTH_SOCK` が現在の shell で有効な socket を指す
 - `git config user.name` と `git config user.email` を設定する
-- `rg` を入れる
+- repository 検索には Git 標準の path / `git grep` を使える状態にする
 - VS Code を使う場合は AgentCanon-managed `.vscode/extensions.json` の推奨拡張を入れる
 
 ## 4. WSL2 Rule

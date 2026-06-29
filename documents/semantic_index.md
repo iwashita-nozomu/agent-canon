@@ -109,7 +109,7 @@ agent-canon semantic-index build \
 When `search`, `context-pack`, `thin-docs`, or related commands fail because the
 SQLite database is missing, build the index in the current worktree and retry
 the bounded command. Do not treat a missing generated cache as permission to
-skip semantic-index and immediately read broad raw `rg` output.
+skip semantic-index and immediately read broad raw text-search output.
 
 Add an LLM-backed embedding provider to an existing index:
 
@@ -171,7 +171,7 @@ bounded evidence cells: path, line range, score, responsibility bucket, node
 kind, and a capped excerpt. It is the default bridge from semantic search into
 subagent prompts when raw JSONL or full documents would be too large.
 
-For prompt context narrowing, put the current user request, reviewer question,
+For prompt context selection, put the current user request, reviewer question,
 or handoff purpose in `reports/.../query.txt`, run `context-pack`, and pass only
 the cells plus the exact follow-up task to the subagent. Do not paste full
 AGENTS/read-packet files when the bounded cells identify the relevant path and
@@ -396,5 +396,5 @@ a document should be merged or deleted.
 
 Full-repo input is the normal path. The tool avoids full pairwise comparison by
 using vector prefix features to propose exact-rescored candidates. Operators
-should not narrow `--include` just to make `merge-candidates` finish; if full
+should not constrain `--include` just to make `merge-candidates` finish; if full
 input is too slow, fix candidate generation or responsibility bucketing instead.

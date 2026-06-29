@@ -176,10 +176,10 @@ evidence, or repo-owned state.
 1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
    TODO draft. The output lists unchecked Exit Criteria and Backlog items as
    `GW*` work units with evidence hints.
-   The minimum first-iteration packet must be large enough to move a coherent task slice:
+   The first-iteration packet must cover a coherent task slice:
    prompt-to-artifact checklist, reuse / consolidation / deletion survey,
    implementation over the selected related surfaces, and validation evidence.
-   Do not reduce Goal setup to one single micro-fix when the objective names
+   Do not reduce Goal setup to one isolated edit when the objective names
    multiple deliverables.
 1. The Plan-mode output must include:
    - `Goal Contract`: exact objective, non-goals, constraints, and request

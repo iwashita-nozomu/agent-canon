@@ -32,6 +32,6 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Fix the question, scope, and exclusion criteria before searching.
 1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
 1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.
-1. Record contrary or narrowing evidence, not only supporting sources.
+1. Record contrary or scope-limiting evidence, not only supporting sources.
 1. If a prose graph handoff is present, use unsupported-claim and citation/evidence-gap diagnostics to seed query terms, source adoption decisions, and source exclusion checks.
 1. If a source is used, downloaded, quoted, or cited in the answer/report, leave a durable tracked reference note or source packet with URL/DOI, access date, claim used, limitation, and artifact location; do not rely on transient browser context as the only record.

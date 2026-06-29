@@ -399,7 +399,7 @@ _三点を基本にする。_
 
 `owner` → `docs` → `check`
 
-_運用できる小ささに保つ。_
+_運用責務を追える形に保つ。_
 
 
 #### 図解: MCP成熟度
@@ -774,7 +774,7 @@ MCPは外部toolの面を増やす。Rulesはshell commandの実行可否をpref
 ```text
 L{0.34}L{0.36}}
 項目  |  内容  |  実務上の判断
-MCP allowlist  |  server toolの範囲を絞る。  |  外部能力の入口を小さくする。
+MCP allowlist  |  server toolの範囲を絞る。  |  外部能力の入口を制御する。
 sandbox  |  OS上の読み書きやnetworkを制限する。  |  tool外のshell実行にも効く境界。
 approval  |  人間の確認を挟む。  |  境界越えや高リスク操作に使う。
 Rules  |  command prefixで許可、確認、禁止を決める。  |  shell実行の予防線。
@@ -1021,5 +1021,3 @@ owner  |  MCP serverと実験機能のownerを決めた。  |  放置を防ぐ�
 
 
 ---
-
-

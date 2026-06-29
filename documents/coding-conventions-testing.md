@@ -40,7 +40,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 | 用途 | コマンド | 詳細 |
 |---|---|---|
 | **最初の pytest 実行** | `pytest tests/<subdir>/test_*.py -v` | → [実行方法](#4-実行方法) |
-| **ユニットテスト作成** | 小さい behavior example + 明示 expected | → [Unit Test Contract](#3-unit-test-contract) |
+| **ユニットテスト作成** | bounded behavior example + 明示 expected | → [Unit Test Contract](#3-unit-test-contract) |
 | **契約だけの wrapper** | static contract validation + canonical command evidence | → [Contract-Only Wrapper Gate](#32-contract-only-wrapper-gate) |
 | **統合テスト設計** | 異なるレイヤー・複数ケース | → [分類](#2-配置と分類) |
 | **エッジケーステスト** | 乱数 seed 固定 + 悪条件 | → [乱数](#7-乱数大規模テスト) |
@@ -51,7 +51,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 ## 1. 対象と目的
 
 - 対象は `tests/` 配下のテストです。
-- 目的は、behavior を小さく、決定的に、保守しやすく検証することです。
+- 目的は、behavior を bounded、決定的、保守しやすい形で検証することです。
 - 科学計算・数値コードでは、unit test、small smoke、reference comparison、
   task automation を組み合わせ、変更のたびに同じ検証を再実行できるようにします。
 
@@ -105,7 +105,7 @@ criterion に接続できる場合に採用します。
 - `Numerical Trigger`: 数値テストが必要な具体的契約、既知 regression、acceptance
   criterion、または proof / experiment requirement。
 - `Non-Numerical Alternative`: static contract、parser example、diagnostic key、
-  property、metamorphic relation、snapshot で同じリスクをより小さく検証できない理由。
+  property、metamorphic relation、snapshot で同じリスクをより bounded に検証できない理由。
 - `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
   flag など、production path と同じ bug を複製しない expected。
 - `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
@@ -180,7 +180,7 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 - production と同じ bug を複製しうる derived expected は避け、literal、
   hand-computed value、small reference implementation、または domain invariant を
   expected として置きます。
-- 乱数は固定 seed と小さい dimension を既定にします。
+- 乱数は固定 seed と bounded dimension を既定にします。
 - どの順で実行しても通るようにし、前の test が残した state に依存しません。
 
 許可される helper / fixture:
@@ -240,7 +240,7 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
   copy-paste より `pytest.mark.parametrize` を優先します。
 - case ごとに期待結果や failure mode が大きく違うなら、parametrize で分岐するより
   test を分けます。
-- fixture や helper が非自明な計算を持つ場合は、その helper 自体を小さい test で固定します。
+- fixture や helper が非自明な計算を持つ場合は、その helper 自体を focused test で固定します。
 
 ## 7. 乱数・大規模テスト
 

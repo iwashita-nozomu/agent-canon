@@ -228,7 +228,7 @@ fn collect_path(
                 path: path.to_path_buf(),
                 line: None,
                 message: "test directory could not be read".to_string(),
-                recommendation: "Check permissions or pass a narrower path.".to_string(),
+                recommendation: "Check permissions or pass a more specific path.".to_string(),
             });
             return;
         };
@@ -257,7 +257,7 @@ fn collect_path(
             path: path.to_path_buf(),
             line: None,
             message: format!("test file could not be read: {error}"),
-            recommendation: "Check encoding or pass a narrower path.".to_string(),
+            recommendation: "Check encoding or pass a more specific path.".to_string(),
         }),
     }
 }

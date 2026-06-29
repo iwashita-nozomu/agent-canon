@@ -15,7 +15,7 @@ upstream design README.md notes lifecycle index
 - 同じマシンで前後比較したい。
 - 数秒から数分で終わる結果が欲しい。
 - 条件数が少なく、1 回の fresh 実行で完走できる。
-- 実装変更の影響を小さく切り出して見たい。
+- 実装変更の影響を責務単位で切り出して見たい。
 
 ## Experiment を選ぶとき
 

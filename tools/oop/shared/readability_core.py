@@ -13,8 +13,8 @@
 """Evaluate OOP readability risks for Python and C++ source files.
 
 The score is a review aid, not a substitute for human design review. It focuses on
-signals that are cheap to compute and aligned with the local OOP policy: small
-responsibility boundaries, explicit state ownership, narrow public surfaces, and
+signals that are fast to compute and aligned with the local OOP policy: focused
+responsibility boundaries, explicit state ownership, role-specific public surfaces, and
 avoiding vague class shapes.
 """
 
@@ -219,7 +219,7 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
     "public_methods": (
         "public surface width",
         "The public API is wide enough to suggest more than one class responsibility.",
-        "Review caller roles and narrow the interface only when responsibilities are independent.",
+        "Review caller roles and refine the interface only when responsibilities are independent.",
     ),
     "public_fields": (
         "state ownership",
@@ -2232,7 +2232,7 @@ def add_python_class_size_findings(
             node.name,
             len(public_methods),
             thresholds.max_public_methods,
-            "review-caller-roles-before-narrowing-api",
+            "review-caller-roles-before-refining-api",
         )
     if len(attrs) > thresholds.max_instance_attributes:
         add_finding(
@@ -2897,7 +2897,7 @@ def cpp_aggregate_value_object_name(name: str) -> bool:
 
 
 def cpp_preceding_lines(text: str, start: int, line_count: int) -> str:
-    """Return a small source window immediately before an index."""
+    """Return a bounded source window immediately before an index."""
     return "\n".join(text[:start].splitlines()[-line_count:])
 
 
@@ -3310,7 +3310,7 @@ def add_cpp_class_surface_findings(
             shape.name,
             shape.public_methods,
             thresholds.max_public_methods,
-            "review-caller-roles-before-narrowing-api",
+            "review-caller-roles-before-refining-api",
         )
     if (
         not shape.aggregate_value_object

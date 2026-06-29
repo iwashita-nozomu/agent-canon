@@ -60,7 +60,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
 | `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
-| `small-change-routing` | 小規模修正で selected runtime skill 読了、軽量 preflight、targeted validation を固定する | `agents/skills/small-change-routing.md` | `.agents/skills/small-change-routing/SKILL.md` |
+| `owner-bounded-routing` | owner-bounded 修正で selected runtime skill 読了、軽量 preflight、targeted validation を固定する | `agents/skills/owner-bounded-routing.md` | `.agents/skills/owner-bounded-routing/SKILL.md` |
 | `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
@@ -138,7 +138,7 @@ in the Codex host runtime.
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
-- repo-changing task では `$agent-orchestration` から始めます。小規模修正では `$small-change-routing` を使い、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
+- repo-changing task では `$agent-orchestration` から始めます。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正では `$owner-bounded-routing` を使い、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
 - アルゴリズムの収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは `algorithm-proof-exploration` を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は `formal-proof-workflow` へ接続します。
@@ -148,7 +148,7 @@ in the Codex host runtime.
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - observable behavior、regression risk、または test contract を変える code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
-- 1 file、single abstraction、typo / link / format-only、Routine docs、Focused code で閉じる小規模修正では `small-change-routing` を使い、selected_runtime_skill_read、small_change_skill_read、targeted validation を evidence に残します。
+- owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、typo / link / format-only、Routine docs、Focused code では `owner-bounded-routing` を使い、selected_runtime_skill_read、owner_bounded_skill_read、targeted validation を evidence に残します。file 数だけでは route を固定しません。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
 - 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。
@@ -170,7 +170,7 @@ in the Codex host runtime.
 - substantive な文書変更では `prose-reasoning-graph` と `structure-planning` を先に通し、typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残します。
 - docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
-- HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、primary figure、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
+- HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、primary figure、既存資産調査、責務境界、report-specific renderer、ignored artifact 出力を固定します。
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。

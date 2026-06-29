@@ -40,7 +40,7 @@ GitHub/submodule-first repositories.
 
 ## Risk Classes
 
-| Risk | Examples | Minimum validation |
+| Risk | Examples | Required validation |
 | --- | --- | --- |
 | Routine docs | Link/text edits in project-local docs with no source contract change | docs check for touched docs and changed-file dependency header checks |
 | Focused code | Narrow Python or shell edit with local tests | changed-file dependency checks, targeted tests, ruff/pyright when Python changes |
@@ -49,9 +49,9 @@ GitHub/submodule-first repositories.
 | Large delivery | repo-wide rewrite, workflow redesign, broad policy change, or user-requested comprehensive run | run bundle, dependency review, focused and full validation gates, independent review |
 
 `make ci` remains the full local confidence gate, but it is not the only
-acceptable evidence for every small change. The selected validation must match
-the changed paths and risk class, and the PR or run bundle must state why that
-set is sufficient.
+acceptable evidence for every owner-bounded change. The selected validation
+must match the changed paths, owner surface, and risk class, and the PR or run
+bundle must state why that set is sufficient.
 Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,
 and dependency checks selected by the active profile; they do not automatically
 escalate to full `make ci`.

@@ -46,7 +46,7 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
 - skill が呼ばれない、関連 skill が狭い、公式 skill へ移譲できるかなど、
   skill / tool routing の入口と後続候補を機械的に確認したい。
 - `template_agent_canon_tool_skillization_500_candidates.md` 系の提案を実装へ落とす。
-- workflow 本文を読む前に、最小 check や runtime profile を機械的に決めたい。
+- workflow 本文を読む前に、変更 surface と risk に合う check や runtime profile を機械的に決めたい。
 
 ## Standard Command
 

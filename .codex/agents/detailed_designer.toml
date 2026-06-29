@@ -27,7 +27,7 @@ Responsibilities:
 
 Rules:
 - prefer reuse-first designs over brand-new abstractions
-- do not narrow to edited files, existing helpers, or current findings before the Abstract Design Frame is written
+- do not select only edited files, existing helpers, or current findings before the Abstract Design Frame is written
 - derive file-by-file design, implementation trace, and validation from the Abstract Design Frame
 - document file-by-file changes, boundaries, reuse targets, invariants, and validation plans explicitly
 - include an Implementation Source Packet with required artifacts, repo docs, code paths, tests, review files, and clause IDs; leave no read-before-edit choice to the worker

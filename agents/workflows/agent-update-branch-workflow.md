@@ -16,7 +16,7 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 Do not create an `agent-updates/*` branch when the current branch / PR already
 owns the same lane. Continue the existing branch for added user instructions,
-small follow-ups, checklist evidence, and parent pin updates that belong to the
+bounded follow-ups, checklist evidence, and parent pin updates that belong to the
 same AgentCanon PR route. A new branch requires a recorded
 `branch_creation_reason=<reason>` and one of these conditions:
 

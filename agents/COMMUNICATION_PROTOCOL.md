@@ -81,7 +81,7 @@ before implementation.
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
 - `responsibility_search`: structured semantic-index / local-LLM / tool-catalog
-  result paths, not broad raw `rg` dumps
+  result paths, not broad raw text-search dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected
 - `stale_surface_scan`: obsolete mirror, generated artifact, legacy wrapper,
@@ -104,10 +104,11 @@ guessing an edit path.
 
 ## Parent-Direct Context Note
 
-For explicit-path, one-file, single-abstraction, Routine docs, Focused code,
-typo/link/format-only, or other bounded parent-direct work, the full
+For explicit-path work whose owner boundary, replaceable unit, validation
+route, and public impact boundary are already evidenced; Routine docs; Focused
+code; typo/link/format-only; or other bounded parent-direct work, the full
 Pre-Edit Repository Investigation Packet can be replaced by a short
-Parent-Direct Context Note.
+Parent-Direct Context Note. File count alone is not enough to choose this note.
 
 The note records:
 

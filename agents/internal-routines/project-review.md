@@ -63,7 +63,7 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 - `make ci-quick`
 - `bash tools/run_comprehensive_review.sh`
 - `git worktree list --porcelain`
-- `rg -n \"<pattern>\" agents documents README.md QUICK_START.md AGENTS.md`
+- `git grep -n \"<pattern>\" -- agents documents README.md QUICK_START.md AGENTS.md`
 
 ## Boundary
 

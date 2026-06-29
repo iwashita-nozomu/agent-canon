@@ -50,7 +50,7 @@ execution contract for those source manifests.
 Because future evidence domains use the same registry, extend manifests in this
 order:
 
-1. Add narrower eval entries when a specific skill, workflow, role, or report
+1. Add more specific eval entries when a specific skill, workflow, role, or report
    surface needs stronger invariants.
 1. Declare accumulated eval result families in `eval_result_families.toml`.
 1. Treat that registry as the abstract contract between eval producers, archive
@@ -196,7 +196,7 @@ The role eval fails when a role TOML violates this contract:
 | Registration | every role TOML is registered. |
 | Cost bucket | model and reasoning bucket are not over-costed for the role. |
 | Prohibitions | read-only and findings-first prohibitions are present where required. |
-| Routing order | expensive reviewers are not routed before cheaper language or diff-triage reviewers. |
+| Routing order | broad reviewers are not routed before boundary-relevant language or diff-triage reviewers. |
 | Runtime metrics | optional `--runtime-log <path>` uses bounded fields such as `agent`, `tokens`, `latency_ms`, `retry_count`, `parent_intervention`, `format_violation`, and `output_used`. |
 | Missing metrics | `ROLE_RUNTIME_METRICS_STATUS=missing` is reported without failing the eval. |
 

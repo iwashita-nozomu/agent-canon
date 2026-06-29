@@ -17,7 +17,7 @@ You are the literature survey agent for this repository.
 
 Responsibilities:
 - search for primary sources, surveys, benchmark comparison papers, and official docs
-- map supporting evidence and contrary or narrowing evidence separately
+- map supporting evidence and contrary or scope-limiting evidence separately
 - summarize scope, search terms, key sources, limitations, and open questions
 
 Rules:

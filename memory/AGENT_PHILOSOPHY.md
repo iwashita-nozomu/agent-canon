@@ -272,7 +272,7 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User observed that multi-agent work tends to break when additional instructions arrive mid-task.
 
-- 2026-06-13 | interaction-observation | Conservative editing should mean evidence-backed and behavior-respecting, not smallest possible diff; when the root cause is stale structure or an underspecified harness, the agent should choose a cohesive structural repair instead of adding only a narrow wrapper.
+- 2026-06-13 | interaction-observation | Conservative editing should mean evidence-backed and behavior-respecting, not file-count-driven diff; when the root cause is stale structure or an underspecified harness, the agent should choose a cohesive structural repair instead of adding only a bounded wrapper.
   - source: chat
   - scope: repo-wide
   - confidence: tentative
@@ -332,11 +332,11 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: 2026-06-21 user feedback: 出力にコード命名由来の単語を使わない．存在しない単語を作らない
 
-- 2026-06-22 | interaction-observation | Small repo-changing edits still require reading every selected runtime SKILL.md before patching; treat small_change_skill_read evidence as a required task-route evidence item alongside bounded context.
+- 2026-06-22 | interaction-observation | Small repo-changing edits still require reading every selected runtime SKILL.md before patching; treat owner_bounded_skill_read evidence as a required task-route evidence item alongside bounded context.
   - source: chat
   - scope: repo-wide
   - confidence: tentative
-  - evidence: User feedback: 小規模修正のときスキル読まないのはよくない
+  - evidence: User feedback: 責務境界が閉じた修正のときもスキルを読む
 
 - 2026-06-22 | interaction-observation | PR processing should preserve the change essence as a distinct PR body contract covering problem, design intent, canonical owner, behavior delta, and evidence route.
   - source: chat
@@ -344,7 +344,7 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: 2026-06-22 user feedback that PR essence tends to be absent from documentation
 
-- 2026-06-27 | interaction-observation | For repository investigation, start from declared repository structure and owner maps before broad text search; use text search only after narrowing by AGENTS.md, README, responsibility scope, task packets, or structure contracts.
+- 2026-06-27 | interaction-observation | For repository investigation, start from declared repository structure and owner maps before broad text search; use text search only after selecting context by AGENTS.md, README, responsibility scope, task packets, or structure contracts.
   - source: chat
   - scope: repo-wide
   - confidence: tentative
@@ -408,7 +408,7 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: User feedback on 2026-06-16: prohibit doing computation tests on CPU.
 
-- 2026-06-27 | failure-avoidance | Full CI is a confidence gate, not the default evidence for narrow docs, prompt-only, or focused changes; select validation by runtime profile and risk class, and record targeted evidence instead of escalating automatically to make ci.
+- 2026-06-27 | failure-avoidance | Full CI is a confidence gate, not the default evidence for docs-focused, prompt-only, or focused changes; select validation by runtime profile and risk class, and record targeted evidence instead of escalating automatically to make ci.
   - source: chat
   - scope: agent-runtime-validation
   - confidence: stable

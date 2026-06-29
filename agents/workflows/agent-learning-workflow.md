@@ -170,7 +170,7 @@ parent は結果を見た時点で、次の route に分類します。
 subagent が hook / tool failure の種類を見逃した、または handoff に必要な checker evidence が入っていなかった場合、parent は chat 上の注意だけで済ませません。
 該当 role TOML、`CODEX_SUBAGENTS.md`、workflow family prompt、または handoff packet を更新するか、`subagent_protocol_update=not_required` と理由を記録します。
 
-behavior eval 用の最小 token は次です。
+behavior eval 用の必須 token セットは次です。
 
 ```text
 hook_tool_feedback=reviewed
@@ -207,8 +207,7 @@ user、reviewer、runtime、CI が workflow defect を指摘した場合は、ru
 workflow defect の affected surface を探すときは、raw search hit を dependency graph に通します。
 
 ```bash
-rg -l "topic keywords" <responsibility-scoped dirs> \
-  -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl' \
+git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
 wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \

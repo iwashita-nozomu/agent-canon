@@ -86,8 +86,8 @@ Execute the required and task-matching conditional commands that the packet prin
    - PRs touching shared root/runtime surfaces before dependent docs-only PRs;
    - conflicting PRs after the branch they conflict with has landed, unless the
      conflict repair is independent.
-1. Resolve conflicts on the PR head branch, then rerun the smallest validation
-   that covers the touched surface. Do not resolve conflicts by discarding user
+1. Resolve conflicts on the PR head branch, then rerun validation that covers
+   the touched surface. Do not resolve conflicts by discarding user
    changes or force-pushing without explicit authority.
    Conflict repair is semantic integration, not "ours/theirs" selection: inspect
    the merge base, current branch intent, incoming branch intent, owning

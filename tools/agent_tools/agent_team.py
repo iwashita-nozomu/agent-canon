@@ -122,8 +122,8 @@ CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS = (
     "review_gate",
 )
 CONTRACT_COMPLETE_IMPLEMENTATION_ROUTE_SIGNALS = (
-    "task_size",
-    "scoped_change_lite",
+    "apparent_breadth",
+    "owner_bounded_change",
     "mvp",
     "thin_slice",
 )
@@ -132,9 +132,11 @@ CONTRACT_COMPLETE_IMPLEMENTATION_RULE = (
     "実装 behavior は request clauses、acceptance contract、"
     "Implementation Source Packet、Design-To-Implementation Trace、"
     "dependency-expanded scope、validation route、review gate から導く。"
-    "task size、Scoped Change Lite、MVP、thin slice は routing、wave、validation "
-    "profile の選択 signal として扱う。contract gap、責務境界、API shape、"
-    "依存方向、runtime contract の不足は design_issue_blocker として Gate 5-6 へ戻す。"
+    "見た目の広さ、Owner-Bounded Change、MVP、thin slice は暫定的な routing、"
+    "wave、validation profile の選択 signal に留め、owner boundary や "
+    "impact surface が違うと分かった時点で route を更新する。contract gap、"
+    "責務境界、API shape、依存方向、runtime contract の不足は "
+    "design_issue_blocker として Gate 5-6 へ戻す。"
 )
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"

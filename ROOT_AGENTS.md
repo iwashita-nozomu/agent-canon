@@ -88,8 +88,8 @@ Context construction is the primary runtime concern. Use
 context visibility, pre-edit investigation packets, and fresh subagent
 capsules.
 
-Build prompt context for shape, ownership, and traceability, not smallness.
-LLM-visible context may be large when the next decision requires it, but each
+Build prompt context for shape, ownership, and traceability.
+LLM-visible context may be large when the next decision requires it, and each
 piece must tie to a request clause, owner, source packet, exact file section, or
 artifact path. Raw search output, full dashboards, logs, long histories, and
 broad workflow packets stay in local/tool context until selected.
@@ -203,7 +203,7 @@ Mechanical readiness is owned by `task_close.py` and
 
 ## Validation Command Menu
 
-These are common commands, not a default checklist. Select the narrowest command
+These are common commands, not a default checklist. Select the most targeted command
 that validates the changed responsibility unit, active profile, or blocking
 finding.
 

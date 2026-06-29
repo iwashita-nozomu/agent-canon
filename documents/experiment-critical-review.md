@@ -237,7 +237,7 @@ AI に要約や論点抽出を補助させても、math validity、figure validi
 - `report_rewrite_required`
   - evidence は足りているが、説明順、数値の見せ方、図表導線、結論の書き方が弱い
 - `extra_validation_required`
-  - 同じコードと比較方針のまま、追加 table、追加 figure、追加 narrow run が必要
+  - 同じコードと比較方針のまま、追加 table、追加 figure、追加 bounded run が必要
 - `rerun_required`
   - case set 不一致、条件変更、partial run 混入、protocol 汚染がある
 - `approved`

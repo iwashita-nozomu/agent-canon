@@ -85,7 +85,7 @@ implementation slices, validation, review, sync, and closeout.
 
 | Family | Owner Row |
 | ------ | --------- |
-| Scoped Change Lite | `agents/task_catalog.yaml` `workflow_families[].id=scoped_change_lite` |
+| Owner-Bounded Change | `agents/task_catalog.yaml` `workflow_families[].id=owner_bounded_change` |
 | Scoped Change | `agents/task_catalog.yaml` `workflow_families[].id=scoped_change` |
 | Research-Driven Change | `agents/task_catalog.yaml` `workflow_families[].id=research_driven_change` |
 | Large Delivery | `agents/task_catalog.yaml` `workflow_families[].id=large_delivery` |

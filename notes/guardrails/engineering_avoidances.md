@@ -76,7 +76,7 @@ upstream design README.md notes lifecycle index
 - export worker に live Python object reference を渡す。cross-process 境界では serializable manifest と reconstruction recipe を使う
 - runtime materialization を compile DAG node として扱う。`LoadedProgram` は runtime vertex / lifetime scope に属する
 - external runner が process model を持つのに、bridge-local な追加 process spawn を足す
-- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
+- toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
 - 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にする
 - failure-onset dimension を記録せず、implementation bug と真の frontier limit を混同する
 - `notes/` に置くべき一時メモを `documents/` へ混ぜる
