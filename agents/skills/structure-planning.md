@@ -73,6 +73,7 @@ first_artifact=<figure|table|ponchi-e|concept-diagram|slide|summary-card|section
 first_artifact_question=<one sentence>
 visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable> <why this visual shape fits>
 source_to_structure_map=<source path/id -> section, slide, visual, claim, experiment slice, or refactor slice>
+oop_structure_contract=<for experiment plans/reports: implementation responsibility map, object flow, variant boundary, and dependency direction>
 metric_or_delta_contract=<denominator, directionality, baseline, caveat, allowed structural delta, forbidden semantic delta>
 ordered_structure=<ordered headings, slides/storyboard, visuals, experiment slices, or refactor slices>
 invalid_interpretations=<claims or changes this structure must not support>
@@ -103,6 +104,13 @@ experiment scripts, or refactor edits.
 1. Define the question answered by that first artifact.
 1. Map each source artifact to the section, slide, visual, claim, experiment
    slice, or refactor slice it supports.
+1. For `experiment-plan` and `experiment-report`, write the structure from an
+   OOP responsibility view before ordering sections. Include the reused
+   modules, classes, functions, and protocols; the objects each experiment step
+   creates, mutates, passes downstream, and writes as artifacts; the factory or
+   function boundary where variants differ; and the dependency direction that
+   keeps orchestration, domain logic, metrics, visualization, and artifact I/O
+   separate.
 1. When block order, transition choice, or logic-gap evidence is nontrivial,
    run `agent-canon semantic-index discourse-relations` with the matching
    connective profile and use the JSONL edge output as structure evidence for the ordered
@@ -153,6 +161,7 @@ structure_contract=<path-or-inline>
 structure_first_artifact=<name>
 structure_visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable>
 structure_source_map=<path-or-inline>
+structure_oop_contract=<path-or-inline|not_required>
 discourse_relations=<path|not_required>
 structure_invalid_interpretations_recorded=yes
 ```
