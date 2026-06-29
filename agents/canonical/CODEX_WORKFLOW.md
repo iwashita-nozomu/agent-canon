@@ -204,6 +204,20 @@ repo-changing run では `team_manifest.yaml` の
 扱います。contract gap、責務境界、API shape、依存方向、runtime contract の不足は
 `design_issue_blocker` として Gate 5-6 に戻します。
 
+### Design Integrity Gate
+
+実装前の設計判断は、近い file、現在の finding、会話印象ではなく
+owning responsibility model から始めます。Full staged route では `Abstract Design
+Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、
+`Design-To-Implementation Trace` をそろえ、parent-direct route では同じ責務
+model を短い owner/path/design-boundary note で引用します。
+
+API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
+runtime contract、config surface の判断が未確定なら、実装吸収ではなく
+`design_issue_blocker=<issue>` と evidence を残して Gate 5-6 へ戻ります。local
+fallback、wrapper、helper、branch、compatibility route、test relaxation、docs
+overwrite、implementation shortcut は Design Integrity Gate の外側です。
+
 ### Codex Goals Feature Preflight
 
 Codex `goals` feature が有効な runtime では、`agents/workflows/codex-goals-workflow.md` を overlay として読みます。
