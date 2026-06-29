@@ -12,6 +12,14 @@ downstream implementation ../tools/update_agent_canon.sh manages derived repo up
 
 `iwashita-nozomu/agent-canon` on GitHub is the canonical AgentCanon repository.
 
+## Reader Map
+
+Use this reference to answer which GitHub remote, branch, and submodule URL are
+canonical for AgentCanon and how derived repos should handle non-GitHub remotes.
+Read Canonical Defaults first, then Existing Non-GitHub Remotes and Local
+Branches From Derived Repos for migration cases. The final sections cover commit
+message notes, branch protection baseline, and GitHub Actions access.
+
 ## Canonical Defaults
 
 - Canonical URL: `https://github.com/iwashita-nozomu/agent-canon.git`

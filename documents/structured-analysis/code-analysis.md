@@ -15,6 +15,15 @@ downstream design dependency-header-analysis.md joins code evidence with report 
 この文書は、Python、shell、C/C++、Rust などの code dependency 解析を
 structured analysis に取り込む adapter contract を定義する。
 
+## Reader Map
+
+- Owns code dependency analysis scope for the structured-analysis package.
+- Main path: Scope, Boundary, Import Mapping, Report Trace, and Diagnostics.
+- Read this before importing import/include/source evidence into structured
+  analysis or joining it with dependency-manifest evidence.
+- Boundary: code dependency edges and manifest edges may be joined for
+  explanation, but their meanings stay distinct.
+
 ## Scope
 
 Code analysis は、実装 surface がどの symbol、file、module、include、source script を

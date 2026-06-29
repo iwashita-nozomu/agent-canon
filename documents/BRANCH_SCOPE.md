@@ -18,6 +18,15 @@ downstream design ../.agents/skills/pr-processing/SKILL.md exposes PR merge scop
 この文書は、branch 名、branch の責務、commit / push、merge / rebase の判断をまとめた正本です。
 worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-lifecycle.md) を参照します。
 
+## この文書の読み方
+
+- この文書は、branch 名、branch scope、commit/push、merge/rebase、
+  削除前チェックの Git workflow を定めます。
+- 主な順路は、基本方針、branch 名、Scope の固定、コミット・プッシュ、
+  Conflict 解決と merge / rebase、削除前チェックです。
+- branch や PR の責務を固定する前、または merge 判断時に読みます。
+- 境界: worktree 作成と carry-over の詳細は `worktree-lifecycle.md` が扱います。
+
 ## 1. 基本方針
 
 - 1 branch = 1 topic に固定します。

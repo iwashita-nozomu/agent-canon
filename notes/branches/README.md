@@ -41,4 +41,4 @@ upstream design ../README.md notes lifecycle index
 
 ## Template
 
-- [BRANCH_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/branches/BRANCH_NOTE_TEMPLATE.md)
+- [BRANCH_NOTE_TEMPLATE.md](BRANCH_NOTE_TEMPLATE.md)

@@ -11,6 +11,16 @@ upstream design worktree-lifecycle.md worktree lifecycle policy
 このファイルは、他環境へ渡す worktree や、変更範囲を限定して使う worktree のためのテンプレートです。
 実際に使うときは、このファイルを worktree root に `WORKTREE_SCOPE.md` として置きます。
 
+## この文書の読み方
+
+- この文書は、限定 worktree の目的、編集範囲、実行出力、参照、carry-over、
+  作業 notes、commit 前 checks を記録するテンプレートです。
+- 主な順路は、Worktree Summary、Kickoff Status、Editable Directories、
+  Runtime Output Directories、Experiment Registry Links、Read-Only Or Avoid
+  Directories、Required References、Carry-Over、Working Notes、Checks、Rules です。
+- worktree root に `WORKTREE_SCOPE.md` を置くときに読みます。
+- 境界: これはテンプレートであり、現在の worktree authority そのものではありません。
+
 ## Worktree Summary
 
 - Branch:

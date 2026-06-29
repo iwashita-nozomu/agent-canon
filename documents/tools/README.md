@@ -50,6 +50,10 @@ agent/worktree helper、review / validation runner、docs-check helper、contain
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
 実行する tool は [Runtime Profiles And Check Matrix](../runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
 
+## この文書の読み方
+
+この文書は、AgentCanon tool docs の reader-facing hub です。まず Where To Start で構造化 catalog、tool docs map、docs check、tool drift、dependency tool、graph visualization の入口を選びます。次に Tool Catalog と Tool Detail Notes で tool ごとの責務を確認し、Evidence / Assumption Ledger、置き場所の固定ルール、よく使うもの、結果ログと可視化へ進みます。正確な tool registry は prose ではなく `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を優先します。
+
 ## Where To Start
 
 This file explains the tool documentation surface. It is not a duplicate
@@ -144,7 +148,7 @@ second command manual.
 ## よく使うもの
 
 - `tools/ci/run_all_checks.sh`
-  - full confidence が必要な時に主要なチェックをまとめて実行します。small docs / focused code では check matrix に従って個別 check を選びます。
+  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
 - `tools/bin/agent-canon docs check`
@@ -268,12 +272,12 @@ second command manual.
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
 - `tools/agent_tools/goal_loop.py`
   - top-level `goal.md` の exit criteria を正本にし、達成まで iteration command を繰り返します。既定 criteria には依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を含めます。
-  - 既定 Backlog は小さな `B1` だけではなく、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、`NEXT_ACTION=run_next_iteration` 継続判断までを 1 回目の iteration packet として持ちます。
+  - 既定 Backlog は `B1` 単体だけではなく、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、`NEXT_ACTION=run_next_iteration` 継続判断までを 1 回目の iteration packet として持ちます。
   - `goal_loop.py init` は default active items と non-default optional items を分けます。`Exit Criteria` と `Backlog` は機械 gate の対象で、`Optional Goal Item Catalog` は必要時に active section へ昇格する候補です。
   - `goal_loop.py plan` は未完了の exit criteria / backlog を `Goal Work Breakdown` として `GW*` work unit へ展開します。implementation 前にこの行を run bundle `schedule.md` へ移し、bare objective から直接実装へ入らないようにします。
 - `tools/agent_tools/vector_search.py`
   - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
-  - exact symbol / path / error message は `rg` を優先し、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
+  - exact symbol / path / error message は `git grep` または直接 path 確認を使い、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
   - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
   - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
   - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
@@ -334,7 +338,7 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
   - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
 - `tools/agent_tools/review_backlog_scan.sh`
   - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
-  - goal / maintainer / audit profile の tool であり、通常の small change では required gate にしません。
+  - goal / maintainer / audit profile の tool であり、通常の owner-bounded route では required gate にしません。
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
   - 既定で `agent-canon semantic-index` も実行し、responsibility-scoped merge candidates、thin docs、任意の long-query search を review artifact として JSONL 保存し、`eval-output` の JSON report も残します。LLM embedding provider が明示された場合だけ provider-comparison report も保存します。
   - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。
@@ -375,7 +379,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、local LLM、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
   - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。
   - `evaluate_workflow_selection.py` は `evidence/agent-evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/log-archive/eval-results/workflow-selection/` に詳細結果を蓄積します。
-  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。agent-facing run では `--compact-out <path>.json` を使い、model matrix と finding detail は artifact で読む運用にします。
+  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` bounded implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。agent-facing run では `--compact-out <path>.json` を使い、model matrix と finding detail は artifact で読む運用にします。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。
@@ -393,7 +397,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/agent_tools/tool_drift.py`
   - GitHub PR flow、AgentCanon PR check、dependency review、skill/workflow prompt eval、runtime alignment、skill mirror parity、convention compliance、tool catalog の dependency-header trace を検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
-  - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
+  - Python / C++ source の裸の数値リテラルを検出します。既定では汎用的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/check_static_any.py`
   - Python source の明示的な `typing.Any` を検出します。`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にし、外部境界は `object`、`Mapping[str, object]`、`TypedDict`、または typed dataclass に寄せます。
 - `tools/agent_tools/check_log_helper_names.py`

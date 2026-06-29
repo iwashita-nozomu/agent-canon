@@ -31,6 +31,15 @@ SQLite databases, model files, vector caches, or local LLM outputs were
 retained in the tracked tree. The durable retained artifact is this source
 record.
 
+## Reader Map
+
+Use this bibliography to answer which external technical sources support
+AgentCanon runtime, LLM agent, semantic-index, discourse, proof, compiler,
+static-analysis, environment, security, and documentation choices. Start with
+Coverage Map to find the source cluster, then read the matching topical section.
+The out-of-scope section prevents related sources from being treated as adopted
+implementation authority.
+
 ## Coverage Map
 
 - Agent runtime: `$openai-docs` source route for OpenAI/Codex product docs and

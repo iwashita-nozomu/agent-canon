@@ -10,6 +10,12 @@ upstream design README.md memory surface index
 この file は、会話から抽出した user の coding philosophy、review expectation、document preference を逐次追記する append-first note です。
 `AGENTS.md` へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
+## この文書の読み方
+
+- この note は、会話から抽出した repo-wide な user preference を蓄積し、`AGENTS.md` へ昇格する前の観測を保持します。
+- `Use` で追記対象を確認し、`Stable Preferences` と `Provisional Preferences` で安定度ごとの preference を読みます。
+- 昇格候補や最近の観測を確認するときは `Promotion Candidates` と `Recent Observations` を読みます。
+
 ## Use
 
 - user が明示した repo-wide preference を観測したら追記します。
@@ -139,7 +145,7 @@ upstream design README.md memory surface index
 - 2026-05-05 | 各実装・実験パスでは OOP readability / public surface / nested contract チェッカを実行し、失敗はチェッカ不具合ではなく実装違反として扱う。
   - source: repo-local jax_solver_util AgentCanon memory diff
 
-- 2026-05-05 | レート制約が強い task では、repo inventory、tool drift survey、static validation planning、diff-local language review、design-traced narrow implementation slice を gpt-5.3-codex-spark low の fresh subagent へ優先委譲し、parent / gpt-5.5 は統合判断と最終責任に集中させる。
+- 2026-05-05 | レート制約が強い task では、repo inventory、tool drift survey、static validation planning、diff-local language review、design-traced bounded implementation slice を gpt-5.3-codex-spark low の fresh subagent へ優先委譲し、parent / gpt-5.5 は統合判断と最終責任に集中させる。
   - source: chat
 
 - 2026-05-11 | Codex should actively configure and use available runtime features such as hooks, MCP, and goals when they are stable and useful, instead of leaving them dormant.

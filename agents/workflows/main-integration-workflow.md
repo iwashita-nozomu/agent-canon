@@ -11,6 +11,14 @@ upstream design README.md workflow catalog
 この文書は、`main` へ戻すときの統合手順の正本です。
 特に branch 側で file 構成を変えたときに、その変更を落とさず `main` へ持ち帰ることを目的にします。
 
+## この文書の読み方
+
+この workflow は、構成変更を含む branch を `main` へ戻すときの統合判断を
+扱います。まず `対象` と `原則` でこの手順が必要な変更か確認し、
+`推奨手順` を integration branch の操作順として読みます。`禁止事項` と
+`判定基準` は file 構成、submodule pin、validation evidence を落としていないかの
+確認に使い、`Convention Compliance Gate` は closeout 前の機械確認です。
+
 ## 対象
 
 - file の追加

@@ -23,6 +23,12 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。
 
+## この文書の読み方
+
+- この文書は、`.codex/` の project-scoped 設定、subagent 定義、hook、runtime cap、model 設定の入口です。
+- `Layout` と `Shared Canon` で設定 file と shared canon への接続を確認し、goal、token profile、spawn limit、hook context、agents、smoke test は目的別に読みます。
+- Codex runtime の設定確認、hook や subagent inventory の確認、project-local Codex smoke test の前に読みます。
+
 ## Layout
 
 - `config.toml`
@@ -89,7 +95,7 @@ sandbox_mode = "read-only"
 approval_policy = "never"
 ```
 
-Use `codex -p token-lite` for narrow diagnosis, `codex -p token-standard` for
+Use `codex -p token-lite` for bounded diagnosis, `codex -p token-standard` for
 normal staged repo work, and `codex -p token-deep` for architecture, research,
 or high-risk review. Profiles do not waive workflow gates.
 
@@ -102,7 +108,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `max_depth = 2`
   - one bounded child-subagent layer を許可します
 - 同時 spawn の既定 budget は workflow family 側で決めます
-  - `Scoped Change Lite`: 4
+  - `Owner-Bounded Change`: 4
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
@@ -131,7 +137,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `Stop` は `hooks/codex_runtime_summary_logger.py` で bounded runtime summary を書いた後、`hooks/runtime_log_auto_sync.py` で `runtime_log_archive_git.py sync` を best-effort 実行します。これにより hook JSONL、eval report、Codex runtime summary、`reports/agents/` run bundle は通常 agent の手動 push なしで log archive の `logs/<repo-key>` branch に集約されます。network / SSH / archive 不在の失敗は fail-open で作業を止めません。
-- `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。`rg --files`、`rg -l "<pattern>" <bounded dirs>`、specific file / small dir への `rg -n`、`--max-count` 付き検索、または `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` を除外した検索は通常 quiet です。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
+- `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。`rg --files`、`rg -l "<pattern>" <bounded dirs>`、specific file / bounded dir への `rg -n`、`--max-count` 付き検索、または `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` を除外した検索は通常 quiet です。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を確認します。普通の相談、read-only search、validation command では child guard を起動しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行します。current finding は warning context と hook log に残し、closeout 前の修復対象にします。
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
@@ -143,7 +149,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を continuation context として返します。
 - `Stop` でも `hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば closeout repair context を返します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
-- dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。
+- dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。`PostToolUse` は runtime の post-tool output schema を壊さないため、非 blocking finding や child failure を stdout に返さず、hook log、明示 validation、closeout evidence の対象にします。
 - `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:` のいずれかで明示されます。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` でテスト・debug 用の出力先を差し替えられます。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。

@@ -27,6 +27,15 @@ The normal route is:
 Local Git remotes must not define the normal distribution path for
 self-authored reusable modules.
 
+## Reader Map
+
+Use this policy to answer why reusable AgentCanon modules and devcontainer
+surfaces use GitHub as the source-of-truth path. Read the opening route first,
+then Local Git Boundary, Dockerfile Boundary, Devcontainer Boundary, VS Code
+Workspace Boundary, and Validation in order when changing shared runtime or
+environment surfaces. Host-only local remotes are treated as repo-specific
+problems, not shared architecture.
+
 ## Local Git Boundary
 
 Repo-specific local Git problems are deferred to the repo that owns them.

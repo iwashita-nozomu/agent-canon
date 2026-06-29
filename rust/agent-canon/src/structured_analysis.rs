@@ -1188,7 +1188,7 @@ fn document_responsibility_findings(
                 path: record.path.clone(),
                 kind: DOCUMENT_RESPONSIBILITY_GAP.to_string(),
                 canonical_path: record.path.clone(),
-                action: "cover the declared upstream design coverage in the document or narrow the dependency manifest responsibility".to_string(),
+                action: "cover the declared upstream design coverage in the document or constrain the dependency manifest responsibility".to_string(),
                 reason: format!(
                     "responsibility=`{}` missing_responsibility_coverage=`{}` upstream_design=`{}` missing_terms=`{}`",
                     display_responsibility(&record.responsibility),

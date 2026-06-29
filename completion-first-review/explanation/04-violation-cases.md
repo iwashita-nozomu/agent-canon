@@ -10,6 +10,17 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py current moni
 @dependency-end
 -->
 
+## Reader Map
+
+- Owns the catalog of completion-first false-negative cases that should not
+  pass closeout.
+- Main path: Purpose, Core false-negative cases, Fixture shape, How to use this
+  catalog, and Completion-first invariant.
+- Read this when designing eval fixtures or closeout checks that must reject
+  weak completion evidence.
+- Boundary: this catalog names failure cases; evaluator implementation and
+  workflow policy live in the linked tools and completion-first docs.
+
 ## Purpose
 
 This chapter lists concrete false-negative cases: situations that may look acceptable under loose token or checklist rules but should fail under a completion-first system.

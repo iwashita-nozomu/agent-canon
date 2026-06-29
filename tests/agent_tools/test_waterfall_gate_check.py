@@ -102,7 +102,7 @@ def design_brief_lines(
         "# Detailed Design Brief",
         "",
         "## Goals",
-        "Implement the approved small change.",
+        "Implement the approved bounded change.",
         "## Existing Code And Docs To Reuse",
         "Mirror `tools/agent_tools/task_close.py`.",
     ]
@@ -464,7 +464,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertIn("NEXT_ACTION=proceed_to_next_waterfall_gate", result.stdout)
 
     def test_design_gate_rejects_missing_abstract_design_frame(self) -> None:
-        """Design gate should fail when design narrows to files without abstraction."""
+        """Design gate should fail when design selects files without abstraction."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-abstract-frame"
             report_dir.mkdir(parents=True, exist_ok=True)

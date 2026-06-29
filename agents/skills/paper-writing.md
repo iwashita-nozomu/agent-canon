@@ -10,6 +10,18 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 -->
 
 
+## Reader Map
+
+- Purpose: routes submission-paper or thesis-chapter drafting through section
+  contracts, citation evidence, notation, and logic review.
+- Use When: the artifact is a paper-style manuscript rather than general
+  academic notes.
+- Section path: Purpose, Use When, and Core References set scope; Mandatory
+  Checklist, Default Sequence, and Standard Command are operational rules;
+  Boundary limits the paper route.
+- Boundary: broader scholarly prose outside paper ownership uses
+  `academic-writing`.
+
 ## Purpose
 
 file / document responsibility が submission paper、thesis chapter、または paper-style

@@ -23,6 +23,15 @@ because they are cloned from the template. That coupling is intentional. The
 boundary that must stay clear is ownership: each root path must say who owns it,
 whether a derived repository may override it, and where edits must be made.
 
+## Reader Map
+
+Use this document to answer who owns each shared runtime surface exposed from
+`vendor/agent-canon/` into a template or derived repository root. Start with
+Owner Classes and Manifest Contract, then read the symlink, active-contract,
+durable-state, GitHub copy, documents, evidence, memory, notes, and tests
+sections for path-specific ownership. Editing Rule and Validation close the
+workflow for changes to shared surfaces.
+
 ## Owner Classes
 
 | Owner class | Root behavior | Edit source | Local override |
@@ -178,6 +187,9 @@ from AgentCanon:
 
 Do not edit these root copies as independent truth surfaces. Edit the
 AgentCanon source, then run `bash tools/sync_agent_canon.sh link-root`.
+The `.github/scripts/checkout_agent_canon_submodule.sh` root copy is only a
+GitHub-path wrapper; the shared checkout implementation lives in
+`tools/ci/checkout_agent_canon_submodule.sh`.
 
 ## Documents Directory Ownership
 

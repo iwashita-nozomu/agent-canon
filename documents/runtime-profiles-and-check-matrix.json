@@ -103,38 +103,37 @@
     {
       "risk": "Routine docs",
       "examples": "Link/text edits in project-local docs with no source contract change",
-      "minimum_validation": "docs check for touched docs and changed-file dependency header checks"
+      "required_validation": "docs check for touched docs and changed-file dependency header checks"
     },
     {
       "risk": "Focused code",
       "examples": "Narrow Python or shell edit with local tests",
-      "minimum_validation": "changed-file dependency checks, targeted tests, ruff/pyright when Python changes"
+      "required_validation": "changed-file dependency checks, targeted tests, ruff/pyright when Python changes"
     },
     {
       "risk": "Profile change",
       "examples": "Docker, GitHub, experiment, C++, devcontainer, MCP, or memory surface change",
-      "minimum_validation": "profile-specific checker plus targeted tests"
+      "required_validation": "profile-specific checker plus targeted tests"
     },
     {
       "risk": "Shared canon",
       "examples": "`vendor/agent-canon/`, root shared views, skills, workflows, hooks, tools",
-      "minimum_validation": "`make agent-canon-pr-check` or equivalent AgentCanon PR gate"
+      "required_validation": "`make agent-canon-pr-check` or equivalent AgentCanon PR gate"
     },
     {
       "risk": "Large delivery",
       "examples": "repo-wide rewrite, workflow redesign, broad policy change, or user-requested comprehensive run",
-      "minimum_validation": "run bundle, dependency review, focused and full validation gates, independent review"
+      "required_validation": "run bundle, dependency review, focused and full validation gates, independent review"
     }
   ],
   "risk_note": [
     "`make ci` remains the full local confidence gate, but it is not the only",
-    "acceptable evidence for every small change. The selected validation must match",
-    "the changed paths and risk class, and the PR or run bundle must state why that",
-    "set is sufficient.",
-    "GPU backend validation first selects an available GPU slot and records slot",
-    "evidence; missing slots produce `gpu_validation_blocker=<reason>`.",
-    "Backend selection values are supplied through environment variables rather",
-    "than implementation-code defaults."
+    "acceptable evidence for every owner-bounded change. The selected validation",
+    "must match the changed paths, owner surface, and risk class, and the PR or run",
+    "bundle must state why that set is sufficient.",
+    "Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,",
+    "and dependency checks selected by the active profile; they do not automatically",
+    "escalate to full `make ci`."
   ],
   "check_matrix": [
     {
@@ -156,7 +155,12 @@
       "changed_surface": "AgentCanon docs/workflows/skills/tools/hooks",
       "required_check": [
         "`make agent-canon-pr-check`",
-        "prompt/eval checks when prompt surfaces change"
+        "shared-surface sync",
+        "workflow/PR checks",
+        "dependency review",
+        "docs check",
+        "generated-artifact guard",
+        "broad quick CI with already-run docs/workflow gates skipped"
       ]
     },
     {

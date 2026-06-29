@@ -13,6 +13,20 @@ downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: explore algorithm choices and implementation changes under proof
+  obligations before handing terminal proof work to `$formal-proof-workflow`.
+- Section path: read Purpose, Use When, Relationship To
+  `$formal-proof-workflow`, Numerical Iteration Boundary, and Completion
+  Condition before Canonical Flow, Artifact Contract, and Guardrails.
+- Use when: convergence, stopping, finite-precision, certificate, or solver
+  handoff claims need IR, theorem graph, blocker frontier, and algorithm-change
+  evidence.
+- Boundary: blocker summaries and algorithm guidance are intermediate; terminal
+  outcomes remain checker-backed proof, refutation, or
+  `unprovable_under_assumptions`.
+
 ## Purpose
 
 `algorithm-proof-exploration` は、証明義務を入力にしてアルゴリズムを探索・修正する
@@ -57,12 +71,9 @@ backend を top-level profile input、generated backend witness、coverage evide
 両者は必ず接続します。アルゴリズム由来の証明 task では、この skill がアルゴリズム候補と
 実装変更候補を作り、それを `$formal-proof-workflow` が checker-backed に評価します。
 この skill から formal-proof subagent へ渡す `formal_proof_handoff` は、
-`agents/COMMUNICATION_PROTOCOL.md` の `Target Binding Packet` を必ず含めます。
-target theorem、public root / entrypoint と signature、theorem-visible return
-projection、identifier naming plan、generated evidence artifacts、accepted top-level
-assumptions、forbidden assumptions、completion condition、validation commands、
-unchecked-output policy を埋められない場合は、曖昧な blocker summary を渡さず、
-IR、theorem graph、または source packet を先に再生成・修復します。
+`agents/COMMUNICATION_PROTOCOL.md` が所有する `Target Binding Packet` を必ず含めます。
+packet を埋められない場合は、曖昧な blocker summary を渡さず、IR、theorem graph、または
+source packet を先に再生成・修復します。
 
 ## Numerical Iteration Boundary
 
@@ -131,7 +142,7 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
    - finite-precision floor
    - solver-chain reachability
    - infeasibility / unboundedness certificate
-   - problem-class narrowing
+   - problem-class restriction
 1. Root algorithm:
    - public `main` / run function
    - public `initialize` only as part of that run function's expansion
@@ -237,7 +248,7 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
      returned proof outcome to decide whether an algorithm change is needed
   - when formal-proof returns a missing witness or assumption-insufficiency
     result, decide whether that gap is better solved by changing the algorithmic
-    recurrence, deriving a numerical convergence witness, narrowing the problem
+    recurrence, deriving a numerical convergence witness, restricting the problem
     class, or leaving an external assumption boundary
   - frontier を、対象アルゴリズム入力と無関係な仮定注入で閉じてはいけません。
     固定された algorithm では、数学的仮定は theorem top level の
@@ -287,7 +298,7 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
     direction construction、nested solver certificate、state update、
     residual / merit recomputation、final scalar binding の返却値が theorem に影響するなら、
     route call や unconstrained theorem variable のまま blocker にしてはいけません。
-    その場合は、より小さい formal-proof witness として戻します。algorithmic blocker として
+    その場合は、より下位の formal-proof witness として戻します。algorithmic blocker として
     返せるのは、残る穴が missing contraction、missing residual-merit selection、
     missing problem-class bound、missing backend boundary、checker-backed refutation などの
     semantic mechanism まで縮約された場合だけです。
@@ -387,14 +398,11 @@ backend/runtime architecture boundary へ縮約され、その最小性が check
      remaining proof obligation is on `Init(Problem, InitializeConfig)` or on a
      stronger Phase-I/globalization algorithm
    - add Phase I / globalization when the theorem needs basin entry
-   - narrow a theorem to selected local scope / warm-start assumptions
+   - restrict a theorem to selected local scope / warm-start assumptions
    - add problem-class or backend evidence witnesses
 1. Formal proof handoff:
    - pass exact theorem variables, proof artifacts, checked fragments, and remaining obligations to `$formal-proof-workflow`
-   - include the complete `Target Binding Packet`: target theorem, public root,
-     return projection, identifier naming plan, generated evidence, accepted /
-     forbidden assumptions, completion condition, validation commands, and
-     unchecked-output policy
+   - include the protocol-owned `Target Binding Packet`
    - do not mark a graph path verified unless checker-backed proof nodes cover the target chain
 
 ## Artifact Contract

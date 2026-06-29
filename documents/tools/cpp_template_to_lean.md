@@ -23,6 +23,15 @@ tools remain implementation components and diagnostic helpers. Formal proof
 workflows should call this tool for C++ template source roots instead of
 manually chaining the lower-level tools.
 
+## Reader Map
+
+- Owns the canonical full-expansion C++ template source to Lean evidence route.
+- Main path: Command, Expansion And Coverage Contract, Output Contract, and
+  Boundary.
+- Read this before generating Lean evidence from C++ template source roots.
+- Boundary: lower-level C++ IR and operational IR tools are diagnostic
+  components, not the preferred formal-proof entrypoint for this route.
+
 ## Command
 
 ```bash

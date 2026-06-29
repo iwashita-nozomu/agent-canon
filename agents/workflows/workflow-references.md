@@ -12,6 +12,13 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 この文書は、workflow、review、agent system、report policy を設計するときに参照した外部資料の索引です。
 外部根拠で repo-wide な手順を更新した場合は、この文書へ出典を追記します。
 
+## Reader Map
+
+- This document owns the bibliography and source-route index for workflow, review, agent runtime, reporting, writing, memory, and academic-writing policy.
+- The local index and OpenAI / Codex source route come first; later clusters group external sources by runtime customization, system development, research/reporting, writing, agent learning, and academic logic / notation.
+- Use this file when a workflow claim needs source grounding or when adding an external basis to a repo-wide procedure.
+- For chunked reading, choose the source cluster matching the claim under review and avoid treating this bibliography as a replacement for current official-doc routes such as `$openai-docs`.
+
 ## Local Reference Indexes
 
 - [AgentCanon Technology Bibliography](../../references/agent-canon-technology-bibliography.md)

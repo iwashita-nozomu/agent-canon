@@ -35,16 +35,16 @@ subjects = [
 
 [[case_groups]]
 id = "scoped-lite-code"
-description = "Tiny one-file code or doc fixes should route as scoped change lite."
-expected_workflows = ["scoped-change-lite", "codex-task-workflow"]
+description = "Bounded one-file code or doc fixes should route as owner-bounded change."
+expected_workflows = ["owner-bounded-change", "codex-task-workflow"]
 expected_skills = ["codex-task-workflow"]
 limit = 25
 prompt_templates = [
-  "{subject} の typo を軽微に修正して",
-  "one-file patch で {subject} の小さい修正を入れて",
+  "{subject} の typo を責務境界内で修正して",
+  "one-file patch で {subject} の bounded 修正を入れて",
   "{subject} の flaky test 名だけを単一 file で直して",
-  "軽微な repo-changing patch として {subject} を修正して",
-  "{subject} の small fix を scoped-change-lite で進めて",
+  "責務境界が閉じた repo-changing patch として {subject} を修正して",
+  "{subject} の bounded fix を owner-bounded-change で進めて",
 ]
 subjects = [
   "README heading",
@@ -61,11 +61,11 @@ expected_workflows = ["scoped-change", "codex-task-workflow"]
 expected_skills = ["codex-task-workflow", "test-design"]
 limit = 25
 prompt_templates = [
-  "repo-changing patch として {subject} の public behavior を小規模に修正し、既存テストも見て",
+  "repo-changing patch として {subject} の public behavior を bounded scope で修正し、既存テストも見て",
   "cross-module ではないが {subject} の仕様解釈を直して regression case を足して",
-  "{subject} の既存テストを確認して小規模 patch を入れて",
+  "{subject} の既存テストを確認して bounded patch を入れて",
   "仕様解釈が必要な {subject} を scoped-change として修正して",
-  "repo-changing patch として {subject} の narrow behavior fix と regression case をお願いします",
+  "repo-changing patch として {subject} の bounded behavior fix と regression case をお願いします",
 ]
 subjects = [
   "CLI option parsing",

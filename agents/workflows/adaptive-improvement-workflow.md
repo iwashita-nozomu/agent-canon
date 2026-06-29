@@ -14,6 +14,13 @@ upstream design README.md workflow catalog
 repo-level の長期 loop では top-level `goal.md` を正本にし、`python3 tools/agent_tools/goal_loop.py` で状態確認、iteration 実行、criteria 更新を行います。
 Codex `goals` feature が有効な runtime では [codex-goals-workflow.md](codex-goals-workflow.md) を overlay とし、Codex goals を `goal.md` の session view として同期します。
 
+## この文書の読み方
+
+- この文書は、探索的改善、実験、調査、tuning、prompt / workflow repair を backlog-driven outer loop として回す workflow を所有します。
+- 前半は位置づけ、対象、基本ルール、canonical outer loop を扱い、後半は iteration backlog、decision states、roles、他 workflow との関係、close conditions を扱います。
+- loop owner は `## 3. 基本ルール` と `## 4. Canonical Outer Loop` から入り、各 extension の実装は `implementation-waterfall-workflow.md` に戻します。
+- chunked reading では、`goal.md`、backlog、decision state のどれを更新しているかを固定し、その節だけを開いて closeout 条件と照合します。
+
 ## 1. 位置づけ
 
 - 通常の実装:
@@ -43,7 +50,7 @@ outer loop は agile、inner change pass は waterfall です。
 - template repo では active `goal.md` は repo-local runtime state です。派生 repo の seed に混ぜないため tracked product state からは外し、必要なら `.gitignore` で ignored local state として保持します。
 - goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
-- ただし 1 iteration は単発 micro-fix ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
+- ただし 1 iteration は単発の孤立修正ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
 - iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。

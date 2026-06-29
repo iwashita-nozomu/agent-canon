@@ -22,6 +22,17 @@ edit_scope: tools/agent_tools/eval_accumulation_check.py, tests/agent_tools/test
 required_action: Add a gate that verifies AgentCanon-owned hook and skill eval result directories are append-only, tracked, and structurally readable.
 close_condition: The gate passes on current accumulated evidence and fails on missing result directories, duplicate hook run ids, malformed JSONL, or ignored result paths.
 
+## Reader Map
+
+- Owns the open issue record for missing mechanical eval/hook accumulation
+  gates.
+- Main path: Finding, Required Fix, dated dashboard/routing evidence, and
+  triage notes.
+- Read this before implementing or reviewing eval accumulation checker and
+  static-gate work.
+- Boundary: the issue records required repair and evidence; implementation
+  authority remains with the affected tool, test, catalog, and CI paths.
+
 ## Finding
 
 Hook and skill eval logs are now present, but there is no single checker that

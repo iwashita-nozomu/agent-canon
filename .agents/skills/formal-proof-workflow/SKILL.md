@@ -23,6 +23,19 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 
 # Formal Proof Workflow
 
+## Reader Map
+
+- Purpose: expose the formal proof workflow to Codex skill discovery and route
+  mathematical or implementation-derived claims into proof obligations.
+- Section path: Tool Commands names the command packet; the numbered rules carry
+  the operational sequence; later sections cover JIT-canonical IR, theorem
+  graph, Frontier Exploration Loop, Initialize-Rooted Proof Expansion, and
+  Nested Iterative Solver Proofs.
+- Use when: a task needs formal-proof scaffolding, generated Lean evidence,
+  theorem targets, or checker-gated proof status.
+- Boundary: this shim points to `agents/skills/formal-proof-workflow.md` for the
+  canonical policy and does not make unchecked sketches proof evidence.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -76,11 +89,8 @@ Execute the required and task-matching conditional commands that the packet prin
    proof-only arguments, trace handles, op ids, binding ids, or proof-only
    state/config. If a theorem needs a value, expose it through the public return
    schema or reconstruct it in the theorem graph from the implementation path.
-1. When handing proof work to a subagent, include the `Target Binding Packet` from
-   `agents/COMMUNICATION_PROTOCOL.md`: exact target theorem, public root and
-   signature, return projection, identifier naming plan, accepted top-level
-   assumptions, forbidden assumptions, current generated evidence, completion
-   condition, validation commands, and unchecked-output policy. Do not ask a
+1. When handing proof work to a subagent, include the protocol-owned
+   `Target Binding Packet` from `agents/COMMUNICATION_PROTOCOL.md`. Do not ask a
    subagent to "look at the proof" or "find blockers" from a file list alone.
    Do not adopt an unchecked theorem sketch, type-incompatible statement, local
    counterexample, or algorithm suggestion unless it is checked against the same
@@ -140,7 +150,7 @@ Execute the required and task-matching conditional commands that the packet prin
    config explicitly scopes the theorem to that backend. Otherwise keep backend
    semantics as top-level profile input, generated backend witness, and coverage
    evidence. If evidence is missing, record `backend_evidence_blocker=<gap>`
-   instead of narrowing the theorem to IREE, XLA, CUDA, CPU, GPU, VMFB,
+   instead of restricting the theorem to IREE, XLA, CUDA, CPU, GPU, VMFB,
    StableHLO, LLVM, FP32, or another backend surface.
    For target-critical code shape, do not leave implementation-local functions
    as arbitrary proof axioms merely because the current trace generator does not
@@ -386,7 +396,7 @@ Execute the required and task-matching conditional commands that the packet prin
    provable: replace the current recurrence, initializer, line search,
    inner-solver policy, regularization, Phase I / globalization route, strengthen
    an acceptance rule as part of the algorithm, add a top-level problem-class
-   witness, or narrow the theorem. Keep this as proof guidance, not as a reason
+   witness, or restrict the theorem. Keep this as proof guidance, not as a reason
    to add proof-only fields, diagnostic gates, or runtime proof checks to
    production code.
 1. Before returning a blocker to the user, show that it is frontier-minimal for
@@ -472,7 +482,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
-1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or narrowing evidence.
+1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or scope-limiting evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use
    `refuted` only with a counterexample, formal model, or implementation trace
@@ -615,10 +625,10 @@ algorithm theorem.
    scope, not merely one proof route.
 1. If a weaker proposition is verified, add a bridge edge showing what remains
    to use it in the target theorem. If a stronger route is refuted, keep the
-   refutation and replace the route with a narrowed theorem or algorithm change.
+   refutation and replace the route with a restricted theorem or algorithm change.
 1. Update the proof status table and proof note in the same pass. Every open
    row must state whether the next step is mathematical proof, implementation
-   return-value projection, backend evidence binding, or theorem narrowing.
+   return-value projection, backend evidence binding, or theorem restriction.
    Do not close out while a frontier row still has bare `unverified` as its
    only outcome.
 

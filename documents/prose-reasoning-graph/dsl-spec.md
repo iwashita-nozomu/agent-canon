@@ -43,6 +43,17 @@ reader-state transitions, subtopics, and argument blocks are projection views
 over that same graph. The durable boundary is canonical graph versus projection
 view, not one prose layer versus another.
 
+## Reader Map
+
+Use this specification to answer what the prose graph DSL owns, which graph
+objects and relation vocabulary are valid, and how projections, diagnostics,
+edit operations, explanations, adapters, and validation fit together. Start
+with Normative Scope, Linguistic Grounding, and the responsibility contracts for
+authority boundaries; then read the object model, layer registry, identifiers,
+relation kinds, and projection sections for implementation work. The final
+sections cover visualization, handoff profiles, verification routes,
+diagnostics, edit packets, explanation, adapter behavior, and validation.
+
 ## Normative Scope
 
 This specification is binding for:
@@ -465,7 +476,7 @@ The MVP relation registry includes:
 - `realizes_move`: paragraph realizes a phase or genre move.
 - `requires`: one text unit requires a prior premise, definition, condition,
   or reader-state update.
-- `refines`: one text unit narrows, qualifies, or operationalizes another.
+- `refines`: one text unit specializes, qualifies, or operationalizes another.
 - `generalizes`: one text unit abstracts from examples, evidence, or local
   observations.
 - `concludes`: one text unit states a conclusion or decision that depends on

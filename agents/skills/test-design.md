@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+- Purpose: designs adversarial, resilient tests before code changes so behavior
+  contracts and test oracles are explicit.
+- Use When: implementation changes need static test design, oracle choice,
+  nasty cases, regression cases, or brittle-test diagnosis.
+- Section path: Purpose, Use When, and Core References orient scope; Expected
+  Outcome, Mandatory Checklist, and Default Sequence are the operational rules;
+  Common Failure Modes lists pitfalls.
+- Boundary: this skill designs tests and validation evidence; it does not
+  loosen behavior contracts to fit existing tests.
+
 ## Purpose
 
 approved design と既存 code/test path を静的解析し、変更耐性のある behavior contract、oracle、input space、adequacy evidence を implementation 前に固定します。

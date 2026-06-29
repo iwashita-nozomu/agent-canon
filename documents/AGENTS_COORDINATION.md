@@ -10,6 +10,15 @@ upstream design README.md durable document index
 
 この文書は repo 運用から見た agent 運用の薄い入口です。
 
+## この文書の読み方
+
+- この文書は、repo 運用から現在の agent 正本 surface へ誘導する入口です。
+- 主な順路は、正本、Runtime Entry Points、Skills、実行入口、repo 側の運用ルールです。
+- 古い `documents/AGENTS_COORDINATION.md` 参照を見つけたときや、
+  runtime entrypoint の正本を確認するときに読みます。
+- 境界: 新しい stage rule や skill policy はここではなく、リンク先の
+  `agents/` と `AGENTS.md` が所有します。
+
 ## 正本
 
 - [agents/README.md](../agents/README.md)

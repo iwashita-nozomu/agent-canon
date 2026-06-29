@@ -21,6 +21,17 @@ downstream design ../tools/render_dependency_manifest_graph.md documents depende
 AgentCanon から将来切り離す場合の集約先である。既存の正本を移動せず、
 独立 tool 化で使う契約、adapter、DB 境界をここに蓄積する。
 
+## Reader Map
+
+- Owns the package-level index for structured-analysis canon and runtime entry
+  points.
+- Main path: Evidence And Assumption Ledger, Canon Set, Boundary, Runtime Entry
+  Point, Layer Model, and Extraction Rule.
+- Read this before choosing which structured-analysis adapter or database
+  contract to inspect.
+- Boundary: it indexes the structured-analysis package; individual adapter and
+  DB schemas live in sibling documents.
+
 ## Evidence And Assumption Ledger
 
 - Evidence sources:

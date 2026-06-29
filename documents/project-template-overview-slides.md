@@ -13,6 +13,18 @@ downstream design ./README.md document index links this slide deck
 
 # Project Template Overview Slides
 
+## Reader Map
+
+- Owns the slide-style overview of the project template repository.
+- Main path: repository purpose, shape, AgentCanon model, GitHub policy,
+  Actions/PR automation, Codex runtime, workflow discipline, dependency
+  manifest policy, static analysis, Docker, Jupyter/results, template use, and
+  review checklist.
+- Read this for a presentation-oriented scan of the template rather than a
+  complete operating manual.
+- Boundary: detailed policy and commands remain in the linked repository,
+  document, and runtime canon files.
+
 ## 1. What This Repository Is
 
 - A reusable project template for code, experiments, documents, agent workflows, Docker runtime, and GitHub operations.

@@ -274,7 +274,7 @@ local_override_allowed = false
 [[surface]]
 path = ".github/scripts/checkout_agent_canon_submodule.sh"
 mode = "copy"
-source = "tools/ci/checkout_agent_canon_submodule.sh"
+source = ".github/scripts/checkout_agent_canon_submodule.sh"
 owner = "github-path-constraint"
 class = "github_copy"
 local_override_allowed = false

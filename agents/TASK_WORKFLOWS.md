@@ -16,8 +16,15 @@ downstream implementation ../tools/agent_tools/workflow_monitor.py records dynam
 
 # Agent Task Workflows
 
+## Reader Map
+
 This file is a workflow reader map. It points to the owner surfaces that select
 workflow family, roles, skills, stage gates, wave budgets, and closeout checks.
+Use `Workflow Contract Owners` to find the canonical owner, `Common Evidence
+Packet` to understand task/run handoff data, `Design Artifact Shape` for
+implementation design anchors, and `Workflow Family Reader Paths` to route by
+family. This file maps readers to owner surfaces; it does not replace the
+task catalog, runtime profile matrix, or closeout tools as policy authority.
 
 ## Workflow Contract Owners
 
@@ -42,6 +49,9 @@ reader path changes.
 
 - workflow family
 - active and deferred skills
+- selected skill tool route sequence
+- dynamic skill routing candidates
+- tool catalog match surface
 - review roles
 - document packets
 - initial wave recommendation
@@ -50,6 +60,12 @@ reader path changes.
 - validation route
 
 Subagent handoffs carry that machine-readable packet and the run bundle paths.
+Tool routing is carried through `team_manifest.yaml` under
+`run.repo_tool_routing_policy`. Each selected skill has a sequential command
+packet: show the skill packet, run required commands, run task-matching
+conditional commands, then run validation commands. When a related skill becomes
+active in a later wave, the same `skill_tool_commands.py show --skill <skill>`
+packet is regenerated for that skill before the handoff proceeds.
 
 ## Design Artifact Shape
 
@@ -69,7 +85,7 @@ implementation slices, validation, review, sync, and closeout.
 
 | Family | Owner Row |
 | ------ | --------- |
-| Scoped Change Lite | `agents/task_catalog.yaml` `workflow_families[].id=scoped_change_lite` |
+| Owner-Bounded Change | `agents/task_catalog.yaml` `workflow_families[].id=owner_bounded_change` |
 | Scoped Change | `agents/task_catalog.yaml` `workflow_families[].id=scoped_change` |
 | Research-Driven Change | `agents/task_catalog.yaml` `workflow_families[].id=research_driven_change` |
 | Large Delivery | `agents/task_catalog.yaml` `workflow_families[].id=large_delivery` |

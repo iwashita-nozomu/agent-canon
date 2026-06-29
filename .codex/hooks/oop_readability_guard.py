@@ -211,11 +211,11 @@ def default_oop_min_score(root: Path) -> int | None:
 
 
 def check_mode_from_environment() -> CheckMode:
-    """Return the OOP hook mode, defaulting to full current finding blocking."""
-    mode = os.environ.get(MODE_ENV, MODE_FULL).strip().casefold() or MODE_FULL
+    """Return the OOP hook mode, defaulting to changed-finding checks."""
+    mode = os.environ.get(MODE_ENV, MODE_DIFF).strip().casefold() or MODE_DIFF
     if mode in {"baseline", "changed", "changed-only", "diff-only"}:
         mode = MODE_DIFF
-    if mode != MODE_DIFF:
+    if mode == MODE_FULL:
         return CheckMode(mode=MODE_FULL, baseline_ref=None)
     baseline_ref = os.environ.get(BASELINE_REF_ENV, DEFAULT_DIFF_BASELINE_REF).strip()
     return CheckMode(mode=MODE_DIFF, baseline_ref=baseline_ref or DEFAULT_DIFF_BASELINE_REF)
@@ -460,16 +460,17 @@ def emit_warning(results: list[AnalyzerResult]) -> None:
         {
             "decision": "approve",
             "reason": (
-                "OOP readability hook found changed source findings. This is a warning; "
-                "run the listed checker(s) before closeout and either fix the findings or "
-                "record the approved OOP boundary.\n\n"
+                "OOP readability hook found new or changed-source review findings. "
+                "This warning is a non-blocking boundary review signal; do not split code only "
+                "to satisfy the score. Run the listed checker(s) before closeout and "
+                "either fix a true design risk or record why the current boundary is intended.\n\n"
                 + "\n\n".join(snippets)
             ),
-            "next_action": "fix_oop_readability_findings_or_record_boundary_approval",
+            "next_action": "review_oop_boundary_signal",
             "remediation": [
-                "Run the listed OOP readability checker command.",
-                "Fix readability findings before closeout when they are in the intended edit scope.",
-                "If findings are accepted, record the owning boundary and approval evidence.",
+                "Classify each finding as true boundary risk, accepted boundary, or checker false positive.",
+                "Refactor only when caller contracts or source ownership show a real boundary change.",
+                "Record the boundary decision when findings are accepted for the current edit.",
             ],
         },
         sys.stdout,

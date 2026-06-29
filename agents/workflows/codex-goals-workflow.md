@@ -17,6 +17,13 @@ This workflow defines how to use the Codex `goals` feature in this repository.
 The feature is a session/runtime aid; it does not replace the repo-owned goal
 contract.
 
+## Reader Map
+
+- This document owns the boundary between Codex `goals`, repo-local `goal.md`, and the mechanical `goal_loop.py` gates.
+- The early sections split durable and session state, preflight goal tooling, autonomous goal drafting, and pre-goal fan-out; the later sections cover plan-mode entry, TUI commands, goal creation, iteration, efficiency, and closeout.
+- Use `## Preflight` before relying on a goal, then read `## Autonomous Goal Draft` when the user gives goal-driven intent without exact criteria.
+- For chunked reading, keep `goal.md` as the durable state anchor and open only the section matching the current phase: setup, plan-mode entry, iteration, or closeout.
+
 ## Role Split
 
 - `goal.md` is the durable source of truth for Objective, Exit Criteria,
@@ -169,10 +176,10 @@ evidence, or repo-owned state.
 1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
    TODO draft. The output lists unchecked Exit Criteria and Backlog items as
    `GW*` work units with evidence hints.
-   The first iteration must be large enough to move a coherent task slice:
+   The first-iteration packet must cover a coherent task slice:
    prompt-to-artifact checklist, reuse / consolidation / deletion survey,
    implementation over the selected related surfaces, and validation evidence.
-   Do not reduce Goal setup to one single micro-fix when the objective names
+   Do not reduce Goal setup to one isolated edit when the objective names
    multiple deliverables.
 1. The Plan-mode output must include:
    - `Goal Contract`: exact objective, non-goals, constraints, and request
@@ -248,7 +255,7 @@ When starting a goal-driven task:
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
 1. Run `goal_loop.py plan --goal-file goal.md --report-out <run>/goal_work_breakdown.md`.
-   Confirm the generated Backlog contains the minimum first-iteration packet
+   Confirm the generated Backlog contains the initial first-iteration packet
    rather than only one tiny "next item" task.
 1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
    implementation edit.

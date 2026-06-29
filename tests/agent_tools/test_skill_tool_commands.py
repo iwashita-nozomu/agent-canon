@@ -95,6 +95,18 @@ class SkillToolCommandsTest(unittest.TestCase):
                 payload["discovered_commands"],
             )
 
+    def test_show_marks_validation_as_maintenance_only(self) -> None:
+        """Show keeps validation commands out of the default action path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(root, "example-skill", "Use the canon.\n")
+
+            result = self.run_tool(root, "show", "--skill", "example-skill")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:", result.stdout)
+            self.assertIn("Run these only when editing skill command sections", result.stdout)
+
     def test_show_returns_related_skills_from_catalog(self) -> None:
         """Show prints related skills from the public skill catalog."""
         with tempfile.TemporaryDirectory() as tmp_dir:

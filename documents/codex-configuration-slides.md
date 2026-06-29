@@ -11,6 +11,10 @@ upstream implementation ../.codex/config.toml current shared template Codex conf
 
 このスライドは `documents/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/workflows/slide-production-workflow.md` に従い、固定 template と layout review を優先します。
 
+## この文書の読み方
+
+この deck は、Codex 設定の全体像、根拠、設定 surface、template の現在値、未設定項目、CLI override、主要 key、subagents、MCP、hooks、skills、AGENTS.md discovery を順に説明します。発表や説明資料を作るときは前半の全体像から読み、設定変更の根拠確認には詳細 reference である `codex-configuration-reference.md` に戻ります。この文書自体は slide 派生物であり、設定正本ではありません。
+
 ---
 
 # Codex 設定の全体像
@@ -240,7 +244,7 @@ repo default を一律に重くするより、確認済み model ID を profile 
 agent へ寄せます。
 
 - design / review: `$openai-docs` で選んだ frontier model + `reasoning_effort="high"`
-- bounded implementation: task sizeに応じて medium/high
+- bounded implementation: owner boundary、impact surface、validation route に応じて medium/high
 - trivial run: default profile
 - plan mode: `plan_mode_reasoning_effort` を別管理
 
@@ -514,7 +518,7 @@ credential は committed config に直書きしません。
 
 # Agent-canon での推奨設計
 
-- `.codex/config.toml`: 小さく保つ
+- `.codex/config.toml`: 責務を追える形に保つ
 - `AGENTS.md`: workflow gate と closeout policy
 - `.codex/agents/*.toml`: role behavior
 - `.agents/skills`: reusable workflow

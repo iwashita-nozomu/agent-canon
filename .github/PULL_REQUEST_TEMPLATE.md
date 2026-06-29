@@ -16,6 +16,12 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 @dependency-end
 -->
 
+## Reader Map
+
+- This checklist owns the standalone AgentCanon PR body structure and closeout evidence prompts.
+- Use `PR Essence`, `Summary`, and `Scope` to describe the shared-canon change; use the branch, authority, automation, canon discipline, plan, orchestration, issue, validation, propagation, submodule pin, and review-focus sections to record evidence.
+- Read it when opening or reviewing a PR against the standalone AgentCanon repository.
+
 ## PR Essence
 
 - Problem / user request:

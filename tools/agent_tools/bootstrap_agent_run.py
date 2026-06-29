@@ -24,21 +24,26 @@ from agent_team import (
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
+    contract_complete_implementation_policy_output_lines,
     create_run_bundle,
     current_stage_skills,
+    default_quality_check_policy_output_lines,
+    default_review_pack_ids_for_task,
     default_specialists_for_task,
     deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
+    format_subagent_role_instance_wave_chunks,
     format_subagent_wave,
     format_subagent_wave_chunks,
-    format_subagent_role_instance_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
-    recommended_dynamic_expansion_waves,
+    pre_handoff_scope_policy_output_lines,
     recommended_dynamic_expansion_wave_slots,
+    recommended_dynamic_expansion_waves,
     recommended_initial_subagent_wave,
+    repo_tool_routing_policy_output_lines,
     resolve_cross_cutting_document_packet,
     resolve_report_root,
     resolve_role_document_packet,
@@ -46,8 +51,11 @@ from agent_team import (
     resolve_workflow_family,
     same_role_subagent_policy_output_lines,
     select_roles,
+    standard_agent_wave_sequence_output_lines,
     subagent_wave_record_command,
+    suggested_public_skills,
     task_ids,
+    user_facing_language_policy_output_lines,
     workflow_spawn_budget,
 )
 from task_authority import write_task_authority_baselines
@@ -62,9 +70,11 @@ class BootstrapRunContext:
     report_root: Path
     run_id: str
     report_dir: Path
+    manual_specialists: tuple[str, ...]
     enabled_specialists: tuple[str, ...]
     task_default_specialists: tuple[str, ...]
     auto_specialists: tuple[str, ...]
+    default_review_pack_ids: tuple[str, ...]
     workflow_family_id: str | None
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
@@ -83,22 +93,10 @@ class BootstrapRuntime:
 def suggested_skills(
     task_id: str | None,
     workflow_family_id: str | None,
+    task_text: str = "",
 ) -> tuple[str, ...]:
     """Return the public skills that should be read before work starts."""
-    selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
-    if workflow_family_id == "research_driven_change":
-        selected.append("$research-workflow")
-    elif workflow_family_id == "platform_and_environment":
-        selected.append("$environment-maintenance")
-    elif workflow_family_id == "comprehensive_development":
-        selected.append("$comprehensive-development")
-    elif workflow_family_id == "adaptive_improvement_loop":
-        selected.append("$adaptive-improvement-loop")
-    if task_id == "T6":
-        selected.append("$refactor-loop")
-    if task_id == "T10":
-        selected.append("$paper-writing")
-    return tuple(dict.fromkeys(selected))
+    return suggested_public_skills(task_id, workflow_family_id, task_text)
 
 
 def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
@@ -133,7 +131,9 @@ def cross_cutting_document_packet_output(workspace_root: Path) -> str:
     )
 
 
-def build_parser(enable_names: tuple[str, ...], task_choices: tuple[str, ...]) -> argparse.ArgumentParser:
+def build_parser(
+    enable_names: tuple[str, ...], task_choices: tuple[str, ...]
+) -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
@@ -232,8 +232,10 @@ def resolve_bootstrap_context(
     report_root = resolve_report_root(args.report_root, workspace_root)
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
-    enabled_specialists = list(expand_enabled_specialists(config, catalog, tuple(args.enable)))
+    manual_specialists = expand_enabled_specialists(config, catalog, tuple(args.enable))
+    enabled_specialists = list(manual_specialists)
     task_default_specialists: tuple[str, ...] = ()
+    default_review_pack_ids: tuple[str, ...] = ()
     workflow_family_id: str | None = None
     workflow_family_name: str | None = None
     workflow_active_spawn_budget: int | None = None
@@ -243,9 +245,11 @@ def resolve_bootstrap_context(
         workflow_family_id = str(task_spec["family"])
         workflow_family = resolve_workflow_family(catalog, workflow_family_id)
         workflow_family_name = str(workflow_family["name"])
-        workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
-            catalog,
-            workflow_family_id,
+        workflow_active_spawn_budget, workflow_max_write_subagents = (
+            workflow_spawn_budget(
+                catalog,
+                workflow_family_id,
+            )
         )
         task_default_specialists = default_specialists_for_task(
             config=config,
@@ -253,6 +257,11 @@ def resolve_bootstrap_context(
             task_id=args.task_id,
             include_default_review_packs=not args.no_default_review_packs,
         )
+        if not args.no_default_review_packs:
+            default_review_pack_ids = default_review_pack_ids_for_task(
+                catalog,
+                args.task_id,
+            )
         for role_id in task_default_specialists:
             if role_id not in enabled_specialists:
                 enabled_specialists.append(role_id)
@@ -270,9 +279,11 @@ def resolve_bootstrap_context(
         report_root=report_root,
         run_id=run_id,
         report_dir=report_dir,
+        manual_specialists=tuple(manual_specialists),
         enabled_specialists=tuple(enabled_specialists),
         task_default_specialists=task_default_specialists,
         auto_specialists=auto_specialists,
+        default_review_pack_ids=default_review_pack_ids,
         workflow_family_id=workflow_family_id,
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
@@ -305,7 +316,11 @@ def emit_bootstrap_output(
     runtime: BootstrapRuntime,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
-    selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    selected_skills = suggested_skills(
+        args.task_id,
+        context.workflow_family_id,
+        args.task,
+    )
     active_skills = current_stage_skills(selected_skills)
     deferred_skills = deferred_stage_skills(selected_skills)
     review_roles = selected_review_roles(runtime.roles)
@@ -333,14 +348,20 @@ def emit_bootstrap_output(
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print("TASK_ID_ROUTE_STATUS=explicit")
-        print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
+        print(
+            "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet"
+        )
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
         print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
         print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
         print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
-        print("DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events")
-        print(f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}")
+        print(
+            "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events"
+        )
+        print(
+            f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}"
+        )
         active_budget = context.workflow_active_spawn_budget or 0
         initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
         if initial_wave:
@@ -364,25 +385,55 @@ def emit_bootstrap_output(
             initial_wave,
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
-        print(f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}")
+        print(
+            f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}"
+        )
         print(
             "RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES="
             f"{format_subagent_role_instance_wave_chunks(expansion_wave_slots)}"
         )
+        for line in standard_agent_wave_sequence_output_lines():
+            print(line)
         for line in same_role_subagent_policy_output_lines():
             print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
-        print("SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default")
+        print(
+            "SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default"
+        )
     else:
         print("TASK_ID_ROUTE_STATUS=missing")
         print("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes")
         print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
         print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
+    for line in pre_handoff_scope_policy_output_lines():
+        print(line)
+    for line in user_facing_language_policy_output_lines():
+        print(line)
+    for line in contract_complete_implementation_policy_output_lines():
+        print(line)
+    for line in repo_tool_routing_policy_output_lines(selected_skills):
+        print(line)
+    for line in default_quality_check_policy_output_lines(
+        runtime.roles,
+        manual_specialists=context.manual_specialists,
+        task_default_specialists=context.task_default_specialists,
+        auto_specialists=context.auto_specialists,
+        default_review_packs_enabled=bool(
+            args.task_id is not None and not args.no_default_review_packs
+        ),
+        default_review_pack_ids=context.default_review_pack_ids,
+    ):
+        print(line)
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
-    print("IMPLEMENTATION_CODEX_AGENTS=" f"{','.join(codex_agents_for_role(config, 'implementer'))}")
-    print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}")
+    print(
+        "IMPLEMENTATION_CODEX_AGENTS="
+        f"{','.join(codex_agents_for_role(config, 'implementer'))}"
+    )
+    print(
+        f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}"
+    )
     print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
     print(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
@@ -396,13 +447,20 @@ def emit_bootstrap_output(
         "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>"
     )
     print("AGENT_REPORT_COLLECTION_STATUS=available")
-    print("AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status")
+    print(
+        "AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status"
+    )
     print(
         "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
         f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}"
     )
-    print("AGENT_REPORT_COLLECTION_SYNC_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py sync")
-    print("CROSS_CUTTING_DOCUMENT_PACKET=" f"{cross_cutting_document_packet_output(workspace_root)}")
+    print(
+        "AGENT_REPORT_COLLECTION_SYNC_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py sync"
+    )
+    print(
+        "CROSS_CUTTING_DOCUMENT_PACKET="
+        f"{cross_cutting_document_packet_output(workspace_root)}"
+    )
     print(
         "DESIGN_DOCUMENT_PACKET="
         f"{document_packet_output(config, 'designer', context.report_dir, workspace_root)}"
@@ -432,11 +490,13 @@ def record_bootstrap_monitoring(
                 f"skills={','.join(current_stage_skills(selected_skills)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
-            "stage owner routing active_roles=" f"{','.join(role.id for role in roles)}",
+            f"stage owner routing active_roles={','.join(role.id for role in roles)}",
             f"agent_canon_preflight={preflight_status}",
             "web_research_not_required: bootstrap does not decide external research",
         ],
-        interventions=[f"created run bundle and workflow_monitoring.md at {context.report_dir}"],
+        interventions=[
+            f"created run bundle and workflow_monitoring.md at {context.report_dir}"
+        ],
         behavior_events=["token_efficiency_not_required reason=bootstrap_default"],
     )
 
@@ -463,6 +523,11 @@ def main() -> int:
         catalog=catalog,
         workflow_family_id=context.workflow_family_id,
     )
+    selected_skills = suggested_skills(
+        args.task_id,
+        context.workflow_family_id,
+        args.task,
+    )
     created_files = create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -474,13 +539,24 @@ def main() -> int:
             roles=roles,
             workspace_root=workspace_root,
             workflow_family_id=context.workflow_family_id or "",
+            manual_specialists=context.manual_specialists,
+            task_default_specialists=context.task_default_specialists,
+            auto_specialists=context.auto_specialists,
+            default_review_packs_enabled=bool(
+                args.task_id is not None and not args.no_default_review_packs
+            ),
+            default_review_pack_ids=context.default_review_pack_ids,
+            selected_skills=selected_skills,
         )
     )
     active_pointer = context.report_root / ".active_run"
-    active_pointer.write_text(str(context.report_dir.resolve()) + "\n", encoding="utf-8")
+    active_pointer.write_text(
+        str(context.report_dir.resolve()) + "\n", encoding="utf-8"
+    )
     write_task_authority_baselines(context.report_dir, context.report_root)
-    runtime = BootstrapRuntime(roles=roles, created_files=created_files, active_pointer=active_pointer)
-    selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    runtime = BootstrapRuntime(
+        roles=roles, created_files=created_files, active_pointer=active_pointer
+    )
     review_roles = selected_review_roles(roles)
     emit_bootstrap_output(
         args=args,

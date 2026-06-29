@@ -30,6 +30,17 @@ domain-specific TSV extraction and compatibility route. When dependency graph
 views are embedded in prose workflows, prose-specific vocabulary remains owned
 by `documents/prose-reasoning-graph/dsl-spec.md`.
 
+## Reader Map
+
+- Owns the usage contract for rendering dependency manifests into Mermaid,
+  Graphviz, HTML, and summary artifacts.
+- Main path: the opening description explains the render target, and Evidence
+  And Assumption Ledger records sources, assumptions, and validation.
+- Read this when producing visual dependency-manifest projections from an
+  existing graph artifact.
+- Boundary: this tool renders validated dependency data; schema and dependency
+  semantics remain with the manifest and validation docs.
+
 ## Evidence And Assumption Ledger
 
 - Evidence sources:

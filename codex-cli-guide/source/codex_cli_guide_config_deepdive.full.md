@@ -1401,7 +1401,7 @@ _成熟ロードマップ_
 
 ### まず作る最小構成
 
-最小構成では、リポジトリ直下に`AGENTS.md`と`.codex/config.toml`だけを置く。`AGENTS.md`は「Codexが毎回読む作業規約」、`.codex/config.toml`は「Codexクライアントが読む設定」である。前者は自然言語で、後者はTOMLで書く。最初からHooks、Rules、MCP、Skills、Subagentsを全部入れる必要はない。最初は小さく始め、Codexが同じ間違いを繰り返したら`AGENTS.md`へルールを追加し、危険なコマンドが出るならRulesへ移し、繰り返しの手順が増えたらSkillsに切り出す。
+基本構成では、リポジトリ直下に`AGENTS.md`と`.codex/config.toml`だけを置く。`AGENTS.md`は「Codexが毎回読む作業規約」、`.codex/config.toml`は「Codexクライアントが読む設定」である。前者は自然言語で、後者はTOMLで書く。最初からHooks、Rules、MCP、Skills、Subagentsを全部入れる必要はない。最初は基本構成で始め、Codexが同じ間違いを繰り返したら`AGENTS.md`へルールを追加し、危険なコマンドが出るならRulesへ移し、繰り返しの手順が増えたらSkillsに切り出す。
 
 
 ```
@@ -1697,7 +1697,7 @@ project_doc_max_bytes = 65536
 
 ### いつ使うか
 
-サブエージェントは、Codexが別のagent threadをspawnし、並列に調査、実装、レビュー、要約を進め、親スレッドへ結果を返す仕組みである。Codexはサブエージェントを勝手にspawnせず、ユーザーが明示的に「spawn two agents」「parallel subagents」「one agent per point」のように依頼したときに使う。各サブエージェントは独自にモデルとツールを使うため、単一agentよりトークン消費、レイテンシ、ローカルリソース消費が増える。したがって、小さな修正ではなく、広い調査、PRレビュー、複数観点の監査、複数ファイル群の一括点検に向く。
+サブエージェントは、Codexが別のagent threadをspawnし、並列に調査、実装、レビュー、要約を進め、親スレッドへ結果を返す仕組みである。Codexはサブエージェントを勝手にspawnせず、ユーザーが明示的に「spawn two agents」「parallel subagents」「one agent per point」のように依頼したときに使う。各サブエージェントは独自にモデルとツールを使うため、単一agentよりトークン消費、レイテンシ、ローカルリソース消費が増える。したがって、単発修正ではなく、広い調査、PRレビュー、複数観点の監査、複数ファイル群の一括点検に向く。
 
 
 ```
@@ -2004,7 +2004,7 @@ L{0.20} X}
 仕様判断、セキュリティレビュー  |  high  |  複数前提を検証し、エッジケースを追う必要がある。
 コード探索、影響範囲整理  |  medium  |  速度と品質のバランスがよい。
 大量CSV行の要約  |  lowまたはmedium  |  1件あたりの判断が軽く、並列数の方が重要。
-実装修正  |  medium  |  変更を小さく保ち、テストで検証する。
+実装修正  |  medium  |  変更を責務境界に保ち、テストで検証する。
 ```
 
 
@@ -2135,7 +2135,7 @@ MCPはCodexに新しい外部ツールを渡すため、便利だが攻撃面も
 
 ### Rulesの役割
 
-Rulesは、Codexがsandbox外で実行しようとするコマンドを、prefixに基づいて判定する。たとえば`gh pr view`は承認ありで許可、`git push`は必ずprompt、`rm -rf`はforbidden、といった運用ができる。Rulesは実験的機能として扱われるため、仕様変更に備えて小さく保ち、定期的に確認する。
+Rulesは、Codexがsandbox外で実行しようとするコマンドを、prefixに基づいて判定する。たとえば`gh pr view`は承認ありで許可、`git push`は必ずprompt、`rm -rf`はforbidden、といった運用ができる。Rulesは実験的機能として扱われるため、仕様変更に備えて責務を追える形に保ち、定期的に確認する。
 
 
 ```
@@ -2383,7 +2383,7 @@ prefix_rule(
 ```
 
 
-## プロジェクト導入手順：小さく始めて育てる
+## プロジェクト導入手順：基本構成から育てる
 
 
 ### Step 1: 現状の作業規約を集約する
@@ -2458,7 +2458,7 @@ Implement the smallest fix for the described bug.
 Before editing, ask code_mapper to identify the responsible files.
 If browser behavior is relevant, ask browser_debugger to reproduce the issue first.
 Only after evidence is gathered, use ui_fixer to change files.
-Run the narrowest relevant tests and summarize changed files and validation results.
+Run the most relevant tests and summarize changed files and validation results.
 ```
 
 
@@ -2661,7 +2661,7 @@ L{0.35} L{0.50}}
 
 Codex CLIは更新速度が高く、CLI本体、TUI、設定schema、MCP、Hooks、Subagents、Apps連携、Codex Cloudとの接続が並行して進化する。したがって、実験的機能を理解するには、単に機能名を覚えるよりも、成熟度、feature flag、profile、rollback、監査、チーム共有の流れを決めることが重要である。公式ドキュメント上のFeature Maturityは、機能をStable、Beta、Experimental、Deprecatedのような状態で読むための基準になる。Experimentalは便利でも、設定名、UI、既定値、エラーメッセージ、subcommandの構造が変わる可能性を前提に扱う。
 
-本書では、実験的機能を「開発速度を上げるための候補」と「本番作業に混ぜるとリスクが上がる候補」に分けて扱う。前者にはmulti agent、background terminal、goal追跡、Hooks、Rules、MCP連携、Apps connector、fast modeなどがある。後者には、write権限を増やすもの、外部サービスへ接続するもの、長時間実行するもの、ユーザー確認を減らすものが含まれる。実験機能の導入では、常に小さなprofileで試し、`/debug-config`で有効状態を確認し、`codex features list`で手元のbinaryが認識する機能名を照合する。
+本書では、実験的機能を「開発速度を上げるための候補」と「本番作業に混ぜるとリスクが上がる候補」に分けて扱う。前者にはmulti agent、background terminal、goal追跡、Hooks、Rules、MCP連携、Apps connector、fast modeなどがある。後者には、write権限を増やすもの、外部サービスへ接続するもの、長時間実行するもの、ユーザー確認を減らすものが含まれる。実験機能の導入では、常にbounded profileで試し、`/debug-config`で有効状態を確認し、`codex features list`で手元のbinaryが認識する機能名を照合する。
 
 
 実験機能は「使えるか」ではなく、「どのprofileで、誰が、どのrepositoryで、何日間、どの成功条件で試し、どう戻すか」を決めてから有効化する。
@@ -2882,7 +2882,7 @@ _運用規則を文書にする。_
 
 ## multi agentとサブエージェントの実験運用
 
-multi agentは、親セッションがすべてを抱え込まず、調査、レビュー、実装、UI再現、ログ解析などを分担する設計である。実験的に導入する場合は、`max_threads`を小さくし、`max_depth = 1`から始める。深いspawnや多数のagentは、費用、文脈、判断の不一致を増やす。親agentは、子agentへ明確な成果物形式を求める。たとえば「関連ファイル一覧」「リスク上位5件」「再現手順」「根拠URL」「未確認事項」を固定すると統合しやすい。
+multi agentは、親セッションがすべてを抱え込まず、調査、レビュー、実装、UI再現、ログ解析などを分担する設計である。実験的に導入する場合は、`max_threads`を制御し、`max_depth = 1`から始める。深いspawnや多数のagentは、費用、文脈、判断の不一致を増やす。親agentは、子agentへ明確な成果物形式を求める。たとえば「関連ファイル一覧」「リスク上位5件」「再現手順」「根拠URL」「未確認事項」を固定すると統合しやすい。
 
 
 ```
@@ -2915,7 +2915,7 @@ _親は統合役に集中する。_
 
 `同時数` → `費用` → `文脈`
 
-_同時数は小さく始める。_
+_同時数は制御して始める。_
 
 
 #### 図解: max depth
@@ -3378,7 +3378,7 @@ _三点を基本にする。_
 
 `owner` → `docs` → `check`
 
-_運用できる小ささに保つ。_
+_運用責務を追える形に保つ。_
 
 
 #### 図解: MCP成熟度
@@ -3753,7 +3753,7 @@ MCPは外部toolの面を増やす。Rulesはshell commandの実行可否をpref
 ```text
 L{0.34}L{0.36}}
 項目  |  内容  |  実務上の判断
-MCP allowlist  |  server toolの範囲を絞る。  |  外部能力の入口を小さくする。
+MCP allowlist  |  server toolの範囲を絞る。  |  外部能力の入口を制御する。
 sandbox  |  OS上の読み書きやnetworkを制限する。  |  tool外のshell実行にも効く境界。
 approval  |  人間の確認を挟む。  |  境界越えや高リスク操作に使う。
 Rules  |  command prefixで許可、確認、禁止を決める。  |  shell実行の予防線。
@@ -4152,7 +4152,7 @@ _MCP cleanupの基本パターン。_
 
 #### 図解: feature canary
 
-`lab` → `small repo` → `observe`
+`lab` → `sandbox repo` → `observe`
 
 _feature canaryの基本パターン。_
 
@@ -4845,7 +4845,7 @@ _実験機能カードの確認カード15。_
 
 #### 図解: 実験機能カード 16
 
-`canary` → `small repo` → `observe`
+`canary` → `sandbox repo` → `observe`
 
 _実験機能カードの確認カード16。_
 
@@ -4921,7 +4921,7 @@ _実験機能カードの確認カード25。_
 
 #### 図解: サブエージェントカード 01
 
-`role` → `narrow` → `output`
+`role` → `bounded` → `output`
 
 _サブエージェントカードの確認カード01。_
 
@@ -5667,7 +5667,7 @@ _チーム運用カードの確認カード25。_
 
 `最小設定` → `差分確認` → `段階追加`
 
-_小さく書いて検証する。_
+_責務境界を書いて検証する。_
 
 
 #### 図解: 設定ファイルの役割
@@ -6228,7 +6228,7 @@ exclude_slash_tmp = false
 
 
 **確認** 
-patch作成、test実行、外部networkの扱いを小さなrepoで確認する。
+patch作成、test実行、外部networkの扱いをsandbox repoで確認する。
 
 
 **落とし穴** 
@@ -9059,7 +9059,7 @@ model_reasoning_effort = "high"
 
 ### 追加設定レシピ 117: 軽量lint確認profile
 
-**目的**  小さなlintやtypoの確認を低コストで行い、修正自体は通常の責務・検証手順に戻す。
+**目的**  限定されたlintやtypoの確認を低コストで行い、修正自体は通常の責務・検証手順に戻す。
 
 
 ```toml
@@ -9071,7 +9071,7 @@ approval_policy = "on-request"
 ```
 
 
-**確認**  小さなbranchでlint確認を試し、出力品質と速度を比較する。
+**確認**  検証用branchでlint確認を試し、出力品質と速度を比較する。
 
 **戻し方**  `service_tier` と `model_reasoning_effort` を削除する。
 

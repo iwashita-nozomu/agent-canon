@@ -16,23 +16,23 @@ upstream design README.md notes lifecycle index
 
 ## Known
 
-- 
+- <known>
 
 ## Likely
 
-- 
+- <likely>
 
 ## Open
 
-- 
+- <open-question>
 
 ## Worked
 
-- 
+- <worked>
 
 ## Did Not Work
 
-- 
+- <did-not-work>
 
 ## References
 

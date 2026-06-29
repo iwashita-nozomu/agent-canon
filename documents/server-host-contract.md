@@ -12,6 +12,15 @@ downstream design ./tools/html_artifact_access.md documents remote HTML artifact
 この文書は、repo を日常運用する main server host の最小契約をまとめます。
 remote execution contract が「repo が外部 server から実行される条件」を定義するのに対し、ここでは「この repo を主に回す host 自身が満たすべき条件」を固定します。
 
+## この文書の読み方
+
+- この文書は、main 開発 host の必須条件、推奨事項、storage/container/browser/WSL/Git
+  rules、validation、関連文書を定めます。
+- 主な順路は、対象、必須、推奨、Storage Rule、Container Runtime Rule、
+  Remote Browser Artifact Rule、WSL / Shared Mount Rule、Git Rule、Validation、Related です。
+- repo を日常運用する server host を準備または監査するときに読みます。
+- 境界: remote execution contract は外部 server から repo を実行する条件を扱います。
+
 ## 対象
 
 - main 開発 host

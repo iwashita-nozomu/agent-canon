@@ -9,6 +9,18 @@ upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontain
 -->
 
 
+## Reader Map
+
+- Purpose: routes Docker, CI, dependency, and development-environment changes
+  through explicit proposal, validation, and rollback evidence.
+- Use When: touching runtime images, dependency manifests, CI, devcontainer, or
+  environment compatibility guidance.
+- Section path: Purpose, Use When, and Core References set scope; Required
+  Proposal Fields, Operating Rules, and Validation are the operational rules;
+  Boundary limits environment authority.
+- Boundary: environment-dependent tools should not become hidden local
+  prerequisites.
+
 ## Purpose
 
 Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの code requirement が環境変更を要求したかを明示します。

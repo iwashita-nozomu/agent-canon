@@ -23,6 +23,12 @@ AgentCanon as a submodule. Use it before editing, normalizing, or reformatting
 container, devcontainer, or shared editor workspace surfaces in a
 template-derived repository.
 
+## Reader Map
+
+- This rulebook owns the AgentCanon Docker, devcontainer, VS Code, and shared editor workspace boundary.
+- `Scope`, `Canonical Source Contract`, and `Ownership Boundary` explain what this file controls; the Dockerfile, devcontainer, Python dependency, GitHub workflow, validation, hook, and recent-rule sections cover the operational details.
+- Read it before changing container, devcontainer, editor workspace, Docker workflow, or related validator surfaces.
+
 ## Scope
 
 This document is AgentCanon-owned. It describes the shared rule boundary. The
@@ -254,7 +260,7 @@ before editing.
 
 ## Required Validation
 
-For container or devcontainer changes, use the narrow checks first and then the
+For container or devcontainer changes, use the targeted checks first and then the
 repository closeout checks.
 
 ```bash

@@ -9,6 +9,18 @@ downstream implementation ../../.agents/skills/mvp-skeleton/SKILL.md exposes thi
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: keeps MVP, prototype, skeleton, or thin-slice work runnable without
+  overbuilding architecture, UI, tests, or features.
+- Use When: the request asks for MVP作成, prototype, core runnable path,
+  or scope-creep control.
+- Section path: Purpose and MVP Contract define the contract; Scope Sort,
+  Overbuild Tripwires, and Frontend Rule are operational rules; Closeout states
+  completion evidence.
+- Boundary: MVP scope is a routing and sequencing control, not permission to
+  leave the core path unrunnable.
+
 ## Purpose
 
 `mvp-skeleton` keeps MVP work shaped around a skeletal product slice. It owns
@@ -28,8 +40,8 @@ Before editing, fix this compact contract:
 ```text
 core_user=<who uses the skeletal slice>
 core_loop=<one input-to-useful-output path>
-success_signal=<smallest observable result that proves the loop>
-runtime_floor=<cheapest local run or inspection path>
+success_signal=<observable result that proves the core loop>
+runtime_floor=<local run or inspection path that exercises the loop>
 stop_line=<tempting work that must be deferred>
 ```
 
@@ -68,9 +80,9 @@ Stop and re-scope before adding:
 Make the entry screen the usable product surface. Use a landing page only when
 the user explicitly asked for a landing page.
 
-Use existing design system pieces and the fewest controls needed for the core
-loop. If visual assets are required, use the smallest domain-relevant asset that
-makes the surface understandable; keep asset work to one supporting asset.
+Use existing design system pieces and controls that the core loop requires. If
+visual assets are required, use a domain-relevant asset that makes the surface
+understandable; keep asset work tied to that supporting role.
 
 ## Closeout
 

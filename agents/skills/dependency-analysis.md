@@ -13,10 +13,22 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py valid
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: collect dependency-header, graph, code-dependency, and
+  change-impact evidence before choosing or validating edit scope.
+- Section path: Purpose and Use When explain the trigger; Required Commands
+  lists the operational tool surface; Interpretation, Change Impact Packet, and
+  Core References define how outputs feed planning and handoff.
+- Use when: dependency manifests, changed-file gates, graph edges, reverse
+  edges, design-claim evidence, or repair-planning packets are needed.
+- Boundary: code dependency evidence and dependency-header evidence remain
+  separate until summarized in a structured Change Impact Packet.
+
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
-code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を token-light な `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM context には必要最小限だけを載せます。
+code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を structured `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM-visible context には planning に必要な selected excerpt、summary、artifact path を載せます。
 
 ## Use When
 
@@ -26,7 +38,7 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - closeout 前に dependency manifest evidence を揃えたい
 - 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
 - code 変更の commit evidence として、file-level dependency と関数 / public entrypoint 単位の call-site evidence を揃えたい
-- repo-wide search の responsibility-based candidate と bounded `rg` hit から、どの file を編集・確認すべきか dependency graph で展開したい
+- repo-wide search の responsibility-based candidate と bounded `git grep` hit から、どの file を編集・確認すべきか dependency graph で展開したい
 - design document の implementation-backed claim、DSL / standard-form assumption、parent-doc alignment を dependency header evidence と比較したい
 - requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
 - refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
@@ -81,7 +93,7 @@ agent-canon semantic-index context-pack \
   --max-cells 12 \
   --format text \
   > reports/search_responsibility_context.txt
-rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
+git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
@@ -123,7 +135,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
-- search result を編集対象に変換するときは、responsibility-based context、bounded `rg` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw `rg` hit だけで編集対象を決めません。
+- search result を編集対象に変換するときは、responsibility-based context、bounded `git grep` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw text-search hit だけで編集対象を決めません。
 - design document を修正または作成するときは、major claim の code / path token、初出 DSL / standard-form terms、parent-doc alignment を `Evidence And Assumption Ledger` に接続し、`check_design_doc_claims.py` の finding を design evidence gap として扱います。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
@@ -132,14 +144,14 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ## Change Impact Packet
 
 `dependency-analysis` は、依存 evidence を集めるだけでなく、修正計画の入力になる
-token-light な `Change Impact Packet` manifest の正本です。これは LLM が依存
+structured `Change Impact Packet` manifest の正本です。これは LLM が依存
 graph 全体を prose 化する場所ではありません。tool output は JSON / TSV /
 Markdown artifact として保存し、packet には path、count、object id、現在の
-repair batch に必要な最小 excerpt だけを載せます。`refactor-loop`、
-implementation handoff、原因仮説の fix-surface 選定では、raw `rg` hit、raw
+repair batch に必要な selected excerpt と structured summary を載せます。`refactor-loop`、
+implementation handoff、原因仮説の fix-surface 選定では、raw text-search hit、raw
 finding、単一 file 名だけを subagent に渡しません。
 
-Packet には最低限次を含めます。
+Packet には次を含めます。
 
 - `requested_target`: `path:start-end:qualname`、file、または finding id
 - `code_dependency_surface`: static に見える import / include / source edge、
@@ -147,7 +159,7 @@ Packet には最低限次を含めます。
 - `header_dependency_surface`: dependency manifest の upstream / downstream
   design、implementation、environment、test、workflow edge
 - `search_surface`: responsibility-based context、text search が seed の場合の
-  bounded `rg -l` hit、`dependency_edit_scope.txt`
+  bounded `git grep -l` hit、`dependency_edit_scope.txt`
 - `structural_surface`: `tool-finding-report` や structural checker が seed の
   場合の full finding packet、priority order、repair slice
 - `tests_docs_config_log_info_edges`: test、doc、config、log、Info など code 以外の
@@ -174,8 +186,8 @@ code dependency と header dependency は packet 内でも section を分けま�
 影響範囲の block 化は tool の責務です。LLM は tool-generated block を受け取り、
 必要に応じて accept、split、merge、`review_required` を判断します。その場合も
 元の `block_id`、分割/統合理由、追加確認した artifact path を残します。
-node の大きさも固定値ではなく最適化対象です。最もよい scope は「大きいほどよい」
-でも「小さいほど安全」でもなく、behavior contract が明確で、write conflict がなく、
+node の粒度も固定値ではなく最適化対象です。最もよい scope は「大きいほどよい」
+でも「縮めるほど安全」でもなく、behavior contract が明確で、write conflict がなく、
 token 予算に収まり、1 つの coherent な validation surface で確認できる最大の block
 です。semantic risk、ownership、validation isolation が崩れる場合だけ block を縮めます。
 LLM が full artifact を読むのは、現在の repair batch、争点になった edge、review

@@ -9,6 +9,16 @@ upstream implementation ../../tools/agent_tools/task_close.py current closeout e
 @dependency-end
 -->
 
+## Reader Map
+
+- Owns the P-1 completion-gate checklist for evidence-backed completion
+  judgment.
+- Main path: P-1 goal explains the gate, Checklist lists required surfaces, and
+  P-1 done condition states the exit criteria.
+- Read this when defining or reviewing completion-first closeout gates.
+- Boundary: this file is a checklist; the broader completion-first model lives
+  in the linked review index and explanation docs.
+
 ## P-1 goal
 
 Completion judgment comes first. This checklist defines what must exist before agent settings, workflow rules, and self-growth rules can be considered mechanically meaningful.

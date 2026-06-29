@@ -31,14 +31,19 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 統合 CI スクリプト
+# Full confidence CI entrypoint
 #
-# 用途: agent/runtime・Markdown・pytest・pyright・pydocstyle・ruff を一括実行して
-#       プロジェクト品質を検証
+# 用途: agent/runtime, dependency manifest, eval accumulation, Rust,
+#       GitHub workflow, container config, documentation, experiment registry,
+#       pytest, pyright, pydocstyle, and ruff checks を一括実行します。
+#       普段の変更では Makefile の check-matrix から対象 profile を選び、
+#       この script は full confidence gate として使います。
 #
 # 使用方法:
-#   bash tools/ci/run_all_checks.sh           # 全テスト・解析実行
-#   bash tools/ci/run_all_checks.sh --quick   # 高速モード（ruff skip）
+#   bash tools/ci/run_all_checks.sh           # full confidence checks
+#   bash tools/ci/run_all_checks.sh --quick   # broad checks with ruff skipped
+#   bash tools/ci/run_all_checks.sh --quick --skip-docs --skip-github-workflows
+#                                               # PR gate reuse after those gates already ran
 #   bash tools/ci/run_all_checks.sh --verbose # 詳細出力
 #
 # 前提条件:
@@ -94,10 +99,20 @@ fi
 # オプション解析
 QUICK_MODE=0
 VERBOSE_MODE=0
+SKIP_DOCS=0
+SKIP_GITHUB_WORKFLOWS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
       QUICK_MODE=1
+      shift
+      ;;
+    --skip-docs)
+      SKIP_DOCS=1
+      shift
+      ;;
+    --skip-github-workflows)
+      SKIP_GITHUB_WORKFLOWS=1
       shift
       ;;
     --verbose)
@@ -124,13 +139,6 @@ if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
   # shellcheck disable=SC1091
   . "${HOME}/.cargo/env"
 fi
-
-PYTHON_SOURCE_PATHS=()
-for candidate_path in python tests; do
-  if [ -e "${candidate_path}" ]; then
-    PYTHON_SOURCE_PATHS+=("${candidate_path}")
-  fi
-done
 
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 統合 CI セッション開始"
@@ -298,7 +306,9 @@ else
   echo "❌ Rust tests 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
+if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
+  echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
+elif "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"
@@ -314,7 +324,9 @@ echo ""
 
 # 1. Markdown / link checks
 echo "1️⃣  documentation checks を実行中..."
-if tools/bin/agent-canon docs check 2>&1; then
+if [ "$SKIP_DOCS" -eq 1 ]; then
+  echo "DOCS_CHECKS=skip reason=already_checked_by_parent_gate"
+elif tools/bin/agent-canon docs check 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"
@@ -335,59 +347,18 @@ else
 fi
 echo ""
 
-# 3. pytest 実行
-echo "3️⃣  pytest を実行中..."
-if "$PYTHON_BIN" -m pytest tests/ -q --tb=short 2>&1; then
-  echo "✅ pytest 成功"
+# 3. Python quality checks
+python_quality_args=()
+if [ "$QUICK_MODE" -eq 1 ]; then
+  python_quality_args+=(--quick)
+fi
+if bash tools/ci/run_python_quality_checks.sh "${python_quality_args[@]}"; then
+  echo "✅ Python quality checks 成功"
 else
-  echo "❌ pytest 失敗"
+  echo "❌ Python quality checks 失敗"
   EXIT_CODE=1
 fi
 echo ""
-
-# 4. pyright 実行
-echo "4️⃣  pyright を実行中..."
-if "$PYTHON_BIN" -m pyright 2>&1; then
-  echo "✅ pyright 成功"
-else
-  echo "❌ pyright 失敗"
-  EXIT_CODE=1
-fi
-echo ""
-
-# 5. pydocstyle 実行（Docstring 検証）
-echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
-if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
-  echo "PYDOCSTYLE=skip"
-  echo "python/tests source roots are absent in this checkout; skipping pydocstyle"
-elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ pydocstyle 成功"
-else
-  echo "❌ pydocstyle 失敗（詳細: documents/DOCSTRING_GUIDE.md を参照）"
-  EXIT_CODE=1
-fi
-echo ""
-
-# 5. ruff (QUICK_MODE でスキップ可能)
-if [ $QUICK_MODE -eq 0 ]; then
-  echo "6️⃣  ruff を実行中..."
-  echo "   - E,F: コード品質（エラー・警告）"
-  echo "   - I: Import 順序チェック"
-  echo "   - D: Docstring 検証"
-  echo "   - UP: Python 最新構文チェック"
-  echo ""
-  
-  if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
-    echo "RUFF=skip"
-    echo "python/tests source roots are absent in this checkout; skipping ruff"
-  elif "$PYTHON_BIN" -m ruff check "${PYTHON_SOURCE_PATHS[@]}" --select D,E,F,I,UP --ignore E501 2>&1; then
-    echo "✅ ruff 成功"
-  else
-    echo "❌ ruff 失敗"
-    EXIT_CODE=1
-  fi
-  echo ""
-fi
 
 echo "════════════════════════════════════════════════════════════════"
 if [ $EXIT_CODE -eq 0 ]; then

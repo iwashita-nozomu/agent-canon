@@ -23,7 +23,7 @@ SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "search.py"
 
 
 def write_search_fixture(root: Path) -> None:
-    """Write a small repository fixture for coordinated search."""
+    """Write a bounded repository fixture for coordinated search."""
     (root / "tools").mkdir(parents=True)
     (root / "documents").mkdir(parents=True)
     (root / "python").mkdir(parents=True)

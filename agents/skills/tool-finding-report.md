@@ -13,6 +13,18 @@ downstream implementation ../../.agents/skills/tool-finding-report/SKILL.md expo
 @dependency-end
 -->
 
+## Reader Map
+
+- Purpose: run tools, checkers, hooks, static analysis, or structural analyzers
+  to produce full raw, structured, prioritized finding packets.
+- Section path: Purpose, Use When, and Boundary define ownership; Finding Packet
+  and Procedure define artifacts and ranking; Refactor Integration explains how
+  repair workflows consume the packet.
+- Use when: baseline findings, mechanical priority order, before/after impact,
+  or prompt-feedback evidence is needed before or after implementation.
+- Boundary: this skill reports and ranks findings; repair choice belongs to the
+  caller workflow, `refactor-loop`, or the relevant implementation skill.
+
 ## Purpose
 
 tool、checker、hook、static analysis、構造解析を使って問題を探し、raw result、

@@ -244,7 +244,7 @@ def evaluate_role_behavior(
     if agent_id == "explorer" and ("implementation" not in lower_instructions or "do not edit" not in lower_instructions):
         findings.append(Finding("behavior", agent_id, "explorer-must-stay-read-only"))
     if agent_id == "spark_worker":
-        for phrase in ("narrow", "parent-assigned write scope", "report exactly which files changed"):
+        for phrase in ("bounded", "parent-assigned write scope", "report exactly which files changed"):
             if phrase not in lower_instructions:
                 findings.append(Finding("behavior", agent_id, f"spark-worker-missing-{phrase}"))
     if agent_id == "worker" and "parent-assigned write scope" not in lower_instructions:
@@ -278,8 +278,8 @@ def evaluate_routing(root: Path) -> list[Finding]:
 
     for task_id in ("T1", "T2"):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
-        if task.get("family") != "scoped_change_lite":
-            findings.append(Finding("routing", task_id, "must-use-scoped-change-lite"))
+        if task.get("family") != "owner_bounded_change":
+            findings.append(Finding("routing", task_id, "must-use-owner-bounded-change"))
         specialists = default_specialists_for_task(config, catalog, task_id)
         forbidden = {"scheduler", "schedule_reviewer", "document_flow_reviewer"}
         active_forbidden = sorted(forbidden & set(specialists))

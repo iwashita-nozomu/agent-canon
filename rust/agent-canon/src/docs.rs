@@ -1183,13 +1183,13 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
             required_string(item.get("risk"), "risk_classes.risk")?,
             required_string(item.get("examples"), "risk_classes.examples")?,
             required_string(
-                item.get("minimum_validation"),
-                "risk_classes.minimum_validation",
+                item.get("required_validation"),
+                "risk_classes.required_validation",
             )?,
         ]);
     }
     output.push_str(&render_table(
-        &["Risk", "Examples", "Minimum validation"],
+        &["Risk", "Examples", "Required validation"],
         &risk_rows,
     ));
     output.push('\n');

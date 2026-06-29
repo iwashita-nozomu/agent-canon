@@ -24,7 +24,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Missing Or Weak Support
 
-<!-- Record places where the paper needs a citation, stronger evidence, or narrower wording. -->
+<!-- Record places where the paper needs a citation, stronger evidence, or more precise wording. -->
 
 ## Rewrite Targets
 

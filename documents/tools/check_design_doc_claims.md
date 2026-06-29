@@ -21,6 +21,15 @@ Use it when a design document introduces implementation-backed claims, DSL
 terms, problem standard forms, normalization rules, or structure-refactor
 handoff decisions.
 
+## Reader Map
+
+- Owns operator usage for deterministic design-document claim evidence checks.
+- Main path: Command, Evidence Model, Output, and Refactor Route.
+- Read this before checking whether design-document claims are wired to
+  dependency headers, implementations, or upstream design docs.
+- Boundary: semantic proof and domain judgement stay with proof, review, and
+  domain skills.
+
 ## Command
 
 ```bash

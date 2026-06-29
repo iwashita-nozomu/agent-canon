@@ -9,6 +9,18 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 -->
 
 
+## Reader Map
+
+- Purpose: structures paper search, prior-art mapping, contradictory-source
+  hunting, and reusable bibliography output.
+- Use When: a task needs external research, literature comparison, source
+  reliability checks, or citation-ready survey evidence.
+- Section path: Purpose, Use When, and Core References set scope; Mandatory
+  Checklist and Canonical Flow are operational rules; Deliverable Shape and
+  Boundary define output limits.
+- Boundary: do not turn search notes into accepted claims without source
+  evaluation and contradiction handling.
+
 ## Purpose
 
 文献調査、先行研究整理、関連資料比較を、検索、選定、反証候補の抽出まで含めて扱います。

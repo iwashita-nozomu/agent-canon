@@ -8,6 +8,18 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
+## Reader Map
+
+- Purpose: manages experiments, research, tuning, and iterative code
+  improvement as one backlog-driven agile outer loop.
+- Use When: work will iterate over hypotheses, measurements, implementation
+  changes, and review decisions rather than a single fixed patch.
+- Section path: Purpose, Use When, and Core References set scope; Operating
+  Rules and Required Records are the mandatory checklist; Boundary limits local
+  improvisation.
+- Boundary: individual runs do not count as accepted results without backlog,
+  evidence, and review closure.
+
 ## Purpose
 
 実験、調査、チューニング、比較検証をまとめて回しながら、改善 backlog を iteration 単位で潰していく outer loop を定めます。

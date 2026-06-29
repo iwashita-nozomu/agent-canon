@@ -161,6 +161,24 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("solver", "residual"),
         ("residual",),
     ),
+    "gpu-execution": (
+        ("gpu", "実行"),
+        ("gpu", "利用"),
+        ("gpu", "検証"),
+        ("cuda", "backend"),
+        ("jax", "gpu"),
+        ("xla", "gpu"),
+        ("nvidia-smi",),
+        ("cuda_visible_devices",),
+        ("gpu_validation_blocker",),
+        ("experimentrunner",),
+        ("experiment_runner",),
+        ("python", "experimentrunner"),
+        ("xla_python_client_preallocate",),
+        ("preallocation", "disable"),
+        ("先取", "無効"),
+        ("先取り", "無効"),
+    ),
     "result-artifact-writeout": (
         ("結果書き出し",),
         ("結果を書き出",),
@@ -211,10 +229,10 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("agent-canon", "docs"),
         ("run_docs_checks.sh",),
         ("patch", "repo"),
-        ("small fix",),
+        ("bounded fix",),
         ("patch",),
         ("typo", "修正"),
-        ("軽微", "修正"),
+        ("責務境界", "修正"),
         ("flaky test", "直して"),
         ("単一 file", "直して"),
         ("scoped-change",),
@@ -222,9 +240,9 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("修正して", "repo"),
         ("直して", "repo"),
         ("public behavior",),
-        ("narrow behavior",),
+        ("bounded behavior",),
         ("regression case",),
-        ("小規模",),
+        ("bounded scope",),
         ("仕様解釈", "修正"),
         ("optimizer", "修正"),
         ("solver", "直して"),
@@ -411,8 +429,8 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "修正して",
         "直して",
         "実装して",
-        "small fix",
-        "narrow behavior",
+        "bounded fix",
+        "bounded behavior",
         "regression case",
         "agent-canon docs",
         "docs check",
@@ -475,8 +493,8 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "どのスキル",
         "which workflow",
     ),
-    "scoped-change": ("public behavior", "narrow behavior", "regression case", "cross-module", "小規模", "仕様解釈", "既存テスト"),
-    "scoped-change-lite": ("scoped-change-lite", "軽微", "one-file", "単一 file", "typo", "flaky test", "小さい修正", "small fix"),
+    "scoped-change": ("public behavior", "bounded behavior", "regression case", "cross-module", "bounded scope", "仕様解釈", "既存テスト"),
+    "owner-bounded-change": ("owner-bounded-change", "bounded fix", "bounded patch", "one-file", "単一 file", "typo", "flaky test", "責務境界が閉じた", "責務境界が閉じた修正"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "agent-canon-cli": (
@@ -1077,7 +1095,7 @@ def save_workflow_context(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(context, sort_keys=True) + "\n", encoding="utf-8")
-    except OSError:
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return
 
 
@@ -1108,7 +1126,7 @@ def _log_append_log(root: Path, entry: dict[str, object]) -> None:
     try:
         context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
         context.append(entry)
-    except OSError:
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return
 
 

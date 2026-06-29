@@ -11,6 +11,14 @@ upstream design README.md canonical workflow index
 この文書は、agent ごとの入口差分をまとめた正本です。
 共有ルールは `agents/` に寄せ、各 CLI では薄い入口だけを使います。
 
+## この文書の読み方
+
+この文書は、CLI ごとの最初の入口と run bootstrap の使い分けを扱います。
+まず `共通ルール` で全 CLI に共通する起動前提を確認し、Codex で作業する場合は
+`Codex` を読みます。新しい run bundle を作る場合は `Run Bootstrap` の
+標準 command を使います。共有 workflow、skill、subagent routing の詳細は
+この文書に重複させず、参照先の `agents/` owner surface で保守します。
+
 ## 共通ルール
 
 - repo root で起動する
@@ -36,6 +44,9 @@ upstream design README.md canonical workflow index
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - planning を含む parent session では、parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
+- `task_start.py` / `bootstrap_agent_run.py` の出力では
+  `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
+  `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を確認する
 
 ## Run Bootstrap
 
@@ -50,6 +61,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
+`--task` の文面は `route.py --prompt` にも使われ、prompt-derived skill は
+`SUGGESTED_SKILLS` と `team_manifest.yaml` の `run.repo_tool_routing_policy`
+へ反映されます。
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \

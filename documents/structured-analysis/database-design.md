@@ -24,6 +24,17 @@ This file records the shared Graph DSL Core storage created and validated by
 `initialize_graph_schema` and
 `validate_graph_contract`.
 
+## Reader Map
+
+- Owns the SQLite materialization contract for structured prose, report, and
+  dependency analysis.
+- Main path: Evidence And Assumption Ledger, Storage Boundary, Core Tables,
+  Implemented Layers, Validation Contract, and Build Flow.
+- Read this before changing structured-analysis DB tables, cache artifacts, or
+  adapter-to-storage mappings.
+- Boundary: adapter vocabulary stays with the adapter docs; this file defines
+  shared storage shape and validation.
+
 ## Evidence And Assumption Ledger
 
 - Evidence sources:

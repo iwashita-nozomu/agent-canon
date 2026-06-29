@@ -10,6 +10,14 @@ upstream design ../../agents/skills/README.md public skill surface
 @dependency-end
 -->
 
+## Reader Map
+
+Use this document to answer how the completion-first improvement layers are
+ordered and which question each layer owns. Start with Overview for the full
+P-1 through P8 map, then read each priority layer in order when planning work.
+The final dependency section explains why lower layers must serve completion
+judgment instead of redefining it.
+
 ## Overview
 
 The improvement plan uses priority layers. The corrected ordering places completion judgment before agent settings.

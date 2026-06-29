@@ -76,7 +76,7 @@ DEFAULT_BACKLOG = (
     (
         "B3",
         "Execute one cohesive implementation slice that advances the selected "
-        "related surfaces together instead of stopping after one micro-fix.",
+        "related surfaces together instead of stopping after one isolated edit.",
     ),
     (
         "B4",

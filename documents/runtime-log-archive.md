@@ -38,6 +38,14 @@ The mount is intentionally ignored by AgentCanon Git. It is not a submodule and
 does not create a gitlink that can dirty AgentCanon source branches or parent
 repo AgentCanon pins.
 
+## Reader Map
+
+Use this document to answer where runtime hook logs, accumulated evals, Codex
+summaries, and archived agent run bundles are retained outside the source tree.
+Read Layout first for path selection, then Branch Policy, Mount, and Push for
+operational handling. The final sections cover legacy in-tree migration and
+agent report archiving boundaries.
+
 ## Layout
 
 Use this table first when deciding where a report is kept:

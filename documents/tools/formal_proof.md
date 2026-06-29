@@ -11,6 +11,16 @@ downstream implementation ../../tests/agent_tools/test_formal_proof.py tests CLI
 
 # formal_proof.py
 
+## Reader Map
+
+- Owns the operator usage and proof-status boundary for `formal_proof.py`.
+- Main path: the opening description defines purpose, followed by the command
+  example, output behavior, and proof-status limits.
+- Read this before generating proof-planning scaffolds from natural-language
+  claims or Python symbols.
+- Boundary: the tool scaffolds proof obligations; proof validity remains with
+  the target proof assistant and formal-proof workflow.
+
 `formal_proof.py` turns a natural-language mathematical claim, or a selected
 Python symbol parsed through `ast.parse`, into a proof-planning scaffold. It
 does not prove the claim. Its output status is

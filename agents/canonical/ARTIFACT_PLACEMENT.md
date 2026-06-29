@@ -11,6 +11,15 @@ upstream design README.md canonical workflow index
 この文書は、task 実行中に増える文書や補助出力の置き場の正本です。
 run ごとの一時 artifact と、repo に長く残す文書を分けて扱います。
 
+## この文書の読み方
+
+この文書は、run-local artifact、repo-wide 正本文書、cross-run に残す
+agent report の置き場を決めます。まず `置き場ルール` と `Task 中の拡張文書`
+で判断軸を確認し、具体的な保存先は `どこへ置くか` の
+`reports/agents/<run-id>/`、`documents/`、`agents/`、`notes/` を読み分けます。
+`Subagent と補助文書` と `禁止事項` は、task 固有メモを repo 正本へ
+昇格させる前の境界確認に使います。
+
 ## 置き場ルール
 
 - repo-wide の正本:

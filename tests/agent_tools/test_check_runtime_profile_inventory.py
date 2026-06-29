@@ -39,7 +39,7 @@ def write_minimal_inventory(path: Path) -> None:
             {
                 "risk": "Routine docs",
                 "examples": "examples",
-                "minimum_validation": "validation",
+                "required_validation": "validation",
             }
         ],
         "risk_note": ["risk note"],

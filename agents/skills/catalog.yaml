@@ -18,7 +18,7 @@ skill_families:
     related_skills:
       - task-routing
       - codex-task-workflow
-      - small-change-routing
+      - owner-bounded-routing
       - subagent-bootstrap
       - dependency-analysis
     routing:
@@ -46,7 +46,7 @@ skill_families:
     shim: .agents/skills/task-routing/SKILL.md
     related_skills:
       - agent-orchestration
-      - small-change-routing
+      - owner-bounded-routing
       - structure-refactor
       - agent-log-analysis
       - issue-finding-report
@@ -68,6 +68,16 @@ skill_families:
         - ["スキル", "走査"]
         - ["スキル", "動線"]
         - ["スキル", "ツール", "欠落"]
+        - ["自作ツール"]
+        - ["repo", "tool", "routing"]
+        - ["repository", "tool", "routing"]
+        - ["tool", "automatic", "routing"]
+        - ["ツール", "自動", "ルーティング"]
+        - ["自動ルーティング"]
+        - ["ツール", "逐次"]
+        - ["逐次", "呼ぶ"]
+        - ["動的", "ルーティング"]
+        - ["動的", "スキル"]
         - ["スキル内", "起動コマンド"]
         - ["スキル", "起動コマンド"]
         - ["tool", "command", "skill"]
@@ -118,37 +128,33 @@ skill_families:
     related_skills:
       - agent-orchestration
       - task-routing
-      - small-change-routing
+      - owner-bounded-routing
       - result-artifact-writeout
       - change-review
-  - id: small-change-routing
-    purpose: Route small repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
-    canonical_doc: agents/skills/small-change-routing.md
-    shim: .agents/skills/small-change-routing/SKILL.md
+  - id: owner-bounded-routing
+    purpose: Route owner-bounded repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
+    canonical_doc: agents/skills/owner-bounded-routing.md
+    shim: .agents/skills/owner-bounded-routing/SKILL.md
     related_skills:
       - task-routing
       - md-style-check
       - change-review
     routing:
       stage_policy: active
-      reason: small repository edit needs a minimal skill-read and targeted-validation route
+      reason: owner-bounded repository edit needs a visible skill-read and targeted-validation route
       triggers:
-        - ["小規模修正"]
-        - ["小規模", "修正"]
-        - ["軽微", "修正"]
-        - ["小さい", "変更"]
-        - ["small", "change"]
-        - ["small repository edit"]
-        - ["Scoped Change Lite"]
-        - ["one-file", "fix"]
-        - ["single-abstraction"]
+        - ["owner-bounded"]
+        - ["bounded", "route"]
+        - ["bounded", "edit"]
+        - ["targeted", "validation"]
+        - ["Owner-Bounded Change"]
         - ["コードファイル", "順序"]
         - ["定義順"]
         - ["コード", "順序", "わかりにく"]
         - ["typo", "link"]
         - ["format-only"]
         - ["selected_runtime_skill_read"]
-        - ["small_change_skill_read"]
+        - ["owner_bounded_skill_read"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -754,6 +760,40 @@ skill_families:
         - ["先取無効"]
         - ["preallocation", "experiment"]
         - ["notebook", "artifact", "experiment"]
+  - id: gpu-execution
+    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
+    canonical_doc: agents/skills/gpu-execution.md
+    shim: .agents/skills/gpu-execution/SKILL.md
+    related_skills:
+      - experiment-lifecycle
+      - computational-optimization
+      - result-artifact-writeout
+      - environment-maintenance
+      - test-design
+    routing:
+      stage_policy: active
+      reason: GPU/CUDA/JAX/XLA execution, ExperimentRunner Python execution, or preallocation-disabled validation is in scope
+      triggers:
+        - ["gpu", "実行"]
+        - ["gpu", "利用"]
+        - ["gpu", "検証"]
+        - ["cuda", "実行"]
+        - ["cuda", "backend"]
+        - ["jax", "gpu"]
+        - ["xla", "gpu"]
+        - ["iree", "gpu"]
+        - ["nvidia-smi"]
+        - ["cuda_visible_devices"]
+        - ["gpu_validation_blocker"]
+        - ["experimentrunner"]
+        - ["experiment_runner"]
+        - ["python", "experimentrunner"]
+        - ["python", "実行", "experimentrunner"]
+        - ["preallocation", "disable"]
+        - ["preallocate", "false"]
+        - ["xla_python_client_preallocate"]
+        - ["先取", "無効"]
+        - ["先取り", "無効"]
   - id: computational-optimization
     purpose: Fix mathematical and validation contracts for numerical optimization, solvers, preconditioners, convergence, derivatives, KKT conditions, tolerances, and optimization benchmarks.
     canonical_doc: agents/skills/computational-optimization.md

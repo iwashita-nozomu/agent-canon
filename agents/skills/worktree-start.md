@@ -9,6 +9,18 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 -->
 
 
+## Reader Map
+
+- Purpose: documents the legacy-only route for inspecting or retiring stale
+  `WORKTREE_SCOPE.md` and action-log cleanup evidence.
+- Use When: existing legacy worktree cleanup artifacts must be reviewed or
+  closed, not when starting new work.
+- Section path: Purpose, Use When, and Core References set scope; Expected
+  Outcome, Mandatory Checklist, Default Kickoff Sequence, and Default Commands
+  contain operational rules; Boundary states the hard limit.
+- Boundary: do not use this skill to create, recreate, resume, or move work
+  into a git worktree.
+
 ## Purpose
 
 既存の stale worktree、古い `WORKTREE_SCOPE.md`、または過去の action log を current checkout へ持ち帰る前に、scope drift と cleanup 判断を固定します。新しい `git worktree` は作成・使用しません。

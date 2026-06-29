@@ -18,6 +18,19 @@ upstream design ../../../documents/tools/lean_capability_matrix.md routes Lean/M
 
 # Algorithm Proof Exploration
 
+## Reader Map
+
+- Purpose: expose theorem-driven algorithm exploration to Codex and connect it
+  to formal proof adoption.
+- Section path: Tool Commands gives the command packet; the numbered rules hold
+  the required sequence; Outputs defines the return surface.
+- Use when: proof obligations require JIT-canonical IR, theorem dependency
+  graphs, algorithmic blockers, numerical witnesses, or algorithm-change
+  guidance.
+- Boundary: `$formal-proof-workflow` owns final checker-backed proof,
+  refutation, or unprovability; this shim owns discovery and operational
+  routing.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
@@ -39,19 +52,16 @@ Execute the required and task-matching conditional commands that the packet prin
    `$formal-proof-workflow` owns proof-route exploration, formal proof adoption,
    final checker-backed proof, refutation, or unprovability claims.
 1. Every `formal_proof_handoff` produced by this skill must include the
-   `Target Binding Packet` required by `agents/COMMUNICATION_PROTOCOL.md`:
-   target theorem, public root / entrypoint and signature, theorem-visible return
-   projection, identifier naming plan, generated evidence artifacts, accepted
-   top-level assumptions, forbidden assumptions, completion condition,
-   validation commands, and unchecked-output policy. If the current algorithm
-   frontier cannot fill those fields, the next action is to regenerate / repair
+   protocol-owned `Target Binding Packet` from
+   `agents/COMMUNICATION_PROTOCOL.md`. If the current algorithm frontier cannot
+   fill that packet, the next action is to regenerate / repair
    the IR, theorem graph, or source packet; do not pass a vague blocker summary
    to a proof subagent.
 1. Fix the whole target theorem first, rooted at the JIT-canonical public
    entrypoint: normally `main(problem, InitializeConfig, ...) -> Answer / State
    / Info` or the equivalent run function. Local convergence, certificate
    soundness, finite-precision floor, solver-chain reachability, infeasibility
-   certificate, and problem-class narrowing are profiles of that whole theorem,
+   certificate, and problem-class restriction are profiles of that whole theorem,
    not starting points. Do not explore helpers without first stating the
    top-level main theorem they decompose.
 1. State that top-level theorem over the public root's static argument schema
@@ -209,7 +219,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When formal-proof returns a missing witness or assumption-insufficiency
    result, classify whether the gap is better solved by changing the algorithm,
    changing the algorithmic recurrence, deriving a numerical convergence
-   witness, narrowing the problem class, or leaving an external assumption
+   witness, restricting the problem class, or leaving an external assumption
    boundary.
 1. Function-level blockers must be reported as a causal chain, not as a flat
    missing-lemma inventory.  For each recursive function on the target path,
@@ -316,7 +326,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. When the code must change for provability, state the algorithm change in
    proof terms first: remove an unsound gate, change the blocking recurrence,
    initializer, line search, inner-solver policy, regularization, Phase I /
-   globalization route, narrow to a local theorem, or add a problem-class
+   globalization route, restrict to a local theorem, or add a problem-class
    witness. A code change for provability means replacing the algorithm with a
    provable numerical mechanism, not embedding the proof check in production
    code.
@@ -351,7 +361,8 @@ Execute the required and task-matching conditional commands that the packet prin
    note. A valid connected path is structure evidence, not proof completion.
 1. Hand terminal proof obligations to `$formal-proof-workflow`: checked theorem
    statements, counterexamples, unprovable-under-assumptions witnesses, existing
-   proof search packets, checker commands, and the complete `Target Binding Packet`.
+   proof search packets, checker commands, and the protocol-owned
+   `Target Binding Packet`.
 
 ## Outputs
 

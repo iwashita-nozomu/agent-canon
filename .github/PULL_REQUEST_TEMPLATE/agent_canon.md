@@ -15,6 +15,12 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 <!-- Synced to /.github/PULL_REQUEST_TEMPLATE/agent_canon.md by tools/sync_agent_canon.sh link-root. -->
 <!-- Edit vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE/agent_canon.md, not the root copy. -->
 
+## Reader Map
+
+- This template owns the PR checklist for AgentCanon changes made through a template or derived repository.
+- Use `PR Essence`, `Summary`, and `Scope` to state the change route; use the branch, authority, automation, plan, orchestration, issue, validation, integration, sync, mirror, and risk sections for required evidence.
+- Read it when preparing or reviewing a template-side PR that changes shared canon surfaces or updates an AgentCanon pin/root view.
+
 ## PR Essence
 
 - Problem / user request:

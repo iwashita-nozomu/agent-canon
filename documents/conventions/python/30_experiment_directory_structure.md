@@ -11,6 +11,14 @@ upstream design ../README.md convention index
 この章は、このリポジトリで experiment をどこへ置くかを定めます。
 研究の問い、数式、比較設計、段階的改造の手順は `agents/workflows/research-workflow.md` を正本とします。
 
+## この文書の読み方
+
+- この文書は、experiment runtime、topic 固有コード、result 生成物の配置を定めます。
+- 主な順路は、要約、規約、補足、更新手順です。
+- experiment topic や長時間実行の出力先を作る前に読みます。
+- 境界: 研究の問いや比較設計の workflow は
+  `agents/workflows/research-workflow.md` が正本です。
+
 ## 要約
 
 - 再利用できる汎用 runtime は pip installed `experiment_runner` package に置きます。

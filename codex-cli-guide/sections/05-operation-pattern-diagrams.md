@@ -164,7 +164,7 @@ _MCP cleanupの基本パターン。_
 
 #### 図解: feature canary
 
-`lab` → `small repo` → `observe`
+`lab` → `sandbox repo` → `observe`
 
 _feature canaryの基本パターン。_
 
@@ -553,5 +553,4 @@ _final pattern Eの基本パターン。_
 
 
 ---
-
 

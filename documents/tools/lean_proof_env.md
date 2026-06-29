@@ -28,7 +28,18 @@ devcontainer installs `elan` from the pinned `AGENT_CANON_ELAN_VERSION`
 release asset and verifies the architecture-specific SHA256 checksum before
 running `elan-init`, so this helper can run `lake update`, `lake build`, and
 `lake env lean` in fresh containers without host-global Lean setup or a moving
-installer script.
+toolchain installer script.
+
+## Reader Map
+
+- Owns the operator usage and environment boundary for `lean_proof_env.py`.
+- Main path: the opening description defines the reusable Lean environment,
+  followed by setup assumptions, command usage, generated files, and boundary
+  notes.
+- Read this before creating a reusable Lean proof-search or smoke-check
+  environment.
+- Boundary: durable theorem dependencies for an active proof theme belong in
+  that topic's own Lake package.
 
 Initialize the environment without executing Lake:
 

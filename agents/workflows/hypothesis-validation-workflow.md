@@ -16,6 +16,13 @@ downstream implementation ../../tools/agent_tools/check_dependency_graph.sh vali
 この workflow は、考察が弱いまま局所修正へ進む失敗を防ぐための analysis-first overlay です。
 primary family は `Scoped Change`、`Large Delivery`、`Research-Driven Change`、`Comprehensive Development` のいずれかを使い、実装順序は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) に従います。
 
+## この文書の読み方
+
+- この文書は、原因仮説、依存抽出、修正候補比較、編集前妥当性検証の overlay workflow を所有します。
+- `Gate H0` は code dependency と header dependency の分離、`Gate H1-H3` は仮説と着手条件、`Gate H4-H5` は実装後判定と closeout を扱います。
+- 実装前の原因特定では `## Gate H0. 依存抽出` と `## Gate H1. 仮説` を先に読み、修正候補が固定されてから `Gate H2-H3` へ進みます。
+- chunked reading では、現在の gate 番号を作業単位にし、support / disconfirming evidence と validation route を見失わないようにします。
+
 ## 目的
 
 - 変更前に、実コード依存と dependency header 依存を別々に抽出する。

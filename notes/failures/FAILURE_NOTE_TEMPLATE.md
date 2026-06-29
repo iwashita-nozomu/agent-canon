@@ -10,27 +10,27 @@ upstream design README.md notes lifecycle index
 
 ## Scope
 
-- 
+- <scope>
 
 ## Failure Kind
 
-- 
+- <failure-kind>
 
 ## Trigger
 
-- 
+- <trigger>
 
 ## Why It Matters
 
-- 
+- <why-it-matters>
 
 ## Current Understanding
 
-- 
+- <current-understanding>
 
 ## Safe Alternative
 
-- 
+- <safe-alternative>
 
 ## References
 

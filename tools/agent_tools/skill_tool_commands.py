@@ -394,7 +394,8 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
         lines.extend(f"- {command}" for command in packet.discovered_commands)
     else:
         lines.append(f"- python3 tools/agent_tools/route.py --prompt \"{PROMPT_PLACEHOLDER}\" --format json")
-    lines.append("SKILL_TOOL_COMMANDS_VALIDATION:")
+    lines.append("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:")
+    lines.append("- Run these only when editing skill command sections or checking skill-tool drift.")
     lines.extend(f"- {command}" for command in packet.validation_commands)
     return "\n".join(lines)
 

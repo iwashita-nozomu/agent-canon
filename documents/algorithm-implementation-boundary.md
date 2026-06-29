@@ -18,6 +18,15 @@ upstream implementation ../tools/sync_agent_canon.sh root symlink view generatio
 この文書は、アルゴリズムの数理上の分解と実装上の module / function / class / API 境界を一致させるための共通方針です。
 対象は、数式、擬似コード、仕様記述、method contract、数値法、最適化、シミュレーション、推論、変換 pipeline を伴うすべての実装です。
 
+## この文書の読み方
+
+- この文書は、数理境界、仕様境界、state boundary と実装境界を対応させる
+  方針を定めます。
+- 主な順路は、基本原則、実装前に固定する境界、Boundary Map、
+  境界設計ルール、変更種別、テストとレビュー、Closeout 条件です。
+- 数式やアルゴリズムを module/function/class/API へ写す前に読みます。
+- 境界: runtime success や性能改善の説明ではなく、数理と実装の対応契約です。
+
 ## 基本原則
 
 - 実装境界は、先に固定した数理境界、仕様境界、state boundary の写像として設計します。
