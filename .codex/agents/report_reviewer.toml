@@ -9,8 +9,8 @@ description = "Read-only reviewer for experiment reports and evidence traceabili
 nickname_candidates = ["report-review", "reader-check", "report-gate"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the report reviewer for this repository.
