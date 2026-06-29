@@ -47,11 +47,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("diff_triage_reviewer:gpt-5.5:high", result.stdout)
         self.assertIn("experiment_runner:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("explorer:gpt-5.4-mini:medium", result.stdout)
-        self.assertIn("manager_reviewer:gpt-5.4-mini:medium", result.stdout)
-        self.assertIn("plan_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("manager_reviewer:gpt-5.5:high", result.stdout)
+        self.assertIn("plan_reviewer:gpt-5.5:high", result.stdout)
         self.assertIn("spark_worker:gpt-5.3-codex-spark:low", result.stdout)
         self.assertIn("ship_reviewer:gpt-5.5:high", result.stdout)
 
@@ -179,7 +179,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:T1:must-use-owner-bounded-change", result.stdout)
 
     def test_spark_model_is_reserved_for_spark_worker(self) -> None:
-        """Read-heavy and review roles should use the mini route."""
+        """Only spark_worker should use the Spark model."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
@@ -209,6 +209,42 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertIn(
                 "CODEX_AGENT_ROLE_FINDING=model-settings:explorer:"
                 "spark-model-reserved-for-spark-worker",
+                result.stdout,
+            )
+
+    def test_review_roles_require_frontier_model(self) -> None:
+        """Reviewer and quality-check roles should stay on the frontier route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
+            (root / ".codex").mkdir(exist_ok=True)
+            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
+            (root / "agents").mkdir()
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "agents_config.json",
+                root / "agents" / "agents_config.json",
+            )
+            shutil.copy2(
+                PROJECT_ROOT / "agents" / "task_catalog.yaml",
+                root / "agents" / "task_catalog.yaml",
+            )
+            python_reviewer = root / ".codex" / "agents" / "python_reviewer.toml"
+            python_reviewer.write_text(
+                python_reviewer.read_text(encoding="utf-8")
+                .replace('model = "gpt-5.5"', 'model = "gpt-5.4-mini"')
+                .replace('model_reasoning_effort = "high"', 'model_reasoning_effort = "medium"'),
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-model-gpt-5.5",
+                result.stdout,
+            )
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-high-reasoning",
                 result.stdout,
             )
 

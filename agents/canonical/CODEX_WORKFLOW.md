@@ -535,7 +535,7 @@ handoff はこの policy を含めます。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、bounded review / report traceability / checklist gate は mini role TOML、Abstract Design Frame と design trace で完全に切れる狭い実装 slice は `spark_worker` に寄せます。
+default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は mini helper role TOML に残します。設計判断、scope 判断、final judgment、broad / ambiguous implementation、static validation triage、language-specific code review、bounded review / report traceability / checklist gate は frontier role TOML に寄せます。Abstract Design Frame と design trace で完全に切れる狭い実装 slice は `spark_worker` に寄せます。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Owner-Bounded Change` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
@@ -656,7 +656,7 @@ cost を無視して review coverage を優先する run では、research-drive
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
-- 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は mini role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
+- 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は mini helper role TOML へ、static validation failure triage と diff-local language review は frontier review role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
 - `spark_worker` に渡す実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。適格性は design trace と dependency-expanded handoff scope で判断します。
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
@@ -684,7 +684,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた bounded slice の preferred candidate は `spark_worker`、execution-only experiment/log work は mini role TOML とする
+- broad worker と review / quality-check gate は frontier role TOML、Abstract Design Frame と design trace から導かれた bounded slice の preferred candidate は `spark_worker`、execution-only experiment / log work は mini helper role TOML とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ

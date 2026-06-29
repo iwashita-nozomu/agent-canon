@@ -43,14 +43,18 @@ GIT_COMMAND_TIMEOUT_SECONDS = 5
 VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 SPARK_MODEL = "gpt-5.3-codex-spark"
 MINI_MODEL = "gpt-5.4-mini"
+FRONTIER_MODEL = "gpt-5.5"
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
 SPARK_MODEL_AGENT_IDS = {"spark_worker"}
 MINI_MEDIUM_AGENT_IDS = {
-    "cpp_reviewer",
-    "diff_triage_reviewer",
     "experiment_runner",
     "explorer",
-    "python_reviewer",
+}
+FRONTIER_HIGH_AGENT_IDS = {
+    "diff_triage_reviewer",
+    "docs_workflow_steward",
+    "reviewer",
+    "ship_reviewer",
     "test_designer",
 }
 
@@ -207,6 +211,11 @@ def evaluate_static_agent_configs(
                 findings.append(Finding("model-settings", agent_id, f"expected-model-{MINI_MODEL}"))
             if effort != "medium":
                 findings.append(Finding("model-settings", agent_id, "expected-medium-reasoning"))
+        if agent_id.endswith("_reviewer") or agent_id in FRONTIER_HIGH_AGENT_IDS:
+            if model != FRONTIER_MODEL:
+                findings.append(Finding("model-settings", agent_id, f"expected-model-{FRONTIER_MODEL}"))
+            if effort != "high":
+                findings.append(Finding("model-settings", agent_id, "expected-high-reasoning"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
     return findings
 

@@ -9,8 +9,8 @@ description = "Read-only reviewer for top-down document coherence, section order
 nickname_candidates = ["doc-flow", "readthrough-gate", "top-down-review"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the document-flow reviewer for this repository.
