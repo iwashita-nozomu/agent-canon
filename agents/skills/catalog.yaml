@@ -850,6 +850,10 @@ skill_families:
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md
     shim: .agents/skills/research-workflow/SKILL.md
+    related_skills:
+      - literature-survey
+      - experiment-lifecycle
+      - result-artifact-writeout
   - id: comprehensive-development
     purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
     canonical_doc: agents/skills/comprehensive-development.md

@@ -298,6 +298,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
     "$task-routing",
+    "$literature-survey",
     "$research-workflow",
     "$environment-maintenance",
     "$comprehensive-development",
@@ -825,6 +826,7 @@ def suggested_public_skills(
     """Return the public skill set required by the selected route."""
     selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
     if workflow_family_id == "research_driven_change":
+        selected.append("$literature-survey")
         selected.append("$research-workflow")
     elif workflow_family_id == "platform_and_environment":
         selected.append("$environment-maintenance")

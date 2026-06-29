@@ -11,6 +11,38 @@
 schema_version = 1
 
 [[contracts]]
+id = "literature_backed_skill_call_order"
+description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
+
+[[contracts.surfaces]]
+path = ".agents/skills/agent-orchestration/SKILL.md"
+markers = ["$literature-survey", "$research-workflow", "before `$research-workflow`", "source packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["literature-survey", "research-workflow", "先に", "source packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["$literature-survey", "$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["literature-survey", "research-workflow", "設計", "Implementation Source Packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["literature-survey", "research-workflow", "related_skills"]
+
+[[contracts.surfaces]]
+path = "agents/task_catalog.yaml"
+markers = ["literature-survey", "research-workflow", "source packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/agent_team.py"
+markers = ["$literature-survey", "$research-workflow", "research_driven_change", "selected.append"]
+
+[[contracts]]
 id = "owner_bounded_tool_route"
 description = "Owner-bounded repository edits run existing tools without a pre-use reading gate and keep owner/tool/validation routing visible."
 

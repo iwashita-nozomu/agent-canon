@@ -24,6 +24,7 @@ from tools.agent_tools.check_convention_compliance import (
     EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
     FALLBACK_EXIT_POLICY_MARKERS,
     IMPLEMENTATION_GUARDRAIL_MARKERS,
+    LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
     OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
@@ -223,11 +224,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/agent-orchestration/SKILL.md": skill_fixture(
         "agent-orchestration",
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "$owner-bounded-routing "
+        "$owner-bounded-routing $literature-survey $research-workflow "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff $prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
+        "before `$research-workflow` source packet adoption/exclusion "
         "parent-direct SKILL.md "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
         "explicit_approval_evidence router_unavailable_blocker\n"
@@ -235,9 +237,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ".agents/skills/codex-task-workflow/SKILL.md": skill_fixture(
         "codex-task-workflow",
         "codex task workflow prose-reasoning-graph $structure-planning "
+        "$literature-survey $research-workflow before design "
         "$md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
         "parent-direct $owner-bounded-routing SKILL.md "
+        "Implementation Source Packet adoption/exclusion "
         "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
@@ -332,6 +336,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
+        "literature-survey research-workflow 先に source packet adoption/exclusion "
         "$owner-bounded-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
@@ -343,6 +348,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/codex-task-workflow.md": (
         "codex task workflow prose-reasoning-graph structure-planning "
+        "literature-survey research-workflow 設計 Implementation Source Packet "
+        "adoption/exclusion "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
         "parent-direct $owner-bounded-routing SKILL.md "
@@ -448,6 +455,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/catalog.yaml": (
         "skill catalog routing entry skill format-only docs work "
+        "literature-survey research-workflow related_skills "
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
@@ -455,6 +463,13 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
         "- [\"Dependency inversion\"]\n"
+    ),
+    "agents/task_catalog.yaml": (
+        "literature-survey research-workflow source packet adoption/exclusion "
+        "Research-Driven Change\n"
+    ),
+    "tools/agent_tools/agent_team.py": (
+        "$literature-survey $research-workflow research_driven_change selected.append\n"
     ),
     ".codex/config.toml": "../.agents/skills/owner-bounded-routing/SKILL.md\n",
     ".codex/agents/python_reviewer.toml": (
@@ -1165,6 +1180,27 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "agents/skills/owner-bounded-routing.md",
             OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
         )
+
+    def test_literature_backed_skill_call_order_contract_is_manifest_backed(self) -> None:
+        """Literature-backed skill-call order surfaces are manifest-backed."""
+        self.assertIn(
+            ".agents/skills/agent-orchestration/SKILL.md",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "tools/agent_tools/agent_team.py",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+
+    def test_minimal_fixture_covers_literature_backed_skill_call_order_surfaces(self) -> None:
+        """The fixture includes every literature-backed skill-call order surface."""
+        missing = sorted(
+            path
+            for path in LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def test_responsibility_preflight_gate_requires_markers(self) -> None:
         """Pre-edit routing must keep responsibility-scope markers."""

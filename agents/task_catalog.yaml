@@ -132,12 +132,14 @@ workflow_families:
       purpose: Prompt packet for research-backed implementation, experiment, benchmark, report, and academic-writing tasks.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; external sources inform the work but do not replace repo-local artifacts.
+        - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
         - Start from the run bundle, user_request_contract.md, schedule.md, research_notes.md or cited sources, and team_manifest.yaml.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings: route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, bounded review, and report traceability to mini roles; route Abstract Design Frame-derived eligible bounded implementation slices to `spark_worker`; reserve frontier roles for synthesis, design judgment, conflict resolution, and final approval.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
+        - Treat literature-survey as the source packet owner and research-workflow as the outer loop owner; do not let implementation, experiment, report, or follow-up branches close source-backed claims without source packet evidence, limitations, and adoption/exclusion decisions.
         - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
         - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
         - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
