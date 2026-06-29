@@ -518,7 +518,7 @@ credential は committed config に直書きしません。
 
 # Agent-canon での推奨設計
 
-- `.codex/config.toml`: 小さく保つ
+- `.codex/config.toml`: 責務を追える形に保つ
 - `AGENTS.md`: workflow gate と closeout policy
 - `.codex/agents/*.toml`: role behavior
 - `.agents/skills`: reusable workflow

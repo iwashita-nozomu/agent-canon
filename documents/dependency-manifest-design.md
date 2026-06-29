@@ -68,7 +68,7 @@ The ledger carries four fields:
 - `Assumptions`: first-use DSL terms, problem standard forms, normalization
   rules, and governing definitions.
 - `Parent-doc alignment`: parent documents that agree with the claim, plus the
-  governing source when a child design chooses a narrower interpretation.
+  governing source when a child design chooses a more constrained interpretation.
 - `Refactor handoff`: structure, ownership, or route changes passed to
   `dependency-analysis` and `structure-refactor`.
 

@@ -45,7 +45,7 @@ without hidden assumptions.
 
 ## Abstract Design Frame Review
 
-<!-- Check whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces before narrowing to implementation files, helpers, or current findings. Return revise if file-by-file design or validation is not derived from this frame. -->
+<!-- Check whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces before selecting implementation files, helpers, or current findings. Return revise if file-by-file design or validation is not derived from this frame. -->
 
 ## Evidence Coverage Review
 

@@ -49,7 +49,7 @@ projection rules, validation rules, and extension contract live here.
 
 ## Expansion Rule
 
-When the graph language grows, add narrowly owned documents in this directory
+When the graph language grows, add specifically owned documents in this directory
 instead of expanding tool usage docs into a second specification. Examples of
 valid future documents are adapter contracts, projection algorithms,
 diagnostic-rule inventories, or code/design mirror contracts.

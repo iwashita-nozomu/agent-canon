@@ -31,9 +31,9 @@ Execute the required and task-matching conditional commands that the packet prin
    `documents/conventions/common/05_docs.md`.
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
-1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Pair it with `$small-change-routing` when the whole task is an owner-bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
+1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Pair it with `$owner-bounded-routing` when the whole task is an owner-bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
 1. For typo/link/format-only edits, keep selected_runtime_skill_read and
-   small_change_skill_read evidence for this runtime `SKILL.md` before patching.
+   owner_bounded_skill_read evidence for this runtime `SKILL.md` before patching.
 1. Use the unified Rust entrypoint as the canonical tool: `tools/bin/agent-canon docs check <paths...>` for checks and `tools/bin/agent-canon docs format <paths...>` for formatter repairs.
 1. Use `tools/bin/agent-canon docs -h` for command options and examples before reading implementation files.
 1. Before formatting files with display math, normalize display math to standalone double-dollar delimiter lines with blank lines around the block. Do not nest Markdown display delimiters inside KaTeX / math fenced blocks.

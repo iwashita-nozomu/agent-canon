@@ -29,7 +29,7 @@ back in design review rather than local implementation judgment.
 
 ## Abstract Design Frame
 
-<!-- Before narrowing to files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
+<!-- Before selecting files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
 
 - Responsibility model:
 - Concept or layer model:

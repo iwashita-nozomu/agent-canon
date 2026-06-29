@@ -170,7 +170,7 @@ parent は結果を見た時点で、次の route に分類します。
 subagent が hook / tool failure の種類を見逃した、または handoff に必要な checker evidence が入っていなかった場合、parent は chat 上の注意だけで済ませません。
 該当 role TOML、`CODEX_SUBAGENTS.md`、workflow family prompt、または handoff packet を更新するか、`subagent_protocol_update=not_required` と理由を記録します。
 
-behavior eval 用の最小 token は次です。
+behavior eval 用の必須 token セットは次です。
 
 ```text
 hook_tool_feedback=reviewed

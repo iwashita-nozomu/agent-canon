@@ -66,7 +66,7 @@ git -C vendor/agent-canon push origin HEAD
 ```
 
    Reuse the current AgentCanon source branch / PR when it already owns the
-   shared-canon work. Do not create a fresh branch for a small follow-up,
+   shared-canon work. Do not create a fresh branch for a bounded follow-up,
    mid-task user instruction, dirty-state avoidance, or checklist addendum.
    Record a reason before creating any new branch.
 

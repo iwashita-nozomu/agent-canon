@@ -50,7 +50,7 @@ outer loop は agile、inner change pass は waterfall です。
 - template repo では active `goal.md` は repo-local runtime state です。派生 repo の seed に混ぜないため tracked product state からは外し、必要なら `.gitignore` で ignored local state として保持します。
 - goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
-- ただし 1 iteration は単発 micro-fix ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
+- ただし 1 iteration は単発の孤立修正ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
 - iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。

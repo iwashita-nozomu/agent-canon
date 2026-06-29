@@ -257,7 +257,7 @@ decision を作ります。
 1. dependency depth、call direction、shared policy / base abstraction の有無から
    `sequential_root_slices` と `parallel_candidate_slices` に分けます。
 1. 各 wave では、同じ責務 group と validation surface に属する mechanically safe
-   target object を repair batch としてまとめます。親 agent は「小さく安全」だけを
+   target object を repair batch としてまとめます。親 agent は「縮めれば安全」だけを
    理由に finding 1 件へ分割せず、分割する場合は関連 target ごとに deferred /
    review_required 理由を書きます。
 1. 依存の根本、共通 helper、shared policy、base abstraction、public contract に
@@ -308,7 +308,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - regression case、nasty case、behavior-preservation assertions を設計し、
      実装 agent へ渡します。
 1. Write-capable implementation agent
-   - 既定は `worker` または小さい slice では `spark_worker` です。
+   - 既定は `worker` です。低遅延で閉じる write scope では `spark_worker` も使えます。
    - write-capable agent は既定 1 体ですが、parent が dependency order、
      wave plan、disjoint write scope、integration order、review gate を明示した
      場合は、複数 writer を同一 wave で並列化できます。衝突する target は禁止

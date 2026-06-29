@@ -1089,7 +1089,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS=apparent_breadth,scoped_change_lite,mvp,thin_slice",
+                "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS=apparent_breadth,owner_bounded_change,mvp,thin_slice",
                 result.stdout,
             )
             self.assertIn(

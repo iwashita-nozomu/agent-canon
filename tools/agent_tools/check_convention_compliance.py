@@ -14,7 +14,7 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/small-change-routing.md owner-bounded routing skill
+# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
@@ -424,7 +424,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
     ),
 }
 SMALL_CHANGE_SKILL_READ_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "small_change_skill_read"
+    "owner_bounded_skill_read"
 ]
 RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "responsibility_preflight_gate"
@@ -1776,7 +1776,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_document_structure_routing(root))
     findings.extend(
         collect_marker_contract_findings(
-            root, "small_change_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
+            root, "owner_bounded_skill_read", SMALL_CHANGE_SKILL_READ_MARKERS
         )
     )
     findings.extend(

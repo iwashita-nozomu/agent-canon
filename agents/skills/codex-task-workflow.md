@@ -60,9 +60,9 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   run-local packet として扱い、`team_manifest.yaml` の
   `run.repo_tool_routing_policy` を handoff に渡す
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
-- `Scoped Change Lite` では cheap local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
+- owner-bounded route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では、実装前に parent-direct route と targeted validation が固定された場合に parent-direct を使う
-- repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Scoped Change Lite`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。owner boundary、差し替え可能な単位、targeted validation route、public impact boundary が evidence で閉じた修正は `$small-change-routing` に流し、patch 前の作業 evidence に small_change_skill_read、skill 名、path を残す。見た目の小ささや file 数だけでは route を固定しません。実装 behavior は契約完全実装ポリシーから導く
+- repo-changing execution の編集では、選択済み runtime `SKILL.md` の本文を読む。これは `Owner-Bounded Change`、Routine docs、Focused code、typo / link / format-only、parent-direct route を含む selected_runtime_skill_read 契約です。owner boundary、差し替え可能な単位、targeted validation route、public impact boundary が evidence で閉じた修正は `$owner-bounded-routing` に流し、patch 前の作業 evidence に owner_bounded_skill_read、skill 名、path を残す。外形的な作業量や file 数だけでは route を固定しません。実装 behavior は契約完全実装ポリシーから導く
 - ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、`spark_worker` / `worker` を起動してから実装へ進む
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
@@ -71,7 +71,8 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - commit / push の前に `documents/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
-- 編集手段は、小〜中規模は patch-based edit、機械生成・一括変換は repo script / formatter の順に選ぶ
+- request clauses から `requested_scope` を先に固定し、その後に owner boundary、dependency evidence、validation route から `work_scope` を導く。限定された `work_scope` は実装段階の packet としてだけ使えます。broader request を閉じるには `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を明示し、要求された surface を勝手に外していないことを示します。
+- 編集手段は、手編集で責務を追える差分では patch-based edit、機械生成・一括変換では repo script / formatter の順に選ぶ
 - sweep と原因調査は、次の具体的な作業に結び付けます。各結果は、実装経路、再利用判断、古い面の修復、依存範囲、検証経路、Issue、または担当者付きの保留のどれかを更新します。更新先が同じ根拠は記録内の短い引用に圧縮し、現在の作業へ戻ります。
 - 検証は軽量な根拠から始めます。静的解析、依存確認、文書確認、経路確認、変更ファイル対象のテストを先に使います。CI 全体、長いテスト一式、ベンチマーク、実験、GPU / CPU 数値実行、ソルバーの一括確認、大きな乱択ケースは、今回の依頼、期待する確認結果、時間と資源の上限、停止条件、成果物の場所を持つ実行前の確認記録から実行します。
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
@@ -82,11 +83,11 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、各 implementation slice と downstream side effect が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
 - 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きで処理してはいけない
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、`Implementation Source Packet`、validation route を結び、要求を縮める implementation shortcut を見つけたら `design_issue_blocker` と evidence を記録して design review へ戻る
-- 見た目の広さ、`Scoped Change Lite`、MVP、thin slice は暫定的な routing、wave、validation profile の signal に留めます。実装 behavior は request clauses、acceptance contract、implementation source packet、design trace、dependency-expanded scope、validation route、review gate から導き、owner boundary や impact surface が違うと分かった時点で route を更新します。
+- 見た目の広さ、`Owner-Bounded Change`、MVP、thin slice は暫定的な routing、wave、validation profile の signal に留めます。実装 behavior は request clauses、acceptance contract、implementation source packet、design trace、dependency-expanded scope、validation route、review gate から導き、owner boundary や impact surface が違うと分かった時点で route を更新します。
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱う
 - class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る implementation slice は `$oop-readability-check` を validation route に入れ、SOLID principle signal、OOP dimension、finding kind、`tools/oop/shared/readability_core.py` の mapping を design artifact に結びます。
 - SOLID-sensitive な Python slice は `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` で、OOP readability report の `scanned_paths` が changed path を覆うことを確認します。
-- 実装前に `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と design trace から導かれた narrow slice は `spark_worker` を使い、design interpretation / conflict resolution / broad architecture judgment / scope judgment を含む slice は `worker` を使う
+- 実装前に `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と design trace から導かれた bounded slice は `spark_worker` を使い、design interpretation / conflict resolution / broad architecture judgment / scope judgment を含む slice は `worker` を使う
 - 変更対象の `Dependency Manifest Plan` を設計で固定し、編集前に upstream、編集後に downstream を読む
 - parent 直編集でも write-capable subagent でも、実装前に cause investigation artifact を固定し、`Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残してから code edit に入る
 - parent 直編集でも write-capable subagent でも、実装前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、予測された cause investigation / OOP / helper / dependency / responsibility_scope / hook runtime / skill mirror / tool catalog / protocol / log-surface gate と repair plan を handoff または work log に残す。実装ディレクトリを選ぶ前に owner scope と protecting tools を記録する

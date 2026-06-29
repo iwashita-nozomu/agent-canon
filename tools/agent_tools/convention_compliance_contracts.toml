@@ -1,7 +1,7 @@
 # @dependency-start
 # contract tool
 # responsibility Declares marker contracts consumed by convention compliance checks.
-# upstream design ../../agents/skills/small-change-routing.md owner-bounded routing skill contract
+# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
 # downstream implementation ./check_convention_compliance.py loads marker contracts
@@ -11,68 +11,68 @@
 schema_version = 1
 
 [[contracts]]
-id = "small_change_skill_read"
+id = "owner_bounded_skill_read"
 description = "Owner-bounded repository edits keep selected runtime skill reading visible and route through the small-change skill surface."
 
 [[contracts.surfaces]]
 path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "parent-direct", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/small-change-routing/SKILL.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
+path = ".agents/skills/owner-bounded-routing/SKILL.md"
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
 
 [[contracts.surfaces]]
-path = "agents/skills/small-change-routing.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "Scoped Change Lite", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
+path = "agents/skills/owner-bounded-routing.md"
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/md-style-check/SKILL.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "format-only", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "format-only", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/skills/md-style-check.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "format-only", "$small-change-routing", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "format-only", "$owner-bounded-routing", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/long-form-writing/SKILL.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "typo/link/format-only", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "typo/link/format-only", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/skills/long-form-writing.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "typo", "format-only", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "typo", "format-only", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/skills/README.md"
-markers = ["small-change-routing", "selected_runtime_skill_read", "small_change_skill_read", ".codex/config.toml"]
+markers = ["owner-bounded-routing", "selected_runtime_skill_read", "owner_bounded_skill_read", ".codex/config.toml"]
 
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
-markers = ["small-change-routing", "owner-bounded", "targeted validation", "Scoped Change Lite"]
+markers = ["owner-bounded-routing", "owner-bounded", "targeted validation", "Owner-Bounded Change"]
 
 [[contracts.surfaces]]
 path = ".codex/config.toml"
-markers = ["../.agents/skills/small-change-routing/SKILL.md"]
+markers = ["../.agents/skills/owner-bounded-routing/SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "bounded route", "SKILL.md"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "bounded route", "SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/USER_GUIDE_JA.md"
-markers = ["selected_runtime_skill_read", "small_change_skill_read", "runtime `SKILL.md`"]
+markers = ["selected_runtime_skill_read", "owner_bounded_skill_read", "runtime `SKILL.md`"]
 
 [[contracts]]
 id = "responsibility_preflight_gate"
@@ -95,11 +95,11 @@ path = "agents/skills/codex-task-workflow.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/small-change-routing/SKILL.md"
+path = ".agents/skills/owner-bounded-routing/SKILL.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "implementation directory"]
 
 [[contracts.surfaces]]
-path = "agents/skills/small-change-routing.md"
+path = "agents/skills/owner-bounded-routing.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
 
 [[contracts.surfaces]]

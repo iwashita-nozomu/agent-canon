@@ -130,7 +130,7 @@ python3 tools/oop/cpp/readability.py \
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は score threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。
 score は設計判断の補助であり、behavior correctness の代替ではありません。
-tool が足りない場合は、refactor 対象に合わせて小さい解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
+tool が足りない場合は、refactor 対象に合わせて targeted 解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
 
 外部 repo、bare repo、または派生 template snapshot を調べる場合は、元 repo を編集せず `git archive` などで読み取り専用 snapshot を作り、run bundle に `OOP Analysis Scope:` として次を残します。
 

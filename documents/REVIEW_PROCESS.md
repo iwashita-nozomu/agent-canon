@@ -185,7 +185,7 @@ findings は少なくとも次に分けます。
 
 - `fix now`
   - この変更で直さないと回帰や矛盾が残るもの
-  - 修正後は、どんなに小さい差分でも full required review set を再実行する
+  - 修正後は、どの差分でも full required review set を再実行する
   - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
   - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
   - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの

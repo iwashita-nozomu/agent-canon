@@ -232,7 +232,7 @@ def warning_payload(command: str) -> dict[str, object]:
         "next_action": "replace_broad_rg_with_bounded_or_compact_search",
         "remediation": [
             "`rg --files` or `rg -l '<pattern>' <bounded dirs>` for discovery.",
-            "`rg -n '<pattern>' <specific files or small dirs>` for line details.",
+            "`rg -n '<pattern>' <specific files or bounded dirs>` for line details.",
             "Exclude `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl` for ordinary repo search.",
             "This warning is non-blocking; record unresolved direct-rg findings before closeout.",
         ],

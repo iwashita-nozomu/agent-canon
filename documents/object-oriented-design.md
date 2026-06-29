@@ -33,7 +33,7 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
 - まず関数、値オブジェクト、既存 `Protocol`、既存 class を再利用し、新しい class は最後に追加します。
-- 状態を持たない処理は class にせず、関数または小さい module-level helper に保ちます。
+- 状態を持たない処理は class にせず、関数または focused module-level helper に保ちます。
 - helper は極力、使う関数の内側へ局所内包します。public / module-level helper は domain の射として読める名前と型を持つ場合だけ許可します。
 - 不変の設定、結果、通知は `@dataclass(frozen=True)` などの値オブジェクトで表します。
 - 差し替え境界は具象 class ではなく、最小の振る舞い契約で受けます。
@@ -60,7 +60,7 @@ SOLID signal は設計レビューの入口です。最終判断では機械 fin
 | Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `function_lines`、`class_lines`、`mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket` |
 | Open/closed | 安定した policy を extension point で拡張可能にする。 | 予測済み variant は branch cascade ではなく `Protocol`、registry、adapter、variant value、別 entrypoint へ置く。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
 | Liskov substitution | subtype は supertype の証明済み性質を保存する。 | 継承は置換可能な契約の特殊化に限定し、入力条件、戻り値、例外、invariant、history property を保存する。 | `base_classes` と type checker / shared behavior contract |
-| Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの小さい contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
+| Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの role-specific contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
 | Dependency inversion | high-level policy と low-level detail は stable abstraction に依存する。 | composition root / factory / adapter で具象生成を閉じ、policy layer は `Protocol`、typed value、stable interface を受ける。 | OOP primary signal は `missing_public_annotations` と `optional_boundary`。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
 
 この表は Martin の SOLID 系 article、Liskov/Wing の behavioral subtyping、
@@ -128,7 +128,7 @@ member が増える場合は、値オブジェクト、state owner、adapter、s
 - 既存設計文書で継承関係が正本として固定されている。
 
 実装共有だけを目的にした深い継承、mixin の多用、親 class の内部状態に依存する subclass を禁止します。
-共通処理は helper function、composition された component、または小さい値オブジェクトへ切り出します。
+共通処理は helper function、composition された component、または focused value object へ切り出します。
 
 ### 6. 境界で検証する
 
@@ -152,7 +152,7 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 
 - public function / method は、入力 domain、出力 codomain、失敗境界が型や名前から読める。
 - 純粋な変換 `A -> B` と、IO / mutation / process 起動のような副作用境界を 1 つの関数に混ぜない。
-- 合成可能な小さい変換を作り、巨大な手続きで複数の射を隠さない。
+- 合成可能な focused 変換を作り、巨大な手続きで複数の射を隠さない。
 - `None` による runtime routing を domain の一部として曖昧にせず、別型、別 constructor、別 entrypoint、`Protocol`、variant で表す。
 - helper は外へ増やすより、合成の内側でしか使わない局所関数や内包に閉じる。
 - 数理的に情報を増やさない identity wrapper、pass-through wrapper、stateless callable class、薄い formatting wrapper は不要構造として扱います。

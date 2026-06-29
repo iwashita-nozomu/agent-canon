@@ -88,7 +88,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
    `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
    があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
    再 check、archive sync の順で閉じます。
-1. event file drilldown は tool 実装、schema debugging、破損 audit、または API が明示した drilldown path に限定します。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `git grep -n` を使います。
+1. event file drilldown は tool 実装、schema debugging、破損 audit、または API が明示した drilldown path に限定します。読む場合は理由を明示し、`tail`、focused parser、または path 限定 `git grep -n` を使います。
 1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
 1. structured evidence を durable skill issue に変換する場合は、`issue-finding-report`
    に渡し、抽象原因、重複検索、dependency-expanded edit scope、multi-agent
@@ -97,7 +97,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 ## Boundaries
 
 - この skill は log archive API、structured summary、routing miss、selection gap、
-  missed / late skill invocation、narrow related-skill coverage、
+  missed / late skill invocation、over-constrained related-skill coverage、
   wave execution reconciliation の観測と解釈を所有します。
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。

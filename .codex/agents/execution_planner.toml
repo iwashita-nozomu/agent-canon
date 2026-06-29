@@ -27,7 +27,7 @@ Responsibilities:
 - rewrite the plan until plan review returns approve
 
 Rules:
-- keep the workflow-family order explicit; full staged routes use requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> change review -> final review, while Scoped Change Lite uses cheap-first local routing unless escalation conditions apply
+- keep the workflow-family order explicit; full staged routes use requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> change review -> final review, while owner-bounded routes use boundary-evidenced local routing unless escalation conditions apply
 - planning review must be performed by a separate reviewer agent
 - name the writer, the read-only reviewers, the required checks, and the handoff artifact for each stage
 - route raw checker/stat artifacts to artifact review, reader-facing interpretation to report review, and repo-wide integration drift to project review

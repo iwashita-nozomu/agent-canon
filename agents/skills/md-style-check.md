@@ -25,8 +25,8 @@ upstream design ../canonical/skills.md skill canon registry
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。
 formatter を実行した場合は、体裁修正だけで完了にせず、同じ入口で周辺チェックまで閉じます。
 この skill 単独で扱うのは typo / link / format-only の文書変更です。
-repo-changing task 全体が owner-bounded 修正として閉じる場合は `$small-change-routing`
-と組み合わせ、selected_runtime_skill_read と small_change_skill_read を残します。
+repo-changing task 全体が owner-bounded 修正として閉じる場合は `$owner-bounded-routing`
+と組み合わせ、selected_runtime_skill_read と owner_bounded_skill_read を残します。
 section order、reader path、claim support、source map、canonical route、
 document responsibility が変わる substantive な文書変更では、
 `prose-reasoning-graph` と `structure-planning` を先に通し、
@@ -65,7 +65,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 ## Mandatory Checklist
 
-- typo / link / format-only route でも selected_runtime_skill_read と small_change_skill_read の evidence に runtime `SKILL.md` path が残っている
+- typo / link / format-only route でも selected_runtime_skill_read と owner_bounded_skill_read の evidence に runtime `SKILL.md` path が残っている
 - changed Markdown files have been checked with `tools/bin/agent-canon docs check`
 - 見出し階層が飛んでいない
 - command、path、file reference の書式が揃っている

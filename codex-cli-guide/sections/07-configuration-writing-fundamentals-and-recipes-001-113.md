@@ -31,7 +31,7 @@ upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved gene
 
 `最小設定` → `差分確認` → `段階追加`
 
-_小さく書いて検証する。_
+_責務境界を書いて検証する。_
 
 
 #### 図解: 設定ファイルの役割
@@ -592,7 +592,7 @@ exclude_slash_tmp = false
 
 
 **確認** 
-patch作成、test実行、外部networkの扱いを小さなrepoで確認する。
+patch作成、test実行、外部networkの扱いをsandbox repoで確認する。
 
 
 **落とし穴** 
@@ -3343,5 +3343,4 @@ Team/person responsible for upkeep.
 
 
 ---
-
 

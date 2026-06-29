@@ -18,7 +18,7 @@ skill_families:
     related_skills:
       - task-routing
       - codex-task-workflow
-      - small-change-routing
+      - owner-bounded-routing
       - subagent-bootstrap
       - dependency-analysis
     routing:
@@ -46,7 +46,7 @@ skill_families:
     shim: .agents/skills/task-routing/SKILL.md
     related_skills:
       - agent-orchestration
-      - small-change-routing
+      - owner-bounded-routing
       - structure-refactor
       - agent-log-analysis
       - issue-finding-report
@@ -128,13 +128,13 @@ skill_families:
     related_skills:
       - agent-orchestration
       - task-routing
-      - small-change-routing
+      - owner-bounded-routing
       - result-artifact-writeout
       - change-review
-  - id: small-change-routing
+  - id: owner-bounded-routing
     purpose: Route owner-bounded repository edits through selected runtime skill reads, lightweight preflight, and targeted validation.
-    canonical_doc: agents/skills/small-change-routing.md
-    shim: .agents/skills/small-change-routing/SKILL.md
+    canonical_doc: agents/skills/owner-bounded-routing.md
+    shim: .agents/skills/owner-bounded-routing/SKILL.md
     related_skills:
       - task-routing
       - md-style-check
@@ -147,14 +147,14 @@ skill_families:
         - ["bounded", "route"]
         - ["bounded", "edit"]
         - ["targeted", "validation"]
-        - ["Scoped Change Lite"]
+        - ["Owner-Bounded Change"]
         - ["コードファイル", "順序"]
         - ["定義順"]
         - ["コード", "順序", "わかりにく"]
         - ["typo", "link"]
         - ["format-only"]
         - ["selected_runtime_skill_read"]
-        - ["small_change_skill_read"]
+        - ["owner_bounded_skill_read"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md

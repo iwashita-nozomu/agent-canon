@@ -124,7 +124,7 @@ discoverable through tool or route guidance for API search.
   defect where an agent moved toward changing an external library before
   confirming the caller-side public API path.
 
-This issue is narrower: it records the precise search-path error that produced
+This issue is more specific: it records the precise search-path error that produced
 the false "cannot do it" conclusion.
 
 ## Evidence

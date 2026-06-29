@@ -44,7 +44,7 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 - correctness evidence と performance evidence を混同しません。正しさの parity test は性能の証拠ではなく、速度比較は数式上の正しさの証拠ではありません。
 - runtime success や smoke pass は acceptance の十分条件ではありません。本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と一致しているかを別に確認します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
-- user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで close しません。
+- user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで close しません。
 - 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
   `references/`、`notes/`、`documents/`、topic report に同じ source / claim があるか
   を確認します。既存 source note がある場合は、そこを更新または引用します。
@@ -151,7 +151,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - ordered difficulty 軸は 1 ずつ連続に sweep します。飛び飛びの点だけで frontier や failure onset を判断することを禁止します。
 - raw failure count だけで結論を出すことを禁止します。environment noise、case mix、failure kind、success rate を分離してから解釈します。
 - failure-onset dimension を記録せずに、implementation bug と真の frontier limit を区別した扱いにすることを禁止します。
-- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張することを禁止します。
+- toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張することを禁止します。
 
 ### Step 4. 作業場所と出力先を決める
 
@@ -162,12 +162,12 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 ### Step 5. prototype を作る
 
-- まず小さい prototype または最小ケースで式と実装の対応を確かめます。
+- まず bounded prototype または基準ケースで式と実装の対応を確かめます。
 - 可能なら analytical solution、trusted prototype、corner case、旧実装と比較します。
 - run が通っても `Equation-to-Code Mapping:` とズレるなら prototype 段階で fail とし、大規模 sweep に進みません。
 - prototype 段階で落ちるなら、大規模 sweep に進みません。
 
-### Step 6. 小さく改造する
+### Step 6. 責務単位で改造する
 
 - 1 commit 1 意図にします。
 - 各改造ごとに、次を action log へ残します。

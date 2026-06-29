@@ -6,7 +6,7 @@
 # @dependency-end
 
 name = "experiment_runner"
-description = "Low-cost execution-only agent for running bounded experiments and summarizing logs."
+description = "Execution-only agent for running bounded experiments and summarizing logs."
 nickname_candidates = ["run-log", "experiment", "measure"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"

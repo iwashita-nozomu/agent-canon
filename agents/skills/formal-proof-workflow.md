@@ -316,7 +316,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   未解決 goal / missing hypothesis を読みます。その gap を bridge candidate に翻訳し、
   generated Lean evidence、checker-facing Lean 関数、IR/source fact から
   証明または反証できるか確認し、再び `P` の証明を走らせます。
-  `P` が証明・反証・現仮定下での非導出証明・より小さい witness への縮約のいずれかに達するまで
+  `P` が証明・反証・現仮定下での非導出証明・下位 witness への縮約のいずれかに達するまで
   ループします。平坦な候補一覧はこのループの入力であり、最終成果ではありません。
 - 実装されている反復法と証明状態を人間が一目で確認する必要がある場合は、
   `$algorithm-flowchart` で IR、theorem graph、
@@ -355,15 +355,15 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   production code へ足す口実ではありません。
 - `unverified_with_next_witness` を書いたらそこで止めず、named witness / next frontier を
   同じ loop へ再投入します。`verified`、`refuted`、
-  `unprovable_under_assumptions` まで到達するか、より小さい named witness を持つ
+  `unprovable_under_assumptions` まで到達するか、下位 named witness を持つ
   open row へ縮約するまで、proof note を closeout してはいけません。
-- より小さい named witness が、caller lemma または target theorem edge を止めている
+- 下位 named witness が、caller lemma または target theorem edge を止めている
   関数単位の保証である場合は、それを user-facing に返してはいけません。
   同一 turn 内で callee 展開、IR / Lean 関数生成の改善、bridge proposition の変更、
   counterexample 探索、または algorithm exploration に戻し、その関数保証が
   `verified`、`refuted`、`unprovable_under_assumptions`、または現在の
   repo / tool 環境では進められない checked external boundary に到達するまで続けます。
-- より小さい named witness が connection-level guarantee、すなわち code fact から
+- 下位 named witness が connection-level guarantee、すなわち code fact から
   theorem variable への binding、backend profile の instance 化、solver return から
   caller 単位への変換、または bridge lemma edge である場合も同じ扱いです。
   その接続は次の in-turn work item であり、`external_assumption` として返す前に、
@@ -380,7 +380,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   `unverified_with_next_witness` は同一 turn 内の作業 queue であり、
   user-facing な終端 outcome ではありません。各 frontier row は
   `verified`、`refuted`、`unprovable_under_assumptions`、または strict に
-  小さい named witness を持つ open row のどれかへ落とし、小さい witness も
+  下位 named witness を持つ open row のどれかへ落とし、その witness も
   直ちに同じ loop へ再投入します。
 - 「どの証明 path でも証明できない」と言う場合は、絶対的な不可証明ではなく、
   現在の JIT-canonical IR、assumption ledger、生成済み backend trace coverage の
@@ -404,7 +404,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   示した場合だけです。
 - user-facing に進捗を返す前に、現在選択した部品証明をすべて終端状態まで
   処理します。部品証明ごとに `verified`、`refuted`、
-  `unprovable_under_assumptions`、またはより小さい named witness を持つ
+  `unprovable_under_assumptions`、または下位 named witness を持つ
   `unverified_with_next_witness` へ到達させ、単なる未検査の生成物作成、
   「未証明」の列挙だけで返してはいけません。
 - target claim が `verified` / `refuted` /
@@ -422,7 +422,7 @@ LLM 生成文、自然言語証明、未検査の theorem file を証明済み�
   frontier-minimal であることを示します。すなわち、返した blocker より手前の
   target-chain node は `verified` / `refuted` /
   `unprovable_under_assumptions` / external assumption として処理済みであり、
-  返した blocker の下にさらに小さい未処理 target-chain witness が残っていないことを、
+  返した blocker の下にさらに下位の未処理 target-chain witness が残っていないことを、
   proof-path analyzer、lemma graph slice、または checker-backed minimality lemma で
   示します。高レベルな「局所収束が未証明」「KKT が未証明」だけを blocker として
   返してはいけません。
@@ -707,7 +707,7 @@ definition, library, or implementation fact prevents progress.
 For frontier rows in a proof note, prefer `unverified_with_next_witness` over
 bare `unverified`, and fill the remaining-obligation cell with the named
 theorem variable, existing algorithm-output projection, backend evidence, problem-class witness,
-or theorem narrowing needed next. A bare `unverified` frontier row is not a
+or theorem restriction needed next. A bare `unverified` frontier row is not a
 closeout state.
 Only `verified`, `refuted`, and `unprovable_under_assumptions` are terminal
 outcomes for this skill; all other statuses require more proof work or a
@@ -871,13 +871,13 @@ graph 生成後、algorithm theorem を進めるときは次の loop を回し�
    checker-backed に示した場合だけ採用します。
 1. 弱い命題だけが証明できた場合は、その弱い命題から target theorem へ何が不足するかを
    bridge edge として残します。強い route が refuted の場合は、refutation を残し、
-   theorem narrowing または algorithm change を書きます。
+   theorem restriction または algorithm change を書きます。
 1. blocker が algorithmic choice にある場合は、変更候補を proof obligation として
    書き出し、実装変更後に IR / lemma graph を再生成して同じ loop へ戻します。
    algorithm-change guidance だけで target theorem の作業を終えません。
 1. proof status table と proof note を同じ pass で更新します。open row は、次が
    数学証明、implementation return-value projection、backend evidence binding、
-   theorem narrowing のどれかを必ず示します。
+   theorem restriction のどれかを必ず示します。
 
 Proof path attempt record は次の形を基本にします。
 

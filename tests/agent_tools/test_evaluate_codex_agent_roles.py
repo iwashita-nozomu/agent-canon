@@ -169,14 +169,14 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 encoding="utf-8"
             )
             (root / "agents" / "task_catalog.yaml").write_text(
-                task_catalog.replace("family: scoped_change_lite", "family: scoped_change", 1),
+                task_catalog.replace("family: owner_bounded_change", "family: scoped_change", 1),
                 encoding="utf-8",
             )
 
             result = run_eval("--root", str(root))
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:T1:must-use-scoped-change-lite", result.stdout)
+            self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:T1:must-use-owner-bounded-change", result.stdout)
 
     def test_spark_model_is_reserved_for_spark_worker(self) -> None:
         """Read-heavy and review roles should use the mini route."""

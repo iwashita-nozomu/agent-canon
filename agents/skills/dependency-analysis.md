@@ -186,8 +186,8 @@ code dependency と header dependency は packet 内でも section を分けま�
 影響範囲の block 化は tool の責務です。LLM は tool-generated block を受け取り、
 必要に応じて accept、split、merge、`review_required` を判断します。その場合も
 元の `block_id`、分割/統合理由、追加確認した artifact path を残します。
-node の大きさも固定値ではなく最適化対象です。最もよい scope は「大きいほどよい」
-でも「小さいほど安全」でもなく、behavior contract が明確で、write conflict がなく、
+node の粒度も固定値ではなく最適化対象です。最もよい scope は「大きいほどよい」
+でも「縮めるほど安全」でもなく、behavior contract が明確で、write conflict がなく、
 token 予算に収まり、1 つの coherent な validation surface で確認できる最大の block
 です。semantic risk、ownership、validation isolation が崩れる場合だけ block を縮めます。
 LLM が full artifact を読むのは、現在の repair batch、争点になった edge、review

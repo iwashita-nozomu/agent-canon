@@ -131,11 +131,11 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("small-change-routing", decision["related_skill_candidates"])
-        self.assertNotIn("small-change-routing", decision["active_skills"])
+        self.assertIn("owner-bounded-routing", decision["related_skill_candidates"])
+        self.assertNotIn("owner-bounded-routing", decision["active_skills"])
         self.assertIn("task-routing", decision["related_skills"])
         self.assertIn(
-            "small-change-routing", decision["related_skills"]["task-routing"]
+            "owner-bounded-routing", decision["related_skills"]["task-routing"]
         )
 
     def test_prompt_routes_repo_owned_tool_routing_feedback(self) -> None:
@@ -419,8 +419,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("small-change-routing", decision["matched_skills"])
-        self.assertIn("small-change-routing", decision["active_skills"])
+        self.assertIn("owner-bounded-routing", decision["matched_skills"])
+        self.assertIn("owner-bounded-routing", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
         self.assertIn("python-review", decision["deferred_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")

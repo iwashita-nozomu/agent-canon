@@ -389,7 +389,7 @@ _成熟ロードマップ_
 
 ### まず作る最小構成
 
-最小構成では、リポジトリ直下に`AGENTS.md`と`.codex/config.toml`だけを置く。`AGENTS.md`は「Codexが毎回読む作業規約」、`.codex/config.toml`は「Codexクライアントが読む設定」である。前者は自然言語で、後者はTOMLで書く。最初からHooks、Rules、MCP、Skills、Subagentsを全部入れる必要はない。最初は小さく始め、Codexが同じ間違いを繰り返したら`AGENTS.md`へルールを追加し、危険なコマンドが出るならRulesへ移し、繰り返しの手順が増えたらSkillsに切り出す。
+基本構成では、リポジトリ直下に`AGENTS.md`と`.codex/config.toml`だけを置く。`AGENTS.md`は「Codexが毎回読む作業規約」、`.codex/config.toml`は「Codexクライアントが読む設定」である。前者は自然言語で、後者はTOMLで書く。最初からHooks、Rules、MCP、Skills、Subagentsを全部入れる必要はない。最初は基本構成で始め、Codexが同じ間違いを繰り返したら`AGENTS.md`へルールを追加し、危険なコマンドが出るならRulesへ移し、繰り返しの手順が増えたらSkillsに切り出す。
 
 
 ```
@@ -685,7 +685,7 @@ project_doc_max_bytes = 65536
 
 ### いつ使うか
 
-サブエージェントは、Codexが別のagent threadをspawnし、並列に調査、実装、レビュー、要約を進め、親スレッドへ結果を返す仕組みである。Codexはサブエージェントを勝手にspawnせず、ユーザーが明示的に「spawn two agents」「parallel subagents」「one agent per point」のように依頼したときに使う。各サブエージェントは独自にモデルとツールを使うため、単一agentよりトークン消費、レイテンシ、ローカルリソース消費が増える。したがって、小さな修正ではなく、広い調査、PRレビュー、複数観点の監査、複数ファイル群の一括点検に向く。
+サブエージェントは、Codexが別のagent threadをspawnし、並列に調査、実装、レビュー、要約を進め、親スレッドへ結果を返す仕組みである。Codexはサブエージェントを勝手にspawnせず、ユーザーが明示的に「spawn two agents」「parallel subagents」「one agent per point」のように依頼したときに使う。各サブエージェントは独自にモデルとツールを使うため、単一agentよりトークン消費、レイテンシ、ローカルリソース消費が増える。したがって、単発修正ではなく、広い調査、PRレビュー、複数観点の監査、複数ファイル群の一括点検に向く。
 
 
 ```
@@ -992,7 +992,7 @@ L{0.20} X}
 仕様判断、セキュリティレビュー  |  high  |  複数前提を検証し、エッジケースを追う必要がある。
 コード探索、影響範囲整理  |  medium  |  速度と品質のバランスがよい。
 大量CSV行の要約  |  lowまたはmedium  |  1件あたりの判断が軽く、並列数の方が重要。
-実装修正  |  medium  |  変更を小さく保ち、テストで検証する。
+実装修正  |  medium  |  変更を責務境界に保ち、テストで検証する。
 ```
 
 
@@ -1123,7 +1123,7 @@ MCPはCodexに新しい外部ツールを渡すため、便利だが攻撃面も
 
 ### Rulesの役割
 
-Rulesは、Codexがsandbox外で実行しようとするコマンドを、prefixに基づいて判定する。たとえば`gh pr view`は承認ありで許可、`git push`は必ずprompt、`rm -rf`はforbidden、といった運用ができる。Rulesは実験的機能として扱われるため、仕様変更に備えて小さく保ち、定期的に確認する。
+Rulesは、Codexがsandbox外で実行しようとするコマンドを、prefixに基づいて判定する。たとえば`gh pr view`は承認ありで許可、`git push`は必ずprompt、`rm -rf`はforbidden、といった運用ができる。Rulesは実験的機能として扱われるため、仕様変更に備えて責務を追える形に保ち、定期的に確認する。
 
 
 ```
@@ -1371,7 +1371,7 @@ prefix_rule(
 ```
 
 
-## プロジェクト導入手順：小さく始めて育てる
+## プロジェクト導入手順：基本構成から育てる
 
 
 ### Step 1: 現状の作業規約を集約する
@@ -1446,7 +1446,7 @@ Implement the smallest fix for the described bug.
 Before editing, ask code_mapper to identify the responsible files.
 If browser behavior is relevant, ask browser_debugger to reproduce the issue first.
 Only after evidence is gathered, use ui_fixer to change files.
-Run the narrowest relevant tests and summarize changed files and validation results.
+Run the most relevant tests and summarize changed files and validation results.
 ```
 
 
@@ -1640,5 +1640,4 @@ L{0.35} L{0.50}}
 
 
 ---
-
 

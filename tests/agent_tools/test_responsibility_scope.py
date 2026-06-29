@@ -151,7 +151,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertIn("scope_overlap:tools/evidence.py:scopes:tools,evidence", result.stdout)
 
     def write_fixture(self, root: Path) -> None:
-        """Write a small responsibility-scope fixture repository."""
+        """Write a bounded responsibility-scope fixture repository."""
         self.write_file(root, "tools/agent_tools/responsibility_scope.py", "# tool\n")
         self.write_file(root, "tests/agent_tools/test_responsibility_scope.py", "# test\n")
         self.write_file(

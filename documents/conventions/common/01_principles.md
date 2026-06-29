@@ -27,7 +27,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - **実装指針**:
   - チューニング可能な値（例: `m`, `s`, `sigma`, `num_trials`）は **公開APIの引数**として受け取ります。
   - 内部関数でのみ使う値は、**名前付き定数**として定義し、用途をコメントで明確にします。
-  - dtype 依存の小さい値（例: `eps`）は、公開APIから受け取るか、型に合わせて `jnp.asarray(..., dtype=...)` で作ります。
+  - dtype 依存値（例: `eps`）は、公開APIから受け取るか、型に合わせて `jnp.asarray(..., dtype=...)` で作ります。
 
 ## 数値ハードコード検証
 

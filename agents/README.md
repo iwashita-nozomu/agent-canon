@@ -92,7 +92,7 @@ $adaptive-improvement-loop
 $paper-writing
 ```
 
-repo-changing task の最小 bundle:
+repo-changing task の基本 bundle:
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
