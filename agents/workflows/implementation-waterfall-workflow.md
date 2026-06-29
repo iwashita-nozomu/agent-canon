@@ -383,6 +383,12 @@ exit 条件:
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
+- Design Integrity Gate はこの gate の中心条件です。設計は
+  owning responsibility model から始め、近い file、current finding、会話印象から
+  file-level work を決めません。API shape、責務境界、path layout、命名、
+  アルゴリズム、test oracle、依存方向、runtime contract、config surface の
+  判断不足は `design_issue_blocker` として扱い、implementation shortcut に
+  しません
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Abstract Design Frame` には、実装対象 file や直近 finding へ絞る前の抽象責務、概念 graph または layer model、非対象、将来拡張 layer、評価軸、既存正本との関係を列挙します。`File-By-File Design`、`Design-To-Implementation Trace`、validation はこの frame から導きます
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します

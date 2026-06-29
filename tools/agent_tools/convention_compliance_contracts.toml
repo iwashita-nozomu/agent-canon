@@ -11,6 +11,38 @@
 schema_version = 1
 
 [[contracts]]
+id = "design_integrity_gate"
+description = "Implementation starts from an owning responsibility model, preserves Abstract Design Frame traceability, and routes unresolved design choices through design_issue_blocker instead of implementation shortcuts."
+
+[[contracts.surfaces]]
+path = "ROOT_AGENTS.md"
+markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "Design-To-Implementation Trace", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/agent-orchestration/SKILL.md"
+markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts.surfaces]]
+path = ".agents/skills/codex-task-workflow/SKILL.md"
+markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation latitude"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["Design Integrity Gate", "責務 model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["Design Integrity Gate", "owning responsibility model", "Abstract Design Frame", "Design-To-Implementation Trace", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts.surfaces]]
+path = "agents/workflows/implementation-waterfall-workflow.md"
+markers = ["Design Integrity Gate", "owning responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+
+[[contracts]]
 id = "static_read_validation_policy"
 description = "Validation policy treats static analysis and reading evidence as primary, with operation checks and broad execution only as supplemental evidence for runtime or unresolved risk."
 

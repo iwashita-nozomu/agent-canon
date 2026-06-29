@@ -19,6 +19,7 @@ from pathlib import Path
 from tools.agent_tools.check_convention_compliance import (
     AGENT_CANON_PUSH_REMOTE_MARKERS,
     BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
+    DESIGN_INTEGRITY_GATE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
@@ -192,6 +193,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Completion Readiness\n"
+        "Design Integrity Gate owning responsibility model "
+        "Abstract Design Frame Design-To-Implementation Trace "
+        "design_issue_blocker implementation shortcut\n"
         "user-facing completion\n"
         "repo_wide_static_analysis_complete\n"
         "repo_wide_dependency_tools_complete\n"
@@ -237,6 +241,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
         "static/read evidence unresolved signal operation checks smoke runs "
         "Expensive command "
+        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "design_issue_blocker implementation shortcut "
         "before `$research-workflow` source packet adoption/exclusion "
         "parent-direct SKILL.md "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -250,6 +256,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
         "static/read evidence primary validation evidence supplemental evidence "
         "operation checks unresolved static findings "
+        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "design_issue_blocker implementation latitude "
         "parent-direct $owner-bounded-routing SKILL.md "
         "Implementation Source Packet adoption/exclusion "
         "tool_rejection_preflight.py "
@@ -349,6 +357,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "literature-survey research-workflow 先に source packet adoption/exclusion "
         "静的解析・読み取り evidence 未解決 signal 動作確認 smoke run "
         "重いコマンド "
+        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "design_issue_blocker implementation shortcut "
         "$owner-bounded-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
@@ -364,6 +374,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "adoption/exclusion "
         "静的解析・読み取り evidence primary validation evidence "
         "supplemental evidence 動作確認 未解決 finding "
+        "Design Integrity Gate 責務 model Abstract Design Frame "
+        "design_issue_blocker implementation shortcut "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
         "parent-direct $owner-bounded-routing SKILL.md "
@@ -446,6 +458,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Interface segregation Dependency inversion "
         "tools/oop/shared/readability_core.py SOLID route owner mechanical projections "
         "readability.py\n"
+    ),
+    "agents/workflows/implementation-waterfall-workflow.md": (
+        "Design Integrity Gate owning responsibility model Abstract Design Frame "
+        "design_issue_blocker implementation shortcut\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
     ".agents/skills/long-form-writing/SKILL.md": skill_fixture(
         "long-form-writing",
@@ -626,6 +644,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED\n"
     ),
     "ROOT_AGENTS.md": (
+        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "Design-To-Implementation Trace design_issue_blocker "
+        "implementation shortcut\n"
         "## Runtime Owner Map\n\n"
         "| Contract | Owner Surface | Evidence / Checker |\n"
         "| -------- | ------------- | ------------------ |\n"
@@ -1194,6 +1215,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "agents/skills/owner-bounded-routing.md",
             OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
         )
+
+    def test_design_integrity_gate_requires_markers(self) -> None:
+        """Design guidance must keep implementation tied to responsibility model."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "owning responsibility model",
+                    "nearby file route",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("design_integrity_gate", result.stdout)
+            self.assertIn(
+                "missing-marker:owning responsibility model",
+                result.stdout,
+            )
+
+    def test_design_integrity_gate_contract_is_manifest_backed(self) -> None:
+        """Design-integrity surfaces are loaded from the marker manifest."""
+        self.assertIn("ROOT_AGENTS.md", DESIGN_INTEGRITY_GATE_MARKERS)
+        self.assertIn(
+            "agents/workflows/implementation-waterfall-workflow.md",
+            DESIGN_INTEGRITY_GATE_MARKERS,
+        )
+
+    def test_minimal_fixture_covers_design_integrity_gate_surfaces(self) -> None:
+        """The fixture includes every design-integrity gate surface."""
+        missing = sorted(
+            path
+            for path in DESIGN_INTEGRITY_GATE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
 
     def test_literature_backed_skill_call_order_contract_is_manifest_backed(self) -> None:
         """Literature-backed skill-call order surfaces are manifest-backed."""

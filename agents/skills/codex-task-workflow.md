@@ -98,6 +98,12 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   広い実行が supplemental かつ承認済みか、担当者の 3 点を書いて閉じます。
   方針、文書、メタデータ、契約だけの薄い包み、既存の確認コマンドが所有する
   性質では、静的確認だけを使います。
+- 実装前に Design Integrity Gate を閉じます。`Abstract Design Frame` または
+  parent-direct の design-boundary note は、責務 model、差し替え可能な単位、
+  非対象、validation route を file-level work より先に示します。API shape、
+  責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
+  runtime contract、config surface の判断不足は `design_issue_blocker` として
+  扱い、implementation shortcut にしません。
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、各 implementation slice と downstream side effect が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
 - 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きで処理してはいけない
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、`Implementation Source Packet`、validation route を結び、要求を縮める implementation shortcut を見つけたら `design_issue_blocker` と evidence を記録して design review へ戻る

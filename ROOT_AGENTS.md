@@ -53,10 +53,10 @@ workflow.
 Default to design-complete, responsibility-bounded work for substantive
 changes. Completion is proportional to the changed surface: behavior or code
 changes must have coherent behavior, design/OOP boundary, ownership boundary,
-and required tests or docs; doc-only, format-only, and explicit small-scope
+and required tests or docs; doc-only, format-only, and explicit bounded-route
 changes need the owner/path/design-boundary note and validation that exercises
-that surface. Use "small", "quick", or "parent-direct" only as routing labels;
-needed design still comes from the changed surface.
+that surface. Parent-direct is only an execution route; needed design still
+comes from the changed surface.
 
 Design-complete stays scoped to the owning abstraction. Find that abstraction and finish
 the requested behavior inside that replaceable responsibility unit; stop before
@@ -80,6 +80,23 @@ repo-wide audits for explicit user scope or blocking findings. Hook, archive, or
 dashboard failures expand the task only when they
 block the selected edit, validation, or PR route; otherwise record a concrete
 deferral.
+
+## Design Integrity Gate
+
+Before implementation, prove that the work is derived from an owning
+responsibility model rather than from a nearby file, current finding, or chat
+impression. Full staged work uses the `Abstract Design Frame`,
+`Implementation Source Packet`, `Design Side-Effect Map`, and
+`Design-To-Implementation Trace`; parent-direct work uses the short
+owner/path/design-boundary note when the same responsibility model is already
+evidenced.
+
+Treat API shape, responsibility boundary, path layout, naming, algorithm,
+test oracle, dependency direction, runtime contract, and config-surface gaps as
+design issues. The valid route is `design_issue_blocker=<issue>` with evidence,
+then return to the owning design/review gate. Local fallback, wrapper, helper,
+branch, compatibility route, test relaxation, docs overwrite, and
+implementation shortcut are outside the gate.
 
 ## Context Construction
 
@@ -182,7 +199,7 @@ task.
 - Keep algorithm branches, solver choices, tolerances, diagnostics, and runtime
   paths part of the product contract rather than adding test-only or
   experiment-only production behavior.
-- When a quick experiment is needed, keep it outside the production code path
+- When an exploratory experiment is needed, keep it outside the production code path
   and label it as experimental evidence. Production code must reflect the
   approved design, not a temporary workaround.
 

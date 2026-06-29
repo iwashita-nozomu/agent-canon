@@ -74,6 +74,9 @@ def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
 
 
 DECLARATIVE_MARKER_CONTRACTS = load_marker_contracts()
+DESIGN_INTEGRITY_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
+    "design_integrity_gate"
+]
 
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
@@ -1780,6 +1783,11 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
+        )
+    )
     findings.extend(
         collect_marker_contract_findings(
             root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
