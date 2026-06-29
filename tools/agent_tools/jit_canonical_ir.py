@@ -377,7 +377,12 @@ def _detect_source_main_pattern(
             if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
                 solve_config: dict[str, object] = {}
                 for arg in value.args:
-                    if isinstance(arg, ast.Call) and _call_name(arg.func).endswith(".SolveConfig"):
+                    if isinstance(arg, ast.Name) and arg.id == "solve_config":
+                        solve_config = {
+                            "source": "parameter",
+                            "name": arg.id,
+                        }
+                    elif isinstance(arg, ast.Call) and _call_name(arg.func).endswith(".SolveConfig"):
                         solve_config = {
                             "constructor": _call_name(arg.func),
                             "keywords": _keyword_map(source_text, arg),
@@ -520,7 +525,7 @@ def _return_roots_from_annotation(return_annotation: str) -> list[dict[str, obje
         parts = [annotation] if annotation else []
     roots: list[dict[str, object]] = []
     for index, part in enumerate(parts):
-        class_name = part.rsplit(".", maxsplit=1)[-1].strip()
+        class_name = part.rsplit(".", maxsplit=1)[-1].split("[", maxsplit=1)[0].strip()
         label = class_name[:1].lower() + class_name[1:] if class_name else f"return_{index}"
         roots.append(
             {

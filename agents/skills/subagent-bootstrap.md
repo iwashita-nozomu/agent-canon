@@ -134,6 +134,12 @@ parent は launch mechanics、budget、fresh lifecycle、wave ledger の整合�
 または path scope で分けます。instance id は
 `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` を推奨形にします。
 parent または delegated stage owner が実際に spawn / skip / replacement を行ったら、`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...` で `schedule.md` と `workflow_monitoring.md` を同じ `wave_id` で更新します。delegated child wave は `remaining_spawn_budget` を必ず含めます。
+Wave は「最初に決めた agent 数を一度だけ走らせる」運用ではありません。
+parent は各 wave の出力を frontier queue に戻し、次に必要な bounded handoff を
+作り、fresh subagent を追加または scope 変更時に差し替え、同じ checker /
+validation を再実行します。次 frontier が repository / code / tool action で進む
+限り、`unverified_with_next_witness` や `connection_unconnected` を user-facing
+停止点にしてはいけません。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 behavior-changing、regression-prone、または high-risk code change では
 `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。

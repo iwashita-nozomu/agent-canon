@@ -904,6 +904,15 @@ def self_attribute_names(node: ast.ClassDef) -> set[str]:
     return names
 
 
+def class_field_annotation_names(node: ast.ClassDef) -> set[str]:
+    """Collect typed fields declared directly in a class body."""
+    names: set[str] = set()
+    for item in node.body:
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            names.add(item.target.id)
+    return names
+
+
 def method_uses_self(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """Return true when method body uses self or cls."""
     if not node.args.args:
@@ -2147,7 +2156,7 @@ def analyze_python_class(
     shape = PythonClassShape(
         direct_methods=direct_method_nodes(node),
         public_methods=public_method_nodes(node),
-        attrs=self_attribute_names(node),
+        attrs=self_attribute_names(node) | class_field_annotation_names(node),
     )
     add_python_class_shape_findings(context, node, shape.public_methods, shape.attrs, findings)
     add_python_class_contract_findings(

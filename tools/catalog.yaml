@@ -345,6 +345,28 @@ entries:
     tests:
       - tests/agent_tools/test_jit_canonical_ir.py
 
+  - id: stablehlo-value-closure
+    summary: Traces scoped StableHLO SSA value dependencies from JIT-canonical operational IR.
+    path: tools/agent_tools/stablehlo_value_closure.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/stablehlo_value_closure.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/stablehlo_value_closure.md
+      - documents/tools/jit_canonical_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_stablehlo_value_closure.py
+
   - id: cpp-source-canonical-ir
     summary: Extracts source-only C++ records into the shared thin operational IR.
     path: tools/agent_tools/cpp_source_canonical_ir.py

@@ -8,6 +8,7 @@ description: Use when exploring, refactoring, or choosing an algorithm under pro
 contract skill
 responsibility Exposes theorem-driven algorithm exploration to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/algorithm-proof-exploration.md canonical skill document
+upstream design ../../../agents/skills/lean-algorithm-design.md Lean-first pre-implementation algorithm design workflow
 upstream design ../../../agents/skills/formal-proof-workflow.md checker-backed claim workflow.
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py builds JIT-canonical implementation IR and backend traces.
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
@@ -51,6 +52,9 @@ Execute the required and task-matching conditional commands that the packet prin
    witnesses.
    `$formal-proof-workflow` owns proof-route exploration, formal proof adoption,
    final checker-backed proof, refutation, or unprovability claims.
+   If the algorithm has not been implemented yet, use `$lean-algorithm-design`
+   first and bring its checked Lean design handoff into this skill only when
+   mapping that design to production code.
 1. Every `formal_proof_handoff` produced by this skill must include the
    protocol-owned `Target Binding Packet` from
    `agents/COMMUNICATION_PROTOCOL.md`. If the current algorithm frontier cannot
@@ -64,6 +68,10 @@ Execute the required and task-matching conditional commands that the packet prin
    certificate, and problem-class restriction are profiles of that whole theorem,
    not starting points. Do not explore helpers without first stating the
    top-level main theorem they decompose.
+   When a checked Lean design handoff exists, add a first target theorem stating
+   that the public entrypoint realizes the design transition and certificate
+   predicates. Implementation changes must preserve that handoff or return to
+   `$lean-algorithm-design` for a revised checked design.
 1. State that top-level theorem over the public root's static argument schema
    and return schema. The theorem surface uses `let out := main problem config`
    and high-level projections of `out.answer`, `out.state`, and `out.info`.
@@ -102,6 +110,72 @@ Execute the required and task-matching conditional commands that the packet prin
    it is verified, refuted, proved unprovable under current top-level
    assumptions, or reduced to a checked production code / target input /
    backend-runtime boundary.
+   An unconnected theorem graph edge, unexpanded generated equation,
+   unconnected generated Lean function, `next_witness`, or repairable extractor /
+   graph / proof-status gap is neither completion nor a terminal
+   `formal_proof_handoff`. Keep it in the same algorithm-exploration Wave:
+   repair, regenerate, recheck, or route it to `$formal-proof-workflow` for a
+   checker-backed row result. Handoff is valid only after the Target Binding
+   Packet is complete and every unconnected row is represented as a Goal
+   checklist item or pruned from every selected target route. A nonterminal
+   boundary is a work item for the same public-root theorem, not a completion
+   state, while any reachable target-chain frontier remains actionable.
+   If the user asks what is missing or where the algorithm proof is blocked,
+   first promote the relevant row to a required Goal checklist item and reduce
+   it to verified, refuted, unprovable under assumptions, checked boundary, or
+   pruned from every selected route. Do not return an unconnected row, helper
+   lemma name, or local witness as the terminal answer. The answer must cite the
+   checked item and the corresponding production code, algorithm choice,
+   Problem/config/solve input, or backend/runtime architecture boundary.
+   Maintain a whole-theorem frontier board before choosing an algorithmic
+   repair or local proof handoff. The board must start at the public-root target
+   theorem, include all active proof routes and their terminal leaves, label
+   each route as certified, circular/projection-only, actionable proof work,
+   code-shape/extractor work, backend work, problem/config witness work, or
+   algorithm-choice work, and rank rows by how much they can close the target
+   theorem. Do not spend a Wave on a one-step local bridge unless this board
+   shows the bridge is on a highest-impact route or removes a blocker shared by
+   multiple routes.
+   The board is the unit of work selection. Group frontier rows by route
+   segment, such as initializer/recurrence, stopping scalar, nested solver
+   return, generated tolerance, backend decode, and problem/config witness.
+   A useful Wave advances one complete segment or a connected batch of frontier
+   nodes toward the public-root theorem. If the algorithm team only changes one
+   local witness, immediately rerun the board and continue into the next
+   reachable sibling unless the route is closed, refuted, or reduced to a
+   checked code/input/backend/algorithm boundary.
+   Treat the board as an entry gate, not a reporting accessory. Before any
+   proof edit, algorithm edit, or subagent handoff, write the current board row
+   statuses in the handoff / working note: target theorem, selected public
+   return projection, sufficient route, reverse/necessary route,
+   circularity/projection-only route, implementation/extractor route, backend
+   route, public Problem/config expressivity route, and algorithm-change route.
+   The selected work item must name the board row and the whole route segment
+   it will close. If this cannot be stated, first repair the board or graph
+   extraction; do not start from the last local theorem touched.
+   Lower-level witnesses, local lemmas, and one-shot wave summaries are queue items
+   only. They are never user-facing progress unless the board row they serve is
+   terminal or reduced to a checked boundary with no actionable sibling row.
+   For convergence and finite-stop tasks, run a problem-level board pass at the
+   start of every Wave before selecting any proof edit. The pass must name the
+   final theorem, the sufficient route, the reverse / necessary route, the
+   circularity route, the implementation / extractor route, the backend route,
+   the public Problem/config expressivity route, and the algorithm-change
+   route. The work queue for that Wave is a connected batch that can move one
+   whole board row to `verified`, `refuted`,
+   `unprovable_under_assumptions`, or a checked boundary. A single bridge,
+   generated field projection, or local lemma is only a batch item; it is not a
+   Wave result unless it closes the row or the graph checker prunes every
+   sibling frontier on that row.
+   Wave parent must delegate a state inspection pass to a read-only subagent or
+   checker tool before user-facing return. The packet includes the target
+   theorem, public root, return projection, board rows, proof-status table,
+   generated artifacts, selected repair or algorithm-change route, and
+   exit-gate criteria. The inspector checks that sufficient-route fragments are
+   not reported as Goal completion, theorem-critical values are not free
+   witnesses, and open frontiers are not mislabeled as checked boundaries. Parent
+   integrates findings, regenerates/rechecks affected artifacts, and recomputes
+   the same public-root board before returning.
 1. Generate checker-facing Lean evidence modules with
    `tools/bin/agent-canon jit-ir-to-lean`. If the algorithm changes, delete
    stale generated proof-route artifacts and regenerate from the current JIT
@@ -160,7 +234,9 @@ Execute the required and task-matching conditional commands that the packet prin
    check whether current Lean functions / generated IR facts can prove or
    refute those candidates, then rerun the target proof. Repeat until `P` is
    proved, refuted, shown unprovable under the current top-level assumptions, or
-   reduced to a strictly smaller named witness.
+   reduced to a checked boundary. A lower-level named witness becomes the
+   next loop input; it is not an algorithmic completion state, handoff terminal,
+   or user-facing result for the public-root theorem.
    When a candidate condition proves `P` only because it is definitionally the
    same predicate as `P`, classify it as `projection_only` /
    `circularity_check`. Do not treat that candidate as an algorithmic success or
@@ -175,6 +251,12 @@ Execute the required and task-matching conditional commands that the packet prin
    equivalence, existential-lift, or certificate-inclusion edges. Do not accept a
    necessary/sufficient problem class merely because the terms were renamed or
    the proof did not close by a single definitional step.
+   Keep a route portfolio, not a single restriction path. For every selected
+   frontier row, preserve at least one alternate route or record why no
+   alternate remains. If the selected row proves only a side sufficient route
+   while the public-root finite-stop theorem still has a broader frontier,
+   immediately recompute the board and continue with the broader frontier
+   before returning.
 1. For theorem-critical intermediate formulas, use
    `python3 tools/agent_tools/jit_canonical_ir.py` after theorem graph
    generation. Check assignment and return equations per iteration unit
@@ -202,6 +284,11 @@ Execute the required and task-matching conditional commands that the packet prin
    implementation identity, returned-value projection, numerical
    reachability/ranking mechanism, algorithmic choice, external assumption
    binding, or problem-class witness.
+   When multiple blockers exist, prefer the one closest to a non-circular
+   public-input condition for the final theorem over a helper-level
+   convenience lemma. A blocker report is incomplete unless it explains why
+   resolving it would advance the whole public-root theorem more than the
+   remaining candidate blockers.
 1. Do not treat a failed single-lemma formal-proof route as an algorithm
    failure. Hand proof-route alternatives to `$formal-proof-workflow`; use its checker-backed
    outcome to decide whether an algorithm change is actually needed.
@@ -212,7 +299,7 @@ Execute the required and task-matching conditional commands that the packet prin
    selection, direction construction, nested solver certificate, state update,
    residual/merit recomputation, and final scalar binding. If any such block is
    still only a route call or unconstrained theorem variable, send it back as a
-   smaller formal-proof witness. An algorithmic blocker is visible only when
+   lower-level formal-proof witness. An algorithmic blocker is visible only when
    the remaining gap is a semantic mechanism such as missing contraction,
    missing residual-merit selection, missing problem-class bound, missing
    backend boundary, or checker-backed refutation.
@@ -221,6 +308,16 @@ Execute the required and task-matching conditional commands that the packet prin
    changing the algorithmic recurrence, deriving a numerical convergence
    witness, restricting the problem class, or leaving an external assumption
    boundary.
+1. Target theorem values must be implementation values, not free witnesses.
+   KKT components, residual components, stopping scalars, solver returns,
+   backend error bounds, and upper-bound budgets consumed by the target theorem
+   must be backed by generated functions/projections from `Problem`, config, the
+   public root path, and backend profile, or by a same-public-input uniqueness
+   theorem. Do not close a route using standalone KKT witness variables,
+   unconstrained records, or `Nonempty ... values`. If the current generated
+   evidence cannot bind the value, classify the gap as code shape, extractor,
+   generated Lean, or theorem-graph wiring work and repair/regenerate before
+   calling it an algorithmic blocker.
 1. Function-level blockers must be reported as a causal chain, not as a flat
    missing-lemma inventory.  For each recursive function on the target path,
    state `function`, `unguaranteed property`, `why that output can be wrong or
@@ -236,7 +333,7 @@ Execute the required and task-matching conditional commands that the packet prin
    downstream lemma can be named.
    A callee name is never itself the algorithmic blocker. Before reporting an
    algorithmic blocker, expand the callee's generated equations into the
-   smallest relevant function predicates: input/output relation, return
+   directly relevant function predicates: input/output relation, return
    binding, loop-exit reason, stopping predicate, breakdown or exception
    predicate, and nested solver or callback output relation. Only after those
    predicates are verified, refuted, proved unprovable under the current
@@ -266,7 +363,7 @@ Execute the required and task-matching conditional commands that the packet prin
    caller-side lemma or target theorem edge is open.  Re-enter the recursive
    function frontier immediately: generate the next callee/function property,
    prove it, refute it, prove it unprovable under the current top-level
-   assumptions, or change the algorithm and regenerate IR/graphs.  A smaller
+   assumptions, or change the algorithm and regenerate IR/graphs.  A lower-level
    named witness is not a user-facing stopping point for this class of gap; it
    is the next in-turn work item.
    Apply the same rule to `connection_unconnected`: bridge edges, profile
@@ -282,6 +379,24 @@ Execute the required and task-matching conditional commands that the packet prin
    Architecture assumptions such as the implementation trace and backend/runtime
    semantics are allowed only as architecture boundaries, and must be labeled
    separately from Problem/config assumptions.
+1. When proof search fails, return an implementation problem, not an extra
+   theorem request. A missing theorem / bridge / witness from
+   `$formal-proof-workflow` is an internal work item: prove it from the current
+   code path and public inputs if possible, or reduce it to the exact production
+   code mechanism, extractor gap, generated Lean function gap, theorem-graph
+   wiring issue, `Problem` / config input condition, or backend boundary that
+   blocks the target theorem. Do not present "add theorem X" as the terminal
+   answer unless it is accompanied by the checked causal chain showing which
+   implementation path cannot provide X and which target theorem edge that
+   failure breaks.
+   If `$formal-proof-workflow` returns a nonterminal checklist packet, accept it
+   as algorithm input only when the packet names the failed required item and
+   the code / input / backend / algorithm boundary that blocks the target
+   theorem. Without that check, re-enter `$formal-proof-workflow`; a
+   nonterminal packet with only remaining witnesses is still proof-search queue,
+   not algorithmic evidence. Even with that packet, keep the same public-root
+   theorem active until the whole-theorem frontier board shows that no
+   actionable sibling frontier remains.
 1. Treat a desired local assumption as a derivation target, not as a premise.
    For each desired intermediate condition, run a try-and-error derivation loop:
    name the condition as a candidate lemma, bind every variable to either
@@ -292,7 +407,7 @@ Execute the required and task-matching conditional commands that the packet prin
    upper-bound lemmas, selected-scope bounds, finite-prefix ranking/contraction
    witnesses, same-units conversion, or projection of existing algorithm return
    facts. Do not promote the desired condition into an independent
-   assumption. If no derivation route closes, return the minimal blocker as
+   assumption. If no derivation route closes, return the blocker with direct frontier evidence as
    either missing top-level problem/config property, missing external
    architecture evidence, or an algorithmic choice that must change.
 1. For initialization, basin-entry, or selected-scope-entry blockers, normalize the
@@ -304,12 +419,28 @@ Execute the required and task-matching conditional commands that the packet prin
    classify the gap as either a problem-class witness for that initializer or
    an algorithmic choice to add a stronger initializer, Phase I, or
    globalization path.
-1. If the gap is a current algorithmic choice, enumerate the smallest
+1. If the gap is a current algorithmic choice, enumerate the directly relevant
    implementation degrees of freedom that could make the target theorem
    provable and translate each candidate into a proof obligation before editing
    code. After any algorithm change, regenerate IR/graphs and re-enter the same
    algorithm frontier; do not stop at guidance when the target theorem can still
    be tested by `$formal-proof-workflow`.
+1. If a frontier gap is repairable in production code shape, extraction,
+   generated Lean functions, theorem graph wiring, proof-status overlays, or
+   proof-note alignment, repair that surface, regenerate the affected artifacts,
+   and rerun `$formal-proof-workflow` on the same target theorem or theorem
+   profile before returning progress. Such a gap is not an algorithmic blocker until the repaired route
+   still fails at a checked top-level input/config/backend boundary or a genuine
+   algorithmic choice. Do not satisfy this rule by adding proof-only production
+   fields, diagnostic gates, or runtime proof checks.
+   Keep iterating the same repair/regenerate/check loop while the remaining
+   frontier is actionable in repository code, extractor logic, generated Lean
+   functions, theorem graph overlays, proof-status artifacts, local proof
+   libraries, or existing checker output. A Wave result is integrated by the
+   parent, not returned as a terminal summary, until the current public-root
+   theorem is verified, refuted, proved unprovable under the current top-level
+   assumptions, or reduced to a checked direct code/input/backend/algorithm
+   boundary.
 1. After changing initialization logic, require `$formal-proof-workflow` to
    consume the newly extracted initialization code facts before returning to
    the user. Code-visible selected initial point, epigraph point,
@@ -335,14 +466,55 @@ Execute the required and task-matching conditional commands that the packet prin
    the target theorem itself: either the target theorem is proved, or it is
    proved that the current assumptions and implementation path are insufficient
    to derive that theorem.
+   For finite-stop and convergence tasks, a verified sufficient route is
+   intermediate evidence only. Do not report `complete` until the public-root
+   Goal checklist passes.
+1. Enforce the algorithm-exploration return contract as a hard gate. A
+   user-facing `status=complete` is legal only when the public-root Goal
+   checklist passes after the current algorithm route and all selected repairs
+   have been regenerated and rechecked. A failed checklist item is not a
+   top-level outcome; it is the next Wave work item unless the user explicitly
+   asks for interim status. A
+   proposed algorithm change, lower-level witness, missing bridge, unconnected
+   function guarantee, one-shot Wave summary, or graph report with open
+   frontier is not a return value. Treat it as the next work item: repair or
+   change the algorithm if justified, regenerate JIT/backend/Lean/theorem-graph
+   artifacts, and re-enter `$formal-proof-workflow` before reporting.
 1. Treat `unverified_with_next_witness` as a handoff queue back to
    `$formal-proof-workflow`, not as algorithmic completion. Re-enter that named
-   witness until the proof workflow returns `verified`, `refuted`,
-   `unprovable_under_assumptions`, or a strictly smaller frontier witness.
-   If the strictly smaller witness is another function-level guarantee whose
+   witness until it passes the required checklist item, is removed from all
+   target routes, or yields a lower-level frontier witness.
+   If the lower-level witness is another function-level guarantee whose
    absence blocks a caller lemma or target edge, do not return it to the user;
    continue the same recursion until that function guarantee is terminal or no
    repository/code/tool action can advance it.
+   Multi-agent Wave is this adaptive loop in execution: integrate each wave
+   result, rerun the same graph / proof / validation route, create the next
+   frontier queue, and spawn fresh bounded follow-up agents when repository,
+   code, or tool work can advance that frontier. A one-shot wave summary is not
+   a terminal outcome while the next frontier is actionable.
+   Wave planning must avoid microscopic progress: the handoff packet should
+   contain the whole-theorem board, a batch frontier queue, and a stopping rule
+   for that batch. Parent integration prunes profile-only/obsolete branches,
+   verifies or refutes connected bridge rows, regenerates artifacts if needed,
+   and then re-enters `$formal-proof-workflow` before user-facing reporting.
+   Plan at the problem level before choosing the next edit. For convergence
+   tasks, the handoff packet must show which of these board rows remains active:
+   sufficient route, necessary/reverse route, circularity rejection,
+   implementation/extractor gap, backend semantics gap, public
+   Problem/config expressivity gap, and algorithm-change candidate. Work one
+   local theorem only when it advances one of those rows, and keep iterating
+   until the row itself is terminal or hands off a different active row. If a
+   proof step only improves an already-sufficient route while the reverse or
+   expressivity row is still open, the algorithm exploration wave must continue
+   instead of returning that local progress.
+   The handoff packet must also include a batch frontier queue for the selected
+   row. The queue is built from the current theorem graph, not prose order, and
+   includes every sibling frontier that is reachable from the selected public
+   theorem/profile and can be advanced by repository code, generated evidence,
+   Lean proof, graph overlay, or existing backend/source artifacts. The parent
+   integrates the whole batch, reruns graph/proof checks, then either opens the
+   next batch or records a checked terminal/boundary status for that row.
 1. If an algorithm change is needed, continue until either the current
    assumptions are proved insufficient or the changed algorithm has a
    checker-backed proof of the target theorem. A proposed change alone is only
@@ -376,6 +548,8 @@ Execute the required and task-matching conditional commands that the packet prin
   formal-proof handoff targets.
 - `proof_frontier`: theorem-facing graph frontier sent back to formal proof
   work when an algorithmic change is not yet justified.
+- `goal_checklist`: checker-backed finite list of required public-root Goal
+  items, including diagnostic boundary items when a row is not closed.
 - `algorithm_change_guidance`: algorithmic changes needed to make a theorem
   provable without adding runtime proof-only surfaces.
 - `formal_proof_handoff`: exact claims and artifacts for

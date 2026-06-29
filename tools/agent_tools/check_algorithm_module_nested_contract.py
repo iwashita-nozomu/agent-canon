@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks nested algorithm ownership fields for algorithm modules.
-# upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
+# upstream design ../../documents/design/jax_util/algorithm_module_contract.md algorithm boundary policy
 # upstream implementation ./check_algorithm_module_public_surface.py discovers algorithm modules
 # downstream implementation ../../tests/agent_tools/test_check_algorithm_module_nested_contract.py tests  # noqa: E501
 # @dependency-end
@@ -13,8 +13,11 @@ surface the nested ownership explicitly:
 
 * ``B.InitializeConfig`` holds ``A.InitializeConfig``.
 * ``B.SolveConfig`` holds ``A.SolveConfig``.
-* ``B.Info`` holds ``A.Info``.
 * ``B.Algorithm`` holds ``A.Algorithm``.
+
+``Info`` is intentionally not required to hold every child ``Info``. Parent
+algorithms may return a summary ``Info`` while child details are emitted through
+the shared run-log file.
 
 ``Problem`` is intentionally exempt because parent algorithms often assemble
 child problems internally at solve time.
@@ -56,20 +59,9 @@ NON_ALGORITHM_IMPORT_ALLOWLIST = (
     "python/tests",
     "tests",
 )
-_CONTRACT_CLASSES = (
-    "InitializeConfig",
-    "SolveConfig",
-    "Info",
-    "Algorithm",
-)
-_CONTRACT_ATTRIBUTE_TO_CLASS = {
-    "InitializeConfig": "InitializeConfig",
-    "SolveConfig": "SolveConfig",
-    "Info": "Info",
-    "Algorithm": "Algorithm",
-}
-_CALL_ATTRIBUTES = frozenset({"initialize"})
 _PROBLEM_ATTRIBUTE = "Problem"
+_ALGORITHM_ATTRIBUTE = "Algorithm"
+_INITIALIZE_CONFIG_ATTRIBUTE = "InitializeConfig"
 
 
 @dataclass(frozen=True)
@@ -251,31 +243,6 @@ def imported_aliases(tree: ast.Module) -> dict[str, str]:
     return aliases
 
 
-def alias_attribute_usage(tree: ast.Module, aliases: dict[str, str]) -> dict[str, set[str]]:
-    """Return attribute names used on each imported alias."""
-    usage: dict[str, set[str]] = {alias: set() for alias in aliases}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Attribute):
-            continue
-        if isinstance(node.value, ast.Name) and node.value.id in aliases:
-            usage[node.value.id].add(node.attr)
-    return {alias: attrs for alias, attrs in usage.items() if attrs}
-
-
-def required_contract_classes(attributes: set[str]) -> set[str]:
-    """Return parent contract classes required by one child usage set."""
-    required = {
-        _CONTRACT_ATTRIBUTE_TO_CLASS[attribute]
-        for attribute in attributes
-        if attribute in _CONTRACT_ATTRIBUTE_TO_CLASS
-    }
-    if attributes & _CALL_ATTRIBUTES:
-        required.update(_CONTRACT_CLASSES)
-    if required == set() and attributes == {_PROBLEM_ATTRIBUTE}:
-        return set()
-    return required
-
-
 def top_level_type_aliases(tree: ast.Module) -> dict[str, str]:
     """Return top-level private/public type alias expansions."""
     aliases: dict[str, str] = {}
@@ -353,6 +320,92 @@ def annotation_contains_dependency(
     return any(required in annotation for annotation in annotations)
 
 
+def contract_annotation_dependencies(
+    classes: dict[str, ast.ClassDef],
+    aliases: dict[str, str],
+    dependency_aliases: set[str],
+) -> dict[str, set[str]]:
+    """Return dependency classes explicitly owned by public contract annotations."""
+    dependencies: dict[str, set[str]] = {}
+    for contract_class, class_node in classes.items():
+        if contract_class not in EXPECTED_PUBLIC_NAME_SET:
+            continue
+        for annotation in class_annotation_texts(class_node, aliases):
+            for dependency_alias in dependency_aliases:
+                prefix = f"{dependency_alias}."
+                if prefix not in annotation:
+                    continue
+                dependency_class = annotation.split(prefix, maxsplit=1)[1].split(
+                    "[", maxsplit=1
+                )[0].split(")", maxsplit=1)[0].split(",", maxsplit=1)[0]
+                if dependency_class and dependency_class != _PROBLEM_ATTRIBUTE:
+                    dependencies.setdefault(dependency_alias, set()).add(dependency_class)
+    return dependencies
+
+
+def initialize_call_requirements(
+    tree: ast.Module,
+    dependency_aliases: set[str],
+) -> dict[str, set[str]]:
+    """Return ownership requirements implied by nested ``initialize`` calls.
+
+    A child algorithm callable owned by the parent must be visible in the parent
+    ``Algorithm``. A child ``InitializeConfig`` is required only when the call
+    consumes a parent ``config.<field>``; fixed or parent-derived child config
+    construction stays an implementation detail.
+    """
+    requirements: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr == "initialize"
+            and isinstance(func.value, ast.Name)
+            and func.value.id in dependency_aliases
+        ):
+            continue
+        dependency_alias = func.value.id
+        requirements.setdefault(dependency_alias, set()).add(_ALGORITHM_ATTRIBUTE)
+        if (
+            node.args
+            and uses_parent_config_field(node.args[0])
+            and not is_dependency_initialize_config_construction(
+                node.args[0],
+                dependency_alias,
+            )
+        ):
+            requirements[dependency_alias].add(_INITIALIZE_CONFIG_ATTRIBUTE)
+    return requirements
+
+
+def is_dependency_initialize_config_construction(
+    node: ast.AST,
+    dependency_alias: str,
+) -> bool:
+    """Return true for ``dependency.InitializeConfig(...)`` construction."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == _INITIALIZE_CONFIG_ATTRIBUTE
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == dependency_alias
+    )
+
+
+def uses_parent_config_field(node: ast.AST) -> bool:
+    """Return true when an expression reads ``config.<field>``."""
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Attribute)
+            and isinstance(child.value, ast.Name)
+            and child.value.id == "config"
+        ):
+            return True
+    return False
+
+
 def module_is_algorithm(tree: ast.Module, relative: str) -> bool:
     """Return true when a file is a production algorithm module."""
     if not imports_algorithm_module_protocol(tree):
@@ -383,17 +436,20 @@ def analyze_file(root: Path, path: Path) -> tuple[ModuleReport | None, list[Find
         return None, []
 
     imported = imported_aliases(tree)
-    usage = alias_attribute_usage(tree, imported)
     aliases = top_level_type_aliases(tree)
     classes = class_definitions(tree)
+    dependency_aliases = set(imported)
+    owned_dependencies = contract_annotation_dependencies(
+        classes,
+        aliases,
+        dependency_aliases,
+    )
+    requirements = initialize_call_requirements(tree, dependency_aliases)
     findings: list[Finding] = []
-    dependencies: list[str] = []
+    dependencies: set[str] = set(owned_dependencies) | set(requirements)
 
-    for dependency_alias in sorted(usage):
-        required = required_contract_classes(usage[dependency_alias])
-        if not required:
-            continue
-        dependencies.append(dependency_alias)
+    for dependency_alias in sorted(dependencies):
+        required = requirements.get(dependency_alias, set())
         for contract_class in sorted(required):
             class_node = classes.get(contract_class)
             if class_node is None:
@@ -427,7 +483,7 @@ def analyze_file(root: Path, path: Path) -> tuple[ModuleReport | None, list[Find
             )
 
     return (
-        ModuleReport(path=relative, dependencies=tuple(sorted(set(dependencies)))),
+        ModuleReport(path=relative, dependencies=tuple(sorted(dependencies))),
         findings,
     )
 
