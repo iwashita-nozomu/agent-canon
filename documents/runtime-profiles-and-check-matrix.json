@@ -127,10 +127,14 @@
     }
   ],
   "risk_note": [
-    "`make ci` remains the full local confidence gate, but it is not the only",
-    "acceptable evidence for every owner-bounded change. The selected validation",
-    "must match the changed paths, owner surface, and risk class, and the PR or run",
-    "bundle must state why that set is sufficient.",
+    "Static analysis and reading evidence are the primary validation evidence for",
+    "AgentCanon tasks. `make ci` remains the full local confidence gate, but it is",
+    "not the default or only acceptable evidence for every owner-bounded change. Use",
+    "operation checks, smoke runs, full CI, long test suites, benchmarks, experiments,",
+    "and other broad execution as supplemental evidence when runtime behavior,",
+    "integration risk, or unresolved static/read findings require them. The selected",
+    "validation must match the changed paths, owner surface, and risk class, and the",
+    "PR or run bundle must state why that set is sufficient.",
     "Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,",
     "and dependency checks selected by the active profile; they do not automatically",
     "escalate to full `make ci`."

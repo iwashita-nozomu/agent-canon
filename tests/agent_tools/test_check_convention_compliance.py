@@ -35,6 +35,7 @@ from tools.agent_tools.check_convention_compliance import (
     REVIEW_ISSUE_ROUTING_MARKERS,
     SOLID_CODING_CONTRACT_MARKERS,
     SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+    STATIC_READ_VALIDATION_POLICY_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
 )
 
@@ -152,6 +153,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
     ),
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
+    "documents/runtime-profiles-and-check-matrix.md": (
+        "Static analysis and reading evidence primary validation evidence "
+        "operation checks supplemental evidence unresolved static/read findings\n"
+    ),
     "documents/codex-configuration-reference.md": (
         "## Hook Severity Policy\n"
         "fail-open CRITICAL_BLOCKING_CHILD_HOOKS warning/evidence\n"
@@ -194,6 +199,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "bounded route existing tool targeted validation follow-up context\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
+        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution\n"
         "compatibility-preservation drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
@@ -229,6 +235,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "write-capable handoff $prose-reasoning-graph $structure-planning "
         "$md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
+        "static/read evidence unresolved signal operation checks smoke runs "
+        "Expensive command "
         "before `$research-workflow` source packet adoption/exclusion "
         "parent-direct SKILL.md "
         "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
@@ -240,6 +248,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$literature-survey $research-workflow before design "
         "$md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
+        "static/read evidence primary validation evidence supplemental evidence "
+        "operation checks unresolved static findings "
         "parent-direct $owner-bounded-routing SKILL.md "
         "Implementation Source Packet adoption/exclusion "
         "tool_rejection_preflight.py "
@@ -337,6 +347,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "literature-survey research-workflow 先に source packet adoption/exclusion "
+        "静的解析・読み取り evidence 未解決 signal 動作確認 smoke run "
+        "重いコマンド "
         "$owner-bounded-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
@@ -350,6 +362,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "codex task workflow prose-reasoning-graph structure-planning "
         "literature-survey research-workflow 設計 Implementation Source Packet "
         "adoption/exclusion "
+        "静的解析・読み取り evidence primary validation evidence "
+        "supplemental evidence 動作確認 未解決 finding "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
         "parent-direct $owner-bounded-routing SKILL.md "
@@ -1197,6 +1211,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_static_read_validation_policy_requires_markers(self) -> None:
+        """Validation policy must keep static/read evidence primary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "静的解析・読み取り evidence",
+                    "runtime confirmation",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("static_read_validation_policy", result.stdout)
+            self.assertIn("missing-marker:静的解析・読み取り evidence", result.stdout)
+
+    def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
+        """Static/read validation policy surfaces are manifest-backed."""
+        self.assertIn(
+            "documents/runtime-profiles-and-check-matrix.md",
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+        self.assertIn(
+            ".agents/skills/codex-task-workflow/SKILL.md",
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+
+    def test_minimal_fixture_covers_static_read_validation_policy_surfaces(self) -> None:
+        """The fixture includes every static/read validation policy surface."""
+        missing = sorted(
+            path
+            for path in STATIC_READ_VALIDATION_POLICY_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 
