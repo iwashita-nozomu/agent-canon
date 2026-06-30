@@ -21,6 +21,7 @@ from tools.agent_tools.check_convention_compliance import (
     BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
     DESIGN_INTEGRITY_GATE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
+    DOCUMENT_SPLIT_DECISION_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
     FALLBACK_EXIT_POLICY_MARKERS,
@@ -68,7 +69,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "return projection proof obligation provisional wording "
         "check_convention_compliance.py mathematical necessity gate "
         "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route "
-        "necessary-and-sufficient condition non-contractual mathematical judgment\n"
+        "necessary-and-sufficient condition non-contractual mathematical judgment "
+        "Document Split Decision document_split_decision document_unit split_when "
+        "merge_when invalid_split_boundaries task_close.py\n"
     ),
     "documents/conventions/python/01_scope.md": "scope\n",
     "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
@@ -297,6 +300,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "structure_contract=skipped existing-tool route "
         "targeted-validation evidence\n"
     ),
+    ".agents/skills/structure-planning/SKILL.md": skill_fixture(
+        "structure-planning",
+        "document_unit document_split_decision invalid split boundaries\n",
+    ),
     ".agents/skills/owner-bounded-routing/SKILL.md": skill_fixture(
         "owner-bounded-routing",
         "existing tool owner boundary targeted validation Owner-Bounded Change "
@@ -414,6 +421,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning $owner-bounded-routing format-only "
         "structure_contract=skipped existing-tool route targeted validation\n"
     ),
+    "agents/skills/structure-planning.md": (
+        "document_unit document_split_decision split_when merge_when "
+        "invalid_split_boundaries\n"
+    ),
     "agents/skills/owner-bounded-routing.md": (
         "existing tool owner boundary targeted validation Owner-Bounded Change "
         "targeted validation tool_rejection_preflight.py "
@@ -443,7 +454,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/long-form-writing.md": (
         "数学的 claim program contract proof obligation $formal-proof-workflow "
         "provisional wording existing-tool route targeted validation "
-        "typo format-only SKILL.md\n"
+        "typo format-only SKILL.md document_split_decision owner reader path "
+        "source map validation route chunking convenience\n"
     ),
     "agents/skills/python-review.md": (
         "SOLID 原則シグナル OOP 可読性レポート "
@@ -469,7 +481,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "long-form-writing",
         "mathematical claim program contract proof obligation $formal-proof-workflow "
         "provisional wording existing-tool route targeted-validation evidence "
-        "typo/link/format-only SKILL.md\n"
+        "typo/link/format-only SKILL.md document_split_decision owner reader path "
+        "source map validation route chunking convenience\n"
     ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation "
@@ -560,7 +573,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/templates/closeout_gate.md": (
         "evaluate_agent_run.py run_repo_dependency_review.sh\n"
         "Document Structure Evidence document_structure_status structure_planning "
-        "prose_graph md_style_check format_only_reason\n"
+        "prose_graph md_style_check format_only_reason document_split_decision "
+        "keep:<reason> split:<new-owner-boundary> "
+        "not_applicable:format-only:<reason>\n"
     ),
     "agents/templates/workflow_monitoring.md": (
         "tool_warning_exit_status resolved deferred_with_issue "
@@ -641,7 +656,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/agent_tools/task_close.py": (
         "changed_markdown_paths Document Structure Evidence "
-        "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED\n"
+        "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED "
+        "document_split_decision DOCUMENT_SPLIT_DECISION_EVIDENCE "
+        "document_split_decision_ready\n"
     ),
     "ROOT_AGENTS.md": (
         "Design Integrity Gate responsibility model Abstract Design Frame "
@@ -1153,6 +1170,36 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_split_decision_requires_policy_markers(self) -> None:
+        """Document split decisions must stay wired into source policy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            policy_doc = root / "documents" / "conventions" / "common" / "05_docs.md"
+            policy_doc.write_text(
+                policy_doc.read_text(encoding="utf-8").replace(
+                    "document_split_decision",
+                    "document split decision missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_split_decision", result.stdout)
+            self.assertIn("missing-marker:document_split_decision", result.stdout)
+
+    def test_minimal_fixture_covers_document_split_decision_surfaces(self) -> None:
+        """The fixture includes every document split decision surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_SPLIT_DECISION_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

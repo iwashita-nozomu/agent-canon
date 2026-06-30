@@ -426,6 +426,57 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "DOCUMENT_STRUCTURE_REQUIRED",
     ),
 }
+DOCUMENT_SPLIT_DECISION_MARKERS = {
+    "documents/conventions/common/05_docs.md": (
+        "Document Split Decision",
+        "document_split_decision",
+        "document_unit",
+        "split_when",
+        "merge_when",
+        "invalid_split_boundaries",
+        "check_convention_compliance.py",
+        "task_close.py",
+    ),
+    "agents/skills/structure-planning.md": (
+        "document_unit",
+        "document_split_decision",
+        "split_when",
+        "merge_when",
+        "invalid_split_boundaries",
+    ),
+    ".agents/skills/structure-planning/SKILL.md": (
+        "document_unit",
+        "document_split_decision",
+        "invalid split boundaries",
+    ),
+    "agents/skills/long-form-writing.md": (
+        "document_split_decision",
+        "owner",
+        "reader path",
+        "source map",
+        "validation route",
+        "chunking convenience",
+    ),
+    ".agents/skills/long-form-writing/SKILL.md": (
+        "document_split_decision",
+        "owner",
+        "reader path",
+        "source map",
+        "validation route",
+        "chunking convenience",
+    ),
+    "agents/templates/closeout_gate.md": (
+        "document_split_decision",
+        "keep:<reason>",
+        "split:<new-owner-boundary>",
+        "not_applicable:format-only:<reason>",
+    ),
+    "tools/agent_tools/task_close.py": (
+        "document_split_decision",
+        "DOCUMENT_SPLIT_DECISION_EVIDENCE",
+        "document_split_decision_ready",
+    ),
+}
 OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "owner_bounded_tool_route"
 ]
@@ -1783,6 +1834,11 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_fallback_exit_policy(root))
     findings.extend(check_document_structure_routing(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root, "document_split_decision", DOCUMENT_SPLIT_DECISION_MARKERS
+        )
+    )
     findings.extend(
         collect_marker_contract_findings(
             root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
