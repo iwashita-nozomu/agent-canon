@@ -32,12 +32,20 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - permanent team ownership、artifact output、write policy は `agents/agents_config.json` を優先します
 - subagent registration と runtime budget は `.codex/config.toml` を優先し、role model / reasoning は `.codex/agents/*.toml` を優先します
 - prompt / config drift を見つけたら、親がその場で policy prose を増やす前に `prompt_config_reviewer` の監査結果を要求します
-- parent agent が最終編集責任を持つ
+- parent agent は最終責任を持つ orchestrator / integrator です。repo-changing
+  implementation / patch / doc-edit work では、親は handoff packet、agent
+  起動、追加指示、統合、review / validation gate 判定に集中し、既定の
+  implementer にはなりません
 - routing と required review を決めてから subagent wave を起動する
 - Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。各 wave は
   plan artifact、review gate decision、edit handoff evidence を
   `team_manifest.yaml`、`schedule.md`、`workflow_monitoring.md` に残します。
 - repo-changing task では、stage ごとに適切な subagent を explicit に立てる
+- repo-changing implementation / patch / doc-edit work の既定 route は
+  write-capable `spark_worker` / `worker` handoff first です。parent-direct は
+  spawn authorization、tool gate、または explicit parent-direct approval がある
+  場合の recorded exception としてだけ使い、`schedule.md` /
+  `workflow_monitoring.md` / run bundle に理由を残します。
 - 調査、レビュー、文書整備は分ける
 - fan-out は active spawn budget と stage wave plan の範囲で管理する
 - subagents may spawn bounded child subagents when their handoff packet includes `delegated_spawn_policy` with owner, input packet, expected output, dependency-expanded handoff scope, validation route, review gate, and remaining spawn budget
@@ -58,8 +66,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
 - Abstract Design Frame と approved packet で完全に切れる低リスク slice は `spark_worker` を preferred implementation candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
-- user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence です。requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、`spark_worker` / `worker` を起動または schedule します。
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
+- user が coding / implementation / patch / doc-edit work を求めた task では、read-only wave は setup evidence です。requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、`spark_worker` / `worker` を起動または schedule します。parent-direct completion は既定 route ではなく、blocked subagent route または explicit approval を記録した例外です。
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
 - `spark_worker` が runtime capacity または compatibility で起動できない場合は、同じ packet を `worker` に渡して実装 route を継続する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier role TOML に残す
@@ -79,7 +87,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
   integrate して同じ validation を再実行します。frontier が
   `verified`、`refuted`、`unprovable_under_assumptions`、または checked external
   boundary に縮約された時点で closeout 条件を満たします。
-- multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct rationale を `schedule.md` / `workflow_monitoring.md` に残します
+- multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct exception rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は subagent type / behavior contract であり、実行単位は `role_type+instance_id` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
 - role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。
 - 既定 budget は `Owner-Bounded Change` で同時 4 体までです
@@ -534,8 +542,8 @@ workflow docs、task catalog は agent TOML を参照します。
 - review / quality-check role TOML は frontier model と `xhigh` reasoning を使い、final judgment や scope を変える設計判断も frontier review route に残します
 - Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only helper work は mini helper role TOML に置きます
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、dependency-expanded handoff scope が揃っていることです
-- 明示 spawn 許可がある repo-changing task では、coding / implementation / patch work の implementation critical path を pre-handoff investigation packet で作ってから、並行可能な独立検証を read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を支える frontier review wave に切ります。
-- user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、completion route は write-capable handoff、integration、review、validation で構成します。
+- 明示 spawn 許可がある repo-changing task では、coding / implementation / patch / doc-edit work の implementation critical path を pre-handoff investigation packet で作ってから、並行可能な独立検証を read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を支える frontier review wave に切ります。
+- coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、completion route は write-capable handoff、integration、review、validation で構成します。parent-direct は explicit exception rationale と validation evidence がある場合だけ completion route にできます。
 - `spark_worker` eligible な実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。eligibility は design trace と dependency-expanded handoff scope で判断します。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。code-only owner-bounded change では省略できます

@@ -540,12 +540,27 @@ exit 条件:
 - 凍結済みの設計を実装へ落とす
 
 主担当:
-- `implementer`
+- write-capable Codex implementer selected from `IMPLEMENTATION_CODEX_AGENTS`
+  (`spark_worker` for bounded low-risk slices, otherwise `worker`)
+- parent is the gate owner / integrator only
 
 条件付き追加 subagent:
-- bounded な切り出しだけを `worker` に渡す
+- additional write-capable `spark_worker` / `worker` instances only when
+  dependency order, disjoint write scope, integration order, and review gate are
+  fixed in the handoff packet
 
 ルール:
+- Gate 8 starts from `IMPLEMENTATION_HANDOFF_REQUIRED=yes` and
+  `PARENT_REPO_EDITS_ALLOWED=no`. The parent owns routing, handoff packet
+  construction, monitoring, additional instructions, integration, validation,
+  and closeout; it does not directly patch repository files unless
+  `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
+  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` are
+  recorded.
+- Parent-Direct Context Note is a routing / handoff artifact, not edit
+  authorization. Once edit scope is known, launch or schedule `spark_worker` /
+  `worker`; if blocked, record `WRITE_SUBAGENT_AUTHORIZATION=required` or
+  `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します

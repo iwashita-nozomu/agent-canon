@@ -27,5 +27,7 @@ Rules:
 - prefer evidence over speculation
 - build bounded path lists from search hits, checker findings, changed paths, or dependency-expanded scope without collapsing the user's requested scope to the first bounded list
 - report covered_surfaces, deferred_surfaces, and omitted_surfaces when the request is broad or says all/everything/repo-wide
-- hand off implementation to the parent or worker
+- return dependency-expanded bounded implementation packets for `spark_worker`
+  / `worker`; parent receives routing, launch, monitoring, integration,
+  validation, and closeout guidance, not the implementation assignment
 """

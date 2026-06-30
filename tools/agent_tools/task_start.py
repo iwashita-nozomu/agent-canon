@@ -322,8 +322,8 @@ def emit_task_start_output(
         context.workflow_family_id,
         args.task,
     )
-    active_skills = current_stage_skills(selected_skills)
-    deferred_skills = deferred_stage_skills(selected_skills)
+    active_skills = current_stage_skills(selected_skills, args.task)
+    deferred_skills = deferred_stage_skills(selected_skills, args.task)
     start_declaration = (
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
         f"skills={','.join(active_skills) or '-'}, "
@@ -401,7 +401,7 @@ def emit_task_start_output(
         print(line)
     for line in user_facing_language_policy_output_lines():
         print(line)
-    for line in contract_complete_implementation_policy_output_lines():
+    for line in contract_complete_implementation_policy_output_lines(args.task):
         print(line)
     for line in repo_tool_routing_policy_output_lines(selected_skills):
         print(line)

@@ -144,17 +144,20 @@ guessing an edit path.
 
 ## Parent-Direct Context Note
 
-For explicit-path work whose owner boundary, replaceable unit, validation
-route, and public impact boundary are already evidenced; Routine docs; Focused
-code; typo/link/format-only; or other bounded parent-direct work, the full
+For an approved parent-direct exception whose owner boundary, replaceable unit,
+validation route, and public impact boundary are already evidenced, the full
 Pre-Edit Repository Investigation Packet can be replaced by a short
-Parent-Direct Context Note. File count alone is not enough to choose this note.
+Parent-Direct Context Note. Routine docs, Focused code, typo/link/format-only,
+or other bounded work still needs the exception rationale when the work is
+repo-changing implementation / patch / doc-edit. File count alone is not enough
+to choose this note.
 
 The note records:
 
 - `owner`
 - `target_path`
 - `request_clause`
+- `parent_direct_exception_rationale`
 - `reuse_basis`
 - `design_oop_boundary`
 - `validation_route`
