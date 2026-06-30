@@ -536,6 +536,30 @@ class RouteToolTest(unittest.TestCase):
             python_decision["evidence"], "mode=repo-changing;matched=none"
         )
 
+    def test_prompt_routes_settings_skill_duplicate_management(self) -> None:
+        """Settings and skill duplicate-management prompts should not fall through."""
+        prompts = (
+            "設定，スキルの二重管理を洗い出して，修正してください",
+            ".codex/.agents と skill catalog の ownership を直して",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                for skill in (
+                    "task-routing",
+                    "structure-refactor",
+                    "agent-canon-update",
+                ):
+                    self.assertIn(skill, decision["matched_skills"])
+                    self.assertIn(skill, decision["active_skills"])
+                self.assertNotEqual(
+                    decision["evidence"], "mode=repo-changing;matched=none"
+                )
+
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
         """All-skill command packet repair should not fall through."""
         prompt = (
