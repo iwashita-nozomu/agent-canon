@@ -528,10 +528,10 @@ workflow docs、task catalog は agent TOML を参照します。
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は product-evidence route を示します。
 - この repo では、repo inventory、tool drift survey、machine-report summarization、execution-only experiment / log work を mini helper role TOML に残します。設計判断・広域 synthesis・学術主張の精査・final judgment、broad / ambiguous implementation、static validation triage、diff-local language review、bounded review、report traceability、checklist / quality-check gate は frontier role TOML に寄せ、Abstract Design Frame から導かれた設計済み低リスク実装 slice は `spark_worker` に寄せます。
-- repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
+- repo default の reasoning は non-review role では `high` にし、review / quality-check role TOML は `xhigh` を既定にします
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を preferred candidate とします
-- review / quality-check role TOML は frontier model と high reasoning を使い、final judgment や scope を変える設計判断も frontier review route に残します
+- review / quality-check role TOML は frontier model と `xhigh` reasoning を使い、final judgment や scope を変える設計判断も frontier review route に残します
 - Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only helper work は mini helper role TOML に置きます
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、dependency-expanded handoff scope が揃っていることです
 - 明示 spawn 許可がある repo-changing task では、coding / implementation / patch work の implementation critical path を pre-handoff investigation packet で作ってから、並行可能な独立検証を read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を支える frontier review wave に切ります。

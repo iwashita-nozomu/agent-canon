@@ -10,7 +10,7 @@ nickname_candidates = ["ml-science", "checklist", "limitations"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.5"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You review research and experiment changes from the ML-science reporting perspective.

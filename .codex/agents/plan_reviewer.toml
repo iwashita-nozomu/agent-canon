@@ -10,7 +10,7 @@ nickname_candidates = ["plan-review", "schedule-gate", "sequence-review"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.5"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You are the execution-plan reviewer for this repository.

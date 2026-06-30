@@ -10,7 +10,7 @@ nickname_candidates = ["prompt-audit", "config-review", "role-review"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.5"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You are the prompt and subagent-configuration reviewer for this repository.
