@@ -47,13 +47,13 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:gpt-5.5:high", result.stdout)
+        self.assertIn("diff_triage_reviewer:gpt-5.5:xhigh", result.stdout)
         self.assertIn("experiment_runner:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("explorer:gpt-5.4-mini:medium", result.stdout)
-        self.assertIn("manager_reviewer:gpt-5.5:high", result.stdout)
-        self.assertIn("plan_reviewer:gpt-5.5:high", result.stdout)
+        self.assertIn("manager_reviewer:gpt-5.5:xhigh", result.stdout)
+        self.assertIn("plan_reviewer:gpt-5.5:xhigh", result.stdout)
         self.assertIn("spark_worker:gpt-5.3-codex-spark:low", result.stdout)
-        self.assertIn("ship_reviewer:gpt-5.5:high", result.stdout)
+        self.assertIn("ship_reviewer:gpt-5.5:xhigh", result.stdout)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
@@ -232,7 +232,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             python_reviewer.write_text(
                 python_reviewer.read_text(encoding="utf-8")
                 .replace('model = "gpt-5.5"', 'model = "gpt-5.4-mini"')
-                .replace('model_reasoning_effort = "high"', 'model_reasoning_effort = "medium"'),
+                .replace('model_reasoning_effort = "xhigh"', 'model_reasoning_effort = "medium"'),
                 encoding="utf-8",
             )
 
@@ -244,7 +244,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-high-reasoning",
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-xhigh-reasoning",
                 result.stdout,
             )
 

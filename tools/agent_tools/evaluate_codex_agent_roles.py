@@ -50,7 +50,7 @@ MINI_MEDIUM_AGENT_IDS = {
     "experiment_runner",
     "explorer",
 }
-FRONTIER_HIGH_AGENT_IDS = {
+FRONTIER_XHIGH_AGENT_IDS = {
     "diff_triage_reviewer",
     "docs_workflow_steward",
     "reviewer",
@@ -211,11 +211,11 @@ def evaluate_static_agent_configs(
                 findings.append(Finding("model-settings", agent_id, f"expected-model-{MINI_MODEL}"))
             if effort != "medium":
                 findings.append(Finding("model-settings", agent_id, "expected-medium-reasoning"))
-        if agent_id.endswith("_reviewer") or agent_id in FRONTIER_HIGH_AGENT_IDS:
+        if agent_id.endswith("_reviewer") or agent_id in FRONTIER_XHIGH_AGENT_IDS:
             if model != FRONTIER_MODEL:
                 findings.append(Finding("model-settings", agent_id, f"expected-model-{FRONTIER_MODEL}"))
-            if effort != "high":
-                findings.append(Finding("model-settings", agent_id, "expected-high-reasoning"))
+            if effort != "xhigh":
+                findings.append(Finding("model-settings", agent_id, "expected-xhigh-reasoning"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
     return findings
 
