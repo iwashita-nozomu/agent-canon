@@ -5,6 +5,7 @@ responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy
 downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates document claim grounding
+downstream implementation ../../../tools/agent_tools/task_close.py validates document split decision closeout evidence
 @dependency-end
 -->
 
@@ -37,6 +38,11 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
   先頭付近に reader map を置きます。reader map は、その文書が扱う内容、
   主な章のまとまり、読むべき場面、誤用を避ける境界を短く示します。
 - `documents/` 内の編成は、参照先の一覧ではなく、責務ごとの分割を優先します。
+- 文書を分割、統合、移動、または現状維持する Markdown 変更では、
+  `document_split_decision` を記録します。判断候補は
+  `keep:<reason>`、`split:<new-owner-boundary>`、`merge:<target>`、
+  `inline:<target-section>`、`rename:<new-path>`、
+  `not_applicable:format-only:<reason>` のいずれかにします。
 - 実装への参照は、実装ファイル名や実装上の制約を明示する必要がある場合に限ります。
 - 各 `.md` ファイルは、タイトル、短い導入、`##` 見出しごとの本文という流れを基本にします。
 - workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
@@ -47,6 +53,41 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 - まとまった Markdown 変更の前後では、少なくとも変更したファイルに対して `markdownlint` を実行して体裁崩れを確認します。
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。
 - 箇条書きは `-` を基本にし、パス・識別子・コマンドはバッククォートで示します。
+
+## Document Split Decision
+
+`document_split_decision` は、文書構造変更の自動判定に使う machine-readable
+field です。本文量や分割読みの都合ではなく、文書責務、読者、source map、
+validation route、更新頻度、正本 owner の組み合わせで判断します。
+
+- `keep:<reason>`: 同じ owner、reader、source map、validation route、update cadence
+  で読める内容は同じ文書に残します。章、reader map、Mermaid 図、または
+  section contract で読者順序を直せる場合は `keep` を選びます。
+- `split:<new-owner-boundary>`: 新しい責務 owner、別読者、別 validation route、
+  別 source map、または独立した update cadence を持つ内容は別文書に分けます。
+- `merge:<target>`: 2 つ以上の文書が同じ owner、reader、source map、
+  validation route、update cadence を持ち、差し替え可能な境界を作らない場合は
+  正本側へ統合します。
+- `inline:<target-section>`: 独立文書にするほどの owner boundary がなく、親文書の
+  受け入れ条件、例外、検証経路の一部として読むべき内容は section に戻します。
+- `rename:<new-path>`: 責務は変えず、path 名だけが reader map または documents
+  index とずれている場合に使います。
+- `not_applicable:format-only:<reason>`: typo、link、format-only の変更で文書構造に
+  触らない場合に使います。
+
+受け入れ条件:
+
+- `structure-planning` の `document_unit` は、owner、reader、source map、
+  validation route、update cadence、canonical parent、downstream consumers を
+  列として持ちます。
+- `split_when` は上の `split` 条件のどれが成立したかを示します。
+- `merge_when` は同じ owner、reader、source map、validation route、update cadence
+  が揃い、別文書にしたときの差し替え可能な責務境界がないことを示します。
+- `invalid_split_boundaries` は、本文量、token 量、読み込み chunk、章番号、近い path、
+  一時的な作業都合、同じ validation oracle を共有する連続説明を含めます。
+- closeout の Document Structure Evidence は `document_split_decision` を記録し、
+  `python3 tools/agent_tools/check_convention_compliance.py` と
+  `python3 tools/agent_tools/task_close.py` がこの field の有無を確認します。
 
 ## Claim Grounding
 

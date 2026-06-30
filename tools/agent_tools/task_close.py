@@ -32,6 +32,15 @@ from report_artifact_checks import (
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
 MAKE_CI_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
+DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
+DOCUMENT_SPLIT_DECISION_PREFIXES = (
+    "keep:",
+    "split:",
+    "merge:",
+    "inline:",
+    "rename:",
+)
+DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -259,12 +268,24 @@ def parse_document_structure_paths(value: str) -> set[str]:
     }
 
 
+def document_split_decision_ready(status: str, decision: str) -> bool:
+    """Return whether document split evidence matches the structure route."""
+    normalized_decision = decision.strip()
+    if normalized_decision in DOCUMENT_STRUCTURE_MISSING_VALUES:
+        return False
+    if status == "skipped":
+        return normalized_decision.startswith(DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX)
+    if status == "complete":
+        return normalized_decision.startswith(DOCUMENT_SPLIT_DECISION_PREFIXES)
+    return False
+
+
 def document_structure_evidence_ready(
     changed_markdown: Sequence[str], evidence: dict[str, str]
-) -> tuple[bool, bool]:
-    """Return path-record and route evidence readiness for Markdown changes."""
+) -> tuple[bool, bool, bool]:
+    """Return path-record, split-decision, and route readiness."""
     if not changed_markdown:
-        return True, True
+        return True, True, True
     recorded_paths = parse_document_structure_paths(
         evidence.get("document_structure_paths", "")
     )
@@ -272,6 +293,9 @@ def document_structure_evidence_ready(
     paths_recorded = normalized_changed.issubset(recorded_paths)
     status = evidence.get("document_structure_status", "")
     structure_contract = evidence.get("structure_contract", "")
+    split_decision_ready = document_split_decision_ready(
+        status, evidence.get("document_split_decision", "")
+    )
     complete_route = (
         status == "complete"
         and evidence.get("structure_planning") == "complete"
@@ -286,7 +310,9 @@ def document_structure_evidence_ready(
         and "skipped" in evidence.get("structure_contract", "")
         and evidence.get("format_only_reason", "") not in {"", "missing", "none"}
     )
-    return paths_recorded, complete_route or skipped_route
+    return paths_recorded, split_decision_ready, split_decision_ready and (
+        complete_route or skipped_route
+    )
 
 
 def active_run_name(report_dir: Path) -> str | None:
@@ -369,7 +395,11 @@ def main() -> int:
     )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
-    document_structure_paths_ready, document_structure_route_ready = (
+    (
+        document_structure_paths_ready,
+        document_split_decision_route_ready,
+        document_structure_route_ready,
+    ) = (
         document_structure_evidence_ready(changed_markdown, document_structure)
     )
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
@@ -450,6 +480,7 @@ def main() -> int:
         not in {"", "missing", "none"},
         "workflow_tool_warnings_closed": not workflow_tool_warning_blockers,
         "document_structure_paths_recorded": document_structure_paths_ready,
+        "document_split_decision_evidence": document_split_decision_route_ready,
         "document_structure_evidence": document_structure_route_ready,
         "mechanical_completion_loop_complete": closeout.get(
             "mechanical_completion_loop_complete"
@@ -683,6 +714,14 @@ def main() -> int:
     print(
         "DOCUMENT_STRUCTURE_PATHS="
         f"{document_structure.get('document_structure_paths', '')}"
+    )
+    print(
+        "DOCUMENT_SPLIT_DECISION="
+        f"{document_structure.get('document_split_decision', '')}"
+    )
+    print(
+        "DOCUMENT_SPLIT_DECISION_EVIDENCE="
+        f"{'yes' if document_split_decision_route_ready else 'no'}"
     )
     print(
         "DOCUMENT_STRUCTURE_EVIDENCE="

@@ -8,6 +8,8 @@ upstream design catalog.yaml public skill family catalog
 upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
 upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../tools/agent_tools/task_close.py consumes document_split_decision closeout evidence
+downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates document split decision wiring
 downstream design html-output.md consumes structure contracts for explicit HTML output
 @dependency-end
 -->
@@ -73,6 +75,11 @@ first_artifact=<figure|table|ponchi-e|concept-diagram|slide|summary-card|section
 first_artifact_question=<one sentence>
 visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable> <why this visual shape fits>
 source_to_structure_map=<source path/id -> section, slide, visual, claim, experiment slice, or refactor slice>
+document_unit=<for documents: owner, reader, source map, validation route, update cadence, canonical parent, downstream consumers>
+document_split_decision=<keep|split|merge|inline|rename|not_applicable:format-only> <reason or target>
+split_when=<new owner, new reader, new validation route, new source map, independent update cadence, or separate downstream consumer>
+merge_when=<same owner, same reader, same source map, same validation route, same update cadence, and no replaceable responsibility boundary>
+invalid_split_boundaries=<length, token budget, chunking convenience, section count, nearby path, temporary work queue, shared oracle>
 oop_structure_contract=<for experiment plans/reports: implementation responsibility map, object flow, variant boundary, and dependency direction>
 metric_or_delta_contract=<denominator, directionality, baseline, caveat, allowed structural delta, forbidden semantic delta>
 ordered_structure=<ordered headings, slides/storyboard, visuals, experiment slices, or refactor slices>
@@ -92,6 +99,14 @@ experiment scripts, or refactor edits.
    canonical route changes, create the structure contract before prose edits;
    if it is typo / link / formatting only, record `structure_contract=skipped`
    with that reason.
+1. For document structure changes, fill `document_unit` and
+   `document_split_decision` before prose edits. Choose `split` only when the
+   content has a new owner, reader, validation route, source map, update
+   cadence, or downstream consumer. Choose `merge`, `inline`, or `keep` when
+   the same owner, reader, source map, validation route, and update cadence
+   remain shared. Do not split because a file is long, because a context window
+   is inconvenient, because a chunk boundary is convenient, or because adjacent
+   sections look separable without a replaceable responsibility boundary.
 1. Choose the first artifact: figure, table, ponchi-e/concept diagram, slide,
    summary card, first section, experiment slice, or refactor slice.
 1. For reader-facing documents, reports, plans, workflow guides, and refactor
@@ -158,6 +173,7 @@ Record these in `workflow_monitoring.md`, a run bundle, or the artifact itself:
 ```text
 structure_planning=complete
 structure_contract=<path-or-inline>
+document_split_decision=<keep|split|merge|inline|rename|not_applicable:format-only>
 structure_first_artifact=<name>
 structure_visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable>
 structure_source_map=<path-or-inline>
