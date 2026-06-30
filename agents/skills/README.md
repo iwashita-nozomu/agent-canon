@@ -18,7 +18,7 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 - Purpose: index the public skill canon and explain the split between
   human-facing skill docs and runtime discovery shims.
 - Section path: Rules and Skill Visibility Naming define naming and ownership;
-  Public Skill Surface is the main catalog table; Internal Review And Runtime
+  Public Skill Surface defines the catalog owner; Internal Review And Runtime
   Routines, Official System Skill Delegation, Codex Defaults, and Updating
   Skills define boundaries and maintenance.
 - Use when: adding, routing, reviewing, or explaining public AgentCanon skills.
@@ -53,59 +53,14 @@ review の細粒度 checklist、CLI adapter、artifact placement、validation he
 workflow selection は task 開始時に使い忘れると実害が出るため、`agent-orchestration` を routing entry skill として public surface の先頭に置きます。
 subagent bootstrap は repo-changing task の stage 分離に必要なため public skill として出します。
 
-| Family | Purpose | Canonical Doc | Discovery Shim |
-| ------ | ------- | ------------- | -------------- |
-| `agent-orchestration` | task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint を先に選ぶ | `agents/skills/agent-orchestration.md` | `.agents/skills/agent-orchestration/SKILL.md` |
-| `repo-onboarding` | unfamiliar repo の最短入口確認 | `agents/skills/repo-onboarding.md` | `.agents/skills/repo-onboarding/SKILL.md` |
-| `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
-| `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
-| `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
-| `owner-bounded-routing` | owner-bounded 修正で existing tool の直接利用、軽量 preflight、targeted validation を固定する | `agents/skills/owner-bounded-routing.md` | `.agents/skills/owner-bounded-routing/SKILL.md` |
-| `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
-| `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
-| `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
-| `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
-| `oop-readability-check` | OOP readability tool を走らせ、必要なら機械結果と分離して agent 分析も出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
-| `result-artifact-writeout` | tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す | `agents/skills/result-artifact-writeout.md` | `.agents/skills/result-artifact-writeout/SKILL.md` |
-| `tool-finding-report` | tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る | `agents/skills/tool-finding-report.md` | `.agents/skills/tool-finding-report/SKILL.md` |
-| `issue-finding-report` | prompt / run bundle / hook / routing / eval evidence を抽象原因でまとめ、durable skill issue 候補に変換する | `agents/skills/issue-finding-report.md` | `.agents/skills/issue-finding-report/SKILL.md` |
-| `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを structured summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
-| `agent-eval-accumulation` | missing / stale な AgentCanon eval family を registered producer と checker で append-only evidence に戻す | `agents/skills/agent-eval-accumulation.md` | `.agents/skills/agent-eval-accumulation/SKILL.md` |
-| `agent-canon-update` | AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する | `agents/skills/agent-canon-update.md` | `.agents/skills/agent-canon-update/SKILL.md` |
-| `pr-processing` | PR / Issue queue を inventory、authority、conflict、validation、merge、Issue triage、closeout evidence の順に処理する | `agents/skills/pr-processing.md` | `.agents/skills/pr-processing/SKILL.md` |
-| `agent-update-branch` | memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する | `agents/skills/agent-update-branch.md` | `.agents/skills/agent-update-branch/SKILL.md` |
-| `report-writing` | evidence から reader-facing report / presentation narrative / PPT storyboard を構成し、source packet、visual asset plan、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
-| `prose-reasoning-graph` | 既存 prose を SQLite-backed graph に変換し、構造診断、自然言語説明、rewrite packet、既存 skill handoff を出す | `agents/skills/prose-reasoning-graph.md` | `.agents/skills/prose-reasoning-graph/SKILL.md` |
-| `structure-planning` | report / experiment / Eval / presentation / document / refactor の構造 contract、primary artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
-| `code-visualization` | user request や文書内 `visual_plan` の文脈から context question を分類し、flowchart、call graph、control-flow graph、sequence diagram、state-transition diagram、data-flow diagram、dependency graph、timing diagram などの図示形式と source evidence を先に選ぶ | `agents/skills/code-visualization.md` | `.agents/skills/code-visualization/SKILL.md` |
-| `html-output` | HTML が明示された出力だけを browser-readable artifact にし、layout、ImageGen、既存 server reuse / external URL 公開を固定する | `agents/skills/html-output.md` | `.agents/skills/html-output/SKILL.md` |
-| `html-experiment-report` | experiment / Eval artifact を HTML report にし、primary figure、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
-| `test-design` | brittle test 診断、behavior contract、oracle、property/metamorphic 候補、nasty/regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
-| `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
-| `structure-refactor` | directory README と dependency manifest を再帰展開し、責務に基づいて directory 構造、path mapping、scope map を refactor する | `agents/skills/structure-refactor.md` | `.agents/skills/structure-refactor/SKILL.md` |
-| `user-guided-debugging` | ユーザー明示時に、1 件ずつ問題点を提示してから修正し、検証後に次の課題を提示する | `agents/skills/user-guided-debugging.md` | `.agents/skills/user-guided-debugging/SKILL.md` |
-| `long-form-writing` | README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
-| `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
-| `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
-| `md-style-check` | format-only な Markdown の体裁とリンク確認。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
-| `document-canon-cleanup` | 非正本の文書候補を棚卸しし、generated evidence / closed issue / duplicate heading を正本へ振り分ける | `agents/skills/document-canon-cleanup.md` | `.agents/skills/document-canon-cleanup/SKILL.md` |
-| `dependency-analysis` | 依存 manifest / 実コード依存を確認し、変更影響範囲と repair-planning packet を作る | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
-| `worktree-start` | stale worktree / `WORKTREE_SCOPE.md` / action log を legacy cleanup evidence として診断し、new worktree kickoff には使わない | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
-| `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
-| `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
-| `experiment-review` | 実験 topic の `run.py` 直実行、GPU/JAX 環境所有、artifact / notebook / README 契約を review する | `agents/skills/experiment-review.md` | `.agents/skills/experiment-review/SKILL.md` |
-| `gpu-execution` | GPU / CUDA / JAX / XLA 実行を ExperimentRunner 経由にし、preallocation 無効化と GPU blocker evidence を固定する | `agents/skills/gpu-execution.md` | `.agents/skills/gpu-execution/SKILL.md` |
-| `computational-optimization` | 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約を固定する | `agents/skills/computational-optimization.md` | `.agents/skills/computational-optimization/SKILL.md` |
-| `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
-| `literature-survey` | 先行研究、関連文献、反証候補の整理 | `agents/skills/literature-survey.md` | `.agents/skills/literature-survey/SKILL.md` |
-| `formal-proof-workflow` | 自然言語 claim を形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence へ接続する | `agents/skills/formal-proof-workflow.md` | `.agents/skills/formal-proof-workflow/SKILL.md` |
-| `lean-algorithm-design` | 実装前に候補アルゴリズムを Lean の数学モデルとして設計し、収束・停止・certificate・inner solver 契約を検証してから実装へ渡す | `agents/skills/lean-algorithm-design.md` | `.agents/skills/lean-algorithm-design/SKILL.md` |
-| `algorithm-proof-exploration` | 証明義務を入力に、IR / lemma graph / algorithmic blocker frontier でアルゴリズム選択と必要な algorithm change を探索し、formal-proof へ渡す | `agents/skills/algorithm-proof-exploration.md` | `.agents/skills/algorithm-proof-exploration/SKILL.md` |
-| `research-workflow` | 外部調査、比較設計、run loop、decision state の整理 | `agents/skills/research-workflow.md` | `.agents/skills/research-workflow/SKILL.md` |
-| `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
-| `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
-| `user-preference-sync` | user preference note を stable な AGENTS guidance へ昇格 | `agents/skills/user-preference-sync.md` | `.agents/skills/user-preference-sync/SKILL.md` |
-| `agent-learning` | agent の作業哲学、対話学習、task retrospective を蓄積 | `agents/skills/agent-learning.md` | `.agents/skills/agent-learning/SKILL.md` |
+公開 skill の id、purpose、canonical doc、discovery shim、related skills、
+prompt routing trigger は `agents/skills/catalog.yaml` が唯一の列挙正本です。
+この README には catalog の行を複製しません。
+
+確認入口:
+- public skill の一覧と shim/doc/config の整合: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
+- prompt からの skill 選択: `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
+- skill ごとの command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
 
 ## Internal Review And Runtime Routines
 

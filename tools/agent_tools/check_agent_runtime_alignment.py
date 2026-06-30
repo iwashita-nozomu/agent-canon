@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 import tomllib
@@ -70,6 +71,10 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
 }
 SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 PRIVATE_SKILL_PREFIX = "_"
+PUBLIC_SKILL_README_DUPLICATE_ROW = re.compile(
+    r"^\|\s*`[^`]+`\s*\|.*`agents/skills/[^`]+\.md`.*`\.agents/skills/[^`]+/SKILL\.md`",
+    re.MULTILINE,
+)
 OFFICIAL_SYSTEM_SKILLS = (
     "imagegen",
     "openai-docs",
@@ -677,6 +682,19 @@ def validate_public_skill_document_contract(
         not missing_public_docs,
         "skill catalog canonical docs missing from agents/skills: "
         + ", ".join(missing_public_docs),
+    )
+    validate_public_skill_readme_single_source(root)
+
+
+def validate_public_skill_readme_single_source(root: Path) -> None:
+    """Check that README does not duplicate the catalog-backed skill table."""
+    readme = root / "agents" / "skills" / "README.md"
+    ensure(readme.is_file(), "public skill README missing: agents/skills/README.md")
+    text = readme.read_text(encoding="utf-8")
+    ensure(
+        PUBLIC_SKILL_README_DUPLICATE_ROW.search(text) is None,
+        "agents/skills/README.md must not duplicate public skill catalog rows; "
+        "keep the skill list in agents/skills/catalog.yaml",
     )
 
 

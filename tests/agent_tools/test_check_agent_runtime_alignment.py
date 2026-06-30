@@ -291,6 +291,42 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             runtime_alignment.validate_public_skill_document_contract(catalog, root)
 
+    def test_public_skill_readme_rejects_duplicate_catalog_table(self) -> None:
+        """The public skill list must stay in catalog.yaml, not README rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True)
+            (root / "agents" / "internal-routines").mkdir(parents=True)
+            (root / "agents" / "skills" / "README.md").write_text(
+                "\n".join(
+                    [
+                        "# Skills",
+                        "",
+                        "| Family | Purpose | Canonical Doc | Discovery Shim |",
+                        "| ------ | ------- | ------------- | -------------- |",
+                        "| `example` | Example | `agents/skills/example.md` | `.agents/skills/example/SKILL.md` |",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "internal-routines" / "README.md").write_text(
+                "# Internal\n",
+                encoding="utf-8",
+            )
+            catalog = {
+                "skill_families": [
+                    {
+                        "id": "example",
+                        "canonical_doc": "agents/skills/example.md",
+                        "shim": ".agents/skills/example/SKILL.md",
+                    }
+                ]
+            }
+
+            with self.assertRaisesRegex(RuntimeError, "must not duplicate public skill catalog rows"):
+                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+
     def test_public_skill_shims_reject_extra_shim_without_catalog_entry(self) -> None:
         """Runtime discovery shims must match the public skill catalog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
