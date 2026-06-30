@@ -36,6 +36,9 @@ config policy の第二の正本にはしません。
 - 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent を分けたい
 - `/goal` 確定前に read-only subagent、または明示許可待ちの handoff plan で goal draft、repo survey、first-slice plan を固めたい
 - prompt、routing、subagent-config drift の修正前に dedicated prompt-audit subagent を挟みたい
+- repo-changing implementation / patch / doc-edit work で、parent が
+  orchestrator / integrator に徹し、write-capable subagent handoff を既定 route
+  にする必要がある
 
 ## Core References
 
@@ -101,12 +104,12 @@ prompt / routing / subagent-config drift を直す task では、shared policy p
 対象 surface は route seed として扱い、責務検索、再利用確認、stale surface scan、dependency expansion を通して handoff scope へ落とします。
 goal-driven repo-changing task では、`/goal` がまだ exact でなくても provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only handoff plan を先に作ります。active runtime が明示許可を持つ場合だけ、その wave を起動します。
 goal-driven task では、write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
-通常の repo-changing task で user が coding / implementation / patch work の subagent 委譲を明示した場合は、この goal-driven `goal.md` block を適用しません。run bundle と pre-handoff investigation packet が dependency-expanded handoff scope、validation plan、tool-rejection preflight evidence を作ったら、read-only wave の追加より先に `spark_worker` / `worker` を起動または schedule します。read-only wave は setup evidence であり、implementation handoff の代替ではありません。
+通常の repo-changing task で coding / implementation / patch / doc-edit work が scope に入る場合は、この goal-driven `goal.md` block を適用しません。run bundle と pre-handoff investigation packet が dependency-expanded handoff scope、validation plan、tool-rejection preflight evidence を作ったら、read-only wave の追加より先に `spark_worker` / `worker` を起動または schedule します。read-only wave は setup evidence であり、implementation handoff の代替ではありません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame と approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
 read-only exploration に切る前に、その質問を所有する checker、router、semantic index、dashboard があるか確認し、ある場合は tool を先に呼びます。subagent は structured tool artifact が曖昧な場合の解釈や、tool-covered ではない judgement の独立 review に使い、同じ文書を読み直して決定論的 check を反復しません。
-repo inventory、tool drift survey、機械 report 要約は、implementation の critical path を塞がない独立検証としてだけ mini helper role に切ります。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は frontier review role TOML に切ります。user が coding / implementation / patch work を求めている場合、既定の説明は write-capable handoff first にします。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任を持ちます。
+repo inventory、tool drift survey、機械 report 要約は、implementation の critical path を塞がない独立検証としてだけ mini helper role に切ります。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は frontier review role TOML に切ります。user が coding / implementation / patch / doc-edit work を求めている場合、既定の説明は write-capable handoff first にします。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任を持ちます。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を run bundle に記録した exception route です。
 実装 slice は Abstract Design Frame から導かれた差し替え可能な責務単位で、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `spark_worker` が runtime capacity または compatibility で起動できない場合は、同じ packet を `worker` に渡して実装 route を継続します。mini helper role または review role の起動失敗は、同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は `agents/COMMUNICATION_PROTOCOL.md` の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
@@ -122,7 +125,7 @@ handoff prompt には repo root や `/workspace` 全体ではなく、dependency
 theorem-driven、algorithm、implementation handoff では、protocol-owned `Target Binding Packet` を Fresh Subagent Context Capsule に必ず入れます。packet が不完全な場合は subagent を起動せず、parent が capsule または source packet を補完します。subagent から返った unchecked theorem sketch、型が合っていない式、public root への到達が示されていない local counterexample、または code suggestion は、親が同じ public root に対する checker / validation route を通すまで採用しません。
 write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `agentcanon_new_tool_source_route`、`codex_hook_runtime_alignment`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。既存 AgentCanon tool source はこの新規 source route gate では止めません。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
-write-capable coding subagent を authorization または tool gate で起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、その slice について read-only 分析を増やし続けません。
+write-capable coding / docs-edit subagent を authorization または tool gate で起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、その slice について read-only 分析を増やし続けません。parent-direct へ切り替える場合は、blocked subagent route、exception rationale、owner boundary、targeted validation を同じ run bundle に残します。
 独立 workstream が複数ある場合は、workstream ごとに stage owner を置き、`run.delegated_spawn_policy` の下で vertical dynamic wave を起こします。同じ parent wave へ全 role を flat に詰め込むのは避け、入力 packet、write scope、validation route、review gate が交差しない sibling wave だけを同時に走らせます。
 log-analysis 由来の wave は `agent-log-analysis` の `Finding Route Packet` を
 input にします。`finding_class` が `wave_execution`、`skill_selection`、

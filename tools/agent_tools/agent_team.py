@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
-from route import decide_skills, load_skill_route_rules
+from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import (
     PROMPT_PLACEHOLDER,
     SkillCommandPacket,
@@ -138,6 +138,10 @@ CONTRACT_COMPLETE_IMPLEMENTATION_RULE = (
     "責務境界、API shape、依存方向、runtime contract の不足は "
     "design_issue_blocker として Gate 5-6 へ戻す。"
 )
+IMPLEMENTATION_HANDOFF_REQUIRED = "yes"
+PARENT_REPO_EDITS_ALLOWED = "no"
+PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED = "yes"
+PARENT_DIRECT_WRITE_EXCEPTION = "-"
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"
 REPO_TOOL_ROUTING_STATUS = "selected_skill_command_packets"
@@ -653,9 +657,21 @@ def user_facing_language_policy_output_lines() -> tuple[str, ...]:
     )
 
 
-def contract_complete_implementation_policy_output_lines() -> tuple[str, ...]:
+def contract_complete_implementation_policy_output_lines(
+    task_text: str = "",
+) -> tuple[str, ...]:
     """Return stdout lines for contract-complete implementation policy."""
+    handoff_lines: tuple[str, ...] = ()
+    if implementation_handoff_required(task_text):
+        handoff_lines = (
+            f"IMPLEMENTATION_HANDOFF_REQUIRED={IMPLEMENTATION_HANDOFF_REQUIRED}",
+            f"PARENT_REPO_EDITS_ALLOWED={PARENT_REPO_EDITS_ALLOWED}",
+            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED="
+            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED}",
+            f"PARENT_DIRECT_WRITE_EXCEPTION={PARENT_DIRECT_WRITE_EXCEPTION}",
+        )
     return (
+        *handoff_lines,
         "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
         "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS="
         f"{CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS}",
@@ -1185,16 +1201,24 @@ def recommended_dynamic_expansion_wave_slots(
     return tuple(waves)
 
 
-def current_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+def current_stage_skills(
+    selected_skills: tuple[str, ...],
+    task_text: str = "",
+) -> tuple[str, ...]:
     """Return public skills to declare for the current stage only."""
     active_skills = set(CURRENT_STAGE_SKILLS)
     active_skills.update(catalog_active_stage_skills())
+    if implementation_handoff_required(task_text):
+        active_skills.add("$subagent-bootstrap")
     return tuple(skill for skill in selected_skills if skill in active_skills)
 
 
-def deferred_stage_skills(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
+def deferred_stage_skills(
+    selected_skills: tuple[str, ...],
+    task_text: str = "",
+) -> tuple[str, ...]:
     """Return selected public skills that should wait for dynamic wave triggers."""
-    active = set(current_stage_skills(selected_skills))
+    active = set(current_stage_skills(selected_skills, task_text))
     return tuple(skill for skill in selected_skills if skill not in active)
 
 
@@ -1765,7 +1789,7 @@ def manifest_run_lines(
         f"    gate_order: {STANDARD_AGENT_WAVE_SEQUENCE_GATE!r}",
         "    edit_handoff_rule: 'write-capable handoff は review gate 後の bounded write scope から開始し、read-only wave は read scope と次の review gate を記録する'",
         *manifest_user_facing_language_policy_lines(),
-        *manifest_contract_complete_implementation_policy_lines(),
+        *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
         *manifest_repo_tool_routing_policy_lines(spec),
         *manifest_default_quality_check_policy_lines(spec),
@@ -1938,7 +1962,9 @@ def manifest_run_lines(
             "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
         )
         lines.append(
-            "      - closed run-local agent ids or parent_direct_no_subagents rationale"
+            "      - closed run-local agent ids or parent_direct_no_subagents with "
+            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes and "
+            "PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>"
         )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
@@ -1959,7 +1985,9 @@ def manifest_run_lines(
     return lines
 
 
-def manifest_contract_complete_implementation_policy_lines() -> list[str]:
+def manifest_contract_complete_implementation_policy_lines(
+    task_text: str = "",
+) -> list[str]:
     """Render contract-complete implementation policy lines."""
     lines = [
         "  contract_complete_implementation_policy:",
@@ -1970,6 +1998,14 @@ def manifest_contract_complete_implementation_policy_lines() -> list[str]:
         f"    rule: {CONTRACT_COMPLETE_IMPLEMENTATION_RULE!r}",
         "    required_inputs:",
     ]
+    if implementation_handoff_required(task_text):
+        lines[6:6] = [
+            f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
+            f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
+            "    parent_direct_write_exception_required: "
+            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED!r}",
+            f"    parent_direct_write_exception: {PARENT_DIRECT_WRITE_EXCEPTION!r}",
+        ]
     for field in CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS:
         lines.append(f"      - {field}")
     lines.append("    route_signals:")

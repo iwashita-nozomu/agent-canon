@@ -321,8 +321,8 @@ def emit_bootstrap_output(
         context.workflow_family_id,
         args.task,
     )
-    active_skills = current_stage_skills(selected_skills)
-    deferred_skills = deferred_stage_skills(selected_skills)
+    active_skills = current_stage_skills(selected_skills, args.task)
+    deferred_skills = deferred_stage_skills(selected_skills, args.task)
     review_roles = selected_review_roles(runtime.roles)
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
@@ -410,7 +410,7 @@ def emit_bootstrap_output(
         print(line)
     for line in user_facing_language_policy_output_lines():
         print(line)
-    for line in contract_complete_implementation_policy_output_lines():
+    for line in contract_complete_implementation_policy_output_lines(args.task):
         print(line)
     for line in repo_tool_routing_policy_output_lines(selected_skills):
         print(line)
@@ -479,6 +479,7 @@ def record_bootstrap_monitoring(
     roles: tuple[Role, ...],
     selected_skills: tuple[str, ...],
     review_roles: tuple[str, ...],
+    task_text: str,
     preflight_status: str,
 ) -> None:
     """Record bootstrap monitoring evidence."""
@@ -487,7 +488,7 @@ def record_bootstrap_monitoring(
         signals=[
             (
                 f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(current_stage_skills(selected_skills)) or '-'}, "
+                f"skills={','.join(current_stage_skills(selected_skills, task_text)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
             f"stage owner routing active_roles={','.join(role.id for role in roles)}",
@@ -571,6 +572,7 @@ def main() -> int:
         roles,
         selected_skills,
         review_roles,
+        args.task,
         preflight.status,
     )
     return 0

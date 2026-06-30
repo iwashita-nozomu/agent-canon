@@ -26,5 +26,7 @@ Rules:
 - stay read-only even when exact replacement text is requested
 - keep prompt/config policy separate from general docs cleanup
 - prefer `.codex/agents/*.toml` for role behavior and model/reasoning settings, and `.codex/config.toml` for registry and runtime settings
-- escalate implementation to the parent or a scoped worker after the audit
+- return a bounded implementation packet for `spark_worker` / `worker` after
+  the audit; parent receives routing, launch, integration, review, validation,
+  and closeout guidance, not the implementation assignment
 """

@@ -113,10 +113,109 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("subagent-bootstrap", decision["skills"])
         self.assertIn("agent-orchestration", decision["active_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
+
+    def test_prompt_routes_subagent_first_implementation_active(self) -> None:
+        """Implementation, patch, and doc-edit prompts should activate bootstrap."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "Repo-changing implementation patch doc-edit work should be "
+                "subagent-first; parent only orchestrates and integrates."
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("subagent-bootstrap", decision["matched_skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_routes_plain_fix_to_active_subagent_bootstrap(self) -> None:
+        """Plain fix prompts should activate write-capable handoff."""
+        result = self.run_route(
+            "--prompt",
+            "Fix the failing tests in the repository.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_routes_plain_refactor_to_active_subagent_bootstrap(self) -> None:
+        """Plain refactor prompts should activate write-capable handoff."""
+        result = self.run_route(
+            "--prompt",
+            "Refactor the repository routing helpers.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_routes_review_only_subagent_without_bootstrap_activation(self) -> None:
+        """Review-only or do-not-edit prompts should not activate bootstrap."""
+        result = self.run_route(
+            "--prompt",
+            "Use subagents for review only; do not edit files.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("subagent-bootstrap", decision["matched_skills"])
+        self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_routes_explicit_japanese_delegation_to_subagent_bootstrap(self) -> None:
+        """Explicit Japanese delegation prompts should activate bootstrap as write-capable."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "作業はすべてサブエージェントに依頼し，"
+                "親は監視，エージェント起動，追加指示に徹する"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("subagent-bootstrap", decision["matched_skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_routes_review_request_without_subagent_markers_does_not_activate_bootstrap(
+        self,
+    ) -> None:
+        """Review-only dependency words should not trigger write-capable handoff."""
+        result = self.run_route(
+            "--prompt",
+            "レビューを依頼します",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("subagent-bootstrap", decision["matched_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
 
     def test_prompt_routes_related_skill_candidates_without_activating(self) -> None:
         """Related skill metadata should guide later waves without expanding active skills."""

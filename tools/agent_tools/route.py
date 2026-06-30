@@ -39,6 +39,50 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
 STAGE_POLICY_VALUES = ("active", "deferred")
 PRIVATE_SKILL_PREFIX = "_"
+SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
+
+IMPLEMENTATION_HANDOFF_TRIGGER_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("implementation",),
+    ("implement",),
+    ("実装",),
+    ("patch",),
+    ("パッチ",),
+    ("fix",),
+    ("修正",),
+    ("refactor",),
+    ("リファクタ",),
+    ("doc-edit",),
+    ("doc", "edit"),
+    ("docs", "edit"),
+    ("document", "edit"),
+    ("ドキュメント", "編集"),
+    ("文書", "編集"),
+    ("文書", "修正"),
+    ("write-capable", "handoff"),
+    ("implementation", "handoff"),
+    ("edit", "handoff"),
+)
+NON_IMPLEMENTATION_REVIEW_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("do", "not", "edit"),
+    ("don't", "edit"),
+    ("do-not-edit",),
+    ("no", "edits"),
+    ("no", "patch"),
+    ("review-only",),
+    ("review", "only"),
+    ("read-only",),
+    ("advisory",),
+    ("do", "not", "implement"),
+    ("編集しない",),
+    ("修正しない",),
+    ("実装しない",),
+    ("レビューのみ",),
+    ("読取専用",),
+)
+IMPLEMENTATION_DELEGATION_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("サブエージェント", "依頼"),
+    ("エージェント", "起動"),
+)
 
 AREA_DATA: tuple[AreaData, ...] = (
     (
@@ -669,8 +713,27 @@ def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
-def is_current_stage_skill(skill: str, rules_by_skill: Mapping[str, SkillRoutingRule]) -> bool:
+def implementation_handoff_required(prompt: str, mode: str = "repo-changing") -> bool:
+    """Return whether prompt text asks for a write-capable implementation handoff."""
+    if mode != "repo-changing":
+        return False
+    text = prompt.lower()
+    if any(text_matches_group(text, group) for group in NON_IMPLEMENTATION_REVIEW_GROUPS):
+        return False
+    if any(text_matches_group(text, group) for group in IMPLEMENTATION_DELEGATION_GROUPS):
+        return True
+    return any(text_matches_group(text, group) for group in IMPLEMENTATION_HANDOFF_TRIGGER_GROUPS)
+
+
+def is_current_stage_skill(
+    skill: str,
+    rules_by_skill: Mapping[str, SkillRoutingRule],
+    prompt: str = "",
+    mode: str = "repo-changing",
+) -> bool:
     """Return whether one matched skill belongs in the initial routing wave."""
+    if skill == SUBAGENT_BOOTSTRAP_SKILL:
+        return implementation_handoff_required(prompt, mode)
     rule = rules_by_skill.get(skill)
     return rule is not None and rule.stage_policy == "active"
 
@@ -709,18 +772,24 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
     base_skills = ["agent-orchestration"]
     if active_mode == "repo-changing":
         base_skills.append("codex-task-workflow")
-    skills = ordered_unique((*base_skills, *matched_skills))
-    active_skills = ordered_unique(
-        (
-            "agent-orchestration",
-            *(
-                match.skill
-                for match in matches
-                if match.reason == "prompt explicitly names public skill"
-                or is_current_stage_skill(match.skill, rules_by_skill)
-            ),
+    handoff_required = implementation_handoff_required(prompt, active_mode)
+    prompt_skills = matched_skills
+    if handoff_required:
+        prompt_skills = ordered_unique((*prompt_skills, SUBAGENT_BOOTSTRAP_SKILL))
+    skills = ordered_unique((*base_skills, *prompt_skills))
+    active_skill_inputs = ["agent-orchestration"]
+    if handoff_required:
+        active_skill_inputs.append(SUBAGENT_BOOTSTRAP_SKILL)
+    active_skill_inputs.extend(
+        match.skill
+        for match in matches
+        if (
+            match.skill != SUBAGENT_BOOTSTRAP_SKILL
+            and match.reason == "prompt explicitly names public skill"
         )
+        or is_current_stage_skill(match.skill, rules_by_skill, prompt, active_mode)
     )
+    active_skills = ordered_unique(active_skill_inputs)
     deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
     related_by_source, related_candidates = related_skill_candidates(
         matched_skills,
