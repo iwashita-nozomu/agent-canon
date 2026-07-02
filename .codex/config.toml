@@ -49,6 +49,10 @@ path = "../.agents/skills/agent-log-analysis/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/runtime-log-repair/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/agent-orchestration/SKILL.md"
 enabled = true
 

@@ -217,6 +217,18 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
 
+    def test_prompt_routes_direct_review_to_change_review_without_bootstrap(self) -> None:
+        """Direct review prompts should activate change-review, not implementation handoff."""
+        for prompt in ("レビューしてください", "変更レビューして"):
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("change-review", decision["matched_skills"])
+                self.assertIn("change-review", decision["active_skills"])
+                self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+
     def test_prompt_routes_related_skill_candidates_without_activating(self) -> None:
         """Related skill metadata should guide later waves without expanding active skills."""
         result = self.run_route(
@@ -501,6 +513,121 @@ class RouteToolTest(unittest.TestCase):
                 self.assertIn("agent-log-analysis", decision["skills"])
                 self.assertIn("agent-log-analysis", decision["matched_skills"])
                 self.assertIn("agent-log-analysis", decision["active_skills"])
+
+    def test_prompt_routes_current_dashboard_skillization_request(self) -> None:
+        """Dashboard-driven skillization should route analysis, routing, and repair follow-up."""
+        result = self.run_route(
+            "--prompt",
+            "ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("agent-log-analysis", decision["matched_skills"])
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("agent-log-analysis", decision["active_skills"])
+        self.assertIn("task-routing", decision["active_skills"])
+        self.assertIn("runtime-log-repair", decision["related_skill_candidates"])
+
+    def test_prompt_routes_runtime_dashboard_repair_to_runtime_log_repair(self) -> None:
+        """Runtime dashboard repair prompts should activate runtime-log-repair."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "runtime dashboard next actions: repair failing hook evidence and "
+                "AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("runtime-log-repair", decision["matched_skills"])
+        self.assertIn("runtime-log-repair", decision["active_skills"])
+
+    def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
+        self,
+    ) -> None:
+        """Ordinary source URL and report wording should not trigger runtime-log repair."""
+        prompts = (
+            "consulted source URLs are missing from the literature survey notes",
+            "Reference missing URLs in the README link list",
+            "workflow attribution section in this report",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertNotIn("runtime-log-repair", decision["matched_skills"])
+                self.assertNotIn("runtime-log-repair", decision["active_skills"])
+                self.assertNotIn("runtime-log-repair", decision["skills"])
+                self.assertNotIn(
+                    "runtime-log-repair",
+                    decision["related_skill_candidates"],
+                )
+
+    def test_prompt_routes_pr_cleanup_to_pr_processing(self) -> None:
+        """PR cleanup prompts should activate pr-processing."""
+        result = self.run_route(
+            "--prompt",
+            "PRを片付けてください。LocalもMainに追従",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("pr-processing", decision["matched_skills"])
+        self.assertIn("pr-processing", decision["active_skills"])
+
+    def test_prompt_routes_docs_check_failure_to_md_style_check(self) -> None:
+        """Docs check failures should activate md-style-check."""
+        result = self.run_route(
+            "--prompt",
+            "docs check が失敗しているので直して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("md-style-check", decision["matched_skills"])
+        self.assertIn("md-style-check", decision["active_skills"])
+
+    def test_prompt_routes_experiment_run_results_to_lifecycle(self) -> None:
+        """Experiment run/result prompts should activate lifecycle and suggest writeout."""
+        result = self.run_route(
+            "--prompt",
+            "experiment run artifacts を保存して実験結果をまとめて",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("experiment-lifecycle", decision["matched_skills"])
+        self.assertIn("experiment-lifecycle", decision["active_skills"])
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+
+    def test_prompt_routes_result_save_export_to_writeout(self) -> None:
+        """Result save/export prompts should activate result-artifact-writeout."""
+        result = self.run_route(
+            "--prompt",
+            "save result and export result as a durable artifact with raw summary",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("result-artifact-writeout", decision["matched_skills"])
+        self.assertIn("result-artifact-writeout", decision["active_skills"])
 
     def test_prompt_routes_missed_skill_invocation_feedback(self) -> None:
         """Missed skill feedback should reach routing, log analysis, and learning surfaces."""

@@ -123,6 +123,13 @@ skill_families:
         - ["スキル", "委譲"]
         - ["スキル", "移譲"]
         - ["根本", "設計", "見直"]
+        - ["validation", "route"]
+        - ["check", "profile"]
+        - ["profile", "route"]
+        - ["closeout", "route"]
+        - ["evidence", "route"]
+        - ["長い", "候補名"]
+        - ["long", "candidate", "names"]
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
@@ -194,11 +201,19 @@ skill_families:
     canonical_doc: agents/skills/change-review.md
     shim: .agents/skills/change-review/SKILL.md
     routing:
-      stage_policy: deferred
+      stage_policy: active
       reason: review findings or implementation changes need findings-first review
       triggers:
+        - ["レビューしてください"]
+        - ["変更レビュー"]
         - ["全体", "レビュー"]
         - ["review", "findings"]
+        - ["findings-first"]
+        - ["review-only"]
+        - ["do-not-edit-review"]
+        - ["change-review"]
+        - ["doc-review"]
+        - ["generated-diff-review"]
         - ["diff", "review"]
         - ["コード", "レビュー"]
         - ["根本", "設計", "レビュー"]
@@ -260,9 +275,15 @@ skill_families:
       - tool-finding-report
       - report-writing
     routing:
-      stage_policy: deferred
+      stage_policy: active
       reason: raw results, reports, manifests, or accumulated evidence must be written out
       triggers:
+        - ["save", "result"]
+        - ["export", "result"]
+        - ["durable", "artifact"]
+        - ["checker", "result"]
+        - ["raw", "summary"]
+        - ["結果保存"]
         - ["結果書き出し"]
         - ["結果を書き出"]
         - ["result writeout"]
@@ -326,10 +347,13 @@ skill_families:
       - tool-finding-report
       - agent-learning
       - report-writing
+      - runtime-log-repair
     routing:
       stage_policy: active
       reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
       triggers:
+        - ["ログ", "すべて", "解析"]
+        - ["頻発", "作業", "スキル"]
         - ["routing miss"]
         - ["selection gap"]
         - ["routing", "coverage"]
@@ -368,6 +392,36 @@ skill_families:
         - ["欠落", "スキル"]
         - ["弱い", "動線"]
         - ["エージェント", "成長"]
+  - id: runtime-log-repair
+    purpose: Turn AgentCanon runtime dashboard priority repair evidence into owner-routed Runtime Log Repair Packets and closeout verification.
+    canonical_doc: agents/skills/runtime-log-repair.md
+    shim: .agents/skills/runtime-log-repair/SKILL.md
+    related_skills:
+      - agent-log-analysis
+      - agent-eval-accumulation
+      - result-artifact-writeout
+      - issue-finding-report
+      - subagent-bootstrap
+      - task-routing
+      - agent-learning
+    routing:
+      stage_policy: active
+      reason: structured runtime dashboard evidence needs owner-routed repair work
+      triggers:
+        - ["runtime", "log", "repair"]
+        - ["runtime-log", "repair"]
+        - ["runtime", "dashboard", "next", "actions"]
+        - ["agent-runtime-dashboard"]
+        - ["dashboard", "repair", "failing", "hook", "evidence"]
+        - ["runtime", "log", "repair", "failing", "hook"]
+        - ["runtime", "dashboard", "hook", "entries", "status=fail"]
+        - ["runtime", "dashboard", "missing", "actual", "wave"]
+        - ["runtime", "dashboard", "workflow", "attribution"]
+        - ["runtime", "dashboard", "consulted", "source", "urls"]
+        - ["runtime", "dashboard", "reference", "missing", "urls"]
+        - ["AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"]
+        - ["AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING"]
+        - ["AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS"]
   - id: agent-eval-accumulation
     purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
     canonical_doc: agents/skills/agent-eval-accumulation.md
@@ -408,6 +462,18 @@ skill_families:
       stage_policy: active
       reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
       triggers:
+        - ["open", "prs"]
+        - ["open", "pr"]
+        - ["pr", "checks"]
+        - ["gh", "pr"]
+        - ["pr", "review", "comments"]
+        - ["requested", "changes"]
+        - ["queue", "cleanup"]
+        - ["ready", "pr"]
+        - ["stale", "pr"]
+        - ["PRを片付け"]
+        - ["PR", "片付け"]
+        - ["Local", "Main", "追従"]
         - ["pr", "処理"]
         - ["pr", "merge"]
         - ["pr", "マージ"]
@@ -443,6 +509,11 @@ skill_families:
       stage_policy: active
       reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
       triggers:
+        - ["reader-facing", "synthesis"]
+        - ["audit", "findings"]
+        - ["finding", "route", "packet"]
+        - ["implementation", "plan"]
+        - ["改善提案"]
         - ["レポート"]
         - ["報告書"]
         - ["評価", "報告"]
@@ -705,11 +776,14 @@ skill_families:
       - document-canon-cleanup
       - prose-reasoning-graph
     routing:
-      stage_policy: deferred
+      stage_policy: active
       reason: Markdown style, links, headings, or docs lint are in scope
       triggers:
         - ["md-style"]
         - ["docs-check"]
+        - ["docs", "check", "失敗"]
+        - ["docs check", "失敗"]
+        - ["docs check", "failed"]
         - ["agent-canon", "docs"]
         - ["docs", "format"]
         - ["docs", "check"]
@@ -775,6 +849,24 @@ skill_families:
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
     shim: .agents/skills/experiment-lifecycle/SKILL.md
+    related_skills:
+      - result-artifact-writeout
+      - structure-planning
+      - experiment-review
+      - test-design
+    routing:
+      stage_policy: active
+      reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
+      triggers:
+        - ["experiment run"]
+        - ["experiment lifecycle"]
+        - ["experiment artifacts"]
+        - ["experiment rerun"]
+        - ["experiment results"]
+        - ["実験実行"]
+        - ["実験", "実行"]
+        - ["実験結果"]
+        - ["実験", "結果"]
   - id: experiment-review
     purpose: Review experiment topics for direct run.py execution, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
