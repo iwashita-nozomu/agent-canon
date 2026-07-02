@@ -548,6 +548,30 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("runtime-log-repair", decision["matched_skills"])
         self.assertIn("runtime-log-repair", decision["active_skills"])
 
+    def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
+        self,
+    ) -> None:
+        """Ordinary source URL and report wording should not trigger runtime-log repair."""
+        prompts = (
+            "consulted source URLs are missing from the literature survey notes",
+            "Reference missing URLs in the README link list",
+            "workflow attribution section in this report",
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertNotIn("runtime-log-repair", decision["matched_skills"])
+                self.assertNotIn("runtime-log-repair", decision["active_skills"])
+                self.assertNotIn("runtime-log-repair", decision["skills"])
+                self.assertNotIn(
+                    "runtime-log-repair",
+                    decision["related_skill_candidates"],
+                )
+
     def test_prompt_routes_pr_cleanup_to_pr_processing(self) -> None:
         """PR cleanup prompts should activate pr-processing."""
         result = self.run_route(
