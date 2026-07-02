@@ -22,7 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Purpose
 
-approved design と既存 code/test path を静的解析し、変更耐性のある behavior contract、oracle、input space、adequacy evidence を implementation 前に固定します。
+approved design と既存 code/test path を静的解析し、変更耐性のある観測可能契約、stable observation level、oracle、input space、adequacy evidence を implementation 前に固定します。code path と test path は survey / placement evidence であり、未承認の API shape、private helper、private return shape、error prose、mock order、internal call sequence を作る根拠ではありません。
 
 ## Use When
 
@@ -43,8 +43,8 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 
 ## Expected Outcome
 
-- `test_plan.md` に static path、behavior contract、oracle、input space、nasty case、regression case、implementation notes がある
-- case が抽象論ではなく、target path、入力、期待結果まで具体化されている
+- `test_plan.md` に static path survey、contract source、observation level、observable outcome、oracle、input space、adequacy evidence、nasty case、regression case、placement notes がある
+- case が抽象論ではなく、contract source、入力、安定した観測結果、oracle まで具体化されている
 - brittle coupling finding がある場合、残す理由または修正方針が書かれている
 - 既存 test style、fixture、naming へどう寄せるかが書かれている
 - static analysis、checker、formatter、dependency review、type checker、lint、
@@ -63,7 +63,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 
 ## Mandatory Checklist
 
-- changed code path と関連 test path を固定している
+- changed code path と関連 test path を survey / placement evidence として記録している
 - `tools/bin/agent-canon test-design check <related-test-paths...>` を先に走らせ、`fix-now` / `review` / `design-hint` を test plan に反映している
 - `static-analysis-duplicate-test` と
   `meaningless-generated-execution-test` の `fix-now` finding を、deletion、
@@ -74,20 +74,21 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
   observable behavior が追加された場合だけ behavior example を候補にしている
 - formatter、lint、checker が表出した既存 style debt や周辺 debt は residual evidence と
   repair route に分け、現在の diff を requested contract に沿った semantic change に保っている
-- behavior contract、observation level、oracle、input space、adequacy evidence を分けている
+- contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、do-not-freeze details を分けている
 - 数値、randomized、tolerance、solver、convergence、residual、benchmark、
   experiment-style test を提案する前に `documents/coding-conventions-testing.md` の
   数値テスト採用ゲートを適用している
 - malformed input、boundary value、empty / null-ish input、error path、state transition を列挙している
 - 以前壊れたか、再発しやすい regression case を残している
-- expected exception、error message、return shape、state mutation を曖昧にしていない
+- expected value、exception class/category、documented public response shape、public state mutation、diagnostic key、public failure mode のどれを固定するかを曖昧にしていない
+- API shape、helper 名、private return shape、全文 error prose、mock order、internal call sequence は、user request / approved design / documented external contract / public behavior で固定済みの場合だけ oracle にしている
 - parser / formatter / graph / router / mapping では property または metamorphic relation の候補を検討している
 - assertion の強さが疑わしい場合は mutation testing または reviewer による oracle adequacy check を候補にしている
 - 既存 test style を調べ、どの file / fixture / helper を再利用するか書いている
 
 ## Default Sequence
 
-1. approved design と既存 code path を読み、target function / module / script を固定します。
+1. approved design と既存 code/test path を読み、code path と関連 test path を survey / placement evidence として記録します。target function / module / script は配置調査の根拠であり、未承認 API shape や internal call sequence を作る根拠ではありません。
 1. 関連 test path がある場合は `tools/bin/agent-canon test-design check <paths...>` を実行します。新規 test の場合は `documents/coding-conventions-testing.md` を読み、同種の既存 test style を確認します。
 1. `fix-now` finding は先に修正対象へ入れます。特に static-analysis duplicate や
    generated execution-only placeholder は、canonical checker validation へ戻すか、
@@ -101,10 +102,10 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
    classification では static contract validation と canonical command evidence を
    test plan に置きます。
 1. branch、error path、parsing path、state mutation point を静的に洗います。
-1. 各 case の `Behavior Contract / Observation Level / Oracle / Input Space / Adequacy Evidence` を固定します。
+1. 各 case の `Contract Source / Behavior Contract / Observation Level / Observable Outcome / Oracle / Input Space / Adequacy Evidence / Do Not Freeze` を固定します。
 1. 数値テスト候補は `Numerical Trigger / Non-Numerical Alternative / Oracle / Budget` を固定し、trigger がない場合は省略理由と非数値の代替 test を書きます。
 1. 数理的な判定・oracle・assertion は `mathematical necessity gate` の採用条件に照合し、checker-owned property や proof obligation で足りる性質を test oracle に昇格させる前に validation route へ戻します。
-1. nasty case を `Target / Case / Why It Is Nasty / Expected Outcome / Oracle` で列挙します。
+1. nasty case を `Contract Source / Observation Level / Case / Why It Is Nasty / Observable Outcome / Oracle` で列挙します。
 1. regression として残すべき case を分けます。
 1. worker がどこへ test を実装すべきかを `Implementation Notes` に書きます。
 
@@ -113,6 +114,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - happy path しか見ず、error path や malformed input が抜ける
 - expected failure mode が曖昧で、test が assertion しにくい
 - private helper、mock call sequence、stdout 全文、error prose 全文など、変更しやすい実装詳細を public contract と混同する
+- tests が不要な API shape、private return shape、helper 名、error prose、mock order、internal call sequence を固定して harmless refactor を阻害する
 - property / metamorphic relation が向いている変換系処理を、少数の example だけで固定する
 - coverage だけを adequacy とみなし、assertion が mutant や regressions を捕まえるかを見ない
 - 既存 test style を無視して別流儀の test を生やす

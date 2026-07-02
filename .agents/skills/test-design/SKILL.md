@@ -27,13 +27,14 @@ Execute the required and task-matching conditional commands that the packet prin
 
 
 1. Read `agents/skills/test-design.md`.
-1. Fix the target code paths and related test paths.
+1. Record target code paths and related test paths as survey and placement evidence. Do not treat path evidence as authority to freeze API shape, private helper names, return shape, error prose, mock order or internal call sequence.
 1. If related tests exist, run `tools/bin/agent-canon test-design check <related-test-paths...>` before reading whole files. Use `fix-now`, `review`, and `design-hint` findings as the first test-plan inputs.
 1. Statically inspect branches, parsing, error handling, state transitions, observable behavior, and public contract boundaries.
 1. Before adding or recommending a test, decide whether the property is already owned by static analysis, a checker, formatter, dependency review, type checker, lint, docs check, or CI gate. For checker-owned properties, route the canonical command as validation evidence.
 1. Classify validation findings by validation repair scope before applying an autofix. Findings tied to the changed contract, changed lines, or checker-owned property named in the task plan enter the current repair; broad pre-existing style debt becomes residual evidence with a separate repair route.
 1. For a `contract-only wrapper` or thin adapter, classify whether it adds observable behavior, branch logic, parser/error behavior, state mutation, diagnostic keys, serialization shape, or external process behavior. Names, types, forwards, configuration, and documentation for an existing contract use static contract validation and canonical command evidence.
-1. For each test case, fix `Behavior Contract`, `Observation Level`, `Oracle`, `Input Space`, and `Adequacy Evidence`.
+1. Use API shape, helper identity, return shape, error prose, mock order or internal call sequence as test oracles only when the user request, approved design, documented external contract, or public behavior already fixes them. Otherwise record them under placement notes or `Do Not Freeze`.
+1. For each test case, fix `Contract Source`, `Behavior Contract`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, and `Do Not Freeze`.
 1. Classify generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` as checker-command validation candidates when they observe only process success, import success, no-crash, or exit code 0.
 1. Route mathematical judgments, oracles, and assertions through the `mathematical necessity gate`: connect them to `Numerical Trigger`, `Non-Numerical Alternative`, checker-owned property, proof obligation, or approved design acceptance criterion before making them test evidence.
 1. Before proposing numerical, randomized, tolerance, solver, convergence,
@@ -44,5 +45,5 @@ Execute the required and task-matching conditional commands that the packet prin
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
 1. Record nasty edge cases and regression cases in `test_plan.md`.
-1. Keep cases concrete: target, input, expected outcome, oracle, and why the case is nasty.
+1. Keep cases concrete at the stable observation level: contract source, input, observable outcome, oracle, `Do Not Freeze`, and why the case is nasty.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.
