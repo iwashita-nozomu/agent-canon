@@ -379,7 +379,7 @@ exit 条件:
 - `Validation And Rollback Plan:`
 - refactor pass では追加で `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を残します
 - directory layout、directory README ownership、root view、または responsibility-scope map refactor では追加で `Directory Responsibility Map:`, `Recursive README Sources:`, `Scope Delta:`, `Reader Navigation Delta:`, `Scope Overlap Report:`, `Import Responsibility Report:` を残します
-- 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Target Score:`, `Static Analyzer Limits:` を残します
+- 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Signal Class Outcome:`, `Accepted Warning Ledger:`, `Human Review Gate:`, `Static Analyzer Limits:` を残します
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
@@ -424,7 +424,7 @@ exit 条件:
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
 - refactor pass では move / rename / split と挙動保存境界が文書だけで追える
-- 包括 refactor では設計見直し、OOP 的な契約完全実装方針、解析 baseline / target score が文書だけで追える
+- 包括 refactor では設計見直し、OOP 的な契約完全実装方針、解析 baseline / signal class outcome / accepted-warning ledger / human review gate が文書だけで追える
 
 ### Gate 6. 詳細設計レビュー
 
