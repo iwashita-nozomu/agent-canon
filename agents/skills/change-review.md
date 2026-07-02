@@ -39,6 +39,9 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 
 - findings が summary より先に並んでいる
 - `fix now` と `follow-up` が分かれている
+- `revise`、`required_change`、rejected diff、requested-change review が user
+  request を戻す権限として扱われていない。各 finding は保持する request clause
+  または design intent を示し、修正、再設計、または escalation に接続している
 - 各 finding に `issue_route` があり、既存 issue、new local issue、
   GitHub mirror plan、または run-local resolution のいずれかへ分類されている
 - review で見ていない範囲や validation gap が残っている
@@ -50,6 +53,10 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、`--changed` だけで済ませていない
 - 回帰、欠落テスト、stale documentation を優先して見ている
 - 必要な validation が走っているか、未実行なら明記している
+- blanket revert / discard を既定の required action にしない。revert /
+  discard を求める場合は、該当 clause が撤回または置換された、canonical
+  owner 外だった、または危険で同じ意図の代替修正や escalation に接続した
+  evidence を添える
 - Python の class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る diff は `python-review` と `$oop-readability-check` の対象にし、`check_solid_evidence.py` で OOP readability report の path coverage と SOLID principle signal を確認している
 - `fix now` と `follow-up` finding には `issue_route` を付けている。
   現在の diff で閉じるものは `run_local_resolution:<evidence>`、
@@ -86,6 +93,7 @@ Finding rows include:
 - `severity`
 - `evidence`
 - `required_action`
+- `intent_preservation`
 - `issue_route`
 - `rerun_review_required`
 

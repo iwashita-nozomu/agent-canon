@@ -26,6 +26,14 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 - 次の role が判断に使う情報は artifact に残します。
 - reviewer は repo を直接修正せず、required change を artifact に残します。
 - review を受けた role は `resolved`、`rejected`、`escalated` のいずれかで必ず応答します。
+- review の `rejected`、`revise`、`required_change` は、提案された実装や
+  修正方法への判定であり、user request や design intent を rollback する権限では
+  ありません。実行 role は、同じ意図を保つ修正、同じ意図を保つ再設計、または
+  design / scope conflict の escalation に接続します。
+- 実装 slice の削除、revert、discard は、該当 request clause が user / owner に
+  よって撤回または置換された、canonical owner 外だった、または危険で代替修正や
+  escalation が同じ意図を保持する場合だけ選べます。その場合も保持した clause、
+  置換した clause、捨てた clause と理由を artifact に残します。
 - scope や permission の変更は `manager` に戻します。
 
 ## 主要な通信面
@@ -252,6 +260,11 @@ contract.
 - `finding`
 - `severity`
 - `required_change`
+- `intent_preservation`: `repair_same_intent`、`redesign_same_intent`、
+  `escalate_design_conflict`、`withdrawn_or_superseded`、`outside_owner`、または
+  `unsafe_replaced`
+- `revert_or_discard_authority`: rollback、revert、または slice discard を求める
+  場合だけ、撤回 / 置換 / owner 外 / unsafe replacement / escalation の根拠を書く
 - `evidence`
 - `status`
 

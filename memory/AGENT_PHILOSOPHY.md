@@ -456,6 +456,12 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-06-28 user feedback after PR closeout: 余計な確認をした結果，時間を無駄にしています
 
+- 2026-07-02 | failure-avoidance | Review rejection must not be handled by simply reverting or discarding user-requested behavior; preserve the request/design intent through repair, redesign, or explicit escalation, and require authority evidence before rollback.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: 2026-07-02 user feedback: review rejection rollback makes the change meaningless
+
 ## Open Questions
 
 - まだなし

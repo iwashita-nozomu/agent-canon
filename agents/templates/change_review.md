@@ -54,6 +54,10 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the active required review set for the risk class and changed surface on the refreshed diff. -->
 
+## Review Rejection Response Review
+
+<!-- Confirm that any revise / required_change / rejected diff / requested-change handling preserves the user-requested clause or approved design intent. Return revise if the response simply reverts, discards, or shrinks requested behavior. If a revert or discard is justified, record withdrawal / supersession / owner-boundary / unsafe-replacement / escalation authority and the clauses still preserved. -->
+
 ## Post-Review Fix Rerun Requirement
 
 <!-- If this review requires any fix, state that every required review family must rerun on the updated diff before closeout, even when the implementer believes the fix is tiny. List the review artifacts that must be refreshed. -->

@@ -43,6 +43,8 @@ Rules:
 - return revise when closeout claims diff_check_agent_complete=yes without an independent read-only diff-check decision for the latest diff
 - return revise when any must-do or completion-evidence clause lacks corresponding product behavior, code, docs, test, command, artifact, or explicit deferred/rejected clause
 - return revise when prior required review findings are not applied, re-reviewed, or explicitly escalated before closeout
+- return revise when the response to a review rejection, requested-change, or `required_change` simply reverts or discards user-requested behavior instead of preserving the request clause through repair, redesign, or escalation
+- only recommend revert, discard, or deletion of an implementation slice when the affected clause is withdrawn or superseded, outside the canonical owner, or unsafe and replaced by an intent-preserving alternative; cite that authority and the clauses still preserved
 - return escalate when the diff disagrees with the approved design packet or exposes a design gap rather than a local implementation mistake
 - return revise when the worker changed files that are not derived from the Abstract Design Frame and listed in the Implementation Source Packet or file-by-file design, unless the design explicitly allowed that exception
 - return revise when side-effect changes are implemented without an approved Design Side-Effect Map item and review gate
