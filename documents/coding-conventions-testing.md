@@ -79,13 +79,16 @@ exit code 0 で終わることだけを見る test は unit test ではありま
 その性質を static analysis / checker / CI gate が所有している場合は、
 pytest wrapper を作らず、その checker を validation route に入れます。
 
-変更耐性のある test design は、次の 5 軸を先に固定します。
+変更耐性のある test design は、次の 8 軸を先に固定します。
 
+- `Contract Source`: user request、approved design、documented external contract、public behavior、regression evidence のどれを根拠にするか。
 - `Behavior Contract`: どの observable behavior、failure mode、diagnostic key を固定するか。
 - `Observation Level`: unit、service/API、CLI、integration、acceptance のどこで見るか。
+- `Observable Outcome`: expected value、exception class/category、documented public response shape、public state mutation、diagnostic key、public failure mode のどれを見るか。
 - `Oracle`: literal expected、known reference、exception type、state change、property、metamorphic relation のどれか。
 - `Input Space`: concrete regression、boundary table、random/property generator、metamorphic follow-up input のどれか。
 - `Adequacy Evidence`: branch/edge coverage、mutation score、regression replay、manual review のどれで assertion の強さを確認するか。
+- `Do Not Freeze`: private helper、internal call sequence、mock order、全文 error prose、stdout 全文一致など、public contract でない実装詳細を固定しない根拠。
 
 ### 3.1 数値テスト採用ゲート
 
@@ -131,8 +134,9 @@ checker command のような static contract validation が主な evidence に�
 
 実行テストの admission 条件は、新しい observable behavior、branch、parser error path、
 state mutation、diagnostic key、serialization shape、external process contract のいずれかです。
-該当する条件がある場合は、Behavior Contract、Observation Level、Oracle、Input Space、
-Adequacy Evidence を test plan に固定してから最小の behavior example を作ります。
+該当する条件がある場合は、Contract Source、Behavior Contract、Observation Level、
+Observable Outcome、Oracle、Input Space、Adequacy Evidence、Do Not Freeze を test plan に
+固定してから最小の behavior example を作ります。
 
 contract-only wrapper の validation evidence は次のように固定します。
 
@@ -173,8 +177,7 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 - 1 test は 1 behavior / 1 failure reason を主語にします。
 - test 名は、対象 behavior と期待結果が読める名前にします。
 - Arrange / Act / Assert を読み分けられる構造にします。
-- expected value、expected exception、shape、state mutation、diagnostic key を
-  明示します。
+- expected value、exception class/category、documented public response shape、public state mutation、diagnostic key、public failure mode のどれを固定するかを明示します。
 - test body で expected を計算する複雑な logic、loop、branch を増やしません。
   必要なら helper へ出し、非自明 helper は別途 test します。
 - production と同じ bug を複製しうる derived expected は避け、literal、
