@@ -97,7 +97,10 @@ refactor 後の拡張は、Gate B で固定した OOP boundary を迂回しま�
 ## Gate C. 解析ツールと合格点
 
 大規模 refactor では、人間の印象だけで「整理できた」と判断しません。
-必要に応じて静的解析 baseline を取り、target score を設計に入れます。
+必要に応じて静的解析 baseline を取り、signal class outcome、accepted-warning
+ledger、human review gate を設計に入れます。strict score floor は明示的な
+根拠がある場合だけ使い、size-only split で score を上げることを成功条件に
+してはいけません。
 
 Python code surface の size / surface baseline では次を使えます。
 
@@ -130,7 +133,7 @@ python3 tools/oop/cpp/readability.py \
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は score threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。
 score は設計判断の補助であり、behavior correctness の代替ではありません。
-tool が足りない場合は、refactor 対象に合わせて targeted 解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
+tool が足りない場合は、refactor 対象に合わせて targeted 解析 tool を同じ pass で追加し、signal class outcome、限界、false positive の扱いを design artifact に書きます。
 
 外部 repo、bare repo、または派生 template snapshot を調べる場合は、元 repo を編集せず `git archive` などで読み取り専用 snapshot を作り、run bundle に `OOP Analysis Scope:` として次を残します。
 
@@ -141,14 +144,17 @@ tool が足りない場合は、refactor 対象に合わせて targeted 解析 t
 - `Reports:` Markdown report、JSON report、`oop_readability_reviewer` prompt。
 - `Interpretation:` 最上位 dimensions、finding kinds、hotspot files。score / counts / path / line は機械 report から変更しません。
 
-調査目的で既定 score gate を止めたくない場合は、survey report だけ `--min-score 0` で完走させます。
-closeout gate に使う report は、別途 task の target score を指定して pass / fail を残します。
+調査目的で score floor を評価条件にしたくない場合は、survey report だけ `--min-score 0` で完走させます。
+closeout gate に使う report は、signal class outcome、accepted-warning ledger、
+human review gate を残します。strict score floor は task が根拠を明示した場合
+だけ closeout 条件に含めます。
 
-合格点を使う場合、設計に次を書きます。
+解析 report を使う場合、設計に次を書きます。
 
 - `Baseline Score:` refactor 前の score。
-- `Target Score:` closeout 前の最低 score。
+- `Signal Class Outcome:` error / gate / review signal の扱い。
 - `Allowed Warnings:` 今回の scope 外として残す warning。
+- `Accepted Warning Ledger:` 意図的に残す warning とその根拠。
 - `Tool Limits:` AST 解析で見えない behavior、dynamic dispatch、framework magic。
 - `Human Review Gate:` tool pass 後も reviewer が見る責務境界。
 
@@ -178,7 +184,7 @@ test、smoke、behavior execution は二段完了後の return-gate validation �
 closeout 前に次を確認します。
 
 - `refactor_safety_case.md` または design artifact に Behavior Contract、Allowed Structural Delta、Forbidden Semantic Delta、Path Mapping、Deletion Plan がある。
-- `analyze_refactor_surface.py`、`tools/oop/*/readability.py`、または task 固有解析 tool を使った場合、baseline、target、actual score がある。
+- `analyze_refactor_surface.py`、`tools/oop/*/readability.py`、または task 固有解析 tool を使った場合、baseline、signal class outcome、accepted-warning ledger、human review gate がある。
 - `project_reviewer` が stale path、delete 漏れ、cross-module drift を確認している。
 - language reviewer が OOP boundary、function/class length、public API、test placement を確認している。
 - dependency review が full repo で pass している。
