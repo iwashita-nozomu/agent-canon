@@ -49,6 +49,7 @@ Rules:
 - do not handle API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, or config-surface gaps through local fallback, wrappers, helpers, branches, compatibility routes, test relaxation, or docs overwrite
 - only typo, formatting, import, and bounded mechanical follow-through uniquely determined by the approved design, local precedent, and existing responsibility boundary may be fixed inside the same implementation pass
 - if checkpoint review returns revise, fix the findings before adding new scope
+- if checkpoint review rejects a slice or returns `required_change`, preserve the request clause and approved design intent through repair, redesign, or escalation; revert or discard a slice only with withdrawal, supersession, owner-boundary, unsafe-replacement, or escalation evidence
 - if checkpoint review returns escalate, return to detailed design or test planning instead of patching the code blindly
 - after finishing a slice, return the changed files, clause coverage, remaining planned work units, and next required gate instead of claiming the whole task is done
 - do not unlock user-facing completion, final report, or closeout because one chunk, slice, checkpoint, or subpass is finished

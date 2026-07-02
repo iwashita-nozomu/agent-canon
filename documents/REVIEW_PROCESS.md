@@ -114,6 +114,17 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. 学術文章では notation review で、記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認します。
 1. 学術文章では logic-gap review で、claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認します。
 1. 実装中に checkpoint review を入れ、decision が `approve` でない限り implementer に戻します。
+1. review artifact が `revise`、`required_change`、`rejected`、または
+   requested-change review を返した場合、その判定は user request や design intent
+   を rollback する権限ではありません。実行 role は、指摘を
+   `repair_same_intent`、`redesign_same_intent`、`escalate_design_conflict`、
+   `withdrawn_or_superseded`、`outside_owner`、`unsafe_replaced` のいずれかに
+   分類し、保持する request clause と修正経路を artifact に残します。
+1. review 後の修正で実装 slice を削除、revert、または discard する場合は、
+   該当 request clause が user / owner によって撤回または置換された、canonical
+   owner 外だった、または危険な実装を同じ意図の代替修正や escalation に置き換えた
+   ことを記録します。blanket revert で user-requested behavior を消して
+   closeout してはいけません。
 1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary alternate route、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書が最新実装と一致し、削除済み・置換済みの挙動や手順を reader に案内していないことを確認します。文書が現行実装を説明できていなければ `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
@@ -135,6 +146,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. final acceptance review では、全 must-do / completion-evidence clause が product surface、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応しているか確認します。
 1. final acceptance review では、cross-cutting packet に含まれる文書のうち今回の task に効くものが review から漏れていないか確認します。
 1. final acceptance review では、required review の `fix now` findings が実装へ反映済み、再レビュー済み、または明示的に escalated であることを確認します。
+1. final acceptance review では、review reject / requested-change への応答が
+   user request を縮める rollback になっていないことを確認します。rollback、
+   revert、discard がある場合は、撤回 / 置換 / owner 外 / unsafe replacement /
+   escalation の authority と、保持された design intent の証跡が必要です。
 1. review artifact が `revise`、`required_change`、または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、その修正量に関わらず full required review set を最初から再実行します。
 1. post-fix full review では、少なくとも `change_review.md`、`final_review.md`、task に必要な language / docs / specialist review artifact を最新の fix 後に作り直します。
 1. validation 実行後に final acceptance review を行い、必要なら追加修正や追加検証を行います。
@@ -186,6 +201,9 @@ findings は少なくとも次に分けます。
 - `fix now`
   - この変更で直さないと回帰や矛盾が残るもの
   - 修正後は、どの差分でも full required review set を再実行する
+  - review reject / requested-change への応答が、同じ user request と design
+    intent を保つ修正や再設計ではなく、blanket revert、discard、または
+    completion scope の縮小になっているもの
   - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
   - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
   - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの

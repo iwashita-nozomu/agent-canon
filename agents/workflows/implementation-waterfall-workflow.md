@@ -157,6 +157,8 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - 反復規則:
   - `change_review.md` の decision が `approve` でない限り Gate 9 に戻します
   - `revise` は Gate 9 へ戻します
+  - `revise`、`required_change`、または rejected slice への応答は、同じ
+    request clause と approved design intent を保つ修正として行います
   - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
 - 完了条件:
 - diff が approved design と test plan に一致する
@@ -647,6 +649,12 @@ exit 条件:
 
 ルール:
 - review で戻されたあとに入れる修正は、設計を変えない tiny fix でもこの gate 内だけで閉じません。Gate 8 に戻して差分を更新し、Gate 8 と Gate 9 の required review を最新 diff に対してやり直します
+- review の `revise`、`required_change`、`rejected`、または requested-change は、
+  user request や approved design intent を戻す権限ではありません。実装担当は
+  同じ意図を保つ修正、同じ意図を保つ再設計、または design / scope conflict の
+  escalation として扱います。実装 slice を削除、revert、discard する場合は、
+  request clause の撤回 / 置換、owner 外、unsafe replacement、または escalation
+  の authority と、保持した clause を review artifact に残します
 - 新しい requirement が必要なら Gate 1 に戻します
 - 計画変更が必要なら Gate 3 に戻します
 - 設計変更が必要なら Gate 5 に戻します
@@ -697,6 +705,9 @@ exit 条件:
 - chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
 - required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
+- review reject / requested-change への応答が user-requested behavior の blanket
+  revert ではなく、intent-preserving repair / redesign / escalation として
+  証跡化されていることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
 - planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
 - read-only diff-check agent の decision、latest diff ref、run-local artifact、findings disposition が `Diff-Check Agent Evidence` に記録され、artifact が `approve` を示している

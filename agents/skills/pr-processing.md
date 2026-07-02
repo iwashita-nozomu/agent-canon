@@ -129,6 +129,11 @@ route を短く書きます。
    - `review-blocked`: requested changes / review request が残っている
    - `dependent-pin`: source PR merge 後の parent pin / root view PR
    - `stale`: base、目的、Issue、既存 main との差分を再判定する
+1. requested-change review や rejecting review は、head branch の修正 signal
+   であり、PR Essence、user request、または design intent を戻す権限ではありません。
+   branch repair は元の意図を保持して行い、slice を revert / discard する場合は
+   撤回、置換、owner 外、unsafe replacement、または escalation の evidence を
+   PR log または run bundle に残します。
 1. PR diff intake を固定し、必要な差分修正を取り込み前に行います。
    - target base に対する head diff を確認する
    - diff を PR Essence、user request、canonical owner、validation route と照合する

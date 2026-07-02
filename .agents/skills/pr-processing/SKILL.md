@@ -75,6 +75,11 @@ Execute the required and task-matching conditional commands that the packet prin
    - for each candidate PR, inspect `gh pr view` and `gh pr checks`.
 1. Classify each PR as `ready`, `behind`, `conflicting`, `draft`,
    `checks-failing`, `review-blocked`, `stale`, or `dependent-pin`.
+1. Treat requested-change or rejecting reviews as branch repair signals, not
+   authority to revert the PR's user request or PR Essence. Repair the head
+   branch so the original design intent remains covered, or record withdrawal,
+   supersession, owner-boundary, unsafe-replacement, or escalation evidence
+   before discarding a slice.
 1. Before marking a PR ready, merging it, or syncing a dependent parent pin,
    perform diff intake against the target base. Compare the head diff with the
    PR Essence, user request, canonical owner, and validation route; repair

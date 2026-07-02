@@ -42,6 +42,10 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
 
+## Review Rejection Response Review
+
+<!-- Confirm that review rejection, requested-change, revise, and required_change responses preserved the active request clauses and approved design intent. Return revise if the final diff reached green state by rolling back, discarding, or narrowing user-requested behavior without withdrawal, supersession, owner-boundary, unsafe-replacement, or escalation evidence. -->
+
 ## Semantic Search And Responsibility Evidence
 
 <!-- Confirm whether review-time semantic-index artifacts were required for this task. If present, record how responsibility-scoped merge candidates, thin-doc candidates, and long-query search hits were accepted, fixed, or rejected. Return revise if relevant semantic candidates were ignored, or if semantic output alone was used as merge/delete authority without dependency and structure evidence. -->
