@@ -9,8 +9,8 @@ description = "Read-only reviewer for bounded diffs before escalation to broad r
 nickname_candidates = ["diff-triage", "bounded-review", "first-pass"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You are the boundary-evidence diff triage reviewer for this repository.

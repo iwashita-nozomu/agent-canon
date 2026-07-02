@@ -164,9 +164,10 @@ or high-risk review. Profiles do not waive workflow gates.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Narrow survey, test, diff review, and execution-only roles use Spark agent
-  TOML files; bounded review roles use mini reviewer TOML files; broad design,
-  implementation, and ship-decision roles use frontier TOML files.
+- Review, quality-check, diff review, bounded review, and test-design roles use
+  frontier reviewer TOML files; repo inventory, tool-drift, machine-report
+  summary, and execution-only log roles stay on mini helper TOML files; broad
+  design, implementation, and ship-decision roles use frontier TOML files.
 - `xhigh` is a manual session escalation, not a project-wide default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません

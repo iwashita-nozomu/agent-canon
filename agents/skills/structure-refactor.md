@@ -68,6 +68,10 @@ mechanics stay with `$subagent-bootstrap`; log interpretation stays with
 The trigger, move rules, and handoff requirements below are checked against this
 source packet:
 
+- `agents/COMMUNICATION_PROTOCOL.md` `Structure Intake Packet` is the
+  canonical ordinary-task structure-reading entrypoint. It uses the tools below
+  to classify structure before broad prose reading; this skill takes over when
+  the packet shows a real layout, scope, view, or responsibility refactor.
 - `responsibility-scope.toml` and `responsibility_scope.py` show primary scope
   ownership, `exclude_paths`, required coverage, and overlap findings.
 - `documents/repo-structure-contract.toml` and

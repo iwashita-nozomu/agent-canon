@@ -47,6 +47,44 @@ shape, ownership, and traceability, not token minimization.
 | `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
 | `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
 
+## Structure Intake Packet
+
+Use this packet before manual broad repository reading when a repo-changing
+task needs structure, ownership, path selection, stale-surface, or document
+responsibility evidence. It is the canonical structure-reading entrypoint for
+ordinary task intake; `structure-refactor` owns deeper layout repair and
+refactor decisions.
+
+```text
+structure_intake_root=<repo-root>
+structure_intake_reason=<routing|edit-path|stale-surface|document-responsibility|handoff|review>
+repo_structure_contract=<artifact path>
+responsibility_scope=<artifact path>
+file_surface_inventory=<artifact path>
+document_inventory=<artifact path|not_applicable>
+import_responsibility=<artifact path|not_applicable>
+selected_owner_summary=<short summary tied to request clauses>
+llm_visible_context=<selected excerpts or structured summary>
+local_tool_context=<complete JSON/Markdown/raw artifact paths>
+next_decision_changed=<routing|edit-location|validation|review|handoff|deferral>
+```
+
+Canonical tool commands:
+
+```bash
+python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
+python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
+python3 tools/agent_tools/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
+agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
+python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
+```
+
+Run `document-inventory` when document, README, generated report, stale-doc,
+or reader-navigation surfaces are implicated. Run `import_responsibility.py`
+when import boundaries or package layout are implicated. In parent repos where
+the structure contract is not a root view, pass
+`--contract vendor/agent-canon/documents/repo-structure-contract.toml`.
+
 ## Handoff Packet
 
 - `from`
@@ -77,6 +115,8 @@ before implementation.
 - `request_clause_ids`: user clauses covered by the edit
 - `workflow_and_skills`: selected workflow, active skills, deferred dynamic
   wave triggers
+- `structure_intake`: `Structure Intake Packet` path, or reason it is not
+  applicable
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
@@ -104,17 +144,20 @@ guessing an edit path.
 
 ## Parent-Direct Context Note
 
-For explicit-path work whose owner boundary, replaceable unit, validation
-route, and public impact boundary are already evidenced; Routine docs; Focused
-code; typo/link/format-only; or other bounded parent-direct work, the full
+For an approved parent-direct exception whose owner boundary, replaceable unit,
+validation route, and public impact boundary are already evidenced, the full
 Pre-Edit Repository Investigation Packet can be replaced by a short
-Parent-Direct Context Note. File count alone is not enough to choose this note.
+Parent-Direct Context Note. Routine docs, Focused code, typo/link/format-only,
+or other bounded work still needs the exception rationale when the work is
+repo-changing implementation / patch / doc-edit. File count alone is not enough
+to choose this note.
 
 The note records:
 
 - `owner`
 - `target_path`
 - `request_clause`
+- `parent_direct_exception_rationale`
 - `reuse_basis`
 - `design_oop_boundary`
 - `validation_route`

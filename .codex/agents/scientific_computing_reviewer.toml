@@ -9,8 +9,8 @@ description = "Read-only reviewer for incremental change, testing, automation, a
 nickname_candidates = ["sci-comp", "prototype-check", "research-eng"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You review research and experiment changes from the scientific computing practice perspective.

@@ -89,6 +89,12 @@ skill_families:
         - ["スキル", "細分化"]
         - ["スキル", "分割"]
         - ["スキル", "重い"]
+        - ["スキル", "二重管理"]
+        - ["設定", "スキル", "二重管理"]
+        - ["skill", "duplicate", "management"]
+        - ["settings", "skills", "duplicate"]
+        - ["skill", "catalog", "ownership"]
+        - [".agents", "skills"]
         - ["関連スキル"]
         - ["関連スキル", "狭"]
         - ["スキル", "呼ばれ"]
@@ -165,8 +171,20 @@ skill_families:
       - result-artifact-writeout
     routing:
       stage_policy: deferred
-      reason: explicit subagent or multi-agent execution requires run-local specialist routing
+      reason: repo-changing implementation, patch, doc-edit, or explicit subagent execution requires write-capable handoff routing
       triggers:
+        - ["implementation"]
+        - ["implement"]
+        - ["実装"]
+        - ["patch"]
+        - ["パッチ"]
+        - ["doc-edit"]
+        - ["doc", "edit"]
+        - ["docs", "edit"]
+        - ["document", "edit"]
+        - ["ドキュメント", "編集"]
+        - ["文書", "編集"]
+        - ["文書", "修正"]
         - ["マルチエージェント"]
         - ["サブエージェント"]
         - ["subagent"]
@@ -372,6 +390,11 @@ skill_families:
         - ["agentcanon", "update"]
         - ["agent-canon", "update"]
         - ["vendor/agent-canon"]
+        - [".codex", ".agents"]
+        - [".agents", "skills"]
+        - ["設定", "スキル", "二重管理"]
+        - ["settings", "skills", "duplicate"]
+        - ["skill", "catalog", "ownership"]
   - id: pr-processing
     purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
@@ -642,6 +665,13 @@ skill_families:
         - ["personal", "runtime", "surface"]
         - ["agents.md", "重複"]
         - ["skill", "重複"]
+        - ["スキル", "二重管理"]
+        - ["設定", "スキル", "二重管理"]
+        - ["skill", "duplicate", "management"]
+        - ["settings", "skills", "duplicate"]
+        - ["skill", "catalog", "ownership"]
+        - [".codex", ".agents"]
+        - [".agents", "skills"]
         - ["責務", "重複"]
         - ["責務重複"]
         - ["過剰", "分割"]

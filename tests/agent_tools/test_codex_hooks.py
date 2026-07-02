@@ -4241,8 +4241,8 @@ class CodexHooksTest(unittest.TestCase):
                         "tool_name": "spawn_agent",
                         "tool_input": {
                             "agent_type": "test_designer",
-                            "model": "gpt-5.4-mini",
-                            "reasoning_effort": "medium",
+                            "model": "gpt-5.5",
+                            "reasoning_effort": "high",
                             "fork_context": True,
                             "message": "Design tests for the changed hook.",
                             "items": [{"type": "text", "text": "packet"}],
@@ -4261,8 +4261,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["subagent_event_kind"], "spawn")
         self.assertEqual(entry["subagent_tool_name"], "spawn_agent")
         self.assertEqual(entry["subagent_agent_type"], "test_designer")
-        self.assertEqual(entry["subagent_model"], "gpt-5.4-mini")
-        self.assertEqual(entry["subagent_reasoning_effort"], "medium")
+        self.assertEqual(entry["subagent_model"], "gpt-5.5")
+        self.assertEqual(entry["subagent_reasoning_effort"], "high")
         self.assertTrue(entry["subagent_fork_context"])
         self.assertTrue(entry["subagent_prompt_fingerprint"])
         self.assertEqual(entry["subagent_prompt_char_count"], len("Design tests for the changed hook."))

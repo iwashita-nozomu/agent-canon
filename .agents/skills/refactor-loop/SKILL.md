@@ -46,8 +46,10 @@ Execute the required and task-matching conditional commands that the packet prin
    file. The editable candidate set is every file returned by dependency
    analysis for the requested object/file, plus validation commands and the
    tests/docs that own observable behavior or reader-facing contracts. Narrow
-   implementation only after mapping exact target functions, methods, and
-   classes inside that expanded scope.
+   implementation only after mapping target traces inside that expanded scope.
+   A target trace is `path:start-end:qualname` for an existing function, method,
+   or class, or `path:start-end:region-id` for a cohesive source region,
+   behavior unit, or responsibility unit.
 1. Use `$dependency-analysis` to create a structured `Change Impact Packet`
    manifest before choosing targets, writing the refactor orchestration plan,
    or launching a write-capable subagent. The packet is the unified
@@ -60,7 +62,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Before launching implementation subagents, the parent must write a refactor
    orchestration plan from that dependency graph. Separate sequential root
    slices that must be fixed first from independent downstream slices that can
-   run in parallel, assign each target object to an owner/wave, and record
+   run in parallel, assign each target trace to an owner/wave, and record
    `blocked_by`, allowed files, validation, and whether the slice is single-agent
    or parallel-safe.
    `$structure-refactor` owns structure surface classification, root/scope
@@ -74,10 +76,12 @@ Execute the required and task-matching conditional commands that the packet prin
 1. The default implementation handoff is a dependency-expanded repair batch,
    not a single finding. Group every mechanically safe target in the same
    responsibility group, dependency wave, and validation surface into one
-   object-by-object handoff. A single-finding handoff is allowed only for
-   root/shared contract changes, risky semantic changes, or when the
-   orchestration plan records why related targets are `review_required` or
-   deferred.
+   target-by-target handoff. A single-finding handoff is allowed only after
+   dependency evidence rejects a behavior-preserving canonical home, nearest
+   valid ancestor, and batchable downstream repair; then record the isolation
+   reason as root/shared contract risk, risky semantic change, or no batchable
+   target. Record `review_required` / `deferred` only as that evidence-backed
+   blocker.
 1. Read `agents/skills/refactor-loop.md`.
 1. Use `$structure-planning` before editing when file moves, module boundaries, repair slices, path mapping, responsibility maps, allowed structural delta, or forbidden semantic delta are nontrivial.
 1. Fix `Behavior Contract`, `Allowed Structural Delta`, and `Forbidden Semantic Delta` before editing.
@@ -93,28 +97,45 @@ Execute the required and task-matching conditional commands that the packet prin
    stage updates every caller, document, workflow, skill, hook, config, and
    report consumer that uses the moved surface. Put test, smoke, and behavior
    execution in return-gate validation after both stages are complete.
-1. Explicitly list every function, method, or class being changed before editing, using `path:start-end:qualname`; do not start implementation from a file-level or module-level target alone.
+1. Explicitly list every target trace being changed before editing. Use
+   `path:start-end:qualname` for actual functions, methods, and classes, or
+   `path:start-end:region-id` for cohesive source regions, behavior units, and
+   responsibility units. Do not start implementation from a file-level or
+   module-level target alone. Do not split or extract code solely to create a
+   qualname; a new boundary requires caller contract, state ownership, domain
+   vocabulary, effect boundary, validated decision point, or stable reusable
+   behavior.
 1. If a shared policy or base abstraction is being consolidated, first declare the canonical module/object, refactor that root surface, then run dependency and usage scans before touching dependents.
 1. Record delete, move, rename, and split targets before implementation.
 1. Keep feature additions out of the same pass.
 1. For dependency-guided structural duplicate cleanup, generate `priority_order`
-   and `repair_slice` through `$tool-finding-report`, fix one
-   dependency-expanded repair batch/wave at a time, feed the finding packet
-   into `$dependency-analysis` to join code/header/search impact and generate
-   tool-made `impact_blocks`, expand downstream affected files, reject
-   responsibility-mixing root findings as `review_required`, and rerun the full
-   scan after each batch before choosing the next batch.
+   and `repair_slice` through `$tool-finding-report`, build
+   dependency-expanded repair batches/waves, process one dependency-ordered
+   wave at a time, and include related mechanically safe targets in the same
+   batch when they share responsibility group and validation surface. Feed the
+   finding packet into `$dependency-analysis` to join code/header/search impact,
+   generate tool-made `impact_blocks`, expand downstream affected files, and
+   classify `review_required`, `deferred`, or current-state/no-op outcomes as
+   evidence-backed blockers only after dependency evidence rejects a
+   behavior-preserving canonical home, nearest valid ancestor, and batchable
+   downstream repair.
    For Python structural findings, the default planning command is
    `agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir <dependency-review-dir> --output <change-impact-packet.json>`.
-1. After each implementation slice, join the latest `git diff` against the full
-   finding packet. Produce a `diff_linked_findings` artifact that separates
-   direct changed-line findings, related structural findings for changed
-   functions/classes and their dependency/representative instances, and
-   unchanged out-of-slice findings.
-1. Use `$tool-finding-report` before implementation and after each slice to
-   preserve baseline, structured findings, impact, and prompt feedback decision;
-   repair `handoff_prompt_gap` or `shared_skill_or_workflow_gap` before launching
-   the next write-capable subagent.
+1. After each implementation slice, if a finding packet exists, join the latest
+   `git diff` against it; otherwise join the diff against owner-selected static
+   / targeted validation artifacts and target trace. Produce a
+   `diff_linked_findings` artifact that separates direct changed-line findings,
+   related structural findings for changed target traces and their dependency /
+   representative instances, and unchanged out-of-slice findings.
+1. Use `$tool-finding-report` and baseline capture proportionally: require them
+   for behavior-changing or regression-prone code refactors, missing behavior
+   oracles, root/shared contract waves, or tool-owned global properties. For
+   prompt/doc/static-contract refactors, use owner-selected static and targeted
+   validation. Repair `handoff_prompt_gap` or `shared_skill_or_workflow_gap`
+   before the next writer only when the gap affects the selected next batch,
+   review safety, or behavior-preservation evidence; otherwise record it as
+   follow-up and continue with a corrected bounded handoff for unaffected
+   targets.
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
    wave-scoped write-capable `worker`/`spark_worker` agents implement,
@@ -129,16 +150,17 @@ Execute the required and task-matching conditional commands that the packet prin
    successor waves, validate and rerun tools after the predecessor, and only
    run independent targets with disjoint write scopes in the same wave.
 1. Before launching a write-capable subagent, include a token-bounded handoff:
-   the `Change Impact Packet` path, every target object in the repair batch,
-   allowed files, and an object-by-object repair intent.
-   For each target object, the parent must state the current problem, the
+   the `Change Impact Packet` path, every target trace in the repair batch,
+   allowed files, and a target-by-target repair intent.
+   For each target trace, the parent must state the current problem, the
    intended structural change, why the behavior should remain unchanged,
    non-goals, and the validation that should prove the slice. Also include the
    forbidden semantic delta, tests to run, and required final format limited to
    changed paths, validation commands, and unresolved blockers. If the subagent
    returns broad prose, unrelated edits, or a file-level implementation without
-   target-object trace, classify it as `handoff_prompt_gap`, repair this prompt,
-   and do not launch the next writer until the handoff is bounded by target objects.
+   target trace, classify it as `handoff_prompt_gap`, repair this prompt,
+   and do not launch the next writer until the handoff is bounded by target
+   traces.
 1. Keep runtime metrics collection active for every write-capable subagent.
    The active run bundle must be discoverable through
    `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` or `reports/agents/.active_run`
@@ -151,9 +173,12 @@ Execute the required and task-matching conditional commands that the packet prin
    rely on chat-only memory.
 1. Treat an implementation handoff that fixes only one mechanically safe
    finding as a default smell, not the default plan. If a wave contains one
-   target only, record the reason as root-contract risk, semantic risk,
-   write-scope conflict, or validation isolation. If no such reason exists,
-   classify the underspecified handoff as `handoff_prompt_gap`, batch the related
-   targets, and repair this skill/handoff before launching the next writer.
+   target only, first record dependency evidence rejecting a behavior-preserving
+   canonical home, nearest valid ancestor, and batchable downstream repair; only
+   then record the isolation reason as root-contract risk, semantic risk,
+   write-scope conflict, or validation isolation. If no such evidence-backed
+   reason exists, classify the underspecified handoff as `handoff_prompt_gap`,
+   batch the related targets, and repair this skill/handoff before launching the
+   next writer.
 1. Run `test_designer` before behavior-changing or regression-prone implementation and keep regression coverage in the same pass. For contract-only wrapper refactors, use static contract validation and canonical command evidence.
 1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.

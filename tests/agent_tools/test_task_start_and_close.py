@@ -141,6 +141,7 @@ def ready_closeout_evidence_lines(
         "## Document Structure Evidence",
         f"- document_structure_paths: {document_structure_paths}",
         "- document_structure_status: skipped",
+        "- document_split_decision: not_applicable:format-only: fixture closeout bundle",
         "- structure_planning: not_applicable",
         "- prose_graph: not_applicable",
         "- structure_contract: skipped: fixture format-only route",
@@ -934,7 +935,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     sys.executable,
                     str(TASK_START_SCRIPT),
                     "--task",
-                    "comprehensive native change",
+                    "comprehensive native implementation change",
                     "--task-id",
                     "T12",
                     "--owner",
@@ -1032,11 +1033,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$comprehensive-development",
+                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn(
-                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
+                "DEFERRED_SKILLS=$codex-task-workflow",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
@@ -1078,6 +1079,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn(
                 "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
+                result.stdout,
+            )
+            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+            self.assertIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
+            self.assertIn(
+                "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes",
+                result.stdout,
+            )
+            self.assertIn(
+                "PARENT_DIRECT_WRITE_EXCEPTION=-",
                 result.stdout,
             )
             self.assertIn(
@@ -1158,7 +1169,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "START_DECLARATION=workflow=Comprehensive Development", result.stdout
             )
             self.assertIn(
-                "skills=$agent-orchestration,$comprehensive-development",
+                "skills=$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("cpp_reviewer", result.stdout)
@@ -1253,6 +1264,28 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 contract_complete_implementation_policy["escalation"],
                 "design_issue_blocker_to_gate_5_6",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "implementation_handoff_required"
+                ],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy["parent_repo_edits_allowed"],
+                "no",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "parent_direct_write_exception_required"
+                ],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "parent_direct_write_exception"
+                ],
+                "-",
             )
             self.assertTrue(repo_tool_routing_policy["enabled"])
             self.assertEqual(
@@ -1385,6 +1418,141 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assert_initial_wave_execution_gate(report_root / "test-task-start")
             self.assert_abstract_design_prompt_contracts(manifest)
+
+    def test_task_start_plain_fix_activates_subagent_bootstrap(self) -> None:
+        """Plain fix prompts should match route.py write-capable handoff."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "Fix the failing tests in the repository.",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-plain-fix-route-parity",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
+                result.stdout,
+            )
+            self.assertIn(
+                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap",
+                result.stdout,
+            )
+            self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
+            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+
+    def test_task_start_plain_refactor_activates_subagent_bootstrap(self) -> None:
+        """Plain refactor prompts should match route.py write-capable handoff."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "Refactor the repository routing helpers.",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-plain-refactor-route-parity",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop,$structure-refactor",
+                result.stdout,
+            )
+            self.assertIn(
+                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$refactor-loop,$structure-refactor",
+                result.stdout,
+            )
+            self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
+            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+
+    def test_task_start_review_only_does_not_activate_subagent_bootstrap(self) -> None:
+        """Review-only do-not-edit prompts should not emit implementation handoff."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "Use subagents for review only; do not edit files.",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-review-only-no-edit",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
+                result.stdout,
+            )
+            self.assertIn("ACTIVE_SKILLS=$agent-orchestration", result.stdout)
+            self.assertIn(
+                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
+                result.stdout,
+            )
+            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+            self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
+            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
+            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
+            manifest_text = (
+                report_root / "test-review-only-no-edit" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
+            manifest = yaml.safe_load(manifest_text)
+            contract_policy = manifest["run"]["contract_complete_implementation_policy"]
+            self.assertNotIn("implementation_handoff_required", contract_policy)
+            self.assertNotIn("parent_repo_edits_allowed", contract_policy)
+            self.assertNotIn("parent_direct_write_exception_required", contract_policy)
+            self.assertNotIn("parent_direct_write_exception", contract_policy)
 
     def test_academic_reviewers_precede_ship_review_in_dynamic_waves(self) -> None:
         """Task-specific academic reviewers should run before final review."""
@@ -1536,11 +1704,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$refactor-loop",
+                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$refactor-loop",
                 result.stdout,
             )
             self.assertIn(
-                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
+                "DEFERRED_SKILLS=$codex-task-workflow",
                 result.stdout,
             )
 
@@ -1726,6 +1894,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff",
                 result.stdout,
             )
+            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+            self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
+            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
+            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
             self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_ROLES=test_designer,docs_workflow_steward,python_reviewer,change_reviewer",
@@ -2119,6 +2291,28 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 contract_complete_implementation_policy["scope_basis"],
                 "contract_required_behavior",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "implementation_handoff_required"
+                ],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy["parent_repo_edits_allowed"],
+                "no",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "parent_direct_write_exception_required"
+                ],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy[
+                    "parent_direct_write_exception"
+                ],
+                "-",
             )
             self.assertEqual(
                 default_quality_check_policy["roles"],
@@ -3208,6 +3402,67 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN=README.md", result.stdout
             )
             self.assertIn("document_structure_paths_recorded", result.stdout)
+
+    def test_task_close_rejects_markdown_change_without_split_decision(self) -> None:
+        """Document structure closeout must include split decision evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n",
+                encoding="utf-8",
+            )
+            run_id = "test-task-close-doc-split-decision"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- document_split_decision: "
+                    "not_applicable:format-only: fixture closeout bundle",
+                    "- document_split_decision: missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DOCUMENT_SPLIT_DECISION_EVIDENCE=no", result.stdout)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
+            self.assertIn("document_split_decision_evidence", result.stdout)
 
     def test_task_close_rejects_complete_structure_route_with_skip_contract(
         self,

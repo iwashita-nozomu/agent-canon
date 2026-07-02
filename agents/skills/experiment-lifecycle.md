@@ -71,5 +71,10 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
   formal experiment run は明示された run plan の実行段階で扱います。
 - result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
+- experiment plan / report の structure contract には OOP 観点を入れます。
+  再利用する module / class / function / protocol、各 step が作る object、
+  変更する object、下流へ渡す object、artifact として書く object、variant が
+  差し替わる factory / function 境界、orchestration / domain logic / metric /
+  visualization / artifact I/O の依存方向を固定してから section order を書きます。
 - experiment plan / report の paragraph order、causal transition、evidence-to-claim transition が非自明な場合は、`structure-planning` 側で `agent-canon semantic-index discourse-relations --profile experiment-report` または `--profile methods-protocol` を使い、discourse edge を構造 evidence として保存します。
 - prose graph handoff がある場合は、hypothesis / metric / baseline / expected-result diagnostics を experiment plan または rerun plan の入力にします。

@@ -11,8 +11,8 @@ description = "Read-only reviewer that documents mechanical OOP readability repo
 nickname_candidates = ["oop-readability", "readability-doc", "oop-report"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 developer_instructions = """
 You are the OOP readability report reviewer for this repository.
@@ -28,5 +28,7 @@ Rules:
 - do not invent findings that are not present in the mechanical report
 - do not change pass/fail status, score, thresholds, counts, paths, or line numbers
 - cite every conclusion with path:line and finding kind from the mechanical report
-- keep recommendations scoped to documentation and triage unless the mechanical report provides a concrete finding
+- keep tool facts separate from reviewer judgment
+- treat size, public-surface, parameter-count, and complexity findings as boundary review signals, not accepted design defects or split/extract instructions
+- keep recommendations scoped to documentation and decision triage unless surrounding caller contract, ownership, or source shape supports a stable boundary change
 """

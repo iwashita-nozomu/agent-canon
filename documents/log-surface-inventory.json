@@ -2492,30 +2492,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "audience",
-      "line": 70,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "decision_context",
-      "line": 71,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "discourse_relations",
-      "line": 156,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact",
       "line": 72,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2523,7 +2499,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "first_artifact_question",
+      "field": "decision_context",
       "line": 73,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2531,95 +2507,15 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "invalid_interpretations",
-      "line": 78,
+      "field": "discourse_relations",
+      "line": 181,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "metric_or_delta_contract",
-      "line": 76,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordered_structure",
-      "line": 77,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_to_structure_map",
-      "line": 75,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_contract",
-      "line": 152,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_first_artifact",
-      "line": 153,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_invalid_interpretations_recorded",
-      "line": 157,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_kind",
-      "line": 69,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_planning",
-      "line": 151,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_source_map",
-      "line": 155,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_visual_plan",
-      "line": 154,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_gate",
+      "field": "document_split_decision",
       "line": 79,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2627,7 +2523,23 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "visual_plan",
+      "field": "document_split_decision",
+      "line": 176,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "document_unit",
+      "line": 78,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "first_artifact",
       "line": 74,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2635,175 +2547,159 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "allowed_structural_delta",
-      "line": 158,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "first_artifact_question",
+      "line": 75,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "behavior_contract",
-      "line": 154,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "invalid_interpretations",
+      "line": 86,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "contract_check",
-      "line": 130,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "invalid_split_boundaries",
+      "line": 82,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "design_claim_evidence",
-      "line": 183,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "merge_when",
+      "line": 81,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "detected_repo_profile",
-      "line": 127,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "metric_or_delta_contract",
+      "line": 84,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 155,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "oop_structure_contract",
+      "line": 83,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 178,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "ordered_structure",
+      "line": 85,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "directory_responsibility_graph",
-      "line": 352,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "source_to_structure_map",
+      "line": 77,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "drift_symptom",
-      "line": 128,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "split_when",
+      "line": 80,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "expected_owner",
-      "line": 129,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_contract",
+      "line": 175,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "forbidden_semantic_delta",
-      "line": 159,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_first_artifact",
+      "line": 177,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "generated_artifact_boundary",
-      "line": 185,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_invalid_interpretations_recorded",
+      "line": 182,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "import_check",
-      "line": 132,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_kind",
+      "line": 71,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "missing_path_triage",
-      "line": 134,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "moves_applied",
-      "line": 357,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordinary_task_status",
-      "line": 136,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
-      "line": 160,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
+      "field": "structure_oop_contract",
       "line": 180,
-      "path": "agents/skills/structure-refactor.md",
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "path_mapping",
-      "line": 353,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_planning",
+      "line": 174,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "personal_runtime_check",
-      "line": 133,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_source_map",
+      "line": 179,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "primary_responsibility_map",
-      "line": 156,
-      "path": "agents/skills/structure-refactor.md",
+      "field": "structure_visual_plan",
+      "line": 178,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "reader_delta",
+      "field": "validation_gate",
+      "line": 87,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "visual_plan",
+      "line": 76,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "allowed_structural_delta",
       "line": 162,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -2811,215 +2707,23 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "recursive_readme_sources",
-      "line": 157,
+      "field": "behavior_contract",
+      "line": 158,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "repair_action",
-      "line": 135,
+      "field": "contract_check",
+      "line": 134,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "reverse_edge_check",
-      "line": 182,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reverse_edge_check",
-      "line": 356,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reviewed_contract",
-      "line": 177,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "reviewer_decision",
-      "line": 189,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "runtime_boundary",
-      "line": 163,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_check",
-      "line": 131,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_delta",
-      "line": 161,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_overlap_report",
-      "line": 181,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "scope_overlap_report",
-      "line": 354,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_view_boundary_check",
-      "line": 179,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_view_boundary_check",
-      "line": 355,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "stale_path_sweep",
-      "line": 358,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "stale_surface_sweep",
-      "line": 184,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_refactor",
-      "line": 350,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_refactor_root",
-      "line": 152,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_repair_root",
-      "line": 125,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_review_decision",
-      "line": 351,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_review_root",
-      "line": 175,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_review_surface",
-      "line": 176,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_surface",
-      "line": 126,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_surface",
-      "line": 153,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_docs",
-      "line": 188,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_docs",
-      "line": 361,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_gate",
-      "line": 164,
-      "path": "agents/skills/structure-refactor.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_imports",
+      "field": "design_claim_evidence",
       "line": 187,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -3027,15 +2731,167 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_imports",
-      "line": 360,
+      "field": "detected_repo_profile",
+      "line": 131,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_scope",
+      "field": "directory_responsibility_graph",
+      "line": 159,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "directory_responsibility_graph",
+      "line": 182,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "directory_responsibility_graph",
+      "line": 356,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "drift_symptom",
+      "line": 132,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "expected_owner",
+      "line": 133,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "forbidden_semantic_delta",
+      "line": 163,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "generated_artifact_boundary",
+      "line": 189,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "import_check",
+      "line": 136,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "missing_path_triage",
+      "line": 138,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "moves_applied",
+      "line": 361,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "ordinary_task_status",
+      "line": 140,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 164,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 184,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "path_mapping",
+      "line": 357,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "personal_runtime_check",
+      "line": 137,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "primary_responsibility_map",
+      "line": 160,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reader_delta",
+      "line": 166,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "recursive_readme_sources",
+      "line": 161,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "repair_action",
+      "line": 139,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reverse_edge_check",
       "line": 186,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
@@ -3043,8 +2899,216 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "validation_scope",
+      "field": "reverse_edge_check",
+      "line": 360,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewed_contract",
+      "line": 181,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "reviewer_decision",
+      "line": 193,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "runtime_boundary",
+      "line": 167,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_check",
+      "line": 135,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_delta",
+      "line": 165,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 185,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "scope_overlap_report",
+      "line": 358,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
+      "line": 183,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_view_boundary_check",
       "line": 359,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_path_sweep",
+      "line": 362,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "stale_surface_sweep",
+      "line": 188,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor",
+      "line": 354,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_refactor_root",
+      "line": 156,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_repair_root",
+      "line": 129,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_decision",
+      "line": 355,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_root",
+      "line": 179,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_review_surface",
+      "line": 180,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_surface",
+      "line": 130,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_surface",
+      "line": 157,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 192,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_docs",
+      "line": 365,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 168,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 191,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_imports",
+      "line": 364,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_scope",
+      "line": 190,
+      "path": "agents/skills/structure-refactor.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_scope",
+      "line": 363,
       "path": "agents/skills/structure-refactor.md",
       "surface": "skill"
     },
@@ -4884,7 +4948,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2735,
+      "line": 2737,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4892,7 +4956,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2769,
+      "line": 2771,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4900,7 +4964,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 464,
+      "line": 465,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4908,15 +4972,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2326,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 2329,
+      "line": 2328,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4932,7 +4988,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2334,
+      "line": 2333,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4948,7 +5004,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2339,
+      "line": 2338,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4956,7 +5012,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2345,
+      "line": 2341,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4964,7 +5020,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2357,
+      "line": 2347,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4972,7 +5028,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2360,
+      "line": 2359,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4980,7 +5036,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2361,
+      "line": 2362,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -4996,7 +5052,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2366,
+      "line": 2365,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5005,14 +5061,6 @@
       "emitter": "key_value_literal",
       "field": "<dynamic>",
       "line": 2368,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 2369,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5052,7 +5100,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2378,
+      "line": 2374,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 2375,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5068,7 +5124,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2423,
+      "line": 2382,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5076,7 +5132,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2664,
+      "line": 2425,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 2666,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5084,62 +5148,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "DEFAULT_QUALITY_CHECKS",
-      "line": 801,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_AGENT_TYPES",
-      "line": 805,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS",
-      "line": 810,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS",
-      "line": 815,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS",
-      "line": 812,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_REVIEW_PACKS",
-      "line": 814,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_ROLES",
-      "line": 803,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_SOURCE",
       "line": 802,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5147,15 +5155,63 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_STAGES",
-      "line": 807,
+      "field": "DEFAULT_QUALITY_CHECK_AGENT_TYPES",
+      "line": 806,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS",
+      "field": "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS",
+      "line": 811,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS",
+      "line": 816,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS",
+      "line": 813,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_REVIEW_PACKS",
+      "line": 815,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_ROLES",
+      "line": 804,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_SOURCE",
+      "line": 803,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_STAGES",
       "line": 808,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5163,8 +5219,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS",
+      "line": 809,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "IMPLEMENTATION_COMPLETENESS_ESCALATION",
-      "line": 667,
+      "line": 668,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5172,30 +5236,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPLEMENTATION_COMPLETENESS_POLICY",
-      "line": 658,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS",
-      "line": 663,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS",
-      "line": 665,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS",
       "line": 659,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5203,8 +5243,32 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS",
+      "line": 664,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS",
+      "line": 666,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS",
+      "line": 660,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "IMPLEMENTATION_COMPLETENESS_SOURCE",
-      "line": 661,
+      "line": 662,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5212,22 +5276,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "PRE_HANDOFF_SCOPE_POLICY",
-      "line": 638,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PRE_HANDOFF_SCOPE_SEQUENCE",
-      "line": 640,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "PRE_HANDOFF_SCOPE_SOURCE",
       "line": 639,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5235,7 +5283,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "PRE_HANDOFF_SCOPE_STATUS",
+      "field": "PRE_HANDOFF_SCOPE_SEQUENCE",
       "line": 641,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5243,15 +5291,23 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPO_DYNAMIC_SKILL_AREA_COMMAND",
-      "line": 757,
+      "field": "PRE_HANDOFF_SCOPE_SOURCE",
+      "line": 640,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES",
+      "field": "PRE_HANDOFF_SCOPE_STATUS",
+      "line": 642,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_DYNAMIC_SKILL_AREA_COMMAND",
       "line": 758,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5259,15 +5315,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPO_DYNAMIC_SKILL_ROUTING_COMMAND",
-      "line": 756,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_DYNAMIC_SKILL_ROUTING_NEXT",
+      "field": "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES",
       "line": 759,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5275,8 +5323,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "REPO_DYNAMIC_SKILL_ROUTING_COMMAND",
+      "line": 757,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_DYNAMIC_SKILL_ROUTING_NEXT",
+      "line": 760,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "REPO_DYNAMIC_SKILL_ROUTING_POLICY",
-      "line": 755,
+      "line": 756,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5284,7 +5348,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPO_TOOL_ROUTING_CHECK",
-      "line": 754,
+      "line": 755,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -5292,62 +5356,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPO_TOOL_ROUTING_EXECUTION_MODE",
-      "line": 747,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_NEXT_COMMAND",
-      "line": 749,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_OWNER",
-      "line": 745,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_PACKET_COMMANDS",
-      "line": 753,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_PACKET_COUNT",
-      "line": 752,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_POLICY",
-      "line": 743,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_ROUTE_BASIS",
-      "line": 746,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_SEQUENCE",
       "line": 748,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5355,23 +5363,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_SKILLS",
-      "line": 751,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_SOURCE",
-      "line": 744,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "REPO_TOOL_ROUTING_STAGE_FIELDS",
+      "field": "REPO_TOOL_ROUTING_NEXT_COMMAND",
       "line": 750,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5379,15 +5371,79 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "SAME_ROLE_SUBAGENT_INSTANCES",
-      "line": 619,
+      "field": "REPO_TOOL_ROUTING_OWNER",
+      "line": 746,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "SAME_ROLE_SUBAGENT_INSTANCE_KEY",
+      "field": "REPO_TOOL_ROUTING_PACKET_COMMANDS",
+      "line": 754,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_PACKET_COUNT",
+      "line": 753,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_POLICY",
+      "line": 744,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_ROUTE_BASIS",
+      "line": 747,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_SEQUENCE",
+      "line": 749,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_SKILLS",
+      "line": 752,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_SOURCE",
+      "line": 745,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "REPO_TOOL_ROUTING_STAGE_FIELDS",
+      "line": 751,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "SAME_ROLE_SUBAGENT_INSTANCES",
       "line": 620,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5395,7 +5451,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS",
+      "field": "SAME_ROLE_SUBAGENT_INSTANCE_KEY",
       "line": 621,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5403,23 +5459,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS",
+      "line": 622,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "STANDARD_AGENT_WAVE_SEQUENCE",
-      "line": 629,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "STANDARD_AGENT_WAVE_SEQUENCE_GATE",
-      "line": 631,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "STANDARD_AGENT_WAVE_SEQUENCE_SOURCE",
       "line": 630,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5427,23 +5475,23 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "STANDARD_AGENT_WAVE_SEQUENCE_GATE",
+      "line": 632,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "STANDARD_AGENT_WAVE_SEQUENCE_SOURCE",
+      "line": 631,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "USER_FACING_LANGUAGE",
-      "line": 648,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "USER_FACING_LANGUAGE_SCOPE",
-      "line": 650,
-      "path": "tools/agent_tools/agent_team.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "USER_FACING_LANGUAGE_SOURCE",
       "line": 649,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
@@ -5451,8 +5499,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "USER_FACING_MACHINE_FIELDS",
+      "field": "USER_FACING_LANGUAGE_SCOPE",
       "line": 651,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "USER_FACING_LANGUAGE_SOURCE",
+      "line": 650,
+      "path": "tools/agent_tools/agent_team.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "USER_FACING_MACHINE_FIELDS",
+      "line": 652,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -6364,7 +6428,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "convention_sources",
-      "line": 1849,
+      "line": 1933,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6372,7 +6436,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 1849,
+      "line": 1933,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6380,7 +6444,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 1849,
+      "line": 1933,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6388,7 +6452,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_gates",
-      "line": 1849,
+      "line": 1933,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6396,7 +6460,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_prompts",
-      "line": 1849,
+      "line": 1933,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6404,7 +6468,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONVENTION_COMPLIANCE_FINDING",
-      "line": 1025,
+      "line": 1085,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6412,7 +6476,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE",
-      "line": 1868,
+      "line": 1952,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6420,7 +6484,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_FINDINGS",
-      "line": 1867,
+      "line": 1951,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6428,7 +6492,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_SOURCES",
-      "line": 1864,
+      "line": 1948,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6436,7 +6500,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_TOOL_GATES",
-      "line": 1865,
+      "line": 1949,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6444,7 +6508,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_WORKFLOWS",
-      "line": 1866,
+      "line": 1950,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -8100,7 +8164,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 519,
+      "line": 528,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8108,7 +8172,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 598,
+      "line": 607,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8116,7 +8180,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 598,
+      "line": 607,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8124,7 +8188,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_COMPACT_OUT",
-      "line": 471,
+      "line": 480,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8132,7 +8196,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 466,
+      "line": 475,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8140,7 +8204,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 537,
+      "line": 546,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8148,46 +8212,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 465,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 536,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_FINDING",
-      "line": 68,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 467,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 538,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ROLE_MODEL_MATRIX",
       "line": 474,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
@@ -8195,7 +8219,55 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
+      "line": 545,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_FINDING",
+      "line": 72,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_FINDINGS",
+      "line": 476,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_FINDINGS",
+      "line": 547,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ROLE_MODEL_MATRIX",
+      "line": 483,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRIC",
+      "line": 486,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "ROLE_RUNTIME_METRICS_STATUS",
       "line": 477,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
@@ -8204,15 +8276,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 468,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 539,
+      "line": 548,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8220,7 +8284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT",
-      "line": 611,
+      "line": 620,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -8228,7 +8292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_REPORT",
-      "line": 609,
+      "line": 618,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -13804,7 +13868,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 220,
+      "line": 229,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
     },
@@ -13812,582 +13876,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_LATEST_COMMAND",
-      "line": 624,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_LATEST_COMPLETE",
-      "line": 620,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_LATEST_STATUS",
-      "line": 628,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PARENT_PIN",
-      "line": 640,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_SOURCE_HEAD",
-      "line": 636,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_STATUS",
-      "line": 632,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_EVALUATION_COMPLETE",
-      "line": 748,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_EVALUATION_STATUS",
-      "line": 774,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_FEEDBACK_RESOLVED",
-      "line": 775,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_LEARNING_CAPTURE_COMPLETE",
-      "line": 776,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALL_PLANNED_CHUNKS_COMPLETE",
-      "line": 608,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CANONICAL_TREE_HEAD_COMPLETE",
-      "line": 744,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CLOSEOUT_AUDITOR_STATUS",
-      "line": 604,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CLOSEOUT_BLOCKERS",
-      "line": 803,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CLOSEOUT_READY",
-      "line": 799,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "CLOSEOUT_VERIFIER_STATUS",
-      "line": 603,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "COMMIT_CREATED",
-      "line": 796,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DEPENDENCY_HEADERS_COMPLETE",
-      "line": 611,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_AGENT_COMPLETE",
-      "line": 734,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_AGENT_DECISION",
-      "line": 736,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_AGENT_ROLE",
-      "line": 735,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_ARTIFACT",
-      "line": 739,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_ARTIFACT_EXISTS",
-      "line": 740,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_CURRENT_DIFF_REF",
-      "line": 738,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DIFF_CHECK_LATEST_DIFF_REF",
-      "line": 737,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN",
-      "line": 675,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCUMENT_STRUCTURE_EVIDENCE",
-      "line": 687,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCUMENT_STRUCTURE_PATHS",
-      "line": 683,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCUMENT_STRUCTURE_REQUIRED",
-      "line": 671,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCUMENT_STRUCTURE_STATUS",
-      "line": 679,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "FINAL_REVIEW_ARTIFACT_BLOCKERS",
-      "line": 788,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "FINAL_REVIEW_ARTIFACT_COMPLETE",
-      "line": 787,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "FORBIDDEN_DRIFT_DETECTED",
-      "line": 781,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MAKE_CI_STATUS",
-      "line": 644,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_COMPLETION_LOOP_COMPLETE",
-      "line": 691,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_LOOP_DEPENDENCY_REVIEW_STATUS",
-      "line": 702,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_LOOP_ITERATIONS",
-      "line": 696,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_LOOP_OPEN_ITEMS",
-      "line": 697,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS",
-      "line": 706,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MECHANICAL_LOOP_VALIDATION_STATUS",
-      "line": 698,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OVERALL_DELIVERY_COMPLETE",
-      "line": 609,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "POST_FIX_FULL_REVIEW_COMPLETE",
-      "line": 650,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PUSH_COMPLETED",
-      "line": 797,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_ACTIVE_RUN",
-      "line": 789,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_ACTIVE_RUN_MATCH",
-      "line": 790,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_ARTIFACT_PLACEMENT_BLOCKERS",
-      "line": 795,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_ARTIFACT_PLACEMENT_CLEAN",
-      "line": 791,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_DIR",
-      "line": 600,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE",
-      "line": 612,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPO_WIDE_STATIC_ANALYSIS_COMPLETE",
-      "line": 616,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REQUEST_CONTRACT_COMPLETE",
-      "line": 607,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REQUEST_CONTRACT_RESOLVED",
-      "line": 780,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REQUIRED_REVIEWS_COMPLETE",
-      "line": 605,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REVIEW_FINDINGS_INTEGRATED",
-      "line": 649,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH",
-      "line": 770,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN_STATUS",
-      "line": 758,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_DIRTY",
-      "line": 762,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY",
-      "line": 766,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_SYNCED",
-      "line": 749,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_SYNC_COMMAND",
-      "line": 750,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_SYNC_STATUS",
-      "line": 754,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SPEC_PRODUCT_COVERAGE_COMPLETE",
-      "line": 645,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENTS_CLOSED",
-      "line": 695,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_CLOSEOUT_STATUS",
-      "line": 722,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_FRESH_REQUIRED",
-      "line": 710,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_OPEN_INSTANCES",
-      "line": 730,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_PREVIOUS_TASK_REUSE",
-      "line": 718,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_REUSE_FOR_NEW_TASK",
-      "line": 714,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS",
-      "line": 726,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TODO_ARTIFACT_BLOCKERS",
-      "line": 784,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TODO_ARTIFACT_COMPLETE",
-      "line": 783,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TOOL_WARNINGS_RESOLVED",
-      "line": 654,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TOOL_WARNING_MONITORING_STATUS",
       "line": 655,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
@@ -14395,7 +13883,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "TOOL_WARNING_OPEN_ITEMS",
+      "field": "AGENT_CANON_LATEST_COMPLETE",
+      "line": 651,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LATEST_STATUS",
       "line": 659,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
@@ -14403,63 +13899,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "TOOL_WARNING_RESOLUTION_EVIDENCE",
-      "line": 663,
+      "field": "AGENT_CANON_PARENT_PIN",
+      "line": 671,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "UNFINISHED_TASKS_ABSENT",
-      "line": 610,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "UNRESOLVED_CLAUSE_IDS",
-      "line": 782,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "USER_COMPLETION_REPORT",
-      "line": 798,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "VALIDATION_COMPLETE",
-      "line": 606,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "VERIFICATION_STATUS",
-      "line": 601,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "VERIFICATION_UNLOCK",
-      "line": 602,
-      "path": "tools/agent_tools/task_close.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_TOOL_WARNING_BLOCKERS",
+      "field": "AGENT_CANON_SOURCE_HEAD",
       "line": 667,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
@@ -14467,8 +13915,640 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_STATUS",
+      "line": 663,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_EVALUATION_COMPLETE",
+      "line": 787,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_EVALUATION_STATUS",
+      "line": 813,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_FEEDBACK_RESOLVED",
+      "line": 814,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_LEARNING_CAPTURE_COMPLETE",
+      "line": 815,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "ALL_PLANNED_CHUNKS_COMPLETE",
+      "line": 639,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CANONICAL_TREE_HEAD_COMPLETE",
+      "line": 783,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CLOSEOUT_AUDITOR_STATUS",
+      "line": 635,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CLOSEOUT_BLOCKERS",
+      "line": 842,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CLOSEOUT_READY",
+      "line": 838,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CLOSEOUT_VERIFIER_STATUS",
+      "line": 634,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "COMMIT_CREATED",
+      "line": 835,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DEPENDENCY_HEADERS_COMPLETE",
+      "line": 642,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_AGENT_COMPLETE",
+      "line": 773,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_AGENT_DECISION",
+      "line": 775,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_AGENT_ROLE",
+      "line": 774,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_ARTIFACT",
+      "line": 778,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_ARTIFACT_EXISTS",
+      "line": 779,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_CURRENT_DIFF_REF",
+      "line": 777,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DIFF_CHECK_LATEST_DIFF_REF",
+      "line": 776,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_SPLIT_DECISION",
+      "line": 718,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_SPLIT_DECISION_EVIDENCE",
+      "line": 722,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN",
+      "line": 706,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_STRUCTURE_EVIDENCE",
+      "line": 726,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_STRUCTURE_PATHS",
+      "line": 714,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_STRUCTURE_REQUIRED",
+      "line": 702,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DOCUMENT_STRUCTURE_STATUS",
+      "line": 710,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "FINAL_REVIEW_ARTIFACT_BLOCKERS",
+      "line": 827,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "FINAL_REVIEW_ARTIFACT_COMPLETE",
+      "line": 826,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "FORBIDDEN_DRIFT_DETECTED",
+      "line": 820,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MAKE_CI_STATUS",
+      "line": 675,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_COMPLETION_LOOP_COMPLETE",
+      "line": 730,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_LOOP_DEPENDENCY_REVIEW_STATUS",
+      "line": 741,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_LOOP_ITERATIONS",
+      "line": 735,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_LOOP_OPEN_ITEMS",
+      "line": 736,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS",
+      "line": 745,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MECHANICAL_LOOP_VALIDATION_STATUS",
+      "line": 737,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "OVERALL_DELIVERY_COMPLETE",
+      "line": 640,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "POST_FIX_FULL_REVIEW_COMPLETE",
+      "line": 681,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PUSH_COMPLETED",
+      "line": 836,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_ACTIVE_RUN",
+      "line": 828,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_ACTIVE_RUN_MATCH",
+      "line": 829,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_ARTIFACT_PLACEMENT_BLOCKERS",
+      "line": 834,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_ARTIFACT_PLACEMENT_CLEAN",
+      "line": 830,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_DIR",
+      "line": 631,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE",
+      "line": 643,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPO_WIDE_STATIC_ANALYSIS_COMPLETE",
+      "line": 647,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REQUEST_CONTRACT_COMPLETE",
+      "line": 638,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REQUEST_CONTRACT_RESOLVED",
+      "line": 819,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REQUIRED_REVIEWS_COMPLETE",
+      "line": 636,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REVIEW_FINDINGS_INTEGRATED",
+      "line": 680,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_BRANCH_MATCH",
+      "line": 809,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN_STATUS",
+      "line": 797,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_DIRTY",
+      "line": 801,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY",
+      "line": 805,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_SYNCED",
+      "line": 788,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_SYNC_COMMAND",
+      "line": 789,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_SYNC_STATUS",
+      "line": 793,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SPEC_PRODUCT_COVERAGE_COMPLETE",
+      "line": 676,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENTS_CLOSED",
+      "line": 734,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_CLOSEOUT_STATUS",
+      "line": 761,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_FRESH_REQUIRED",
+      "line": 749,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_OPEN_INSTANCES",
+      "line": 769,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_PREVIOUS_TASK_REUSE",
+      "line": 757,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_REUSE_FOR_NEW_TASK",
+      "line": 753,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS",
+      "line": 765,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TODO_ARTIFACT_BLOCKERS",
+      "line": 823,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TODO_ARTIFACT_COMPLETE",
+      "line": 822,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_WARNINGS_RESOLVED",
+      "line": 685,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_WARNING_MONITORING_STATUS",
+      "line": 686,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_WARNING_OPEN_ITEMS",
+      "line": 690,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_WARNING_RESOLUTION_EVIDENCE",
+      "line": 694,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "UNFINISHED_TASKS_ABSENT",
+      "line": 641,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "UNRESOLVED_CLAUSE_IDS",
+      "line": 821,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "USER_COMPLETION_REPORT",
+      "line": 837,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "VALIDATION_COMPLETE",
+      "line": 637,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "VERIFICATION_STATUS",
+      "line": 632,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "VERIFICATION_UNLOCK",
+      "line": 633,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_TOOL_WARNING_BLOCKERS",
+      "line": 698,
+      "path": "tools/agent_tools/task_close.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "WORK_LOG_BLOCKERS",
-      "line": 786,
+      "line": 825,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
     },
@@ -14476,7 +14556,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORK_LOG_COMPLETE",
-      "line": 785,
+      "line": 824,
       "path": "tools/agent_tools/task_close.py",
       "surface": "tool"
     },
@@ -15300,7 +15380,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 655,
+      "line": 665,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -15308,7 +15388,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 655,
+      "line": 665,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -15316,7 +15396,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 655,
+      "line": 665,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -15324,7 +15404,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATE",
-      "line": 647,
+      "line": 657,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -15332,7 +15412,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATES",
-      "line": 643,
+      "line": 653,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -15340,7 +15420,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREFLIGHT",
-      "line": 642,
+      "line": 652,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },

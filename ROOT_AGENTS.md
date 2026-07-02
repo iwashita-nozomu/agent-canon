@@ -74,13 +74,26 @@ Owner-map entries, skill command packets, validation commands, and CI jobs are
 routing menus, not automatic worklists. Run or read only the item that changes
 the next decision: edit path, fix, validation, PR state, or explicit deferral.
 
-Use parent-direct work when the ownership path and design boundary are clear and
-the work stays inside one replaceable responsibility unit. Use multi-agent waves
-only when the user asks for them, or when independent, replaceable workstreams
-can run in parallel without expanding scope or weakening design responsibility.
-Parallelism authorizes split execution while parent responsibility remains
-single-owner; use subagents for distinct decisions instead of repeating the same
-deterministic read, checker, or search.
+For repo-changing implementation, patch, or doc-edit work, parent is the default
+orchestrator and integrator, with implementation assigned through the selected
+write-capable handoff route. Parent owns route selection, monitoring, write-capable
+agent launch or recorded blocker
+evidence, additional instructions, integration, review gates, validation
+evidence, and closeout. After owner boundary, replaceable responsibility
+unit, context packet, and validation route are evidenced, implementation/doc-edit
+slices are handed to `spark_worker` or `worker`.
+
+Parent-direct repository edits are an exception with recorded evidence:
+`PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
+`PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>`, plus
+owner boundary, exception rationale, targeted validation, and fallback status.
+
+Split work only when coordination requires it; otherwise keep one replaceable
+responsibility unit in one packet and one writer unless independent workstreams
+have disjoint write scope, dependency order, integration order, and
+review/validation gates. Use subagents for distinct decisions and
+write-capable handoffs; reserve deterministic reads/checkers/searches for the
+owner-selected evidence path.
 
 Proceed after the selected evidence passes, and reserve repeated sync logs or
 repo-wide audits for explicit user scope or blocking findings. Hook, archive, or
@@ -90,13 +103,14 @@ deferral.
 
 ## Design Integrity Gate
 
-Before implementation, prove that the work is derived from an owning
-responsibility model rather than from a nearby file, current finding, or chat
-impression. Full staged work uses the `Abstract Design Frame`,
-`Implementation Source Packet`, `Design Side-Effect Map`, and
-`Design-To-Implementation Trace`; parent-direct work uses the short
-owner/path/design-boundary note when the same responsibility model is already
-evidenced.
+Before implementation or write-capable handoff, prove that the work is derived
+from an owning responsibility model rather than from a nearby file, current
+finding, or chat impression. Full staged and subagent-implemented work uses the
+`Abstract Design Frame`, `Implementation Source Packet`,
+`Design Side-Effect Map`, and `Design-To-Implementation Trace`. A
+parent-direct write exception may use the short owner/path/design-boundary note
+only after the exception route is recorded; the note is exception evidence and
+not authorization to bypass `spark_worker` or `worker`.
 
 Treat API shape, responsibility boundary, path layout, naming, algorithm,
 test oracle, dependency direction, runtime contract, and config-surface gaps as
@@ -232,8 +246,19 @@ surfaces. Create run bundles, dependency reviews, subagent lifecycle records,
 log archive syncs, shared-canon syncs, or full validation evidence only when the
 selected route requires them.
 
-When the task used no subagents, close with a short
-parent-direct/no-subagents note when closeout evidence is selected.
+For repo-changing implementation, patch, or doc-edit work, closeout cites the
+write-capable handoff route, integration result, review gate, validation
+evidence, and subagent lifecycle evidence.
+
+A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
+audits, or recorded parent-direct write exceptions; cite the advisory/read-only
+reason or recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
+
+If write-capable handoff was blocked, closeout records
+`WRITE_SUBAGENT_AUTHORIZATION=required` or
+`write_capable_handoff_blocker=<gate>` plus `fallback_exit_status`; it records
+the blocked-handoff fallback instead of ordinary `parent-direct/no-subagents`
+completion for repo-changing work.
 
 For CI and hook failures, first decide whether the failure belongs to the
 changed surface or blocks the requested PR/update. Stale, duplicated, or legacy

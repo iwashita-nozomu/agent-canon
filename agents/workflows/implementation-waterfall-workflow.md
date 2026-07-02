@@ -379,7 +379,7 @@ exit 条件:
 - `Validation And Rollback Plan:`
 - refactor pass では追加で `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を残します
 - directory layout、directory README ownership、root view、または responsibility-scope map refactor では追加で `Directory Responsibility Map:`, `Recursive README Sources:`, `Scope Delta:`, `Reader Navigation Delta:`, `Scope Overlap Report:`, `Import Responsibility Report:` を残します
-- 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Target Score:`, `Static Analyzer Limits:` を残します
+- 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Signal Class Outcome:`, `Accepted Warning Ledger:`, `Human Review Gate:`, `Static Analyzer Limits:` を残します
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
@@ -424,7 +424,7 @@ exit 条件:
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
 - refactor pass では move / rename / split と挙動保存境界が文書だけで追える
-- 包括 refactor では設計見直し、OOP 的な契約完全実装方針、解析 baseline / target score が文書だけで追える
+- 包括 refactor では設計見直し、OOP 的な契約完全実装方針、解析 baseline / signal class outcome / accepted-warning ledger / human review gate が文書だけで追える
 
 ### Gate 6. 詳細設計レビュー
 
@@ -540,12 +540,27 @@ exit 条件:
 - 凍結済みの設計を実装へ落とす
 
 主担当:
-- `implementer`
+- write-capable Codex implementer selected from `IMPLEMENTATION_CODEX_AGENTS`
+  (`spark_worker` for bounded low-risk slices, otherwise `worker`)
+- parent is the gate owner / integrator only
 
 条件付き追加 subagent:
-- bounded な切り出しだけを `worker` に渡す
+- additional write-capable `spark_worker` / `worker` instances only when
+  dependency order, disjoint write scope, integration order, and review gate are
+  fixed in the handoff packet
 
 ルール:
+- Gate 8 starts from `IMPLEMENTATION_HANDOFF_REQUIRED=yes` and
+  `PARENT_REPO_EDITS_ALLOWED=no`. The parent owns routing, handoff packet
+  construction, monitoring, additional instructions, integration, validation,
+  and closeout; it does not directly patch repository files unless
+  `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
+  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` are
+  recorded.
+- Parent-Direct Context Note is a routing / handoff artifact, not edit
+  authorization. Once edit scope is known, launch or schedule `spark_worker` /
+  `worker`; if blocked, record `WRITE_SUBAGENT_AUTHORIZATION=required` or
+  `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
