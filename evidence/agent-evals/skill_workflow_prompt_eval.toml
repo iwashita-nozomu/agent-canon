@@ -15,7 +15,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 53
+expected_count = 54
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -40,7 +40,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 54
+expected_count = 55
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -2037,6 +2037,42 @@ id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"
 critical = true
 description = "Routes missing or stale accumulated eval families to the dedicated producer/checker loop."
 required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "run_accumulated_agent_evals\\.py"]
+
+[[evals]]
+id = "runtime-log-repair-skill"
+target = ".agents/skills/runtime-log-repair/SKILL.md"
+kind = "skill"
+description = "Runtime log repair must turn dashboard evidence into owner-routed repair packets without taking over raw analysis or owner internals."
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-SHIM-1"
+critical = true
+description = "Starts from agent-log-analysis dashboard artifacts and builds a Runtime Log Repair Packet."
+required_regex = ["agent-log-analysis-api\\.json", "agent-log-analysis-compact\\.md", "Runtime Log Repair Packet", "repair_class", "dashboard_evidence", "owner_surface", "closeout_gate"]
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-SHIM-2"
+critical = true
+description = "Routes repairs to existing owners instead of owning raw analysis, evals, artifacts, issues, subagent launch, or prompt/config review."
+required_regex = ["\\$agent-eval-accumulation", "\\$result-artifact-writeout", "\\$issue-finding-report", "\\$subagent-bootstrap", "\\$task-routing", "\\$agent-learning", "does not own raw log analysis"]
+
+[[evals]]
+id = "runtime-log-repair-doc"
+target = "agents/skills/runtime-log-repair.md"
+kind = "skill-doc"
+description = "Human runtime-log-repair skill must define owner-routed dashboard repair boundaries."
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-DOC-1"
+critical = true
+description = "Defines dashboard evidence inputs, repair packet fields, owner route, non-goals, and closeout gate."
+required_regex = ["agent-log-analysis", "Runtime Log Repair Packet", "repair_class", "dashboard_evidence", "owner_surface", "non_goals", "closeout_gate"]
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-DOC-2"
+critical = true
+description = "Keeps dashboard schema, raw analysis, eval loops, artifacts, durable issues, subagent mechanics, prompt/config review, hooks, and reference extraction with existing owners."
+required_regex = ["Raw log compaction", "dashboard API schema", "agent-eval-accumulation", "result-artifact-writeout", "issue-finding-report", "subagent-bootstrap", "reference extraction internals"]
 
 [[evals]]
 id = "agent-eval-accumulation-skill"
