@@ -27,7 +27,7 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 
 ## この文書の読み方
 
-この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Backlog への変換、例外は、checker finding や設計 review の扱いを決めるときに使います。
+この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Decision への triage、例外は、checker finding や設計 review の扱いを決めるときに使います。
 
 ## 要約
 
@@ -173,7 +173,7 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 
 ## 機械評価
 
-OOP 的な可読性は reviewer の判断を必要としますが、危険な形は機械的に先に落とします。
+OOP 的な可読性は reviewer の判断を必要としますが、危険な形は機械的な signal として先に報告します。
 Python surface では次を baseline として使います。
 
 ```bash
@@ -219,7 +219,7 @@ default は signal 判定を使います。明示的に default より高い sco
 state ownership、既存責務語彙、または周辺 source shape から安定した境界が
 読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
-重要な変更では、機械 report を正本にします。
+重要な変更では、機械 report の status、count、path、line を正本にします。
 
 ```bash
 python3 tools/oop/python/readability.py \
@@ -245,18 +245,18 @@ status は `tools/catalog.yaml` に記録し、`tool_catalog.py` の検査対象
 `oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。
 
-## Finding から Backlog への変換
+## Finding から Decision への Triage
 
-`tools/oop/*/readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
+`tools/oop/*/readability.py` の finding は、chat の感想や自動 backlog 化で終わらせず、次の decision へ triage します。機械 finding は signal であり、境界変更、split、extract の指示ではありません。
 
-- `cognitive_complexity`: まず分岐の意味を named decision、variant、entrypoint、または flatten できる条件へ分ける。
-- `parameters`: stable な入力集合を dataclass / typed request object / existing value object へ寄せる。
-- `optional_boundary` / `none_runtime_branch`: `None` sentinel ではなく、別 entrypoint、variant、Protocol、validated value object のいずれかへ寄せる。
-- `mixed_morphism_effect`: 戻り値を作る純粋変換と file / process / mutation / print などの effect を分離する。
-- `identity_function` / `pass_through_function` / `trivial_format_function`: domain contract が無ければ削除または caller へ inline する。
-- `public_methods` / `instance_attributes` / `public_fields`: state owner、adapter、renderer、writer、value object に責務を再分類する。
+- boundary change with evidence: caller contract、state ownership、domain vocabulary、effect boundary、validated decision point、または stable reusable behavior がある場合だけ境界を変える。
+- flatten / name decision while keeping code contiguous: `cognitive_complexity` は、分岐意味の命名や flatten で読めるなら、新しい helper や class を増やさず同じ source region に保つ。
+- inline / delete wrapper: `identity_function`、`pass_through_function`、`trivial_format_function` は、domain contract が無ければ削除または caller へ inline する。
+- accept as intentional boundary: value object、adapter、ABI、framework contract、DSL terminal など、周辺 contract が境界の意図を説明する場合は許容する。
+- false positive: test-only organization、generated shape、typed protocol、schema / DTO など、checker の静的 heuristic が設計 intent を読めない場合は false positive として記録する。
+- defer with rationale: 呼び出し contract、ownership、validation が足りない場合は、予定する境界変更を書かず、必要な evidence と owner を記録して defer する。
 
-backlog item には、少なくとも `path:line`、finding kind、対象責務、予定する境界変更、validation を含めます。
+decision record には、少なくとも `path:line`、finding kind、tool fact、agent judgment、選んだ outcome、根拠、validation または defer 理由を含めます。
 機械 finding を許容する場合も、許容理由を design artifact か run bundle に残し、score を改善した事実と混同しません。
 
 ## 例外

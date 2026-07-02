@@ -492,7 +492,7 @@ Activation Conditions:
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
-| OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report を事実として扱い、OOP 原則別に文書化する |
+| OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report の status / count / path / line を保持し、tool fact と reviewer judgment を分けて OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、Abstract Design Frame から導かれ、design trace、naming、validation、dependency-expanded handoff scope が揃った slice は `spark_worker`、broad / ambiguous slice は `worker` |
 | 低リスク実装slice | Abstract Design Frame から導かれ、design trace、naming、validation、dependency-expanded handoff scope が揃った slice だけを `spark_worker` preferred |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer`。Design Side-Effect Map から外れた side effect は設計差分として扱う |

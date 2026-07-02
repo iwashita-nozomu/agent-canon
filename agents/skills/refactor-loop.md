@@ -49,8 +49,10 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 1. refactor-loop の対象 file は、最初に user が指した file だけで固定しません。
    まず依存解析で requested object / file から到達する依存 file、依存元 file、
    関連 test / docs / validation command を展開し、その dependency-expanded scope 全体を候補集合に
-   します。実装対象は、その展開済み scope 内で関数、method、class 単位に
-   絞り込んでから決めます。
+   します。実装対象は、その展開済み scope 内で target trace として固定します。
+   target trace は、実在する関数、method、class なら `path:start-end:qualname`、
+   cohesive な source region、behavior unit、responsibility unit なら
+   `path:start-end:region-id` で表します。
 1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff
    の前に、`dependency-analysis` で structured `Change Impact Packet:`
    manifest を作ります。この packet は code dependency、header dependency、
@@ -75,9 +77,13 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
    stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
    config、report consumer を新しい surface に合わせます。test、smoke、
    behavior execution は二段完了後の return-gate validation に集約します。
-1. 実装前に `Targets To Change:` として、変更する関数、method、class を
-   `path:start-end:qualname` で列挙します。file や module だけを target にして
-   実装へ入ってはいけません。
+1. 実装前に `Targets To Change:` として、変更する target trace を列挙します。
+   実在する関数、method、class は `path:start-end:qualname`、cohesive な
+   source region、behavior unit、responsibility unit は `path:start-end:region-id`
+   で表します。file や module だけを target にして実装へ入ってはいけません。
+   qualname を作るためだけに split / extract してはいけません。新しい境界は
+   caller contract、state ownership、domain vocabulary、effect boundary、
+   validated decision point、または stable reusable behavior がある場合だけ許可します。
 1. 新機能追加は同じ pass に混ぜません。必要なら先に分離します。
 1. delete、rename、move、module split は `Files To Remove Or Move:` として先に列挙します。
 1. old path と new path の対応を `Path Mapping:` として残します。
@@ -93,7 +99,7 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 1. implementation subagent を起動する前に、親 agent が dependency graph から
    `Refactor Orchestration Plan:` を作ります。依存の根本に近い sequential root
    slice と、root 修正後に並列化できる independent downstream slice を分け、
-   各 target object に owner wave、`blocked_by`、allowed files、validation
+   各 target trace に owner wave、`blocked_by`、allowed files、validation
    signal、single-agent / parallel-safe の判定を付けます。
    `structure-refactor` が構造 surface 分類、root/scope contract、path mapping、
    runtime boundary を所有し、この skill が repair batch sizing、`blocked_by`、
@@ -105,14 +111,14 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
    validation surface で確認できるなら、大きい block を選んで構いません。
 1. implementation の既定単位は finding 1 件ではなく、dependency-expanded repair
    batch です。同じ責務 group、同じ dependency wave、同じ validation surface に
-   属し、機械的に安全に直せる target object は 1 つの handoff にまとめます。
+   属し、機械的に安全に直せる target trace は 1 つの handoff にまとめます。
    finding 1 件だけの handoff は、dependency evidence が関連 target の
    behavior-preserving canonical home、nearest valid ancestor、batchable
    downstream repair を退けた後に限ります。そのうえで root/shared contract
    risk、semantic risk、または batch 化不能の根拠を記録します。
 1. implementation slice 後は、finding packet がある場合は latest `git diff` と
    その packet を突き合わせます。ない場合は owner-selected static / targeted
-   validation artifact と target-object trace に diff を突き合わせます。
+   validation artifact と target trace に diff を突き合わせます。
    `Diff Linked Findings:` では、変更 file、diff hunk 行範囲、finding の `path` /
    `line` / structural `instances` / `representatives` / dependency signal を使い、
    変更行に直接乗る finding、同じ変更 object に属する related structural finding、
@@ -136,10 +142,12 @@ Stopping、logging、runtime tolerance、preconditioner など、複数 algorith
 1. `Expected API:` として、正本化後に caller が使う import path、config field、
    initialize-time policy、削除する legacy alias / helper を明示します。この
    expected API は write-capable subagent と reviewer の context に含めます。
-1. `Targets To Change:` には canonical surface を構成する関数、method、class を
-   `path:start-end:qualname` で列挙します。stage 1 の forced migration は正本
+1. `Targets To Change:` には canonical surface を構成する target trace を
+   列挙します。実在する関数、method、class は `path:start-end:qualname`、
+   cohesive な region / behavior unit / responsibility unit は
+   `path:start-end:region-id` で表します。stage 1 の forced migration は正本
    surface の移動または削除をまとめ、stage 2 の usage-surface repair で利用面を
-   更新します。
+   更新します。qualname を作るためだけの抽出は境界根拠になりません。
 1. `Forbidden Semantic Delta:` には、停止条件、tolerance 解決、ログ項目、数値
    residual の定義を変えないことを明記します。意味を変える必要がある場合は
    refactor pass ではなく design / algorithm pass に分離します。
@@ -175,7 +183,7 @@ validation surface を共有する mechanically safe な target は、同じ bat
    を使い、親 agent が手作業で block 化しません。
 1. `repair_slice.root_finding` は今回の修正 batch の根を示します。実装単位は
    root finding 1 件に固定せず、同じ home/downstream group と dependency wave
-   にあり、同じ責務で同時に消せる related finding / target object を batch に
+   にあり、同じ責務で同時に消せる related finding / target trace を batch に
    含めます。
 1. `repair_slice.preferred_home_group` を共通化候補にします。ただし、
    その group の設計責務に合わない helper / base / protocol / alias を追加
@@ -205,10 +213,10 @@ validation surface を共有する mechanically safe な target は、同じ bat
    validation を実行します。差分 finding だけで次の wave を判断してはいけません。
 1. 再走査前後の判断材料として、finding packet がある場合は latest `git diff`
    をその packet に join し、ない場合は owner-selected static / targeted
-   validation artifact と target-object trace に join した
+   validation artifact と target trace に join した
    `diff_linked_findings` artifact を作ります。最低限、次を分けます。
    - `direct_changed_findings`: diff hunk の変更行に finding location が重なるもの
-   - `related_structural_findings`: 変更した関数、method、class、またはその
+   - `related_structural_findings`: 変更した target trace、またはその
      structural `instances` / `representatives` / dependency group に属するもの
    - `unchanged_scope_findings`: full report には残るが今回 slice の変更範囲外のもの
    この artifact は reviewer handoff と次 slice 選択の入力にします。
@@ -230,23 +238,23 @@ validation を使います。
 
 1. write-capable subagent への handoff には、`dependency-analysis` が作った
    `Change Impact Packet` path、current `repair_slice`、repair batch に含める
-   全 target object、`Forbidden Semantic Delta`、新規 finding を増やさない制約を
+   全 target trace、`Forbidden Semantic Delta`、新規 finding を増やさない制約を
    含めます。finding packet がある場合はその path を含めます。ない場合は
-   owner-selected static / targeted validation artifact と target-object trace を
+   owner-selected static / targeted validation artifact と target trace を
    含めます。
 1. write-capable subagent への handoff は token-bounded にします。必ず exact
-   target objects、allowed files、object-by-object repair intent、
+   target traces、allowed files、target-by-target repair intent、
    forbidden semantic delta、test commands、final response format を指定します。
-   repair intent では、各 target object ごとに current problem、intended
+   repair intent では、各 target trace ごとに current problem、intended
    structural change、behavior が変わらない理由、non-goals、validation signal を
    親 agent が言語化します。final response は changed paths、validation
    commands、unresolved blockers に絞らせます。broad prose、unrelated edit、
-   file-level target だけの実装、target-object trace のない差分は
+   file-level target だけの実装、target trace のない差分は
    `handoff_prompt_gap` として扱い、次の writer 起動前に handoff / skill を
    修正します。
 1. implementation subagent が返した差分は、finding packet がある場合はその packet
    と突き合わせます。ない場合は owner-selected static / targeted validation
-   artifact と target-object trace に突き合わせ、`git diff` hunk と合わせて
+   artifact と target trace に突き合わせ、`git diff` hunk と合わせて
    `diff_linked_findings` にします。レビューには latest diff だけでなく、direct /
    related / unchanged finding の分類を渡します。
 1. finding packet が `handoff_prompt_gap` または `shared_skill_or_workflow_gap`
@@ -294,7 +302,7 @@ validation を使います。
 1. dependency depth、call direction、shared policy / base abstraction の有無から
    `sequential_root_slices` と `parallel_candidate_slices` に分けます。
 1. 各 wave では、同じ責務 group と validation surface に属する mechanically safe
-   target object を repair batch としてまとめます。親 agent は「縮めれば安全」だけを
+   target trace を repair batch としてまとめます。親 agent は「縮めれば安全」だけを
    理由に finding 1 件へ分割しません。分割、`deferred`、`review_required`、
    current-state/no-op は、dependency evidence が behavior-preserving canonical
    home、nearest valid ancestor、batchable downstream repair を退けた後だけ
@@ -310,7 +318,7 @@ validation を使います。
    write scope が交差しない downstream slice を wave に分けて並列化します。
 1. 各 slice には少なくとも次を記録します。
    - `slice_id`
-   - `target_objects`: `path:start-end:qualname`
+   - `target_objects`: `path:start-end:qualname` または `path:start-end:region-id`
    - `owner_agent`
    - `blocked_by`
    - `allowed_files`
@@ -361,9 +369,10 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
      current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず後続 wave へ直列化します。
    - repair batch / slice、affected files、forbidden semantic delta、既存 dirty
      state の扱い、validation command を明示して渡します。
-   - 親 agent は「どこをどう直すか」を file 単位ではなく object 単位で渡します。
-     少なくとも `path:start-end:qualname`、問題の根拠、想定 diff 形状、触らない
-     semantic、期待する test / checker signal を含めます。
+   - 親 agent は「どこをどう直すか」を file 単位ではなく target trace 単位で渡します。
+     少なくとも `path:start-end:qualname` または `path:start-end:region-id`、
+     問題の根拠、想定 diff 形状、触らない semantic、期待する test / checker signal
+     を含めます。
    - 実装 agent は review を完了扱いにしてはいけません。
 1. Read-only review agent
    - 実装 agent とは別 instance にします。

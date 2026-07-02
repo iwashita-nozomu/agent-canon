@@ -18,7 +18,7 @@ downstream design ../../tool-docs.toml one-to-one tool/document manifest
 C / C++ source に対して、class / struct / function が責務と所有境界を読みやすく保っているかを軽量な静的解析で確認します。
 
 - 責務が見えない class / struct 名: `Manager`、`Helper`、`Util`、`Thing` で終わる型名を検出します。
-- 巨大 class / function: 行数が閾値を超え、責務分割が必要そうな境界を検出します。
+- 巨大 class / function: 行数が閾値を超えた source region を、複数責務が混ざる可能性のある review signal として検出します。安定した境界が見えない限り抽出は要求しません。
 - public method 過多: 公開 API が広すぎる型を検出します。
 - public field 過多: mutable state や invariant が外へ漏れている可能性を検出します。
 - base class 過多: 継承面が広すぎ、composition へ寄せるべき候補を検出します。

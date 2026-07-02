@@ -18,7 +18,7 @@ downstream design ../../tool-docs.toml one-to-one tool/document manifest
 Python source に対して、OOP 境界が「責務、状態、契約、公開面」を読みやすく分けているかを軽量な静的解析で確認します。
 
 - 責務が見えない class 名: `Manager`、`Helper`、`Util`、`Thing` で終わる class を検出します。
-- 巨大 class / function: 行数が閾値を超え、複数責務が混ざりやすい境界を検出します。
+- 巨大 class / function: 行数が閾値を超えた source region を、複数責務が混ざる可能性のある review signal として検出します。安定した境界が見えない限り抽出は要求しません。
 - public method 過多: class の公開 API が広すぎる場合を検出します。
 - instance state 過多: `self.*` の所有状態と class body の型付き field が多く、
   ライフサイクルや invariant が追いにくい class を検出します。Equinox
