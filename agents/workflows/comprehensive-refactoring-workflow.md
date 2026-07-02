@@ -144,7 +144,7 @@ tool が足りない場合は、refactor 対象に合わせて targeted 解析 t
 - `Reports:` Markdown report、JSON report、`oop_readability_reviewer` prompt。
 - `Interpretation:` 最上位 dimensions、finding kinds、hotspot files。score / counts / path / line は機械 report から変更しません。
 
-調査目的で既定 score gate を止めたくない場合は、survey report だけ `--min-score 0` で完走させます。
+調査目的で score floor を評価条件にしたくない場合は、survey report だけ `--min-score 0` で完走させます。
 closeout gate に使う report は、signal class outcome、accepted-warning ledger、
 human review gate を残します。strict score floor は task が根拠を明示した場合
 だけ closeout 条件に含めます。

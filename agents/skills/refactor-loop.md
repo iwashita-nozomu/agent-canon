@@ -318,7 +318,7 @@ validation を使います。
    write scope が交差しない downstream slice を wave に分けて並列化します。
 1. 各 slice には少なくとも次を記録します。
    - `slice_id`
-   - `target_objects`: `path:start-end:qualname` または `path:start-end:region-id`
+   - `target_traces`: `path:start-end:qualname` または `path:start-end:region-id`
    - `owner_agent`
    - `blocked_by`
    - `allowed_files`
