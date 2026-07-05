@@ -18,14 +18,26 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 ## Reader Map
 
-This template owns review of a detailed design before implementation. Work
+This template owns review of the detailed design artifact itself before
+implementation. Record the exact design artifact under review, then work
 through document completeness, reuse/style, cross-doc coverage, upstream
 requirements, abstract design frame, evidence, assumptions, parent-doc
 alignment, source packet, side effects, canonical tree head, naming,
 design-to-implementation trace, and readiness before deciding approve, revise,
 or escalate. Top-down reader flow is reviewed separately by the document-flow
-review artifact; this template checks whether implementation can proceed
-without hidden assumptions.
+review artifact; this template checks whether implementation can proceed from
+the reviewed design without hidden assumptions. An approve decision applies
+only to the current artifact recorded below.
+
+## Design Artifact Under Review
+
+<!-- Name the exact design_brief.md path, revision or section set, source packet, and reviewer separation evidence. Return revise if the review target is a chat summary, implementation diff, worker summary, or stale design artifact. -->
+
+- Design artifact path:
+- Design revision or section set:
+- Source packet reviewed:
+- Reviewer separation:
+- Review validity:
 
 ## Document Completeness Review
 

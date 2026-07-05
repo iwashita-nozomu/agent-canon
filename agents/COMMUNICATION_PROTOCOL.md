@@ -103,6 +103,7 @@ the structure contract is not a root view, pass
 - `requested_action`
 - `pre_edit_repository_investigation`
 - `fresh_subagent_context_capsule`
+- `pre_handoff_gate_status`
 - `artifacts`
 - `repo_changes`
 - `pre_edit_rejection_prediction`
@@ -112,6 +113,15 @@ the structure contract is not a root view, pass
 - `design_issue_blocker`
 - `open_questions`
 - `status`
+
+`pre_handoff_gate_status` records gate evidence before a write-capable
+implementation handoff. Design-backed implementation handoffs require the
+current `design_brief.md` path or revision, matching `design_review.md`
+`Design Artifact Under Review`, `design_review.md decision=approve`,
+`waterfall-gate-check --gate design` pass evidence, and selected
+`document_flow_review.md` status when that workflow gate is active. Missing,
+stale, or non-approve design review status returns the task to Gate 5-6 before
+handoff.
 
 ## Pre-Edit Repository Investigation Packet
 
@@ -168,6 +178,7 @@ The note records:
 - `parent_direct_exception_rationale`
 - `reuse_basis`
 - `design_oop_boundary`
+- `pre_handoff_gate_status`
 - `validation_route`
 - `llm_visible_context`
 - `local_tool_context`
@@ -190,6 +201,8 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
+- `pre_handoff_gate_status`: design review and gate-check status required
+  before write-capable implementation handoff
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use

@@ -57,16 +57,46 @@ def write_document_flow_review(report_dir: Path) -> None:
     )
 
 
-def approved_design_review_lines(*, include_abstract: bool = True) -> list[str]:
+def approved_design_review_lines(
+    *,
+    include_abstract: bool = True,
+    design_artifact_path: str = "design_brief.md",
+    include_artifact_section: bool = True,
+    include_revision: bool = True,
+    include_source_packet: bool = True,
+    include_reviewer_separation: bool = True,
+) -> list[str]:
     """Return a design review fixture that satisfies the design gate."""
     lines = [
         "# Detailed Design Review",
         "",
         "## Findings",
         "No blockers.",
-        "## Upstream Requirement Packet Review",
-        "The design cites the governing requirement and workflow documents.",
     ]
+    if include_artifact_section:
+        lines.extend(
+            [
+                "## Design Artifact Under Review",
+                f"- Design artifact path: {design_artifact_path}",
+            ]
+        )
+        if include_revision:
+            lines.append(
+                "- Design revision or section set: current sections through "
+                "Design-To-Implementation Trace"
+            )
+        if include_source_packet:
+            lines.append("- Source packet reviewed: design_brief.md Implementation Source Packet")
+        if include_reviewer_separation:
+            lines.append(
+                "- Reviewer separation: design_reviewer is separate from designer"
+            )
+    lines.extend(
+        [
+            "## Upstream Requirement Packet Review",
+            "The design cites the governing requirement and workflow documents.",
+        ]
+    )
     if include_abstract:
         lines.extend(
             [
@@ -76,14 +106,14 @@ def approved_design_review_lines(*, include_abstract: bool = True) -> list[str]:
         )
     lines.extend(
         [
-        "## Implementation Source Packet Review",
-        "The packet names every required read-before-edit artifact.",
-        "## Canonical Tree-Head Review",
-        "The design leaves only canonical tracked paths in the tree.",
-        "## Design-To-Implementation Trace Review",
-        "Each planned edit maps to the request clause and test plan.",
-        "## Decision",
-        "approve",
+            "## Implementation Source Packet Review",
+            "The packet names every required read-before-edit artifact.",
+            "## Canonical Tree-Head Review",
+            "The design leaves only canonical tracked paths in the tree.",
+            "## Design-To-Implementation Trace Review",
+            "Each planned edit maps to the request clause and test plan.",
+            "## Decision",
+            "approve",
         ]
     )
     return lines
@@ -354,6 +384,29 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertIn("WATERFALL_GATE_READY=no", result.stdout)
             self.assertIn("design_review.md:decision_not_approve", result.stdout)
 
+    def test_document_flow_gate_is_separate_from_design_gate(self) -> None:
+        """Design approval should not unconditionally require document flow."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "design-only"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_markdown(report_dir / "design_brief.md", design_brief_lines())
+            write_markdown(
+                report_dir / "design_review.md",
+                approved_design_review_lines(),
+            )
+
+            design_result = run_gate(report_dir, "design")
+            document_flow_result = run_gate(report_dir, "document_flow")
+
+            self.assertEqual(
+                design_result.returncode,
+                0,
+                design_result.stdout + design_result.stderr,
+            )
+            self.assertIn("WATERFALL_GATE_READY=yes", design_result.stdout)
+            self.assertNotEqual(document_flow_result.returncode, 0)
+            self.assertIn("document_flow_review.md:missing", document_flow_result.stdout)
+
     def test_test_gate_rejects_dependency_header_only_plan(self) -> None:
         """Dependency headers alone should not satisfy the test-plan gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -497,6 +550,128 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 "design_review.md:section_empty_or_missing:abstract_design_frame_review"
             )
             self.assertIn(expected_blocker, result.stdout)
+
+    def test_design_gate_rejects_missing_reviewed_artifact_section(self) -> None:
+        """Design review must name the current design artifact it approved."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-artifact-section"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_design_bundle_with_review(
+                report_dir,
+                design_brief_lines(),
+                approved_design_review_lines(include_artifact_section=False),
+            )
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_review.md:section_empty_or_missing:design_artifact_under_review",
+                result.stdout,
+            )
+            self.assertIn(
+                "design_review.md:design_artifact_under_review_missing:design_artifact_path",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_stale_reviewed_artifact_path(self) -> None:
+        """Design review approval cannot target a stale design artifact path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "stale-artifact-path"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_design_bundle_with_review(
+                report_dir,
+                design_brief_lines(),
+                approved_design_review_lines(
+                    design_artifact_path="reports/agents/old/design_brief.md"
+                ),
+            )
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_review.md:design_artifact_path_not_current",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_missing_review_source_packet(self) -> None:
+        """Design review must record source packet and separation evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-review-evidence"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_design_bundle_with_review(
+                report_dir,
+                design_brief_lines(),
+                approved_design_review_lines(
+                    include_source_packet=False,
+                    include_reviewer_separation=False,
+                ),
+            )
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_review.md:design_artifact_under_review_missing:source_packet_reviewed",
+                result.stdout,
+            )
+            self.assertIn(
+                "design_review.md:design_artifact_under_review_missing:reviewer_separation",
+                result.stdout,
+            )
+
+    def test_implementation_gate_requires_current_design_approval(self) -> None:
+        """Implementation cannot proceed from an unapproved existing design."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "implementation-design-review"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_markdown(report_dir / "design_brief.md", design_brief_lines())
+            write_markdown(
+                report_dir / "change_review.md",
+                [
+                    "# Change Review",
+                    "",
+                    "## Design-Base Implementation Review",
+                    "Implementation cites the design.",
+                    "## Canonical Tree-Head Review",
+                    "Tree head is canonical.",
+                    "## Decision",
+                    "approve",
+                ],
+            )
+
+            missing_review = run_gate(report_dir, "implementation")
+            write_markdown(
+                report_dir / "design_review.md",
+                approved_design_review_lines(
+                    design_artifact_path="reports/agents/old/design_brief.md"
+                ),
+            )
+            stale_review = run_gate(report_dir, "implementation")
+            write_markdown(
+                report_dir / "design_review.md",
+                approved_design_review_lines(),
+            )
+            approved_review = run_gate(report_dir, "implementation")
+
+            self.assertNotEqual(missing_review.returncode, 0)
+            self.assertIn("design_review.md:missing", missing_review.stdout)
+            self.assertIn(
+                "NEXT_ACTION=return_to_design_owner_until_gate_approves",
+                missing_review.stdout,
+            )
+            self.assertNotEqual(stale_review.returncode, 0)
+            self.assertIn(
+                "design_review.md:design_artifact_path_not_current",
+                stale_review.stdout,
+            )
+            self.assertIn(
+                "NEXT_ACTION=return_to_design_owner_until_gate_approves",
+                stale_review.stdout,
+            )
+            self.assertEqual(
+                approved_review.returncode,
+                0,
+                approved_review.stdout + approved_review.stderr,
+            )
 
     def test_design_gate_rejects_under_specified_abstract_design_frame(self) -> None:
         """Design gate should require the six abstract design frame dimensions."""

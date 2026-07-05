@@ -39,6 +39,7 @@ from agent_team import (
     load_task_catalog,
     load_team_config,
     make_run_id,
+    pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
     recommended_dynamic_expansion_wave_slots,
     recommended_dynamic_expansion_waves,
@@ -398,6 +399,8 @@ def emit_task_start_output(
             print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
     for line in pre_handoff_scope_policy_output_lines():
+        print(line)
+    for line in pre_handoff_gate_status_output_lines():
         print(line)
     for line in user_facing_language_policy_output_lines():
         print(line)

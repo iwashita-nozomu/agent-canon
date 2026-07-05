@@ -39,6 +39,7 @@ from agent_team import (
     load_task_catalog,
     load_team_config,
     make_run_id,
+    pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
     recommended_dynamic_expansion_wave_slots,
     recommended_dynamic_expansion_waves,
@@ -407,6 +408,8 @@ def emit_bootstrap_output(
         print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
         print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
     for line in pre_handoff_scope_policy_output_lines():
+        print(line)
+    for line in pre_handoff_gate_status_output_lines():
         print(line)
     for line in user_facing_language_policy_output_lines():
         print(line)

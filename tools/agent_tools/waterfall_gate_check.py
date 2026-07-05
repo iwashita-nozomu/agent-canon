@@ -107,6 +107,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             require_filled=True,
             require_approve=True,
             required_sections=(
+                "## Design Artifact Under Review",
                 "## Upstream Requirement Packet Review",
                 "## Abstract Design Frame Review",
                 "## Implementation Source Packet Review",
@@ -114,6 +115,8 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
                 "## Design-To-Implementation Trace Review",
             ),
         ),
+    ),
+    "document_flow": (
         ArtifactCheck("document_flow_review.md", require_filled=True, require_approve=True),
     ),
     "test": (
@@ -237,6 +240,68 @@ def check_abstract_design_frame(text: str) -> list[str]:
     return blockers
 
 
+def section_label_values(body: str) -> dict[str, str]:
+    """Return simple Markdown list label values from a section body."""
+    values: dict[str, str] = {}
+    for line in body.splitlines():
+        stripped = line.strip().lstrip("-* ").strip()
+        if ":" not in stripped:
+            continue
+        label, value = stripped.split(":", 1)
+        normalized_label = label.strip().lower()
+        if normalized_label:
+            values[normalized_label] = value.strip()
+    return values
+
+
+def populated_label_value(values: dict[str, str], label: str) -> bool:
+    """Return whether one review label has concrete non-placeholder content."""
+    value = values.get(label, "").strip().strip("`")
+    return value.lower() not in {"", "-", "todo", "tbd", "none", "n/a"}
+
+
+def design_artifact_path_matches(value: str, design_brief_path: Path) -> bool:
+    """Return whether a review target path names the current design brief."""
+    normalized = value.strip().strip("`'\"")
+    if not normalized:
+        return False
+    candidate = Path(normalized)
+    if candidate.is_absolute():
+        return candidate.resolve() == design_brief_path.resolve()
+    if (design_brief_path.parent / candidate).resolve() == design_brief_path.resolve():
+        return True
+    return normalized in {"design_brief.md", "./design_brief.md"} or (
+        not candidate.is_absolute()
+        and candidate.name == "design_brief.md"
+        and candidate.parent in {Path("."), Path("")}
+    )
+
+
+def check_design_review_artifact(report_dir: Path, text: str) -> list[str]:
+    """Return blockers for design review's reviewed-artifact identity."""
+    body = section_body(text, "## Design Artifact Under Review")
+    values = section_label_values(body)
+    blockers: list[str] = []
+    design_brief_path = report_dir / "design_brief.md"
+    required_labels = (
+        "design artifact path",
+        "design revision or section set",
+        "source packet reviewed",
+        "reviewer separation",
+    )
+    for label in required_labels:
+        if not populated_label_value(values, label):
+            slug = label.replace(" ", "_")
+            blockers.append(f"design_review.md:design_artifact_under_review_missing:{slug}")
+    path_value = values.get("design artifact path", "")
+    if populated_label_value(values, "design artifact path") and not design_artifact_path_matches(
+        path_value,
+        design_brief_path,
+    ):
+        blockers.append("design_review.md:design_artifact_path_not_current")
+    return blockers
+
+
 def abstract_term_has_content(body: str, accepted_terms: tuple[str, ...]) -> bool:
     """Return whether one abstract-frame dimension is named with concrete content."""
     placeholder_values = {"", "-", "todo", "tbd", "none", "n/a"}
@@ -274,6 +339,8 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
         blockers.extend(check_user_request_contract(text))
     elif check.path == "design_brief.md":
         blockers.extend(check_abstract_design_frame(text))
+    elif check.path == "design_review.md":
+        blockers.extend(check_design_review_artifact(report_dir, text))
     elif check.path == "schedule.md":
         blockers.extend(check_schedule_artifact(text))
     elif check.path == "work_log.md":
@@ -281,6 +348,16 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
     if check.require_approve and not decision_is_approve(text):
         blockers.append(f"{check.path}:decision_not_approve")
     return blockers
+
+
+def next_action_for_gate(gate: str, blockers: list[str]) -> str:
+    """Return the owning stage that should repair one failed gate check."""
+    if gate == "implementation" and any(
+        blocker.startswith(("design_brief.md:", "design_review.md:"))
+        for blocker in blockers
+    ):
+        return "return_to_design_owner_until_gate_approves"
+    return f"return_to_{gate}_owner_until_gate_approves"
 
 
 def main() -> int:
@@ -291,6 +368,9 @@ def main() -> int:
     blockers: list[str] = []
     for check in checks:
         blockers.extend(check_artifact(report_dir, check))
+    if args.gate == "implementation" and (report_dir / "design_brief.md").is_file():
+        for design_check in GATE_CHECKS["design"]:
+            blockers.extend(check_artifact(report_dir, design_check))
 
     ready = not blockers
     print(f"REPORT_DIR={report_dir}")
@@ -298,7 +378,7 @@ def main() -> int:
     print(f"WATERFALL_GATE_READY={'yes' if ready else 'no'}")
     if blockers:
         print(f"WATERFALL_GATE_BLOCKERS={','.join(blockers)}")
-        print(f"NEXT_ACTION=return_to_{args.gate}_owner_until_gate_approves")
+        print(f"NEXT_ACTION={next_action_for_gate(str(args.gate), blockers)}")
         return 1
     print("NEXT_ACTION=proceed_to_next_waterfall_gate")
     return 0

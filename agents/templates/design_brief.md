@@ -19,9 +19,21 @@ This template owns the implementation-facing detailed design packet. Fill the
 goal, abstract design frame, evidence ledger, reuse survey, requirement packet,
 implementation source packet, side-effect map, reader path, clause mapping,
 file-by-file design, trace, naming plan, validation, rollback, and risks before
-handoff. The implementation worker should use this as the approved source
-packet; unresolved responsibility, naming, validation, or API-shape gaps belong
-back in design review rather than local implementation judgment.
+handoff. After this design is written, send this exact artifact to detailed
+design review before any implementation or worker handoff. The implementation
+worker uses this as an approved source packet only after `design_review.md`
+approves the same artifact; unresolved responsibility, naming, validation, or
+API-shape gaps belong back in design review rather than local implementation
+judgment.
+
+## Design Review Handoff
+
+<!-- Record the design artifact path, current revision or section set, required design_review.md path, document_flow_review.md path if applicable, and the fact that implementation/handoff is blocked until the latest review decision is approve. -->
+
+- Design artifact under review:
+- Required review artifact:
+- Review state:
+- Implementation / handoff blocker:
 
 ## Goals
 
@@ -61,7 +73,7 @@ back in design review rather than local implementation judgment.
 
 ## Implementation Source Packet
 
-<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md when active, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
 
 ## Design Side-Effect Map
 
