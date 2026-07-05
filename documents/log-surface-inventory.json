@@ -2444,7 +2444,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 147,
+      "line": 151,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2452,7 +2452,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 148,
+      "line": 152,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2460,7 +2460,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 145,
+      "line": 149,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2468,7 +2468,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 144,
+      "line": 148,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2476,7 +2476,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_summary_artifact",
-      "line": 146,
+      "line": 150,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2484,7 +2484,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 143,
+      "line": 147,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -2542,6 +2542,94 @@
       "field": "required_input",
       "line": 66,
       "path": "agents/skills/runtime-log-repair.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_formal_status",
+      "line": 119,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_overwrite_policy",
+      "line": 122,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_raw_manifest",
+      "line": 120,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_report",
+      "line": 121,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_result_branch",
+      "line": 116,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_result_dir",
+      "line": 115,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_result_save",
+      "line": 112,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_run_name",
+      "line": 114,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_source_commit",
+      "line": 117,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_source_dirty_state",
+      "line": 118,
+      "path": "agents/skills/save-experiment-results.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "experiment_topic",
+      "line": 113,
+      "path": "agents/skills/save-experiment-results.md",
       "surface": "skill"
     },
     {
@@ -20101,6 +20189,7 @@
     ".agents/skills/research-workflow/SKILL.md",
     ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/runtime-log-repair/SKILL.md",
+    ".agents/skills/save-experiment-results/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
     ".agents/skills/structure-planning/SKILL.md",
     ".agents/skills/structure-refactor/SKILL.md",
@@ -20182,6 +20271,7 @@
     "agents/skills/research-workflow.md",
     "agents/skills/result-artifact-writeout.md",
     "agents/skills/runtime-log-repair.md",
+    "agents/skills/save-experiment-results.md",
     "agents/skills/start-repository.md",
     "agents/skills/structure-planning.md",
     "agents/skills/structure-refactor.md",

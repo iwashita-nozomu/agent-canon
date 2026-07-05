@@ -56,6 +56,8 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - 標準 run artifact は `summary.json`、`cases.jsonl`、topic config snapshot、case artifacts、`visualize_executed.ipynb` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に rerun または明示的な limitation を残します。
 - smoke / formal の入口は project `Makefile` に置く場合も、内側では topic `run.py` をオプションなしで呼びます。
 - formal run は source checkout、既定では `main` で実行し、run 完了後に
+  `save-experiment-results` で retention plan、dirty-source formal-status、
+  overwrite policy、branch reason を固定してから
   `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`
   で結果と report を専用 result branch へ保存します。
 - experiment execution surface を変更する task は、patch 前に
@@ -69,7 +71,9 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
   runner / registry checker behavior を変える場合は
   `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` で確認します。
   formal experiment run は明示された run plan の実行段階で扱います。
-- result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
+- result / report 生成では `save-experiment-results` と
+  `result-artifact-writeout` を使い、raw run output、summary report、manifest、
+  unique run_name、overwrite policy、result branch reason、formal-status を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
 - experiment plan / report の structure contract には OOP 観点を入れます。
   再利用する module / class / function / protocol、各 step が作る object、

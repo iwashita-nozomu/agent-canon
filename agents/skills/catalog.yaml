@@ -274,6 +274,7 @@ skill_families:
     related_skills:
       - tool-finding-report
       - report-writing
+      - save-experiment-results
     routing:
       stage_policy: active
       reason: raw results, reports, manifests, or accumulated evidence must be written out
@@ -851,6 +852,7 @@ skill_families:
     shim: .agents/skills/experiment-lifecycle/SKILL.md
     related_skills:
       - result-artifact-writeout
+      - save-experiment-results
       - structure-planning
       - experiment-review
       - test-design
@@ -867,6 +869,29 @@ skill_families:
         - ["実験", "実行"]
         - ["実験結果"]
         - ["実験", "結果"]
+  - id: save-experiment-results
+    purpose: Save experiment run results with raw artifacts, manifests, reports, and branch-safe publication to dedicated experiment result branches.
+    canonical_doc: agents/skills/save-experiment-results.md
+    shim: .agents/skills/save-experiment-results/SKILL.md
+    related_skills:
+      - experiment-lifecycle
+      - result-artifact-writeout
+      - report-writing
+      - experiment-review
+    routing:
+      stage_policy: active
+      reason: experiment result retention, manifest writeout, overwrite prevention, or result-branch publication is in scope
+      triggers:
+        - ["実験結果", "保存"]
+        - ["実験", "結果", "保存"]
+        - ["実験結果", "残"]
+        - ["実験", "result", "保存"]
+        - ["experiment", "result", "save"]
+        - ["experiment", "result", "publish"]
+        - ["experiment", "result", "branch"]
+        - ["publish", "result", "branch"]
+        - ["formal", "result", "retention"]
+        - ["run", "artifact", "preserve"]
   - id: experiment-review
     purpose: Review experiment topics for direct run.py execution, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md

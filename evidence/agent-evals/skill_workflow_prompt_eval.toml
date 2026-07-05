@@ -6,6 +6,7 @@
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
 # upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
 # upstream design ../../agents/skills/html-output.md explicit HTML output and browser publication skill contract
+# upstream design ../../agents/skills/save-experiment-results.md experiment result saving skill contract
 # upstream design ../../agents/internal-routines/README.md internal routine document owner surface
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
@@ -15,7 +16,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 54
+expected_count = 55
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -40,7 +41,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 55
+expected_count = 56
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -136,6 +137,36 @@ id = "RESULT-WRITEOUT-4"
 critical = true
 description = "Routes reader-facing tool or JSON result reports to report-writing instead of treating writeout as the narrative report skill."
 required_regex = ["reader-facing report", "\\$report-writing", "source packet", "limitations", "quality checklist"]
+
+[[evals]]
+id = "save-experiment-results-skill"
+target = ".agents/skills/save-experiment-results/SKILL.md"
+kind = "skill"
+description = "Experiment result saving must preserve raw run artifacts through branch-safe result retention without overwrite or dirty-source formal loopholes."
+
+[[evals.checklist]]
+id = "SAVE-EXPERIMENT-RESULTS-1"
+critical = true
+description = "Requires a retention plan and result branch evidence before publishing."
+required_regex = ["retention plan", "branch_creation_reason", "result_branch"]
+
+[[evals.checklist]]
+id = "SAVE-EXPERIMENT-RESULTS-2"
+critical = true
+description = "Separates source branches from experiment result branches."
+required_regex = ["source branches/PRs", "experiment-results/<topic>", "publish_result_branch\\.py"]
+
+[[evals.checklist]]
+id = "SAVE-EXPERIMENT-RESULTS-3"
+critical = true
+description = "Prevents overwrite and preserves failed or partial runs."
+required_regex = ["Do not overwrite", "failed", "partial", "not disposable"]
+
+[[evals.checklist]]
+id = "SAVE-EXPERIMENT-RESULTS-4"
+critical = true
+description = "Dirty-source runs cannot become formal success evidence."
+required_regex = ["dirty-source", "not formal success evidence", "not_formal_dirty_source"]
 
 [[evals]]
 id = "tool-finding-report-skill"
