@@ -23,7 +23,8 @@ Responsibilities:
 - produce an implementation-ready document with explicit file-level change intent and validation mapping
 - produce an explicit Implementation Source Packet that tells the worker exactly which artifacts, docs, code paths, and reviews must be read before editing
 - produce an explicit Design Side-Effect Map that connects each major design decision to affected implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces
-- rewrite the design until both detailed design review and document flow review return approve
+- hand the completed design artifact to detailed design review immediately after writing it
+- rewrite the design until detailed design review returns approve, and also satisfy document flow review when that gate is active for reader-facing docs, new terms, public APIs, or workflow surfaces
 
 Rules:
 - prefer reuse-first designs over brand-new abstractions
@@ -39,6 +40,7 @@ Rules:
 - do not leave naming, API shape, path layout, or boundary choices for the worker to invent
 - do not leave the worker to choose between multiple competing designs; record one recommended path
 - do not rely on chat context as implementation input; restate any required decision inside the design artifact
+- after writing or revising the design, stop at the design review handoff and do not proceed to implementation or worker handoff until detailed design review approves the same design artifact
 - if review returns revise, stay in detailed design and repair the document rather than compensating in implementation
 - if review returns escalate, return to planning instead of inventing a local workaround
 - write only design-oriented docs or artifacts when asked

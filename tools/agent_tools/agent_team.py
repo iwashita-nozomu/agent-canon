@@ -118,6 +118,7 @@ CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS = (
     "implementation_source_packet",
     "design_to_implementation_trace",
     "dependency_expanded_scope",
+    "pre_handoff_gate_status",
     "validation_route",
     "review_gate",
 )
@@ -188,6 +189,17 @@ PRE_HANDOFF_SCOPE_STATUS = "seed_then_expand_before_handoff"
 PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
     "allowed_paths と write_scope は surface-route seed、responsibility search、"
     "reuse survey、stale-surface scan、dependency expansion から導く handoff 制約"
+)
+PRE_HANDOFF_GATE_STATUS_SOURCE = (
+    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet and Parent-Direct Context Note"
+)
+PRE_HANDOFF_GATE_STATUS_DEFAULT = "pending_design_review_gate_check"
+PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE = (
+    "current_design_brief",
+    "design_review_artifact_under_review",
+    "design_review_decision_approve",
+    "waterfall_gate_check_design_pass",
+    "document_flow_review_when_active",
 )
 DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
@@ -283,6 +295,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "contract_complete_implementation_policy",
     "standard_wave_sequence",
     "pre_handoff_scope_policy",
+    "pre_handoff_gate_status",
     "default_quality_check_policy",
     "subagent_lifecycle_policy",
     "cross_cutting_document_packet",
@@ -644,6 +657,16 @@ def pre_handoff_scope_policy_output_lines() -> tuple[str, ...]:
         f"PRE_HANDOFF_SCOPE_SOURCE={PRE_HANDOFF_SCOPE_POLICY_SOURCE}",
         f"PRE_HANDOFF_SCOPE_SEQUENCE={','.join(PRE_HANDOFF_SCOPE_SEQUENCE)}",
         f"PRE_HANDOFF_SCOPE_STATUS={PRE_HANDOFF_SCOPE_STATUS}",
+    )
+
+
+def pre_handoff_gate_status_output_lines() -> tuple[str, ...]:
+    """Return machine-readable stdout lines for gate status before handoff."""
+    return (
+        f"PRE_HANDOFF_GATE_STATUS={PRE_HANDOFF_GATE_STATUS_DEFAULT}",
+        f"PRE_HANDOFF_GATE_STATUS_SOURCE={PRE_HANDOFF_GATE_STATUS_SOURCE}",
+        "PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE="
+        f"{','.join(PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE)}",
     )
 
 
@@ -1791,6 +1814,7 @@ def manifest_run_lines(
         *manifest_user_facing_language_policy_lines(),
         *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
+        *manifest_pre_handoff_gate_status_lines(),
         *manifest_repo_tool_routing_policy_lines(spec),
         *manifest_default_quality_check_policy_lines(spec),
         "  agent_report_collection:",
@@ -1923,6 +1947,7 @@ def manifest_run_lines(
         lines.append("      - review_gate")
         lines.append("      - plan_artifact")
         lines.append("      - edit_handoff")
+        lines.append("      - pre_handoff_gate_status")
         lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
         lines.append(
@@ -1936,6 +1961,10 @@ def manifest_run_lines(
         lines.append(
             "      - include run.pre_handoff_scope_policy and dependency-expanded "
             "handoff scope evidence"
+        )
+        lines.append(
+            "      - include run.pre_handoff_gate_status before implementation or "
+            "write-capable handoff when design_brief.md exists"
         )
         lines.append(
             "      - include run.repo_tool_routing_policy selected-skill command sequence, "
@@ -2057,6 +2086,27 @@ def manifest_pre_handoff_scope_policy_lines() -> list[str]:
             "      - write_scope",
             "      - validation_route",
             "      - review_gate",
+        ]
+    )
+    return lines
+
+
+def manifest_pre_handoff_gate_status_lines() -> list[str]:
+    """Render the pre-handoff gate status contract."""
+    lines = [
+        "  pre_handoff_gate_status:",
+        "    enabled: true",
+        f"    source: {PRE_HANDOFF_GATE_STATUS_SOURCE!r}",
+        f"    status: {PRE_HANDOFF_GATE_STATUS_DEFAULT!r}",
+        "    required_evidence:",
+    ]
+    for field in PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE:
+        lines.append(f"      - {field}")
+    lines.extend(
+        [
+            "    design_gate_command: 'python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design'",
+            "    applies_when: design_brief.md_exists_before_implementation_or_handoff",
+            "    document_flow_review: conditional_when_workflow_gate_active",
         ]
     )
     return lines

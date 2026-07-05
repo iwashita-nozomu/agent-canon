@@ -1096,7 +1096,15 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS=request_clause_ids,acceptance_contract,implementation_source_packet,design_to_implementation_trace,dependency_expanded_scope,validation_route,review_gate",
+                "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS=request_clause_ids,acceptance_contract,implementation_source_packet,design_to_implementation_trace,dependency_expanded_scope,pre_handoff_gate_status,validation_route,review_gate",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_GATE_STATUS=pending_design_review_gate_check",
+                result.stdout,
+            )
+            self.assertIn(
+                "PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE=current_design_brief,design_review_artifact_under_review,design_review_decision_approve,waterfall_gate_check_design_pass,document_flow_review_when_active",
                 result.stdout,
             )
             self.assertIn(
@@ -1258,6 +1266,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 contract_complete_implementation_policy["required_inputs"],
             )
             self.assertIn(
+                "pre_handoff_gate_status",
+                contract_complete_implementation_policy["required_inputs"],
+            )
+            self.assertIn(
                 "mvp",
                 contract_complete_implementation_policy["route_signals"],
             )
@@ -1375,6 +1387,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn(
                 "pre_handoff_scope_policy",
+                handoff_context_policy["common_prompt_must_include"],
+            )
+            self.assertIn(
+                "pre_handoff_gate_status",
                 handoff_context_policy["common_prompt_must_include"],
             )
             self.assertIn(
@@ -2087,6 +2103,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
+                (
+                    "include run.pre_handoff_gate_status before implementation or "
+                    "write-capable handoff when design_brief.md exists"
+                ),
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
                 "include run.repo_tool_routing_policy selected-skill command sequence, dynamic skill candidates, and tool evidence in every handoff packet",
                 delegated_spawn_policy["required_before_spawn"],
             )
@@ -2104,6 +2127,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn(
                 "edit_handoff", delegated_spawn_policy["handoff_required_fields"]
+            )
+            self.assertIn(
+                "pre_handoff_gate_status",
+                delegated_spawn_policy["handoff_required_fields"],
             )
             first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
             self.assertEqual(
@@ -2158,6 +2185,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("allowed_paths", common_prompt_fields)
             self.assertIn("do_not_read", common_prompt_fields)
             self.assertIn("expected_output_schema", common_prompt_fields)
+            self.assertIn("pre_handoff_gate_status", common_prompt_fields)
+            pre_handoff_gate_status = manifest["run"]["pre_handoff_gate_status"]
+            self.assertEqual(
+                pre_handoff_gate_status["status"],
+                "pending_design_review_gate_check",
+            )
+            self.assertIn(
+                "design_review_decision_approve",
+                pre_handoff_gate_status["required_evidence"],
+            )
             for role in cast("list[object]", manifest["roles"]):
                 role_map = cast("dict[str, object]", role)
                 prompt_contract = cast(

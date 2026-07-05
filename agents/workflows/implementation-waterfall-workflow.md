@@ -86,8 +86,9 @@ README、workflow、guide、migration、specification など file responsibility
 1. 最終受け入れ review
 1. audit / gate close
 
-`Scoped Change` のような bounded 差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
-また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
+`Scoped Change` のような bounded 差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビューを省略しません。
+文書通読レビューは reader-facing docs、新用語、公開 API、workflow surface がある場合の active gate として扱います。
+また、`計画レビュー`、`詳細設計レビュー`、active な `文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 behavior-changing、regression-prone、または high-risk code pass では、実装前に
 `test_designer` を独立に立て、static path と nasty case を test plan として固定します。
 contract-only wrapper pass では、static contract validation と canonical checker command を validation evidence にします。
@@ -99,7 +100,7 @@ contract-only wrapper pass では、static contract validation と canonical che
 次段へ進む前の機械チェックは次を使います。
 
 ```bash
-make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <requirements|plan|design|test|implementation|final>"
+make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <requirements|plan|design|document_flow|test|implementation|final>"
 ```
 
 `WATERFALL_GATE_READY=no` の場合は、`NEXT_ACTION` に出た owner stage へ戻し、空テンプレート、未承認 review、未記入 artifact を直してから再実行します。
@@ -121,7 +122,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - stage 順序、handoff、rollback、validation sequence が hidden step なしで実行できる
   - review 分離と parent-managed write-scope discipline が崩れていない
 
-### Cycle B. 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー
+### Cycle B. 詳細設計 -> 設計そのもののレビュー -> 文書通読レビュー
 
 - 対象:
   - Gate 5 詳細設計
@@ -131,9 +132,15 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `designer`
 - reviewers:
   - `design_reviewer`
-  - `document_flow_reviewer`
+  - active gate の場合は `document_flow_reviewer`
 - 反復規則:
-  - `design_review.md` または `document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
+  - Gate 5 で詳細設計を作成した直後に Gate 6 を通します。設計文書は
+    書かれただけでは承認済みではありません
+  - Gate 6 は実装 diff ではなく、Gate 5 で作られた同一の詳細設計文書
+    そのものを review 対象にし、`design_review.md` に design artifact path
+    と対象 revision / section を記録します
+  - `design_review.md` の decision が `approve` でない限り Gate 5 に戻します
+  - 文書通読レビューが active gate の場合は、`document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
   - `revise` は Gate 5 へ戻します
   - `escalate` は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
@@ -148,15 +155,15 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 ### Cycle C. 実装 -> 実装 checkpoint review
 
 - 対象:
-  - Gate 9 実装
-  - Gate 10 実装 checkpoint review
+  - Gate 8 実装
+  - Gate 8 内の実装 checkpoint review
 - owner:
   - `implementer`
 - reviewer:
   - `change_reviewer`
 - 反復規則:
-  - `change_review.md` の decision が `approve` でない限り Gate 9 に戻します
-  - `revise` は Gate 9 へ戻します
+  - `change_review.md` の decision が `approve` でない限り Gate 8 に戻します
+  - `revise` は Gate 8 へ戻します
   - `revise`、`required_change`、または rejected slice への応答は、同じ
     request clause と approved design intent を保つ修正として行います
   - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
@@ -394,7 +401,7 @@ exit 条件:
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Abstract Design Frame` には、実装対象 file や直近 finding へ絞る前の抽象責務、概念 graph または layer model、非対象、将来拡張 layer、評価軸、既存正本との関係を列挙します。`File-By-File Design`、`Design-To-Implementation Trace`、validation はこの frame から導きます
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
-- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、active な場合の `document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
 - `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、validation / test-plan item に接続します
 - `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
@@ -409,6 +416,8 @@ exit 条件:
 - worker が naming、API shape、path layout、boundary choice を発明しなくてよい状態まで詳細設計を詰めます
 - worker が会話文脈や記憶を実装入力にしなくてよい状態まで、必要な判断を設計文書内に再掲します
 - worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
+- Gate 5 が詳細設計を作成したら、designer は実装や worker handoff へ進まず
+  `design_review_required=yes` として Gate 6 に渡します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
@@ -431,6 +440,7 @@ exit 条件:
 ### Gate 6. 詳細設計レビュー
 
 目的:
+- Gate 5 で作成された詳細設計文書そのものを、実装前に独立 review する
 - 詳細設計文書の十分性と、reuse-first / style-following が担保されているか確認する
 
 主担当:
@@ -445,6 +455,11 @@ exit 条件:
 
 必須レビュー:
 - `design_reviewer`
+  - `design_review.md` の `Design Artifact Under Review` に、対象の
+    `design_brief.md` path、対象 revision / section、review した source packet
+    を記録する
+  - implementation diff、worker summary、または parent の会話要約ではなく、
+    Gate 5 の詳細設計文書そのものを判定対象にする
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
   - `Abstract Design Frame` が実装対象 file、既存 helper、current finding より先に抽象責務、概念 model、非対象、将来 layer、評価軸、既存正本との関係を固定し、そこから実装 slice を導いているか確認する
   - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
@@ -464,6 +479,11 @@ exit 条件:
 
 ルール:
 - `詳細設計レビュー` は計画レビューより重い gate とします
+- `design_review.md` の decision が `approve` になるまで、実装、worker
+  handoff、implementation checkpoint review、または設計を前提にした
+  follow-up task へ進みません
+- 承認は latest design artifact にだけ有効です。Gate 5 で設計を修正したら、
+  旧 `approve` を流用せず Gate 6 を再実行します
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
@@ -559,12 +579,15 @@ exit 条件:
   `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
   `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` are
   recorded.
+- Gate 8 cannot start from a detailed design until `pre_handoff_gate_status`
+  records the current design artifact, `design_review.md decision=approve`, and
+  `waterfall-gate-check --gate design` pass evidence.
 - Parent-Direct Context Note is a routing / handoff artifact, not edit
   authorization. Once edit scope is known, launch or schedule `spark_worker` /
   `worker`; if blocked, record `WRITE_SUBAGENT_AUTHORIZATION=required` or
   `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
-- 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します
+- 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、active な場合の `document_flow_review.md`、`test_plan.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
 - 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
@@ -746,7 +769,8 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - Gate 0 から Gate 10 をそのまま 1 pass で通します
 - artifact は軽くて構いませんが、要件整理、計画、詳細設計、各 review の区別は崩しません
-- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を軽量版として必ず有効化します
+- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer` を軽量版として必ず有効化します
+- `document_flow_reviewer` は reader-facing docs、新用語、公開 API、workflow surface がある場合に有効化します
 
 ### Research-Driven Change
 

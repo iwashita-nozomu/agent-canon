@@ -217,6 +217,10 @@ routing / handoff artifact として扱い、edit authorization は別 gate で�
 を直接編集するには、同じ責務 model に加えて
 `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
 `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` が必要です。
+Gate 5 で作成された設計文書は、作成直後に Gate 6 の detailed design review を
+受けます。`design_review.md` が同一の design artifact path と対象 revision /
+section を `approve` した後に、その設計を implementation handoff、worker input、
+または follow-up 実装判断の根拠にします。
 
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
@@ -529,7 +533,7 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer`、`test_designer` を標準構成とします。
+full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer`、`test_designer` を標準構成とします。
 owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
 Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`spark_worker`、`worker` を workflow family に応じて stage ごとに明示します。
 Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
@@ -657,11 +661,17 @@ cost を無視して review coverage を優先する run では、research-drive
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path、test plan を読了する
+- 実装前に `design_review.md` を読み、`Design Artifact Under Review` が
+  現在の `design_brief.md` を指し、decision が `approve` であることを確認する。
+  設計を修正した後は Gate 6 で現行設計の approve を取り直す
+- 詳細設計 artifact がある run では、write-capable handoff と parent-direct
+  exception の前に `pre_handoff_gate_status` へ `design_review.md decision=approve`
+  と `waterfall-gate-check --gate design` pass evidence を記録する
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、test plan item、request clause ID です
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
-- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
+- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
