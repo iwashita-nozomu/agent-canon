@@ -10,14 +10,49 @@
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
+RUNTIME_PROFILE_INVENTORY = (
+    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+)
+
+
+class EvaluateAgentRunModule(Protocol):
+    """Loaded evaluate_agent_run constants used by regression tests."""
+
+    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES: frozenset[str]
+    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES: frozenset[str]
+
+
+def load_evaluate_module() -> EvaluateAgentRunModule:
+    """Load evaluate_agent_run.py for constant-level regression checks."""
+    sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+    try:
+        spec = importlib.util.spec_from_file_location("evaluate_agent_run", SCRIPT)
+        if spec is None or spec.loader is None:
+            raise AssertionError("failed to load evaluate_agent_run module spec")
+        module = importlib.util.module_from_spec(spec)
+        prior_module = sys.modules.get(spec.name)
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+            return cast(EvaluateAgentRunModule, module)
+        finally:
+            if prior_module is None:
+                sys.modules.pop(spec.name, None)
+            else:
+                sys.modules[spec.name] = prior_module
+    finally:
+        sys.path.pop(0)
 
 
 def write_lines(path: Path, lines: list[str]) -> None:
@@ -135,6 +170,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
                 "- tool_call=oop-readability-check code_checker=pass "
                 "checker=oop-readability scope=changed-paths"
             ),
+            "- validation_failure_not_observed reason=unit-test-run-bundle",
             (
                 "- execution_path_comparison=pass execution_path=reuse-first "
                 "route_efficiency=efficient selected_inefficient_route=no"
@@ -236,6 +272,21 @@ def write_ready_run(report_dir: Path) -> None:
 
 class EvaluateAgentRunTest(unittest.TestCase):
     """Verify the run evaluation helper."""
+
+    def test_validation_failure_taxonomy_comes_from_runtime_inventory(self) -> None:
+        """Validation-failure slugs should be owned by the JSON inventory."""
+        data = json.loads(RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8"))
+        response = data["validation_failure_response"]
+        module = load_evaluate_module()
+
+        self.assertEqual(
+            module.VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
+            frozenset(response["cause_classes"]),
+        )
+        self.assertEqual(
+            module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
+            frozenset(response["intent_preservation"]),
+        )
 
     def test_evaluate_ready_run_writes_pass_report(self) -> None:
         """A complete run should receive a passing agent evaluation."""
@@ -761,6 +812,482 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("code checker results", result.stdout.lower())
+
+    def test_evaluate_unresolved_implementation_bug_checker_failure_revises(
+        self,
+    ) -> None:
+        """Same-intent implementation-bug checker failures require a later pass."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed tool_call=pyright "
+                        "code_checker=fail failing_contract=type-check "
+                        "observation_level=public-cli-output "
+                        "cause_classification=implementation_bug "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("pyright still reports code_checker=fail", result.stdout)
+            self.assertIn("repair_same_intent", result.stdout)
+
+    def test_evaluate_checker_failure_passes_after_later_same_checker_pass(
+        self,
+    ) -> None:
+        """A same-check pass after repair resolves the checker failure route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed tool_call=pyright "
+                        "code_checker=fail failing_contract=type-check "
+                        "observation_level=public-cli-output "
+                        "cause_classification=implementation_bug "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md\n"
+                        "- tool_call=pyright code_checker=pass checker=pyright "
+                        "scope=repo-wide evidence=reports/agents/run/pyright-after.txt"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
+
+    def test_evaluate_pre_existing_checker_failure_passes_with_residual_evidence(
+        self,
+    ) -> None:
+        """Explicit residual failures may pass when evidence routes them away."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed tool_call=pyright "
+                        "code_checker=fail failing_contract=type-check "
+                        "observation_level=public-cli-output "
+                        "cause_classification=pre_existing_unrelated_failure "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/residual.md"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
+
+    def test_evaluate_oracle_weakening_without_failure_response_revises(self) -> None:
+        """Oracle weakening tokens require complete failure response evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    "- check_failure=observed code_checker=fail oracle_weakening=yes",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("failing_contract", result.stdout)
+
+    def test_evaluate_validation_not_observed_then_checker_failure_fails(
+        self,
+    ) -> None:
+        """A later checker failure contradicts validation_failure_not_observed."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "tool_call=pyright code_checker=pass",
+                    "tool_call=pyright code_checker=fail",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("validation_failure_not_observed", result.stdout)
+            self.assertIn("later failure evidence", result.stdout)
+
+    def test_evaluate_later_validation_failure_without_packet_revises(
+        self,
+    ) -> None:
+        """Every observed validation failure needs its own evidence packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=fixture_environment_issue "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md\n"
+                        "- validation_status=fail"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("failing_contract=", result.stdout)
+            self.assertIn("observation_level=", result.stdout)
+
+    def test_evaluate_later_checker_failure_without_packet_revises(
+        self,
+    ) -> None:
+        """A later code_checker=fail without the five fields remains blocking."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed tool_call=pyright "
+                        "code_checker=fail failing_contract=type-check "
+                        "observation_level=public-cli-output "
+                        "cause_classification=fixture_environment_issue "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md\n"
+                        "- tool_call=ruff code_checker=fail checker=ruff "
+                        "scope=repo-wide"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("ruff code_checker=fail missing validation-failure", result.stdout)
+            self.assertIn("intent_preservation=<canonical_slug>", result.stdout)
+
+    def test_evaluate_missing_validation_failure_observation_fails(self) -> None:
+        """The validation failure criterion needs an explicit observation state."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("validation_failure_not_observed", result.stdout)
+            self.assertIn("observed validation failure token", result.stdout)
+
+    def test_evaluate_oracle_weakening_with_same_intent_repair_fails(self) -> None:
+        """Forbidden oracle weakening is not justified by same-intent repair."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=implementation_bug "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md "
+                        "oracle_weakening=attempted"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("oracle_weakening=", result.stdout)
+            self.assertIn("escalate_design_conflict", result.stdout)
+
+    def test_evaluate_forbidden_validation_repairs_fail_without_escalation(
+        self,
+    ) -> None:
+        """Deletion, simplification, and validation downscope require escalation."""
+        forbidden_tokens = ("test_deleted=", "behavior_simplified=", "validation_downscope=")
+        for token in forbidden_tokens:
+            with self.subTest(token=token), tempfile.TemporaryDirectory() as tmp_dir:
+                report_dir = Path(tmp_dir) / "run"
+                write_ready_run(report_dir)
+                monitoring_path = report_dir / "workflow_monitoring.md"
+                monitoring = monitoring_path.read_text(encoding="utf-8")
+                monitoring_path.write_text(
+                    monitoring.replace(
+                        "- validation_failure_not_observed reason=unit-test-run-bundle",
+                        (
+                            "- check_failure=observed failing_contract=pytest "
+                            "observation_level=public_cli "
+                            "cause_classification=implementation_bug "
+                            "intent_preservation=repair_same_intent "
+                            "evidence=reports/agents/run/cause.md "
+                            f"{token}attempted"
+                        ),
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--report-dir",
+                        str(report_dir),
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(token, result.stdout)
+                self.assertIn("approved_design_user_request_conflict", result.stdout)
+
+    def test_evaluate_explicit_design_conflict_escalation_allows_oracle_change(
+        self,
+    ) -> None:
+        """Escalated design/user conflict may carry an oracle-change token."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=approved_design_user_request_conflict "
+                        "intent_preservation=escalate_design_conflict "
+                        "evidence=reports/agents/run/design_escalation.md "
+                        "oracle_weakening=escalated"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
+
+    def test_evaluate_mixed_escalation_does_not_allow_later_test_deletion(
+        self,
+    ) -> None:
+        """Escalation applies only to forbidden tokens in the same event."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "- validation_failure_not_observed reason=unit-test-run-bundle",
+                    (
+                        "- check_failure=observed failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=approved_design_user_request_conflict "
+                        "intent_preservation=escalate_design_conflict "
+                        "evidence=reports/agents/run/design_escalation.md "
+                        "oracle_weakening=escalated\n"
+                        "- check_failure=observed failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=implementation_bug "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run/cause.md "
+                        "test_deleted=attempted"
+                    ),
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("test_deleted=", result.stdout)
+            self.assertIn("same event", result.stdout)
 
     def test_evaluate_incomplete_run_fails_with_feedback(self) -> None:
         """Missing evidence should create fix-now feedback actions."""

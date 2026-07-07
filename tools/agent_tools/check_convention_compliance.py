@@ -601,6 +601,24 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "behavior-owned cases",
     ),
 }
+VALIDATION_FAILURE_RESPONSE_MARKERS = {
+    "agents/skills/test-design.md": (
+        "failing contract",
+        "observation level",
+        "cause classification",
+        "approved intent",
+        "escalation",
+        "oracle weakening",
+    ),
+    ".agents/skills/test-design/SKILL.md": (
+        "failing contract",
+        "observation level",
+        "failure cause",
+        "approved intent",
+        "escalate",
+        "oracle weakening",
+    ),
+}
 MATHEMATICAL_NECESSITY_MARKERS = {
     "documents/conventions/common/05_docs.md": (
         "mathematical necessity gate",
@@ -1888,6 +1906,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
     findings.extend(check_test_contract_routing(root))
+    findings.extend(
+        collect_marker_contract_findings(
+            root,
+            "validation_failure_response",
+            VALIDATION_FAILURE_RESPONSE_MARKERS,
+        )
+    )
     findings.extend(check_mathematical_necessity_gate(root))
     findings.extend(check_implementation_guardrails(root))
     findings.extend(check_refactor_sequence(root))

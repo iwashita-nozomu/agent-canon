@@ -137,6 +137,13 @@ install_json_cli_tools() {
   apt_install jq
 }
 
+install_structure_inspection_tools() {
+  if command -v tree >/dev/null 2>&1; then
+    return
+  fi
+  apt_install tree
+}
+
 install_tex_tooling() {
   if command -v latexmk >/dev/null 2>&1 \
     && command -v pdflatex >/dev/null 2>&1 \
@@ -485,6 +492,7 @@ install_github_cli
 install_codex_cli
 install_browser_validation_tooling
 install_json_cli_tools
+install_structure_inspection_tools
 install_tex_tooling
 install_lean_toolchain
 install_secret_scanners
@@ -492,6 +500,7 @@ install_agent_canon_cli
 install_llama_cpp
 build_structured_analysis_cache
 jq --version
+tree --version
 latexmk --version | sed -n '1p'
 pdflatex --version | sed -n '1p'
 xelatex --version | sed -n '1p'

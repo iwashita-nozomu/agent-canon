@@ -82,7 +82,8 @@ Authority / blocker notes:
 - [ ] Template / derived repo follow-up, if needed, will use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
 - [ ] The source of truth was edited in AgentCanon, not only through a derived repo root view.
 - [ ] New shared surfaces are listed in `documents/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
-- [ ] Root-copy surfaces are synchronized through `bash tools/sync_agent_canon.sh link-root` when applicable.
+- [ ] `agentcanon_structure_followup=required` was recorded for this AgentCanon source / synced-surface change.
+- [ ] `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` passed from the template / derived parent root, or this source PR records the parent pin/root-view PR that must provide `agentcanon_structure_followup=pass`.
 - [ ] No derived-repo project-specific policy leaked into AgentCanon.
 
 ## Plan Mode Evidence
@@ -119,6 +120,7 @@ Issue / edit-scope evidence:
 
 ## Validation Evidence
 
+- [ ] Validation failure response, if any, cites the owner contract in `agents/canonical/CODEX_WORKFLOW.md` or `documents/runtime-profiles-and-check-matrix.md` and records same-intent repair / escalation evidence.
 - [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`
 - [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_graph.tsv" --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
@@ -152,6 +154,7 @@ paste the key pass lines here
 - [ ] AgentCanon GitHub `main` will be updated first.
 - [ ] Template `vendor/agent-canon` pin will be updated after AgentCanon merge.
 - [ ] Template / derived repo will bring the change back with `make agent-canon-ensure-latest` and `bash tools/sync_agent_canon.sh link-root`, not by direct `sync_agent_canon.sh push`.
+- [ ] Template / derived repo follow-up will record `agentcanon_structure_followup=pass` after `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check`.
 - [ ] Template `.gitmodules` impact was reviewed when URL, branch, or checkout behavior is affected.
 - [ ] Local bare mirror, if used, is compatibility-only and not the latest source of truth.
 - [ ] Derived repos that need the update are listed or intentionally deferred.
@@ -164,6 +167,7 @@ paste the key pass lines here
 - AgentCanon GitHub SHA:
 - expected template submodule SHA:
 - submodule pin changed / unchanged rationale:
+- `agentcanon_structure_followup=`:
 
 ## Review Focus
 

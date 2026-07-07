@@ -334,6 +334,14 @@ validation を使います。
    static validation を実行し、次 wave の plan を更新します。最初に作った
    parallel plan を、root 修正後の validation signal を見ずに最後まで使い回しては
    いけません。
+1. refactor validation が fail した場合は、behavior-preserving intent の変更、
+   pass 目的の単純化、revert、intended behavior / test 削除、oracle weakening、
+   validation downscope へ進む前に `failing_contract`、`observation_level`、
+   `cause_classification`、`intent_preservation`、`evidence` を記録します。
+   implementation bug は `Forbidden Semantic Delta` を保って修復し、oracle / spec、
+   fixture / environment / stale artifact、unrelated failure、approved-design /
+   user-request conflict は owner route、residual、または escalation として次 wave
+   plan に反映します。
 
 ## Subagent Routing
 

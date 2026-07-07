@@ -33,6 +33,7 @@ skill, or routine that calls it.
 | Docs review routines | `docs-completeness-review.md`, `docs-consistency-review.md` | `$document-canon-cleanup`, `$md-style-check` |
 | Research routines | `experiment-change-loop.md`, `experiment-workflow.md`, `research-perspective-review.md` | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
 | Runtime and validation adapters | `artifact-placement.md`, `codex-cli.md`, `static-check.md`, `static-validation.md`, `project-health.md`, `from_another_agent.md` | workflow stages, tool checks, and project review |
+| Subagent startup routines | `subagent-startup.md` | `$subagent-bootstrap`, `route.py --area agents` |
 
 ## Contract
 

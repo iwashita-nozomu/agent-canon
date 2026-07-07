@@ -19,8 +19,10 @@ import heapq
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
+import tempfile
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -176,6 +178,7 @@ SPLIT_PARAGRAPH_SENTENCE_LIMIT = 3
 MERGE_PARAGRAPH_MIN_OVERLAP = 0.18
 EXPLANATION_CLAIM_LIMIT = 5
 EXPLANATION_DISCOURSE_EDGE_LIMIT = 6
+DISPLAY_MATH_EMPTY_DELIMITER_LENGTH = 4
 EXPLANATION_DIAGNOSTIC_LIMIT = 8
 EXPLANATION_OPERATION_LIMIT = 6
 PHASE_ORDER = (
@@ -1229,9 +1232,22 @@ def local_llm_prose_ir_payload(
     for terms_file in cast(list[Path], getattr(args, "terms_file", [])):
         command.extend(["--terms-file", str(terms_file.resolve())])
     command.extend(str(path.resolve()) for path in input_paths)
+    command_env = os.environ.copy()
+    command_env.setdefault("CARGO_TARGET_DIR", str(Path(tempfile.gettempdir()) / "agent-canon-local-llm-target"))
+    cargo = shutil.which("cargo", path=command_env.get("PATH"))
+    if cargo:
+        cargo_path = Path(cargo).resolve()
+        if cargo_path.parent.name == "bin" and cargo_path.parent.parent.name == ".cargo":
+            cargo_home = cargo_path.parent.parent
+            rustup_home = cargo_home.parent / ".rustup"
+            command_env.setdefault("CARGO_HOME", str(cargo_home))
+            if rustup_home.is_dir():
+                command_env.setdefault("RUSTUP_HOME", str(rustup_home))
+    command_env.setdefault("RUSTUP_TOOLCHAIN", "stable")
     result = subprocess.run(
         command,
         cwd=repo_root,
+        env=command_env,
         check=False,
         capture_output=True,
         text=True,
@@ -1262,10 +1278,11 @@ def local_llm_root(args: argparse.Namespace, input_path: Path) -> Path:
 
 def agent_canon_cli(repo_root: Path) -> Path | str:
     """Return the preferred AgentCanon Rust CLI entrypoint."""
+    override = os.environ.get("AGENT_CANON_CLI", "").strip()
+    if override:
+        return override
+
     candidates = [
-        repo_root / "rust" / "agent-canon" / "target" / "debug" / "agent-canon",
-        Path.cwd() / "rust" / "agent-canon" / "target" / "debug" / "agent-canon",
-        Path.cwd() / "vendor" / "agent-canon" / "rust" / "agent-canon" / "target" / "debug" / "agent-canon",
         repo_root / "tools" / "bin" / "agent-canon",
         Path.cwd() / "tools" / "bin" / "agent-canon",
         Path.cwd() / "vendor" / "agent-canon" / "tools" / "bin" / "agent-canon",
@@ -2521,7 +2538,11 @@ def is_structured_presentation_block(text: str) -> bool:
 def is_display_math_block(text: str) -> bool:
     """Return true for standalone Markdown display math blocks."""
     stripped = text.strip()
-    return stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) > 4
+    return (
+        stripped.startswith("$$")
+        and stripped.endswith("$$")
+        and len(stripped) > DISPLAY_MATH_EMPTY_DELIMITER_LENGTH
+    )
 
 
 def safe_identifier(value: str) -> str:

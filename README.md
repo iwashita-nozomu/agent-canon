@@ -201,6 +201,59 @@ Template や派生 repo では `vendor/agent-canon/` を source of truth にし�
 root の入口は symlink view または明示的な synced copy にします。Template /
 derived repo に露出する root view は次です。
 
+期待する parent root の top-level shape は次です。`vendor/agent-canon/` が
+AgentCanon source of truth で、root の共有入口は symlink view または GitHub
+path constraint のための checked copy に限定します。regular file / directory
+は parent repo が ownership を持つ project surface です。
+
+```text
+<parent-root>/
+├── AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md
+├── README.md
+├── QUICK_START.md
+├── Makefile
+├── goal.md
+├── responsibility-scope.toml
+├── .agent-canon/
+│   └── update-state.toml
+├── .agents -> vendor/agent-canon/.agents
+├── .codex/
+│   ├── agents -> ../vendor/agent-canon/.codex/agents
+│   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
+│   ├── project-config.toml  # optional parent-owned skill overlay
+│   └── project-skills/  # optional parent-owned additions
+├── .devcontainer -> vendor/agent-canon/.devcontainer
+├── .github/
+│   ├── AGENTS.md -> ../vendor/agent-canon/.github/AGENTS.md
+│   ├── PULL_REQUEST_TEMPLATE/
+│   │   └── agent_canon.md  # GitHub path-constrained copy
+│   ├── scripts/
+│   │   └── checkout_agent_canon_submodule.sh  # GitHub path-constrained copy
+│   └── workflows/
+│       ├── agent-coordination.yml  # GitHub path-constrained copy
+│       ├── agent-canon-static-gates.yml
+│       ├── ci.yml
+│       └── docker-build.yml
+├── .vscode -> vendor/agent-canon/.vscode
+├── agents -> vendor/agent-canon/agents
+├── documents/
+│   └── <parent-owned active contracts>
+├── docker/
+├── scripts/
+├── tools -> vendor/agent-canon/tools
+└── vendor/
+    └── agent-canon/
+```
+
+人間向けの構造確認は `tree` 表示を正本の見方にします。典型的な確認は次です。
+`parent_repo_readiness.py` は同じ ignore pattern と depth を表示し、`tree`
+がない環境では warning として扱います。
+
+```bash
+tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <parent-root>
+python3 tools/agent_tools/parent_repo_readiness.py --root <parent-root> --tree-depth <depth>
+```
+
 - `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、docs の正本。
 - `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
@@ -217,6 +270,8 @@ derived repo に露出する root view は次です。
 - `.github/workflows/agent-canon-static-gates.yml`: standalone AgentCanon PR / push で tool catalog、tool drift、dependency review、workflow convention、container config の軽量 gate を走らせる workflow。
 - `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。
+- `.codex/project-config.toml`: optional な parent-owned skill overlay。repo 固有 skill はここで `[[skills.config]] path = "project-skills/<skill>/SKILL.md"` として有効化します。
+- `.codex/project-skills/`: optional な parent-owned skill 追加置き場。AgentCanon shared skill discovery の正本にはしません。
 
 repo-local の正本として残すもの:
 

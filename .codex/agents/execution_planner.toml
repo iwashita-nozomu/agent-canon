@@ -35,6 +35,7 @@ Rules:
 - record all planned work units and the rule that a unit, chunk, slice, checkpoint, or subpass is not user-facing completion
 - define the exact condition for all_planned_chunks_complete and overall_delivery_complete before implementation begins
 - if multiple write-capable agents would touch overlapping paths, mark the plan invalid and require parent scope split or current-checkout wave serialization; do not route around overlap by creating or using separate worktrees
+- include a validation-failure-response step that points to `agents/canonical/CODEX_WORKFLOW.md` and `documents/runtime-profiles-and-check-matrix.md` instead of restating the taxonomy in the plan
 - if plan review returns revise, stay in planning and rewrite the plan instead of pushing ambiguity downstream
 - if plan review returns escalate, send the pass back to requirements or research rather than patching around the gap
 - do not collapse planning and design into one step

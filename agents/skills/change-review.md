@@ -53,6 +53,13 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、`--changed` だけで済ませていない
 - 回帰、欠落テスト、stale documentation を優先して見ている
 - 必要な validation が走っているか、未実行なら明記している
+- validation failure を受けた修正では、pass 目的の単純化、revert、intended
+  behavior / test 削除、oracle weakening、validation downscope が入る前に
+  `failing_contract`、`observation_level`、`cause_classification`、
+  `intent_preservation`、`evidence` が記録されているかを確認する。
+  `intent_preservation` は same-intent repair / escalation route を示す。finding は
+  approved intent を保持する repair、test / design evidence 修正、owner route、
+  residual route、または escalation に接続する
 - blanket revert / discard を既定の required action にしない。revert /
   discard を求める場合は、該当 clause が撤回または置換された、canonical
   owner 外だった、または危険で同じ意図の代替修正や escalation に接続した

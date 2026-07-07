@@ -60,6 +60,41 @@ Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,
 and dependency checks selected by the active profile; they do not automatically
 escalate to full `make ci`.
 
+## Validation Failure Response
+
+After any validation test/check failure, do not simplify, revert, delete intended behavior/tests, weaken the oracle, or downscope required validation just to pass.
+First record the five machine fields: `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`.
+This runtime-profile inventory JSON is the canonical validation-failure-response taxonomy owner. `documents/runtime-profiles-and-check-matrix.md` is the generated reader projection, while `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, `agents/TASK_WORKFLOWS.md`, and `documents/REVIEW_PROCESS.md` are workflow, handoff, reader-map, or checklist projections that must cite this inventory instead of defining separate slug lists.
+Repair with approved intent preserved or escalate before intent change.
+
+Required machine fields:
+
+- `failing_contract`
+- `observation_level`
+- `cause_classification`
+- `intent_preservation`
+- `evidence`
+
+Valid `cause_classification` values are:
+
+- `implementation_bug`
+- `test_oracle_spec_mismatch`
+- `fixture_environment_issue`
+- `stale_generated_artifact`
+- `pre_existing_unrelated_failure`
+- `approved_design_user_request_conflict`
+
+Valid `intent_preservation` values are:
+
+- `repair_same_intent`
+- `redesign_same_intent`
+- `escalate_design_conflict`
+
+Intent preservation routes:
+
+- repair_same_intent: repair the owning code, config, docs, workflow, fixture, environment, generated artifact, test oracle, or residual evidence route while preserving approved intent
+- redesign_same_intent: return to design/test planning while preserving the same approved intent
+- escalate_design_conflict: escalate approved-design/user-request conflict before any intent change
 
 ## Check Matrix
 

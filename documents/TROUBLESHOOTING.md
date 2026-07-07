@@ -16,6 +16,14 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 - `make ci-quick` を再実行して、どの段階で落ちているかを切り分けます。
 - Python 関連なら `docker/requirements.txt` と設定ファイルの不整合を確認します。
 - 文書関連なら `tools/bin/agent-canon docs check` を流します。
+- validation test/check failure では、通すために intended behavior/test を削る、
+  oracle を弱める、required validation を縮める、または blanket revert で済ませる
+  ことを禁止します。先に `failing_contract`、`observation_level`、
+  `cause_classification`、`intent_preservation`、`evidence` を記録します。
+- `cause_classification` と `intent_preservation` の slug set は
+  `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、
+  `agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。
+  approved intent を保って修正するか、intent 変更前に escalation します。
 
 ## Docker build が通らない
 

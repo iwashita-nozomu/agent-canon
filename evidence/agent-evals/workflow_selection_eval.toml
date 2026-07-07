@@ -9,8 +9,8 @@
 
 catalog_kind = "agent_canon_workflow_selection_eval"
 version = 2
-expected_case_count = 500
-expected_generated_case_count = 500
+expected_case_count = 525
+expected_generated_case_count = 525
 
 [[case_groups]]
 id = "routing-advisory"
@@ -73,6 +73,27 @@ subjects = [
   "archive path resolver",
   "workflow monitor status",
   "dependency review summary",
+]
+
+[[case_groups]]
+id = "validation-failure-cause-analysis"
+description = "Failed validation prompts should route to same-intent implementation repair with test design secondary."
+expected_workflows = ["codex-task-workflow"]
+expected_skills = ["codex-task-workflow"]
+limit = 25
+prompt_templates = [
+  "{subject} が failing です。tests を削除せず oracle を弱めず、failing contract を先に診断して",
+  "{subject} failed validation; do not delete tests or weaken oracles just to pass",
+  "{subject} の validation failure は cause_classification と same-intent repair evidence を残して直して",
+  "Tests are failing in {subject}; diagnose the failing contract before write-capable repair",
+  "{subject} の test failure は oracle weakening ではなく preserved-intent repair で扱って",
+]
+subjects = [
+  "route.py",
+  "workflow_monitor.py",
+  "hook guard",
+  "task closeout",
+  "manifest validation",
 ]
 
 [[case_groups]]

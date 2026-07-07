@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
 EXPECTED_SKILL_SHIM_COUNT = 55
 EXPECTED_HUMAN_SKILL_DOC_COUNT = 56
-EXPECTED_INTERNAL_ROUTINE_DOC_COUNT = 20
+EXPECTED_INTERNAL_ROUTINE_DOC_COUNT = 21
 EXPECTED_WORKFLOW_DOC_COUNT = 21
 EXPECTED_CANONICAL_DOC_COUNT = 6
 EXPECTED_CODEX_AGENT_PROMPT_COUNT = 33
@@ -140,6 +140,30 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             "agent-orchestration-skill-call-routing",
             "codex-task-workflow-convention-gate",
         ):
+            checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
+            self.assertTrue(all(bool(item["critical"]) for item in checklists))
+
+    def test_default_manifest_includes_validation_failure_response_eval_coverage(
+        self,
+    ) -> None:
+        """The canonical manifest covers test-design validation failure response."""
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, object]], data["evals"])
+        by_id = {str(entry["id"]): entry for entry in evals}
+
+        for eval_id, target_glob in (
+            (
+                "test-design-validation-failure-response-shim",
+                ".agents/skills/test-design/SKILL.md",
+            ),
+            (
+                "test-design-validation-failure-response-doc",
+                "agents/skills/test-design.md",
+            ),
+        ):
+            self.assertEqual(by_id[eval_id]["target_glob"], target_glob)
+            self.assertEqual(by_id[eval_id]["expected_count"], 1)
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
 

@@ -31,6 +31,9 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - user / reviewer feedback が agent 行動、routing miss、skill の呼び出し漏れ、
   関連 skill 候補の狭さ、再発防止、task retrospective、または agent-side
   memory update を要求している
+- user / reviewer feedback が、test を pass させるために agent が intended
+  behavior を単純化、revert、削除、oracle weakening したこと、または test planning
+  を過剰に重視して owning code repair を止めたことを指摘している
 - task closeout で、次回以降の agent 行動を変える観測がある
 - run bundle を評価し、agent feedback action を closeout 前に潰したい
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい
@@ -61,6 +64,14 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
 - 利用中に得られた user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、skill prompt、workflow prompt、eval、memory のどれへ還元したかを残す
 - feedback が利用中の skill の弱さ、浅さ、遅さ、routing miss、または修正不足を指摘している場合は、active skill set を first repair candidate として owner を確認する。固定する前の calibration step では、指摘をどの強さで反映するかを決める。単発の観測は scoped guidance や example に留められるかを先に見る。hard rule は invariant、checker-backed、または反復観測された失敗に限る。skill prompt を変える場合は、discoverable runtime `SKILL.md` と canonical `agents/skills/<skill>.md` をそろえ、対応する prompt eval を更新または確認する
+- test を pass させるための simplification、revert、intended behavior deletion、
+  oracle weakening、または test planning の過剰重視で owning code repair が止まる
+  feedback は、`test-design` と
+  implementation workflow への active skill feedback として扱う。
+  `workflow_monitor.py --runtime-feedback` で
+  `target=test-design` または implementation workflow を指し、
+  `action=prompt_repair|eval_update` を記録して prompt、eval、または tool repair
+  で解決する。memory-only で閉じない
 - input token 過多、context の重複読み込み、raw log の再投入、広い prose の model 投入が feedback された場合は、active routing / context skill を first repair candidate にする。owner / dependency evidence は落とさず、構造読み込みを protocol-owned `Structure Intake Packet` へ寄せ、重複または bulky な raw material を artifact と構造要約へ移す prompt repair として扱う。必要 context の省略を一般 rule にしない
 - active skill feedback で `skill_improvement_decision=applied` と記録できるのは、対象 skill prompt または eval anchor を実際に変更し、対応 validation を rerun した場合です。memory-only や issue 化だけの場合は `recorded` にする
 - behavior eval は `evidence/agent-evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる

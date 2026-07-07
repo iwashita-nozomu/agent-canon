@@ -110,3 +110,9 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
   または table 外の本文へ移してから、`tools/bin/agent-canon docs check <paths...>` を再実行します。
 - format-only として閉じる場合は、`structure_contract=skipped` と理由が
   run bundle、work log、PR body、または closeout evidence に残っていることを確認します。
+- docs formatter / fixer / checker failure を修復へ回す場合は、
+   validation-failure-response packet の `failing_contract`、`observation_level`、
+   `cause_classification`、`intent_preservation`、`evidence` を記録します。
+   `intent_preservation` は same-intent repair / owner-route repair / residual
+   classification / escalation route を示します。pass 目的の scope 縮小、
+   link / heading oracle weakening、または validation downscope で閉じてはいけません。

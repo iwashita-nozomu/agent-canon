@@ -51,6 +51,13 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 1. owner-bounded code 修正では、changed-file dependency checks、該当 static checker、
    型 / lint / OOP readability などの owner checker、直接関連 test を validation
    route に置きます。
+1. targeted validation が fail した場合は、pass 目的の実装単純化、revert、
+   intended behavior / test の削除、oracle weakening、validation downscope へ進む前に
+   `failing_contract`、`observation_level`、`cause_classification`、
+   `intent_preservation`、`evidence` を記録します。approved intent を保てる
+   implementation bug は同じ owner-bounded slice で修復し、oracle / spec、
+   fixture / environment / stale artifact、unrelated failure、approved-design /
+   user-request conflict はそれぞれ owner route、residual、または escalation に分けます。
 1. public behavior、dependency direction、document responsibility、claim grounding、
    schema、runtime profile、複数 writer が入った場合は、`codex-task-workflow` の
    broader route に戻します。

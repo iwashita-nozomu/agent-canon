@@ -1968,6 +1968,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "default_quality_check_policy"
             ]
             delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
+            validation_failure_policy = delegated_spawn_policy[
+                "validation_failure_triage_policy"
+            ]
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             role_topology = spawn_wave_recommendation["role_topology"]
             same_role_instances = role_topology["same_role_parallel_instances"]
@@ -2082,8 +2085,39 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "validation_failure_requires_parallel_triage",
                 delegated_spawn_policy["expansion_triggers"],
             )
+            self.assertEqual(
+                validation_failure_policy["trigger"],
+                "validation_failure_requires_parallel_triage",
+            )
+            self.assertEqual(
+                validation_failure_policy["triage_write_scope"],
+                "read_only_until_cause_identified",
+            )
+            self.assertEqual(
+                validation_failure_policy["repair_required_fields"],
+                [
+                    "failing_contract",
+                    "observation_level",
+                    "cause_classification",
+                    "intent_preservation",
+                    "evidence",
+                ],
+            )
+            self.assertIn(
+                "repair_same_intent",
+                validation_failure_policy["intent_preservation_values"],
+            )
             self.assertIn(
                 "schedule.md Agent Wave Ledger row with spawn_authority, budget, runtime ceilings, paths, validation_route, review_gate, handoff_artifacts, and delegated policy ref",
+                delegated_spawn_policy["required_before_spawn"],
+            )
+            self.assertIn(
+                (
+                    "validation_failure_requires_parallel_triage waves stay read-only "
+                    "until failing_contract, observation_level, cause_classification, "
+                    "intent_preservation, and evidence are recorded for same-intent repair "
+                    "or escalation"
+                ),
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
@@ -2417,8 +2451,21 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 self.assertIn("subagent_lifecycle_policy:", manifest_text)
                 self.assertIn("mid_task_user_input_policy:", manifest_text)
                 self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
+                self.assertIn(
+                    "subagent_startup_route: 'agents/internal-routines/subagent-startup.md'",
+                    manifest_text,
+                )
                 self.assertIn("prompt_contract:", manifest_text)
                 manifest = yaml.safe_load(manifest_text)
+                subagent_prompt_packet = manifest["run"]["subagent_prompt_packet"]
+                self.assertEqual(
+                    subagent_prompt_packet["subagent_startup_route"],
+                    "agents/internal-routines/subagent-startup.md",
+                )
+                self.assertIn(
+                    "agents/internal-routines/subagent-startup.md",
+                    subagent_prompt_packet["internal_skill_routes"],
+                )
                 self.assert_role_prompt_includes(
                     manifest,
                     "implementer",

@@ -67,6 +67,25 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
 
+    def test_agent_canon_cli_honors_env_override(self) -> None:
+        """CLI selection should allow tests and callers to pin an entrypoint."""
+        with mock.patch.dict(os.environ, {"AGENT_CANON_CLI": "/tmp/agent-canon-test"}, clear=False):
+            self.assertEqual(prose_graph.agent_canon_cli(PROJECT_ROOT), "/tmp/agent-canon-test")
+
+    def test_agent_canon_cli_prefers_stable_wrapper_over_target_artifact(self) -> None:
+        """CLI selection should not couple LocalLLM tests to stale target binaries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            stale_target = root / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
+            stable_wrapper = root / "tools" / "bin" / "agent-canon"
+            stale_target.parent.mkdir(parents=True)
+            stable_wrapper.parent.mkdir(parents=True)
+            stale_target.write_text("#!/bin/sh\nexit 127\n", encoding="utf-8")
+            stable_wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"AGENT_CANON_CLI": ""}, clear=False):
+                self.assertEqual(prose_graph.agent_canon_cli(root), stable_wrapper)
+
     def test_selected_ordering_topology_overrides_source_order(self) -> None:
         """Explicit ordering edges should control whole-document sentence order."""
         source_anchors = [

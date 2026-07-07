@@ -94,6 +94,10 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    comparison ref / worktree は、差分 impact が明示されたときだけ固定します。
 1. raw result を先に保存します。保存時は `result-artifact-writeout` を使い、
    failed / partial run も evidence として残します。
+   failed validation / check output を implementation に渡す場合は、
+   validation-failure-response packet の `failing_contract`、
+   `observation_level`、`cause_classification`、`intent_preservation`、
+   `evidence` を finding packet に含めます。
 1. tool 固有の structured artifact を full repository scope で作ります。件数上限や top-N
    truncation は使わず、tool が出した finding を情報を減らさず保存します。
    - Python structural analysis: `python-structure-hash` ->

@@ -23,6 +23,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import yaml
 from agent_team import (
@@ -50,9 +51,11 @@ from agent_team import (
 from vendor_skill_adapters import VendorSkillValidator
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
+PROJECT_SKILL_CONFIG_PATH = ROOT / ".codex" / "project-config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+PROJECT_SKILL_LANE = ".codex/project-skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 FRONTMATTER_OPEN_MARKER = "---\n"
@@ -148,11 +151,69 @@ def ensure(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def require_mapping(value: object, message: str) -> dict[str, object]:
+    """Return a string-keyed mapping or raise with the supplied message."""
+    if not isinstance(value, dict):
+        raise RuntimeError(message)
+    normalized: dict[str, object] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if not isinstance(key, str):
+            raise RuntimeError(message)
+        normalized[key] = item
+    return normalized
+
+
+def require_list(value: object, message: str) -> list[object]:
+    """Return a list or raise with the supplied message."""
+    if not isinstance(value, list):
+        raise RuntimeError(message)
+    return list(cast(list[object], value))
+
+
+def require_string_list(value: object, message: str) -> list[str]:
+    """Return a list of strings or raise with the supplied message."""
+    raw_items = require_list(value, message)
+    items: list[str] = []
+    for item in raw_items:
+        if not isinstance(item, str):
+            raise RuntimeError(message)
+        items.append(item)
+    return items
+
+
+def require_string(value: object, message: str) -> str:
+    """Return a string or raise with the supplied message."""
+    if not isinstance(value, str):
+        raise RuntimeError(message)
+    return value
+
+
+def require_prompt_entries(value: object, message: str) -> list[str]:
+    """Return prompt entries that are strings or string-valued mappings."""
+    raw_items = require_list(value, message)
+    entries: list[str] = []
+    for item in raw_items:
+        if isinstance(item, str):
+            entries.append(item)
+            continue
+        if isinstance(item, dict):
+            mapping = require_mapping(cast(object, item), message)
+            ensure(bool(mapping), message)
+            rendered: dict[str, str] = {}
+            for key, mapping_value in mapping.items():
+                rendered[key] = require_string(mapping_value, message)
+            entries.append(str(rendered))
+            continue
+        raise RuntimeError(message)
+    return entries
+
+
 def parse_codex_agents() -> dict[str, dict[str, object]]:
     """Load every Codex agent config."""
     parsed: dict[str, dict[str, object]] = {}
     for path in sorted(CODEX_AGENT_ROOT.glob("*.toml")):
-        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        raw_payload: object = tomllib.loads(path.read_text(encoding="utf-8"))
+        payload = require_mapping(raw_payload, f"{path} must parse as a mapping")
         name = str(payload.get("name", path.stem))
         payload["__file_name"] = path.name
         payload["__file_stem"] = path.stem
@@ -162,7 +223,19 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
 
 def load_project_config_toml() -> dict[str, object]:
     """Load the shared Codex project config."""
-    return tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
+    raw_config: object = tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
+    return require_mapping(raw_config, ".codex/config.toml must parse as a mapping")
+
+
+def load_project_skill_config_toml() -> dict[str, object]:
+    """Load the optional parent-owned Codex skill overlay."""
+    if not PROJECT_SKILL_CONFIG_PATH.is_file():
+        return {}
+    raw_config: object = tomllib.loads(PROJECT_SKILL_CONFIG_PATH.read_text(encoding="utf-8"))
+    return require_mapping(
+        raw_config,
+        ".codex/project-config.toml must parse as a mapping",
+    )
 
 
 def validate_project_config() -> None:
@@ -177,8 +250,7 @@ def validate_project_config() -> None:
         config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
         f"tool_output_token_limit must remain {EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT}",
     )
-    features = config.get("features", {})
-    ensure(isinstance(features, dict), "features must be a mapping")
+    features = require_mapping(config.get("features", {}), "features must be a mapping")
     ensure(features.get("hooks") is True, "features.hooks must be true")
     ensure(features.get("goals") is True, "features.goals must be true")
     ensure(features.get("multi_agent") is True, "features.multi_agent must be true")
@@ -188,9 +260,8 @@ def validate_project_config() -> None:
         "agent_model_policy" not in config,
         "agent_model_policy must stay out of .codex/config.toml; use .codex/agents/*.toml",
     )
-    validate_skill_config(config)
-    agents = config.get("agents", {})
-    ensure(isinstance(agents, dict), "agents must be a mapping")
+    validate_skill_config(config, load_project_skill_config_toml())
+    agents = require_mapping(config.get("agents", {}), "agents must be a mapping")
     ensure(
         agents.get("max_threads") == EXPECTED_MAX_THREADS,
         f"agents.max_threads must remain {EXPECTED_MAX_THREADS}",
@@ -215,11 +286,13 @@ def validate_project_config() -> None:
         + "; keep task policy in agents/task_catalog.yaml or generated team_manifest.yaml",
     )
     codex_agents = parse_codex_agents()
-    registry = {
-        key: value
-        for key, value in agents.items()
-        if isinstance(value, dict)
-    }
+    registry: dict[str, dict[str, object]] = {}
+    for key, value in agents.items():
+        if isinstance(value, dict):
+            registry[key] = require_mapping(
+                cast(object, value),
+                f"agents.{key} registry entry must be a mapping",
+            )
     missing_registry = sorted(set(codex_agents) - set(registry))
     extra_registry = sorted(set(registry) - set(codex_agents))
     ensure(
@@ -263,47 +336,97 @@ def is_public_skill_id(skill_id: str) -> bool:
     return bool(skill_id) and not is_private_skill_id(skill_id)
 
 
-def validate_skill_config(config: dict[str, object]) -> None:
-    """Check that every local public skill is wired through official skills.config."""
-    skills = config.get("skills", {})
-    ensure(isinstance(skills, dict), "skills must be a mapping")
-    entries = skills.get("config", [])
-    ensure(isinstance(entries, list), "skills.config must be a list")
-    observed: list[str] = []
+def validate_skill_config(
+    config: dict[str, object],
+    project_config: dict[str, object] | None = None,
+) -> None:
+    """Check shared and parent-owned skill config lanes."""
+    skills = require_mapping(config.get("skills", {}), "skills must be a mapping")
+    entries = require_list(skills.get("config", []), "skills.config must be a list")
+    observed_agentcanon: list[str] = []
     for entry in entries:
-        ensure(isinstance(entry, dict), "skills.config entries must be mappings")
-        path_value = str(entry.get("path", "")).strip()
-        ensure(path_value, "skills.config entry path must be non-empty")
-        ensure(entry.get("enabled") is True, f"skills.config {path_value} must be enabled")
+        entry = require_mapping(entry, "skills.config entries must be mappings")
+        path_value = validate_skill_config_entry(entry, PROJECT_CONFIG_PATH)
         resolved = (PROJECT_CONFIG_PATH.parent / path_value).resolve()
-        ensure(resolved.is_file(), f"skills.config path missing: {path_value}")
-        ensure(resolved.name == "SKILL.md", f"skills.config path must point at SKILL.md: {path_value}")
         ensure(
             resolved.is_relative_to(SKILL_SHIM_ROOT.resolve()),
-            f"skills.config path is outside .agents/skills: {path_value}",
+            "project-owned skills.config entries must live in .codex/project-config.toml: "
+            f"{path_value}",
         )
         ensure(
             is_public_skill_id(resolved.parent.name),
             f"private skill shims must stay out of skills.config: {path_value}",
         )
-        observed.append(path_value)
+        observed_agentcanon.append(path_value)
     expected = expected_skill_config_paths()
     ensure(
-        sorted(observed) == list(expected),
+        sorted(observed_agentcanon) == list(expected),
         "skills.config must enable every .agents/skills/*/SKILL.md path",
     )
+    validate_project_skill_config(project_config or {})
+
+
+def validate_project_skill_config(project_config: dict[str, object]) -> None:
+    """Check optional parent-owned project skill config entries."""
+    skills = require_mapping(project_config.get("skills", {}), "project skills must be a mapping")
+    entries = require_list(
+        skills.get("config", []),
+        "project skills.config must be a list",
+    )
+    observed_project: list[str] = []
+    for entry in entries:
+        entry = require_mapping(entry, "project skills.config entries must be mappings")
+        path_value = validate_skill_config_entry(entry, PROJECT_SKILL_CONFIG_PATH)
+        resolved = (PROJECT_SKILL_CONFIG_PATH.parent / path_value).resolve()
+        ensure(
+            is_project_skill_lane_path(resolved),
+            f"skills.config path is outside allowed skill lanes: {path_value}",
+        )
+        ensure(
+            is_public_skill_id(resolved.parent.name),
+            f"private project skill shims must stay out of skills.config: {path_value}",
+        )
+        observed_project.append(path_value)
+    ensure(
+        len(observed_project) == len(set(observed_project)),
+        "project-owned skills.config entries must not be duplicated",
+    )
+
+
+def validate_skill_config_entry(entry: dict[str, object], config_path: Path) -> str:
+    """Validate one skills.config entry and return its path."""
+    path_value = str(entry.get("path", "")).strip()
+    ensure(bool(path_value), "skills.config entry path must be non-empty")
+    ensure(entry.get("enabled") is True, f"skills.config {path_value} must be enabled")
+    resolved = (config_path.parent / path_value).resolve()
+    ensure(resolved.is_file(), f"skills.config path missing: {path_value}")
+    ensure(resolved.name == "SKILL.md", f"skills.config path must point at SKILL.md: {path_value}")
+    return path_value
+
+
+def is_project_skill_lane_path(path: Path) -> bool:
+    """Return whether one SKILL.md path belongs to the project-owned skill lane."""
+    lane_root = (PROJECT_CONFIG_PATH.parent / "project-skills").resolve()
+    try:
+        return path.is_relative_to(lane_root)
+    except ValueError:
+        return False
 
 
 def validate_project_hooks() -> None:
     """Check that project hooks cover active safety and completion guardrails."""
-    hooks_payload = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
+    raw_hooks_payload: object = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
+    hooks_payload = require_mapping(
+        raw_hooks_payload, "hooks.json top-level must be a mapping"
+    )
     ensure(set(hooks_payload) == {"hooks"}, "hooks.json top-level keys must match Codex hook schema")
-    hooks = hooks_payload.get("hooks", {})
-    ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
+    hooks = require_mapping(
+        hooks_payload.get("hooks", {}), "hooks.json hooks must be a mapping"
+    )
 
     for event in ("UserPromptSubmit", "PostToolUse", "Stop"):
-        entries = hooks.get(event, [])
-        ensure(isinstance(entries, list) and entries, f"{event} hook must be configured")
+        entries = require_list(hooks.get(event, []), f"{event} hook must be configured")
+        ensure(bool(entries), f"{event} hook must be configured")
 
     hooks_text = HOOKS_JSON_PATH.read_text(encoding="utf-8")
     ensure(
@@ -339,16 +462,28 @@ def configured_dispatcher_scripts() -> set[str]:
             capture_output=True,
             text=True,
         )
-        payload = json.loads(result.stdout)
-        events = payload.get("events", {})
-        ensure(isinstance(events, dict), f"dispatcher list output for {event} must contain events")
-        entries = events.get(event, [])
-        ensure(isinstance(entries, list), f"dispatcher list output for {event} must be a list")
+        raw_payload: object = json.loads(result.stdout)
+        payload = require_mapping(
+            raw_payload, f"dispatcher list output for {event} must be a mapping"
+        )
+        events = require_mapping(
+            payload.get("events", {}),
+            f"dispatcher list output for {event} must contain events",
+        )
+        entries = require_list(
+            events.get(event, []),
+            f"dispatcher list output for {event} must be a list",
+        )
         for entry in entries:
-            ensure(isinstance(entry, dict), f"dispatcher entry for {event} must be a mapping")
+            entry = require_mapping(
+                entry, f"dispatcher entry for {event} must be a mapping"
+            )
             script = entry.get("script", "")
-            ensure(isinstance(script, str) and script, f"dispatcher entry for {event} must name a script")
-            scripts.add(script)
+            ensure(
+                isinstance(script, str) and bool(script),
+                f"dispatcher entry for {event} must name a script",
+            )
+            scripts.add(require_string(script, f"dispatcher entry for {event} must name a script"))
     return scripts
 
 
@@ -360,7 +495,10 @@ def validate_codex_agent_settings() -> None:
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         model = config.get("model")
         effort = config.get("model_reasoning_effort")
-        ensure(isinstance(model, str) and model, f"{role_id} model must be a non-empty string")
+        ensure(
+            isinstance(model, str) and bool(model),
+            f"{role_id} model must be a non-empty string",
+        )
         ensure(
             isinstance(effort, str) and effort in valid_efforts,
             f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
@@ -378,8 +516,11 @@ def validate_team_config_references() -> None:
     codex_agent_ids = set(parse_codex_agents())
 
     for role in config.always_on_roles + config.specialist_roles:
-        ensure(role.required_outputs, f"{role.id} must declare required_outputs")
-        ensure(role.write_policy.allowed_artifacts, f"{role.id} must declare allowed_artifacts")
+        ensure(bool(role.required_outputs), f"{role.id} must declare required_outputs")
+        ensure(
+            bool(role.write_policy.allowed_artifacts),
+            f"{role.id} must declare allowed_artifacts",
+        )
         for codex_agent_id in role.codex_agents:
             ensure(
                 codex_agent_id in codex_agent_ids,
@@ -421,15 +562,20 @@ def validate_team_config_references() -> None:
     )
 
     for handoff in config.handoffs:
-        ensure(handoff["from"] in role_ids, f"handoff references unknown role: {handoff['from']}")
-        ensure(handoff["to"] in role_ids, f"handoff references unknown role: {handoff['to']}")
+        from_role = require_string(handoff.get("from"), "handoff from must be a string")
+        to_role = require_string(handoff.get("to"), "handoff to must be a string")
+        ensure(from_role in role_ids, f"handoff references unknown role: {from_role}")
+        ensure(to_role in role_ids, f"handoff references unknown role: {to_role}")
 
     for policy in config.context_policies:
-        for role_id in policy["roles"]:
+        for role_id in require_string_list(
+            policy.get("roles"), "context policy roles must be a list"
+        ):
             ensure(role_id in role_ids, f"context policy references unknown role: {role_id}")
 
     for rule in config.activation_rules:
-        ensure(rule["role"] in role_ids, f"activation rule references unknown role: {rule['role']}")
+        rule_role = require_string(rule.get("role"), "activation rule role must be a string")
+        ensure(rule_role in role_ids, f"activation rule references unknown role: {rule_role}")
 
     packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
@@ -454,45 +600,59 @@ def validate_task_catalog_references() -> None:
     catalog = load_task_catalog(config)
     runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
-    family_ids = {family["id"] for family in catalog.workflow_families}
+    family_ids = {
+        require_string(family.get("id"), "workflow family id must be a string")
+        for family in catalog.workflow_families
+    }
 
     for family in catalog.workflow_families:
-        roles = family.get("roles", {})
-        ensure(isinstance(roles, dict), f"family {family['id']} roles must be a mapping")
+        family_id = require_string(family.get("id"), "workflow family id must be a string")
+        roles = require_mapping(
+            family.get("roles", {}), f"family {family_id} roles must be a mapping"
+        )
         prompt = family.get("subagent_prompt")
-        ensure(isinstance(prompt, dict), f"family {family['id']} subagent_prompt must be a mapping")
+        prompt = require_mapping(
+            prompt, f"family {family_id} subagent_prompt must be a mapping"
+        )
         for key in ("purpose", "prompt_preamble", "workflow_focus", "reviewer_prompt"):
-            ensure(key in prompt, f"family {family['id']} subagent_prompt missing {key}")
+            ensure(key in prompt, f"family {family_id} subagent_prompt missing {key}")
+        purpose = require_string(
+            prompt.get("purpose"), f"family {family_id} subagent_prompt purpose empty"
+        )
         ensure(
-            str(prompt["purpose"]).strip(),
-            f"family {family['id']} subagent_prompt purpose empty",
+            bool(purpose.strip()),
+            f"family {family_id} subagent_prompt purpose empty",
         )
         for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
-            values = prompt[key]
+            values = require_prompt_entries(
+                prompt.get(key),
+                f"family {family_id} subagent_prompt {key} must be a non-empty list",
+            )
             ensure(
-                isinstance(values, list) and all(str(value).strip() for value in values),
-                f"family {family['id']} subagent_prompt {key} must be a non-empty list",
+                bool(values) and all(value.strip() for value in values),
+                f"family {family_id} subagent_prompt {key} must be a non-empty list",
             )
         for bucket in ("always_on", "specialists"):
-            members = roles.get(bucket, [])
-            ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
+            members = require_string_list(
+                roles.get(bucket, []), f"family {family_id} {bucket} must be a list"
+            )
             for role_id in members:
                 ensure(
                     role_id in role_ids,
-                    f"family {family['id']} references unknown role {role_id}",
+                    f"family {family_id} references unknown role {role_id}",
                 )
-        active_budget, max_write_budget = workflow_spawn_budget(catalog, str(family["id"]))
+        active_budget, max_write_budget = workflow_spawn_budget(catalog, family_id)
         ensure(
             active_budget <= runtime_max_threads,
-            f"family {family['id']} active_subagents exceeds runtime max_threads",
+            f"family {family_id} active_subagents exceeds runtime max_threads",
         )
         ensure(
             max_write_budget >= 1,
-            f"family {family['id']} max_write_subagents must be >= 1",
+            f"family {family_id} max_write_subagents must be >= 1",
         )
         ensure(
             max_write_budget <= active_budget,
-            f"family {family['id']} max_write_subagents exceeds active_subagents",
+            f"family {family_id} max_write_subagents exceeds active_subagents",
         )
 
     for task_id in task_ids(catalog):
@@ -509,20 +669,29 @@ def validate_task_catalog_references() -> None:
         )
 
     for pack in catalog.review_packs:
-        for role_id in pack.get("specialists", []):
+        pack_id = require_string(pack.get("id"), "review pack id must be a string")
+        for role_id in require_string_list(
+            pack.get("specialists", []), f"review pack {pack_id} specialists must be a list"
+        ):
             ensure(
                 role_id in role_ids,
-                f"review pack {pack['id']} references unknown role {role_id}",
+                f"review pack {pack_id} references unknown role {role_id}",
             )
-        for task_id in pack.get("default_for_tasks", []):
+        for task_id in require_string_list(
+            pack.get("default_for_tasks", []),
+            f"review pack {pack_id} default_for_tasks must be a list",
+        ):
             ensure(
                 task_id in task_ids(catalog),
-                f"review pack {pack['id']} default task missing: {task_id}",
+                f"review pack {pack_id} default task missing: {task_id}",
             )
-        for task_id in pack.get("optional_for_tasks", []):
+        for task_id in require_string_list(
+            pack.get("optional_for_tasks", []),
+            f"review pack {pack_id} optional_for_tasks must be a list",
+        ):
             ensure(
                 task_id in task_ids(catalog),
-                f"review pack {pack['id']} optional task missing: {task_id}",
+                f"review pack {pack_id} optional task missing: {task_id}",
             )
 
 
@@ -555,7 +724,10 @@ def validate_dynamic_wave_policy() -> None:
                 for index, wave in enumerate(wave_slots)
                 if any(slot.role_id == "final_reviewer" for slot in wave)
             ]
-            ensure(final_wave_indexes, f"task {task_id} dynamic waves missing final_reviewer")
+            ensure(
+                bool(final_wave_indexes),
+                f"task {task_id} dynamic waves missing final_reviewer",
+            )
             final_wave_index = min(final_wave_indexes)
             pre_final_role_ids = {
                 slot.role_id
@@ -574,23 +746,27 @@ def validate_dynamic_wave_policy() -> None:
 def validate_public_skill_shims() -> None:
     """Check that public skill catalog entries have discoverable SKILL.md shims."""
     catalog_path = ROOT / "agents" / "skills" / "catalog.yaml"
-    data = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-    ensure(isinstance(data, dict), "skill catalog must parse as a mapping")
-    families = data.get("skill_families", [])
-    ensure(isinstance(families, list), "skill_families must be a list")
+    raw_data: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    data = require_mapping(raw_data, "skill catalog must parse as a mapping")
+    families = require_list(data.get("skill_families", []), "skill_families must be a list")
 
     observed_skill_ids: set[str] = set()
     for entry in families:
-        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
-        skill_id = str(entry["id"])
+        entry = require_mapping(entry, "skill_families entries must be mappings")
+        skill_id = require_string(
+            entry.get("id"), "skill_families id must be a string"
+        )
         ensure(
             is_public_skill_id(skill_id),
             f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
         )
         ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
         observed_skill_ids.add(skill_id)
-        canonical_doc = ROOT / str(entry["canonical_doc"])
-        shim = ROOT / str(entry["shim"])
+        canonical_doc = ROOT / require_string(
+            entry.get("canonical_doc"),
+            f"{skill_id} canonical_doc must be a string",
+        )
+        shim = ROOT / require_string(entry.get("shim"), f"{skill_id} shim must be a string")
         ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
         ensure(shim.is_file(), f"{skill_id} shim missing: {shim}")
         ensure(
@@ -648,18 +824,22 @@ def validate_public_skill_document_contract(
         (internal_routine_root / "README.md").is_file(),
         "internal routine README missing: agents/internal-routines/README.md",
     )
-    families = data.get("skill_families", [])
-    ensure(isinstance(families, list), "skill_families must be a list")
+    families = require_list(data.get("skill_families", []), "skill_families must be a list")
     catalog_docs: set[str] = set()
     for entry in families:
-        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
-        canonical_doc = str(entry.get("canonical_doc", "")).strip()
-        skill_id = str(entry.get("id", "")).strip()
+        entry = require_mapping(entry, "skill_families entries must be mappings")
+        canonical_doc = require_string(
+            entry.get("canonical_doc"),
+            "skill_families canonical_doc must be non-empty",
+        ).strip()
+        skill_id = require_string(
+            entry.get("id"), "skill_families id must be a string"
+        ).strip()
         ensure(
             is_public_skill_id(skill_id),
             f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
         )
-        ensure(canonical_doc, "skill_families canonical_doc must be non-empty")
+        ensure(bool(canonical_doc), "skill_families canonical_doc must be non-empty")
         canonical_path = root / canonical_doc
         ensure(
             canonical_path.resolve().is_relative_to(public_doc_root.resolve()),
@@ -704,13 +884,15 @@ def validate_official_system_skill_delegation(
     """Check that host-provided system skills stay in the delegation lane."""
     if root is None:
         root = ROOT
-    families = data.get("skill_families", [])
-    ensure(isinstance(families, list), "skill_families must be a list")
-    catalog_skill_ids = {
-        str(entry.get("id", "")).strip()
-        for entry in families
-        if isinstance(entry, dict)
-    }
+    families = require_list(data.get("skill_families", []), "skill_families must be a list")
+    catalog_skill_ids: set[str] = set()
+    for entry in families:
+        if not isinstance(entry, dict):
+            continue
+        entry = require_mapping(cast(object, entry), "skill_families entries must be mappings")
+        catalog_skill_ids.add(
+            require_string(entry.get("id"), "skill_families id must be a string").strip()
+        )
     catalog_official_skills = sorted(set(OFFICIAL_SYSTEM_SKILLS) & catalog_skill_ids)
     ensure(
         not catalog_official_skills,
@@ -749,7 +931,7 @@ def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
     """Check one optional catalog-backed prompt routing block."""
     if routing is None:
         return
-    ensure(isinstance(routing, dict), f"{skill_id} routing must be a mapping")
+    routing = require_mapping(routing, f"{skill_id} routing must be a mapping")
     stage_policy = routing.get("stage_policy", "deferred")
     ensure(
         isinstance(stage_policy, str) and stage_policy in SKILL_ROUTING_STAGE_POLICIES,
@@ -760,34 +942,40 @@ def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
         isinstance(reason, str) and bool(reason.strip()),
         f"{skill_id} routing.reason must be a non-empty string",
     )
-    triggers = routing.get("triggers", [])
-    ensure(isinstance(triggers, list), f"{skill_id} routing.triggers must be a list")
+    triggers = require_list(
+        routing.get("triggers", []), f"{skill_id} routing.triggers must be a list"
+    )
     for group_index, group in enumerate(triggers):
+        group = require_string_list(
+            group,
+            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
+        )
         ensure(
-            isinstance(group, list) and bool(group),
+            bool(group),
             f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
         )
         for term_index, term in enumerate(group):
             ensure(
-                isinstance(term, str) and bool(term.strip()),
+                bool(term.strip()),
                 f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
             )
 
 
 def validate_skill_related_entries(families: object, observed_skill_ids: set[str]) -> None:
     """Check related-skill metadata points to public catalog entries."""
-    ensure(isinstance(families, list), "skill_families must be a list")
+    families = require_list(families, "skill_families must be a list")
     for entry in families:
-        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
-        skill_id = str(entry.get("id", "")).strip()
-        related_skills = entry.get("related_skills", [])
-        ensure(
-            isinstance(related_skills, list),
+        entry = require_mapping(entry, "skill_families entries must be mappings")
+        skill_id = require_string(
+            entry.get("id"), "skill_families id must be a string"
+        ).strip()
+        related_skills = require_string_list(
+            entry.get("related_skills", []),
             f"{skill_id} related_skills must be a list",
         )
         for related_index, related_skill in enumerate(related_skills):
             ensure(
-                isinstance(related_skill, str) and bool(related_skill.strip()),
+                bool(related_skill.strip()),
                 f"{skill_id} related_skills[{related_index}] must be a non-empty string",
             )
             ensure(
@@ -991,13 +1179,15 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
         encoding="utf-8",
     )
-    manifest = yaml.safe_load(manifest_text)
-    ensure(isinstance(manifest, dict), f"task {task_id} manifest must be a mapping")
-    run = manifest.get("run")
-    ensure(isinstance(run, dict), f"task {task_id} manifest missing run mapping")
-    spawn_budget = run.get("spawn_budget")
-    ensure(
-        isinstance(spawn_budget, dict),
+    raw_manifest: object = yaml.safe_load(manifest_text)
+    manifest = require_mapping(
+        raw_manifest, f"task {task_id} manifest must be a mapping"
+    )
+    run = require_mapping(
+        manifest.get("run"), f"task {task_id} manifest missing run mapping"
+    )
+    spawn_budget = require_mapping(
+        run.get("spawn_budget"),
         f"task {task_id} manifest missing run.spawn_budget",
     )
     catalog = load_task_catalog(config)
@@ -1036,9 +1226,8 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
         f"task {task_id} manifest run.spawn_budget max_write scope unclear",
     )
-    delegated_spawn_policy = run.get("delegated_spawn_policy")
-    ensure(
-        isinstance(delegated_spawn_policy, dict),
+    delegated_spawn_policy = require_mapping(
+        run.get("delegated_spawn_policy"),
         f"task {task_id} manifest missing run.delegated_spawn_policy",
     )
     ensure(
@@ -1055,7 +1244,10 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         and "--subagent-wave" in wave_record_command,
         f"task {task_id} manifest missing subagent wave record command",
     )
-    required_fields = delegated_spawn_policy.get("handoff_required_fields")
+    required_fields = require_string_list(
+        delegated_spawn_policy.get("handoff_required_fields"),
+        f"task {task_id} manifest delegated spawn handoff fields incomplete",
+    )
     expected_handoff_fields = {
         "owner",
         "child_role",
@@ -1070,13 +1262,11 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "remaining_spawn_budget",
     }
     ensure(
-        isinstance(required_fields, list)
-        and expected_handoff_fields.issubset({str(item) for item in required_fields}),
+        expected_handoff_fields.issubset(set(required_fields)),
         f"task {task_id} manifest delegated spawn handoff fields incomplete",
     )
-    same_role_policy = delegated_spawn_policy.get("same_role_instances")
-    ensure(
-        isinstance(same_role_policy, dict),
+    same_role_policy = require_mapping(
+        delegated_spawn_policy.get("same_role_instances"),
         f"task {task_id} manifest missing delegated same-role instance policy",
     )
     ensure(
@@ -1087,7 +1277,10 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         same_role_policy.get("identity_key") == "role_type+instance_id",
         f"task {task_id} manifest same-role identity key mismatch",
     )
-    same_role_required_fields = same_role_policy.get("required_fields")
+    same_role_required_fields = require_string_list(
+        same_role_policy.get("required_fields"),
+        f"task {task_id} manifest same-role required fields incomplete",
+    )
     expected_same_role_fields = {
         "role_type",
         "instance_id",
@@ -1100,33 +1293,38 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "review_gate",
     }
     ensure(
-        isinstance(same_role_required_fields, list)
-        and expected_same_role_fields.issubset(
-            {str(item) for item in same_role_required_fields}
-        ),
+        expected_same_role_fields.issubset(set(same_role_required_fields)),
         f"task {task_id} manifest same-role required fields incomplete",
     )
-    spawn_wave_recommendation = run.get("spawn_wave_recommendation")
-    ensure(
-        isinstance(spawn_wave_recommendation, dict),
+    spawn_wave_recommendation = require_mapping(
+        run.get("spawn_wave_recommendation"),
         f"task {task_id} manifest missing run.spawn_wave_recommendation",
     )
-    initial_wave = spawn_wave_recommendation.get("initial_wave_agent_types")
+    initial_wave = require_string_list(
+        spawn_wave_recommendation.get("initial_wave_agent_types"),
+        f"task {task_id} manifest must recommend at least one initial agent type",
+    )
     dynamic_expansion_waves = spawn_wave_recommendation.get("dynamic_expansion_waves")
     manifest_roles = manifest.get("roles")
     total_agent_candidates: list[str] = []
     if isinstance(manifest_roles, list):
-        for role in manifest_roles:
+        for role in require_list(
+            cast(object, manifest_roles), f"task {task_id} manifest roles must be a list"
+        ):
             if not isinstance(role, dict):
                 continue
+            role = require_mapping(cast(object, role), f"task {task_id} role must be a mapping")
             codex_agents = role.get("codex_agents")
             if not isinstance(codex_agents, list):
                 continue
-            for agent_type in codex_agents:
-                if isinstance(agent_type, str) and agent_type not in total_agent_candidates:
+            for agent_type in require_string_list(
+                cast(object, codex_agents),
+                f"task {task_id} role codex_agents must be a list",
+            ):
+                if agent_type not in total_agent_candidates:
                     total_agent_candidates.append(agent_type)
     ensure(
-        isinstance(initial_wave, list) and len(initial_wave) >= 1,
+        len(initial_wave) >= 1,
         f"task {task_id} manifest must recommend at least one initial agent type",
     )
     if (
@@ -1135,17 +1333,24 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     ):
         dynamic_agent_candidates: list[str] = []
         if isinstance(dynamic_expansion_waves, list):
-            for wave in dynamic_expansion_waves:
+            for wave in require_list(
+                cast(object, dynamic_expansion_waves),
+                f"task {task_id} manifest dynamic_expansion_waves must be a list",
+            ):
                 if not isinstance(wave, dict):
                     continue
+                wave = require_mapping(
+                    cast(object, wave),
+                    f"task {task_id} dynamic expansion wave must be a mapping",
+                )
                 agent_types = wave.get("agent_types")
                 if not isinstance(agent_types, list):
                     continue
-                for agent_type in agent_types:
-                    if (
-                        isinstance(agent_type, str)
-                        and agent_type not in dynamic_agent_candidates
-                    ):
+                for agent_type in require_string_list(
+                    cast(object, agent_types),
+                    f"task {task_id} dynamic expansion agent_types must be a list",
+                ):
+                    if agent_type not in dynamic_agent_candidates:
                         dynamic_agent_candidates.append(agent_type)
         ensure(
             initial_wave == ["requirements_organizer", "explorer", "execution_planner"],
@@ -1163,9 +1368,8 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         len(initial_wave) <= expected_active,
         f"task {task_id} manifest initial wave exceeds active spawn budget",
     )
-    write_scope_policy = run.get("write_scope_policy")
-    ensure(
-        isinstance(write_scope_policy, dict),
+    write_scope_policy = require_mapping(
+        run.get("write_scope_policy"),
         f"task {task_id} manifest missing run.write_scope_policy",
     )
     ensure(
@@ -1194,9 +1398,8 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         and "reuse_for_new_task: forbidden" in manifest_text,
         f"task {task_id} manifest missing fresh subagent lifecycle policy",
     )
-    lifecycle_policy = run.get("subagent_lifecycle_policy")
-    ensure(
-        isinstance(lifecycle_policy, dict),
+    lifecycle_policy = require_mapping(
+        run.get("subagent_lifecycle_policy"),
         f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
     )
     ensure(
@@ -1220,36 +1423,49 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
 
 
 def ensure_manifest_abstract_design_prompt_contracts(
-    manifest: dict[object, object],
+    manifest: dict[str, object],
     task_id: str,
 ) -> None:
     """Ensure generated role prompts preserve ADF trace contracts."""
-    roles = manifest.get("roles")
-    ensure(isinstance(roles, list), f"task {task_id} manifest missing roles list")
+    roles = require_list(
+        manifest.get("roles"), f"task {task_id} manifest missing roles list"
+    )
 
     def prompt_fields(role_id: str) -> set[str] | None:
         common_fields: set[str] = set()
         run = manifest.get("run")
         if isinstance(run, dict):
+            run = require_mapping(cast(object, run), f"task {task_id} run must be a mapping")
             context_policy = run.get("handoff_context_policy")
             if isinstance(context_policy, dict):
+                context_policy = require_mapping(
+                    cast(object, context_policy),
+                    f"task {task_id} handoff_context_policy must be a mapping",
+                )
                 raw_common_fields = context_policy.get("common_prompt_must_include")
                 if isinstance(raw_common_fields, list):
-                    common_fields = {str(field) for field in raw_common_fields}
+                    common_fields = set(
+                        require_string_list(
+                            cast(object, raw_common_fields),
+                            f"task {task_id} common_prompt_must_include must be a list",
+                        )
+                    )
         for role in roles:
-            if not isinstance(role, dict) or role.get("id") != role_id:
+            if not isinstance(role, dict):
                 continue
-            prompt_contract = role.get("prompt_contract")
-            ensure(
-                isinstance(prompt_contract, dict),
+            role = require_mapping(cast(object, role), f"task {task_id} role must be a mapping")
+            if role.get("id") != role_id:
+                continue
+            prompt_contract = require_mapping(
+                role.get("prompt_contract"),
                 f"task {task_id} role {role_id} missing prompt_contract",
             )
             raw_fields = prompt_contract.get("role_prompt_must_include")
-            ensure(
-                isinstance(raw_fields, list),
+            raw_fields = require_string_list(
+                raw_fields,
                 f"task {task_id} role {role_id} missing role_prompt_must_include",
             )
-            return common_fields | {str(field) for field in raw_fields}
+            return common_fields | set(raw_fields)
         return None
 
     expected_role_fields = {

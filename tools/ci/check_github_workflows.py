@@ -85,6 +85,8 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "run_repo_dependency_review.sh --search-hits-file",
     "AgentCanon source PR",
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
+    "agentcanon_structure_followup=required",
+    "agentcanon_structure_followup=pass",
     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
@@ -114,6 +116,8 @@ STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "run_repo_dependency_review.sh --search-hits-file",
     "standalone AgentCanon repository",
     "make agent-canon-ensure-latest",
+    "agentcanon_structure_followup=required",
+    "agentcanon_structure_followup=pass",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
     "python3 tools/agent_tools/check_convention_compliance.py",
@@ -616,6 +620,8 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
             "tool addition",
             "memory addition",
             "AgentCanon PR merge 後にこの check を再実行します",
+            "agentcanon_structure_followup=required",
+            "agentcanon_structure_followup=pass",
         ],
     )
 

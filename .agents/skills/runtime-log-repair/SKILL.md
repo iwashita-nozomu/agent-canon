@@ -52,3 +52,11 @@ Execute the required and task-matching conditional commands that the packet prin
    implementation details, or reference extraction internals.
 1. Verify closeout with the owner-selected gate. Rerun a full dashboard only
    when the owner gate needs accumulated post-change evidence.
+1. If the owner-selected gate fails, add `failing_contract`,
+   `observation_level`, `cause_classification`, `intent_preservation`, and
+   `evidence` to the Runtime Log Repair Packet before changing repair
+   intent, simplifying to pass, reverting, deleting intended behavior/tests,
+   weakening an oracle, or downscoping validation. Preserve owner intent for
+   implementation bugs and route oracle/spec, fixture/environment/stale
+   artifact, unrelated, and approved-design/user-request conflicts to owner
+   repair, residual, or escalation.

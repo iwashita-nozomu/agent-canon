@@ -10,10 +10,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Reader Map
 
-- Purpose: designs adversarial, resilient tests before code changes so behavior
-  contracts and test oracles are explicit.
-- Use When: implementation changes need static test design, oracle choice,
-  nasty cases, regression cases, or brittle-test diagnosis.
+- Purpose: classifies oracle/spec risk and designs adversarial, resilient tests
+  when changed behavior or regression risk needs explicit test evidence.
+- Use When: implementation changes need static test design, oracle/spec-risk
+  classification, nasty cases, regression cases, or brittle-test diagnosis.
 - Section path: Purpose, Use When, and Core References orient scope; Expected
   Outcome, Mandatory Checklist, and Default Sequence are the operational rules;
   Common Failure Modes lists pitfalls.
@@ -22,14 +22,16 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Purpose
 
-approved design と既存 code/test path を静的解析し、変更耐性のある観測可能契約、stable observation level、oracle、input space、adequacy evidence を implementation 前に固定します。code path と test path は survey / placement evidence であり、未承認の API shape、private helper、private return shape、error prose、mock order、internal call sequence を作る根拠ではありません。
+approved design と既存 code/test path を静的解析し、oracle / spec risk を分類し、必要な場合に変更耐性のある観測可能契約、stable observation level、oracle、input space、adequacy evidence を implementation 前に固定します。code path と test path は survey / placement evidence であり、未承認の API shape、private helper、private return shape、error prose、mock order、internal call sequence を作る根拠ではありません。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、validation-failure-response fields を記録した後、追加の test-design pass で止めずに owning code / config / docs / workflow repair へ進めます。
 
 ## Use When
 
-- code を変える
+- behavior-changing、regression-prone、high-risk、または oracle / spec risk がある code を変える
 - parser、validation、state transition、error handling を変える
 - bug fix を durable test に変えたい
 - 実装前に test 観点で穴を洗いたい
+- validation failure の `cause_classification` が `test_oracle_spec_mismatch` か
+  `implementation_bug` かを分類する必要がある
 
 ## Core References
 
@@ -55,6 +57,10 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
   evidence を validation route に置く
 - validation repair scope が changed contract、changed lines、または task plan が名指しした
   checker-owned property に結び付いている
+- validation 中に test / check が失敗した場合、`failing_contract`、
+  `observation_level`、`cause_classification`、`intent_preservation`、
+  `evidence`、または design / user-review escalation が
+  `test_plan.md`、work log、review evidence のいずれかに短く書かれている
 - 数値テストを提案する場合は numerical trigger、non-numerical alternative、oracle、
   budget があり、提案しない場合は省略理由と代替 observable behavior が書かれている
 - 数理的な判定・oracle・assertion は `mathematical necessity gate` を通し、
@@ -74,6 +80,20 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
   observable behavior が追加された場合だけ behavior example を候補にしている
 - formatter、lint、checker が表出した既存 style debt や周辺 debt は residual evidence と
   repair route に分け、現在の diff を requested contract に沿った semantic change に保っている
+- validation で test / check failure を見た後、すぐに単純化、revert、feature / test
+  deletion、oracle strength の低下、intended behavior の削除へ進まず、`failing_contract`、
+  `observation_level`、`cause_classification`、`intent_preservation`、`evidence` を
+  記録している
+- `cause_classification` と `intent_preservation` は
+  `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、
+  `agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` の slug set と
+  route semantics に従っている
+- `cause_classification=implementation_bug` は approved intent を保ったまま owning
+  code / config / docs / workflow repair へ進め、追加の test-design pass で
+  implementation repair を止めない。必要な場合だけ同じ intent を保つ test を直すか追加する
+- behavior simplification、revert、feature / test deletion、oracle weakening、
+  intended behavior の削除を許す前に、短い failure-cause note を
+  `test_plan.md`、work log、review evidence のいずれかに残している
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、do-not-freeze details を分けている
 - 数値、randomized、tolerance、solver、convergence、residual、benchmark、
   experiment-style test を提案する前に `documents/coding-conventions-testing.md` の
@@ -88,7 +108,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 
 ## Default Sequence
 
-1. approved design と既存 code/test path を読み、code path と関連 test path を survey / placement evidence として記録します。target function / module / script は配置調査の根拠であり、未承認 API shape や internal call sequence を作る根拠ではありません。
+1. approved design と既存 code/test path を読み、code path と関連 test path を survey / placement evidence として記録します。target function / module / script は配置調査の根拠であり、未承認 API shape や internal call sequence を作る根拠ではありません。behavior-changing、regression-prone、high-risk、または oracle / spec risk がある場合に test design を深掘りします。
 1. 関連 test path がある場合は `tools/bin/agent-canon test-design check <paths...>` を実行します。新規 test の場合は `documents/coding-conventions-testing.md` を読み、同種の既存 test style を確認します。
 1. `fix-now` finding は先に修正対象へ入れます。特に static-analysis duplicate や
    generated execution-only placeholder は、canonical checker validation へ戻すか、
@@ -97,6 +117,15 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 1. validation tool の finding は validation repair scope に分類します。changed contract、
    changed lines、または task plan が名指しした checker-owned property に結び付くものを
    current repair に入れ、既存 style debt や周辺 debt は residual evidence に分けます。
+1. validation 中に test / check が失敗した場合は、behavior を弱める前に
+   `failing_contract`、`observation_level`、`cause_classification`、
+   `intent_preservation`、`evidence` を記録します。slug set と route semantics は
+   validation-failure-response owner surfaces を参照します。
+1. `cause_classification=implementation_bug` は approved intent を保って owning
+   code / config / docs / workflow repair へ進めます。必要な場合だけ同じ intent を保つ
+   test を直すか追加し、generic `cause_classification=implementation_bug` を追加 test planning のために
+   止めません。simplification、revert、deletion、oracle weakening の前に
+   failure-cause note を `test_plan.md`、work log、review evidence のいずれかに残します。
 1. contract-only wrapper では、observable behavior、branch、parser error path、
    state mutation、diagnostic key の trigger を先に判定します。static-only
    classification では static contract validation と canonical command evidence を
@@ -121,5 +150,7 @@ approved design と既存 code/test path を静的解析し、変更耐性のあ
 - bug fix を一回限りの手動確認で済ませて durable test に変えない
 - static checker の成功を pytest で包んだだけの test を「coverage」として残す
 - generated smoke / runs / no-crash test を、behavior contract と oracle なしで残す
+- failing test / check を見た直後に、failing contract と cause classification を
+  記録せず、simplification、revert、feature deletion、oracle weakening で pass だけを作る
 - docs、routing、metadata、string parsing、configuration、structure refactor など
   数値契約を持たない変更に、数値 smoke、large random case、benchmark 風 test を生やす

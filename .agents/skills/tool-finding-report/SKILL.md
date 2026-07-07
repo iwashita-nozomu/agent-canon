@@ -32,6 +32,10 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/tool-finding-report.md`.
 1. Default the target scope to the full repository before running tools. Fix exclude rules, dependency roots, and output directory. Use targeted, changed-only, or selected-path scope only when the user explicitly asks for it, the tool cannot run repo-wide, or it is an additional diagnostic beside the full-repository run; record `scope_exception=<reason>`, `requested_scope=<...>`, and `omitted_surfaces=<...>` in the finding packet. Fix a baseline ref only when before/after impact is explicitly requested.
 1. Preserve raw machine results first with `$result-artifact-writeout`; failed or partial runs are evidence, not noise.
+1. When failed validation/check output feeds implementation, include the
+   validation-failure-response packet fields (`failing_contract`,
+   `observation_level`, `cause_classification`, `intent_preservation`, and
+   `evidence`) in the finding packet.
 1. Build structured full-repository artifacts from the raw results before interpreting them. Do not truncate to top-N findings inside this skill. For Python structural findings, use `python-structure-hash` -> `python-structure-hash-report`, and use `python-structure-hash-impact` only when before / after comparison is requested.
 1. When the structured Python findings will feed implementation or refactor
    planning, preserve the full report and call

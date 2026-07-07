@@ -235,9 +235,15 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
-Run these commands when AgentCanon source, the submodule pin, or shared root
-views changed or appear stale. Reserve shared-canon sync for changed or stale
-shared surfaces.
+Run these commands when AgentCanon source, the submodule pin, `.gitmodules`,
+shared root views, shared root-copy surfaces, or parent root sync state changed.
+These changes always open `agentcanon_structure_followup=required`; record
+`agentcanon_structure_followup=pass` only after `link-root` and `check` pass
+from the template / derived parent root. For standalone AgentCanon source PRs,
+the parent-root follow-up runs after the source change is integrated or while
+preparing the parent pin/root-view PR. Reserve shared-canon sync for changed or
+stale shared surfaces, and treat the gate as required evidence when those
+surfaces changed.
 
 ## Closeout Evidence
 
@@ -249,6 +255,13 @@ selected route requires them.
 For repo-changing implementation, patch, or doc-edit work, closeout cites the
 write-capable handoff route, integration result, review gate, validation
 evidence, and subagent lifecycle evidence.
+
+For AgentCanon source, submodule pin, `.gitmodules`, root runtime view,
+root-copy surface, or parent root sync changes, closeout also cites
+`agentcanon_structure_followup=required` and
+`agentcanon_structure_followup=pass`, including the parent-root
+`bash tools/sync_agent_canon.sh link-root` and
+`bash tools/sync_agent_canon.sh check` evidence.
 
 A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
 audits, or recorded parent-direct write exceptions; cite the advisory/read-only

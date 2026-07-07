@@ -16,6 +16,8 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
+import shutil
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -27,6 +29,8 @@ from surface_manifest import SurfaceEntry, load_manifest, target_for_entry
 
 DEFAULT_PREFIX = "vendor/agent-canon"
 DEFAULT_MANIFEST = "documents/shared-runtime-surfaces.toml"
+DEFAULT_TREE_DEPTH = 3
+DEFAULT_TREE_IGNORE = ".git|__pycache__|.venv|node_modules|target|reports"
 ERROR = "error"
 WARN = "warn"
 
@@ -76,6 +80,7 @@ class ReadinessReport:
     status: str
     findings: tuple[Finding, ...]
     checked: tuple[str, ...]
+    tree_command: str
 
 
 class ContainerFinding(Protocol):
@@ -262,6 +267,14 @@ class SurfaceReadinessChecker:
     def check_regular(self, entry: SurfaceEntry) -> tuple[Finding, ...]:
         """Return findings for a parent-owned regular file."""
         path = self.root / entry.path
+        if entry.optional and not path.exists():
+            return ()
+        if entry.surface_class == "project_content":
+            if not path.is_dir():
+                return (Finding(ERROR, "project_content", entry.path, "missing-directory"),)
+            if path.is_symlink():
+                return (Finding(ERROR, "project_content", entry.path, "must-be-parent-owned-directory"),)
+            return ()
         if not path.is_file():
             return (Finding(ERROR, "active_contract", entry.path, "missing-regular-file"),)
         if path.is_symlink():
@@ -361,6 +374,39 @@ class ContainerConfigChecker:
         return module
 
 
+class TreeDisplayChecker:
+    """Checks availability of the canonical parent structure display command."""
+
+    def __init__(self, root: Path, depth: int, skip: bool) -> None:
+        """Store tree display inputs."""
+        self.root = root
+        self.depth = depth
+        self.skip = skip
+
+    def run(self) -> tuple[tuple[Finding, ...], tuple[str, ...], str]:
+        """Return tree display findings, checked tokens, and the stable command."""
+        command = self.render_command()
+        if self.skip:
+            return (), ("tree_display:skipped",), command
+        if shutil.which("tree") is None:
+            finding = Finding(WARN, "tree_display", "tree", "missing-command")
+            return (finding,), ("tree_display:missing",), command
+        return (), (f"tree_display:available:depth={self.depth}",), command
+
+    def render_command(self) -> str:
+        """Render the canonical human-facing structure inspection command."""
+        parts = (
+            "tree",
+            "-a",
+            "-L",
+            str(self.depth),
+            "-I",
+            DEFAULT_TREE_IGNORE,
+            str(self.root),
+        )
+        return " ".join(shlex.quote(part) for part in parts)
+
+
 class ParentRepoReadinessChecker:
     """Coordinates all parent repository readiness checks."""
 
@@ -371,6 +417,8 @@ class ParentRepoReadinessChecker:
         manifest_path: str,
         skip_container_config: bool,
         skip_submodule_check: bool,
+        tree_depth: int,
+        skip_tree: bool,
     ) -> None:
         """Store parent readiness check inputs."""
         self.root = root
@@ -378,11 +426,20 @@ class ParentRepoReadinessChecker:
         self.manifest_path = manifest_path
         self.skip_container_config = skip_container_config
         self.skip_submodule_check = skip_submodule_check
+        self.tree_depth = tree_depth
+        self.skip_tree = skip_tree
 
     def run(self) -> ReadinessReport:
         """Run parent readiness checks."""
         findings: list[Finding] = []
         checked: list[str] = []
+        tree_findings, tree_checked, tree_command = TreeDisplayChecker(
+            self.root,
+            self.tree_depth,
+            self.skip_tree,
+        ).run()
+        findings.extend(tree_findings)
+        checked.extend(tree_checked)
         findings.extend(SubmoduleShapeChecker(self.root, self.prefix, self.skip_submodule_check).run())
         try:
             manifest = load_manifest(self.root, self.prefix, self.manifest_path)
@@ -406,7 +463,7 @@ class ParentRepoReadinessChecker:
             sorted(findings, key=lambda item: (item.severity, item.category, item.path, item.detail))
         )
         status = "fail" if any(finding.severity == ERROR for finding in sorted_findings) else "pass"
-        return ReadinessReport(status, sorted_findings, tuple(checked))
+        return ReadinessReport(status, sorted_findings, tuple(checked), tree_command)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -435,6 +492,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Treat warning findings as failures.",
     )
+    parser.add_argument(
+        "--tree-depth",
+        type=int,
+        default=DEFAULT_TREE_DEPTH,
+        help="Depth for the canonical tree structure inspection command.",
+    )
+    parser.add_argument(
+        "--skip-tree",
+        action="store_true",
+        help="Skip tree command availability checking.",
+    )
     return parser
 
 
@@ -444,6 +512,7 @@ def render_json(report: ReadinessReport) -> str:
         {
             "status": report.status,
             "checked": list(report.checked),
+            "tree_command": report.tree_command,
             "findings": [asdict(finding) for finding in report.findings],
         },
         indent=2,
@@ -458,6 +527,7 @@ def render_text(report: ReadinessReport) -> None:
     errors = sum(1 for finding in report.findings if finding.severity == ERROR)
     warnings = sum(1 for finding in report.findings if finding.severity == WARN)
     print(f"PARENT_REPO_READINESS_CHECKED={','.join(report.checked) if report.checked else 'none'}")
+    print(f"PARENT_REPO_READINESS_TREE_COMMAND={report.tree_command}")
     print(f"PARENT_REPO_READINESS_ERRORS={errors}")
     print(f"PARENT_REPO_READINESS_WARNINGS={warnings}")
     print(f"PARENT_REPO_READINESS={report.status}")
@@ -482,6 +552,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         manifest_path=args.manifest,
         skip_container_config=args.skip_container_config,
         skip_submodule_check=args.skip_submodule_check,
+        tree_depth=args.tree_depth,
+        skip_tree=args.skip_tree,
     )
     report = checker.run()
     if args.format == "json":

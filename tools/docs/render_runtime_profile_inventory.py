@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Renders the runtime profile and check matrix doc from a machine-readable inventory.
-# upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
+# upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory machine mirror
 # downstream implementation ../../tools/agent_tools/check_runtime_profile_inventory.py drift checker compares rendered doc
 # downstream implementation ../../documents/runtime-profiles-and-check-matrix.md rendered documentation
 # @dependency-end
@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import cast
 
 DEFAULT_INVENTORY = Path("documents/runtime-profiles-and-check-matrix.json")
 DEFAULT_DOC = Path("documents/runtime-profiles-and-check-matrix.md")
@@ -34,9 +35,10 @@ downstream implementation ../tools/catalog.yaml structured tool catalog
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Render runtime profile inventory markdown from JSON source of truth."
+            "Render runtime profile inventory markdown from its JSON machine mirror."
         )
     )
     parser.add_argument(
@@ -63,17 +65,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_inventory(path: Path) -> dict[str, object]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("inventory JSON must be an object")
-    return raw
+    """Load and validate the runtime profile inventory object."""
+    raw: object = json.loads(path.read_text(encoding="utf-8"))
+    return require_object(raw, "inventory JSON")
 
 
 def render_paragraph(lines: list[str]) -> str:
+    """Render plain text lines as a Markdown paragraph."""
     return "\n".join(lines).rstrip() + "\n"
 
 
 def render_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Render rows as a Markdown table."""
     header_row = "| " + " | ".join(headers) + " |"
     separator_row = "| " + " | ".join(["---"] * len(headers)) + " |"
     body_rows = ["| " + " | ".join(row) + " |" for row in rows]
@@ -81,29 +84,48 @@ def render_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def require_string(value: object, field: str) -> str:
+    """Return a required non-empty string field."""
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string")
     return value
 
 
 def require_string_list(value: object, field: str) -> list[str]:
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    """Return a required list of strings."""
+    if not isinstance(value, list):
         raise ValueError(f"{field} must be a list of strings")
-    return list(value)
+    strings: list[str] = []
+    for item in cast(list[object], value):
+        if not isinstance(item, str):
+            raise ValueError(f"{field} must be a list of strings")
+        strings.append(item)
+    return strings
 
 
 def require_object_list(value: object, field: str) -> list[dict[str, object]]:
+    """Return a required list of objects."""
     if not isinstance(value, list):
         raise ValueError(f"{field} must be a list")
     objects: list[dict[str, object]] = []
-    for item in value:
-        if not isinstance(item, dict):
-            raise ValueError(f"{field} entries must be objects")
-        objects.append(item)
+    for item in cast(list[object], value):
+        objects.append(require_object(item, f"{field} entries"))
     return objects
 
 
+def require_object(value: object, field: str) -> dict[str, object]:
+    """Return a required string-keyed object."""
+    if not isinstance(value, dict):
+        raise ValueError(f"{field} must be an object")
+    normalized: dict[str, object] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if not isinstance(key, str):
+            raise ValueError(f"{field} keys must be strings")
+        normalized[key] = item
+    return normalized
+
+
 def collect_profile_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    """Collect Markdown table rows for profile classes."""
     profile_rows: list[list[str]] = []
     for item in items:
         profile = require_string(item.get("profile"), "profile_classes.profile")
@@ -120,6 +142,7 @@ def collect_profile_class_rows(items: list[dict[str, object]]) -> list[list[str]
 
 
 def collect_risk_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    """Collect Markdown table rows for risk classes."""
     risk_rows: list[list[str]] = []
     for item in items:
         risk = require_string(item.get("risk"), "risk_classes.risk")
@@ -133,6 +156,7 @@ def collect_risk_class_rows(items: list[dict[str, object]]) -> list[list[str]]:
 
 
 def collect_check_matrix_rows(items: list[dict[str, object]]) -> list[list[str]]:
+    """Collect Markdown table rows for check matrix entries."""
     check_rows: list[list[str]] = []
     for item in items:
         changed_surface = require_string(
@@ -147,7 +171,46 @@ def collect_check_matrix_rows(items: list[dict[str, object]]) -> list[list[str]]
     return check_rows
 
 
+def render_validation_failure_response(item: dict[str, object]) -> str:
+    """Render the validation failure response section."""
+    rule = require_string_list(
+        item.get("rule"),
+        "validation_failure_response.rule",
+    )
+    cause_classes = require_string_list(
+        item.get("cause_classes"),
+        "validation_failure_response.cause_classes",
+    )
+    required_fields = require_string_list(
+        item.get("required_fields"),
+        "validation_failure_response.required_fields",
+    )
+    intent_preservation = require_string_list(
+        item.get("intent_preservation"),
+        "validation_failure_response.intent_preservation",
+    )
+    repair_routes = require_string_list(
+        item.get("repair_routes"),
+        "validation_failure_response.repair_routes",
+    )
+
+    output: list[str] = []
+    output.append("## Validation Failure Response\n\n")
+    output.append(render_paragraph(rule) + "\n")
+    output.append("Required machine fields:\n\n")
+    output.extend(f"- `{field}`\n" for field in required_fields)
+    output.append("\n")
+    output.append("Valid `cause_classification` values are:\n\n")
+    output.extend(f"- `{cause_class}`\n" for cause_class in cause_classes)
+    output.append("\nValid `intent_preservation` values are:\n\n")
+    output.extend(f"- `{route}`\n" for route in intent_preservation)
+    output.append("\nIntent preservation routes:\n\n")
+    output.extend(f"- {repair_route}\n" for repair_route in repair_routes)
+    return "".join(output).rstrip() + "\n"
+
+
 def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_link: str) -> str:
+    """Render the full runtime profile inventory Markdown document."""
     title = require_string(inventory.get("title"), "inventory.title")
     summary = require_string_list(inventory.get("summary"), "inventory.summary")
     profile_classes = require_object_list(
@@ -167,12 +230,17 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
         "inventory.compatibility_note",
     )
     risk_note = require_string_list(inventory.get("risk_note"), "inventory.risk_note")
+    validation_failure_response = inventory.get("validation_failure_response")
+    validation_failure_response = require_object(
+        validation_failure_response,
+        "inventory.validation_failure_response",
+    )
     closeout_rule = require_string_list(
         inventory.get("closeout_rule"),
         "inventory.closeout_rule",
     )
 
-    output = []
+    output: list[str] = []
     output.append(DEPENDENCY_HEADER.rstrip() + "\n\n")
     output.append(f"# {title}\n\n")
     output.append(
@@ -190,7 +258,9 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
     risk_rows = collect_risk_class_rows(risk_classes)
     output.append(render_table(["Risk", "Examples", "Required validation"], risk_rows) + "\n")
 
-    output.append(render_paragraph(risk_note) + "\n\n")
+    output.append(render_paragraph(risk_note) + "\n")
+
+    output.append(render_validation_failure_response(validation_failure_response) + "\n")
 
     output.append("## Check Matrix\n\n")
     check_rows = collect_check_matrix_rows(check_matrix)
@@ -203,6 +273,7 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
 
 
 def main() -> int:
+    """Run the runtime profile inventory renderer."""
     args = build_parser().parse_args()
     inventory_path = Path(args.inventory)
     doc_path = Path(args.doc)

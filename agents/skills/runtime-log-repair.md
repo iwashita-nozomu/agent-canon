@@ -83,6 +83,14 @@ closeout_gate=<command or dashboard field that proves routed repair completion>
    dashboard-producing behavior or routing, rerun the focused route/eval/check
    that covers the changed owner. A full dashboard rerun is evidence only when
    the owner gate requires accumulated post-change measurement.
+1. owner-selected gate が fail した場合は、runtime-log repair intent の変更、
+   pass 目的の単純化、revert、intended behavior / test 削除、oracle weakening、
+   validation downscope の前に `failing_contract`、`observation_level`、
+   `cause_classification`、`intent_preservation`、`evidence` を Runtime Log
+   Repair Packet へ追記します。dashboard/schema/tooling の implementation bug は
+   owner intent を保って修復し、oracle / spec、fixture / environment / stale
+   artifact、unrelated failure、approved-design / user-request conflict は owner
+   route、residual、または escalation に分けます。
 
 ## Boundaries
 

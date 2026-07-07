@@ -10,20 +10,72 @@
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
+RUNTIME_PROFILE_INVENTORY = (
+    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+)
+
+
+class WorkflowMonitorModule(Protocol):
+    """Loaded workflow_monitor constants used by regression tests."""
+
+    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES: frozenset[str]
+    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES: frozenset[str]
+
+
+def load_monitor_module() -> WorkflowMonitorModule:
+    """Load workflow_monitor.py for constant-level regression checks."""
+    sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+    try:
+        spec = importlib.util.spec_from_file_location("workflow_monitor", MONITOR_SCRIPT)
+        if spec is None or spec.loader is None:
+            raise AssertionError("failed to load workflow_monitor module spec")
+        module = importlib.util.module_from_spec(spec)
+        prior_module = sys.modules.get(spec.name)
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+            return cast(WorkflowMonitorModule, module)
+        finally:
+            if prior_module is None:
+                sys.modules.pop(spec.name, None)
+            else:
+                sys.modules[spec.name] = prior_module
+    finally:
+        sys.path.pop(0)
 
 
 class WorkflowMonitorTest(unittest.TestCase):
     """Verify workflow monitoring is updated mechanically."""
+
+    def test_monitor_validation_failure_taxonomy_comes_from_runtime_inventory(
+        self,
+    ) -> None:
+        """Validation-failure slugs should be owned by the JSON inventory."""
+        data = json.loads(RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8"))
+        response = data["validation_failure_response"]
+        module = load_monitor_module()
+
+        self.assertEqual(
+            module.VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
+            frozenset(response["cause_classes"]),
+        )
+        self.assertEqual(
+            module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
+            frozenset(response["intent_preservation"]),
+        )
 
     def test_monitor_appends_signals_interventions_and_decisions(self) -> None:
         """The monitor CLI should update all monitored sections."""
@@ -317,6 +369,304 @@ class WorkflowMonitorTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("remaining_spawn_budget", result.stderr)
+
+    def test_monitor_records_read_only_validation_failure_triage_wave(self) -> None:
+        """Validation-failure triage may stay read-only before cause evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Agent Wave Ledger",
+                        (
+                            "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
+                            "Budget Before | Budget After | Runtime Max Threads | "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
+                            "Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                            "Validation Route | Review Gate | Handoff Artifacts | "
+                            "Delegated Policy Ref | Status |"
+                        ),
+                        (
+                            "| ------- | ------------------ | --------------- | ------- | "
+                            "------------- | ------------ | ------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
+                            "------------- | ----------- | ----------- | ---------------- | "
+                            "----------- | ----------------- | -------------------- | ------ |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-2 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=2/4 budget_after=1/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=test_designer "
+                        "role_instances=test_designer:triage:test_plan.md "
+                        "skipped_roles=none allowed_paths=tests/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=read_only "
+                        "validation_route=pytest review_gate=parent_integration "
+                        "handoff_artifacts=reports/agents/run-1/triage_packet.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "trigger=validation_failure_requires_parallel_triage",
+                monitoring_text,
+            )
+            self.assertIn("write_scope=read_only", monitoring_text)
+
+    def test_monitor_accepts_generated_read_only_until_cause_identified_scope(
+        self,
+    ) -> None:
+        """Generated manifest read-only triage value should be accepted."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Agent Wave Ledger",
+                        (
+                            "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
+                            "Budget Before | Budget After | Runtime Max Threads | "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
+                            "Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                            "Validation Route | Review Gate | Handoff Artifacts | "
+                            "Delegated Policy Ref | Status |"
+                        ),
+                        (
+                            "| ------- | ------------------ | --------------- | ------- | "
+                            "------------- | ------------ | ------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
+                            "------------- | ----------- | ----------- | ---------------- | "
+                            "----------- | ----------------- | -------------------- | ------ |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-2 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=2/4 budget_after=1/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=test_designer "
+                        "role_instances=test_designer:triage:test_plan.md "
+                        "skipped_roles=none allowed_paths=tests/agent_tools "
+                        "do_not_read=reports/agents/other "
+                        "write_scope=read_only_until_cause_identified "
+                        "validation_route=pytest review_gate=parent_integration "
+                        "handoff_artifacts=reports/agents/run-1/triage_packet.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "write_scope=read_only_until_cause_identified",
+                monitoring_text,
+            )
+
+    def test_monitor_rejects_validation_failure_repair_without_cause_evidence(
+        self,
+    ) -> None:
+        """Write-capable validation repair requires cause-classification evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-2 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=2/4 budget_after=1/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=worker "
+                        "role_instances=worker:repair:team_manifest.yaml#repair "
+                        "skipped_roles=none allowed_paths=tools/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=tools/agent_tools "
+                        "validation_route=pytest review_gate=change_reviewer "
+                        "handoff_artifacts=reports/agents/run-1/repair_packet.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("validation failure repair wave", result.stderr)
+            self.assertIn("failing_contract", result.stderr)
+            self.assertIn("cause_classification", result.stderr)
+
+    def test_monitor_records_validation_failure_repair_evidence(self) -> None:
+        """Write-capable validation repair should emit preserved-intent tokens."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Agent Wave Ledger",
+                        (
+                            "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | "
+                            "Budget Before | Budget After | Runtime Max Threads | "
+                            "Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / "
+                            "Rationale | Allowed Paths | Do Not Read | Write Scope | "
+                            "Validation Route | Review Gate | Handoff Artifacts | "
+                            "Delegated Policy Ref | Status |"
+                        ),
+                        (
+                            "| ------- | ------------------ | --------------- | ------- | "
+                            "------------- | ------------ | ------------------- | "
+                            "----------------- | ------------- | -------------- | ------------------------- | "
+                            "------------- | ----------- | ----------- | ---------------- | "
+                            "----------- | ----------------- | -------------------- | ------ |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-3 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=2/4 budget_after=1/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=worker "
+                        "role_instances=worker:repair:team_manifest.yaml#repair "
+                        "skipped_roles=none allowed_paths=tools/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=tools/agent_tools "
+                        "validation_route=pytest review_gate=change_reviewer "
+                        "handoff_artifacts=reports/agents/run-1/repair_packet.md "
+                        "failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=implementation_bug "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run-1/cause_investigation.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("failing_contract=pytest", monitoring_text)
+            self.assertIn("observation_level=public_cli", monitoring_text)
+            self.assertIn("cause_classification=implementation_bug", monitoring_text)
+            self.assertIn("intent_preservation=repair_same_intent", monitoring_text)
+
+    def test_monitor_rejects_noncanonical_validation_failure_cause_slug(self) -> None:
+        """Validation failure cause_classification must use token-safe slugs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--subagent-wave",
+                    (
+                        "wave_id=WAVE-3 parent_or_delegate=parent "
+                        "spawn_authority=parent_runtime_authority "
+                        "trigger=validation_failure_requires_parallel_triage "
+                        "budget_before=2/4 budget_after=1/4 "
+                        "runtime_max_threads=24 runtime_max_depth=2 "
+                        "spawned_roles=worker "
+                        "role_instances=worker:repair:team_manifest.yaml#repair "
+                        "skipped_roles=none allowed_paths=tools/agent_tools "
+                        "do_not_read=reports/agents/other write_scope=tools/agent_tools "
+                        "validation_route=pytest review_gate=change_reviewer "
+                        "handoff_artifacts=reports/agents/run-1/repair_packet.md "
+                        "failing_contract=pytest "
+                        "observation_level=public_cli "
+                        "cause_classification=test_oracle/spec_mismatch "
+                        "intent_preservation=repair_same_intent "
+                        "evidence=reports/agents/run-1/cause_investigation.md "
+                        "status=completed"
+                    ),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("cause_classification", result.stderr)
+            self.assertIn("test_oracle_spec_mismatch", result.stderr)
 
     def test_monitor_rejects_mid_task_user_input_with_wrong_action(self) -> None:
         """Classification and redispatch action should be mechanically consistent."""

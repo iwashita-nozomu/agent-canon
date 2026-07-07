@@ -75,6 +75,14 @@ Execute the required and task-matching conditional commands that the packet prin
    - for each candidate PR, inspect `gh pr view` and `gh pr checks`.
 1. Classify each PR as `ready`, `behind`, `conflicting`, `draft`,
    `checks-failing`, `review-blocked`, `stale`, or `dependent-pin`.
+1. For `checks-failing` or validation failure after branch repair, record
+   `failing_contract`, `observation_level`, `cause_classification`,
+   `intent_preservation`, and `evidence` in the PR log or run bundle before
+   pass-only simplification, revert, intended behavior/test deletion, oracle
+   weakening, or validation downscope. Preserve the PR Essence for
+   implementation bugs; route oracle/spec, fixture/environment/stale artifact,
+   unrelated, and approved-design/user-request conflicts to owner repair,
+   residual, or escalation before the merge gate.
 1. Treat requested-change or rejecting reviews as branch repair signals, not
    authority to revert the PR's user request or PR Essence. Repair the head
    branch so the original design intent remains covered, or record withdrawal,

@@ -8,6 +8,7 @@ contract skill
 responsibility Documents Subagent Bootstrap for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
+upstream design ../../../agents/internal-routines/subagent-startup.md owns private subagent startup route labels
 @dependency-end
 -->
 
@@ -40,6 +41,9 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
+1. Read `agents/internal-routines/subagent-startup.md` before preparing
+   subagent-only startup or internal skill route handoffs. Treat `_...` startup
+   names as private route labels, not public skill IDs.
 1. Treat `agents/COMMUNICATION_PROTOCOL.md` as the single owner of handoff and
    capsule fields. This skill owns launch timing, role selection, wave ledger,
    authorization, and closeout mechanics; it does not create a second capsule
@@ -69,6 +73,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
 1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, pass deterministic fallback output as a provisional source-packet seed or record `router_unavailable_blocker` before handoff. Fallback routing reaches `fallback_exit_status` through `canonical_rerun_pass`, `durable_blocker_or_issue`, or `explicit_approval_evidence`.
 1. Treat every spawned subagent as fresh: build the `Fresh Subagent Context Capsule` through `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`. Keep full packets, raw stdout, raw logs, broad chat summaries, and full dashboards in local/tool context by path instead of pasting them into the prompt.
+1. When `team_manifest.yaml` provides
+   `run.subagent_prompt_packet.subagent_startup_route`, carry that structural
+   route field into the handoff packet and downstream review result. Do not
+   convert it into prompt keyword routing, public `ACTIVE_SKILLS`, or a
+   duplicated capsule schema.
 1. For theorem-driven, algorithm, or implementation handoffs, include the
    protocol-owned `Target Binding Packet` in the capsule before spawning. If the
    packet is incomplete, repair the capsule or source packet first. A subagent's
@@ -86,6 +95,11 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For same-role log-analysis instances, use an id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` and give each instance its own structured evidence cell, allowed paths, expected output, validation route, and review gate.
 1. After the parent or delegated stage owner actually spawns, skips, or replaces a wave, record it with `python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...`; delegated child waves must include `remaining_spawn_budget`.
 1. Treat a wave as an adaptive loop, not a fixed one-shot fan-out. The parent integrates each wave result, reruns the same checker / validation route, turns remaining frontier rows into the next bounded handoff queue, and spawns fresh follow-up agents when repository / code / tool action can advance the frontier. Do not return `unverified_with_next_witness`, `connection_unconnected`, or bridge gaps as user-facing stopping points while the next frontier can still be worked.
+1. When returning a validation failure to the next writer, include
+   `failing_contract`, `observation_level`, `cause_classification`,
+   `intent_preservation`, and `evidence` in the handoff, and forbid pass-only
+   simplification, revert, intended behavior/test deletion, oracle weakening,
+   or validation downscope.
 1. For each new user request, start fresh run-local subagents; do not `send_input` a new task into subagents from a previous request.
 1. For user instructions added while the same active task is still running, do not drop the active multi-agent wave. The parent must classify the input as `same_active_task_delta`, `scope_or_contract_change`, or `new_task`; record a checkpoint in the run bundle, Agent Wave Ledger, and workflow monitoring; then either send the updated packet to the still-valid run-local agent or spawn a fresh follow-up wave when scope, allowed paths, owner, or review gate changed.
 1. When context changes mid-task, update the capsule artifact path and send that path; do not append unbounded chat summaries to old handoff prompts.

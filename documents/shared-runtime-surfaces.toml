@@ -138,6 +138,22 @@ paths = [
   "documents/remote-execution-repo-contract.md",
 ]
 
+[[surface]]
+path = ".codex/project-skills"
+mode = "regular"
+owner = "project"
+class = "project_content"
+local_override_allowed = true
+optional = true
+
+[[surface]]
+path = ".codex/project-config.toml"
+mode = "regular"
+owner = "project"
+class = "project_config"
+local_override_allowed = true
+optional = true
+
 [[group]]
 mode = "symlink"
 owner = "agent-canon"

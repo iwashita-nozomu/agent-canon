@@ -14,11 +14,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
 
 DEFAULT_MANIFEST = Path("documents/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/SHARED_RUNTIME_SURFACES.md")
@@ -50,6 +50,7 @@ ALLOWED_CLASSES = frozenset(
         "shared_template",
         "active_contract",
         "durable_state",
+        "project_config",
         "project_content",
         "test_mirror",
         "github_copy",
@@ -57,7 +58,7 @@ ALLOWED_CLASSES = frozenset(
         "removed_legacy",
     }
 )
-DOC_REQUIRED_MARKERS = (
+DOC_ALWAYS_REQUIRED_MARKERS = (
     "documents/shared-runtime-surfaces.toml",
     ".codex/hooks.json",
     ".codex/hooks",
@@ -71,6 +72,10 @@ DOC_REQUIRED_MARKERS = (
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
+DOC_MARKERS_BY_MANIFEST_PATH = {
+    ".codex/project-config.toml": (".codex/project-config.toml",),
+    ".codex/project-skills": (".codex/project-skills",),
+}
 
 
 @dataclass(frozen=True)
@@ -301,7 +306,7 @@ def render_regular_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
     lines = [
         f"{entry.path}:{source_for_entry(prefix, entry) if entry.source else ''}"
         for entry in entries
-        if entry.mode == "regular"
+        if entry.mode == "regular" and not entry.optional
     ]
     return "\n".join(lines)
 
@@ -328,7 +333,7 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     doc_paths = (root / prefix / DEFAULT_DOC, root / DEFAULT_DOC)
     doc_path = next((path for path in doc_paths if path.is_file()), doc_paths[-1])
     doc_text = doc_path.read_text(encoding="utf-8") if doc_path.is_file() else ""
-    for marker in DOC_REQUIRED_MARKERS:
+    for marker in required_doc_markers(manifest):
         if marker not in doc_text:
             findings.append(f"SURFACE_MANIFEST_FINDING={marker}:missing-doc-marker")
     sync_path = root / prefix / "tools" / "sync_agent_canon.sh"
@@ -340,6 +345,16 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     if not manifest.entries:
         findings.append("SURFACE_MANIFEST_FINDING=documents/shared-runtime-surfaces.toml:empty-manifest")
     return findings
+
+
+def required_doc_markers(manifest: SurfaceManifest) -> tuple[str, ...]:
+    """Return doc markers required by always-on policy and active manifest entries."""
+    markers: list[str] = list(DOC_ALWAYS_REQUIRED_MARKERS)
+    manifest_paths = {entry.path for entry in manifest.entries}
+    for path, path_markers in DOC_MARKERS_BY_MANIFEST_PATH.items():
+        if path in manifest_paths:
+            markers.extend(path_markers)
+    return tuple(markers)
 
 
 def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str, str]:

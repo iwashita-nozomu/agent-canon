@@ -36,5 +36,14 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read producer stdout / stderr summaries from `reports/agent-eval-runs/<run-id>/`; avoid broad raw archive searches. Treat those stdout / stderr files as transient, summarize the needed lines into the run bundle, then remove them before closeout.
 1. Rerun `eval_accumulation_check.py` with `--compact-out reports/agents/<run-id>/eval-accumulation-after.json` and require `EVAL_ACCUMULATION=pass` plus `EVAL_ACCUMULATION_BLOCKING_FINDINGS=0` before using the accumulated evidence as green closeout evidence.
 1. If a producer fails, record `workflow_monitor.py --runtime-feedback "source=eval target=<skill-or-workflow-or-tool> action=prompt_repair reason=<producer-failure>"` and repair the target surface before closing the task.
+1. If a producer or `eval_accumulation_check.py` fails, record
+   `failing_contract`, `observation_level`, `cause_classification`,
+   `intent_preservation`, and `evidence` before treating the family as green.
+   Use `intent_preservation` for the same-intent repair or escalation route.
+   Do not skip producers to pass, delete intended eval/oracle coverage, weaken
+   an oracle, downscope validation, or hand-write source-tree substitutes.
+   Route producer bugs, oracle/spec mismatches, fixture/environment/stale
+   generated artifacts, unrelated failures, and approved-design/user-request
+   conflicts to owner repair, residual, or escalation.
 1. After producer runs create archive artifacts, use `python3 tools/agent_tools/runtime_log_archive_git.py sync` or `push` so append-only eval evidence is saved on the log archive branch.
 1. Run `python3 tools/agent_tools/generated_artifact_guard.py --root .` and require `GENERATED_ARTIFACT_GUARD=pass`; do not leave regeneratable `reports/agent-eval-runs/<run-id>/*.stdout.txt` or `*.stderr.txt` files in the source tree.

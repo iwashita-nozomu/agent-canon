@@ -46,3 +46,10 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Check heading hierarchy, command/path formatting, Mermaid fenced blocks, markdown math, and broken links together.
 1. Treat broken links and heading drift as real findings.
 1. Last, inspect formatter-sensitive inline math and inline code in tables. A table cell must not contain a raw `|` inside backticks or inline math; if the formatter escapes backticks or splits a cell, split the expression out of the table, replace the cell with a short name, or otherwise repair the rendered Markdown, then rerun `tools/bin/agent-canon docs check <paths...>`.
+1. If a docs formatter/fixer/checker failure drives repair, record the
+   validation-failure-response packet (`failing_contract`, `observation_level`,
+   `cause_classification`, `intent_preservation`, and `evidence`). Use
+   `intent_preservation` for the same-intent repair / owner-route repair /
+   residual classification / escalation route. Do not close a docs-check failure by
+   pass-only scope shrink, link/heading oracle weakening, or validation
+   downscope.

@@ -18,6 +18,7 @@ import tomllib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import yaml
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
@@ -76,6 +77,7 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
     "tools/catalog.yaml",
 )
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
+SUBAGENT_STARTUP_ROUTE = "agents/internal-routines/subagent-startup.md"
 DEFERRED_SPAWN_ROLE_IDS = {
     "implementer",
     "change_reviewer",
@@ -201,6 +203,20 @@ PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE = (
     "waterfall_gate_check_design_pass",
     "document_flow_review_when_active",
 )
+VALIDATION_FAILURE_TRIAGE_TRIGGER = "validation_failure_requires_parallel_triage"
+VALIDATION_FAILURE_REPAIR_REQUIRED_FIELDS = (
+    "failing_contract",
+    "observation_level",
+    "cause_classification",
+    "intent_preservation",
+    "evidence",
+)
+VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES = (
+    "repair_same_intent",
+    "redesign_same_intent",
+    "escalate_design_conflict",
+)
+CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX = 6
 DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
 )
@@ -298,6 +314,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "pre_handoff_gate_status",
     "default_quality_check_policy",
     "subagent_lifecycle_policy",
+    "subagent_startup_route",
     "cross_cutting_document_packet",
     "role_document_packet",
     "context_artifacts",
@@ -584,19 +601,29 @@ class RunBundleSpec:
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    team = dict(raw["team"])
+    parsed: object = json.loads(path.read_text(encoding="utf-8"))
+    raw = _as_object_mapping(parsed, "team config")
+    team = _as_object_mapping(raw.get("team"), "team")
     always_on_roles = tuple(
-        _parse_role(role, "always") for role in raw["always_on_roles"]
+        _parse_role(role, "always")
+        for role in _as_mapping_tuple(raw.get("always_on_roles"), "always_on_roles")
     )
     specialist_roles = tuple(
-        _parse_role(role, "optional") for role in raw["specialist_roles"]
+        _parse_role(role, "optional")
+        for role in _as_mapping_tuple(raw.get("specialist_roles"), "specialist_roles")
     )
-    handoffs = tuple(dict(item) for item in raw["handoffs"])
-    context_policies = tuple(dict(item) for item in raw["context_policies"])
-    activation_rules = tuple(dict(item) for item in raw["activation_rules"])
-    quality_gates = tuple(str(item) for item in raw["quality_gates"])
-    artifacts = {str(key): str(value) for key, value in dict(raw["artifacts"]).items()}
+    handoffs = _as_mapping_tuple(raw.get("handoffs"), "handoffs")
+    context_policies = _as_mapping_tuple(
+        raw.get("context_policies"), "context_policies"
+    )
+    activation_rules = _as_mapping_tuple(
+        raw.get("activation_rules"), "activation_rules"
+    )
+    quality_gates = _as_string_tuple(raw.get("quality_gates"), "quality_gates")
+    artifacts = {
+        key: _as_required_string(value, f"artifacts.{key}")
+        for key, value in _as_object_mapping(raw.get("artifacts"), "artifacts").items()
+    }
     return TeamConfig(
         raw=raw,
         team=team,
@@ -613,9 +640,8 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
 def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
     """Load the task catalog referenced by the team config."""
     catalog_path = root / str(config.team["task_catalog"])
-    raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise RuntimeError(f"task catalog must parse as a mapping: {catalog_path}")
+    parsed: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    raw = _as_object_mapping(parsed, f"task catalog {catalog_path}")
     return TaskCatalog(
         raw=raw,
         workflow_families=_as_mapping_tuple(
@@ -1049,6 +1075,9 @@ def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, in
         raise RuntimeError(
             f"workflow family spawn_budget must be a mapping for {family_id}"
         )
+    raw_budget = _as_object_mapping(
+        cast(object, raw_budget), f"workflow_families[{family_id}].spawn_budget"
+    )
     active = raw_budget.get("active_subagents")
     max_write = raw_budget.get("max_write_subagents")
     if not isinstance(active, int) or active < 1:
@@ -1086,10 +1115,12 @@ def codex_runtime_max_depth() -> int:
 def codex_runtime_agent_int(key: str) -> int:
     """Return one configured integer from the Codex [agents] runtime section."""
     config_path = ROOT / ".codex" / "config.toml"
-    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    parsed: object = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    data = _as_object_mapping(parsed, ".codex/config.toml")
     agents = data.get("agents")
     if not isinstance(agents, dict):
         raise RuntimeError("missing [agents] section in .codex/config.toml")
+    agents = _as_object_mapping(cast(object, agents), ".codex/config.toml agents")
     value = agents.get(key)
     if not isinstance(value, int) or value < 1:
         raise RuntimeError(f"agents.{key} must be an integer >= 1")
@@ -1294,6 +1325,9 @@ def default_specialists_for_task(
         raise RuntimeError(
             f"workflow family roles must be a mapping for {family['id']}"
         )
+    family_roles = _as_object_mapping(
+        cast(object, family_roles), f"workflow_families[{family['id']}].roles"
+    )
     family_specialists = _as_string_tuple(
         family_roles.get("specialists"),
         f"workflow_families[{family['id']}].roles.specialists",
@@ -1373,6 +1407,10 @@ def workflow_always_on_roles(
     family_roles = family.get("roles", {})
     if not isinstance(family_roles, dict):
         return config.always_on_roles
+    family_roles = _as_object_mapping(
+        cast(object, family_roles),
+        f"workflow_families[{workflow_family_id}].roles",
+    )
     role_ids = _as_string_tuple(
         family_roles.get("always_on"),
         f"workflow_families[{workflow_family_id}].roles.always_on",
@@ -1908,9 +1946,18 @@ def manifest_run_lines(
         lines.append("    expansion_triggers:")
         lines.append("      - new_independent_stage")
         lines.append("      - review_finding_opens_independent_scope")
-        lines.append("      - validation_failure_requires_parallel_triage")
+        lines.append(f"      - {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
         lines.append("      - disjoint_write_scope_available")
         lines.append("      - blocked_role_replacement")
+        lines.append("    validation_failure_triage_policy:")
+        lines.append(f"      trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
+        lines.append("      triage_write_scope: read_only_until_cause_identified")
+        lines.append("      repair_required_fields:")
+        for field in VALIDATION_FAILURE_REPAIR_REQUIRED_FIELDS:
+            lines.append(f"        - {field}")
+        lines.append("      intent_preservation_values:")
+        for value in VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES:
+            lines.append(f"        - {value}")
         lines.append("    same_role_instances:")
         lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
         lines.append(
@@ -1971,6 +2018,12 @@ def manifest_run_lines(
             "dynamic skill candidates, and tool evidence in every handoff packet"
         )
         lines.append(
+            "      - validation_failure_requires_parallel_triage waves stay read-only "
+            "until failing_contract, observation_level, cause_classification, "
+            "intent_preservation, and evidence are recorded for same-intent repair "
+            "or escalation"
+        )
+        lines.append(
             "      - run delegated_spawn_policy.wave_record_command after any "
             "actual parent or delegated child spawn; delegated child waves must "
             "include remaining_spawn_budget"
@@ -2028,7 +2081,10 @@ def manifest_contract_complete_implementation_policy_lines(
         "    required_inputs:",
     ]
     if implementation_handoff_required(task_text):
-        lines[6:6] = [
+        lines[
+            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:
+            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
+        ] = [
             f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
             f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
             "    parent_direct_write_exception_required: "
@@ -2375,14 +2431,19 @@ def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
     lines = ["context_policies:"]
     for policy in config.context_policies:
         lines.append("  - roles:")
-        for role_name in tuple(policy["roles"]):
+        for role_name in _as_string_tuple(policy.get("roles"), "context_policies.roles"):
             lines.append(f"      - {role_name}")
-        lines.append(f"    mode: {policy['mode']}")
+        mode = _as_required_string(policy.get("mode"), "context_policies.mode")
+        lines.append(f"    mode: {mode}")
         lines.append("    share_only:")
-        for artifact in tuple(policy["share_only"]):
+        for artifact in _as_string_tuple(
+            policy.get("share_only"), "context_policies.share_only"
+        ):
             lines.append(f"      - {artifact}")
         lines.append("    do_not_share:")
-        for artifact in tuple(policy["do_not_share"]):
+        for artifact in _as_string_tuple(
+            policy.get("do_not_share"), "context_policies.do_not_share"
+        ):
             lines.append(f"      - {artifact}")
     return lines
 
@@ -2411,25 +2472,44 @@ def render_role_topology(
     topology = workflow_family.get("role_topology")
     if not isinstance(topology, dict):
         return []
+    topology = _as_object_mapping(cast(object, topology), "role_topology")
     lines = [f"{indent}role_topology:"]
     role_families = topology.get("role_families")
     if isinstance(role_families, dict):
         lines.append(f"{indent}  role_families:")
-        for family_name, agent_types in role_families.items():
+        for family_name, agent_types in _as_object_mapping(
+            cast(object, role_families), "role_topology.role_families"
+        ).items():
             lines.append(f"{indent}    {family_name}:")
             if isinstance(agent_types, list):
-                for agent_type in agent_types:
-                    lines.append(f"{indent}      - {str(agent_type)}")
+                for agent_type in _as_string_tuple(
+                    cast(object, agent_types),
+                    f"role_topology.role_families.{family_name}",
+                ):
+                    lines.append(f"{indent}      - {agent_type}")
+            elif isinstance(agent_types, str):
+                lines.append(f"{indent}      - {agent_types}")
             else:
-                lines.append(f"{indent}      - {str(agent_types)}")
+                raise RuntimeError(
+                    "role_topology.role_families entries must be strings or lists "
+                    f"of strings: {family_name}"
+                )
     same_role_instances = topology.get("same_role_parallel_instances")
     if isinstance(same_role_instances, dict):
         lines.append(f"{indent}  same_role_parallel_instances:")
-        for key, value in same_role_instances.items():
+        for key, value in _as_object_mapping(
+            cast(object, same_role_instances),
+            "role_topology.same_role_parallel_instances",
+        ).items():
             if isinstance(value, bool):
                 rendered_value = "true" if value else "false"
+            elif isinstance(value, str):
+                rendered_value = value
             else:
-                rendered_value = str(value)
+                raise RuntimeError(
+                    "role_topology.same_role_parallel_instances values must be "
+                    f"strings or booleans: {key}"
+                )
             lines.append(f"{indent}    {key}: {rendered_value}")
     return lines
 
@@ -2442,10 +2522,14 @@ def render_subagent_prompt_packet(
     prompt = workflow_family.get("subagent_prompt")
     if not isinstance(prompt, dict):
         return []
+    prompt = _as_object_mapping(cast(object, prompt), "subagent_prompt")
     lines = [f"{indent}subagent_prompt_packet:"]
-    purpose = str(prompt.get("purpose", ""))
+    purpose = _as_optional_string(prompt.get("purpose"), "subagent_prompt.purpose")
     if purpose:
         lines.append(f"{indent}  purpose: {purpose!r}")
+    lines.append(f"{indent}  subagent_startup_route: {SUBAGENT_STARTUP_ROUTE!r}")
+    lines.append(f"{indent}  internal_skill_routes:")
+    lines.append(f"{indent}    - {SUBAGENT_STARTUP_ROUTE!r}")
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(
         f"{indent}  tool_commands: 'run.repo_tool_routing_policy.sequential_tool_routes'"
@@ -2460,12 +2544,9 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}    - tool_rejection_prediction")
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
-        values = prompt.get(key, [])
-        if not isinstance(values, list):
-            values = []
         lines.append(f"{indent}  {key}:")
-        for value in values:
-            lines.append(f"{indent}    - {str(value)!r}")
+        for value in _as_prompt_entry_tuple(prompt.get(key), f"subagent_prompt.{key}"):
+            lines.append(f"{indent}    - {value!r}")
     return lines
 
 
@@ -2486,6 +2567,9 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
         f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
+        "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
+        "structural route field into the next handoff or review result without turning it "
+        "into prompt keyword skill activation. "
         "Carry run.repo_tool_routing_policy tool_route, tool_commands, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
@@ -2510,13 +2594,14 @@ def compact_role_prompt_contract(
     return (
         f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
         "role-specific packet, common packet only when active, allowed paths, "
-        "repo tool route fields, and the listed output fields."
+        "subagent startup route when present, repo tool route fields, and the listed "
+        "output fields."
     )
 
 
 def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     """Return handoff fields every invocation prompt should include for one role."""
-    common = []
+    common: list[str] = []
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
     if role.id == "designer":
@@ -2754,27 +2839,47 @@ def make_run_id(task: str, created_at: datetime) -> str:
 
 def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
     """Parse a role from json."""
-    raw_write_policy = dict(raw_role["write_policy"])
+    role_id = _as_required_string(raw_role.get("id"), "role.id")
+    raw_write_policy = _as_object_mapping(
+        raw_role.get("write_policy"), f"roles[{role_id}].write_policy"
+    )
     write_policy = WritePolicy(
-        mode=str(raw_write_policy["mode"]),
-        allowed_artifacts=tuple(
-            str(item) for item in raw_write_policy["allowed_artifacts"]
+        mode=_as_required_string(
+            raw_write_policy.get("mode"), f"roles[{role_id}].write_policy.mode"
         ),
-        allowed_directories=tuple(
-            str(item) for item in raw_write_policy.get("allowed_directories", ())
+        allowed_artifacts=_as_string_tuple(
+            raw_write_policy.get("allowed_artifacts"),
+            f"roles[{role_id}].write_policy.allowed_artifacts",
         ),
-        requires_worktree_scope=bool(
-            raw_write_policy.get("requires_worktree_scope", False)
+        allowed_directories=_as_string_tuple(
+            raw_write_policy.get("allowed_directories"),
+            f"roles[{role_id}].write_policy.allowed_directories",
         ),
-        notes=str(raw_write_policy.get("notes", "")),
+        requires_worktree_scope=_as_bool(
+            raw_write_policy.get("requires_worktree_scope", False),
+            f"roles[{role_id}].write_policy.requires_worktree_scope",
+        ),
+        notes=_as_optional_string(
+            raw_write_policy.get("notes"), f"roles[{role_id}].write_policy.notes"
+        ),
+    )
+    raw_activation = raw_role.get("activation")
+    activation = (
+        default_activation
+        if raw_activation is None
+        else _as_required_string(raw_activation, f"roles[{role_id}].activation")
     )
     return Role(
-        id=str(raw_role["id"]),
-        owns=tuple(str(item) for item in raw_role["owns"]),
-        required_outputs=tuple(str(item) for item in raw_role["required_outputs"]),
-        activation=str(raw_role.get("activation", default_activation)),
+        id=role_id,
+        owns=_as_string_tuple(raw_role.get("owns"), f"roles[{role_id}].owns"),
+        required_outputs=_as_string_tuple(
+            raw_role.get("required_outputs"), f"roles[{role_id}].required_outputs"
+        ),
+        activation=activation,
         write_policy=write_policy,
-        codex_agents=tuple(str(item) for item in raw_role.get("codex_agents", ())),
+        codex_agents=_as_string_tuple(
+            raw_role.get("codex_agents"), f"roles[{role_id}].codex_agents"
+        ),
     )
 
 
@@ -2941,11 +3046,21 @@ def _as_mapping_tuple(value: object, field_name: str) -> tuple[dict[str, object]
     if not isinstance(value, list):
         raise RuntimeError(f"{field_name} must be a list")
     normalized: list[dict[str, object]] = []
-    for item in value:
-        if not isinstance(item, dict):
-            raise RuntimeError(f"{field_name} entries must be mappings")
-        normalized.append(dict(item))
+    for item in cast(list[object], value):
+        normalized.append(_as_object_mapping(item, f"{field_name} entries"))
     return tuple(normalized)
+
+
+def _as_object_mapping(value: object, field_name: str) -> dict[str, object]:
+    """Validate a string-keyed mapping and return a typed copy."""
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{field_name} must be a mapping")
+    normalized: dict[str, object] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if not isinstance(key, str):
+            raise RuntimeError(f"{field_name} keys must be strings")
+        normalized[key] = item
+    return normalized
 
 
 def _as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
@@ -2955,8 +3070,60 @@ def _as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise RuntimeError(f"{field_name} must be a list")
     normalized: list[str] = []
-    for item in value:
+    for item in cast(list[object], value):
         if not isinstance(item, str):
             raise RuntimeError(f"{field_name} entries must be strings")
         normalized.append(item)
     return tuple(normalized)
+
+
+def _as_prompt_entry_tuple(value: object, field_name: str) -> tuple[str, ...]:
+    """Validate prompt entries and render them with the legacy manifest shape."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RuntimeError(f"{field_name} must be a list")
+    return tuple(
+        _render_prompt_entry(item, f"{field_name} entries")
+        for item in cast(list[object], value)
+    )
+
+
+def _render_prompt_entry(value: object, field_name: str) -> str:
+    """Render one prompt entry after validating supported YAML shapes."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        mapping = _as_object_mapping(cast(object, value), field_name)
+        if not mapping:
+            raise RuntimeError(f"{field_name} mapping entries must not be empty")
+        rendered: dict[str, str] = {}
+        for key, item in mapping.items():
+            if not isinstance(item, str):
+                raise RuntimeError(f"{field_name} mapping values must be strings")
+            rendered[key] = item
+        return str(rendered)
+    raise RuntimeError(f"{field_name} entries must be strings or mappings")
+
+
+def _as_required_string(value: object, field_name: str) -> str:
+    """Validate one required string field."""
+    if not isinstance(value, str):
+        raise RuntimeError(f"{field_name} must be a string")
+    return value
+
+
+def _as_optional_string(value: object, field_name: str) -> str:
+    """Validate one optional string field."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise RuntimeError(f"{field_name} must be a string")
+    return value
+
+
+def _as_bool(value: object, field_name: str) -> bool:
+    """Validate one boolean field."""
+    if not isinstance(value, bool):
+        raise RuntimeError(f"{field_name} must be a boolean")
+    return value

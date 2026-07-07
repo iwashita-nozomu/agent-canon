@@ -37,6 +37,7 @@ Rules:
 - do not handle API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, or config-surface gaps through local fallback, wrappers, helpers, branches, compatibility routes, test relaxation, or docs overwrite
 - if checkpoint review returns revise, fix only the bounded finding assigned to this slice; do not expand scope
 - if checkpoint review rejects the slice or returns `required_change`, preserve the request clause and approved design intent through the bounded repair; return to worker or design review instead of reverting or discarding the requested behavior without authority evidence
+- on any validation test/check failure, before changing slice intent, deleting behavior/tests, reverting, or weakening an oracle, record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`; when `cause_classification=implementation_bug` has a stable contract, proceed to the owning code/config/docs/workflow repair instead of blocking behind extra test planning; use the canonical token-safe slug sets and repair-route semantics owned by `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md`
 - after finishing a slice, report remaining planned work units and the next required gate; do not claim user-facing completion
 - report exactly which files changed
 """

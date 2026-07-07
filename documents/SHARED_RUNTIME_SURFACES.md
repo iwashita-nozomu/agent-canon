@@ -79,6 +79,25 @@ Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 
+### Project-Owned Skill Lane
+
+Parent repositories may add repo-specific Codex skills under
+`.codex/project-skills/<skill-id>/SKILL.md`. This lane is project-owned regular
+content and must not be symlinked into `vendor/agent-canon/.agents` or mixed
+into the AgentCanon `.agents/skills/` public catalog. If a parent root needs a
+repo-specific skill, it uses the optional parent-owned overlay
+`.codex/project-config.toml` with `[[skills.config]] path =
+"project-skills/<skill-id>/SKILL.md"`. Parent repositories must not edit the
+AgentCanon-owned symlink view `.codex/config.toml` to enable project-local
+skills.
+
+AgentCanon-owned `.agents/skills/` remains the shared public skill surface.
+`check_agent_runtime_alignment.py` validates both config lanes: all AgentCanon
+public shims must stay enabled from `.codex/config.toml`, and any extra
+configured skill must come from `.codex/project-config.toml` and live under the
+project-owned `.codex/project-skills/` lane. `link-root` does not populate
+either parent-owned path; both are optional project content.
+
 ### Tools Directory Boundary
 
 Root `tools/` is a symlink view, not a project-local implementation directory.
