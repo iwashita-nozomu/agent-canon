@@ -1,6 +1,6 @@
 ---
 name: user-guided-debugging
-description: Use when the user explicitly asks to debug or repair one issue at a time with visible problem statements before each edit and a next-issue prompt after each validated fix.
+description: Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix.
 ---
 <!--
 @dependency-start
@@ -36,6 +36,6 @@ Execute the required and task-matching conditional commands that the packet prin
    - intended repair surface
 1. Do not patch before that problem statement is visible in chat.
 1. Keep the patch scoped to the displayed target unless evidence moves the root cause; if it moves, show the new problem statement before editing.
-1. Run local validation for the repaired target.
-1. Report the validation result and present the next concrete issue.
+1. Do not run tests, smoke runs, lint, docs checks, benchmarks, or other validation commands in this cadence unless the user explicitly asks for that execution after the patch.
+1. Report the patch result, state that validation was not run when it was skipped, and present the next concrete issue.
 1. Use this skill only when the user explicitly asks for this cadence; do not make it an `agent-orchestration` default.
