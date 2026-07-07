@@ -22,7 +22,9 @@ downstream implementation ../../.agents/skills/user-guided-debugging/SKILL.md ex
 ## Core Loop
 
 1. 次に直す対象を 1 件選ぶ。
+1. 実装修復が必要なら、その対象 issue ごとに fresh な実装 worker を修復ハンドオフ前に準備する。既定は task-appropriate worker とし、PDIPM ユーザーガイド付きデバッグでは `gpt-5.3-codex-spark`（high reasoning）を使う。
 1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示する。
+   - worker は問題点提示を経ずに patch に進まない（1 問題 1 修正の可視性を維持する）。
 1. 問題点を提示する前に patch しない。
 1. 根本原因が別 object に移ったら、編集前に新しい問題点を提示する。
 1. この cadence では、修正後に test、smoke run、lint、docs check、benchmark、その他 validation command を実行しない。patch 後にユーザーが明示した場合だけ実行する。
