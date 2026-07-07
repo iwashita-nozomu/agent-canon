@@ -20,6 +20,11 @@ Workflow-routed review, validation, and compatibility routines live in
 
 Runtime alignment enforces that public skill docs, catalog IDs, and
 `.agents/skills/*/SKILL.md` shims stay in parity.
+Parent-repo-specific skills use the separate project-owned
+`.codex/project-skills/<skill>/SKILL.md` lane documented in
+`../skills/README.md` and are enabled through parent-owned
+`.codex/project-config.toml`; they do not enter the AgentCanon public catalog
+unless promoted to shared canon.
 
 Naming carries the visibility boundary:
 

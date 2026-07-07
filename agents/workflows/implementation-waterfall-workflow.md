@@ -91,6 +91,10 @@ README、workflow、guide、migration、specification など file responsibility
 また、`計画レビュー`、`詳細設計レビュー`、active な `文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 behavior-changing、regression-prone、または high-risk code pass では、実装前に
 `test_designer` を独立に立て、static path と nasty case を test plan として固定します。
+`cause_classification=implementation_bug` の validation failure は、
+`failing_contract`、`observation_level`、`cause_classification`、
+`intent_preservation`、`evidence` を記録した後、追加 test planning で止めずに
+owning implementation repair へ進めます。
 contract-only wrapper pass では、static contract validation と canonical checker command を validation evidence にします。
 この gate 順は implementation sequence です。独立 workstream が複数ある場合、parent は同じ sequence を workstream ごとの stage owner に割り当て、evidence と review gate に応じて vertical dynamic wave を追加します。
 
@@ -530,7 +534,7 @@ exit 条件:
 ### Gate 7.5. テストケース設計
 
 目的:
-- 実装前に static path を洗い、境界ケース、failure path、regression-prone case を test plan に落とす
+- behavior-changing、regression-prone、high-risk、または oracle / spec risk がある場合に、実装前の static path、境界ケース、failure path、regression-prone case を test plan に落とす
 
 主担当:
 - `test_designer`
@@ -549,6 +553,7 @@ exit 条件:
 - `test_designer` は read-only とし、repo file は編集しません
 - 既存 test style、fixture layout、naming を先に調べ、そこへ寄せます
 - design や code path の静的解析から出る nasty case を曖昧な助言ではなく具体ケースとして残します
+- `cause_classification=implementation_bug` と判断でき、contract と oracle が安定している場合は、Gate 7.5 を再度広げず Gate 8 の owning implementation repair へ戻します
 - 実装者は test plan を読んで tests を同じ pass で落とし込みます
 
 exit 条件:
@@ -599,6 +604,7 @@ exit 条件:
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
+- validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、`agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
 - design section、request clause ID、test plan item に trace できない変更は実装しません
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
@@ -748,7 +754,7 @@ exit 条件:
 - 設計不整合、file plan の見直し、rollback 方針の欠落:
   - Gate 4-5 へ戻す
 - 実装ミスや test failure だが設計は維持できる:
-  - Gate 7 に戻して修正する
+  - `failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録し、`cause_classification=implementation_bug` なら Gate 8 の owning implementation repair に戻す。slug set と route semantics は validation-failure-response owner surfaces を参照する
 - 実験結果やユーザー要望で別仮説になった:
   - 既存 pass を閉じ、新しい change request として Gate 0 からやり直す
 

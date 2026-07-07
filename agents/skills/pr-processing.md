@@ -129,6 +129,14 @@ route を短く書きます。
    - `review-blocked`: requested changes / review request が残っている
    - `dependent-pin`: source PR merge 後の parent pin / root view PR
    - `stale`: base、目的、Issue、既存 main との差分を再判定する
+1. `checks-failing` または branch repair 後の validation failure では、修正前に
+   `failing_contract`、`observation_level`、`cause_classification`、
+   `intent_preservation`、`evidence` を PR log または run bundle に記録します。
+   pass 目的の単純化、revert、intended behavior / test 削除、oracle weakening、
+   validation downscope は、この分類なしに merge gate へ進めません。implementation
+   bug は PR Essence の intent を保持して修復し、oracle / spec、fixture /
+   environment / stale artifact、unrelated failure、approved-design / user-request
+   conflict は owner route、residual、または escalation に分けます。
 1. requested-change review や rejecting review は、head branch の修正 signal
    であり、PR Essence、user request、または design intent を戻す権限ではありません。
    branch repair は元の意図を保持して行い、slice を revert / discard する場合は

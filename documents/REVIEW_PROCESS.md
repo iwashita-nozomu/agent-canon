@@ -116,8 +116,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. 実装中に checkpoint review を入れ、decision が `approve` でない限り implementer に戻します。
 1. review artifact が `revise`、`required_change`、`rejected`、または
    requested-change review を返した場合、その判定は user request や design intent
-   を rollback する権限ではありません。実行 role は、指摘を
-   `repair_same_intent`、`redesign_same_intent`、`escalate_design_conflict`、
+   を rollback する権限ではありません。実行 role は、runtime profile taxonomy の
+   intent-preservation route、または review-only disposition
    `withdrawn_or_superseded`、`outside_owner`、`unsafe_replaced` のいずれかに
    分類し、保持する request clause と修正経路を artifact に残します。
 1. review 後の修正で実装 slice を削除、revert、または discard する場合は、
@@ -150,6 +150,16 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
    user request を縮める rollback になっていないことを確認します。rollback、
    revert、discard がある場合は、撤回 / 置換 / owner 外 / unsafe replacement /
    escalation の authority と、保持された design intent の証跡が必要です。
+1. validation test/check failure への応答では、通すための simplification、revert、
+   intended behavior/test の削除、oracle 弱体化、required validation の downscope を
+   認めません。先に `failing_contract`、`observation_level`、
+   `cause_classification`、`intent_preservation`、`evidence` を記録します。
+   `cause_classification` と `intent_preservation` の token-safe slug list は
+   `documents/runtime-profiles-and-check-matrix.json` が正本で、
+   `documents/runtime-profiles-and-check-matrix.md` が生成済み reader projection
+   です。この review checklist は slug list を独自定義せず、runtime profile
+   taxonomy の owner route に従って approved intent を保った修正または intent
+   変更前の escalation を確認します。
 1. review artifact が `revise`、`required_change`、または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、その修正量に関わらず full required review set を最初から再実行します。
 1. post-fix full review では、少なくとも `change_review.md`、`final_review.md`、task に必要な language / docs / specialist review artifact を最新の fix 後に作り直します。
 1. validation 実行後に final acceptance review を行い、必要なら追加修正や追加検証を行います。
@@ -207,6 +217,9 @@ findings は少なくとも次に分けます。
   - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
   - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
   - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの
+  - validation failure を通すために intended behavior/test を削る、oracle を弱める、
+    required validation を downscope する、または approved intent 変更前の
+    escalation を省くもの
 - `follow-up`
   - 今回の受け入れを阻害しないが、後続で管理すべきもの
 - `delete-ok`

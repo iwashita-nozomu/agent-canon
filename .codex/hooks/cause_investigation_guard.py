@@ -37,6 +37,7 @@ GIT_TIMEOUT_SECONDS = 10
 MAX_TEXT_BYTES = 160_000
 MAX_RECORDED_PATHS = 20
 MAX_EVIDENCE_FILES = 40
+DEFAULT_EVIDENCE_CANDIDATE_PRIORITY_RANK = 3
 CODE_SUFFIXES = {
     ".c",
     ".cc",
@@ -92,6 +93,13 @@ REQUIRED_TOKEN_GROUPS = (
     ("Hypothesis:", "Root Cause:", "Cause:"),
     ("Expected Fix Surface:", "Selected Surface:", "Fix Surface Justification:"),
     ("Validation Before Edit:", "Support Evidence:"),
+)
+VALIDATION_FAILURE_CAUSE_TOKENS = (
+    "failing_contract",
+    "observation_level",
+    "cause_classification",
+    "intent_preservation",
+    "evidence",
 )
 
 
@@ -309,7 +317,7 @@ def evidence_candidate_priority(root: Path, path: str) -> tuple[int, int, str]:
     elif name == "workflow_monitoring.md":
         rank = 2
     else:
-        rank = 3
+        rank = DEFAULT_EVIDENCE_CANDIDATE_PRIORITY_RANK
     try:
         mtime = (root / path).stat().st_mtime_ns
     except OSError:
@@ -411,6 +419,7 @@ def maybe_log(entry: dict[str, object], context: HookLogContext) -> None:
 
 def block_payload(intent: EditIntent, decision: EvidenceDecision) -> dict[str, object]:
     """Return a Codex hook block payload."""
+    validation_tokens = ",".join(VALIDATION_FAILURE_CAUSE_TOKENS)
     return {
         "decision": "block",
         "reason": (
@@ -418,18 +427,27 @@ def block_payload(intent: EditIntent, decision: EvidenceDecision) -> dict[str, o
             "hypothesis evidence was recorded. Create or update "
             "`reports/agents/<run-id>/cause_investigation.md`, an issue, or a "
             "design note with Observation, Hypothesis/Root Cause, Expected Fix "
-            "Surface/Selected Surface, and Validation Before Edit/Support Evidence."
+            "Surface/Selected Surface, and Validation Before Edit/Support Evidence. "
+            "For validation failures, classify the failing contract before repair "
+            "and preserve intent instead of deleting tests or weakening oracles."
         ),
         "next_action": "write_cause_investigation_evidence_then_retry_edit",
         "remediation": [
             "Record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit.",
+            (
+                "For failed validation/tests, also record failing_contract, "
+                "observation_level, cause_classification, intent_preservation, "
+                "and evidence for same-intent repair or escalation."
+            ),
             "Use `reports/agents/<run-id>/cause_investigation.md`, an issue, or a design note as the durable evidence path.",
             "Retry the edit only after the evidence exists in the worktree.",
         ],
         "findings": [
             "CAUSE_INVESTIGATION_FINDING="
             f"missing_or_incomplete:{','.join(intent.code_paths[:MAX_RECORDED_PATHS])}:"
-            f"evidence_source:{decision.source}"
+            f"evidence_source:{decision.source}",
+            "VALIDATION_FAILURE_CAUSE_CLASSIFICATION_REQUIRED="
+            f"{validation_tokens}",
         ],
     }
 

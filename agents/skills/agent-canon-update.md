@@ -91,6 +91,18 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+   This is the mandatory `agentcanon_structure_followup` gate for every
+   AgentCanon source change, parent submodule pin change, `.gitmodules` change,
+   AgentCanon-owned root runtime view change, shared root-copy surface change,
+   and parent root sync PR. Record `agentcanon_structure_followup=required`
+   when the task enters one of those surfaces, and record
+   `agentcanon_structure_followup=pass` only after `link-root` and `check` both
+   complete from the owning parent root. When the source change is made in
+   standalone AgentCanon or inside `vendor/agent-canon/`, run the parent /
+   derived root follow-up after the source PR is integrated or while preparing
+   the parent pin/root-view PR; do not close the source/pin lane with an
+   optional or "if needed" sync note.
+
 1. Handle parent update TODOs before unrelated work:
 
 ```bash
@@ -111,6 +123,9 @@ Record:
 - update route decision and dirty-surface classification
 - `git submodule status vendor/agent-canon` or standalone AgentCanon commit
 - AgentCanon PR URL or GitHub `main` SHA when source work was involved
-- `bash tools/sync_agent_canon.sh check`
+- `agentcanon_structure_followup=required` and
+  `agentcanon_structure_followup=pass` evidence, including
+  `bash tools/sync_agent_canon.sh link-root` and
+  `bash tools/sync_agent_canon.sh check`
 - parent update TODO status and completed / deferred task IDs
 - validation selected from `documents/runtime-profiles-and-check-matrix.md`

@@ -136,6 +136,14 @@ Execute the required and task-matching conditional commands that the packet prin
    review safety, or behavior-preservation evidence; otherwise record it as
    follow-up and continue with a corrected bounded handoff for unaffected
    targets.
+1. If refactor validation fails, record `failing_contract`,
+   `observation_level`, `cause_classification`, `intent_preservation`, and
+   `evidence` before changing behavior-preserving intent, simplifying to
+   pass, reverting, deleting intended behavior/tests, weakening an oracle, or
+   downscoping validation. Preserve `Forbidden Semantic Delta` for
+   implementation bugs and route oracle/spec, fixture/environment/stale
+   artifact, unrelated, and approved-design/user-request conflicts into the
+   next owner repair, residual, or escalation plan.
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
    wave-scoped write-capable `worker`/`spark_worker` agents implement,

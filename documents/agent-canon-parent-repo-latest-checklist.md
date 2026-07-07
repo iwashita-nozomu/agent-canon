@@ -101,6 +101,15 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+Record this as `agentcanon_structure_followup=required` for every AgentCanon
+source integration, parent `vendor/agent-canon` pin update, `.gitmodules`
+change, AgentCanon-owned root runtime view change, shared root-copy surface
+change, or parent root sync PR. Record `agentcanon_structure_followup=pass` only
+after both commands pass from the parent root. If the AgentCanon source change
+was prepared in standalone AgentCanon or in the submodule worktree, this parent
+root follow-up is still mandatory after the source PR is integrated or while
+preparing the parent pin/root-view PR.
+
 1. Generate and apply AgentCanon update TODOs before unrelated repo work.
 
 ```bash
@@ -319,6 +328,15 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun `bash tools/sync_agent_canon.sh link-root`.
+- missing `agentcanon_structure_followup=pass`: keep the AgentCanon source, pin,
+  root-view, shared root-copy, or parent root sync PR open. Run the root-view
+  commands from the parent root, then run the parent readiness / structure
+  checks selected by the active profile:
+
+```bash
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+```
 
 ## Legacy Compatibility Appendix
 

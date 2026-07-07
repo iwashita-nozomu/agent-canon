@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import json
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -89,6 +90,60 @@ SUBAGENT_WAVE_EMPTY_OK_STATUSES = {
     "not_applicable",
 }
 SUBAGENT_WAVE_DELEGATED_EVENTS = {"delegated_child_spawn"}
+VALIDATION_FAILURE_TRIAGE_TRIGGER = "validation_failure_requires_parallel_triage"
+VALIDATION_FAILURE_READ_ONLY_WRITE_SCOPES = {
+    "none",
+    "read-only",
+    "read_only",
+    "read_only_triage",
+    "read_only_until_cause_identified",
+}
+VALIDATION_FAILURE_REPAIR_REQUIRED_KEYS = (
+    "failing_contract",
+    "observation_level",
+    "cause_classification",
+    "intent_preservation",
+    "evidence",
+)
+RUNTIME_PROFILE_INVENTORY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "documents"
+    / "runtime-profiles-and-check-matrix.json"
+)
+
+
+def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
+    """Load one validation-failure slug set from the runtime profile inventory."""
+    raw_data = json.loads(RUNTIME_PROFILE_INVENTORY_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw_data, dict):
+        raise ValueError("runtime profile inventory must be a JSON object")
+    data = cast(dict[str, object], raw_data)
+    raw_response = data.get("validation_failure_response")
+    if not isinstance(raw_response, dict):
+        raise ValueError("runtime profile inventory missing validation_failure_response")
+    response = cast(dict[str, object], raw_response)
+    raw_values = response.get(field)
+    if not isinstance(raw_values, list) or not raw_values:
+        raise ValueError(
+            f"runtime profile inventory missing validation_failure_response.{field}"
+        )
+    values = cast(list[object], raw_values)
+    slugs: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            raise ValueError(
+                f"validation_failure_response.{field} must contain strings"
+            )
+        slugs.append(value)
+    return frozenset(slugs)
+
+
+VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES = validation_failure_taxonomy_values(
+    "intent_preservation"
+)
+VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES = validation_failure_taxonomy_values(
+    "cause_classes"
+)
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
     "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
@@ -468,7 +523,52 @@ def normalize_subagent_wave(entry: str) -> dict[str, str]:
         raise ValueError(
             "delegated subagent wave must include remaining_spawn_budget"
         )
+    validate_validation_failure_wave(normalized)
     return normalized
+
+
+def validate_validation_failure_wave(row: Mapping[str, str]) -> None:
+    """Validate validation-failure triage versus repair wave evidence."""
+    if row.get("trigger") != VALIDATION_FAILURE_TRIAGE_TRIGGER:
+        return
+    write_scope = row.get("write_scope", "")
+    missing = [
+        key
+        for key in VALIDATION_FAILURE_REPAIR_REQUIRED_KEYS
+        if is_empty_policy_value(row.get(key, ""))
+    ]
+    if missing and write_scope not in VALIDATION_FAILURE_READ_ONLY_WRITE_SCOPES:
+        raise ValueError(
+            "validation failure repair wave must remain read-only before cause "
+            "identification or include required keys: " + ",".join(missing)
+        )
+    intent_preservation = row.get("intent_preservation", "")
+    if intent_preservation and (
+        intent_preservation not in VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES
+    ):
+        raise ValueError(
+            "validation failure intent_preservation must be one of: "
+            + ",".join(sorted(VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES))
+        )
+    cause_classification = row.get("cause_classification", "")
+    if cause_classification and (
+        cause_classification not in VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES
+    ):
+        raise ValueError(
+            "validation failure cause_classification must be one of: "
+            + ",".join(sorted(VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES))
+        )
+
+
+def validation_failure_fields(row: Mapping[str, str]) -> list[tuple[str, str]]:
+    """Return optional validation-failure evidence fields for output rows."""
+    if row.get("trigger") != VALIDATION_FAILURE_TRIAGE_TRIGGER:
+        return []
+    return [
+        (key, row[key])
+        for key in VALIDATION_FAILURE_REPAIR_REQUIRED_KEYS
+        if not is_empty_policy_value(row.get(key, ""))
+    ]
 
 
 def subagent_wave_actual_event(row: dict[str, str]) -> str:
@@ -497,6 +597,7 @@ def subagent_wave_actual_event(row: dict[str, str]) -> str:
     ]
     if "remaining_spawn_budget" in row:
         fields.append(("remaining_spawn_budget", row["remaining_spawn_budget"]))
+    fields.extend(validation_failure_fields(row))
     return " ".join(f"{key}={value}" for key, value in fields)
 
 
@@ -515,6 +616,7 @@ def subagent_wave_behavior_event(row: dict[str, str]) -> str:
     ]
     if "remaining_spawn_budget" in row:
         fields.append(("remaining_spawn_budget", row["remaining_spawn_budget"]))
+    fields.extend(validation_failure_fields(row))
     return " ".join(f"{key}={value}" for key, value in fields)
 
 

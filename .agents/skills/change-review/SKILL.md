@@ -38,6 +38,14 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For Python diffs that touch classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction, add `python-review` and `$oop-readability-check`; require an OOP readability report with SOLID principle signal evidence plus `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` path coverage.
 1. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository during checkpoint and final review; changed-file dependency checks alone are not enough.
 1. Separate `fix now` from `follow-up`.
+1. For fixes made after validation failure, check that the diff records
+   `failing_contract`, `observation_level`, `cause_classification`,
+   `intent_preservation`, and `evidence` before any pass-only simplification.
+   Use `intent_preservation` for the same-intent repair or escalation route before
+   revert, intended behavior/test deletion, oracle weakening, or validation
+   downscope. Findings must preserve approved intent or route oracle/spec,
+   fixture/environment/stale artifact, unrelated, and approved-design/user-
+   request conflicts to the proper repair, residual, or escalation path.
 1. A `revise`, `required_change`, rejected diff, or requested-change review is
    not authority to roll back the user request. Findings must name the same
    user-request or design intent to preserve, then require repair, redesign, or

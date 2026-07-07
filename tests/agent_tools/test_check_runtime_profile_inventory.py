@@ -43,6 +43,33 @@ def write_minimal_inventory(path: Path) -> None:
             }
         ],
         "risk_note": ["risk note"],
+        "validation_failure_response": {
+            "rule": [
+                "After any validation test/check failure, preserve intended behavior.",
+                "Record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`.",
+            ],
+            "required_fields": [
+                "failing_contract",
+                "observation_level",
+                "cause_classification",
+                "intent_preservation",
+                "evidence",
+            ],
+            "cause_classes": [
+                "implementation_bug",
+                "stale_generated_artifact",
+            ],
+            "intent_preservation": [
+                "repair_same_intent",
+                "redesign_same_intent",
+                "escalate_design_conflict",
+            ],
+            "repair_routes": [
+                "repair_same_intent: repair implementation while preserving approved intent",
+                "redesign_same_intent: return to design while preserving approved intent",
+                "escalate_design_conflict: escalate before any intent change",
+            ],
+        },
         "check_matrix": [
             {
                 "changed_surface": "Markdown docs only",
@@ -83,7 +110,8 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
             inventory = root / "inventory.json"
             doc = root / "doc.md"
             write_minimal_inventory(inventory)
-            doc.write_text(self.render_doc(inventory, doc), encoding="utf-8")
+            rendered = self.render_doc(inventory, doc)
+            doc.write_text(rendered, encoding="utf-8")
 
             result = subprocess.run(
                 [
@@ -102,6 +130,13 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=pass", result.stdout)
+        self.assertIn("## Validation Failure Response", rendered)
+        self.assertIn("`intent_preservation`", rendered)
+        self.assertIn("`stale_generated_artifact`", rendered)
+        self.assertIn(
+            "repair_same_intent: repair implementation while preserving approved intent",
+            rendered,
+        )
 
     def test_default_paths_resolve_from_script_source_root(self) -> None:
         """Resolve default inventory/doc paths from AgentCanon source root."""

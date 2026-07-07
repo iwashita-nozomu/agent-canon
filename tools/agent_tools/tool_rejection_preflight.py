@@ -194,7 +194,9 @@ CAUSE_INVESTIGATION_GATE_TEMPLATES = (
         handoff=(
             "record Observation, Hypothesis or Root Cause, Expected Fix Surface "
             "or Selected Surface, and Validation Before Edit or Support Evidence "
-            "before code edits"
+            "before code edits; for validation failures include failing_contract, "
+            "observation_level, cause_classification, intent_preservation, and "
+            "evidence for same-intent repair or escalation before write-capable repair"
         ),
     ),
 )

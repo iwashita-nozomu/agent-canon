@@ -81,6 +81,12 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
 - AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
+- AgentCanon source、submodule pin、`.gitmodules`、AgentCanon-owned root
+  runtime view、root-copy surface、または parent root sync を変更した場合は
+  `agentcanon_structure_followup=required` を記録する。template / derived
+  parent root で `bash tools/sync_agent_canon.sh link-root` と
+  `bash tools/sync_agent_canon.sh check` が pass した後にだけ
+  `agentcanon_structure_followup=pass` を記録して closeout evidence に使う。
 - commit / push の前に `documents/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
@@ -104,6 +110,15 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   広い実行が supplemental かつ承認済みか、担当者の 3 点を書いて閉じます。
   方針、文書、メタデータ、契約だけの薄い包み、既存の確認コマンドが所有する
   性質では、静的確認だけを使います。
+- validation の test / check failure を見た場合は、implementation intent の変更、
+  behavior / test の削除、revert、oracle weakening、pass 目的の単純化、
+  validation downscope へ進む前に、`failing_contract`、`observation_level`、
+  `cause_classification`、`intent_preservation`、`evidence` を記録する。
+  `intent_preservation` は same-intent repair / escalation route を示す。
+  implementation bug は approved intent を保って修正し、test oracle / spec mismatch
+  は test / design evidence を修正し、fixture / environment / stale generated
+  artifact は owner route を修正し、unrelated failure は residual route に分ける。
+  approved-design / user-request conflict は intent を変える前に escalation する。
 - 実装前に Design Integrity Gate を閉じます。`Abstract Design Frame` または
   parent-direct の design-boundary note は、責務 model、差し替え可能な単位、
   非対象、validation route を file-level work より先に示します。API shape、

@@ -201,6 +201,9 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
+- `subagent_startup_route`: private internal startup route path from
+  `team_manifest.yaml` `run.subagent_prompt_packet.subagent_startup_route`, or
+  `not_applicable` when the run manifest does not provide one
 - `pre_handoff_gate_status`: design review and gate-check status required
   before write-capable implementation handoff
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
@@ -273,9 +276,10 @@ contract.
 - `finding`
 - `severity`
 - `required_change`
-- `intent_preservation`: `repair_same_intent`、`redesign_same_intent`、
-  `escalate_design_conflict`、`withdrawn_or_superseded`、`outside_owner`、または
-  `unsafe_replaced`
+- `intent_preservation`: validation-failure response values are the canonical
+  slugs from `documents/runtime-profiles-and-check-matrix.json`; reviewer
+  withdrawal, supersession, owner-boundary, or unsafe-replacement rationale
+  belongs in `revert_or_discard_authority` instead of extending this field
 - `revert_or_discard_authority`: rollback、revert、または slice discard を求める
   場合だけ、撤回 / 置換 / owner 外 / unsafe replacement / escalation の根拠を書く
 - `evidence`

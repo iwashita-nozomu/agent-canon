@@ -91,6 +91,14 @@ python3 tools/agent_tools/eval_accumulation_check.py \
    workflow / role、修復先を `workflow_monitor.py --runtime-feedback` で記録します。
    prompt / skill / workflow の gap は次の write-capable subagent や closeout の前に
    修復します。
+1. eval producer または `eval_accumulation_check.py` が fail した場合は、eval
+   family を green 扱いにする前に `failing_contract`、`observation_level`、
+   `cause_classification`、`intent_preservation`、`evidence` を run bundle に
+   記録します。pass 目的の producer 省略、intended eval / oracle 削除、oracle
+   weakening、validation downscope、source-tree result の手書き代替は行いません。
+   producer bug、eval oracle / spec mismatch、fixture / environment / stale
+   generated artifact、unrelated failure、approved-design / user-request conflict を
+   owner repair、residual、または escalation に分けます。
 1. eval report が archive に積まれたら、`runtime_log_archive_git.py sync` または
    `push` で append-only log branch に保存します。source tree に runtime eval result
    を戻してはいけません。

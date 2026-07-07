@@ -1143,6 +1143,10 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
         "inventory.compatibility_note",
     )?;
     let risk_note = required_string_array(object.get("risk_note"), "inventory.risk_note")?;
+    let validation_failure_response = required_object(
+        object.get("validation_failure_response"),
+        "inventory.validation_failure_response",
+    )?;
     let closeout_rule =
         required_string_array(object.get("closeout_rule"), "inventory.closeout_rule")?;
 
@@ -1195,6 +1199,9 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
     output.push('\n');
     output.push_str(&render_paragraph(&risk_note));
     output.push('\n');
+    output.push_str(&render_validation_failure_response(
+        validation_failure_response,
+    )?);
     output.push('\n');
     output.push_str("## Check Matrix\n\n");
     let mut check_rows = Vec::new();
@@ -1218,6 +1225,51 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
     Ok(output.trim_end().to_string() + "\n")
 }
 
+fn render_validation_failure_response(
+    item: &serde_json::Map<String, Value>,
+) -> Result<String, String> {
+    let rule = required_string_array(item.get("rule"), "validation_failure_response.rule")?;
+    let cause_classes = required_string_array(
+        item.get("cause_classes"),
+        "validation_failure_response.cause_classes",
+    )?;
+    let required_fields = required_string_array(
+        item.get("required_fields"),
+        "validation_failure_response.required_fields",
+    )?;
+    let intent_preservation = required_string_array(
+        item.get("intent_preservation"),
+        "validation_failure_response.intent_preservation",
+    )?;
+    let repair_routes = required_string_array(
+        item.get("repair_routes"),
+        "validation_failure_response.repair_routes",
+    )?;
+
+    let mut output = String::new();
+    output.push_str("## Validation Failure Response\n\n");
+    output.push_str(&render_paragraph(&rule));
+    output.push('\n');
+    output.push_str("Required machine fields:\n\n");
+    for field in required_fields {
+        output.push_str(&format!("- `{field}`\n"));
+    }
+    output.push('\n');
+    output.push_str("Valid `cause_classification` values are:\n\n");
+    for cause_class in cause_classes {
+        output.push_str(&format!("- `{cause_class}`\n"));
+    }
+    output.push_str("\nValid `intent_preservation` values are:\n\n");
+    for route in intent_preservation {
+        output.push_str(&format!("- `{route}`\n"));
+    }
+    output.push_str("\nIntent preservation routes:\n\n");
+    for repair_route in repair_routes {
+        output.push_str(&format!("- {repair_route}\n"));
+    }
+    Ok(output.trim_end().to_string() + "\n")
+}
+
 fn required_string(value: Option<&Value>, name: &str) -> Result<String, String> {
     let Some(value) = value.and_then(Value::as_str) else {
         return Err(format!("{name} must be a non-empty string"));
@@ -1232,6 +1284,15 @@ fn required_array<'a>(value: Option<&'a Value>, name: &str) -> Result<&'a Vec<Va
     value
         .and_then(Value::as_array)
         .ok_or_else(|| format!("{name} must be a list"))
+}
+
+fn required_object<'a>(
+    value: Option<&'a Value>,
+    name: &str,
+) -> Result<&'a serde_json::Map<String, Value>, String> {
+    value
+        .and_then(Value::as_object)
+        .ok_or_else(|| format!("{name} must be an object"))
 }
 
 fn required_string_array(value: Option<&Value>, name: &str) -> Result<Vec<String>, String> {
@@ -1698,5 +1759,75 @@ mod tests {
         assert_eq!(parsed.command, DocsCommand::Format);
         assert_eq!(parsed.root, PathBuf::from("/repo"));
         assert_eq!(parsed.paths, vec!["README.md"]);
+    }
+
+    #[test]
+    fn renders_validation_failure_response_from_inventory() {
+        let root = std::env::temp_dir().join(format!(
+            "agent-canon-runtime-profile-test-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).expect("create temp dir");
+        let inventory = root.join("inventory.json");
+        fs::write(
+            &inventory,
+            r##"{
+  "version": 1,
+  "title": "Runtime Profiles And Check Matrix",
+  "summary": ["summary"],
+  "profile_classes": [
+    {"profile": "Base project", "activates": ["`README.md`"], "required_when": "Every repo"}
+  ],
+  "compatibility_note": ["compat note"],
+  "risk_classes": [
+    {"risk": "Routine docs", "examples": "examples", "required_validation": "validation"}
+  ],
+  "risk_note": ["risk note"],
+    "validation_failure_response": {
+    "rule": [
+      "After any validation test/check failure, preserve intended behavior.",
+      "Record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`."
+    ],
+    "required_fields": [
+      "failing_contract",
+      "observation_level",
+      "cause_classification",
+      "intent_preservation",
+      "evidence"
+    ],
+    "cause_classes": [
+      "implementation_bug",
+      "stale_generated_artifact"
+    ],
+    "intent_preservation": [
+      "repair_same_intent",
+      "redesign_same_intent",
+      "escalate_design_conflict"
+    ],
+    "repair_routes": [
+      "repair_same_intent: repair implementation while preserving approved intent",
+      "redesign_same_intent: return to design while preserving approved intent",
+      "escalate_design_conflict: escalate before any intent change"
+    ]
+  },
+  "check_matrix": [
+    {"changed_surface": "Markdown docs only", "required_check": ["`tools/bin/agent-canon docs check`"]}
+  ],
+  "closeout_rule": ["closeout"]
+}
+"##,
+        )
+        .expect("write inventory");
+
+        let rendered = render_runtime_profile_inventory(&inventory).expect("render inventory");
+        fs::remove_dir_all(&root).ok();
+
+        assert!(rendered.contains("## Validation Failure Response"));
+        assert!(rendered.contains("`intent_preservation`"));
+        assert!(rendered.contains("`stale_generated_artifact`"));
+        assert!(rendered.contains(
+            "repair_same_intent: repair implementation while preserving approved intent"
+        ));
+        assert!(rendered.find("## Risk Classes") < rendered.find("## Check Matrix"));
     }
 }

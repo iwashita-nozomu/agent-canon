@@ -32,6 +32,23 @@ state, split a small addendum, or handle an additional user instruction. A new
 branch requires `branch_creation_reason=<reason>` in run evidence or the PR body
 before it is created.
 
+Every AgentCanon source, parent submodule pin, `.gitmodules`, root runtime
+view, shared root-copy surface, and parent root sync change opens the mandatory
+`agentcanon_structure_followup` gate. Record
+`agentcanon_structure_followup=required`, then run the root-view repair and
+check commands from the template / derived parent root that consumes the
+AgentCanon pin:
+
+```bash
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+```
+
+Record `agentcanon_structure_followup=pass` only after the sync check passes.
+For standalone AgentCanon source PRs, this parent-root follow-up runs after the
+source change is integrated or while preparing the parent pin/root-view PR; it
+is not an optional propagation note.
+
 ## Command Responsibilities
 
 | Command | Responsibility |
@@ -58,6 +75,28 @@ before it is created.
 1. Root view drift only: run `link-root` and `check`.
 1. AgentCanon update TODO pending: treat it as first work, then rerun latest.
 1. Legacy subtree/snapshot repos: compatibility appendix only.
+
+## Mandatory Structure Follow-Up Gate
+
+Use `agentcanon_structure_followup=required` for:
+
+- AgentCanon source PRs and source commits that change shared canon behavior or
+  synced surfaces.
+- Parent `vendor/agent-canon` gitlink updates and `.gitmodules` changes.
+- AgentCanon-owned root runtime views and shared root-copy surfaces.
+- Parent root sync PRs in template or derived repositories.
+
+The gate passes only when the parent root has run both root-view commands and
+the PR/run evidence records `agentcanon_structure_followup=pass`:
+
+```bash
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+```
+
+Parent readiness and structure checks selected by the active parent profile
+remain required after this gate; the structure follow-up gate does not replace
+`make agent-canon-pr-check` or the runtime profile validation route.
 
 ## Eval Coverage
 

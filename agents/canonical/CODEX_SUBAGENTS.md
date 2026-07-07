@@ -128,6 +128,26 @@ Subagent の context は correctness gate です。parent は handoff prompt ご
 
 role 分割が妥当でも、coverage map なしに広い `requested_scope` を狭い input packet へ潰す場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、parent は全体の `requested_scope` を持ち続け、各 agent には solver / optimizer / functional などの担当 path list、contract-check summary、`covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を渡します。Python API / typing review は `python_reviewer` に分け、数学 canon は担当 work packet に必要な節と、外した canon 節の理由を添えます。
 
+## Validation Failure Response Handoff Contract
+
+Handoff packets that include validation, review repair, or closeout authority
+must carry the validation-failure-response contract. After any validation
+test/check failure, prohibited actions are simplifying, reverting, deleting
+intended behavior/tests, weakening the oracle, or downscoping required
+validation just to pass. The packet records `failing_contract`, `observation_level`,
+`cause_classification`, `intent_preservation`, and `evidence` before
+implementation intent changes.
+
+The canonical token-safe `cause_classification` and `intent_preservation` slug
+lists are owned by `documents/runtime-profiles-and-check-matrix.json` and
+projected into `documents/runtime-profiles-and-check-matrix.md`. This section is
+only the subagent handoff projection: handoffs must carry those five fields and
+must cite the runtime profile taxonomy rather than defining a separate slug
+list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
+issues, stale generated artifacts, unrelated failures, and approved-design /
+user-request conflicts follow the owner routes named by the runtime profile
+taxonomy.
+
 ## Wave Plan Contract
 
 Every subagent wave must be recorded with the same structured contract across

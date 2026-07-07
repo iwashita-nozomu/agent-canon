@@ -39,6 +39,8 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
 | implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md`; run bundle design packet |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
+| validation failure response taxonomy | `documents/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime-profiles-and-check-matrix.md` |
+| validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/REVIEW_PROCESS.md` |
 
 Contract edits start in the owner surface. This reader map changes when the
 reader path changes.

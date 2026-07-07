@@ -84,6 +84,23 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
+    def test_private_subagent_startup_aliases_resolve_to_agents_area(self) -> None:
+        """Private startup compatibility names should resolve through task routing."""
+        for alias in (
+            "subagent-beginning",
+            "_subagent-beginning",
+            "subagent-startup",
+            "_subagent-startup",
+        ):
+            with self.subTest(alias=alias):
+                result = self.run_route("--name", alias, "--format", "text")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("STATUS=alias", result.stdout)
+                self.assertIn("CANONICAL_AREA=agents", result.stdout)
+                self.assertIn("CANONICAL_TOOL=route.py --area agents", result.stdout)
+                self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
+
     def test_unknown_legacy_search_alias_fails(self) -> None:
         """Unknown legacy-like search names must not silently resolve."""
         result = self.run_route("--name", "search_legacy.py")
@@ -248,6 +265,125 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn(
             "owner-bounded-routing", decision["related_skills"]["task-routing"]
         )
+
+    def test_prompt_preserves_test_design_related_skills_for_validation_failure(
+        self,
+    ) -> None:
+        """Validation-failure routing should keep test-design as secondary."""
+        result = self.run_route(
+            "--prompt",
+            "failed validation; do not delete tests or weaken oracle before repair",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("codex-task-workflow", decision["matched_skills"])
+        self.assertIn("codex-task-workflow", decision["active_skills"])
+        self.assertIn("test-design", decision["related_skill_candidates"])
+        self.assertNotIn("test-design", decision["active_skills"])
+        self.assertIn("change-review", decision["related_skill_candidates"])
+        self.assertIn("codex-task-workflow", decision["related_skills"])
+
+    def test_prompt_preserves_explicit_test_design_related_skills(self) -> None:
+        """Explicit $test-design routing should keep its catalog metadata."""
+        result = self.run_route(
+            "--prompt",
+            "$test-design で validation failure を診断して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("test-design", decision["matched_skills"])
+        self.assertIn("oop-readability-check", decision["related_skill_candidates"])
+        self.assertIn("change-review", decision["related_skill_candidates"])
+
+    def test_prompt_routes_user_guided_debugging_cadence(self) -> None:
+        """PR 359 cadence prompts should select user-guided-debugging."""
+        prompts = (
+            "Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
+            "Use user-guided debugging: one issue at a time with visible problem statements before each edit.",
+            "ユーザー主導リファクタで、問題点を出してから1件ずつ修正して。",
+            "Debug 1 issue 1 fix; no validation unless asked after the patch.",
+        )
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("user-guided-debugging", decision["matched_skills"])
+                self.assertIn("user-guided-debugging", decision["active_skills"])
+                self.assertNotIn("refactor-loop", decision["matched_skills"])
+                self.assertNotIn("refactor-loop", decision["active_skills"])
+
+    def test_prompt_routes_patch_only_no_validation_as_implementation(self) -> None:
+        """No-validation clauses after patch-only work should not mean no patch."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "Use user-guided refactor cadence: show one concrete issue, "
+                "patch only that target, and do not run validation unless I ask."
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+
+    def test_prompt_plain_refactor_does_not_route_user_guided_debugging(self) -> None:
+        """Ordinary refactor prompts should not select user-guided-debugging."""
+        result = self.run_route(
+            "--prompt",
+            "Refactor the repository routing helpers.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("user-guided-debugging", decision["matched_skills"])
+        self.assertNotIn("user-guided-debugging", decision["active_skills"])
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_prompt_path_only_agent_canon_review_does_not_route_update(self) -> None:
+        """Path-only read-only review prompts should not select AgentCanon update."""
+        result = self.run_route(
+            "--prompt",
+            "Review vendor/agent-canon for routing issues. Do not edit files.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("agent-canon-update", decision["matched_skills"])
+        self.assertNotIn("agent-canon-update", decision["active_skills"])
+
+    def test_prompt_routes_agent_canon_update_intent(self) -> None:
+        """Update, sync, pin, or root-view prompts should still route update."""
+        prompts = (
+            "Update vendor/agent-canon submodule pin.",
+            "Sync vendor/agent-canon and repair the root runtime view.",
+            "Run agent-canon-ensure-latest and fix the parent pin.",
+        )
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("agent-canon-update", decision["matched_skills"])
+                self.assertIn("agent-canon-update", decision["active_skills"])
 
     def test_prompt_routes_repo_owned_tool_routing_feedback(self) -> None:
         """Repo-owned tool routing feedback should activate task-routing."""
@@ -456,6 +592,51 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
+
+    def test_prompt_private_startup_aliases_do_not_activate_public_skills(
+        self,
+    ) -> None:
+        """Private startup route labels should not become public prompt skills."""
+        private_aliases = (
+            "subagent-beginning",
+            "_subagent-beginning",
+            "subagent-startup",
+            "_subagent-startup",
+        )
+        result = self.run_route(
+            "--prompt",
+            " ".join(private_aliases),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        for field in ("skills", "active_skills", "matched_skills"):
+            for alias in private_aliases:
+                self.assertNotIn(alias, decision[field])
+            self.assertNotIn("subagent-bootstrap", decision[field])
+
+    def test_prompt_structural_startup_fields_do_not_activate_subagent_bootstrap(
+        self,
+    ) -> None:
+        """Generated structural route fields should stay out of public skill routing."""
+        result = self.run_route(
+            "--prompt",
+            "\n".join(
+                [
+                    "subagent_startup_route: agents/internal-routines/subagent-startup.md",
+                    "internal_skill_routes: agents/internal-routines/subagent-startup.md",
+                ]
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("subagent-bootstrap", decision["matched_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
 
     def test_prompt_routes_official_skill_delegation_to_task_routing(self) -> None:
         """Official skill delegation prompts should enter the deterministic router."""
@@ -778,10 +959,11 @@ class RouteToolTest(unittest.TestCase):
                 for skill in (
                     "task-routing",
                     "structure-refactor",
-                    "agent-canon-update",
                 ):
                     self.assertIn(skill, decision["matched_skills"])
                     self.assertIn(skill, decision["active_skills"])
+                self.assertNotIn("agent-canon-update", decision["matched_skills"])
+                self.assertNotIn("agent-canon-update", decision["active_skills"])
                 self.assertNotEqual(
                     decision["evidence"], "mode=repo-changing;matched=none"
                 )
@@ -830,6 +1012,37 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(decision["mode"], "repo-changing")
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_prompt_routes_parent_repo_specific_skill_lane_design(self) -> None:
+        """Parent-repo-specific skill lane design should reach routing and structure."""
+        result = self.run_route(
+            "--prompt",
+            "親レポに固有スキルを置けるようにする設計修正",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+        self.assertTrue(
+            any(
+                "task-routing:structural_concept=parent_repo_project_skill_lane"
+                in reason
+                for reason in decision["reasons"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "structure-refactor:structural_concept=parent_repo_project_skill_lane"
+                in reason
+                for reason in decision["reasons"]
+            )
+        )
+        self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_repo_refactor_name_alias_routes_to_structure_area(self) -> None:
         """Proposed repo/refactor helper names should not create a new public skill."""
@@ -1138,6 +1351,45 @@ class RouteToolTest(unittest.TestCase):
     ) -> None:
         """English unneeded numerical-test prompts should route to test design."""
         prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
+        python_decision = json.loads(python_result.stdout)
+        self.assertIn("test-design", python_decision["matched_skills"])
+        self.assertIn("test-design", python_decision["active_skills"])
+
+    def test_prompt_routes_failed_validation_to_owning_repair_surface(
+        self,
+    ) -> None:
+        """Failed validation prompts should not make test design the active owner."""
+        prompt = (
+            "Tests are failing; do not delete tests or weaken oracles just to pass. "
+            "Diagnose the failing contract first."
+        )
+        python_result = self.run_route("--prompt", prompt, "--format", "json")
+
+        self.assertEqual(
+            python_result.returncode, 0, python_result.stdout + python_result.stderr
+        )
+        python_decision = json.loads(python_result.stdout)
+        self.assertIn("codex-task-workflow", python_decision["matched_skills"])
+        self.assertIn("codex-task-workflow", python_decision["active_skills"])
+        self.assertIn("test-design", python_decision["related_skill_candidates"])
+        self.assertNotIn("test-design", python_decision["active_skills"])
+        self.assertIn("agent-orchestration", python_decision["active_skills"])
+        self.assertTrue(
+            any(
+                "tests_are=validation_control_surface_not_default_work_owner"
+                in reason
+                for reason in python_decision["reasons"]
+            )
+        )
+
+    def test_prompt_routes_oracle_spec_mismatch_to_test_design(self) -> None:
+        """Oracle/spec mismatch prompts should still activate test-design."""
+        prompt = "The test oracle has a spec mismatch; update the test design."
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(

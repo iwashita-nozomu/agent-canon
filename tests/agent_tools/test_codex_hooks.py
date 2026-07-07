@@ -575,6 +575,229 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
 
+    def test_skill_usage_logger_routes_validation_failure_prompts(self) -> None:
+        """Hook routing should classify validation failures as repair-owner work."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": (
+                            "failed validation; do not delete tests or weaken "
+                            "oracle before repairing the failing contract"
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+            candidate_workflows = cast("list[str]", entry["candidate_workflows"])
+            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("codex-task-workflow", candidate_skills)
+        self.assertIn("test-design", candidate_skills)
+        self.assertLess(
+            candidate_skills.index("codex-task-workflow"),
+            candidate_skills.index("test-design"),
+        )
+        self.assertIn("codex-task-workflow", candidate_workflows)
+        self.assertTrue(
+            any(
+                "tests_are=validation_control_surface_not_default_work_owner"
+                in reason
+                for reason in candidate_skill_reasons
+            )
+        )
+        self.assertIn("test-design:related_to=codex-task-workflow", candidate_skill_reasons)
+
+    def test_skill_usage_logger_filters_reasons_for_declared_skills(self) -> None:
+        """Candidate reasons should describe only final candidate_skills."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": (
+                            "Use $codex-task-workflow for a validation failure; "
+                            "do not delete tests or weaken the oracle."
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            selected_skills = cast("list[str]", entry["skills"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("codex-task-workflow", selected_skills)
+        self.assertNotIn("codex-task-workflow", candidate_skills)
+        self.assertTrue(
+            all(
+                reason.split(":", 1)[0] in candidate_skills
+                for reason in candidate_skill_reasons
+            )
+        )
+
+    def test_skill_usage_logger_routes_oracle_spec_mismatch_prompts(self) -> None:
+        """Hook routing should still classify genuine test oracle design work."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "The test oracle has a spec mismatch; fix test design.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("test-design", candidate_skills)
+
+    def test_skill_usage_logger_reuses_catalog_for_user_guided_debugging(self) -> None:
+        """Hook prompt candidates should follow route.py catalog skill routing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": (
+                            "Use user-guided refactor cadence: show one concrete issue, "
+                            "patch only that target, and do not run validation unless I ask."
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("user-guided-debugging", candidate_skills)
+        self.assertTrue(
+            any(
+                reason.startswith("user-guided-debugging:")
+                for reason in candidate_skill_reasons
+            )
+        )
+
+    def test_skill_usage_logger_routes_parent_repo_skill_lane_prompts(self) -> None:
+        """Hook routing should classify parent-repo-specific skill lane design."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "親レポに固有スキルを置けるようにする設計修正",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("task-routing", candidate_skills)
+        self.assertIn("structure-refactor", candidate_skills)
+        self.assertTrue(
+            any(
+                "task-routing:structural_concept=parent_repo_project_skill_lane"
+                in reason
+                for reason in candidate_skill_reasons
+            )
+        )
+        self.assertTrue(
+            any(
+                "structure-refactor:structural_concept=parent_repo_project_skill_lane"
+                in reason
+                for reason in candidate_skill_reasons
+            )
+        )
+
+    def test_skill_usage_logger_advisory_prompt_does_not_log_base_candidates(
+        self,
+    ) -> None:
+        """Routing-only advisory prompts should not report default runtime skills."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Which route contract applies for this repository task?",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("task-routing", candidate_skills)
+        self.assertNotIn("agent-orchestration", candidate_skills)
+        self.assertNotIn("codex-task-workflow", candidate_skills)
+
     def test_runtime_log_auto_sync_is_fail_open_by_default(self) -> None:
         """Auto-sync hook should not block or emit context when archive sync fails."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2525,6 +2748,12 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("CAUSE_INVESTIGATION_FINDING=", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "VALIDATION_FAILURE_CAUSE_CLASSIFICATION_REQUIRED=",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
+        self.assertIn("failing_contract", json.dumps(payload))
+        self.assertIn("intent_preservation", json.dumps(payload))
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertTrue(log_entry["code_edit_detected"])
@@ -4002,6 +4231,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("[REDACTED_API_KEY]", entry["prompt_excerpt_redacted"])
         self.assertNotIn("sk-abcdefghijklmnopqrstuvwxyz1234567890", entry["prompt_excerpt_redacted"])
         self.assertEqual(entry["skills"], [])
+        self.assertEqual(entry["candidate_skills"], [])
         self.assertEqual(entry["candidate_tools"], [])
 
     def test_skill_usage_logger_records_post_tool_selection(self) -> None:

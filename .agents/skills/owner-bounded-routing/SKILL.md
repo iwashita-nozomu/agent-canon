@@ -51,6 +51,13 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For bounded code edits, keep `targeted validation`: changed-file dependency
    checks, relevant static checker, and directly related tests only when the
    change adds observable behavior.
+1. If targeted validation fails, record `failing_contract`,
+   `observation_level`, `cause_classification`, `intent_preservation`, and
+   `evidence` before simplifying to pass, reverting, deleting intended
+   behavior/tests, weakening an oracle, or downscoping validation. Repair
+   implementation bugs while preserving approved intent; route oracle/spec,
+   fixture/environment/stale artifact, unrelated, and approved-design/user-
+   request conflicts to the owning repair, residual, or escalation path.
 1. Escalate to the broader workflow when public behavior, dependency direction,
    section responsibility, claim grounding, schema, runtime profile, or multiple
    writers enter scope.

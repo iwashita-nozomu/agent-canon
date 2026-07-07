@@ -164,6 +164,16 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 
 実装後は「変更した」ではなく、仮説が支持されたかを判定します。
 
+Validation test/check が失敗した場合は、通すために仮説、intended behavior/test、oracle、
+または required validation を縮めません。先に `failing_contract`、
+`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を
+記録します。`cause_classification` と `intent_preservation` の slug set と route
+semantics は `documents/runtime-profiles-and-check-matrix.md`、
+`agents/canonical/CODEX_WORKFLOW.md`、`agents/canonical/CODEX_SUBAGENTS.md`、
+`documents/REVIEW_PROCESS.md` を参照します。`cause_classification=implementation_bug`
+で contract と oracle が安定している場合は、追加 test planning で止めず owning
+code / config / docs / workflow repair へ進みます。
+
 必須項目:
 
 - `Post-Change Evidence:` 実行した test / static analysis / benchmark / review と結果。

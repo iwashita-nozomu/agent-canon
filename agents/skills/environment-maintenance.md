@@ -94,6 +94,10 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - `make ci-quick`
 - 必要なら `make ci`
 - 文書更新を含む場合は `tools/bin/agent-canon docs check`
+- environment / CI validation failure を修復へ回す場合は、変更前に
+  validation-failure-response packet の `failing_contract`、
+  `observation_level`、`cause_classification`、`intent_preservation`、
+  `evidence` を記録し、pass 目的の validation downscope や oracle weakening を避けます。
 
 ## Boundary
 

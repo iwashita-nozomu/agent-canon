@@ -39,6 +39,7 @@ from tools.agent_tools.check_convention_compliance import (
     SOURCE_FILE_DEFINITION_ORDER_MARKERS,
     STATIC_READ_VALIDATION_POLICY_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
+    VALIDATION_FAILURE_RESPONSE_MARKERS,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -315,7 +316,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "test-design",
         "contract-only wrapper static contract validation canonical command evidence "
         "observable behavior validation repair scope mathematical necessity gate "
-        "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+        "Numerical Trigger Non-Numerical Alternative checker-owned property "
+        "failing contract observation level failure cause approved intent escalate "
+        "oracle weakening\n"
     ),
     ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
         "experiment-lifecycle",
@@ -434,7 +437,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
         "observable behavior validation repair scope mathematical necessity gate "
-        "Numerical Trigger Non-Numerical Alternative checker-owned property\n"
+        "Numerical Trigger Non-Numerical Alternative checker-owned property "
+        "failing contract observation level cause classification approved intent "
+        "escalation oracle weakening\n"
     ),
     "agents/skills/experiment-lifecycle.md": (
         "experiment_execution_surface_guard tool_rejection_preflight.py "
@@ -1525,6 +1530,50 @@ class CheckConventionComplianceTest(unittest.TestCase):
         missing = sorted(
             path
             for path in TEST_CONTRACT_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_validation_failure_response_requires_runtime_skill_markers(self) -> None:
+        """Runtime test-design keeps validation failure response markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "test-design" / "SKILL.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace("failure cause", ""),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("validation_failure_response", result.stdout)
+            self.assertIn("missing-marker:failure cause", result.stdout)
+
+    def test_validation_failure_response_requires_human_doc_markers(self) -> None:
+        """Human test-design keeps same-intent repair or escalation markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "test-design.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8").replace("approved intent", ""),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("validation_failure_response", result.stdout)
+            self.assertIn("missing-marker:approved intent", result.stdout)
+
+    def test_minimal_fixture_covers_validation_failure_response_surfaces(self) -> None:
+        """The minimal fixture includes every validation failure response surface."""
+        missing = sorted(
+            path
+            for path in VALIDATION_FAILURE_RESPONSE_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

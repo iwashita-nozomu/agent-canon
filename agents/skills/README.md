@@ -66,7 +66,7 @@ prompt routing trigger は `agents/skills/catalog.yaml` が唯一の列挙正本
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/REVIEW_PROCESS.md` の責務に寄せます。
-- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim、`.codex/config.toml` の `[[skills.config]]` を同じ変更で追加します。
+- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim、AgentCanon-owned `.codex/config.toml` の `[[skills.config]]` を同じ変更で追加します。parent-owned skill は `.codex/project-config.toml` で有効化します。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
@@ -88,7 +88,13 @@ in the Codex host runtime.
 
 ## Codex Defaults
 
-- Project-local skill discovery is wired through official Codex `[[skills.config]]` entries in `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
+- AgentCanon public skill discovery is wired through official Codex `[[skills.config]]` entries in AgentCanon-owned `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
+- Parent repositories may add repo-specific skills in
+  `.codex/project-skills/<skill>/SKILL.md` and wire them with additional
+  `[[skills.config]]` entries in parent-owned `.codex/project-config.toml`.
+  Do not put parent-specific skills under
+  AgentCanon-owned `.agents/skills/`; that directory remains catalog-backed
+  shared canon.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。

@@ -35,6 +35,9 @@ Rules:
 - return revise when review rejection or requested-change handling reduced the
   requested behavior by reverting or discarding a slice without withdrawal,
   supersession, owner-boundary, unsafe-replacement, or escalation evidence
+- return revise when validation failure handling simplified, reverted, deleted intended behavior/tests, weakened an oracle, or downscoped required validation just to pass
+- require any validation failure response to record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`; validate the token-safe slug sets through `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md` instead of duplicating them here
+- return escalate when validation failure evidence requires an approved-intent change and the task lacks redesign or user-authority evidence
 - return escalate when the diff exposes a design, workflow, or authority gap
 - return escalate when a design issue was absorbed by implementation instead of being recorded as `design_issue_blocker` and returned to design review
 """

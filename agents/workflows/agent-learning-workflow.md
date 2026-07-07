@@ -137,6 +137,7 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
 feedback が「利用中の skill 修正が甘い」「skill が弱い」「呼び出しが遅い」「routing が外れた」のように active skill の挙動を指す場合は、active skill set を first repair candidate とします。active skill set は、直近の `skills=...` 宣言、読了した runtime `SKILL.md`、run bundle の selected skill evidence、または `workflow_monitoring.md` の skill invocation event から決めます。
+test を pass させるために agent が simplification、revert、intended behavior deletion、oracle weakening、または test planning の過剰重視で owning code repair を止めたという user / reviewer feedback は、`test-design` と implementation workflow への active skill feedback として扱います。`workflow_monitor.py --runtime-feedback` で `target=test-design` または implementation workflow、`action=prompt_repair|eval_update` を記録し、prompt、eval、または tool repair で解決します。memory-only で閉じません。
 input token 過多、同じ文書や raw log の重複読み込み、長い evidence の model 投入が feedback された場合も、active routing / context skill を first repair candidate とします。修正は context を省略する方向ではなく、owner / dependency evidence を保ったまま、構造読み込みを `Structure Intake Packet` に正本化し、LLM-visible context へ入れる material を次の判断に効く構造要約へ正規化し、raw bulk は artifact path で参照する方向に寄せます。
 prompt を固定する前に calibration step を置き、指摘をどの強さで反映するかを決めます。単発 feedback は scoped guidance、example、issue、memory で足りるかを先に見ます。hard rule は invariant、checker-backed、または反復観測された失敗に限ります。prompt rule にする場合は、適用条件、scope、例外または owner decision を短く添えます。
 
@@ -146,6 +147,10 @@ user / reviewer が agent の動き、routing、自己改善、tool 化、prompt
 
 1. `workflow_monitor.py --runtime-feedback` で `source=... target=... action=... evidence=...` を記録する
 1. 指摘の反映先を `skill prompt`、`workflow prompt`、`tool/checker`、`eval rubric`、`memory`、`issue`、`no_op` のどれかに分類する。active skill の挙動に対する feedback は、該当 skill の runtime `SKILL.md` と canonical `agents/skills/<skill>.md` を first repair candidate にする
+1. test pass のために simplification、revert、intended behavior deletion、oracle
+   weakening、または test planning の過剰重視で owning code repair を止めたという
+   feedback は、`test-design` と implementation workflow の active skill feedback
+   として分類し、memory-only では閉じない
 1. calibration step で反映の強さを決め、過剰固定を避ける。hard rule は invariant、checker-backed、または反復観測された失敗に限り、prompt rule にする場合は適用条件、owner、validation または例外条件を短く添える
 1. `skill prompt` を修正する場合は、discoverable runtime `SKILL.md`、canonical skill doc、関連 workflow / handoff surface の順に owner を確認し、必要な prompt eval entry を更新または引用してから rerun する
 1. active skill feedback を memory-only で閉じる場合は、feedback が観測メモに留まる理由、または skill owner を変更しない理由を `target=<skill> action=no_op` か durable issue に記録する。単なる observation 追記だけでは `skill_improvement_decision=applied` にしない

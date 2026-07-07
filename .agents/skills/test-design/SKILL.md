@@ -1,6 +1,6 @@
 ---
 name: test-design
-description: Use when code changes need resilient, adversarial static test design before implementation, including behavior contracts, oracle choice, property/metamorphic candidates, mutation adequacy, or brittle-test diagnosis.
+description: Use when a change needs oracle/spec-risk classification or resilient, adversarial static test design, including behavior contracts, oracle choice, property/metamorphic candidates, mutation adequacy, or brittle-test diagnosis.
 ---
 <!--
 @dependency-start
@@ -30,8 +30,13 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Record target code paths and related test paths as survey and placement evidence. Do not treat path evidence as authority to freeze API shape, private helper names, return shape, error prose, mock order or internal call sequence.
 1. If related tests exist, run `tools/bin/agent-canon test-design check <related-test-paths...>` before reading whole files. Use `fix-now`, `review`, and `design-hint` findings as the first test-plan inputs.
 1. Statically inspect branches, parsing, error handling, state transitions, observable behavior, and public contract boundaries.
+1. Use this skill to classify oracle/spec risk and design tests when the changed behavior, regression risk, or unstable oracle needs it. Do not make test design a mandatory detour for every validation failure.
 1. Before adding or recommending a test, decide whether the property is already owned by static analysis, a checker, formatter, dependency review, type checker, lint, docs check, or CI gate. For checker-owned properties, route the canonical command as validation evidence.
 1. Classify validation findings by validation repair scope before applying an autofix. Findings tied to the changed contract, changed lines, or checker-owned property named in the task plan enter the current repair; broad pre-existing style debt becomes residual evidence with a separate repair route.
+1. When a test or check fails during validation, do not immediately simplify, revert, delete features or tests, lower oracle strength, or remove intended behavior to make it pass. First identify the failing contract and observation level.
+1. Record the validation-failure-response fields `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`; use the slug sets and route semantics owned by `documents/runtime-profiles-and-check-matrix.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md` for failure cause classification, approved intent preservation, and when to escalate before intent changes.
+1. For `cause_classification=implementation_bug` with a stable contract, preserve approved intent and proceed to the owning code, config, docs, or workflow repair after classification; do not block that repair behind an extra test-design pass.
+1. Before allowing behavior simplification, revert, intended-behavior removal, feature/test deletion, or oracle weakening, record a short failure-cause note in `test_plan.md`, work log, or review evidence.
 1. For a `contract-only wrapper` or thin adapter, classify whether it adds observable behavior, branch logic, parser/error behavior, state mutation, diagnostic keys, serialization shape, or external process behavior. Names, types, forwards, configuration, and documentation for an existing contract use static contract validation and canonical command evidence.
 1. Use API shape, helper identity, return shape, error prose, mock order or internal call sequence as test oracles only when the user request, approved design, documented external contract, or public behavior already fixes them. Otherwise record them under placement notes or `Do Not Freeze`.
 1. For each test case, fix `Contract Source`, `Behavior Contract`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, and `Do Not Freeze`.

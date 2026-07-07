@@ -23,13 +23,14 @@ from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
 
-from hook_event_log import HookLogContext, fingerprint_json, utc_now
+AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
 
 LOG_PATH_ENV = "AGENT_CANON_SKILL_LOG_PATH"
 CONTEXT_PATH_ENV = "AGENT_CANON_SKILL_CONTEXT_PATH"
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 ACTIVE_RUN_POINTER_ENV = "AGENT_CANON_ACTIVE_RUN_POINTER"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+BASE_EXECUTION_SKILL_REASON = "repo-changing execution stage selects base workflow skill"
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
 WORKFLOW_FIELD_RE = re.compile(
@@ -249,6 +250,11 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("repo-changing optimization patch",),
         ("収束しない",),
         ("tolerance", "直して"),
+        ("failed", "validation"),
+        ("validation", "failure"),
+        ("failing", "contract"),
+        ("do", "not", "delete", "tests"),
+        ("weaken", "oracle"),
     ),
     "change-review": (
         ("change-review",),
@@ -386,6 +392,10 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("public behavior",),
         ("仕様解釈",),
         ("テスト設計",),
+        ("test oracle",),
+        ("oracle", "mismatch"),
+        ("spec mismatch", "test"),
+        ("brittle", "test"),
     ),
     "tool-finding-report": (
         ("tool finding",),
@@ -441,6 +451,17 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "runtime_log_archive_git.py",
         "oop-readability-check",
         "mechanical verdict",
+        "failed validation",
+        "validation failure",
+        "failing contract",
+        "test failure",
+        "tests are failing",
+        "do not delete tests",
+        "weaken oracle",
+        "oracle weakening",
+        "preserved-intent repair",
+        "same-intent repair",
+        "cause_classification",
         "デバッグ",
         "optimizer convergence",
         "solver regression",
@@ -559,8 +580,38 @@ FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
 }
 SKILL_TEXT_FIELDS = ("prompt", "last_assistant_message", "message")
-ROUTING_CANDIDATE_TEXT_FIELDS = SKILL_TEXT_FIELDS
+ROUTING_CANDIDATE_TEXT_FIELDS = ("prompt",)
 OBSERVED_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
+
+
+def ensure_agent_tools_import_path() -> None:
+    """Ensure local AgentCanon tools are importable when the hook runs directly."""
+    if str(AGENT_TOOLS_ROOT) not in sys.path:
+        sys.path.insert(0, str(AGENT_TOOLS_ROOT))
+
+
+def hook_log_context_class() -> type:
+    """Return HookLogContext from the local AgentCanon tool module."""
+    ensure_agent_tools_import_path()
+    from hook_event_log import HookLogContext
+
+    return HookLogContext
+
+
+def fingerprint_json_value(value: object) -> str:
+    """Return the canonical hook-log fingerprint for one JSON-like value."""
+    ensure_agent_tools_import_path()
+    from hook_event_log import fingerprint_json
+
+    return fingerprint_json(value)
+
+
+def utc_now_value() -> str:
+    """Return the canonical hook-log UTC timestamp."""
+    ensure_agent_tools_import_path()
+    from hook_event_log import utc_now
+
+    return utc_now()
 
 
 @dataclass(frozen=True)
@@ -570,6 +621,7 @@ class PromptIntakeSignals:
     skills: tuple[str, ...]
     selected_workflows: tuple[str, ...]
     candidate_skills: tuple[str, ...]
+    candidate_skill_reasons: tuple[str, ...]
     candidate_workflows: tuple[str, ...]
     candidate_tools: tuple[str, ...]
     feedback_labels: tuple[str, ...]
@@ -581,6 +633,7 @@ class PromptIntakeSignals:
             self.skills
             or self.selected_workflows
             or self.candidate_skills
+            or self.candidate_skill_reasons
             or self.candidate_workflows
             or self.candidate_tools
             or self.feedback_labels
@@ -883,6 +936,82 @@ def grouped_keyword_matches(
     )
 
 
+def structural_candidate_skill_reasons(
+    texts: list[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return candidate skills and reasons from route-owned structural concepts."""
+    ensure_agent_tools_import_path()
+    from skill_lane_detector import structural_skill_lane_concept_matches
+
+    skills: list[str] = []
+    reasons: list[str] = []
+    haystack = "\n".join(texts)
+    for match in structural_skill_lane_concept_matches(haystack):
+        reason = match.reason()
+        for skill in match.concept.route_skills:
+            skills.append(skill)
+            reasons.append(f"{skill}:{reason}")
+    return tuple(dict.fromkeys(skills)), tuple(dict.fromkeys(reasons))
+
+
+def validation_repair_candidate_skill_reasons(
+    texts: list[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return candidate skills and reasons from validation repair concepts."""
+    ensure_agent_tools_import_path()
+    from skill_lane_detector import validation_failure_repair_concept_matches
+
+    skills: list[str] = []
+    reasons: list[str] = []
+    haystack = "\n".join(texts)
+    for match in validation_failure_repair_concept_matches(haystack):
+        skill = match.concept.owner_skill
+        skills.append(skill)
+        reasons.append(f"{skill}:{match.reason()}")
+    return tuple(dict.fromkeys(skills)), tuple(dict.fromkeys(reasons))
+
+
+def catalog_candidate_skill_reasons(
+    root: Path,
+    texts: list[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return route.py catalog-backed prompt skill candidates."""
+    haystack = "\n".join(texts)
+    if not haystack.strip():
+        return (), ()
+    ensure_agent_tools_import_path()
+    from route import decide_skills, load_skill_route_rules
+
+    catalog_root = root
+    if not (catalog_root / "agents" / "skills" / "catalog.yaml").is_file():
+        catalog_root = Path(__file__).resolve().parents[2]
+    decision = decide_skills(haystack, "routing-only", load_skill_route_rules(catalog_root))
+    base_execution_skills = (
+        ("codex-task-workflow",)
+        if decision.mode == "repo-changing" and "codex-task-workflow" in decision.skills
+        else ()
+    )
+    skills = tuple(
+        dict.fromkeys(
+            (
+                *base_execution_skills,
+                *decision.matched_skills,
+                *decision.related_skill_candidates,
+            )
+        )
+    )
+    base_reasons = tuple(
+        f"{skill}:{BASE_EXECUTION_SKILL_REASON}"
+        for skill in base_execution_skills
+    )
+    related_reasons = tuple(
+        f"{related}:related_to={source}"
+        for source, related_skills in decision.related_skills.items()
+        for related in related_skills
+    )
+    return skills, (*base_reasons, *decision.reasons, *related_reasons)
+
+
 def feedback_action(labels: tuple[str, ...]) -> str:
     """Return the workflow-monitor action for observed human feedback."""
     if not labels:
@@ -898,14 +1027,44 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     candidate_texts = observed_routing_candidate_text(payload)
     skills = tuple(observed_skills(payload))
     labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
+    catalog_skills, catalog_reasons = catalog_candidate_skill_reasons(repo_root(), candidate_texts)
+    selected_skill_set = set(skills)
+    if selected_skill_set:
+        catalog_skills = tuple(
+            dict.fromkeys(
+                reason.split(":", 1)[0]
+                for reason in catalog_reasons
+                if reason.split(":", 1)[0] not in selected_skill_set
+                and reason.split(":", 1)[1] != BASE_EXECUTION_SKILL_REASON
+                and not any(
+                    f"related_to={selected_skill}" in reason
+                    for selected_skill in selected_skill_set
+                )
+            )
+        )
     candidate_skills = tuple(
-        skill for skill in grouped_keyword_matches(skill_texts, SKILL_KEYWORD_GROUPS)
-        if skill not in skills
+        dict.fromkeys(
+            skill
+            for skill in catalog_skills
+            if skill not in skills
+        )
+    )
+    raw_candidate_skill_reasons = tuple(
+        dict.fromkeys(
+            catalog_reasons
+        )
+    )
+    candidate_skill_set = set(candidate_skills)
+    candidate_skill_reasons = tuple(
+        reason
+        for reason in raw_candidate_skill_reasons
+        if reason.split(":", 1)[0] in candidate_skill_set
     )
     return PromptIntakeSignals(
         skills=skills,
         selected_workflows=tuple(observed_workflows(payload)),
         candidate_skills=candidate_skills,
+        candidate_skill_reasons=candidate_skill_reasons,
         candidate_workflows=keyword_matches(skill_texts, WORKFLOW_KEYWORDS),
         candidate_tools=keyword_matches(candidate_texts, TOOL_KEYWORDS),
         feedback_labels=labels,
@@ -920,7 +1079,7 @@ def tool_selection(payload: dict[str, object]) -> ToolSelection:
     keys = tuple(sorted(tool_input.keys())) if isinstance(tool_input, dict) else ()
     return ToolSelection(
         tool_name=tool_name,
-        tool_input_fingerprint=fingerprint_json(tool_input) if tool_input is not None else "",
+        tool_input_fingerprint=fingerprint_json_value(tool_input) if tool_input is not None else "",
         tool_input_key_count=len(keys),
         tool_input_keys=keys,
         command_verb=command_verb(tool_input),
@@ -1042,7 +1201,7 @@ def repo_tool_path_part(part: str) -> bool:
 def default_log_path(root: Path) -> Path:
     """Return the skill usage log path."""
     override = os.environ.get(LOG_PATH_ENV, "").strip()
-    return HookLogContext(root, "skill_usage", override).result_path()
+    return hook_log_context_class()(root, "skill_usage", override).result_path()
 
 
 def default_context_path(root: Path) -> Path:
@@ -1088,7 +1247,7 @@ def save_workflow_context(
     context = {
         "workflows": list(signals.selected_workflows),
         "report_dir": report_dir,
-        "timestamp": utc_now(),
+        "timestamp": utc_now_value(),
         "source_event": hook_event_name(payload),
     }
     path = default_context_path(root)
@@ -1124,7 +1283,7 @@ def _log_append_log(root: Path, entry: dict[str, object]) -> None:
     if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
         return
     try:
-        context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
+        context = hook_log_context_class()(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
         context.append(entry)
     except (OSError, RuntimeError, subprocess.SubprocessError):
         return
@@ -1301,9 +1460,9 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
     tool = inputs.tool
     subagent = inputs.subagent
     workflow_context = inputs.workflow_context
-    timestamp = utc_now()
-    payload_fingerprint = fingerprint_json(payload)
-    context = HookLogContext(inputs.root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
+    timestamp = utc_now_value()
+    payload_fingerprint = fingerprint_json_value(payload)
+    context = hook_log_context_class()(inputs.root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
     text_sources = observed_text_sources(payload)
     text_values_seen = observed_text(payload)
     _log_append_log(
@@ -1332,6 +1491,7 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "workflow_context_source_event": workflow_context.source_event,
             "selected_workflow_count": len(signals.selected_workflows),
             "candidate_skills": list(signals.candidate_skills),
+            "candidate_skill_reasons": list(signals.candidate_skill_reasons),
             "candidate_skill_count": len(signals.candidate_skills),
             "candidate_workflows": list(signals.candidate_workflows),
             "candidate_workflow_count": len(signals.candidate_workflows),

@@ -25,6 +25,10 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from skill_lane_detector import (
+    structural_skill_lane_concept_matches,
+    validation_failure_repair_concept_matches,
+)
 
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
@@ -40,6 +44,16 @@ SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
 STAGE_POLICY_VALUES = ("active", "deferred")
 PRIVATE_SKILL_PREFIX = "_"
 SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
+PRIVATE_SUBAGENT_ROUTE_ALIASES = (
+    "subagent-beginning",
+    "_subagent-beginning",
+    "subagent-startup",
+    "_subagent-startup",
+)
+PRIVATE_ROUTE_STRUCTURAL_FIELDS = (
+    "subagent_startup_route",
+    "internal_skill_routes",
+)
 
 IMPLEMENTATION_HANDOFF_TRIGGER_GROUPS: tuple[tuple[str, ...], ...] = (
     ("implementation",),
@@ -83,7 +97,29 @@ IMPLEMENTATION_DELEGATION_GROUPS: tuple[tuple[str, ...], ...] = (
     ("サブエージェント", "依頼"),
     ("エージェント", "起動"),
 )
-
+NO_PATCH_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:no|without)\s+(?:code\s+)?patch(?:es|ing)?(?![A-Za-z0-9])"
+)
+SUPPLEMENTAL_SKILL_ROUTE_GROUPS: Mapping[str, tuple[tuple[str, ...], ...]] = {}
+BROAD_REFACTOR_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("refactor",),
+    ("リファクタ",),
+)
+USER_GUIDED_DEBUGGING_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("one issue at a time",),
+    ("user-guided debugging",),
+    ("user-guided", "cadence"),
+    ("one concrete issue",),
+    ("no", "validation", "unless", "ask"),
+    ("1", "issue", "1", "fix"),
+    ("1", "problem", "1", "patch"),
+    ("問題ごと",),
+    ("一件ずつ",),
+    ("一つずつ",),
+    ("1件", "ずつ"),
+    ("ユーザー主導",),
+    ("問題点", "修正"),
+)
 AREA_DATA: tuple[AreaData, ...] = (
     (
         "surface",
@@ -234,7 +270,16 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Choose parent-direct, read-only scout, or staged agents by risk.",
         "select_agent_mode",
         ("python3 tools/agent_tools/route.py --area agents",),
-        ("multi_agent_mode_selector.py", "agent-mode", "subagent_role_budget.py", "subagent-budget"),
+        (
+            "multi_agent_mode_selector.py",
+            "agent-mode",
+            "subagent-beginning",
+            "_subagent-beginning",
+            "subagent-startup",
+            "_subagent-startup",
+            "subagent_role_budget.py",
+            "subagent-budget",
+        ),
     ),
     (
         "closeout",
@@ -535,9 +580,24 @@ def decide(area: RouteArea, risk: str, changed_paths: Sequence[str]) -> RouteDec
     )
 
 
+def text_matches_term(text: str, term: str) -> bool:
+    """Return whether one trigger term appears without matching inside words."""
+    normalized = term.lower()
+    if re.fullmatch(r"[a-z0-9]+", normalized):
+        suffix = "s?" if len(normalized) > 2 else ""
+        return (
+            re.search(
+                rf"(?<![A-Za-z0-9]){re.escape(normalized)}{suffix}(?![A-Za-z0-9])",
+                text,
+            )
+            is not None
+        )
+    return normalized in text
+
+
 def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     """Return whether all group terms appear in text."""
-    return all(term.lower() in text for term in group)
+    return all(text_matches_term(text, term) for term in group)
 
 
 def object_mapping(value: object, field: str) -> JsonMapping:
@@ -646,6 +706,29 @@ def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
 
 
+def validation_failure_repair_rules(
+    rules_by_skill: Mapping[str, SkillRoutingRule],
+    prompt: str,
+) -> tuple[SkillRoutingRule, ...]:
+    """Return route-owned repair routing for validation-failure prompts."""
+    matches = validation_failure_repair_concept_matches(prompt)
+    if not matches:
+        return ()
+    catalog_rule = rules_by_skill.get("codex-task-workflow")
+    related_skills = ("test-design",)
+    if catalog_rule is not None:
+        related_skills = ordered_unique((*catalog_rule.related_skills, "test-design"))
+    return (
+        SkillRoutingRule(
+            skill="codex-task-workflow",
+            reason=matches[0].reason(),
+            stage_policy="active",
+            triggers=(),
+            related_skills=related_skills,
+        ),
+    )
+
+
 def read_prompt_file(root: Path, raw_path: str) -> str:
     """Read one prompt file, resolving relative paths from the repository root."""
     path = Path(raw_path)
@@ -679,16 +762,104 @@ def public_skill_name_mentioned(text: str, skill: str) -> bool:
     )
 
 
+def strip_private_route_aliases(text: str) -> str:
+    """Remove private route labels before public prompt skill matching."""
+    structural_field_pattern = "|".join(
+        re.escape(field).replace("_", r"[-_]")
+        for field in PRIVATE_ROUTE_STRUCTURAL_FIELDS
+    )
+    scrubbed = re.sub(
+        rf"(?im)^\s*(?:{structural_field_pattern})\s*[:=].*$",
+        " ",
+        text,
+    )
+    for alias in PRIVATE_SUBAGENT_ROUTE_ALIASES:
+        scrubbed = re.sub(
+            rf"(?<![A-Za-z0-9_-])\$?{re.escape(alias)}(?![A-Za-z0-9_-])",
+            " ",
+            scrubbed,
+            flags=re.IGNORECASE,
+        )
+    return scrubbed
+
+
 def matched_skill_routes(prompt: str, rules: Sequence[SkillRoutingRule]) -> tuple[SkillRouteMatch, ...]:
     """Return public skill matches for one prompt."""
     text = prompt.lower()
     matches: list[SkillRouteMatch] = []
+    observed: set[str] = set()
     for rule in rules:
+        if rule.skill in observed:
+            continue
         explicit = public_skill_name_mentioned(text, rule.skill)
         if explicit or any(text_matches_group(text, group) for group in rule.triggers):
             match_reason = "prompt explicitly names public skill" if explicit else rule.reason
             matches.append(SkillRouteMatch(rule.skill, match_reason))
+            observed.add(rule.skill)
     return tuple(matches)
+
+
+def structural_skill_lane_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+    """Return skill matches from structural project-owned skill lane evidence."""
+    matches: list[SkillRouteMatch] = []
+    for concept_match in structural_skill_lane_concept_matches(prompt):
+        reason = concept_match.reason()
+        for skill in concept_match.concept.route_skills:
+            matches.append(SkillRouteMatch(skill, reason))
+    return tuple(matches)
+
+
+def validation_failure_repair_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+    """Return skill matches from same-intent validation repair evidence."""
+    return tuple(
+        SkillRouteMatch(match.concept.owner_skill, match.reason())
+        for match in validation_failure_repair_concept_matches(prompt)
+    )
+
+
+def user_guided_debugging_requested(prompt: str) -> bool:
+    """Return whether the prompt asks for one-issue-at-a-time debugging."""
+    text = prompt.lower()
+    return any(text_matches_group(text, group) for group in USER_GUIDED_DEBUGGING_ROUTE_GROUPS)
+
+
+def broad_refactor_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+    """Return refactor-loop for broad refactor prompts outside user-guided cadence."""
+    text = prompt.lower()
+    if user_guided_debugging_requested(prompt):
+        return ()
+    if any(text_matches_group(text, group) for group in BROAD_REFACTOR_ROUTE_GROUPS):
+        return (
+            SkillRouteMatch(
+                "refactor-loop",
+                "broad refactor prompt needs behavior-preserving refactor loop",
+            ),
+        )
+    return ()
+
+
+def supplemental_skill_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+    """Return route-owned matches that are not yet expressible in catalog data."""
+    text = prompt.lower()
+    return tuple(
+        SkillRouteMatch(skill, "supplemental route-owned prompt trigger")
+        for skill, groups in SUPPLEMENTAL_SKILL_ROUTE_GROUPS.items()
+        if any(text_matches_group(text, group) for group in groups)
+    )
+
+
+def dedupe_skill_route_matches(
+    matches: Sequence[SkillRouteMatch],
+) -> tuple[SkillRouteMatch, ...]:
+    """Return first match per skill while preserving route order."""
+    observed: set[str] = set()
+    deduped: list[SkillRouteMatch] = []
+    for match in matches:
+        if match.skill in observed:
+            continue
+        observed.add(match.skill)
+        deduped.append(match)
+    return tuple(deduped)
 
 
 def infer_mode(prompt: str, requested_mode: str) -> str:
@@ -718,7 +889,13 @@ def implementation_handoff_required(prompt: str, mode: str = "repo-changing") ->
     if mode != "repo-changing":
         return False
     text = prompt.lower()
-    if any(text_matches_group(text, group) for group in NON_IMPLEMENTATION_REVIEW_GROUPS):
+    if any(
+        text_matches_group(text, group)
+        for group in NON_IMPLEMENTATION_REVIEW_GROUPS
+        if group != ("no", "patch")
+    ):
+        return False
+    if NO_PATCH_RE.search(text):
         return False
     if any(text_matches_group(text, group) for group in IMPLEMENTATION_DELEGATION_GROUPS):
         return True
@@ -765,14 +942,28 @@ def related_skill_candidates(
 
 def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
-    active_mode = infer_mode(prompt, mode)
-    rules_by_skill = {rule.skill: rule for rule in rules}
-    matches = matched_skill_routes(prompt, rules)
+    public_prompt = strip_private_route_aliases(prompt)
+    active_mode = infer_mode(public_prompt, mode)
+    catalog_rules_by_skill = {rule.skill: rule for rule in rules}
+    effective_rules = (
+        *rules,
+        *validation_failure_repair_rules(catalog_rules_by_skill, public_prompt),
+    )
+    rules_by_skill = {rule.skill: rule for rule in effective_rules}
+    matches = dedupe_skill_route_matches(
+        (
+            *broad_refactor_routes(public_prompt),
+            *matched_skill_routes(public_prompt, effective_rules),
+            *structural_skill_lane_routes(public_prompt),
+            *validation_failure_repair_routes(public_prompt),
+            *supplemental_skill_routes(public_prompt),
+        )
+    )
     matched_skills = tuple(match.skill for match in matches)
     base_skills = ["agent-orchestration"]
     if active_mode == "repo-changing":
         base_skills.append("codex-task-workflow")
-    handoff_required = implementation_handoff_required(prompt, active_mode)
+    handoff_required = implementation_handoff_required(public_prompt, active_mode)
     prompt_skills = matched_skills
     if handoff_required:
         prompt_skills = ordered_unique((*prompt_skills, SUBAGENT_BOOTSTRAP_SKILL))
@@ -787,7 +978,7 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
             match.skill != SUBAGENT_BOOTSTRAP_SKILL
             and match.reason == "prompt explicitly names public skill"
         )
-        or is_current_stage_skill(match.skill, rules_by_skill, prompt, active_mode)
+        or is_current_stage_skill(match.skill, rules_by_skill, public_prompt, active_mode)
     )
     active_skills = ordered_unique(active_skill_inputs)
     deferred_skills = tuple(skill for skill in skills if skill not in active_skills)

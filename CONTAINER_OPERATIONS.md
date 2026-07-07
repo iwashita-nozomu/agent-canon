@@ -120,8 +120,14 @@ project CI path.
 Use the shared `.devcontainer/` surface for agent runtime setup.
 
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
-  JSON inspection helpers such as `jq`, and post-create bootstrap belong in
-  `.devcontainer/post-create.sh`.
+  JSON and structure inspection helpers such as `jq` and `tree`, and
+  post-create bootstrap belong in `.devcontainer/post-create.sh`.
+- `tree` is the canonical agent-side structure inspection display for template
+  and derived parent repo readiness. Use
+  `tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <parent-root>`
+  with `tools/agent_tools/parent_repo_readiness.py` when checking root view
+  shape; do not require parent repositories to commit generated `tree` output
+  unless a task-specific design explicitly asks for that artifact.
 - Codex CLI setup validates `codex --version` before returning. Command absence
   or a broken wrapper triggers the canonical `npm install -g @openai/codex`
   install command during post-create.

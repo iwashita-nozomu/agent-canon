@@ -77,6 +77,12 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は、先に `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で current branch に GitHub main を取り込み、AgentCanon PR に出します。
 - local checkout branch は valid な shared-canon work surface です。local checkout に積まれた commit は消して最新化する対象ではなく、GitHub `main` を merge して conflict を解き、通常の AgentCanon PR として review / merge します。機械 evidence として `merge-main-into-current-preserve-dirty` の `agent_canon_merge_source_sha`、`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、`agent_canon_merge_remote_main_verified=yes` を run bundle、PR body、または work log に残します。
 - update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
+- AgentCanon source change、parent submodule pin change、`.gitmodules`
+  change、AgentCanon-owned root runtime view / root-copy surface change、parent
+  root sync PR は `agentcanon_structure_followup=required` です。template /
+  derived parent root で `bash tools/sync_agent_canon.sh link-root` と
+  `bash tools/sync_agent_canon.sh check` が pass した後だけ
+  `agentcanon_structure_followup=pass` として closeout に使えます。
 - `ensure-latest` は `.gitmodules` の URL と submodule `origin/main` を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定します。remote main が進んでいれば submodule を fast-forward し、parent repo の gitlink commit と root shared surface を同期します。
 - local submodule commit が remote main に含まれている場合は、`bash tools/update_agent_canon.sh apply` または `make agent-canon-ensure-latest` で parent pin を remote main へ揃えます。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
@@ -724,6 +730,18 @@ cost を無視して review coverage を優先する run では、research-drive
   sweeps, and randomized large cases use a task-linked approval note with
   request clause, expected signal, runtime / resource budget, stop condition,
   artifact path, and owner.
+- After any validation test/check failure, prohibited actions are simplifying,
+  reverting, deleting intended behavior/tests, weakening the oracle, or
+  downscoping required validation just to pass. First record the five machine
+  fields: `failing_contract`, `observation_level`, `cause_classification`,
+  `intent_preservation`, and `evidence`. The canonical token-safe
+  `cause_classification` and `intent_preservation` slug lists are owned by
+  `documents/runtime-profiles-and-check-matrix.json` and projected into
+  `documents/runtime-profiles-and-check-matrix.md`; this workflow section only
+  states when Codex must apply that taxonomy. Repair with approved intent
+  preserved through the owner route named by the taxonomy, route unrelated
+  failures as residual evidence, and escalate approved-design / user-request
+  conflicts before changing intent.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
 - Large delivery、explicit comprehensive validation、高 risk 変更では user-facing completion 前に `make ci` または同等の full local confidence gate を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Shared canon 変更では active profile が指定する `make agent-canon-pr-check` または等価な AgentCanon PR gate を使い、Routine docs / Focused code は active profile の targeted checks を evidence にできる
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する

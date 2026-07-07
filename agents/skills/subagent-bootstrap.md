@@ -5,6 +5,7 @@ contract skill
 responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
+upstream design ../internal-routines/subagent-startup.md owns private subagent startup route labels
 @dependency-end
 -->
 
@@ -45,6 +46,7 @@ config policy の第二の正本にはしません。
 - `agents/TASK_WORKFLOWS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
+- `agents/internal-routines/subagent-startup.md`
 - `tools/agent_tools/bootstrap_agent_run.py`
 
 ## Standard Command
@@ -99,6 +101,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
 handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
+subagent-only startup / internal skill routes are owned by `agents/internal-routines/subagent-startup.md`. Bootstrap cites that routine and carries `run.subagent_prompt_packet.subagent_startup_route` into handoff routing when present; it does not add `_...` labels to public skill routing or duplicate the capsule schema.
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
 対象 surface は route seed として扱い、責務検索、再利用確認、stale surface scan、dependency expansion を通して handoff scope へ落とします。
@@ -143,6 +146,10 @@ parent は各 wave の出力を frontier queue に戻し、次に必要な bound
 validation を再実行します。次 frontier が repository / code / tool action で進む
 限り、`unverified_with_next_witness` や `connection_unconnected` を user-facing
 停止点にしてはいけません。
+validation failure を次 writer に返す場合は、handoff に `failing_contract`、
+`observation_level`、`cause_classification`、`intent_preservation`、`evidence`
+を含め、pass 目的の単純化、revert、intended behavior / test 削除、
+oracle weakening、validation downscope を禁止事項として明示します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 behavior-changing、regression-prone、または high-risk code change では
 `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。

@@ -160,6 +160,16 @@ checker-owned property に結び付く finding です。formatter、lint、test-
 convention checker が既存 style debt や周辺 debt を表出した場合、その finding は residual
 evidence として記録し、現在の diff は requested contract に沿った semantic change に保ちます。
 
+Validation test/check が失敗した場合は、通すために intended behavior/test を削る、oracle を弱める、
+必要な validation を縮める、または blanket revert で済ませることを禁止します。先に
+`failing_contract`、`observation_level`、`cause_classification`、
+`intent_preservation`、`evidence` を記録します。`cause_classification` と
+`intent_preservation` の slug set と route semantics は
+`documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、
+`agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。
+`cause_classification=implementation_bug` で contract と oracle が安定している場合は、
+追加 test planning で止めず owning code / config / docs / workflow repair へ進みます。
+
 実装詳細に強く結合する test は、adapter 境界や protocol 境界を固定する場合だけ許可します。
 private member、内部 call sequence、全文 error prose、stdout 全文一致を固定する場合は、
 その対象が public contract である理由を test 名か test plan に残します。

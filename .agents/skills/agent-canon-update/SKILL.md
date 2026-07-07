@@ -77,6 +77,15 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+   Treat this as the mandatory `agentcanon_structure_followup` gate whenever
+   AgentCanon source, the parent submodule pin, `.gitmodules`, root runtime
+   views, shared root-copy surfaces, or parent root sync state changed. Record
+   `agentcanon_structure_followup=required` before the commands and
+   `agentcanon_structure_followup=pass` only after the sync check passes.
+   Template / derived parent roots must run this gate from the parent root after
+   AgentCanon source changes are integrated, or while preparing the parent
+   pin/root-view PR.
+
 1. Check and apply parent update TODOs before unrelated work:
 
 ```bash

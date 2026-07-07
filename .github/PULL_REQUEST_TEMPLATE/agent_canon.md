@@ -51,6 +51,7 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 - [ ] Tool additions or tool behavior changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] Memory additions, agent-learning updates, skill eval results, or feedback-loop changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] This PR is a pin/root-view update after the AgentCanon source PR, or the deferred upstream-sync reason is documented below.
+- [ ] This PR records `agentcanon_structure_followup=required` for AgentCanon source, pin, root-view, root-copy, or parent sync changes.
 
 Route notes:
 
@@ -117,6 +118,7 @@ Impact notes:
 
 ## Validation
 
+- [ ] Validation failure response, if any, cites `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md` or `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` and records same-intent repair / escalation evidence.
 - [ ] `bash tools/sync_agent_canon.sh link-root`
 - [ ] `bash tools/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
@@ -164,9 +166,11 @@ Integration notes:
 - [ ] AgentCanon source PR was opened and merged before this template pin update, or this is a pin-only update to existing AgentCanon `main`.
 - [ ] After AgentCanon merge, ran `make agent-canon-ensure-latest`.
 - [ ] Compiled AgentCanon tools were rebuilt by the latest/ensure path, or `AGENT_CANON_TOOL_REBUILD_*` explains why rebuild is deferred to DevContainer.
-- [ ] Ran `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check`.
+- [ ] `agentcanon_structure_followup=required` is recorded for this PR.
+- [ ] Ran `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` from the template / derived parent root.
+- [ ] `agentcanon_structure_followup=pass` is recorded after the sync check passed.
 - [ ] Direct `bash tools/sync_agent_canon.sh push` was not used, or a maintainer direct-push exception is explained below.
-- [ ] Upstream sync is intentionally deferred and explained below.
+- [ ] Any upstream sync blocker is recorded below; deferred sync is not PR completion evidence for AgentCanon source/pin/root-view changes.
 
 Upstream sync note:
 

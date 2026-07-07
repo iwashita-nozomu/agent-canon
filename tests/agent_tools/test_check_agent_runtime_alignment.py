@@ -160,6 +160,124 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         ):
             runtime_alignment.validate_project_config()
 
+    def test_skill_config_accepts_project_owned_skill_overlay(self) -> None:
+        """Parent repos may add skills through .codex/project-config.toml."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            agent_skill = root / ".agents" / "skills" / "agent-skill" / "SKILL.md"
+            project_skill = root / ".codex" / "project-skills" / "project-skill" / "SKILL.md"
+            agent_skill.parent.mkdir(parents=True)
+            project_skill.parent.mkdir(parents=True)
+            agent_skill.write_text("---\nname: agent-skill\n---\n", encoding="utf-8")
+            project_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
+            config_path = root / ".codex" / "config.toml"
+            project_config_path = root / ".codex" / "project-config.toml"
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text("", encoding="utf-8")
+            config: dict[str, object] = {
+                "skills": {
+                    "config": [
+                        {
+                            "path": "../.agents/skills/agent-skill/SKILL.md",
+                            "enabled": True,
+                        },
+                    ]
+                }
+            }
+            project_config: dict[str, object] = {
+                "skills": {
+                    "config": [
+                        {
+                            "path": "project-skills/project-skill/SKILL.md",
+                            "enabled": True,
+                        },
+                    ]
+                }
+            }
+
+            with (
+                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
+                patch.object(runtime_alignment, "PROJECT_SKILL_CONFIG_PATH", project_config_path),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "expected_skill_config_paths",
+                    return_value=("../.agents/skills/agent-skill/SKILL.md",),
+                ),
+            ):
+                self.assertTrue(runtime_alignment.is_project_skill_lane_path(project_skill))
+                runtime_alignment.validate_skill_config(config, project_config)
+
+    def test_shared_skill_config_rejects_project_owned_skill_entries(self) -> None:
+        """Parent-owned skills must not be enabled from AgentCanon config.toml."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            project_skill = root / ".codex" / "project-skills" / "project-skill" / "SKILL.md"
+            project_skill.parent.mkdir(parents=True)
+            project_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
+            config_path = root / ".codex" / "config.toml"
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text("", encoding="utf-8")
+            config: dict[str, object] = {
+                "skills": {
+                    "config": [
+                        {
+                            "path": "project-skills/project-skill/SKILL.md",
+                            "enabled": True,
+                        },
+                    ]
+                }
+            }
+
+            with (
+                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "expected_skill_config_paths",
+                    return_value=(),
+                ),
+                self.assertRaisesRegex(RuntimeError, "project-config.toml"),
+            ):
+                runtime_alignment.validate_skill_config(config)
+
+    def test_skill_config_rejects_paths_outside_agentcanon_and_project_lanes(
+        self,
+    ) -> None:
+        """skills.config paths outside approved lanes must fail closed."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            outside_skill = root / "skills" / "project-skill" / "SKILL.md"
+            outside_skill.parent.mkdir(parents=True)
+            outside_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
+            config_path = root / ".codex" / "config.toml"
+            project_config_path = root / ".codex" / "project-config.toml"
+            config_path.parent.mkdir(parents=True)
+            config_path.write_text("", encoding="utf-8")
+            project_config: dict[str, object] = {
+                "skills": {
+                    "config": [
+                        {
+                            "path": "../skills/project-skill/SKILL.md",
+                            "enabled": True,
+                        },
+                    ]
+                }
+            }
+
+            with (
+                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
+                patch.object(runtime_alignment, "PROJECT_SKILL_CONFIG_PATH", project_config_path),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "expected_skill_config_paths",
+                    return_value=(),
+                ),
+                self.assertRaisesRegex(RuntimeError, "outside allowed skill lanes"),
+            ):
+                runtime_alignment.validate_skill_config({"skills": {"config": []}}, project_config)
+
     def test_skill_routing_schema_rejects_unknown_stage_policy(self) -> None:
         """Skill routing stage policy values must match implemented behavior."""
         with self.assertRaisesRegex(RuntimeError, "routing.stage_policy"):
@@ -290,6 +408,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             }
 
             runtime_alignment.validate_public_skill_document_contract(catalog, root)
+            self.assertTrue((root / "agents" / "internal-routines" / "review.md").is_file())
 
     def test_public_skill_readme_rejects_duplicate_catalog_table(self) -> None:
         """The public skill list must stay in catalog.yaml, not README rows."""
@@ -412,6 +531,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
             ):
                 runtime_alignment.validate_public_skill_shims()
+            self.assertTrue((root / ".agents" / "skills" / "_internal-example" / "SKILL.md").is_file())
 
     def test_public_skill_catalog_rejects_private_skill_id(self) -> None:
         """The public catalog is the user-facing skill surface."""

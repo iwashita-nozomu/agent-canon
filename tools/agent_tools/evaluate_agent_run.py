@@ -13,12 +13,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
 
 from agent_team import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
@@ -59,6 +60,107 @@ REQUIRED_ARTIFACTS = (
     "retrospective.md",
 )
 DEFAULT_BEHAVIOR_MANIFEST = eval_manifest_path("agent_behavior_eval.toml")
+RUNTIME_PROFILE_INVENTORY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "documents"
+    / "runtime-profiles-and-check-matrix.json"
+)
+
+
+def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
+    """Load one validation-failure slug set from the runtime profile inventory."""
+    raw_data = json.loads(RUNTIME_PROFILE_INVENTORY_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw_data, dict):
+        raise ValueError("runtime profile inventory must be a JSON object")
+    data = cast(dict[str, object], raw_data)
+    raw_response = data.get("validation_failure_response")
+    if not isinstance(raw_response, dict):
+        raise ValueError("runtime profile inventory missing validation_failure_response")
+    response = cast(dict[str, object], raw_response)
+    raw_values = response.get(field)
+    if not isinstance(raw_values, list) or not raw_values:
+        raise ValueError(
+            f"runtime profile inventory missing validation_failure_response.{field}"
+        )
+    values = cast(list[object], raw_values)
+    slugs: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            raise ValueError(
+                f"validation_failure_response.{field} must contain strings"
+            )
+        slugs.append(value)
+    return frozenset(slugs)
+
+
+def validation_failure_taxonomy_slug(
+    field: str,
+    values: frozenset[str],
+    slug: str,
+) -> str:
+    """Return one route slug only when the runtime inventory owns it."""
+    if slug not in values:
+        raise ValueError(
+            f"runtime profile inventory missing validation_failure_response.{field} "
+            f"slug: {slug}"
+        )
+    return slug
+
+
+def validation_failure_taxonomy_slug_subset(
+    field: str,
+    values: frozenset[str],
+    slugs: tuple[str, ...],
+) -> frozenset[str]:
+    """Return route-specific slugs after validating them against the inventory."""
+    return frozenset(
+        validation_failure_taxonomy_slug(field, values, slug) for slug in slugs
+    )
+
+
+def validation_failure_slug_hint(values: frozenset[str]) -> str:
+    """Return a feedback hint from the inventory-owned slug set."""
+    return "<" + "|".join(sorted(values)) + ">"
+
+
+VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES = validation_failure_taxonomy_values(
+    "cause_classes"
+)
+VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES = validation_failure_taxonomy_values(
+    "intent_preservation"
+)
+VALIDATION_FAILURE_IMPLEMENTATION_BUG = validation_failure_taxonomy_slug(
+    "cause_classes",
+    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
+    "implementation_bug",
+)
+VALIDATION_FAILURE_REPAIR_SAME_INTENT = validation_failure_taxonomy_slug(
+    "intent_preservation",
+    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
+    "repair_same_intent",
+)
+VALIDATION_FAILURE_DESIGN_CONFLICT = validation_failure_taxonomy_slug(
+    "cause_classes",
+    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
+    "approved_design_user_request_conflict",
+)
+VALIDATION_FAILURE_ESCALATE_DESIGN_CONFLICT = validation_failure_taxonomy_slug(
+    "intent_preservation",
+    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
+    "escalate_design_conflict",
+)
+VALIDATION_FAILURE_FORBIDDEN_TOKENS = (
+    "oracle_weakening=",
+    "oracle_deleted=",
+    "test_deleted=",
+    "behavior_simplified=",
+    "validation_downscope=",
+)
+RESIDUAL_CHECKER_FAILURE_CAUSES = validation_failure_taxonomy_slug_subset(
+    "cause_classes",
+    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
+    ("fixture_environment_issue", "pre_existing_unrelated_failure"),
+)
 
 
 @dataclass(frozen=True)
@@ -814,7 +916,62 @@ def evaluate(
         ),
     ]
     blockers = [item.feedback for item in criteria if item.status != "pass"]
+    blockers.extend(unresolved_checker_failure_blockers(evidence.behavior_events_raw_text))
     return criteria, blockers
+
+
+def unresolved_checker_failure_blockers(text: str) -> list[str]:
+    """Return blockers for checker failures that still need same-intent repair."""
+    latest_by_checker: dict[str, dict[str, str]] = {}
+    blockers: list[str] = []
+    for line in text.splitlines():
+        fields = token_fields(line)
+        status = fields.get("code_checker", "")
+        if status not in {"pass", "fail"}:
+            continue
+        checker = checker_identity(fields)
+        latest_by_checker[checker] = fields
+        if status == "fail" and not validation_failure_fields_complete(fields):
+            blockers.append(
+                f"{checker} code_checker=fail missing validation-failure "
+                "field packet: failing_contract=, observation_level=, "
+                "cause_classification=<canonical_slug>, "
+                "intent_preservation=<canonical_slug>, evidence="
+            )
+
+    for checker, fields in sorted(latest_by_checker.items()):
+        if fields.get("code_checker") != "fail":
+            continue
+        if not validation_failure_fields_complete(fields):
+            continue
+        cause = fields.get("cause_classification", "")
+        intent = fields.get("intent_preservation", "")
+        if (
+            cause == VALIDATION_FAILURE_IMPLEMENTATION_BUG
+            and intent == VALIDATION_FAILURE_REPAIR_SAME_INTENT
+        ):
+            blockers.append(
+                f"{checker} still reports code_checker=fail after "
+                f"cause_classification={VALIDATION_FAILURE_IMPLEMENTATION_BUG} "
+                f"intent_preservation={VALIDATION_FAILURE_REPAIR_SAME_INTENT}; "
+                "rerun the same checker "
+                "to a later code_checker=pass or keep repairing the owning surface"
+            )
+            continue
+        if cause in RESIDUAL_CHECKER_FAILURE_CAUSES and fields.get("evidence"):
+            continue
+        if cause or intent:
+            blockers.append(
+                f"{checker} code_checker=fail has unresolved validation-failure "
+                f"route cause_classification={cause or '<missing>'} "
+                f"intent_preservation={intent or '<missing>'}"
+            )
+    return blockers
+
+
+def checker_identity(fields: dict[str, str]) -> str:
+    """Return the stable checker id for one code_checker evidence line."""
+    return fields.get("checker") or fields.get("tool_call") or "unknown-checker"
 
 
 def evaluate_behavior_criteria(
@@ -835,6 +992,8 @@ def evaluate_behavior_criterion(
     """Evaluate one manifest-defined behavior criterion."""
     if item.name == "token_efficiency_recorded":
         return evaluate_token_efficiency_criterion(text, item)
+    if item.name == "validation_failure_response_recorded":
+        return evaluate_validation_failure_response_criterion(text, item)
     missing_all = tuple(token for token in item.required_all if token.lower() not in text)
     any_passed = not item.required_any or has_any(text, item.required_any)
     forbidden_hits = tuple(
@@ -847,6 +1006,155 @@ def evaluate_behavior_criterion(
         passed,
         behavior_feedback(item, missing_all, any_passed, forbidden_hits),
     )
+
+
+def evaluate_validation_failure_response_criterion(
+    text: str,
+    item: BehaviorCriterion,
+) -> CriterionResult:
+    """Require diagnostic evidence before scoring failure-driven simplification."""
+    failure_tokens = tuple(
+        token
+        for token in item.required_any
+        if token != "validation_failure_not_observed"
+    )
+    not_observed = "validation_failure_not_observed" in text
+    failure_observed = has_any(text, failure_tokens)
+    observation_recorded = not_observed or failure_observed
+    contradictory = not_observed and failure_observed
+    forbidden_violations = validation_failure_forbidden_violations(
+        text,
+        (*item.forbidden_any, *VALIDATION_FAILURE_FORBIDDEN_TOKENS),
+    )
+    evidence_complete = validation_failure_evidence_complete(text, failure_tokens)
+    passed = (
+        observation_recorded
+        and not contradictory
+        and (not failure_observed or evidence_complete)
+        and not forbidden_violations
+    )
+    missing_all = validation_failure_missing_tokens(
+        observation_recorded,
+        failure_observed,
+        evidence_complete,
+        forbidden_violations,
+        contradictory,
+    )
+    return criterion(
+        f"behavior::{item.name}",
+        item.max_score,
+        passed,
+        behavior_feedback(item, missing_all, True, forbidden_violations),
+    )
+
+
+def validation_failure_evidence_complete(
+    text: str,
+    failure_tokens: tuple[str, ...],
+) -> bool:
+    """Return whether validation-failure evidence uses the monitor contract."""
+    failure_events = validation_failure_event_fields(text, failure_tokens)
+    return bool(failure_events) and all(
+        validation_failure_fields_complete(fields) for fields in failure_events
+    )
+
+
+def validation_failure_event_fields(
+    text: str,
+    failure_tokens: tuple[str, ...],
+) -> tuple[dict[str, str], ...]:
+    """Return field packets from observed validation/checker failure events."""
+    events: list[dict[str, str]] = []
+    normalized_tokens = tuple(token.lower() for token in failure_tokens)
+    for line in text.splitlines():
+        line_lower = line.lower()
+        if any(token in line_lower for token in normalized_tokens):
+            events.append(token_fields(line))
+    return tuple(events)
+
+
+def validation_failure_fields_complete(fields: dict[str, str]) -> bool:
+    """Return whether one validation/checker failure event has required fields."""
+    cause = fields.get("cause_classification", "")
+    intent = fields.get("intent_preservation", "")
+    return (
+        bool(fields.get("failing_contract"))
+        and bool(fields.get("observation_level"))
+        and cause in VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES
+        and intent in VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES
+        and bool(fields.get("evidence"))
+    )
+
+
+def validation_failure_forbidden_violations(
+    text: str,
+    forbidden_tokens: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return forbidden validation-repair tokens without same-event escalation."""
+    violations: list[str] = []
+    normalized_tokens = tuple(
+        dict.fromkeys(token.lower() for token in forbidden_tokens)
+    )
+    for line in text.splitlines():
+        line_lower = line.lower()
+        line_hits = tuple(token for token in normalized_tokens if token in line_lower)
+        if not line_hits:
+            continue
+        fields = token_fields(line)
+        if validation_failure_fields_escalated(fields):
+            continue
+        violations.extend(line_hits)
+    return tuple(dict.fromkeys(violations))
+
+
+def validation_failure_fields_escalated(fields: dict[str, str]) -> bool:
+    """Return whether one field packet escalates a design/user conflict."""
+    return (
+        fields.get("cause_classification")
+        == VALIDATION_FAILURE_DESIGN_CONFLICT
+        and fields.get("intent_preservation")
+        == VALIDATION_FAILURE_ESCALATE_DESIGN_CONFLICT
+        and bool(fields.get("evidence"))
+    )
+
+
+def validation_failure_missing_tokens(
+    observation_recorded: bool,
+    failure_observed: bool,
+    evidence_complete: bool,
+    forbidden_violations: tuple[str, ...],
+    contradictory: bool,
+) -> tuple[str, ...]:
+    """Return validation-failure-specific missing or contradictory evidence."""
+    missing: list[str] = []
+    if not observation_recorded:
+        missing.append(
+            "validation_failure_not_observed or observed validation failure token"
+        )
+    if contradictory:
+        missing.append(
+            "remove validation_failure_not_observed when later failure evidence exists"
+        )
+    if failure_observed and not evidence_complete:
+        missing.extend(
+            [
+                "failing_contract=",
+                "observation_level=",
+                "cause_classification=<canonical_slug>",
+                "intent_preservation="
+                + validation_failure_slug_hint(
+                    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES
+                ),
+                "evidence=",
+            ]
+        )
+    if forbidden_violations:
+        missing.append(
+            f"intent_preservation={VALIDATION_FAILURE_ESCALATE_DESIGN_CONFLICT} "
+            f"with cause_classification={VALIDATION_FAILURE_DESIGN_CONFLICT} "
+            "on the same event"
+        )
+    return tuple(missing)
 
 
 def evaluate_token_efficiency_criterion(

@@ -58,12 +58,21 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - 派生 repo 由来の shared canon 差分は、`vendor/agent-canon/` 内の normal GitHub branch と AgentCanon PR に分けます。
 - 派生 repo 側の local diff、AgentCanon branch、shared canon main、派生 repo submodule pin を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
+- AgentCanon source change、submodule pin change、`.gitmodules` change、root
+  runtime view / root-copy surface change、parent root sync PR はすべて
+  `agentcanon_structure_followup=required` です。template / derived parent root
+  で `bash tools/sync_agent_canon.sh link-root` と
+  `bash tools/sync_agent_canon.sh check` を実行し、pass 後だけ
+  `agentcanon_structure_followup=pass` を PR / run evidence に記録します。
 - standalone AgentCanon repo では Makefile 前提を置かず、下の explicit validation commands を使います。
 - template / derived repo では `make agent-canon-pr-check` を使います。
 - `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
+- validation failure response は `agents/canonical/CODEX_WORKFLOW.md` と
+  `documents/runtime-profiles-and-check-matrix.md` の owner contract に従い、
+  PR body には分類と same-intent repair / escalation evidence だけを記録します。
 - PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
@@ -188,12 +197,23 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - root 側の symlink view は編集しません。
 - tool addition、memory addition、skill eval result、feedback loop change はこの source worktree 側で commit し、template pin PR だけには閉じ込めません。
 
-3. shared surface を再同期する
+3. `agentcanon_structure_followup` gate を通す
+
+AgentCanon source work、template / derived parent pin、root view、shared
+root-copy surface、parent root sync PR はすべて
+`agentcanon_structure_followup=required` として扱います。
+standalone AgentCanon source PR では、source PR merge 後または parent
+pin/root-view PR 準備時に parent root からこの gate を実行します。
 
 ```bash
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
+
+両方が pass したときだけ `agentcanon_structure_followup=pass` を PR body、
+run bundle、または work log に残します。template / derived repo では、この gate
+の後に parent readiness / structure checks を含む `make agent-canon-pr-check`
+を続けます。
 
 4. PR 前の validation を流す
 
@@ -447,11 +467,17 @@ Validation:
 - PR 本文に `PR Essence` として problem / user request、design intent、
   canonical owner、behavior or contract delta、evidence route が記録されている
 - PR 本文に changed surface と validation が記録されている
+- PR 本文または run evidence に `agentcanon_structure_followup=required` と
+  `agentcanon_structure_followup=pass` が記録されている
 - PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
 - PR 本文に search-to-edit-scope evidence、または search-to-edit-scope 不要判断が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、security check 状態が記録されている
 - file 構成変更がある場合は current-checkout integration branch merge と tree check が完了
-- AgentCanon main へ merge 後、template 側で `make agent-canon-ensure-latest` と parent gitlink commit / push の実行結果、または external block / user stop による未実行理由が残っている
+- AgentCanon main へ merge 後、template / derived parent root で
+  `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、
+  `bash tools/sync_agent_canon.sh check`、parent readiness / structure checks、
+  parent gitlink commit / push の実行結果が残っている。external block / user
+  stop は未実行理由として記録できますが、PR 完了扱いにはしません。
 
 ## GitHub Security Baseline
 

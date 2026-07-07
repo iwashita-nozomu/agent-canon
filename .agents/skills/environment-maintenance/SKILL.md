@@ -37,3 +37,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Do not canonize host-global installs as the repository default.
 1. Follow `CONTAINER_OPERATIONS.md` when deciding whether a tool belongs in repo-local Dockerfile / `docker/` or AgentCanon-owned `.devcontainer/`.
 1. Update mechanical enforcement in `tools/docker_dependency_validator.sh` when the boundary changes.
+1. When environment or CI validation failure drives a repair, record the
+   validation-failure-response packet (`failing_contract`, `observation_level`,
+   `cause_classification`, `intent_preservation`, and `evidence`) before
+   downscoping validation or weakening an oracle.
