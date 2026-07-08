@@ -385,8 +385,8 @@ skill_families:
         - ["skill", "missed"]
         - ["runbundle", "agent", "レポート"]
         - ["run bundle", "agent", "report"]
-        - ["codex", "レポ"]
         - ["codex", "report"]
+        - ["codex", "レポとか"]
         - ["runtime", "dashboard"]
         - ["compact", "dashboard"]
         - ["agent-runtime-dashboard"]
@@ -691,6 +691,10 @@ skill_families:
         - ["test-design"]
         - ["test", "design"]
         - ["テスト", "設計"]
+        - ["アルゴリズム", "テストから"]
+        - ["アルゴリズム", "テスト", "直し"]
+        - ["algorithm", "test", "first"]
+        - ["test", "first", "algorithm"]
         - ["contract-only", "wrapper"]
         - ["contract", "only", "wrapper"]
         - ["契約だけ"]
@@ -760,6 +764,8 @@ skill_families:
       reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
       triggers:
         - ["レポ", "リファクタ"]
+        - ["レポ", "ルール", "読み込み"]
+        - ["レポ", "ルール", "構造"]
         - ["repo", "refactor"]
         - ["repository", "refactor"]
         - ["repo", "structure"]
@@ -768,6 +774,11 @@ skill_families:
         - ["repository", "optimization"]
         - ["レポの", "最適化"]
         - ["root", "view"]
+        - ["codex", "読み込み", "優先"]
+        - ["codex", "読み込み", "プライオリティ"]
+        - ["codex", "loading", "priority"]
+        - ["agents.md", "読み込み"]
+        - ["agents.md", "priority"]
         - ["responsibility-scope"]
         - ["ディレクトリ", "構成"]
         - ["directory", "structure"]
@@ -922,6 +933,10 @@ skill_families:
         - ["non-canonical", "document"]
         - ["noncanonical", "document"]
         - ["document", "inventory"]
+        - ["怪文書"]
+        - ["上位文書", "怪文書"]
+        - ["文書", "正本", "優先"]
+        - ["document", "canon", "priority"]
         - ["文書", "掃除"]
         - ["文書", "整理"]
         - ["文書", "最適化"]
@@ -1066,6 +1081,13 @@ skill_families:
         - ["収束", "tolerance"]
         - ["solver", "residual"]
         - ["residual"]
+        - ["アルゴリズム", "修正"]
+        - ["アルゴリズム", "テストから"]
+        - ["algorithm", "repair"]
+        - ["algorithm", "test", "first"]
+    related_skills:
+      - test-design
+      - algorithm-proof-exploration
   - id: adaptive-improvement-loop
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md
@@ -1113,6 +1135,20 @@ skill_families:
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
     shim: .agents/skills/algorithm-proof-exploration/SKILL.md
+    related_skills:
+      - formal-proof-workflow
+      - computational-optimization
+      - test-design
+    routing:
+      stage_policy: active
+      reason: algorithm repair, proof obligations, theorem frontiers, or algorithm-change guidance are in scope
+      triggers:
+        - ["algorithm", "proof"]
+        - ["algorithm", "repair"]
+        - ["algorithm", "change"]
+        - ["アルゴリズム", "修正"]
+        - ["アルゴリズム", "証明"]
+        - ["アルゴリズム", "テストから"]
   - id: algorithm-flowchart
     purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
@@ -1202,6 +1238,10 @@ skill_families:
         - ["こういう止まり方"]
         - ["フィードバック", "修正"]
         - ["feedback", "repair"]
+        - ["アルゴリズム", "テストから"]
+        - ["アルゴリズム", "テスト", "やめ"]
+        - ["algorithm", "test", "first"]
+        - ["algorithm", "repair", "feedback"]
         - ["memory", "feedback"]
         - ["エージェント", "成長"]
         - ["agent", "growth"]

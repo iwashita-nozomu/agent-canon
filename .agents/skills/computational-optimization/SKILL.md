@@ -51,6 +51,12 @@ Execute the required and task-matching conditional commands that the packet prin
    `validation_surface`. Prefer existing solver/library/framework primitives or
    repo helpers as the first implementation surface, and keep correctness
    validation separate from experiment or benchmark evidence.
+1. For algorithm fixes, enter through the optimization contract and implemented
+   mechanism before changing tests. Record the public entrypoint, recurrence or
+   state transition, invariant, stopping or acceptance scalar, and failure
+   semantics; then select the code-side repair route. Existing tests are
+   symptom and placement evidence, while expected values, tolerances, and new
+   oracle cases are updated after the algorithm route is fixed.
 1. Do not make the theorem pass by fixing the backend, device, compiler route,
    runtime target, or dtype unless the user request, approved design, runtime
    profile, public API, or config explicitly fixes that backend. Backend-specific
@@ -64,7 +70,10 @@ Execute the required and task-matching conditional commands that the packet prin
    `documents/conventions/python/15_jax_rules.md` as the detailed code-writing
    rule.
 1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
-1. If code changes are needed, use `$test-design` before implementation and include exact small cases, ill-conditioned cases, constraint-boundary cases, derivative checks, non-finite guards, and not-converged status handling when relevant.
+1. If code changes are needed, use `$test-design` after the optimization
+   contract and algorithmic repair route are fixed, and include exact small
+   cases, ill-conditioned cases, constraint-boundary cases, derivative checks,
+   non-finite guards, and not-converged status handling when relevant.
 1. Do not green numerical tests by relaxing tolerances, deleting assertions,
    skipping cases, changing expected values to match current output, or running
    computational tests on CPU; using CPU as substitute evidence is a validation

@@ -21,7 +21,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 ## First Read Path
 
 この README は、AgentCanon source tree の役割、構造モデル、目的別 route、runtime profile、検索導線、保守ルールを扱います。
-人がこの repo を読む入口は次の順で固定します。
+Codex runtime の最初の命令入口は `AGENTS.md` です。人がこの repo を読む入口は次の順で固定します。
 
 1. `README.md`
 1. `PHILOSOPHY.md`
@@ -50,10 +50,13 @@ AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope �
 この repo の全体構造は、top-level directory 名だけではなく、
 `responsibility-scope.toml` と各 file の dependency manifest で読む。
 
-2026-06-07 の機械解析では、structured-analysis 対象 file は 773、directory
-は 131、document inventory 対象は 396 だった。scope 定義の逸脱は 0 件で、
-document inventory finding は 11 件だった。この解析結果は、責務 scope、
-top-level surface、大きい directory の内部構造の順に読む。
+2026-07-08 の機械解析では、repo structure contract 対象 path は 1024、
+import responsibility 対象 file は 285、document inventory 対象 document は
+450 だった。scope 定義の逸脱、import responsibility finding、active document
+inventory finding は 0 件です。document inventory の historical record は 23
+件で、closed issue record と stale historical filename だけです。この解析結果は、
+責務 scope、top-level surface、大きい directory の内部構造、historical record
+の順に読む。
 
 ### 責務 Scope
 
@@ -109,10 +112,13 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 
 ### 現在の Review Finding
 
-structured-analysis の 2026-06-07 review では blocker は 0 件です。残る 11
-件は closed issue record の historical inventory が 10 件、closed issue path
-の stale-name candidate が 1 件です。README の構造説明はこれらを隠さず、
-open warning と historical inventory を分けて読む。
+structured-analysis / document-inventory の 2026-07-08 review では active
+finding は 0 件です。これは `issues/open/` にある active operational finding
+を置き換えるものではない。残る 23 件は closed issue record と stale
+historical filename の inventory です。これらは active rule や現行 workflow
+ではなく、`issues/README.md` と `issues/closed/README.md` が管理する履歴証拠
+として読む。新しい scope は closed issue へ追記せず、新しい open issue、
+正本文書、または owner surface に戻す。
 
 ### 大きい Directory の Child 表
 
