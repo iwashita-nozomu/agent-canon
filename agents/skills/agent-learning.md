@@ -34,6 +34,10 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - user / reviewer feedback が、test を pass させるために agent が intended
   behavior を単純化、revert、削除、oracle weakening したこと、または test planning
   を過剰に重視して owning code repair を止めたことを指摘している
+- user / reviewer feedback が、algorithm repair で test 変更や expected value
+  変更から着手し、algorithm contract、public entrypoint、recurrence / state
+  transition、invariant、stopping / acceptance rule、failure semantics、code-side
+  repair route の確定が遅れたことを指摘している
 - task closeout で、次回以降の agent 行動を変える観測がある
 - run bundle を評価し、agent feedback action を closeout 前に潰したい
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい
@@ -72,6 +76,11 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
   `target=test-design` または implementation workflow を指し、
   `action=prompt_repair|eval_update` を記録して prompt、eval、または tool repair
   で解決する。memory-only で閉じない
+- algorithm repair で test 変更から入ったという feedback は、
+  `computational-optimization`、`algorithm-proof-exploration`、`test-design`、
+  および implementation workflow への active skill feedback として扱う。
+  algorithm contract と code-side repair route を先に置く prompt repair で解決し、
+  memory-only で閉じない
 - input token 過多、context の重複読み込み、raw log の再投入、広い prose の model 投入が feedback された場合は、active routing / context skill を first repair candidate にする。owner / dependency evidence は落とさず、構造読み込みを protocol-owned `Structure Intake Packet` へ寄せ、重複または bulky な raw material を artifact と構造要約へ移す prompt repair として扱う。必要 context の省略を一般 rule にしない
 - active skill feedback で `skill_improvement_decision=applied` と記録できるのは、対象 skill prompt または eval anchor を実際に変更し、対応 validation を rerun した場合です。memory-only や issue 化だけの場合は `recorded` にする
 - behavior eval は `evidence/agent-evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる

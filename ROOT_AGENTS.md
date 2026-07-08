@@ -28,14 +28,37 @@ In template or derived repo roots they resolve under
 `vendor/agent-canon/documents/` unless `documents/README.md` lists a
 template-owned active contract.
 
+## Codex Loading Priority
+
+Codex instruction loading is runtime-defined and must be reflected in this
+repository's rule layout:
+
+1. User/global Codex guidance loads from Codex home before repository guidance.
+1. Project guidance loads from the project root down to the current working
+   directory. In each directory, an override file wins over `AGENTS.md`, and
+   Codex includes at most one instruction file per directory.
+1. Files closer to the current working directory appear later in the combined
+   prompt and therefore carry the local override surface.
+1. Skills are selected from metadata first; `SKILL.md` is read only after the
+   skill is chosen.
+
+For this template, `/AGENTS.md` is the top repo instruction surface and is a
+runtime view of `vendor/agent-canon/ROOT_AGENTS.md`. Nested files such as
+`/.github/AGENTS.md` are local overlays for that subtree. When Codex is started
+inside `vendor/agent-canon/`, the AgentCanon source tree's own `AGENTS.md`
+becomes the repo-local entrypoint for that submodule checkout. README files,
+closed issues, reports, notes, and generated inventories are evidence or human
+navigation unless this file or an owner surface explicitly routes to them.
+
 ## Reader Map
 
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
-- Start with Scope Discipline, then use the runtime owner map only to find the
-  surface that owns the next decision. Task entry, base runtime packet, shared
-  canon flow, closeout evidence, and validation commands are selected by the
-  active profile or touched surface; they are not a default checklist.
+- Start with Scope Discipline and Structure-First Scope Formation, then use the
+  runtime owner map only to find the surface that owns the next decision. Task
+  entry, base runtime packet, shared canon flow, closeout evidence, and
+  validation commands are selected by the active profile or touched surface;
+  they are not a default checklist.
 - Read it at the beginning of repository work or when resolving whether a rule
   belongs to the root view, AgentCanon source, a generated task packet, or a
   checker.
@@ -55,7 +78,34 @@ user's literal request clauses into routing, edit-target selection, validation,
 and closeout. Treat changes to the target, requested scope, or success
 condition as authorized only by explicit user evidence or owner-surface
 evidence; convenience, nearby files, prior habits, and inferred intent carry
-zero authority.
+zero authority. Scope is not frozen by the first plausible reading of the
+request: it is formed from request clauses plus repository structure, owner
+surface evidence, dependency edges, root-view state, and checker evidence.
+Adding a surface required by that evidence is part of scope formation; omitting
+it because it was not in the first edit guess is a scope error.
+
+## Structure-First Scope Formation
+
+Fix structure before ordinary task work when the repository shape, root views,
+path ownership, directory responsibility, submodule state, `.codex` / `.agents`
+views, or missing canonical paths affect where the task belongs. The reference
+route is `vendor/agent-canon/agents/skills/structure-refactor.md`
+`Pre-Task Structure Repair Contract`, backed by
+`vendor/agent-canon/documents/repo-structure-contract.toml`,
+`vendor/agent-canon/tools/agent_tools/repo_structure_contract.py`,
+`vendor/agent-canon/tools/agent_tools/responsibility_scope.py`, and
+`vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path
+Triage`.
+
+Structure-first repair is not an optional broad audit. It is the intake path
+that decides the owning abstraction and edit surface before implementation,
+document edits, validation, PR cleanup, or subagent handoff. If the expected
+AgentCanon root view, `vendor/agent-canon/` state, `.gitmodules`, shared root
+copy, directory README responsibility, or responsibility-scope map is stale or
+missing, record the structure symptom and repair it through the owner route
+before proceeding with the ordinary task. If structure evidence shows no drift
+or no ownership impact, cite that evidence and continue without repo-wide
+cleanup.
 
 Default to design-complete, responsibility-bounded work for substantive
 changes. Completion is proportional to the changed surface: behavior or code
@@ -65,10 +115,12 @@ changes need the owner/path/design-boundary note and validation that exercises
 that surface. Parent-direct is only an execution route; needed design still
 comes from the changed surface.
 
-Design-complete stays scoped to the owning abstraction. Find that abstraction and finish
-the requested behavior inside that replaceable responsibility unit; stop before
-unrelated audits, historical cleanup, or adjacent workflow repair unless the
-user asked for that scope or a blocking finding makes it necessary.
+Design-complete is resolved through the owning abstraction. Find the full
+replaceable responsibility unit from structure and owner evidence, then finish
+the requested behavior inside that unit. Keep optional audits, historical
+cleanup, and adjacent workflow repair separate unless structure evidence,
+owner-surface evidence, or a blocking finding makes them part of the same
+responsibility unit.
 
 Owner-map entries, skill command packets, validation commands, and CI jobs are
 routing menus, not automatic worklists. Run or read only the item that changes
@@ -96,10 +148,10 @@ write-capable handoffs; reserve deterministic reads/checkers/searches for the
 owner-selected evidence path.
 
 Proceed after the selected evidence passes, and reserve repeated sync logs or
-repo-wide audits for explicit user scope or blocking findings. Hook, archive, or
-dashboard failures expand the task only when they
-block the selected edit, validation, or PR route; otherwise record a concrete
-deferral.
+repo-wide audits for owner-selected structure repair, explicit user evidence, or
+blocking findings. Hook, archive, or dashboard failures change the task route
+only when they block the selected edit, validation, or PR route; otherwise
+record a concrete deferral.
 
 ## Design Integrity Gate
 
@@ -118,6 +170,15 @@ design issues. The valid route is `design_issue_blocker=<issue>` with evidence,
 then return to the owning design/review gate. Local fallback, wrapper, helper,
 branch, compatibility route, test relaxation, docs overwrite, and
 implementation shortcut are outside the gate.
+
+Algorithm repairs start from the algorithm contract and the implemented
+mechanism. Establish the public entrypoint, state transition or recurrence,
+invariants, stopping or acceptance rule, and failure semantics; then compare the
+current implementation to that contract and identify the first code-side
+mechanism that must change. Existing tests are evidence for contract
+classification and regression placement. Test edits, new expected values,
+tolerance changes, and oracle design enter after the algorithm contract and
+repair mechanism are fixed.
 
 ## Context Construction
 
@@ -143,6 +204,15 @@ Start from repository structure, dependency headers, and the runtime owner map
 before text search. In this repository, start with `find`,
 `git grep`, or targeted `grep` from known owner directories after the structure
 route is clear.
+
+When structure may determine the owner, run the structure intake route before
+manual broad reading: use `repo_structure_contract.py` for expected layout,
+`responsibility_scope.py` for ownership coverage and overlaps, and
+`import_responsibility.py` when import boundaries are implicated. Classify a
+missing path through `CODEX_WORKFLOW.md` `Missing File Or Path Triage` before
+creating it or treating it as absent, so the route records whether the path is
+an AgentCanon source, template root view, generated artifact, project-local
+surface, or personal runtime state.
 
 For long documents, read the reader map and section outline first. Split reads
 only at stable semantic boundaries such as headings, tables, generated blocks,
@@ -220,6 +290,10 @@ task.
 - Keep algorithm branches, solver choices, tolerances, diagnostics, and runtime
   paths part of the product contract rather than adding test-only or
   experiment-only production behavior.
+- For algorithm fixes, enter through contract, recurrence / state transition,
+  invariant, and failure-semantics evidence before changing tests. Tests record
+  the selected oracle and regression cases after the algorithm repair route is
+  known.
 - When an exploratory experiment is needed, keep it outside the production code path
   and label it as experimental evidence. Production code must reflect the
   approved design, not a temporary workaround.

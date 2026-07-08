@@ -23,6 +23,24 @@ repo-changing work, and `Validation` before closeout. This file routes readers;
 the detailed workflow, skill, role, profile, and closeout rules remain in the
 owner surfaces it names.
 
+## Codex Loading Priority In This Tree
+
+When Codex starts with the current working directory inside this AgentCanon
+checkout, this `AGENTS.md` is the source-tree repo instruction entrypoint.
+When Codex starts from a template or derived parent root, the parent
+`/AGENTS.md` runtime view loads `ROOT_AGENTS.md` instead. In that parent-root
+session, this file is not automatically loaded merely because a task mentions
+AgentCanon or edits `vendor/agent-canon/`; read it manually only when the
+AgentCanon source checkout is selected as owner evidence. It becomes automatic
+repo instruction context only when the Codex session starts with its current
+working directory inside the AgentCanon checkout.
+
+Do not copy rules between these files to "make sure" Codex sees them. Put
+template-root runtime behavior in `ROOT_AGENTS.md`, standalone AgentCanon source
+entry behavior in this file, GitHub-subtree overlay behavior in
+`.github/AGENTS.md`, and workflow / skill / closeout policy in the owner
+surfaces listed below.
+
 ## Read First
 
 - `README.md`

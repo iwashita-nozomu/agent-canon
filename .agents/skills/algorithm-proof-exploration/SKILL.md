@@ -103,6 +103,12 @@ Execute the required and task-matching conditional commands that the packet prin
    `trace follows A_impl / Step_impl` extracted from IR. Convergence,
    certificate soundness, finite termination, and residual reachability are
    lemmas derived from that assumption, not assumptions.
+1. For algorithm repairs, begin with the target theorem, public entrypoint,
+   generated IR / theorem graph, frontier board, and selected algorithm-change
+   row before changing tests. Existing tests are symptom and regression
+   placement evidence. Expected values, tolerances, and test oracle shape are
+   updated only after the algorithmic mechanism and proof / validation route are
+   fixed.
 1. Treat bridge, connection, profile binding, and witness instantiation gaps as
    recursive frontier. A missing edge from code fact to theorem variable, solver
    return to caller units, backend profile to finite-precision premise, or
