@@ -21,6 +21,7 @@ from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
+MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 )
@@ -314,6 +315,79 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertIn("- evaluation_status: pass", report)
             self.assertIn("- feedback_actions_resolved: yes", report)
             self.assertIn("- learning_capture_complete: yes", report)
+
+    def test_closeout_token_preset_satisfies_validation_failure_response(
+        self,
+    ) -> None:
+        """The workflow monitor preset should satisfy evaluator closeout evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            (report_dir / "workflow_monitoring.md").unlink()
+            monitor = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--closeout-token-preset",
+                    "--tool-warning-status",
+                    "none",
+                    "--signal",
+                    "skills=$agent-orchestration,$codex-task-workflow",
+                    "--signal",
+                    "stage owner=codex subagent=worker parent_direct_reason=unit-test-run",
+                    "--behavior-event",
+                    "subagent_routing=worker stage=implementation status=observed",
+                    "--behavior-event",
+                    (
+                        "tool_call=evaluate_skill_workflow_prompts.py "
+                        "prompt_eval=pass EVAL_STATUS=pass "
+                        "EVAL_RUN_ID=skill-eval-test "
+                        "EVAL_USED_SKILLS=agent-orchestration,codex-task-workflow "
+                        "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md"
+                    ),
+                    "--decision",
+                    "skill_improvement_decision=recorded",
+                    "--decision",
+                    "config_improvement_decision=not_applicable",
+                    "--decision",
+                    "workflow_improvement_decision=not_applicable",
+                    "--decision",
+                    "memory_learning_decision=not_applicable",
+                    "--intervention",
+                    "Closeout preset generated standard evaluator tokens.",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(monitor.returncode, 0, monitor.stderr)
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "validation_failure_not_observed reason=standard-closeout-preset",
+                monitoring,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
 
     def test_evaluate_ready_run_ignores_template_comment_revise_text(self) -> None:
         """Template comments containing revise should not be treated as open findings."""

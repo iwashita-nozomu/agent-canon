@@ -110,7 +110,6 @@ USER_GUIDED_DEBUGGING_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
     ("user-guided debugging",),
     ("user-guided", "cadence"),
     ("one concrete issue",),
-    ("no", "validation", "unless", "ask"),
     ("1", "issue", "1", "fix"),
     ("1", "problem", "1", "patch"),
     ("問題ごと",),
@@ -273,10 +272,6 @@ AREA_DATA: tuple[AreaData, ...] = (
         (
             "multi_agent_mode_selector.py",
             "agent-mode",
-            "subagent-beginning",
-            "_subagent-beginning",
-            "subagent-startup",
-            "_subagent-startup",
             "subagent_role_budget.py",
             "subagent-budget",
         ),

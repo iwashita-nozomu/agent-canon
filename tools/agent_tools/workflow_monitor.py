@@ -169,6 +169,7 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
         "pre_edit_rejection_prediction=reviewed "
         "predicted_tool_rejection_gates=recorded"
     ),
+    "validation_failure_not_observed reason=standard-closeout-preset",
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
     "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",

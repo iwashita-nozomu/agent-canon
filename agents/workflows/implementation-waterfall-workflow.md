@@ -604,7 +604,7 @@ exit 条件:
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
-- validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、`agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
+- validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md` を generated reader projection として扱います。workflow、subagent、review surface は required evidence と same-intent repair / escalation result だけを記録します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
 - design section、request clause ID、test plan item に trace できない変更は実装しません
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
@@ -754,7 +754,7 @@ exit 条件:
 - 設計不整合、file plan の見直し、rollback 方針の欠落:
   - Gate 4-5 へ戻す
 - 実装ミスや test failure だが設計は維持できる:
-  - `failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録し、`cause_classification=implementation_bug` なら Gate 8 の owning implementation repair に戻す。slug set と route semantics は validation-failure-response owner surfaces を参照する
+  - `failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録し、`cause_classification=implementation_bug` なら Gate 8 の owning implementation repair に戻す。slug set と route semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md` を generated reader projection として扱う
 - 実験結果やユーザー要望で別仮説になった:
   - 既存 pass を閉じ、新しい change request として Gate 0 からやり直す
 

@@ -84,8 +84,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
-    def test_private_subagent_startup_aliases_resolve_to_agents_area(self) -> None:
-        """Private startup compatibility names should resolve through task routing."""
+    def test_private_subagent_startup_aliases_are_unknown_names(self) -> None:
+        """Historical startup labels should not resolve as route aliases."""
         for alias in (
             "subagent-beginning",
             "_subagent-beginning",
@@ -95,11 +95,9 @@ class RouteToolTest(unittest.TestCase):
             with self.subTest(alias=alias):
                 result = self.run_route("--name", alias, "--format", "text")
 
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("STATUS=alias", result.stdout)
-                self.assertIn("CANONICAL_AREA=agents", result.stdout)
-                self.assertIn("CANONICAL_TOOL=route.py --area agents", result.stdout)
-                self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("STATUS=unknown", result.stdout)
+                self.assertIn("CANONICAL_AREA=", result.stdout)
 
     def test_unknown_legacy_search_alias_fails(self) -> None:
         """Unknown legacy-like search names must not silently resolve."""
@@ -354,6 +352,20 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("user-guided-debugging", decision["active_skills"])
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_prompt_docs_update_no_validation_preference_does_not_route_user_guided_debugging(self) -> None:
+        """Ordinary validation preferences should not select user-guided cadence."""
+        result = self.run_route(
+            "--prompt",
+            "Please update the docs; no validation unless asked.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("user-guided-debugging", decision["matched_skills"])
+        self.assertNotIn("user-guided-debugging", decision["active_skills"])
 
     def test_prompt_path_only_agent_canon_review_does_not_route_update(self) -> None:
         """Path-only read-only review prompts should not select AgentCanon update."""

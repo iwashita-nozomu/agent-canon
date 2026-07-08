@@ -21,8 +21,9 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
   ことを禁止します。先に `failing_contract`、`observation_level`、
   `cause_classification`、`intent_preservation`、`evidence` を記録します。
 - `cause_classification` と `intent_preservation` の slug set は
-  `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、
-  `agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。
+  `documents/runtime-profiles-and-check-matrix.json` が所有します。
+  `documents/runtime-profiles-and-check-matrix.md` は生成済み reader projection として
+  参照します。
   approved intent を保って修正するか、intent 変更前に escalation します。
 
 ## Docker build が通らない
