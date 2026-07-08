@@ -720,9 +720,24 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("agent-log-analysis", decision["matched_skills"])
         self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("runtime-log-repair", decision["matched_skills"])
         self.assertIn("agent-log-analysis", decision["active_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("runtime-log-repair", decision["related_skill_candidates"])
+        self.assertIn("runtime-log-repair", decision["active_skills"])
+
+    def test_prompt_routes_skill_miss_cause_repair_to_runtime_log_repair(self) -> None:
+        """Skill-miss cause repair should not leave runtime-log-repair related-only."""
+        result = self.run_route(
+            "--prompt",
+            "ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善して下さい.スキルミスも原因を特定して修正",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("runtime-log-repair", decision["matched_skills"])
+        self.assertIn("runtime-log-repair", decision["active_skills"])
 
     def test_prompt_routes_runtime_dashboard_repair_to_runtime_log_repair(self) -> None:
         """Runtime dashboard repair prompts should activate runtime-log-repair."""
@@ -740,6 +755,16 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("runtime-log-repair", decision["matched_skills"])
         self.assertIn("runtime-log-repair", decision["active_skills"])
+
+    def test_name_resolution_resolves_public_skill_ids(self) -> None:
+        """Public skill ids should resolve through the skill catalog."""
+        result = self.run_route("--name", "runtime-log-repair")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("NAME=runtime-log-repair", result.stdout)
+        self.assertIn("STATUS=canonical", result.stdout)
+        self.assertIn("CANONICAL_AREA=skills", result.stdout)
+        self.assertIn("CANONICAL_SKILL=runtime-log-repair", result.stdout)
 
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,

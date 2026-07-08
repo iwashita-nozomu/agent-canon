@@ -19,7 +19,7 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
@@ -471,15 +471,19 @@ def build_default_areas() -> tuple[RouteArea, ...]:
 class RouteCatalog:
     """Catalog of short routing areas and long-name aliases."""
 
-    def __init__(self, areas: Sequence[RouteArea]) -> None:
+    def __init__(self, areas: Sequence[RouteArea], skill_ids: Collection[str] = ()) -> None:
         """Initialize route areas and aliases."""
         self._areas = {area.key: area for area in areas}
         self._aliases = self._build_aliases(areas)
+        self._skill_ids = frozenset(skill_ids)
 
     @classmethod
     def default(cls) -> RouteCatalog:
         """Build the default catalog."""
-        return cls(build_default_areas())
+        return cls(
+            build_default_areas(),
+            tuple(rule.skill for rule in load_skill_route_rules(DEFAULT_ROOT)),
+        )
 
     def areas(self) -> tuple[RouteArea, ...]:
         """Return all areas in display order."""
@@ -492,6 +496,14 @@ class RouteCatalog:
     def resolve_name(self, name: str) -> NameResolution:
         """Resolve one proposed long tool or skill name to a short route."""
         normalized = normalize_name(name)
+        if normalized in self._skill_ids:
+            return NameResolution(
+                name,
+                "canonical",
+                "skills",
+                f"{TOOL_NAME} --area skills",
+                normalized,
+            )
         area_key = self._aliases.get(normalized, normalized if normalized in self._areas else "")
         if not area_key:
             return NameResolution(name, "unknown", "", "", "")

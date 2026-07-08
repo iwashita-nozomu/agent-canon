@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -98,6 +98,8 @@ MARKDOWN_TOOL_IDS = (
     "run_docs_checks.sh",
 )
 TOOL_SELECTION_ALIASES = {
+    "docs check": "agent-canon-cli",
+    "docs format": "agent-canon-cli",
     "run_docs_checks.sh": "agent-canon-cli",
 }
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"
@@ -1833,32 +1835,45 @@ def compact_counter_summary(counter: Counter[str]) -> str:
 
 def compact_mapping_summary(mapping: object) -> str:
     """Return a compact sorted mapping summary for one table cell."""
-    if not isinstance(mapping, dict) or not mapping:
+    if not isinstance(mapping, Mapping) or not mapping:
         return "none"
-    items = sorted((str(key), int(value)) for key, value in mapping.items())
+    typed_mapping = cast(Mapping[object, object], mapping)
+    items: list[tuple[str, int]] = []
+    for key, value in typed_mapping.items():
+        if isinstance(value, int):
+            items.append((str(key), value))
+        elif isinstance(value, str):
+            try:
+                items.append((str(key), int(value)))
+            except ValueError:
+                continue
+    items.sort()
     return ", ".join(f"{key}={value}" for key, value in items[:MAX_COMPACT_REPORT_LINES])
 
 
 def compact_nested_mapping_summary(mapping: object) -> str:
     """Return a compact nested counter summary for one table cell."""
-    if not isinstance(mapping, dict) or not mapping:
+    if not isinstance(mapping, Mapping) or not mapping:
         return "none"
+    typed_mapping = cast(Mapping[object, object], mapping)
     parts: list[str] = []
-    for key, value in sorted(mapping.items()):
-        if not isinstance(value, dict) or not value:
+    for key, value in sorted(typed_mapping.items()):
+        if not isinstance(value, Mapping) or not value:
             continue
-        parts.append(f"{key}:({compact_mapping_summary(value)})")
+        nested_mapping = cast(Mapping[object, object], value)
+        parts.append(f"{key}:({compact_mapping_summary(nested_mapping)})")
     return ", ".join(parts[:MAX_COMPACT_REPORT_LINES]) if parts else "none"
 
 
 def compact_oop_applicability(payload: object) -> str:
     """Return compact OOP applicability counts for one table cell."""
-    if not isinstance(payload, dict):
+    if not isinstance(payload, Mapping):
         return "none"
+    typed_payload = cast(Mapping[str, object], payload)
     return (
-        f"applicable={payload.get('applicable_count', 0)}, "
-        f"not_applicable={payload.get('not_applicable_count', 0)}, "
-        f"missing_reason={payload.get('missing_reason_count', 0)}"
+        f"applicable={typed_payload.get('applicable_count', 0)}, "
+        f"not_applicable={typed_payload.get('not_applicable_count', 0)}, "
+        f"missing_reason={typed_payload.get('missing_reason_count', 0)}"
     )
 
 
@@ -3624,10 +3639,43 @@ def selected_by_responsibility(
 def candidates_by_responsibility(entry: dict[str, object]) -> dict[str, tuple[str, ...]]:
     """Return candidate skills, workflows, and tools from one hook entry."""
     return {
-        "skill": normalized_text_values(entry.get("candidate_skills")),
+        "skill": metric_candidate_skill_values(entry),
         "workflow": normalized_text_values(entry.get("candidate_workflows")),
         "tool": normalized_text_values(entry.get("candidate_tools")),
     }
+
+
+def metric_candidate_skill_values(entry: dict[str, object]) -> tuple[str, ...]:
+    """Return skill candidates requiring confirmation, excluding related-only hints."""
+    candidates = normalized_text_values(entry.get("candidate_skills"))
+    reasons = normalized_text_values(entry.get("candidate_skill_reasons"))
+    if not reasons and legacy_unattributed_candidate_entry(entry):
+        return ()
+    if not reasons:
+        return candidates
+    reasons_by_skill: defaultdict[str, list[str]] = defaultdict(list)
+    for reason in reasons:
+        skill, _separator, detail = reason.partition(":")
+        if skill:
+            reasons_by_skill[skill].append(detail)
+    metric_candidates: list[str] = []
+    for candidate in candidates:
+        candidate_reasons = reasons_by_skill.get(candidate, [])
+        if candidate_reasons and all("related_to=" in detail for detail in candidate_reasons):
+            continue
+        metric_candidates.append(candidate)
+    return unique_text_values(metric_candidates)
+
+
+def legacy_unattributed_candidate_entry(entry: dict[str, object]) -> bool:
+    """Return whether legacy candidate fields lack enough context for miss accounting."""
+    event = str(entry.get("event") or "")
+    if event not in ("", "UnknownHookEvent"):
+        return False
+    return not (
+        normalized_text_values(entry.get("prompt"))
+        or normalized_text_values(entry.get("last_assistant_message"))
+    )
 
 
 def selected_workflow_values(entry: dict[str, object]) -> tuple[str, ...]:
@@ -3660,12 +3708,12 @@ def canonical_selection_values(
             return unique_text_values(values)
         return tuple(value for value in unique_text_values(values) if value in valid_skill_ids)
     if responsibility == "workflow":
-        workflows = unique_text_values(canonical_workflow_name(value) for value in values)
+        workflows = unique_text_values(tuple(canonical_workflow_name(value) for value in values))
         if not valid_workflow_names:
             return workflows
         return tuple(value for value in workflows if value in valid_workflow_names)
     if responsibility == "tool":
-        return unique_text_values(canonical_tool_name(value) for value in values)
+        return unique_text_values(tuple(canonical_tool_name(value) for value in values))
     return unique_text_values(values)
 
 
