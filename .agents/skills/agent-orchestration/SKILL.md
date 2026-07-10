@@ -120,7 +120,7 @@ Execute the required and task-matching conditional commands that the packet prin
    document/report follow-up may close without source packet evidence, source
    limitation, contrary or narrowing evidence, and adoption/exclusion decisions
    for the claims used in implementation.
-1. Keep the advisory branch non-mutating. If the request is `routing-only/advisory`, defer repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, and repo-changing-only skills until explicit repo-changing intent is provided. In the interim, keep consultation, brainstorming, and explanation turns conversational until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation execution.
+1. Keep the advisory branch non-mutating. If the request is `routing-only/advisory`, defer repo-changing kickoff, run-bundle bootstrap, MCP config inspection, shell / GitHub checks, and repo-changing-only skills until explicit repo-changing intent is provided. In the interim, keep consultation, brainstorming, and explanation turns conversational until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation execution.
 1. Choose the starter command with explicit precedence:
    - if the request is `repo-changing execution`, or the user asks for the startup command / run bundle, prefer `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"`
    - use `python3 tools/agent_tools/task_start.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"` only for routing-only starter guidance when no run bundle is being created yet

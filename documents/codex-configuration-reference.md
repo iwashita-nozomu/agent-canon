@@ -48,8 +48,8 @@ runtime surface and end with the practical change checklist and stability notes.
 | CLI `--enable` / `--disable` | single invocation | Shortcut for `features.<name>=true/false`. |
 | CLI direct flags | single invocation | Common overrides for model, profile, sandbox, approval policy, cwd, images, web search, and output mode. |
 | `.codex/agents/*.toml` / `~/.codex/agents/*.toml` | project / user | Custom subagent roles with model, sandbox, MCP, skills, and instructions overrides. |
-| `.agents/skills/**/SKILL.md` and other skill roots | directory / repo / user / system | Reusable task instructions and optional scripts/resources. |
-| `AGENTS.md` and alternate route project docs | repo tree | Runtime instructions discovered from cwd to root. |
+| `.agents/skills/**/SKILL.md` and other skill roots | directory / repo / user / system | Reusable task instructions and optional scripts/resources read after skill selection. |
+| `AGENTS.md` and fallback project docs | repo tree | Runtime instructions discovered from project root to current working directory. |
 | `hooks.json` or `[hooks]` | repo / user | Lifecycle automation around session start, prompt submit, tool use, stop, and permission events. |
 
 ## Load and Override Model
@@ -120,7 +120,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | -------- | ----------- |
 | Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
-| Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_alternate route_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
+| Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
 | Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
 | MCP OAuth and auth storage | `mcp_oauth_callback_port`, `mcp_oauth_callback_url`, `mcp_oauth_credentials_store`, `cli_auth_credentials_store`, `forced_chatgpt_workspace_id`, `forced_login_method` |
 | UI, history, logging, and local state | `tui`, `history`, `log_dir`, `sqlite_home`, `notify`, `file_opener`, `feedback`, `analytics`, `notice`, `check_for_update_on_startup`, `suppress_unstable_features_warning`, `disable_paste_burst`, `commit_attribution`, `compact_prompt`, `hide_agent_reasoning`, `show_raw_agent_reasoning`, `background_terminal_max_timeout` |
@@ -346,7 +346,7 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `plugins` | object | Plugin enablement by plugin name. |
 | `profile` | string | Selected named profile. |
 | `profiles` | object | Named reusable config overlays. |
-| `project_doc_alternate route_filenames` | array | Alternate route filenames when `AGENTS.md` is missing. |
+| `project_doc_fallback_filenames` | array | Fallback filenames checked after `AGENTS.override.md` and `AGENTS.md`. |
 | `project_doc_max_bytes` | integer | Maximum bytes read from project doc files. |
 | `project_root_markers` | array | Markers for detecting repo root when scanning `.codex`. |
 | `projects` | object | Per-project trust settings. |
@@ -652,7 +652,7 @@ Codex uses `AGENTS.md` as project instructions. Config keys affecting discovery 
 | Key | Purpose |
 | --- | ------- |
 | `project_doc_max_bytes` | Maximum bytes included from project doc files. |
-| `project_doc_alternate route_filenames` | Alternative filenames when `AGENTS.md` is missing. |
+| `project_doc_fallback_filenames` | Fallback filenames checked after `AGENTS.override.md` and `AGENTS.md`. |
 | `project_root_markers` | Root-detection markers used while searching for `.codex` folders. |
 | `include_environment_context` | Whether environment context block is injected. |
 | `include_permissions_instructions` | Whether permissions instruction block is injected. |

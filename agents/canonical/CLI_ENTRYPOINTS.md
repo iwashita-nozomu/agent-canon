@@ -21,23 +21,31 @@ upstream design README.md canonical workflow index
 
 ## 共通ルール
 
-- repo root で起動する
-- まず `AGENTS.md` を読む
+- 目的の repository または submodule checkout を project root として扱える
+  directory から起動する。template / derived parent root と
+  `vendor/agent-canon/` source checkout は instruction chain が異なる。
+- Codex は起動時に Codex home の global guidance を読み、その後 project root
+  から current working directory まで `AGENTS.override.md`、`AGENTS.md`、
+  configured fallback names の順に各 directory から最大 1 file を読み込む。
+  人が確認するときは、その chain の repo 側 entrypoint を `AGENTS.md` から辿る。
 - reusable workflow は `agents/` と skill directory で保守する
 - task 固有の run artifact は `reports/agents/<run-id>/` に寄せる
 
 ## Codex
 
 入口:
-- `AGENTS.md`
-- `.agents/skills/`
+- Codex instruction chain: Codex home guidance, then project-root-to-CWD
+  `AGENTS.override.md` / `AGENTS.md` / configured fallback files
+- Repository entrypoint: root `AGENTS.md` for the active project root
+- Skill discovery metadata: `.agents/skills/`
 
 使いどころ:
 - local repository 上の実装、review、文書整備
 - `AGENTS.md` を起点に canonical docs を読む運用
 
 補足:
-- skill の discovery path は `.agents/skills/<skill>/SKILL.md`
+- skill discovery は metadata が先で、選択後に
+  `.agents/skills/<skill>/SKILL.md` を読む
 - task 実行の標準順序は `agents/canonical/CODEX_WORKFLOW.md`
 - subagent routing は `agents/canonical/CODEX_SUBAGENTS.md`
 - repo-wide の正本変更は `agents/` を先に更新する

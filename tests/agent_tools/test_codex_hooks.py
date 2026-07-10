@@ -1521,7 +1521,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIn("DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["reason"]))
                 self.assertEqual(
                     payload["next_action"],
-                    "replace_broad_rg_with_bounded_or_compact_search",
+                    "replace_broad_rg_with_structure_first_git_grep",
                 )
 
     def test_direct_rg_context_guard_allows_compact_and_bounded_searches(self) -> None:

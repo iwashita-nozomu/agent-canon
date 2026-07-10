@@ -17,6 +17,7 @@ downstream implementation ../tools/validate_split.py validates split guide recon
 - source bytes: 365,144
 
 <!-- split-content-start -->
+
 ---
 title: "OpenAI Codex CLI 実用ガイド 設定実践完全版"
 generated: "2026-05-08"
@@ -849,7 +850,7 @@ AGENTS/プロジェクト/履歴  |  `compact_prompt`  |  string  |  会話圧�
 AGENTS/プロジェクト/履歴  |  `experimental_compact_prompt_file`  |  string(path)  |  圧縮プロンプトを読むファイル。
 AGENTS/プロジェクト/履歴  |  `history.persistence`  |  save-all | none  |  履歴JSONLへ保存するか。
 AGENTS/プロジェクト/履歴  |  `history.max_bytes`  |  integer  |  履歴ファイルの最大バイト数。
-AGENTS/プロジェクト/履歴  |  `project_doc_alternate route_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
+AGENTS/プロジェクト/履歴  |  `project_doc_fallback_filenames`  |  array<string>  |  AGENTS.mdがない時に探す代替ファイル名。
 AGENTS/プロジェクト/履歴  |  `project_doc_max_bytes`  |  integer  |  AGENTS.md由来指示の読み込み上限。
 AGENTS/プロジェクト/履歴  |  `project_root_markers`  |  array<string>  |  プロジェクトルート検出マーカー。既定.git。
 AGENTS/プロジェクト/履歴  |  `projects.<path>.trust_level`  |  trusted | untrusted  |  プロジェクトスコープ.codex層の信頼状態。
@@ -1024,8 +1025,6 @@ CIレビュー  |  `codex exec --sandbox read-only -a never`  |  非対話環境
 
 
 ---
-
-
 # 増補編：プロジェクト内運用とサブエージェント設計
 
 addcontentsline{toc}{part}{増補編：プロジェクト内運用とサブエージェント設計}
@@ -1097,7 +1096,7 @@ _ルート検出_
 
 #### 図解: 58 代替指示名
 
-`alternate route names` → `find per directory` → `one file per dir`
+`fallback names` → `find per directory` → `one file per dir`
 
 _AGENTS代替ファイル_
 
@@ -1555,7 +1554,7 @@ web_search = "cached"
 
 # プロジェクト指示の読み込み上限と代替名。
 project_doc_max_bytes = 65536
-project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 
 # workspace-write時の細かい境界。必要なものだけ許可する。
 [sandbox_workspace_write]
@@ -1682,12 +1681,12 @@ monorepo/
 
 ### 代替ファイル名
 
-既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_alternate route_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
+既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_fallback_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
 
 
 ```
 # ~/.codex/config.toml または .codex/config.toml
-project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 project_doc_max_bytes = 65536
 ```
 
@@ -2481,10 +2480,10 @@ After I approve the plan, process packages one at a time.
 
 
 ```
-codex exec 
-  --sandbox read-only 
-  --ask-for-approval never 
-  --output-schema review-schema.json 
+codex exec
+  --sandbox read-only
+  --ask-for-approval never
+  --output-schema review-schema.json
   "Review the diff against main. Return JSON findings only. Do not edit files."
 ```
 
@@ -2652,8 +2651,6 @@ L{0.35} L{0.50}}
 
 
 ---
-
-
 # 第V部 最新・実験的機能の徹底解説
 
 
@@ -2991,7 +2988,6 @@ _環境ごとの差を文書化する。_
 
 
 ---
-
 
 # 第VI部 MCPの基礎から定義・運用・デバッグまで
 
@@ -3453,7 +3449,7 @@ risk: read-only
 owner: platform-team
 allowed_agents: [docs_researcher, pr_explorer]
 forbidden: secrets, production data, write operations
-failure_alternate route: use ripgrep in docs/ and ask human for missing context
+failure_alternate route: use git grep in docs/ and ask human for missing context
 ```
 
 
@@ -4000,8 +3996,6 @@ owner  |  MCP serverと実験機能のownerを決めた。  |  放置を防ぐ�
 
 
 ---
-
-
 # 第VII部 図解カタログ: MCPと実験機能の運用パターン
 
 
@@ -4541,7 +4535,6 @@ _final pattern Eの基本パターン。_
 
 
 ---
-
 
 # 第VIII部 実務カード集: すぐ使うMCPと実験機能パターン
 
@@ -5648,8 +5641,6 @@ _チーム運用カードの確認カード25。_
 
 
 ---
-
-
 # 第VII部 設定ファイルの書き方完全増補
 
 
@@ -5886,11 +5877,11 @@ log_dir = "/Users/me/.codex/log"
 ```
 
 
-**確認** 
+**確認**
 起動後に `/status` と `/debug-config` で model、approval、sandbox、web searchを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 最初からMCP、Hooks、Subagentsまで入れない。基本値が効くことを確認してから足す。
 
 
@@ -5909,11 +5900,11 @@ model_reasoning_effort = "medium"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile readonly` で起動し、編集やshell実行がどう扱われるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 read-onlyでも、MCPやweb searchが外部文脈を持ち込む場合がある。必要なら `web_search = "disabled"` にする。
 
 
@@ -5938,11 +5929,11 @@ goals = true
 ```
 
 
-**確認** 
+**確認**
 `codex --profile lab` と `codex features list` を併用して、想定した機能だけが有効か見る。
 
 
-**落とし穴** 
+**落とし穴**
 実験機能をroot設定に入れると、普段の作業にも影響する。profileへ閉じ込める。
 
 
@@ -5958,11 +5949,11 @@ model_instructions_file = "/Users/me/.codex/instructions/default.md"
 ```
 
 
-**確認** 
+**確認**
 ファイルが存在し、Codex起動時に読み込まれることを `/debug-config` で確認する。
 
 
-**落とし穴** 
+**落とし穴**
 project固有の規約は `AGENTS.md` へ書く。個人の一般方針だけをinstructions fileへ置く。
 
 
@@ -5979,11 +5970,11 @@ plan_mode_reasoning_effort = "high"
 ```
 
 
-**確認** 
+**確認**
 `/plan` で設計依頼を出し、通常モードとの差を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 常時highにすると速度や利用量に影響する可能性がある。planだけ強める設計にする。
 
 
@@ -6001,11 +5992,11 @@ personality = true
 ```
 
 
-**確認** 
+**確認**
 `/personality` でも変更できるため、TUIで現在値を見る。
 
 
-**落とし穴** 
+**落とし穴**
 チーム共通の強い口調指定は避ける。個人設定に留める方がよい。
 
 
@@ -6020,11 +6011,11 @@ web_search = "disabled"
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でproject layerが読み込まれ、web searchがdisabledになったか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 untrusted projectではproject設定が読まれない。trusted状態を確認する。
 
 
@@ -6042,11 +6033,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile research` で使う。通常profileへliveを固定しない。
 
 
-**落とし穴** 
+**落とし穴**
 live検索結果は常に検証対象であり、コード変更の根拠にするなら出典を残す。
 
 
@@ -6070,11 +6061,11 @@ model_reasoning_effort = "high"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile fast` と `codex --profile deep` を用途で使い分ける。
 
 
-**落とし穴** 
+**落とし穴**
 service tierはプランや機能フラグの影響を受ける。effective configで確認する。
 
 
@@ -6090,11 +6081,11 @@ history = { persistence = "save-all", max_bytes = 52428800 }
 ```
 
 
-**確認** 
+**確認**
 起動後、指定dirにlogが出るか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 共有repo内の `.codex-log` などへ個人logを常時出すと、誤commitの原因になる。
 
 
@@ -6112,11 +6103,11 @@ web_search = "disabled"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile nohistory` で起動し、history保存設定を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 履歴を止めても、shellや外部toolのlogは別に残る場合がある。
 
 
@@ -6133,11 +6124,11 @@ model_reasoning_effort = "medium"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile ui -i screenshot.png "このエラーを分析"` のように使う。
 
 
-**落とし穴** 
+**落とし穴**
 画像内にsecretや個人情報が含まれていないか確認してから添付する。
 
 
@@ -6153,11 +6144,11 @@ model = "gpt-5.5"
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でproviderとmodelを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 model名は更新される可能性がある。利用可能モデルはCLIや公式docsで確認する。
 
 
@@ -6175,11 +6166,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile oss --oss` のように使い、挙動を分ける。
 
 
-**落とし穴** 
+**落とし穴**
 OSS providerではmodel機能、tool対応、速度が違う場合がある。通常profileと混ぜない。
 
 
@@ -6195,11 +6186,11 @@ codex -c 'sandbox_workspace_write.network_access=false'
 ```
 
 
-**確認** 
+**確認**
 一時実行後に設定ファイルが変わっていないことを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 shellのquote規則に注意する。複雑な値はTOMLに書いた方が安全である。
 
 
@@ -6227,11 +6218,11 @@ exclude_slash_tmp = false
 ```
 
 
-**確認** 
+**確認**
 patch作成、test実行、外部networkの扱いをsandbox repoで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 network_accessをtrueにする前に、downloadや外部API利用の理由をAGENTS.mdへ書く。
 
 
@@ -6253,11 +6244,11 @@ network_access = false
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でwritable rootに入っているか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 広いpathを許可しない。HOME全体や親dirを入れると境界が崩れる。
 
 
@@ -6276,11 +6267,11 @@ exclude_slash_tmp = true
 ```
 
 
-**確認** 
+**確認**
 build toolがtmpを要求する場合は失敗する。必要性を確認してから緩める。
 
 
-**落とし穴** 
+**落とし穴**
 node、cargo、pytestなどがtmpを使う場合があるため、CIで試す。
 
 
@@ -6298,11 +6289,11 @@ web_search = "disabled"
 ```
 
 
-**確認** 
+**確認**
 `codex --profile danger_lab` と明示したときだけ使う。
 
 
-**落とし穴** 
+**落とし穴**
 通常profileにこの設定を入れない。使い捨てcontainerやVM内で使う。
 
 
@@ -6318,11 +6309,11 @@ sandbox_mode = "workspace-write"
 ```
 
 
-**確認** 
+**確認**
 最初の数タスクでapproval頻度を観察する。
 
 
-**落とし穴** 
+**落とし穴**
 承認が多すぎる場合でも、いきなりneverにしない。on-requestへ段階的に変える。
 
 
@@ -6337,11 +6328,11 @@ approval_policy = { granular = { sandbox_approval = true, rules = true, mcp_elic
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でgranular設定が解決されているか見る。
 
 
-**落とし穴** 
+**落とし穴**
 granularは読みづらいので、コメントで意図を書く。
 
 
@@ -6359,11 +6350,11 @@ policy = "Prefer denying commands that touch secrets, credentials, SSH keys, or 
 ```
 
 
-**確認** 
+**確認**
 sandbox escapeやMCP approval時の挙動を低リスクrepoで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 自動reviewは人間の責任を消さない。重要操作は別途確認する。
 
 
@@ -6385,11 +6376,11 @@ network_access = false
 ```
 
 
-**確認** 
+**確認**
 実際に該当pathを読ませるコマンドが拒否されるか検証する。
 
 
-**落とし穴** 
+**落とし穴**
 この表記はschema/versionに依存する。requirementsのdeny_readとあわせて確認する。
 
 
@@ -6409,11 +6400,11 @@ set = { "CI" = "1" }
 ```
 
 
-**確認** 
+**確認**
 Codexが実行する `env` の出力を低リスク環境で確認する。
 
 
-**落とし穴** 
+**落とし穴**
 必要なPATHまで落とすとtoolが起動しない。coreから始める。
 
 
@@ -6435,11 +6426,11 @@ model_reasoning_effort = "medium"
 ```
 
 
-**確認** 
+**確認**
 `codex exec --profile ci_review` で差分reviewを実行する。
 
 
-**落とし穴** 
+**落とし穴**
 writeが必要な修正生成CIとは分ける。
 
 
@@ -6460,11 +6451,11 @@ network_access = false
 ```
 
 
-**確認** 
+**確認**
 生成patchをartifactとして保存し、人間reviewへ回す。
 
 
-**落とし穴** 
+**落とし穴**
 自動pushやdeployとは直結しない。
 
 
@@ -6485,11 +6476,11 @@ sandbox_private_desktop = true
 ```
 
 
-**確認** 
+**確認**
 Windows上で `/debug-config` と実行結果を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 macOS/Linuxの設定と混同しない。Windows専用sectionへ置く。
 
 
@@ -6509,11 +6500,11 @@ network_access = true
 ```
 
 
-**確認** 
+**確認**
 package installが必要なタスクだけこのprofileで起動する。
 
 
-**落とし穴** 
+**落とし穴**
 通常開発profileにnetwork_access trueを入れない。MCPやweb searchとは別の概念である。
 
 
@@ -6535,11 +6526,11 @@ enabled = false
 ```
 
 
-**確認** 
+**確認**
 使っているCLI versionがこの構造に対応しているかschemaで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 permissions系は管理ポリシーやversion差が出やすい。必ずschemaとdebugで確認する。
 
 
@@ -6558,11 +6549,11 @@ allow_upstream_proxy = false
 ```
 
 
-**確認** 
+**確認**
 proxyがlocal loopbackであること、上流proxyを許さないことを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 non-loopback proxyを許す危険設定は避ける。
 
 
@@ -6584,11 +6575,11 @@ exclude = ["*_TOKEN", "*_SECRET", "AWS_*", "GITHUB_*"]
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` とAGENTS読み込みを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 TOMLだけでは、レビュー観点や禁止事項が人間に伝わりにくい。AGENTS.mdにも書く。
 
 
@@ -6606,11 +6597,11 @@ prefix_rule(pattern=["redis-cli"], decision="prompt", reason="Redis access requi
 ```
 
 
-**確認** 
+**確認**
 `codex execpolicy check` でコマンド判定を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 Rulesだけでなく、AGENTS.mdにもDB方針を書く。
 
 
@@ -6630,11 +6621,11 @@ prefix_rule(pattern=["gh", "release"], decision="prompt", reason="Release operat
 ```
 
 
-**確認** 
+**確認**
 代表commandをcheckし、prompt/forbiddenの判定を見る。
 
 
-**落とし穴** 
+**落とし穴**
 patternが広すぎると通常作業も止まる。運用しながら絞る。
 
 
@@ -6651,11 +6642,11 @@ prefix_rule(pattern=["git", "clean", "-fdx"], decision="prompt", reason="Destruc
 ```
 
 
-**確認** 
+**確認**
 コマンドのtokenizationが想定通りかcheckする。
 
 
-**落とし穴** 
+**落とし穴**
 rulesはshell展開後の完全な安全装置ではない。sandboxと併用する。
 
 
@@ -6672,11 +6663,11 @@ prefix_rule(pattern=["git", "commit"], decision="prompt", reason="Commit creatio
 ```
 
 
-**確認** 
+**確認**
 `git diff` は許可し、commit/pushだけpromptにする。
 
 
-**落とし穴** 
+**落とし穴**
 AGENTS.mdには「ユーザーが明示した場合だけcommit」と書く。
 
 
@@ -6699,11 +6690,11 @@ allowed_web_search_modes = ["disabled", "cached"]
 ```
 
 
-**確認** 
+**確認**
 ユーザーが `danger-full-access` や `never` を指定したときに弱められないか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 開発速度だけを見てneverを許可しない。例外profileを作るなら管理者承認にする。
 
 
@@ -6724,11 +6715,11 @@ enabled_tools = ["search", "summarize"]
 ```
 
 
-**確認** 
+**確認**
 `codex mcp list` とTUIの `/mcp` でserver状態を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 command名がPATH依存だと他の環境で壊れる。project設定ではrepo相対scriptを使う。
 
 
@@ -6749,11 +6740,11 @@ enabled_tools = ["search_issues", "get_issue"]
 ```
 
 
-**確認** 
+**確認**
 token環境変数が存在する状態で `codex mcp get issues` を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 bearer tokenの値をTOMLへ書かない。env var名だけを書く。
 
 
@@ -6773,11 +6764,11 @@ enabled_tools = ["search_repo_docs"]
 ```
 
 
-**確認** 
+**確認**
 trusted projectでだけ読み込まれることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 project設定に個人HOME pathを固定しない。実運用ではcwdの扱いをrepo内scriptで安定化する。
 
 
@@ -6797,11 +6788,11 @@ enabled_tools = ["get_component", "search_tokens"]
 ```
 
 
-**確認** 
+**確認**
 server停止時に起動やresumeがどう失敗するか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 すべてのMCPをrequiredにしない。作業不能になる。
 
 
@@ -6823,11 +6814,11 @@ disabled_tools = ["merge_pull_request", "delete_repository", "create_deployment"
 ```
 
 
-**確認** 
+**確認**
 `/mcp` でtool一覧を見て、許可toolだけが出るか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 enabled_toolsを省略すると広すぎる場合がある。read-only用途はallowlistを使う。
 
 
@@ -6846,11 +6837,11 @@ env = { "LOG_LEVEL" = "warn" }
 ```
 
 
-**確認** 
+**確認**
 server側で環境変数が読めることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 envは値を直書きするためsecretには使わない。secretはenv_varsかbearer_token_env_varへ寄せる。
 
 
@@ -6869,11 +6860,11 @@ enabled_tools = ["list_events", "get_event"]
 ```
 
 
-**確認** 
+**確認**
 `codex mcp login calendar` でOAuth flowを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 write scopeを最初から要求しない。readから始める。
 
 
@@ -6892,11 +6883,11 @@ enabled_tools = ["search"]
 ```
 
 
-**確認** 
+**確認**
 検索失敗時のログを見てtimeoutを調整する。
 
 
-**落とし穴** 
+**落とし穴**
 timeoutを短くしすぎると有用な検索も失敗する。server別に設定する。
 
 
@@ -6915,11 +6906,11 @@ enabled_tools = ["search", "fetch"]
 ```
 
 
-**確認** 
+**確認**
 環境変数がないとheaderが付かないことを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 静的headerにsecretを入れない。
 
 
@@ -6937,11 +6928,11 @@ args = ["--root", "/Users/me/work/docs"]
 ```
 
 
-**確認** 
+**確認**
 `codex mcp list` でdisabled表示を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 削除と無効化を使い分ける。障害切り分けではenabled=falseが便利。
 
 
@@ -6958,11 +6949,11 @@ codex mcp get context7
 ```
 
 
-**確認** 
+**確認**
 生成された `config.toml` の該当sectionを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 CLI追加後も、tool allowlistやtimeoutは必要に応じて手で補う。
 
 
@@ -6979,11 +6970,11 @@ codex mcp logout calendar
 ```
 
 
-**確認** 
+**確認**
 共有端末ではlogoutを運用手順に入れる。
 
 
-**落とし穴** 
+**落とし穴**
 OAuth tokenの保存場所や期限はserver実装にも依存する。
 
 
@@ -7006,11 +6997,11 @@ tool_timeout_sec = 60
 ```
 
 
-**確認** 
+**確認**
 repoをcloneした開発者がscriptとindexを再現できるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 index生成手順をAGENTS.mdやREADMEへ書く。
 
 
@@ -7029,11 +7020,11 @@ disabled_tools = ["create_ticket", "update_ticket", "delete_ticket"]
 ```
 
 
-**確認** 
+**確認**
 TUIの `/mcp` でwrite系toolが出ないか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 tool名はserver実装で変わる。実際のtool一覧を見てallowlistを更新する。
 
 
@@ -7052,11 +7043,11 @@ tool_timeout_sec = 30
 ```
 
 
-**確認** 
+**確認**
 検索queryに個人情報やsecretが含まれないようAGENTS.mdにも注意を書く。
 
 
-**落とし穴** 
+**落とし穴**
 production logへの接続は情報管理の対象である。
 
 
@@ -7075,11 +7066,11 @@ tool_timeout_sec = 20
 ```
 
 
-**確認** 
+**確認**
 server側でもwrite queryを拒否する。
 
 
-**落とし穴** 
+**落とし穴**
 client allowlistだけに依存しない。MCP server側の権限制御が本体である。
 
 
@@ -7102,11 +7093,11 @@ enabled_tools = ["search", "fetch"]
 ```
 
 
-**確認** 
+**確認**
 親agentから明示的にこのagentをspawnして、成果物形式を固定する。
 
 
-**落とし穴** 
+**落とし穴**
 すべてのagentへ同じMCPを持たせない。
 
 
@@ -7125,11 +7116,11 @@ command = "python3"
 ```
 
 
-**確認** 
+**確認**
 mismatchしたURLやcommandが無効化されることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 server名とidentityの両方が合う必要がある設計にする。
 
 
@@ -7147,11 +7138,11 @@ server名とidentityの両方が合う必要がある設計にする。
 ```
 
 
-**確認** 
+**確認**
 MCP障害時にCodexが推測で進まないかを見る。
 
 
-**落とし穴** 
+**落とし穴**
 required=trueのserverにはalternate routeが効かない。必須か任意かを分ける。
 
 
@@ -7173,11 +7164,11 @@ statusMessage = "Checking MCP tool policy"
 ```
 
 
-**確認** 
+**確認**
 matcher名は実際のイベントpayloadに合わせて調整する。
 
 
-**落とし穴** 
+**落とし穴**
 hook側でsecretをlog出力しない。
 
 
@@ -7199,11 +7190,11 @@ enabled_tools = ["search"]
 ```
 
 
-**確認** 
+**確認**
 対応している環境か確認し、失敗時はlocal STDIOへ戻す。
 
 
-**落とし穴** 
+**落とし穴**
 experimental機能なのでprofileに閉じ込める。
 
 
@@ -7225,11 +7216,11 @@ statusMessage = "Checking Bash command"
 ```
 
 
-**確認** 
+**確認**
 hook scriptが0/非0終了でどう扱われるか低リスクcommandで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 hook scriptをrepoに入れる場合、trusted project前提であることを理解する。
 
 
@@ -7251,11 +7242,11 @@ statusMessage = "Summarizing command result"
 ```
 
 
-**確認** 
+**確認**
 失敗したhookが作業全体を妨げないようtimeoutを短くする。
 
 
-**落とし穴** 
+**落とし穴**
 post hookはlogに機微情報を書かない。
 
 
@@ -7277,11 +7268,11 @@ statusMessage = "Checking prompt"
 ```
 
 
-**確認** 
+**確認**
 過検知しすぎないか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 prompt内容を外部送信しない。local scriptで完結させる。
 
 
@@ -7309,11 +7300,11 @@ statusMessage = "Checking workspace state"
 ```
 
 
-**確認** 
+**確認**
 未commit差分やbranch名を検査する用途に使う。
 
 
-**落とし穴** 
+**落とし穴**
 起動のたびに重い処理を走らせない。
 
 
@@ -7335,11 +7326,11 @@ statusMessage = "Cleaning temporary files"
 ```
 
 
-**確認** 
+**確認**
 background process停止やtmp削除だけに限定する。
 
 
-**落とし穴** 
+**落とし穴**
 成果物を勝手に消さない。
 
 
@@ -7361,11 +7352,11 @@ statusMessage = "Reviewing permission request"
 ```
 
 
-**確認** 
+**確認**
 承認payloadにどの情報が来るか確認してから実装する。
 
 
-**落とし穴** 
+**落とし穴**
 hookが誤判定すると承認flowが壊れる。段階導入する。
 
 
@@ -7393,11 +7384,11 @@ statusMessage = "Checking managed Bash command"
 ```
 
 
-**確認** 
+**確認**
 managed_dirが存在し、scriptが配布済みであることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 requirementsはscriptを配布しない。MDMなどで別途配る必要がある。
 
 
@@ -7416,11 +7407,11 @@ hooks = false
 ```
 
 
-**確認** 
+**確認**
 hooks由来の障害を切り分けるときだけ使う。
 
 
-**落とし穴** 
+**落とし穴**
 requirementsで強制されている場合、ユーザー側で弱められない。
 
 
@@ -7437,11 +7428,11 @@ prefix_rule(pattern=["ls"], decision="allow", reason="Directory listing is safe.
 ```
 
 
-**確認** 
+**確認**
 allowを書きすぎず、よく使う読み取りから始める。
 
 
-**落とし穴** 
+**落とし穴**
 allowはrequirementsでは使えない場合がある。管理設定ではprompt/forbidden中心にする。
 
 
@@ -7458,11 +7449,11 @@ prefix_rule(pattern=["pip", "install"], decision="prompt", reason="Python packag
 ```
 
 
-**確認** 
+**確認**
 install系commandの判定をcheckする。
 
 
-**落とし穴** 
+**落とし穴**
 test script内部でinstallする場合もある。AGENTS.mdで禁止する。
 
 
@@ -7479,11 +7470,11 @@ prefix_rule(pattern=["wget"], decision="prompt", reason="Network download requir
 ```
 
 
-**確認** 
+**確認**
 完全禁止ではなくpromptから始めると運用しやすい。
 
 
-**落とし穴** 
+**落とし穴**
 shell文字列の内容まではprefixだけで完全判定できない。
 
 
@@ -7502,11 +7493,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 Codexに明示的にreviewer subagentを使うよう依頼して動作を見る。
 
 
-**落とし穴** 
+**落とし穴**
 name、description、developer_instructionsは必須として扱う。
 
 
@@ -7525,11 +7516,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 親agentに範囲を渡してspawnさせる。
 
 
-**落とし穴** 
+**落とし穴**
 workerへMCPやdanger権限を過剰に付けない。
 
 
@@ -7548,11 +7539,11 @@ web_search = "disabled"
 ```
 
 
-**確認** 
+**確認**
 成果物形式を「入口、関連file、未確認点」に固定する。
 
 
-**落とし穴** 
+**落とし穴**
 調査agentが修正まで始めないよう明記する。
 
 
@@ -7575,11 +7566,11 @@ enabled_tools = ["search", "fetch"]
 ```
 
 
-**確認** 
+**確認**
 MCP利用をこのagentに寄せる。
 
 
-**落とし穴** 
+**落とし穴**
 親agentが未確認情報を推測で埋めないようにする。
 
 
@@ -7601,11 +7592,11 @@ interrupt_message = true
 ```
 
 
-**確認** 
+**確認**
 複数spawn時に上限が効くか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 max_depthを増やすと統合が難しくなる。最初は1にする。
 
 
@@ -7623,11 +7614,11 @@ nickname_candidates = ["Athena", "Ada"]
 ```
 
 
-**確認** 
+**確認**
 relative pathがconfig.toml基準で解決されることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 agent fileとinline定義の責務を混ぜすぎない。
 
 
@@ -7646,11 +7637,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 親に「pr-reviewerで差分を見て」と明示する。
 
 
-**落とし穴** 
+**落とし穴**
 レビューcommentを実際に投稿するMCP toolは別途allowlistで制限する。
 
 
@@ -7669,11 +7660,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 一回のspawnで担当dirを明示する。
 
 
-**落とし穴** 
+**落とし穴**
 複数workerが同じfileを編集しないよう親が割り振る。
 
 
@@ -7692,11 +7683,11 @@ tools_view_image = true
 ```
 
 
-**確認** 
+**確認**
 画像入力とconsole logを渡して分析させる。
 
 
-**落とし穴** 
+**落とし穴**
 UI修正はworker agentへ渡すと責務が明確になる。
 
 
@@ -7715,11 +7706,11 @@ web_search = "disabled"
 ```
 
 
-**確認** 
+**確認**
 PRや差分reviewで使う。
 
 
-**落とし穴** 
+**落とし穴**
 脆弱性検証の範囲は安全ポリシーと社内規定に従う。
 
 
@@ -7740,11 +7731,11 @@ approval_policy = "on-request"
 ```
 
 
-**確認** 
+**確認**
 各agentのeffective configを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 親sessionの設定を無条件に継承すると役割が曖昧になる。
 
 
@@ -7767,11 +7758,11 @@ Do not edit files.
 ```
 
 
-**確認** 
+**確認**
 親agentが複数agentの結果を並べやすくなる。
 
 
-**落とし穴** 
+**落とし穴**
 自由作文にすると、比較や統合が難しくなる。
 
 
@@ -7793,11 +7784,11 @@ sandbox_mode = "read-only"
 ```
 
 
-**確認** 
+**確認**
 外部情報が必要なときはdocs-researcherへ分ける。
 
 
-**落とし穴** 
+**落とし穴**
 reviewerが外部情報で誤った前提を持ち込まないようにする。
 
 
@@ -7815,11 +7806,11 @@ max_depth = 1
 ```
 
 
-**確認** 
+**確認**
 大きすぎるタスクは分割してspawnする。
 
 
-**落とし穴** 
+**落とし穴**
 timeoutが短すぎると調査が中途半端になる。
 
 
@@ -7834,11 +7825,11 @@ project_root_markers = [".git", "pnpm-workspace.yaml", "package.json"]
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でproject rootが想定通りか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 markerを増やしすぎると深いsubdirがroot扱いになる可能性がある。
 
 
@@ -7849,16 +7840,16 @@ markerを増やしすぎると深いsubdirがroot扱いになる可能性があ�
 
 
 ```
-project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 ```
 
 
-**確認** 
+**確認**
 AGENTS.mdがないdirでalternate routeが使われるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 巨大文書を丸ごと入れない。max bytesを決める。
 
 
@@ -7876,11 +7867,11 @@ Do not use the legacy npm scripts in this directory.
 ```
 
 
-**確認** 
+**確認**
 該当dirで指示が後勝ちになるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 overrideを常用すると規約が見えにくくなる。期限や理由を書く。
 
 
@@ -7901,11 +7892,11 @@ config_file = "./agents/web-reviewer.toml"
 ```
 
 
-**確認** 
+**確認**
 サービス別AGENTS.mdとagentを対応させる。
 
 
-**落とし穴** 
+**落とし穴**
 rootの設定に全サービス固有の詳細を書きすぎない。
 
 
@@ -7921,11 +7912,11 @@ status_line = ["model", "context", "git_branch", "tokens", "codex_version"]
 ```
 
 
-**確認** 
+**確認**
 TUIの `/statusline` でも変更できる。
 
 
-**落とし穴** 
+**落とし穴**
 表示項目を増やしすぎると狭い端末で読みにくい。
 
 
@@ -7941,11 +7932,11 @@ terminal_title = ["app_name", "project", "git_branch", "model", "task_progress"]
 ```
 
 
-**確認** 
+**確認**
 `/title` で対話的に変更できる。
 
 
-**落とし穴** 
+**落とし穴**
 terminal multiplexerのtitle挙動は環境差がある。
 
 
@@ -7965,11 +7956,11 @@ open_command_palette = ["ctrl-p", "ctrl-k"]
 ```
 
 
-**確認** 
+**確認**
 `/keymap` で現在のbindingを見る。
 
 
-**落とし穴** 
+**落とし穴**
 空配列でunbindする場合、意図をコメントに残す。
 
 
@@ -7985,11 +7976,11 @@ alt_screen = "never"
 ```
 
 
-**確認** 
+**確認**
 `--no-alt-screen` でも一時的に指定できる。
 
 
-**落とし穴** 
+**落とし穴**
 fullscreen体験は変わる。端末ごとにprofile化する。
 
 
@@ -8006,11 +7997,11 @@ vim_default_mode = "insert"
 ```
 
 
-**確認** 
+**確認**
 手元のCLI versionが対応しているかchangelogとhelpで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 Vim keymapは新しめの機能のため、version差を考慮する。
 
 
@@ -8026,11 +8017,11 @@ codex --profile lab features disable shell_snapshot
 ```
 
 
-**確認** 
+**確認**
 変更が `[profiles.lab.features]` へ入ったか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 rootのfeaturesとprofileのfeaturesを混同しない。
 
 
@@ -8046,11 +8037,11 @@ goals = true
 ```
 
 
-**確認** 
+**確認**
 `/experimental` または `/goal` で利用可能か確認する。
 
 
-**落とし穴** 
+**落とし穴**
 goalは実験的機能。成功条件と停止条件をprompt側で明示する。
 
 
@@ -8066,11 +8057,11 @@ undo = true
 ```
 
 
-**確認** 
+**確認**
 実際に差分作成後、undo操作の挙動を低リスクrepoで確認する。
 
 
-**落とし穴** 
+**落とし穴**
 Git管理外の巨大fileや生成物の扱いに注意する。
 
 
@@ -8086,11 +8077,11 @@ shell_snapshot = false
 ```
 
 
-**確認** 
+**確認**
 shell環境の変化が反映されるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 通常は速度面で有効な場合がある。切り分け用途にする。
 
 
@@ -8116,11 +8107,11 @@ enabled = false
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でapps関連が無効か見る。
 
 
-**落とし穴** 
+**落とし穴**
 Appsは外部サービス権限に関わるため、必要なprofileだけで有効化する。
 
 
@@ -8145,11 +8136,11 @@ default_tools_enabled = true
 ```
 
 
-**確認** 
+**確認**
 各appのtool一覧と承認挙動を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 destructive/open world toolは明示的に扱う。
 
 
@@ -8170,11 +8161,11 @@ model = "gpt-compatible-model"
 ```
 
 
-**確認** 
+**確認**
 providerのauthやmodel対応を別profileで検証する。
 
 
-**落とし穴** 
+**落とし穴**
 通常OpenAI profileと混ぜない。providerごとのtool対応差に注意する。
 
 
@@ -8189,11 +8180,11 @@ cli_auth_credentials_store = "keyring"
 ```
 
 
-**確認** 
+**確認**
 keyringが使えない環境では失敗する。必要ならautoを使う。
 
 
-**落とし穴** 
+**落とし穴**
 共有端末ではlogout運用も必要である。
 
 
@@ -8210,11 +8201,11 @@ history = { persistence = "none" }
 ```
 
 
-**確認** 
+**確認**
 session終了後にcredentialが残らないことを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 再起動のたびに認証が必要になる。
 
 
@@ -8233,11 +8224,11 @@ enabled = false
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でanalytics設定を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 組織ポリシーがある場合はrequirementsや管理設定が優先される場合がある。
 
 
@@ -8255,11 +8246,11 @@ allow_codex_version_mismatch = false
 ```
 
 
-**確認** 
+**確認**
 debug用途に限定して使う。
 
 
-**落とし穴** 
+**落とし穴**
 lockfileは設定の検査用であり、通常運用へ乱用しない。
 
 
@@ -8277,11 +8268,11 @@ web_search_request = false
 ```
 
 
-**確認** 
+**確認**
 ユーザーが `--search` を付けた場合の挙動を確認する。
 
 
-**落とし穴** 
+**落とし穴**
 業務上liveが必要なチームには例外の運用を決める。
 
 
@@ -8300,11 +8291,11 @@ apps = false
 ```
 
 
-**確認** 
+**確認**
 `/debug-config` でrequirements由来の制約として見えるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 機能名はcanonical keyを使う。version差があるためschema確認が必要。
 
 
@@ -8322,11 +8313,11 @@ deny_read = ["**/.env", "**/.env.*", "**/secrets/**", "**/*_rsa", "**/*_ed25519"
 ```
 
 
-**確認** 
+**確認**
 ユーザーconfigで弱められないことを検証する。
 
 
-**落とし穴** 
+**落とし穴**
 globの効き方やplatform差を確認する。
 
 
@@ -8343,11 +8334,11 @@ globの効き方やplatform差を確認する。
 ```
 
 
-**確認** 
+**確認**
 公式schemaと実装versionに合う形式で確認する。
 
 
-**落とし穴** 
+**落とし穴**
 requirements rulesではallowではなくprompt/forbidden中心にする。
 
 
@@ -8368,11 +8359,11 @@ allowed_sandbox_modes = ["read-only"]
 ```
 
 
-**確認** 
+**確認**
 host名がどのentryにmatchするか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 production系hostではwriteを許さない。
 
 
@@ -8390,11 +8381,11 @@ Prefer explicit human approval for package installation, network downloads, and 
 ```
 
 
-**確認** 
+**確認**
 auto review利用時にpolicyが反映されるか確認する。
 
 
-**落とし穴** 
+**落とし穴**
 空文字や過度に長いpolicyで読みづらくしない。
 
 
@@ -8416,11 +8407,11 @@ When config behavior is surprising:
 ```
 
 
-**確認** 
+**確認**
 新メンバーが同じ手順で原因を切り分けられる。
 
 
-**落とし穴** 
+**落とし穴**
 口頭手順にせず文書化する。
 
 
@@ -8443,11 +8434,11 @@ When config behavior is surprising:
 ```
 
 
-**確認** 
+**確認**
 設定変更をコード変更と同じようにreviewする。
 
 
-**落とし穴** 
+**落とし穴**
 MCPやHooksの変更は権限変更として扱う。
 
 
@@ -8469,11 +8460,11 @@ enabled_tools = ["search", "fetch"]
 ```
 
 
-**確認** 
+**確認**
 障害時にenabled=falseで戻せることを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 コメントなしのexperimental設定は後から意図が分からなくなる。
 
 
@@ -8515,11 +8506,11 @@ job_max_runtime_seconds = 1200
 ```
 
 
-**確認** 
+**確認**
 schema対応エディタで補完と診断を使う。
 
 
-**落とし穴** 
+**落とし穴**
 このテンプレートをそのまま全員へ強制しない。個人差がある。
 
 
@@ -8534,7 +8525,7 @@ schema対応エディタで補完と診断を使う。
 
 ```
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 
@@ -8564,11 +8555,11 @@ timeout = 20
 ```
 
 
-**確認** 
+**確認**
 trusted projectで読み込まれること、untrustedでは読まれないことを確認する。
 
 
-**落とし穴** 
+**落とし穴**
 project設定には個人のabsolute pathやsecretを書かない。
 
 
@@ -8745,7 +8736,7 @@ tool_timeout_sec = 60
 ```
 # .codex/config.toml
 project_root_markers = [".git", "pnpm-workspace.yaml"]
-project_doc_alternate route_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
+project_doc_fallback_filenames = ["AI_GUIDE.md", "DEVELOPMENT.md"]
 project_doc_max_bytes = 200000
 web_search = "disabled"
 
@@ -8979,8 +8970,6 @@ Team/person responsible for upkeep.
 
 
 ---
-
-
 # 第VIII部 設定の書き方 追加レシピ集
 
 
@@ -9439,18 +9428,18 @@ repo/packages/ui/AGENTS.md
 
 ### 追加設定レシピ 136: project doc容量調整
 
-**目的**  AGENTSやalternate route文書を読みすぎない。
+**目的**  AGENTSやfallback project docsを読みすぎない。
 
 
 ```
 project_doc_max_bytes = 150000
-project_doc_alternate route_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
+project_doc_fallback_filenames = ["AI_GUIDE.md", "CODING_RULES.md"]
 ```
 
 
 **確認**  巨大文書でcontextが圧迫されないか確認する。
 
-**戻し方**  文書を分割し、不要なalternate routeを外す。
+**戻し方**  文書を分割し、不要なfallback project docsを外す。
 
 
 ### 追加設定レシピ 137: root markerを言語別にする

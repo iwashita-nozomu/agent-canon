@@ -33,14 +33,25 @@ template-owned active contract.
 Codex instruction loading is runtime-defined and must be reflected in this
 repository's rule layout:
 
-1. User/global Codex guidance loads from Codex home before repository guidance.
-1. Project guidance loads from the project root down to the current working
-   directory. In each directory, an override file wins over `AGENTS.md`, and
-   Codex includes at most one instruction file per directory.
+1. Codex home guidance loads before repository guidance. `AGENTS.override.md`
+   wins over `AGENTS.md` at that global layer, and Codex uses only the first
+   non-empty file there.
+1. Project guidance is discovered from the project root down to the current
+   working directory. In each directory, Codex checks `AGENTS.override.md`,
+   then `AGENTS.md`, then fallback names listed in
+   `project_doc_fallback_filenames`; at most one instruction file from that
+   directory is included.
 1. Files closer to the current working directory appear later in the combined
-   prompt and therefore carry the local override surface.
+   prompt and therefore override earlier, broader guidance. The chain is built
+   once for the run or TUI session. Empty instruction files are skipped, and
+   Codex stops adding project-doc content when the combined size reaches
+   `project_doc_max_bytes`.
+1. Project `.codex/config.toml`, hooks, rules, MCP configuration, skills, and
+   plugins are separate Codex surfaces. They can affect runtime behavior, but
+   they are not a substitute for repository instruction discovery.
 1. Skills are selected from metadata first; `SKILL.md` is read only after the
-   skill is chosen.
+   skill is chosen. Skill instructions are task workflows, not always-loaded
+   repository rules.
 
 For this template, `/AGENTS.md` is the top repo instruction surface and is a
 runtime view of `vendor/agent-canon/ROOT_AGENTS.md`. Nested files such as

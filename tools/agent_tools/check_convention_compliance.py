@@ -890,8 +890,9 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
     ),
     ".codex/hooks/direct_rg_context_guard.py": (
         "DIRECT_RG_CONTEXT_RISK=warn",
-        "rg -l",
-        "--max-count",
+        "repository structure",
+        "git grep",
+        "targeted `grep`",
         ".agent-canon/log-archive",
         "reports",
         "*.jsonl",

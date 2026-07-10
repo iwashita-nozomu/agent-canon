@@ -474,7 +474,7 @@ risk: read-only
 owner: platform-team
 allowed_agents: [docs_researcher, pr_explorer]
 forbidden: secrets, production data, write operations
-failure_alternate route: use ripgrep in docs/ and ask human for missing context
+failure_alternate route: use git grep in docs/ and ask human for missing context
 ```
 
 

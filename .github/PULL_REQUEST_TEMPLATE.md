@@ -109,7 +109,7 @@ Orchestration evidence:
 - [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `evidence/agent-evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
-- [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
+- [ ] Raw search hits, if used to choose the fix surface, were collected after structure intake and expanded with `run_repo_dependency_review.sh --search-hits-file`; dependency-expanded edit scope is cited below.
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check` was run; any missing GitHub mirrors are listed as `ISSUE_SYNC_PLAN=` or intentionally deferred.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.

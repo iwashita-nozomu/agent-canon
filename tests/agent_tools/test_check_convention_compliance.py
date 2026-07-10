@@ -656,7 +656,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "git branch <name>/-c/-C/-f/--force\n"
     ),
     ".codex/hooks/direct_rg_context_guard.py": (
-        "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
+        "DIRECT_RG_CONTEXT_RISK=warn repository structure git grep targeted `grep` .agent-canon/log-archive "
         "reports *.jsonl\n"
     ),
     "tools/agent_tools/task_close.py": (
@@ -900,7 +900,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             (root / ".codex" / "hooks" / "direct_rg_context_guard.py").write_text(
-                "DIRECT_RG_CONTEXT_RISK=warn rg -l\n",
+                "DIRECT_RG_CONTEXT_RISK=warn repository structure\n",
                 encoding="utf-8",
             )
 
@@ -908,7 +908,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("hook_guardrail_policy:.codex/hooks/direct_rg_context_guard.py", result.stdout)
-            self.assertIn("missing-marker:--max-count", result.stdout)
+            self.assertIn("missing-marker:git grep", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""

@@ -362,7 +362,7 @@ Hook には「毎回確実に動いてほしい deterministic 処理」を置き
 
 Skills は reusable workflow package です。
 
-Codex は `SKILL.md` を発見し、必要な skill を読んで実行します。
+Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。
 
 重要:
 
@@ -396,7 +396,7 @@ enabled = true
 関連 key:
 
 - `project_doc_max_bytes`
-- `project_doc_alternate route_filenames`
+- `project_doc_fallback_filenames`
 - `project_root_markers`
 - `include_environment_context`
 - `include_permissions_instructions`
