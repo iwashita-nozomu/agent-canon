@@ -35,7 +35,7 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
+| `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
 | `.github/AGENTS.md` | GitHub agent root view | AgentCanon | `bash tools/sync_agent_canon.sh check` |
 | `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
 | `documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
