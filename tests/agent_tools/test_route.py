@@ -86,8 +86,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
-    def test_private_subagent_startup_aliases_resolve_to_agents_area(self) -> None:
-        """Private startup compatibility names should resolve through task routing."""
+    def test_private_subagent_startup_aliases_are_unknown_names(self) -> None:
+        """Historical startup labels should not resolve as route aliases."""
         for alias in (
             "subagent-beginning",
             "_subagent-beginning",
@@ -97,11 +97,9 @@ class RouteToolTest(unittest.TestCase):
             with self.subTest(alias=alias):
                 result = self.run_route("--name", alias, "--format", "text")
 
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("STATUS=alias", result.stdout)
-                self.assertIn("CANONICAL_AREA=agents", result.stdout)
-                self.assertIn("CANONICAL_TOOL=route.py --area agents", result.stdout)
-                self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("STATUS=unknown", result.stdout)
+                self.assertIn("CANONICAL_AREA=", result.stdout)
 
     def test_unknown_legacy_search_alias_fails(self) -> None:
         """Unknown legacy-like search names must not silently resolve."""
@@ -356,6 +354,20 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("user-guided-debugging", decision["active_skills"])
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertIn("structure-refactor", decision["active_skills"])
+
+    def test_prompt_docs_update_no_validation_preference_does_not_route_user_guided_debugging(self) -> None:
+        """Ordinary validation preferences should not select user-guided cadence."""
+        result = self.run_route(
+            "--prompt",
+            "Please update the docs; no validation unless asked.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("user-guided-debugging", decision["matched_skills"])
+        self.assertNotIn("user-guided-debugging", decision["active_skills"])
 
     def test_prompt_path_only_agent_canon_review_does_not_route_update(self) -> None:
         """Path-only read-only review prompts should not select AgentCanon update."""
@@ -845,9 +857,24 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("agent-log-analysis", decision["matched_skills"])
         self.assertIn("task-routing", decision["matched_skills"])
+        self.assertIn("runtime-log-repair", decision["matched_skills"])
         self.assertIn("agent-log-analysis", decision["active_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("runtime-log-repair", decision["related_skill_candidates"])
+        self.assertIn("runtime-log-repair", decision["active_skills"])
+
+    def test_prompt_routes_skill_miss_cause_repair_to_runtime_log_repair(self) -> None:
+        """Skill-miss cause repair should not leave runtime-log-repair related-only."""
+        result = self.run_route(
+            "--prompt",
+            "ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善して下さい.スキルミスも原因を特定して修正",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("runtime-log-repair", decision["matched_skills"])
+        self.assertIn("runtime-log-repair", decision["active_skills"])
 
     def test_prompt_routes_codex_loading_priority_document_sweep(self) -> None:
         """Codex loading-priority document sweeps should route structure and document canon."""
@@ -908,6 +935,16 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("runtime-log-repair", decision["matched_skills"])
         self.assertIn("runtime-log-repair", decision["active_skills"])
+
+    def test_name_resolution_resolves_public_skill_ids(self) -> None:
+        """Public skill ids should resolve through the skill catalog."""
+        result = self.run_route("--name", "runtime-log-repair")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("NAME=runtime-log-repair", result.stdout)
+        self.assertIn("STATUS=canonical", result.stdout)
+        self.assertIn("CANONICAL_AREA=skills", result.stdout)
+        self.assertIn("CANONICAL_SKILL=runtime-log-repair", result.stdout)
 
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,

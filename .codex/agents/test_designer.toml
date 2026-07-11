@@ -34,7 +34,7 @@ Rules:
 - if the design does not expose enough behavior to derive tests, return the gap instead of inventing behavior
 - classify oracle/spec risk and design tests when the changed behavior, regression risk, or unstable oracle needs it; do not make test design a mandatory detour for every validation failure
 - after any validation test/check failure, do not simplify, revert, delete intended behavior/tests, weaken the oracle, or downscope required validation just to pass; first record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`
-- classify validation failures with the token-safe canonical slugs owned by `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md`; do not duplicate the slug taxonomy here
+- classify validation failures with the token-safe canonical slugs owned by `documents/runtime-profiles-and-check-matrix.json`, with `documents/runtime-profiles-and-check-matrix.md` as the generated reader projection; do not duplicate the slug taxonomy here
 - when the classified cause is `cause_classification=implementation_bug` with a stable contract, route the result back to the owning code/config/docs/workflow repair instead of requiring another test-design pass
 - preserve the approved intent when proposing repairs; escalate before any intent change, oracle weakening, behavior deletion, or validation downscope
 - before proposing numerical, randomized, tolerance, solver, convergence, residual, benchmark, or experiment-style tests, apply the Numerical Test Admission Gate from documents/coding-conventions-testing.md

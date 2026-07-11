@@ -603,7 +603,28 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "behavior-owned cases",
     ),
 }
-VALIDATION_FAILURE_RESPONSE_MARKERS: dict[str, tuple[str, ...]] = {}
+VALIDATION_FAILURE_RESPONSE_MARKERS = {
+    "documents/TROUBLESHOOTING.md": (
+        "validation test/check failure",
+        "failing_contract",
+        "cause_classification",
+        "intent_preservation",
+        "documents/runtime-profiles-and-check-matrix.json",
+        "documents/runtime-profiles-and-check-matrix.md",
+    ),
+    "documents/coding-conventions-testing.md": (
+        "Validation test/check",
+        "failing_contract",
+        "cause_classification",
+        "intent_preservation",
+        "documents/runtime-profiles-and-check-matrix.json",
+        "documents/runtime-profiles-and-check-matrix.md",
+    ),
+}
+VALIDATION_FAILURE_RESPONSE_STALE_OWNER_PHRASES = (
+    "runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md",
+    "agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md",
+)
 MATHEMATICAL_NECESSITY_MARKERS = {
     "documents/conventions/common/05_docs.md": (
         "mathematical necessity gate",
@@ -1444,6 +1465,26 @@ def check_test_contract_routing(root: Path) -> list[Finding]:
     return findings
 
 
+def check_validation_failure_response_owner_propagation(root: Path) -> list[Finding]:
+    """Reject stale projection docs as validation-failure taxonomy owners."""
+    findings: list[Finding] = []
+    for path in VALIDATION_FAILURE_RESPONSE_MARKERS:
+        full_path = readable_path(root, path)
+        if full_path is None:
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        for phrase in VALIDATION_FAILURE_RESPONSE_STALE_OWNER_PHRASES:
+            if phrase in text:
+                findings.append(
+                    Finding(
+                        "validation_failure_response",
+                        path,
+                        f"stale-taxonomy-owner:{phrase}",
+                    )
+                )
+    return findings
+
+
 def check_mathematical_necessity_gate(root: Path) -> list[Finding]:
     """Verify mathematical judgments stay wired to necessity evidence."""
     paths = tuple(MATHEMATICAL_NECESSITY_MARKERS)
@@ -1887,6 +1928,7 @@ def run_checks(root: Path) -> list[Finding]:
             VALIDATION_FAILURE_RESPONSE_MARKERS,
         )
     )
+    findings.extend(check_validation_failure_response_owner_propagation(root))
     findings.extend(check_mathematical_necessity_gate(root))
     findings.extend(check_implementation_guardrails(root))
     findings.extend(check_refactor_sequence(root))

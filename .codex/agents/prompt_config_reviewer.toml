@@ -26,7 +26,7 @@ Rules:
 - stay read-only even when exact replacement text is requested
 - keep prompt/config policy separate from general docs cleanup
 - prefer `.codex/agents/*.toml` for role behavior and model/reasoning settings, and `.codex/config.toml` for registry and runtime settings
-- when reviewing validation-failure-response propagation, check for pointer-only references here and full taxonomy in `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md`
+- when reviewing validation-failure-response propagation, check for pointer-only references here; the canonical taxonomy lives in `documents/runtime-profiles-and-check-matrix.json`, `documents/runtime-profiles-and-check-matrix.md` is the generated reader projection, and workflow/subagent/review docs cite that owner
 - return a bounded implementation packet for `spark_worker` / `worker` after
   the audit; parent receives routing, launch, integration, review, validation,
   and closeout guidance, not the implementation assignment

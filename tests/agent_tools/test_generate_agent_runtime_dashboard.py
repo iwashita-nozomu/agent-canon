@@ -555,7 +555,102 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `tool` | `agent-canon-cli` | `2` | `2` | `0` | `0.0%` |",
             dashboard,
         )
+        self.assertNotIn("| `tool` | `docs check` |", dashboard)
+        self.assertNotIn("| `tool` | `docs format` |", dashboard)
         self.assertNotIn("| `tool` | `run_docs_checks.sh` |", dashboard)
+
+    def test_selection_metrics_ignore_related_only_skill_candidates(self) -> None:
+        """Related skill hints should not inflate missed skill selections."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_dir = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test-container"
+            )
+            with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "hook_run_id": "hook-related-skill",
+                            "hook_log_namespace": "test-container",
+                            "event": "UserPromptSubmit",
+                            "status": "pass",
+                            "timestamp": "2026-05-17T01:02:05Z",
+                            "candidate_skills": ["report-writing"],
+                            "candidate_skill_reasons": [
+                                "report-writing:related_to=agent-log-analysis"
+                            ],
+                        }
+                    )
+                    + "\n"
+                )
+            output = root / "reports" / "dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("| `skill` | `report-writing` |", dashboard)
+
+    def test_selection_metrics_ignore_legacy_unattributed_skill_candidates(self) -> None:
+        """Legacy candidate-only hook entries should not become skill misses."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_dir = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test-container"
+            )
+            with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "hook_run_id": "hook-legacy-skill",
+                            "hook_log_namespace": "test-container",
+                            "event": "UnknownHookEvent",
+                            "status": "pass",
+                            "timestamp": "2026-05-17T01:02:06Z",
+                            "candidate_skills": ["report-writing"],
+                        }
+                    )
+                    + "\n"
+                )
+            output = root / "reports" / "dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("| `skill` | `report-writing` |", dashboard)
 
     def write_fixture(self, root: Path, *, source_root: Path | None = None) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -844,7 +939,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                         "status": "pass",
                         "payload_fingerprint": "payload-tool-alias-candidate",
                         "timestamp": "2026-05-17T01:02:04Z",
-                        "candidate_tools": ["run_docs_checks.sh"],
+                        "candidate_tools": ["run_docs_checks.sh", "docs check", "docs format"],
                     }
                 )
                 + "\n"

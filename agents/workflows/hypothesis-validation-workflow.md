@@ -168,11 +168,13 @@ Validation test/check が失敗した場合は、通すために仮説、intende
 または required validation を縮めません。先に `failing_contract`、
 `observation_level`、`cause_classification`、`intent_preservation`、`evidence` を
 記録します。`cause_classification` と `intent_preservation` の slug set と route
-semantics は `documents/runtime-profiles-and-check-matrix.md`、
-`agents/canonical/CODEX_WORKFLOW.md`、`agents/canonical/CODEX_SUBAGENTS.md`、
-`documents/REVIEW_PROCESS.md` を参照します。`cause_classification=implementation_bug`
-で contract と oracle が安定している場合は、追加 test planning で止めず owning
-code / config / docs / workflow repair へ進みます。
+semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical
+taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md`
+を generated reader projection として扱います。workflow、subagent、review
+surface は required evidence と same-intent repair / escalation result だけを
+記録します。`cause_classification=implementation_bug` で contract と oracle が
+安定している場合は、追加 test planning で止めず owning code / config / docs /
+workflow repair へ進みます。
 
 必須項目:
 

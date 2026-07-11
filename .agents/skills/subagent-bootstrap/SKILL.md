@@ -9,7 +9,7 @@ contract skill
 responsibility Documents Subagent Bootstrap for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
-upstream design ../../../agents/internal-routines/subagent-startup.md owns private subagent startup route labels
+upstream design ../../../agents/internal-routines/subagent-startup.md owns the canonical private subagent startup route
 @dependency-end
 -->
 
@@ -41,8 +41,9 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
 1. Read `agents/internal-routines/subagent-startup.md` before preparing
-   subagent-only startup or internal skill route handoffs. Treat `_...` startup
-   names as private route labels, not public skill IDs.
+   subagent-only startup or internal skill route handoffs. The canonical private
+   startup route is `agents/internal-routines/subagent-startup.md`; historical
+   startup labels are not public skills or accepted route aliases.
 1. Treat `agents/COMMUNICATION_PROTOCOL.md` as the single owner of handoff and
    capsule fields. This skill owns launch timing, role selection, wave ledger,
    authorization, and closeout mechanics; it does not create a second capsule

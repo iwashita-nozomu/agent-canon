@@ -79,11 +79,12 @@ Authority / blocker notes:
 ## Canon Discipline
 
 - [ ] This PR targets the standalone AgentCanon repository, not a template / derived repo pin PR.
-- [ ] Template / derived repo follow-up, if needed, will use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
+- [ ] Template / derived repo follow-up is tracked through `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
 - [ ] The source of truth was edited in AgentCanon, not only through a derived repo root view.
 - [ ] New shared surfaces are listed in `documents/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
 - [ ] `agentcanon_structure_followup=required` was recorded for this AgentCanon source / synced-surface change.
-- [ ] `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` passed from the template / derived parent root, or this source PR records the parent pin/root-view PR that must provide `agentcanon_structure_followup=pass`.
+- [ ] If parent root sync has not run for this source PR yet, the parent pin/root-view PR or blocker that must later provide `agentcanon_structure_followup=pass` is recorded below.
+- [ ] `agentcanon_structure_followup=pass` is recorded only when `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` have both passed from the template / derived parent root.
 - [ ] No derived-repo project-specific policy leaked into AgentCanon.
 
 ## Plan Mode Evidence
@@ -109,7 +110,7 @@ Orchestration evidence:
 - [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `evidence/agent-evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
-- [ ] Raw search hits, if used to choose the fix surface, were collected after structure intake and expanded with `run_repo_dependency_review.sh --search-hits-file`; dependency-expanded edit scope is cited below.
+- [ ] Structure intake, responsibility-scope, or dependency-review evidence used to choose the fix surface is cited below; dependency review evidence that starts from an approved search-hits file uses `run_repo_dependency_review.sh --search-hits-file <path>` and cites the dependency-expanded edit scope.
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check` was run; any missing GitHub mirrors are listed as `ISSUE_SYNC_PLAN=` or intentionally deferred.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
@@ -120,7 +121,7 @@ Issue / edit-scope evidence:
 
 ## Validation Evidence
 
-- [ ] Validation failure response, if any, cites the owner contract in `agents/canonical/CODEX_WORKFLOW.md` or `documents/runtime-profiles-and-check-matrix.md` and records same-intent repair / escalation evidence.
+- [ ] Validation failure response, if any, cites `documents/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `documents/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`
 - [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_graph.tsv" --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
@@ -154,7 +155,7 @@ paste the key pass lines here
 - [ ] AgentCanon GitHub `main` will be updated first.
 - [ ] Template `vendor/agent-canon` pin will be updated after AgentCanon merge.
 - [ ] Template / derived repo will bring the change back with `make agent-canon-ensure-latest` and `bash tools/sync_agent_canon.sh link-root`, not by direct `sync_agent_canon.sh push`.
-- [ ] Template / derived repo follow-up will record `agentcanon_structure_followup=pass` after `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check`.
+- [ ] Template / derived repo follow-up will record `agentcanon_structure_followup=pass` only after `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` pass from the parent root.
 - [ ] Template `.gitmodules` impact was reviewed when URL, branch, or checkout behavior is affected.
 - [ ] Local bare mirror, if used, is compatibility-only and not the latest source of truth.
 - [ ] Derived repos that need the update are listed or intentionally deferred.

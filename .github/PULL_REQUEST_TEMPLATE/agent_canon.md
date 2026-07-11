@@ -95,7 +95,7 @@ Orchestration evidence:
 - [ ] `vendor/agent-canon/issues/README.md` was reviewed.
 - [ ] Existing durable findings were searched in `vendor/agent-canon/issues/open/`, `vendor/agent-canon/issues/closed/`, `vendor/agent-canon/memory/`, `vendor/agent-canon/notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md`, `vendor/agent-canon/memory/`, or `vendor/agent-canon/notes/failures/` before closeout.
-- [ ] Raw search hits, if used to choose the fix surface, were collected after structure intake and expanded with `run_repo_dependency_review.sh --search-hits-file`; dependency-expanded edit scope is cited below.
+- [ ] Structure intake, responsibility-scope, or dependency-review evidence used to choose the fix surface is cited below.
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check` was run; any missing GitHub mirrors are listed as `ISSUE_SYNC_PLAN=` or intentionally deferred.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
@@ -117,7 +117,7 @@ Impact notes:
 
 ## Validation
 
-- [ ] Validation failure response, if any, cites `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md` or `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` and records same-intent repair / escalation evidence.
+- [ ] Validation failure response, if any, cites `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `bash tools/sync_agent_canon.sh link-root`
 - [ ] `bash tools/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
@@ -165,9 +165,9 @@ Integration notes:
 - [ ] AgentCanon source PR was opened and merged before this template pin update, or this is a pin-only update to existing AgentCanon `main`.
 - [ ] After AgentCanon merge, ran `make agent-canon-ensure-latest`.
 - [ ] Compiled AgentCanon tools were rebuilt by the latest/ensure path, or `AGENT_CANON_TOOL_REBUILD_*` explains why rebuild is deferred to DevContainer.
-- [ ] `agentcanon_structure_followup=required` is recorded for this PR.
+- [ ] `agentcanon_structure_followup=required` is recorded for this parent pin/root-view PR.
 - [ ] Ran `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` from the template / derived parent root.
-- [ ] `agentcanon_structure_followup=pass` is recorded after the sync check passed.
+- [ ] `agentcanon_structure_followup=pass` is recorded only after both parent-root sync commands passed.
 - [ ] Direct `bash tools/sync_agent_canon.sh push` was not used, or a maintainer direct-push exception is explained below.
 - [ ] Any upstream sync blocker is recorded below; deferred sync is not PR completion evidence for AgentCanon source/pin/root-view changes.
 
