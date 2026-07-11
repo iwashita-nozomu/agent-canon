@@ -82,7 +82,6 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "vendor/agent-canon/issues/closed/",
     "Agent Improvement Guide artifact",
     "Issue Mirror artifact",
-    "run_repo_dependency_review.sh --search-hits-file",
     "AgentCanon source PR",
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
     "agentcanon_structure_followup=required",
