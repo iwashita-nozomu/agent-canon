@@ -5,7 +5,7 @@ contract reference
 responsibility Indexes AgentCanon reference material used by workflows, reviews, and research notes.
 upstream design ../agents/workflows/workflow-references.md cites workflow-level sources
 downstream design agent-canon-technology-bibliography.md catalogs implementation/runtime technical sources
-downstream reference gpt-5.6-benchmark-report-ja.md records the dated GPT-5.6 model-family benchmark and routing study
+downstream design gpt-5.6-benchmark-report-ja.md records the dated GPT-5.6 model-family benchmark and routing study
 downstream design ../documents/experiment-critical-review.md points reviewers to reference context
 downstream design ../documents/experiment-report-style.md points report authors to reference context
 @dependency-end

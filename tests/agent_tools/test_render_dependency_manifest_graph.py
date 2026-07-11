@@ -5,7 +5,7 @@
 # responsibility Tests dependency manifest graph bundle and projection public contracts.
 # upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders deterministic graph bundles and projections.
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh produces graph TSV inputs.
-# upstream design ../../reports/agents/20260711-code-space-visualization-brushup/design_brief.md defines renderer slice TP-01..TP-04.
+# upstream design ../../documents/tools/render_dependency_manifest_graph.md defines renderer bundle, projection, and Graph IR contracts.
 # @dependency-end
 
 from __future__ import annotations
