@@ -44,10 +44,11 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
-Record `agentcanon_structure_followup=pass` only after the sync check passes.
+Record `agentcanon_structure_followup=pass` only after both `link-root` and
+`check` pass from the parent root.
 For standalone AgentCanon source PRs, this parent-root follow-up runs after the
 source change is integrated or while preparing the parent pin/root-view PR; it
-is not an optional propagation note.
+is mandatory propagation evidence.
 
 ## Command Responsibilities
 

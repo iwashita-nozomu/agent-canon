@@ -111,10 +111,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/coding-conventions-testing.md": (
         "testing contract-only wrapper static contract validation "
         "static-analysis-duplicate-test canonical command Validation repair scope "
+        "Validation test/check "
         "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
         "checker-owned property SOLID / OOP boundary assertion "
         "$oop-readability-check tools/oop/python/readability.py "
-        "tools/oop/cpp/readability.py import_responsibility.py\n"
+        "tools/oop/cpp/readability.py import_responsibility.py "
+        "failing_contract cause_classification intent_preservation "
+        "documents/runtime-profiles-and-check-matrix.json "
+        "documents/runtime-profiles-and-check-matrix.md\n"
     ),
     "documents/coding-conventions-reviews.md": "reviews\n",
     "documents/coding-conventions-experiments.md": "experiments\n",
@@ -161,6 +165,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
         "operation checks supplemental evidence unresolved static/read findings\n"
+    ),
+    "documents/TROUBLESHOOTING.md": (
+        "validation test/check failure failing_contract cause_classification "
+        "intent_preservation documents/runtime-profiles-and-check-matrix.json "
+        "documents/runtime-profiles-and-check-matrix.md\n"
     ),
     "documents/codex-configuration-reference.md": (
         "## Hook Severity Policy\n"
@@ -318,7 +327,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property "
         "failing contract observation level failure cause approved intent escalate "
-        "oracle weakening\n"
+        "oracle weakening documents/runtime-profiles-and-check-matrix.json "
+        "documents/runtime-profiles-and-check-matrix.md\n"
     ),
     ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
         "experiment-lifecycle",
@@ -439,7 +449,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property "
         "failing contract observation level cause classification approved intent "
-        "escalation oracle weakening\n"
+        "escalation oracle weakening documents/runtime-profiles-and-check-matrix.json "
+        "documents/runtime-profiles-and-check-matrix.md\n"
     ),
     "agents/skills/experiment-lifecycle.md": (
         "experiment_execution_surface_guard tool_rejection_preflight.py "
@@ -1568,6 +1579,27 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("validation_failure_response", result.stdout)
             self.assertIn("missing-marker:approved intent", result.stdout)
+
+    def test_validation_failure_response_rejects_stale_owner_projection_set(self) -> None:
+        """Validation-failure slug ownership must stay on runtime-profile JSON."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            troubleshooting = root / "documents" / "TROUBLESHOOTING.md"
+            troubleshooting.write_text(
+                troubleshooting.read_text(encoding="utf-8")
+                + "\n`documents/runtime-profiles-and-check-matrix.md`、"
+                "`agents/canonical/CODEX_WORKFLOW.md`、"
+                "`agents/canonical/CODEX_SUBAGENTS.md`、"
+                "`documents/REVIEW_PROCESS.md` の slug set を参照します。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("validation_failure_response", result.stdout)
+            self.assertIn("stale-taxonomy-owner", result.stdout)
 
     def test_minimal_fixture_covers_validation_failure_response_surfaces(self) -> None:
         """The minimal fixture includes every validation failure response surface."""

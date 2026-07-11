@@ -5,7 +5,7 @@ contract skill
 responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
-upstream design ../internal-routines/subagent-startup.md owns private subagent startup route labels
+upstream design ../internal-routines/subagent-startup.md owns the canonical private subagent startup route
 @dependency-end
 -->
 

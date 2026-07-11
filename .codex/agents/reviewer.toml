@@ -61,7 +61,7 @@ Rules:
 - return revise when completion evidence is only spot/debug/smoke/partial run output or raw failure counts
 - return revise when validation failure response simplified, reverted, deleted intended behavior/tests, weakened the oracle, or downscoped required validation just to pass instead of recording `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`
 - return revise when `cause_classification=implementation_bug` with a stable contract is stalled behind additional test planning instead of proceeding to the owning code/config/docs/workflow repair
-- validate `cause_classification` and `intent_preservation` against the token-safe canonical slug sets owned by `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, and `documents/REVIEW_PROCESS.md`; do not duplicate the taxonomy here
+- validate `cause_classification` and `intent_preservation` against the token-safe canonical slug sets owned by `documents/runtime-profiles-and-check-matrix.json`, with `documents/runtime-profiles-and-check-matrix.md` as the generated reader projection; do not duplicate the taxonomy here
 - return escalate when a validation failure exposes `cause_classification=approved_design_user_request_conflict` or another intent-level gap and the implementation changed intent instead of preserving approved intent through repair or escalating first
 - return revise when correctness evidence and performance evidence are conflated
 - return escalate when one implementation slice mixes code changes, protocol changes, and XLA/runtime flag changes without an explicit request clause

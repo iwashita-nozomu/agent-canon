@@ -3,13 +3,13 @@
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Documents private subagent startup route labels and internal startup handoff routing.
+responsibility Documents the canonical private subagent startup route and internal startup handoff routing.
 upstream design README.md internal routine registry
 upstream design ../COMMUNICATION_PROTOCOL.md owns Fresh Subagent Context Capsule fields
-downstream design ../skills/subagent-bootstrap.md consumes private subagent startup route labels
+downstream design ../skills/subagent-bootstrap.md consumes the canonical private subagent startup route
 downstream implementation ../../tools/agent_tools/agent_team.py emits run.subagent_prompt_packet.subagent_startup_route
-downstream implementation ../../tools/agent_tools/route.py resolves compatibility names without public skill activation
-downstream implementation ../../tests/agent_tools/test_route.py checks private alias routing
+downstream implementation ../../tools/agent_tools/route.py strips private startup labels from prompt skill activation
+downstream implementation ../../tests/agent_tools/test_route.py checks historical startup labels are not public aliases
 downstream implementation ../../tests/agent_tools/test_task_start_and_close.py checks generated run manifest fields
 @dependency-end
 -->
@@ -34,20 +34,17 @@ The canonical internal startup route is:
 agents/internal-routines/subagent-startup.md
 ```
 
-Compatibility labels such as `subagent-beginning`, `_subagent-beginning`,
-`subagent-startup`, and `_subagent-startup` are private route labels. They are
-not user-facing skill IDs. The leading underscore marks a private/internal route
-label, not a public skill namespace.
+Historical startup labels such as `subagent-beginning`,
+`_subagent-beginning`, `subagent-startup`, and `_subagent-startup` are not
+public skills, are not accepted route aliases, and must not be added to
+prompt-routing lists. The leading underscore marks old private/internal label
+text, not a public skill namespace.
 
 Public skills remain plain hyphen-case, catalog-backed, and discoverable through
 `agents/skills/catalog.yaml` plus `.agents/skills/<skill>/SKILL.md`. Do not add
-these startup labels to public `SKILLS`, `ACTIVE_SKILLS`,
-`agents/skills/catalog.yaml`, `.codex/config.toml`, or public prompt-routing
-skill lists.
-
-`route.py --name <startup-label>` may resolve the compatibility labels to
-`route.py --area agents` / `$task-routing` so old candidate names have a compact
-route. Prompt routing must not treat those labels as public skill triggers.
+these historical startup labels to public `SKILLS`, `ACTIVE_SKILLS`,
+`agents/skills/catalog.yaml`, `.codex/config.toml`, `route.py --name` aliases,
+or public prompt-routing skill lists.
 
 ## Handoff Use
 
@@ -62,5 +59,5 @@ run.subagent_prompt_packet.subagent_startup_route
 ```
 
 Subagent prompts carry the field when it is present and keep it structural. Do
-not convert the route path or compatibility labels into prompt keywords, public
-skill activation, or a second capsule schema.
+not convert the route path or historical startup labels into prompt keywords,
+public skill activation, accepted route aliases, or a second capsule schema.

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from typing import cast
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RUNTIME_PROFILE_INVENTORY = PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
@@ -2093,19 +2095,23 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 validation_failure_policy["triage_write_scope"],
                 "read_only_until_cause_identified",
             )
+            runtime_profile_inventory = json.loads(
+                RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8")
+            )
+            validation_failure_response = runtime_profile_inventory[
+                "validation_failure_response"
+            ]
+            self.assertEqual(
+                validation_failure_policy["taxonomy_source"],
+                "documents/runtime-profiles-and-check-matrix.json",
+            )
             self.assertEqual(
                 validation_failure_policy["repair_required_fields"],
-                [
-                    "failing_contract",
-                    "observation_level",
-                    "cause_classification",
-                    "intent_preservation",
-                    "evidence",
-                ],
+                validation_failure_response["required_fields"],
             )
-            self.assertIn(
-                "repair_same_intent",
+            self.assertEqual(
                 validation_failure_policy["intent_preservation_values"],
+                validation_failure_response["intent_preservation"],
             )
             self.assertIn(
                 "schedule.md Agent Wave Ledger row with spawn_authority, budget, runtime ceilings, paths, validation_route, review_gate, handoff_artifacts, and delegated policy ref",

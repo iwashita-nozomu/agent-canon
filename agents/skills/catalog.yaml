@@ -838,7 +838,6 @@ skill_families:
         - ["problem statement", "before", "patch"]
         - ["next issue", "after", "fix"]
         - ["scoped fix"]
-        - ["no", "validation", "unless", "asked"]
         - ["1", "issue", "1", "fix"]
         - ["1", "problem", "1", "patch"]
         - ["1件", "ずつ"]

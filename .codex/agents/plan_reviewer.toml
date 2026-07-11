@@ -30,7 +30,7 @@ Rules:
 - treat merged roles, missing handoff artifacts, missing validation order, orphan request clauses, or broken parent-managed write-scope discipline as blockers
 - return revise if the plan lacks a Task Completion Boundary or Planned Work Units section
 - return revise if any chunk, slice, checkpoint, or subpass is allowed to unlock user-facing completion before all active clauses and planned work units are resolved
-- return revise if validation sequencing lacks a pointer to the validation-failure-response owner surfaces for `intent_preservation` repair or escalation routing
+- return revise if validation sequencing lacks a pointer to `documents/runtime-profiles-and-check-matrix.json` as the validation-failure-response taxonomy owner, with `documents/runtime-profiles-and-check-matrix.md` as the generated reader projection, for `intent_preservation` repair or escalation routing
 - when blockers are local to the plan, return revise
 - when blockers invalidate scope or research assumptions, return escalate
 - do not act as the detailed design reviewer for the same pass

@@ -204,18 +204,9 @@ PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE = (
     "document_flow_review_when_active",
 )
 VALIDATION_FAILURE_TRIAGE_TRIGGER = "validation_failure_requires_parallel_triage"
-VALIDATION_FAILURE_REPAIR_REQUIRED_FIELDS = (
-    "failing_contract",
-    "observation_level",
-    "cause_classification",
-    "intent_preservation",
-    "evidence",
-)
-VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES = (
-    "repair_same_intent",
-    "redesign_same_intent",
-    "escalate_design_conflict",
-)
+VALIDATION_FAILURE_TAXONOMY_SOURCE = "documents/runtime-profiles-and-check-matrix.json"
+RUNTIME_PROFILE_INVENTORY_PATH = ROOT / VALIDATION_FAILURE_TAXONOMY_SOURCE
+_validation_failure_response_policy_cache: dict[str, object] | None = None
 CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX = 6
 DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
@@ -274,6 +265,44 @@ DYNAMIC_EXPANSION_ROLE_STAGE_WAVES = (
     ),
     ("final_reviewer",),
 )
+
+
+def validation_failure_response_policy() -> dict[str, object]:
+    """Return validation-failure response taxonomy from the JSON owner."""
+    global _validation_failure_response_policy_cache
+    if _validation_failure_response_policy_cache is None:
+        raw_data = cast(
+            "dict[str, object]",
+            json.loads(RUNTIME_PROFILE_INVENTORY_PATH.read_text(encoding="utf-8")),
+        )
+        raw_policy = raw_data.get("validation_failure_response")
+        if not isinstance(raw_policy, dict):
+            raise ValueError("validation_failure_response must be an object")
+        policy = cast("dict[str, object]", raw_policy)
+        required_fields = policy.get("required_fields")
+        intent_preservation = policy.get("intent_preservation")
+        if not isinstance(required_fields, list) or not all(
+            isinstance(field, str) for field in cast("list[object]", required_fields)
+        ):
+            raise ValueError("validation_failure_response.required_fields must be strings")
+        if not isinstance(intent_preservation, list) or not all(
+            isinstance(value, str) for value in cast("list[object]", intent_preservation)
+        ):
+            raise ValueError("validation_failure_response.intent_preservation must be strings")
+        _validation_failure_response_policy_cache = {
+            "taxonomy_source": VALIDATION_FAILURE_TAXONOMY_SOURCE,
+            "required_fields": tuple(cast("list[str]", required_fields)),
+            "intent_preservation": tuple(cast("list[str]", intent_preservation)),
+        }
+    return {
+        "taxonomy_source": _validation_failure_response_policy_cache["taxonomy_source"],
+        "required_fields": _validation_failure_response_policy_cache["required_fields"],
+        "intent_preservation": _validation_failure_response_policy_cache[
+            "intent_preservation"
+        ],
+    }
+
+
 NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
 SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
@@ -1952,11 +1981,13 @@ def manifest_run_lines(
         lines.append("    validation_failure_triage_policy:")
         lines.append(f"      trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
         lines.append("      triage_write_scope: read_only_until_cause_identified")
+        validation_policy = validation_failure_response_policy()
+        lines.append(f"      taxonomy_source: {validation_policy['taxonomy_source']}")
         lines.append("      repair_required_fields:")
-        for field in VALIDATION_FAILURE_REPAIR_REQUIRED_FIELDS:
+        for field in cast("tuple[str, ...]", validation_policy["required_fields"]):
             lines.append(f"        - {field}")
         lines.append("      intent_preservation_values:")
-        for value in VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES:
+        for value in cast("tuple[str, ...]", validation_policy["intent_preservation"]):
             lines.append(f"        - {value}")
         lines.append("    same_role_instances:")
         lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")

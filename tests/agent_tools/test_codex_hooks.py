@@ -724,6 +724,40 @@ class CodexHooksTest(unittest.TestCase):
             )
         )
 
+    def test_skill_usage_logger_ignores_no_validation_preference_for_user_guided_debugging(self) -> None:
+        """Hook routing should not treat validation preference as debugging cadence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "skill_usage.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Please update the docs; no validation unless asked.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            candidate_skills = cast("list[str]", entry["candidate_skills"])
+            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("user-guided-debugging", candidate_skills)
+        self.assertFalse(
+            any(
+                reason.startswith("user-guided-debugging:")
+                for reason in candidate_skill_reasons
+            )
+        )
+
     def test_skill_usage_logger_routes_parent_repo_skill_lane_prompts(self) -> None:
         """Hook routing should classify parent-repo-specific skill lane design."""
         with tempfile.TemporaryDirectory() as temp_dir:

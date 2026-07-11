@@ -959,6 +959,10 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("parent_protocol_update=not_required", text)
             self.assertIn("subagent_protocol_update=not_required", text)
             self.assertIn("protocol_feedback_reason=", text)
+            self.assertIn(
+                "validation_failure_not_observed reason=standard-closeout-preset",
+                text,
+            )
             self.assertIn("execution_path_comparison_not_required", text)
             self.assertIn("token_efficiency_not_required", text)
             self.assertIn("prompt_eval_required", text)

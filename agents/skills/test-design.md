@@ -88,9 +88,9 @@ approved design と既存 code/test path を静的解析し、oracle / spec risk
   `observation_level`、`cause_classification`、`intent_preservation`、`evidence` を
   記録している
 - `cause_classification` と `intent_preservation` は
-  `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、
-  `agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` の slug set と
-  route semantics に従っている
+  `documents/runtime-profiles-and-check-matrix.json` が所有する slug set と
+  route semantics に従っている。`documents/runtime-profiles-and-check-matrix.md` は
+  生成済み reader projection として参照する
 - `cause_classification=implementation_bug` は approved intent を保ったまま owning
   code / config / docs / workflow repair へ進め、追加の test-design pass で
   implementation repair を止めない。必要な場合だけ同じ intent を保つ test を直すか追加する
@@ -132,7 +132,9 @@ approved design と既存 code/test path を静的解析し、oracle / spec risk
 1. validation 中に test / check が失敗した場合は、behavior を弱める前に
    `failing_contract`、`observation_level`、`cause_classification`、
    `intent_preservation`、`evidence` を記録します。slug set と route semantics は
-   validation-failure-response owner surfaces を参照します。
+   `documents/runtime-profiles-and-check-matrix.json` が所有し、
+   `documents/runtime-profiles-and-check-matrix.md` は生成済み reader projection として
+   参照します。
 1. `cause_classification=implementation_bug` は approved intent を保って owning
    code / config / docs / workflow repair へ進めます。必要な場合だけ同じ intent を保つ
    test を直すか追加し、generic `cause_classification=implementation_bug` を追加 test planning のために

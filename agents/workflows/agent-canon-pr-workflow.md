@@ -60,9 +60,11 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - AgentCanon source change、submodule pin change、`.gitmodules` change、root
   runtime view / root-copy surface change、parent root sync PR はすべて
-  `agentcanon_structure_followup=required` です。template / derived parent root
-  で `bash tools/sync_agent_canon.sh link-root` と
-  `bash tools/sync_agent_canon.sh check` を実行し、pass 後だけ
+  `agentcanon_structure_followup=required` です。AgentCanon source PR では
+  parent root sync をまだ実行できない場合、後続の parent pin / root-view PR
+  または blocker を記録します。parent pin / root-view PR では template /
+  derived parent root で `bash tools/sync_agent_canon.sh link-root` と
+  `bash tools/sync_agent_canon.sh check` を実行し、両方の pass 後だけ
   `agentcanon_structure_followup=pass` を PR / run evidence に記録します。
 - standalone AgentCanon repo では Makefile 前提を置かず、下の explicit validation commands を使います。
 - template / derived repo では `make agent-canon-pr-check` を使います。
@@ -70,9 +72,11 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
-- validation failure response は `agents/canonical/CODEX_WORKFLOW.md` と
-  `documents/runtime-profiles-and-check-matrix.md` の owner contract に従い、
-  PR body には分類と same-intent repair / escalation evidence だけを記録します。
+- validation failure response は `documents/runtime-profiles-and-check-matrix.json`
+  を canonical taxonomy owner として cite し、
+  `documents/runtime-profiles-and-check-matrix.md` は generated reader projection
+  として扱います。PR body には required evidence と same-intent repair /
+  escalation result だけを記録します。
 - PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
@@ -132,28 +136,36 @@ post-merge の template / derived pin PR では、`make agent-canon-pr-check` �
 AgentCanon PR の前に、運用 finding を durable storage に残すかを必ず判断します。
 この gate は「今から思い出して書く」作業ではなく、PR 作成時に機械的に確認する source-of-truth check です。
 
-1. Durable surfaces を検索する
+1. Structure intake / responsibility evidence を確認する
 
 ```bash
-git grep -l "topic keywords" -- \
-  issues/open issues/closed memory notes/failures documents agents \
-  | sed -n '1,200p' > reports/search_hits.txt
-wc -l reports/search_hits.txt > reports/search_hits.count
+python3 tools/agent_tools/responsibility_scope.py --root . --format json > reports/responsibility_scope.json
+python3 tools/agent_tools/file_surface_inventory.py --root . --submodule-aware --json-out reports/file_surface_inventory.json --markdown-out reports/file_surface_inventory.md
 ```
 
-template / derived repo から作業している場合は、`vendor/agent-canon/` prefix 付きで同じ surface を検索します。
-run bundle は補助 evidence であり、durable storage の代替ではありません。
+template / derived repo から作業している場合は、`vendor/agent-canon/` prefix
+付きの structure intake、responsibility-scope、file-surface inventory、または
+dependency review artifact を PR body に引用します。run bundle は補助 evidence
+であり、durable storage の代替ではありません。
+Durable finding status evidence covers `issues/open` and `issues/closed`;
+those issue-state surfaces do not replace structure intake or dependency review
+as edit-scope evidence.
 
-2. Raw search hit を dependency edit scope に展開する
+2. Dependency review で edit scope を展開する
 
 ```bash
 bash tools/agent_tools/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --search-hits-file reports/search_hits.txt
+  --report-dir reports/dependency-review
 ```
 
-`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を、issue または PR body の edit-scope evidence に残します。
-raw text-search hit だけで「どの file を編集・確認するか」を決めません。
+構造 intake が承認済み search-hits file を昇格している場合は、
+`run_repo_dependency_review.sh --search-hits-file <path>` を使い、検索結果では
+なく dependency-expanded scope を PR evidence にします。
+
+`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` または dependency
+review summary を、issue または PR body の edit-scope evidence に残します。
+structure intake、responsibility-scope、または dependency-review evidence なしに
+「どの file を編集・確認するか」を決めません。
 
 3. 新しい workflow defect がある場合は issue file を作る
 
@@ -202,18 +214,20 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 AgentCanon source work、template / derived parent pin、root view、shared
 root-copy surface、parent root sync PR はすべて
 `agentcanon_structure_followup=required` として扱います。
-standalone AgentCanon source PR では、source PR merge 後または parent
-pin/root-view PR 準備時に parent root からこの gate を実行します。
+standalone AgentCanon source PR では、parent root sync をまだ実行できない
+場合、source PR body または run evidence に後続の parent pin / root-view PR
+または blocker を記録します。source PR merge 後または parent pin/root-view PR
+準備時に parent root からこの gate を実行します。
 
 ```bash
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
-両方が pass したときだけ `agentcanon_structure_followup=pass` を PR body、
-run bundle、または work log に残します。template / derived repo では、この gate
-の後に parent readiness / structure checks を含む `make agent-canon-pr-check`
-を続けます。
+両方が parent root で pass したときだけ
+`agentcanon_structure_followup=pass` を PR body、run bundle、または work log
+に残します。template / derived repo では、この gate の後に parent readiness /
+structure checks を含む `make agent-canon-pr-check` を続けます。
 
 4. PR 前の validation を流す
 
@@ -467,10 +481,16 @@ Validation:
 - PR 本文に `PR Essence` として problem / user request、design intent、
   canonical owner、behavior or contract delta、evidence route が記録されている
 - PR 本文に changed surface と validation が記録されている
-- PR 本文または run evidence に `agentcanon_structure_followup=required` と
+- AgentCanon source PR では、PR 本文または run evidence に
+  `agentcanon_structure_followup=required` と、後続の parent pin / root-view PR
+  または blocker が記録されている。parent pin / root-view PR では
+  `agentcanon_structure_followup=required` と、parent root で
+  `bash tools/sync_agent_canon.sh link-root` と
+  `bash tools/sync_agent_canon.sh check` が pass した後の
   `agentcanon_structure_followup=pass` が記録されている
 - PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
-- PR 本文に search-to-edit-scope evidence、または search-to-edit-scope 不要判断が記録されている
+- PR 本文に structure-intake / responsibility-scope / dependency-review
+  evidence、または edit-scope evidence 不要判断が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、security check 状態が記録されている
 - file 構成変更がある場合は current-checkout integration branch merge と tree check が完了
 - AgentCanon main へ merge 後、template / derived parent root で
