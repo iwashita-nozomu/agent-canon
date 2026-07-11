@@ -535,10 +535,8 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "agent-canon pr",
     ),
     "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
-    "docs check": ("docs check", "markdownlint", "markdown math"),
     "evaluate_skill_workflow_prompts.py": ("evaluate_skill_workflow_prompts.py", "skill workflow eval", "prompt eval"),
     "evaluate_workflow_selection.py": ("evaluate_workflow_selection.py", "workflow selection eval", "routing eval"),
-    "docs format": ("docs format", "markdown format"),
     "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
     "generate_agent_runtime_dashboard.py": (
         "generate_agent_runtime_dashboard.py",

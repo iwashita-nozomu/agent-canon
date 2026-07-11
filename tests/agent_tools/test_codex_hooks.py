@@ -4733,7 +4733,7 @@ class CodexHooksTest(unittest.TestCase):
                 input=json.dumps(
                     {
                         "hookEventName": "UserPromptSubmit",
-                        "prompt": "マークダウンの hook と agent-canon docs check が引っかかっていないか見たい。",
+                        "prompt": "マークダウンの hook と agent-canon docs check / docs format が引っかかっていないか見たい。",
                     }
                 ),
                 check=True,
@@ -4762,6 +4762,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(tool.stdout, "")
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
         self.assertIn("agent-canon-cli", entries[0]["candidate_tools"])
+        self.assertNotIn("docs check", entries[0]["candidate_tools"])
+        self.assertNotIn("docs format", entries[0]["candidate_tools"])
         self.assertEqual(entries[1]["candidate_tools"], [])
         self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
