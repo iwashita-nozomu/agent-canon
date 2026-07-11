@@ -30,7 +30,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、`goal_loop.py status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
-- token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context shaping、escalation trigger を先に決めます。
+- token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、observed session / role evidence を使って、現在の decision に必要な child / specialist を adaptive に materialize します。
 
 ## Quick Routing
 
@@ -103,7 +103,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - `codex-goals-workflow.md`
   - Codex goals feature、top-level `goal.md`、Plan-mode entry、`goal_loop.py status` の責務境界と同期手順
 - `token-efficient-codex-workflow.md`
-  - Codex parent profile、agent mode、context shaping、token-saving escalation trigger
+  - observed session / role evidence と現在の decision に応じた adaptive materialization
 
 ### Research And Experiment
 

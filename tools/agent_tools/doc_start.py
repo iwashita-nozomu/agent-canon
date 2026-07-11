@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides doc start agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../agents/task_catalog.yaml document workflow specialist topology
 # @dependency-end
 
 """Start one document-writing run with machine-generated writing workflow and review hints."""
@@ -16,6 +17,7 @@ from pathlib import Path
 from agent_team import (
     RunBundleSpec,
     create_run_bundle,
+    load_task_catalog,
     load_team_config,
     make_run_id,
     resolve_report_root,
@@ -33,7 +35,7 @@ DOC_KIND_MAP = {
             "$subagent-bootstrap",
             "$long-form-writing",
         ),
-        "enable": (),
+        "enable": ("document_flow_reviewer",),
     },
     "academic": {
         "workflow_family_id": "research_driven_change",
@@ -45,6 +47,7 @@ DOC_KIND_MAP = {
             "$academic-writing",
         ),
         "enable": (
+            "document_flow_reviewer",
             "notation_definition_reviewer",
             "logic_gap_reviewer",
         ),
@@ -59,6 +62,7 @@ DOC_KIND_MAP = {
             "$paper-writing",
         ),
         "enable": (
+            "document_flow_reviewer",
             "citation_evidence_reviewer",
             "notation_definition_reviewer",
             "logic_gap_reviewer",
@@ -110,6 +114,7 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
 def main() -> int:
     """Run the doc-start command."""
     config = load_team_config()
+    catalog = load_task_catalog(config)
     args = build_parser(specialist_role_ids(config)).parse_args()
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
@@ -124,7 +129,14 @@ def main() -> int:
         if role_id not in enabled_specialists:
             enabled_specialists.append(role_id)
 
-    roles = select_roles(config, enabled_specialists, full_team=False)
+    workflow_family_id = str(kind_spec["workflow_family_id"])
+    roles = select_roles(
+        config,
+        enabled_specialists,
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id=workflow_family_id,
+    )
     created_files = create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -135,7 +147,8 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
-            workflow_family_id=str(kind_spec["workflow_family_id"]),
+            workflow_family_id=workflow_family_id,
+            task_catalog=catalog,
         )
     )
 

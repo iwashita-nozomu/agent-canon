@@ -40,6 +40,20 @@ class CheckToolCatalogTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("TOOL_CATALOG=pass", result.stdout)
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        renderer = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["path"]
+            == "tools/agent_tools/render_dependency_manifest_graph.py"
+        )
+        self.assertEqual(
+            renderer["command"],
+            "python3 tools/agent_tools/render_dependency_manifest_graph.py "
+            "--root . --scope full --bundle-dir reports/dependency-graph --format json",
+        )
 
     def test_stale_catalog_entry_fails(self) -> None:
         """Catalog entries must point at existing tool paths."""

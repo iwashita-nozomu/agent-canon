@@ -17,10 +17,20 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest.mock import patch
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+import agent_team  # noqa: E402
+from agent_team import (  # noqa: E402
+    AgentTypeSelection,
+    load_team_config,
+    validate_agent_type_selections,
+)
+
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
@@ -217,11 +227,10 @@ def write_ready_schedule(report_dir: Path) -> None:
                     "---------------- | ----------- | ----------------- | -------------------- | ------ |"
                 ),
                 (
-                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 3/12 | 24 | 2 | "
-                    "requirements_organizer,explorer,execution_planner | "
-                    "requirements_organizer:intake_requirements:team_manifest.yaml,"
-                    "explorer:intake_explorer:team_manifest.yaml,"
-                    "execution_planner:intake_plan:team_manifest.yaml | none | reports/agents/run | "
+                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 1/12 | 24 | 2 | "
+                    "requirements_organizer | "
+                    "manager:manager_requirements_organizer:requirements_organizer:"
+                    "team_manifest.yaml | none | reports/agents/run | "
                     "unrelated | read-only | pytest | schedule_review | team_manifest.yaml | "
                     "team_manifest.yaml#run.delegated_spawn_policy | done |"
                 ),
@@ -270,11 +279,10 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
                 (
                     "- wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
                     "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                    "budget_after=3/12 runtime_max_threads=24 runtime_max_depth=2 "
-                    "spawned_roles=requirements_organizer,explorer,execution_planner "
-                    "role_instances=requirements_organizer:intake_requirements:team_manifest.yaml,"
-                    "explorer:intake_explorer:team_manifest.yaml,"
-                    "execution_planner:intake_plan:team_manifest.yaml "
+                    "budget_after=1/12 runtime_max_threads=24 runtime_max_depth=2 "
+                    "spawned_roles=requirements_organizer "
+                    "role_instances=manager:manager_requirements_organizer:"
+                    "requirements_organizer:team_manifest.yaml "
                     "skipped_roles=none allowed_paths=reports/agents/run "
                     "do_not_read=unrelated write_scope=read-only validation_route=pytest "
                     "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done"
@@ -327,7 +335,7 @@ def append_mid_task_wave_checkpoint(
         spawn_authority = spawn_authority or "parent_checkpoint_then_spawn_fresh_wave"
         target_agents = target_agents or "worker"
         spawned_roles = spawned_roles or target_agents
-        role_instances = role_instances or f"{spawned_roles}:followup:{updated_packet}"
+        role_instances = role_instances or f"{spawned_roles}:followup:{spawned_roles}:{updated_packet}"
         skipped_roles = skipped_roles or "none"
     elif input_classification == "new_task":
         scope_status = scope_status or "new_task"
@@ -589,15 +597,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
             same_role_policy["status"],
             "allowed_with_distinct_packets",
         )
-        self.assertEqual(same_role_policy["identity_key"], "role_type+instance_id")
+        self.assertEqual(
+            same_role_policy["identity_key"],
+            "role_id+instance_id+agent_type",
+        )
         raw_same_role_fields = cast(
             "list[object]",
             same_role_policy["required_fields"],
         )
         self.assertLessEqual(
             {
-                "role_type",
+                "role_id",
                 "instance_id",
+                "agent_type",
                 "input_packet",
                 "allowed_paths",
                 "do_not_read",
@@ -617,7 +629,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
         )
         self.assertIn(expected_schedule, schedule_text)
         self.assertIn(
-            "requirements_organizer,explorer,execution_planner", schedule_text
+            "requirements_organizer:pending_explicit_runtime_spawn_authority",
+            schedule_text,
+        )
+        self.assertNotIn("explorer:pending_explicit_runtime_spawn_authority", schedule_text)
+        self.assertNotIn(
+            "execution_planner:pending_explicit_runtime_spawn_authority",
+            schedule_text,
         )
         self.assertIn("Role Instances", schedule_text)
         self.assertIn("role_instances=none", monitoring_text)
@@ -669,7 +687,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
         self.assertTrue(required_fields.issubset(prompt_fields), role_id)
 
     def assert_abstract_design_prompt_contracts(
-        self, manifest: dict[str, object]
+        self,
+        manifest: dict[str, object],
+        expected_role_ids: set[str] | None = None,
     ) -> None:
         """Assert ADF prompt contracts for generated design and review roles."""
         expected = {
@@ -700,6 +720,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             },
         }
         for role_id, fields in expected.items():
+            if expected_role_ids is not None and role_id not in expected_role_ids:
+                continue
             self.assert_role_prompt_includes(manifest, role_id, fields)
 
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
@@ -969,8 +991,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=12", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=4", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
             self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
             self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
             self.assertIn(
@@ -1004,7 +1026,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             first_wave = cast(re.Match[str], first_wave_match).group(1).split(",")
             self.assertEqual(
                 first_wave,
-                ["requirements_organizer", "explorer", "execution_planner"],
+                ["requirements_organizer"],
             )
             dynamic_waves_match = re.search(
                 r"^RECOMMENDED_DYNAMIC_EXPANSION_WAVES=(.+)$",
@@ -1013,7 +1035,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(dynamic_waves_match)
             dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
-            self.assertIn("WAVE-2=manager_reviewer", dynamic_waves)
+            self.assertIn("WAVE-2=execution_planner", dynamic_waves)
+            self.assertNotIn("manager_reviewer", dynamic_waves)
             role_instances_match = re.search(
                 r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
                 result.stdout,
@@ -1021,12 +1044,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(role_instances_match)
             role_instances = cast(re.Match[str], role_instances_match).group(1)
-            self.assertIn("researcher:explorer:researcher_explorer", role_instances)
-            self.assertIn(
-                "research_reviewer:reviewer:research_reviewer_reviewer", role_instances
+            self.assertNotIn("researcher:researcher_explorer:explorer", role_instances)
+            self.assertNotIn(
+                "research_reviewer:research_reviewer_reviewer:reviewer", role_instances
             )
-            self.assertIn(
-                "infra_reviewer:reviewer:infra_reviewer_reviewer", role_instances
+            self.assertNotIn(
+                "infra_reviewer:infra_reviewer_reviewer:reviewer", role_instances
             )
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
@@ -1042,14 +1065,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn(
-                "IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout
+                "IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker", result.stdout
             )
             self.assertIn(
                 "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
                 result.stdout,
             )
             self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
+                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_id+instance_id+agent_type",
                 result.stdout,
             )
             self.assertIn(
@@ -1116,19 +1139,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_ROUTING_POLICY=selected_skill_command_packets",
+                "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                result.stdout,
+            )
+            self.assertIn(
+                "REPO_TOOL_SELECTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn(
                 "REPO_TOOL_ROUTING_EXECUTION_MODE=sequential_by_skill_and_stage",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_ROUTING_SEQUENCE=show_skill_packet,run_required_commands,run_task_matching_conditional_commands,run_validation_commands",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_ROUTING_NEXT_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
                 result.stdout,
             )
             self.assertIn(
@@ -1145,7 +1168,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=test_designer,docs_workflow_steward,python_reviewer,cpp_reviewer,diff_triage_reviewer,reviewer",
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,cpp_reviewer",
                 result.stdout,
             )
             self.assertIn(
@@ -1154,7 +1177,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=active", result.stdout)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=repo_integration_review",
+                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
                 result.stdout,
             )
             self.assertIn(
@@ -1199,8 +1222,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
             role_topology = spawn_wave_recommendation["role_topology"]
             same_role_instances = role_topology["same_role_parallel_instances"]
-            self.assertEqual(spawn_budget["active_subagents"], 12)
-            self.assertEqual(spawn_budget["max_write_subagents"], 4)
+            self.assertEqual(spawn_budget["active_subagents"], 4)
+            self.assertEqual(spawn_budget["max_write_subagents"], 2)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
             self.assertEqual(spawn_budget["runtime_max_depth"], 2)
             self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
@@ -1319,13 +1342,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             first_tool_route = repo_tool_routing_policy["sequential_tool_routes"][0]
             self.assertEqual(first_tool_route["skill"], "agent-orchestration")
-            self.assertIn(
-                'python3 tools/agent_tools/route.py --prompt "<user request>" --format json',
-                first_tool_route["commands"]["task_matching_conditional_commands"],
+            self.assertEqual(
+                first_tool_route["packet_command"],
+                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
             )
-            self.assertIn(
+            self.assertNotIn("commands", first_tool_route)
+            self.assertIn("runtime_skill", first_tool_route)
+            self.assertIn("canonical_doc", first_tool_route)
+            self.assertIn("related_skills", first_tool_route)
+            self.assertEqual(
+                repo_tool_routing_policy["check_command"],
                 "python3 tools/agent_tools/skill_tool_commands.py check",
-                first_tool_route["commands"]["validation_commands"],
             )
             self.assertTrue(default_quality_check_policy["enabled"])
             self.assertEqual(
@@ -1343,22 +1370,15 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 default_quality_check_policy["roles"],
                 [
-                    "test_designer",
                     "docs_workflow_steward",
-                    "python_reviewer",
                     "cpp_reviewer",
-                    "change_reviewer",
                 ],
             )
             self.assertEqual(
                 default_quality_check_policy["codex_agent_types"],
                 [
-                    "test_designer",
                     "docs_workflow_steward",
-                    "python_reviewer",
                     "cpp_reviewer",
-                    "diff_triage_reviewer",
-                    "reviewer",
                 ],
             )
             self.assertEqual(
@@ -1367,7 +1387,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_pack_ids"],
-                ["repo_integration_review"],
+                [],
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["auto_language_reviewers"],
@@ -1424,16 +1444,272 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 same_role_instances["identity_key"],
-                "role_type+instance_id",
+                "role_id+instance_id+agent_type",
             )
             self.assertFalse(
                 same_role_instances["runtime_threads_are_cardinality_source"]
             )
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
-            self.assert_current_checkout_write_policy(write_scope_policy, 4)
+            self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assert_same_role_runtime_policy(delegated_spawn_policy)
             self.assert_initial_wave_execution_gate(report_root / "test-task-start")
-            self.assert_abstract_design_prompt_contracts(manifest)
+            self.assert_abstract_design_prompt_contracts(
+                manifest,
+                {"designer", "implementer"},
+            )
+
+    def test_t12_default_quality_check_agent_types_do_not_fan_out_candidates(self) -> None:
+        """T12 quality checks should not spawn later reviewer candidates by default."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "comprehensive workflow check",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-t12-quality-default",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,"
+                "python_reviewer",
+                result.stdout,
+            )
+            manifest = yaml.safe_load(
+                (report_root / "test-t12-quality-default" / "team_manifest.yaml")
+                .read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["run"]["default_quality_check_policy"]["codex_agent_types"],
+                ["docs_workflow_steward"],
+            )
+
+    def test_empty_registry_does_not_materialize_configured_candidates(self) -> None:
+        """Configured codex_agents are candidate order, not executable availability."""
+        config = load_team_config()
+        catalog = agent_team.load_task_catalog(config)
+        roles = agent_team.select_roles(
+            config,
+            ["implementer", "change_reviewer", "docs_workflow_steward"],
+            full_team=False,
+            catalog=catalog,
+            workflow_family_id="comprehensive_development",
+        )
+        active_subagents, _max_write_subagents = agent_team.workflow_spawn_budget(
+            catalog,
+            "comprehensive_development",
+        )
+
+        self.assertIn("worker", agent_team.unique_codex_agents_for_roles(roles))
+
+        with patch("agent_team.registered_codex_agent_types", return_value=set()):
+            initial_wave = agent_team.recommended_initial_subagent_wave(
+                roles,
+                active_subagents,
+                catalog,
+            )
+            dynamic_waves = agent_team.recommended_dynamic_expansion_wave_slots(
+                roles,
+                active_subagents,
+                initial_wave,
+                catalog,
+            )
+            quality_agent_types = agent_team.default_quality_check_agent_types(roles)
+
+        self.assertEqual(initial_wave, ())
+        self.assertEqual(dynamic_waves, ())
+        self.assertEqual(quality_agent_types, ())
+
+    def test_task_start_uses_default_worker_candidate(self) -> None:
+        """The implementer role should materialize the first codex_agents entry by default."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "comprehensive workflow check",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-default-worker",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("SUBAGENT_AGENT_TYPE_SELECTIONS=none", result.stdout)
+            self.assertIn(
+                "implementer:implementer_worker:worker",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "implementer:implementer_spark_worker:spark_worker",
+                result.stdout,
+            )
+
+    def test_agent_type_selection_preserves_explicit_empty_registry(self) -> None:
+        """An injected empty registry must reject every selected candidate."""
+        config = load_team_config()
+        implementer = next(
+            role
+            for role in config.always_on_roles + config.specialist_roles
+            if role.id == "implementer"
+        )
+        selection = AgentTypeSelection(
+            role_id="implementer",
+            agent_type="spark_worker",
+            evidence="approved-bounded-slice",
+        )
+        registered_agents: set[str] = set()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "agent type selection references unregistered Codex agent: spark_worker",
+        ):
+            validate_agent_type_selections(
+                config,
+                (implementer,),
+                (selection,),
+                registered_agents=registered_agents,
+            )
+
+    def test_task_start_selects_spark_worker_with_explicit_evidence(self) -> None:
+        """A later implementer candidate requires explicit parent-packet evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "comprehensive workflow check",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-spark-worker",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                    "--select-agent-type",
+                    "implementer=spark_worker:approved-bounded-slice",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "SUBAGENT_AGENT_TYPE_SELECTIONS=implementer=spark_worker:approved-bounded-slice",
+                result.stdout,
+            )
+            self.assertIn(
+                "implementer:implementer_spark_worker:spark_worker",
+                result.stdout,
+            )
+            manifest = yaml.safe_load(
+                (report_root / "test-spark-worker" / "team_manifest.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                manifest["run"]["spawn_wave_recommendation"]["agent_type_selections"],
+                [
+                    {
+                        "role_id": "implementer",
+                        "agent_type": "spark_worker",
+                        "evidence": "approved-bounded-slice",
+                    }
+                ],
+            )
+
+    def test_task_start_rejects_invalid_agent_type_selection(self) -> None:
+        """Invalid role-to-agent parent-packet selections should fail closed."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "comprehensive workflow check",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-invalid-selection",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                    "--select-agent-type",
+                    "implementer=diff_triage_reviewer:not-an-implementer",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("agent type selection for implementer must be one of", result.stdout)
+            self.assertFalse((report_root / "test-invalid-selection").exists())
 
     def test_task_start_plain_fix_activates_subagent_bootstrap(self) -> None:
         """Plain fix prompts should match route.py write-capable handoff."""
@@ -1570,8 +1846,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("parent_direct_write_exception_required", contract_policy)
             self.assertNotIn("parent_direct_write_exception", contract_policy)
 
-    def test_academic_reviewers_precede_ship_review_in_dynamic_waves(self) -> None:
-        """Task-specific academic reviewers should run before final review."""
+    def test_academic_reviewers_precede_work_and_ship_review_is_deferred(self) -> None:
+        """Academic reviewers run before work while ship review awaits its gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -1611,20 +1887,21 @@ class TaskStartAndCloseTest(unittest.TestCase):
             dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
             self.assertLess(
                 dynamic_waves.index("report_reviewer"),
-                dynamic_waves.index("ship_reviewer"),
+                dynamic_waves.index("worker"),
             )
             self.assertLess(
                 dynamic_waves.index("citation_evidence_reviewer"),
-                dynamic_waves.index("ship_reviewer"),
+                dynamic_waves.index("worker"),
             )
             self.assertLess(
                 dynamic_waves.index("notation_definition_reviewer"),
-                dynamic_waves.index("ship_reviewer"),
+                dynamic_waves.index("worker"),
             )
             self.assertLess(
                 dynamic_waves.index("logic_gap_reviewer"),
-                dynamic_waves.index("ship_reviewer"),
+                dynamic_waves.index("worker"),
             )
+            self.assertNotIn("ship_reviewer", dynamic_waves)
             role_instances_match = re.search(
                 r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
                 result.stdout,
@@ -1633,11 +1910,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIsNotNone(role_instances_match)
             role_instances = cast(re.Match[str], role_instances_match).group(1)
             self.assertIn(
-                "research_reviewer:reviewer:research_reviewer_reviewer", role_instances
+                "research_reviewer:research_reviewer_reviewer:reviewer", role_instances
             )
             self.assertIn(
-                "citation_evidence_reviewer:citation_evidence_reviewer:"
-                "citation_evidence_reviewer_citation_evidence_reviewer",
+                "citation_evidence_reviewer:"
+                "citation_evidence_reviewer_citation_evidence_reviewer:"
+                "citation_evidence_reviewer",
                 role_instances,
             )
             manifest_text = (
@@ -1654,7 +1932,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     for item in wave["role_instances"]
                 )
             ]
-            self.assertEqual(wave_ids, ["WAVE-6"])
+            self.assertEqual(wave_ids, ["WAVE-7"])
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
@@ -1696,21 +1974,21 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=3", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
             manifest_text = (
                 report_root / "test-large-refactor" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
-            self.assertEqual(spawn_budget["active_subagents"], 10)
-            self.assertEqual(spawn_budget["max_write_subagents"], 3)
+            self.assertEqual(spawn_budget["active_subagents"], 4)
+            self.assertEqual(spawn_budget["max_write_subagents"], 2)
             self.assertEqual(spawn_budget["runtime_max_threads"], 24)
-            self.assert_current_checkout_write_policy(write_scope_policy, 3)
+            self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assertIn("spawn_budget:", manifest_text)
-            self.assertIn("active_subagents: 10", manifest_text)
-            self.assertIn("max_write_subagents: 3", manifest_text)
+            self.assertIn("active_subagents: 4", manifest_text)
+            self.assertIn("max_write_subagents: 2", manifest_text)
             self.assertIn(
                 "max_write_subagents_scope: 'write-capable subagents only'",
                 manifest_text,
@@ -1871,7 +2149,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
             self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
             self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
@@ -1899,7 +2177,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_type+instance_id",
+                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_id+instance_id+agent_type",
                 result.stdout,
             )
             self.assertIn(
@@ -1916,7 +2194,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
             self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_ROLES=test_designer,docs_workflow_steward,python_reviewer,change_reviewer",
+                "DEFAULT_QUALITY_CHECK_ROLES=test_designer,docs_workflow_steward,python_reviewer",
                 result.stdout,
             )
             self.assertIn(
@@ -1924,13 +2202,15 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_ROUTING_POLICY=selected_skill_command_packets",
+                "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_ROUTING_SEQUENCE=show_skill_packet,run_required_commands,run_task_matching_conditional_commands,run_validation_commands",
+                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
                 result.stdout,
             )
+            self.assertIn("REPO_TOOL_SELECTED_SKILLS=", result.stdout)
+            self.assertIn("REPO_TOOL_DYNAMIC_CANDIDATES=", result.stdout)
             self.assertIn(
                 "REPO_DYNAMIC_SKILL_ROUTING_NEXT=add_skill_then_regenerate_repo_tool_routes",
                 result.stdout,
@@ -1981,7 +2261,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ]
             agent_report_collection = manifest["run"]["agent_report_collection"]
             repo_tool_routing_policy = manifest["run"]["repo_tool_routing_policy"]
-            self.assertEqual(spawn_budget["active_subagents"], 10)
+            self.assertEqual(spawn_budget["active_subagents"], 4)
             self.assertEqual(spawn_budget["max_write_subagents"], 2)
             self.assertGreater(
                 spawn_budget["active_subagents"],
@@ -2011,7 +2291,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 same_role_instances["identity_key"],
-                "role_type+instance_id",
+                "role_id+instance_id+agent_type",
             )
             self.assertFalse(
                 same_role_instances["runtime_threads_are_cardinality_source"]
@@ -2042,7 +2322,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "test_designer",
                     "docs_workflow_steward",
                     "python_reviewer",
-                    "change_reviewer",
                 ],
             )
             self.assertEqual(
@@ -2051,9 +2330,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "test_designer",
                     "docs_workflow_steward",
                     "python_reviewer",
-                    "cpp_reviewer",
-                    "diff_triage_reviewer",
-                    "reviewer",
                 ],
             )
             self.assertEqual(
@@ -2144,13 +2420,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
-                "include run.repo_tool_routing_policy selected-skill command sequence, dynamic skill candidates, and tool evidence in every handoff packet",
+                "include run.repo_tool_routing_policy selected-skill packet commands, dynamic skill candidates, and tool evidence in every handoff packet",
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
                 "tool_route", delegated_spawn_policy["handoff_required_fields"]
             )
             self.assertIn(
+                "tool_command_packet_command",
+                delegated_spawn_policy["handoff_required_fields"],
+            )
+            self.assertNotIn(
                 "tool_commands", delegated_spawn_policy["handoff_required_fields"]
             )
             self.assertIn(
@@ -2169,13 +2449,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
             self.assertEqual(
                 first_wave,
-                ["requirements_organizer", "explorer", "execution_planner"],
+                ["requirements_organizer"],
             )
             self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
             self.assertIn("requirements_organizer", first_wave)
             self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assertIn("spawn_budget:", manifest_text)
-            self.assertIn("active_subagents: 10", manifest_text)
+            self.assertIn("active_subagents: 4", manifest_text)
             self.assertIn("max_write_subagents: 2", manifest_text)
             self.assertIn("runtime_max_threads: 24", manifest_text)
             self.assertIn("runtime_max_depth: 2", manifest_text)
@@ -2251,12 +2531,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
             )
             self.assertEqual(
-                repo_tool_routing_policy["sequential_tool_routes"][0]["commands"][
-                    "show_skill_packet"
-                ],
-                [
-                    "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text"
-                ],
+                repo_tool_routing_policy["sequential_tool_routes"][0]["packet_command"],
+                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+            )
+            self.assertNotIn(
+                "commands", repo_tool_routing_policy["sequential_tool_routes"][0]
             )
             self.assertEqual(
                 implementation_gate_defaults["tool_reuse_ledger_status"],
@@ -2301,7 +2580,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 )
                 self.assertEqual(
                     same_role_instances["identity_key"],
-                    "role_type+instance_id",
+                    "role_id+instance_id+agent_type",
                 )
                 self.assertFalse(
                     same_role_instances["runtime_threads_are_cardinality_source"]
@@ -2466,10 +2745,35 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "agents/internal-routines/subagent-startup.md",
                     subagent_prompt_packet["internal_skill_routes"],
                 )
+                self.assertEqual(
+                    subagent_prompt_packet["tool_command_packet_command"],
+                    "python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                )
+                self.assertNotIn("tool_commands", subagent_prompt_packet)
                 self.assert_role_prompt_includes(
                     manifest,
                     "implementer",
                     {"abstract_design_frame", "design_to_implementation_trace"},
+                )
+                roles_by_id = {role["id"]: role for role in manifest["roles"]}
+                implementer_entries = roles_by_id["implementer"]["document_packet"][
+                    "role_specific_read_before_work"
+                ]
+                sectioned_entries = [
+                    entry for entry in implementer_entries if entry.get("sections")
+                ]
+                self.assertTrue(sectioned_entries)
+                for entry in sectioned_entries:
+                    self.assertNotIn("#", entry["path"])
+                    self.assertIn("sections", entry)
+                workflow_entry = next(
+                    entry
+                    for entry in sectioned_entries
+                    if entry["path"].endswith("agents/canonical/CODEX_WORKFLOW.md")
+                )
+                self.assertIn(
+                    "5. Implementation",
+                    {section["heading"] for section in workflow_entry["sections"]},
                 )
 
     def test_worktree_start_rejects_branch_kickoff(self) -> None:
@@ -4221,11 +4525,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         (
                             "<!-- - wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
                             "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                            "budget_after=3/12 runtime_max_threads=24 runtime_max_depth=2 "
-                            "spawned_roles=requirements_organizer,explorer,execution_planner "
-                            "role_instances=requirements_organizer:intake_requirements:team_manifest.yaml,"
-                            "explorer:intake_explorer:team_manifest.yaml,"
-                            "execution_planner:intake_plan:team_manifest.yaml "
+                            "budget_after=1/12 runtime_max_threads=24 runtime_max_depth=2 "
+                            "spawned_roles=requirements_organizer "
+                            "role_instances=manager:manager_requirements_organizer:"
+                            "requirements_organizer:team_manifest.yaml "
                             "skipped_roles=none allowed_paths=reports/agents/run "
                             "do_not_read=unrelated write_scope=read-only validation_route=pytest "
                             "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done -->"

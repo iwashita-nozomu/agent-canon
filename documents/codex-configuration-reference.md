@@ -72,35 +72,64 @@ codex exec --json -c sandbox_mode='"read-only"' "review this repo"
 
 ## Template Baseline
 
-The current shared template config is intentionally small:
+The current shared template config explicitly owns the parent model, project
+tool-output boundary, skill registry, and child-agent registry. This is a
+representative excerpt; `.codex/config.toml` is the complete machine-readable
+source:
 
 ```toml
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
-review_model = "gpt-5.5"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+review_model = "gpt-5.6-luna"
+model_context_window = 1000000
+tool_output_token_limit = 4096
 
 [features]
 hooks = true
 goals = true
+multi_agent = true
+
+[[skills.config]]
+path = "../.agents/skills/agent-orchestration/SKILL.md"
+enabled = true
 
 [agents]
 max_threads = 24
 max_depth = 2
 job_max_runtime_seconds = 3600
+
+[agents.worker]
+description = "Implementation agent for bounded code, docs, or test changes."
+config_file = "agents/worker.toml"
 ```
 
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
+- `model="gpt-5.6-sol"` with `model_reasoning_effort="high"` owns the parent
+  orchestrator default. Child model and effort settings remain in
+  `.codex/agents/*.toml`; `review_model` does not replace those role files.
+- `tool_output_token_limit=4096` bounds individual tool output admitted to
+  context; it is not a task token cap or a reason to omit decision-relevant
+  evidence.
 - `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
 - `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `tools/agent_tools/goal_loop.py`.
-- Reusable runtime profiles such as `token-lite`, `token-standard`, and `token-deep` belong in user-level Codex config. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
-- `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
+- `features.multi_agent=true` enables the registered child-agent surface.
+- `skills.config` and `agents.<role>` register repo-owned skills and child
+  roles; skill workflow authority remains in `SKILL.md`, and role behavior and
+  model selection remain in each role TOML.
+- Reusable runtime profiles belong to machine-local user config. This repository
+  does not prescribe profile names or values, and workflow routing does not
+  classify a task into a profile before runtime evidence exists.
+- `[agents]` sets capacity and registry entries without forcing all agents to spawn.
 
 ## Current Template Coverage Matrix
 
-The current repo intentionally configures only a small subset of the official schema.
+The current repo intentionally configures the shared runtime keys and registries
+that require repository-wide agreement.
 The lists below are not recommendations to enable every key.
 They are an explicit inventory of settings that Codex can accept but this template does not currently put in `.codex/config.toml`.
 
@@ -110,18 +139,22 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | --- | ------------------------- |
 | `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
-| `features` | `features.hooks=true` and `features.goals=true` are configured. |
-| `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
-| `mcp_servers` | Not configured by the template. |
+| `model`, `model_reasoning_effort` | Parent orchestrator default: `gpt-5.6-sol/high`. |
+| `review_model` | Project review default: `gpt-5.6-luna`; named child roles still use their own TOML. |
+| `model_context_window` | Explicit parent context-window declaration. |
+| `tool_output_token_limit` | Per-tool output context boundary. |
+| `features` | Hooks, goals, and multi-agent runtime are enabled. |
+| `skills.config` | Repo-owned public skill registry. |
+| `agents` | Capacity limits plus named child-agent registry; role TOMLs own child model and behavior. |
 
 ### Top-Level Keys Not Currently In `.codex/config.toml`
 
 | Category | Absent Keys |
 | -------- | ----------- |
-| Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
+| Additional model and provider selection | `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
 | Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
-| Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
+| Hooks, tools, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `apps`, `plugins`, `marketplaces` |
 | MCP OAuth and auth storage | `mcp_oauth_callback_port`, `mcp_oauth_callback_url`, `mcp_oauth_credentials_store`, `cli_auth_credentials_store`, `forced_chatgpt_workspace_id`, `forced_login_method` |
 | UI, history, logging, and local state | `tui`, `history`, `log_dir`, `sqlite_home`, `notify`, `file_opener`, `feedback`, `analytics`, `notice`, `check_for_update_on_startup`, `suppress_unstable_features_warning`, `disable_paste_burst`, `commit_attribution`, `compact_prompt`, `hide_agent_reasoning`, `show_raw_agent_reasoning`, `background_terminal_max_timeout` |
 | Memory, observability, and snapshots | `memories`, `otel`, `ghost_snapshot`, `auto_review` |
@@ -131,16 +164,17 @@ They are an explicit inventory of settings that Codex can accept but this templa
 
 Interpretation for this template:
 
-- Absent model/provider keys should usually be placed in user config or profiles unless the repo requires a shared default.
+- Additional model/provider keys should usually be placed in user config or profiles unless the repo requires a shared default.
 - Absent UI, history, audio, notice, Windows, credential-store, and OAuth keys are machine-local by default.
 - Absent `hooks` does not mean hooks are unused here; this repo uses the sibling `.codex/hooks.json` surface rather than inline TOML hooks.
-- Absent `skills` does not mean skills are unavailable; this repo provides skills through `.agents/skills/`.
+- Registered `skills.config` entries expose repo-owned `.agents/skills/`
+  packages; selecting a skill still precedes reading its `SKILL.md`.
 - Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
 
 ### Feature Flags Not Currently Enabled Here
 
 The schema currently exposes many feature flags under `[features]`.
-This template enables `hooks` and `goals`.
+This template enables `hooks`, `goals`, and `multi_agent`.
 All other schema-listed flags are currently absent from the shared repo config:
 
 ```text
@@ -354,7 +388,7 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `review_model` | string | Model used by `/review`. |
 | `sandbox_mode` | enum | `read-only`, `workspace-write`, or `danger-full-access`. |
 | `sandbox_workspace_write` | object | Writable roots, temp exclusions, and network access for workspace-write sandbox. |
-| `service_tier` | enum | Service tier preference such as `fast` or `flex`. |
+| `service_tier` | enum | Provider- and model-dependent service preference; do not configure a value that the selected model does not advertise. |
 | `shell_environment_policy` | object | Environment inheritance, include/exclude regexes, and forced variables. |
 | `show_raw_agent_reasoning` | boolean | Shows raw reasoning content events. |
 | `skills` | object | Skill config entries and automatic skill instruction injection. |
@@ -382,7 +416,7 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `openai_base_url` | Override only the built-in OpenAI provider URL. |
 | `chatgpt_base_url` | Override ChatGPT-specific requests separately from API provider requests. |
 | `oss_provider` | Select a local provider when `--oss` is used. |
-| `service_tier` | Select fast/flex service preference where supported. |
+| `service_tier` | Set only after the selected model advertises the requested tier; otherwise leave it absent. |
 
 `[model_providers.<id>]` supports:
 
@@ -681,37 +715,11 @@ Keep reusable profiles in `~/.codex/config.toml` or `$CODEX_HOME/config.toml`:
 - `zsh_path`
 - selected prompt/context toggles
 
-Use user-level profiles for operator modes:
-
-```toml
-[profiles.token-lite]
-model_reasoning_effort = "minimal"
-plan_mode_reasoning_effort = "minimal"
-model_verbosity = "low"
-tool_output_token_limit = 3000
-
-[profiles.token-standard]
-model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
-model_verbosity = "medium"
-tool_output_token_limit = 4000
-
-[profiles.token-deep]
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-model_verbosity = "medium"
-tool_output_token_limit = 8000
-
-[profiles.review]
-model = "<model-id-from-openai-docs>"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
-
-[profiles.container-full]
-sandbox_mode = "danger-full-access"
-approval_policy = "never"
-```
+Profiles are an operator-owned runtime surface. AgentCanon does not duplicate
+machine-local profile values or map task labels to profiles. Change a profile
+only after observed token, latency, model-effort, or tool-output evidence
+identifies that surface, and apply the change in a fresh session. Verify current
+keys and model support through `$openai-docs` before editing user config.
 
 ## Tools and Web Search
 

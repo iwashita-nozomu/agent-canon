@@ -116,7 +116,7 @@ legacy adapter に重複 policy を置きません。
 `notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
 `citation_evidence_reviewer` が有効な run では、論文 draft の major claim が citation、figure、table、derivation、appendix、result に辿れるかを別 reviewer で閉じます。
 code change を含む run では `test_designer` が `test_plan.md` を作り、worker はそれを test 実装へ落とします。
-包括的開発では bundle に加えて `project_reviewer` を parent が read-only で立て、必要なら `docs_workflow_steward`、`python_reviewer`、`cpp_reviewer` を追加します。
+T12 の default-active specialists は `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。post-implementation change review は `diff_triage_reviewer` が既定で、`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加します。
 `--task-id` は task catalog の default specialist と default review pack をそのまま bundle に反映します。
 
 Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。

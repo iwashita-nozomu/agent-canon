@@ -22,7 +22,7 @@ downstream implementation ../../.agents/skills/user-guided-debugging/SKILL.md ex
 ## Core Loop
 
 1. 次に直す対象を 1 件選ぶ。
-1. 実装修復が必要なら、その対象 issue ごとに fresh な実装 worker を修復ハンドオフ前に準備する。`.codex/agents/*.toml` から task-appropriate implementation agent を使い、eligible な場合だけ `spark_worker` を優先し、それ以外は `worker` を使う。
+1. 実装修復が必要なら、その対象 issue ごとに fresh な実装 worker を修復ハンドオフ前に準備する。`worker` が既定で、`spark_worker` は eligible な bounded repair に対して parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使う。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は explicit revised parent packet と wave を必須にする。
 1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示する。
    - worker は問題点提示を経ずに patch に進まない（1 問題 1 修正の可視性を維持する）。
 1. 問題点を提示する前に patch しない。

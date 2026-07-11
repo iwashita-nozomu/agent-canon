@@ -89,11 +89,41 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["skill"], "example-skill")
+            self.assertEqual(payload["required_commands"], [])
             self.assertIn("make check-matrix", payload["discovered_commands"])
             self.assertIn(
                 "python3 tools/agent_tools/example.py",
                 payload["discovered_commands"],
             )
+
+    def test_code_visualization_packet_contains_only_renderer_variants(self) -> None:
+        """The code-visualization packet exposes exactly its three renderers."""
+        result = self.run_tool(
+            PROJECT_ROOT,
+            "show",
+            "--skill",
+            "code-visualization",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["required_commands"], [])
+        self.assertEqual(
+            payload["discovered_commands"],
+            [
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
+            ],
+        )
+        for command in payload["discovered_commands"]:
+            self.assertIn(" --root . ", command)
+            self.assertTrue(command.endswith(" --format json"))
+        for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
+            self.assertNotIn(forbidden, payload["discovered_commands"])
+        self.assertNotIn("sed -n", result.stdout)
 
     def test_show_marks_validation_as_maintenance_only(self) -> None:
         """Show keeps validation commands out of the default action path."""

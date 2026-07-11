@@ -1544,6 +1544,65 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 ["single responsibility", "interface segregation"],
             )
 
+    def test_reports_include_all_solid_principles_with_zero_counts(self) -> None:
+        """JSON and Markdown reports retain zero-count SOLID principles."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "customer.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "class CustomerRecord:",
+                        "    def display_name(self) -> str:",
+                        "        return self.name",
+                        "",
+                        "    def contact_email(self) -> str:",
+                        "        return self.email",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            expected_principles = {
+                "single responsibility",
+                "open/closed",
+                "liskov substitution",
+                "interface segregation",
+                "dependency inversion",
+            }
+
+            json_result = self.run_analyzer(
+                root,
+                "--format",
+                "json",
+                "--max-public-methods",
+                "1",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertNotEqual(json_result.returncode, 0)
+            json_payload = json.loads(json_result.stdout)
+            solid_counts = json_payload["summary"]["solid_counts"]
+            self.assertEqual(set(solid_counts), expected_principles)
+            self.assertTrue(all(isinstance(count, int) for count in solid_counts.values()))
+            self.assertEqual(solid_counts["liskov substitution"], 0)
+
+            markdown_result = self.run_analyzer(
+                root,
+                "--format",
+                "markdown",
+                "--max-public-methods",
+                "1",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertNotEqual(markdown_result.returncode, 0)
+            self.assertIn("- `liskov substitution`: 0", markdown_result.stdout)
+
     def test_exclude_skips_vendored_or_report_surfaces(self) -> None:
         """External scans can exclude vendored snapshots and generated reports."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1611,7 +1670,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertEqual(markdown.returncode, 0, markdown.stdout + markdown.stderr)
             self.assertIn("excluded_patterns: `vendor, reports`", markdown.stdout)
             self.assertIn("## SOLID Principle Signals", markdown.stdout)
-            self.assertIn("- none", markdown.stdout)
+            self.assertIn("- `liskov substitution`: 0", markdown.stdout)
 
     def test_markdown_report_and_review_prompt_are_generated(self) -> None:
         """Markdown reports and reviewer prompts are generated."""

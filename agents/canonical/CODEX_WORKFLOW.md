@@ -99,21 +99,20 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 
 ### Runtime Profile And Risk Selection
 
-Before broad context loading or validation, classify the task with
-`documents/runtime-profiles-and-check-matrix.md`.
+Establish structure, owner, and touched-surface evidence before selecting a
+runtime profile. Use
+`documents/runtime-profiles-and-check-matrix.md` only after that evidence fixes
+the applicable validation and checker obligations.
 
-- Routine docs and Focused code still need targeted validation. When they are
-  repo-changing implementation / patch / doc-edit work, write-capable
-  `spark_worker` / `worker` handoff is the default; parent-direct requires a
-  recorded exception rationale before editing.
-- Profile changes activate only their matching checker family: Docker,
-  GitHub automation, experiment, C++, devcontainer, memory/eval, or maintenance.
-- Shared canon changes activate AgentCanon PR workflow and PR gate.
-- Large delivery activates the full run bundle, independent review, full
-  dependency review, and full validation gate.
-
-Use only the active profile for the task. Mark inactive profiles as
-`not_applicable` in the run artifact or PR body when evidence is needed.
+- A runtime profile selects validation and checker obligations only. It does
+  not limit context size, work scope, team mode, or task size.
+- For repo-changing implementation / patch / doc-edit work, the selected
+  write-capable `worker` / `spark_worker` handoff remains the default.
+  Parent-direct execution requires a recorded exception rationale before
+  editing.
+- Record the selected profile and the evidence that made it applicable;
+  inactive profiles remain unrecorded unless an active workflow explicitly
+  asks for their status.
 
 ### Context Sweep
 
@@ -145,7 +144,7 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じたら、minimal write-capable `spark_worker` / `worker` handoff を作ります。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じたら、minimal write-capable `worker` / `spark_worker` handoff を作ります。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
@@ -249,45 +248,31 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 - `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
 - `goal.md` は repo-local state として管理します。
 - user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が conservative な Objective draft を作り、`goal.md` に先に固定します。goal inference は explicit goal intent と Objective draft に基づけます。
-- repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only fan-out plan を作ります。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、runtime authorization が必要な場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃った時点で起動します。
+- repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、active role set と catalog の `intake` stage から read-only WAVE-1 plan を materialize します。標準 catalog では `manager` が `requirements_organizer` として materialize され、`explorer`、`execution_planner`、`plan_reviewer` は parent-packet / stage evidence がある場合だけ dynamic wave に追加します。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、runtime authorization が必要な場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃った時点で起動します。
 - user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含む状態で実装へ進みます。
 - `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。実装は objective と work breakdown の両方に基づけます。
 - goal-driven task では、Codex goals と対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を更新します。
 - `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す場合は、次 iteration の plan / execution へ進みます。
 - Codex goals と `goal.md` が食い違う場合は、repo-owned `goal.md` を正本にして session goal view を修正してから実装へ戻ります。
 
-### Token And Agent Mode Preflight
+### Token Observation And Adaptive Materialization
 
-When the user asks to reduce token usage, or when the session is already long,
-read `agents/workflows/token-efficient-codex-workflow.md` before spawning
-subagents or loading broad context.
+When the user asks to reduce token usage, or current session evidence shows
+repeated context loading, duplicate agent decisions, oversized tool output, or
+retry loops, apply `agents/workflows/token-efficient-codex-workflow.md`.
 
-Use these parent-session profiles as operator modes:
-
-```bash
-codex -p token-lite
-codex -p token-standard
-codex -p token-deep
-```
-
-- `token-lite` is for bounded diagnosis and low-risk changes. It keeps the
-  selected required gates active.
-- `token-standard` is the default staged repo-work mode.
-- `token-deep` is for broad architecture, research synthesis, high-risk review,
-  and repeated validation failures.
-
-Choose one subagent mode before delegation:
-
-- `parent-direct`: exception route for parent repository edits. Trivial or
-  mechanical repo-changing edits still use a minimal write-capable
-  `spark_worker` handoff by default; parent edits require
-  `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
-  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>`.
-- `scout-only`: read-only `explorer` / reviewer answers bounded questions.
-- `spark-slice`: `spark_worker` handles approved low-risk slices derived from the Abstract Design Frame and design trace.
-- `full-stage`: normal staged requirements, planning, design, review, and
-  implementation agents.
-- `deep-review`: additional independent read-only reviewers for high-risk work.
+- Start from the project model and topology config. Runtime evidence owns any
+  later task/profile classification or profile change.
+- Materialize one accountable child for the current decision. Add a specialist
+  only when a distinct input artifact, review focus, and output decision exist.
+- Context may be large. Remove duplicated or decision-irrelevant copies, not
+  context required by request clauses, owner boundaries, or traceability.
+- Keep `worker` as the implementation default. Select `spark_worker` only from
+  the typed parent packet; keep parent-direct writes on the recorded exception
+  route.
+- Attribute change with the existing session comparison, role evaluator, and
+  runtime dashboard tools. Missing post-change runtime evidence remains
+  `missing`; it is not inferred from fewer configured roles.
 
 Token-saving changes context loading while preserving correctness gates. The
 active gates are those selected by runtime profile and risk class.
@@ -541,7 +526,7 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 
 full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer`、`test_designer` を標準構成とします。
 owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
-Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`spark_worker`、`worker` を workflow family に応じて stage ごとに明示します。
+Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。
 Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
 `team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
 plan artifact、review gate decision、edit handoff evidence をこの順で
@@ -561,9 +546,9 @@ handoff はこの policy を含めます。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は mini helper role TOML に残します。設計判断、scope 判断、final judgment、broad / ambiguous implementation、static validation triage、language-specific code review、bounded review / report traceability / checklist gate は frontier role TOML に寄せます。Abstract Design Frame と design trace で完全に切れる狭い実装 slice は `spark_worker` に寄せます。
+default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は mini helper role TOML に残します。通常の planning / authoring / review child は `gpt-5.6-luna/high`、`worker` と `ship_reviewer` は `gpt-5.6-luna/xhigh` とし、final judgment は `.codex/config.toml` の `gpt-5.6-sol/high` parent が持ちます。`spark_worker` は Abstract Design Frame と design trace で完全に切れ、typed parent-packet selection がある機械的 slice だけに使います。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
-- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Owner-Bounded Change` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
+- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。すべての repo-changing family は同時 active 4 体、write-capable 2 体までとし、`Skill Evaluation` / T14 は evaluator-only の `1/1` です。各 decision wave は、その decision が選んだ specialist だけを起動します。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
 - write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は先行 wave の validation と tool rerun 後に後続 wave へ回します。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します。
@@ -589,7 +574,7 @@ bundle 出力には少なくとも次が含まれます。
 - `PRE_EDIT_REJECTION_PREDICTION_STATUS`
 - task id / fan-out budget / active role evidence
 
-parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、requested scope を保持した bounded packet routing を維持します。
+parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を local/tool context 参照として持ち、prompt には `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` で選択した fields だけを入れて requested scope を保持した bounded packet routing を維持します。
 handoff には `allowed_paths`、`do_not_read`、context artifact path、expected output schema、
 `PRIMARY_PATHS` / `FORBIDDEN_PATHS`、reuse ledger、pre-edit rejection prediction を含めます。
 `cross_cutting_document_packet` は利用可能な reference list であり、role ごとの work packet を選ぶために使います。広い request では、packet に含めなかった reference を `omitted_surfaces` として理由付きで残します。
@@ -682,17 +667,17 @@ cost を無視して review coverage を優先する run では、research-drive
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`spark_worker,worker` なら Abstract Design Frame から導かれ、design trace、naming、test plan、dependency-expanded handoff scope が揃った低リスク slice を `spark_worker` へ先に渡す。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
+- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test plan、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
-- 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は mini helper role TOML へ、static validation failure triage と diff-local language review は frontier review role TOML へ先に渡し、低遅延実装 slice は `spark_worker` へ渡します。parent は統合判断と次 gate 判定に集中する
-- `spark_worker` に渡す実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。適格性は design trace と dependency-expanded handoff scope で判断します。
+- 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は mini helper role TOML へ、static validation failure triage と diff-local language review は該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
+- `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。design trace と dependency-expanded handoff scope は必要 evidence であり、実際の選択には `--select-agent-type implementer=spark_worker:<evidence>` が必要です。
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
-- すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
-- `spark_worker` は design trace と dependency-expanded handoff scope が揃った bounded implementation slice に使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
+- すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を local/tool context 参照として扱い、prompt には選択済み `Fresh Subagent Context Capsule` fields を入れる
+- `spark_worker` は design trace と dependency-expanded handoff scope が揃い、typed parent-packet selection が記録された bounded implementation slice にだけ使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
 - repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
@@ -716,7 +701,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker と review / quality-check gate は frontier role TOML、Abstract Design Frame と design trace から導かれた bounded slice の preferred candidate は `spark_worker`、execution-only experiment / log work は mini helper role TOML とする
+- implementation の既定 candidate は `gpt-5.6-luna/xhigh` の `worker` とし、review / quality-check は active decision ごとに一つの `gpt-5.6-luna/high` role を選びます。Abstract Design Frame と design trace から導かれた機械的 slice は explicit parent-packet selection がある場合だけ `spark_worker` を使い、execution-only experiment / log work は mini helper role TOML とします
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ

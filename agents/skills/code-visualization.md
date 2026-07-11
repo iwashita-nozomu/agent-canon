@@ -48,7 +48,7 @@ fact の抽出は
 | Field | Meaning |
 | --- | --- |
 | `context_question` | 読者が図で答えたい問い。例: order、branch precision、call relation、interaction over time、state lifecycle、data movement、module dependency、concurrency timing、type responsibility |
-| `scope` | function、class、service、package、workflow、repository、proof artifact などの対象範囲 |
+| `scope` | function、class、service、package、workflow、proof artifact などの対象範囲 |
 | `time_axis` | 時間順序が中心か、静的な関係が中心か |
 | `precision_need` | 説明用の概観か、compiler / static analysis / test design 向けの正確な分岐か |
 | `source_fact_owner` | code analyzer、dependency manifest、trace/log、schema、workflow contract、JIT-canonical IR など |
@@ -63,8 +63,8 @@ call relation ではなく order の問いなので、flowchart / activity diagr
 文書に図を埋め込む場合も同じです。README、design doc、report、skill 文書、
 workflow 文書、`structure-planning` の `visual_plan` で図が必要になったら、この
 skill で `context_question` と `embedding_context` を決めてから図種を選びます。
-「Mermaid 図を入れる」だけでは図種を確定せず、その section の claim、読者の次の
-行動、source evidence から flowchart、sequence diagram、state-transition
+「Mermaid 図を入れる」だけでは図種を確定せず、その section の claim、読者の
+次の行動、source evidence から flowchart、sequence diagram、state-transition
 diagram、dependency graph などへ射影します。
 
 ## Visualization Selection Record
@@ -92,9 +92,9 @@ Visualization Selection:
 | --- | --- | --- | --- |
 | What happens in what order? | フローチャート / アクティビティ図 | `if`、loop、処理手順、主要 path の説明 | local code read; `$algorithm-flowchart` for JIT/proof overlays |
 | Which exact branches and joins exist? | 制御フローグラフ | compiler、static analysis、test design 向けの branch / join / loop | language analyzer or compiler artifact; `$test-design` for test use |
-| What calls or imports what? | コールグラフ / 依存関係図 | function call relation、file / package / skill dependency | `$dependency-analysis`; `helper_function_inventory.py` for Python |
+| What calls or imports what? | コールグラフ / 依存関係図 | function call relation、file / package / skill dependency | `$dependency-analysis` |
 | Who exchanges messages over time? | シーケンス図 | API、class、service 間の時系列通信 | call traces, code entrypoint read, interface docs |
-| How do concurrent events overlap? | タイミング図 / 並行シーケンス図 | thread、event、async task、queue、timer、race point | trace/log artifacts, async entrypoints, runtime contracts |
+| How do concurrent events overlap? | タイミング図 / 並行シーケンス図 | thread、event、async task、queue、race point | trace/log artifacts, async entrypoints, runtime contracts |
 | What states can exist and how do transitions occur? | 状態遷移図 | login、job lifecycle、workflow stage、retry state など | state enum, transition table, workflow contract |
 | Where does data or an artifact move? | データフロー図 | input、transform、store、output、artifact movement | data schema, IO code, dependency packet |
 | Which types, classes, protocols, or owners relate? | クラス図 / 型図 / architecture map | class、protocol、interface、ownership boundary | language-specific review; `$oop-readability-check`; `$structure-refactor` |
@@ -126,37 +126,61 @@ For embedded diagrams, decide:
 
 ## Source Evidence Routes
 
-Use the command packet before applying the selected owner skill:
+Use the command packet before applying the selected owner skill. For
+repository/code-space dependency visualization, the small-model direct route
+is self-sufficient and precedes canonical/generic visualization choices:
 
 ```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-analysis --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill algorithm-flowchart --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill prose-reasoning-graph --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill html-output --format text
-python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
 ```
 
-For repository dependency and code dependency visualization, start from
-mechanical graph evidence:
+Use this exact changed-scope command only when changed scope is explicit:
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
-bash tools/agent_tools/scan_code_dependencies.sh --changed
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
 ```
 
-For Python call graph context:
+For a supplied TSV hold-out, use the same renderer with the supplied path:
 
 ```bash
-python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json
 ```
 
-For skill routing evidence:
+Treat these three commands as immutable flag templates. Copy the selected
+command with every shown flag: `--root .` and `--format json` are mandatory in
+all three routes. Do not remove, add, or rename any flag. For a supplied TSV,
+only the path value after `--graph-tsv` and the path value after `--bundle-dir`
+may be replaced with user-provided paths; keep every other token unchanged.
 
-```bash
-python3 tools/agent_tools/route.py --prompt "<user request>" --format json
-```
+`--json` is invalid; use `--format json`.
+`check_dependency_graph.sh` owns dependency pass/fail authority. In generated
+mode, the renderer invokes that checker for the
+generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest
+projection creation. For a supplied TSV, checker status is `not_run`: the
+supplied TSV producer owns source facts and the renderer owns only projections.
+This direct route does not call a separate raw checker, scan, helper, or
+Mermaid route because the renderer invokes that checker in generated mode. Its
+generated bundle contains exactly these six basenames:
+
+1. `dependency_graph.tsv`
+2. `dependency_graph.ir.json`
+3. `dependency_graph.md`
+4. `dependency_graph.dot`
+5. `dependency_graph.html`
+6. `manifest.json`
+
+Read the detailed renderer contract in:
+
+`documents/tools/render_dependency_manifest_graph.md`
+
+For non-code-space visualization, delegate source ownership through the
+related skill that owns the facts: `$dependency-analysis` for dependency and
+call relations, `$structure-refactor` for architecture and responsibility
+maps, `$algorithm-flowchart` for algorithm/proof overlays,
+`$prose-reasoning-graph` for prose graphs, `$html-output` for browser-readable
+large-graph views, and `$md-style-check` for embedded Markdown diagrams.
+Follow each related skill's current command packet; this selector describes the
+ownership route without reproducing those commands.
 
 ## Renderer Choice
 
@@ -189,7 +213,7 @@ Diagram Handoff:
 ```
 
 `required_labels` names the code or artifact identifiers that must appear in
-the diagram. `excluded_labels` names generated, stale, or out-of-scope surfaces
+the diagram. `excluded_labels` names generated、stale、or out-of-scope surfaces
 that the renderer should leave out.
 
 ## Closeout

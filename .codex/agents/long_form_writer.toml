@@ -9,7 +9,7 @@ description = "Long-form document author for README, workflow, guide, migration,
 nickname_candidates = ["doc-writer", "long-doc", "guide-writer"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
-model = "gpt-5.5"
+model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
 developer_instructions = """

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 from agent_team import (
+    AgentTypeSelection,
     Role,
     RunBundleSpec,
     TaskCatalog,
@@ -33,12 +34,14 @@ from agent_team import (
     deferred_stage_skills,
     enable_choices,
     expand_enabled_specialists,
+    format_agent_type_selections,
     format_subagent_role_instance_wave_chunks,
     format_subagent_wave,
     format_subagent_wave_chunks,
     load_task_catalog,
     load_team_config,
     make_run_id,
+    parse_agent_type_selections,
     pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
     recommended_dynamic_expansion_wave_slots,
@@ -57,6 +60,7 @@ from agent_team import (
     suggested_public_skills,
     task_ids,
     user_facing_language_policy_output_lines,
+    validate_agent_type_selections,
     workflow_spawn_budget,
 )
 from task_authority import write_task_authority_baselines
@@ -89,6 +93,7 @@ class TaskStartRuntime:
     roles: tuple[Role, ...]
     created_files: tuple[str, ...]
     active_pointer: Path
+    agent_type_selections: tuple[AgentTypeSelection, ...]
 
 
 def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
@@ -182,6 +187,16 @@ def build_parser(
         help=(
             "Optional changed path hint. Repeat to drive automatic language-specific "
             "reviewer selection."
+        ),
+    )
+    parser.add_argument(
+        "--select-agent-type",
+        action="append",
+        default=[],
+        metavar="ROLE_ID=AGENT_TYPE:EVIDENCE",
+        help=(
+            "Explicit parent-packet role-to-agent selection with evidence. "
+            "Required for non-default codex_agents candidates."
         ),
     )
     parser.add_argument(
@@ -311,6 +326,7 @@ def emit_task_start_output(
     *,
     args: argparse.Namespace,
     config: TeamConfig,
+    catalog: TaskCatalog,
     context: TaskStartContext,
     workspace_root: Path,
     preflight: AgentCanonPreflightResult,
@@ -364,7 +380,12 @@ def emit_task_start_output(
             f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}"
         )
         active_budget = context.workflow_active_spawn_budget or 0
-        initial_wave = recommended_initial_subagent_wave(runtime.roles, active_budget)
+        initial_wave = recommended_initial_subagent_wave(
+            runtime.roles,
+            active_budget,
+            catalog,
+            runtime.agent_type_selections,
+        )
         if initial_wave:
             print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
             print("PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required")
@@ -379,11 +400,19 @@ def emit_task_start_output(
             runtime.roles,
             active_budget,
             initial_wave,
+            catalog,
+            runtime.agent_type_selections,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
             active_budget,
             initial_wave,
+            catalog,
+            runtime.agent_type_selections,
+        )
+        print(
+            "SUBAGENT_AGENT_TYPE_SELECTIONS="
+            f"{format_agent_type_selections(runtime.agent_type_selections)}"
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
         print(
@@ -494,6 +523,15 @@ def main() -> int:
         catalog=catalog,
         workflow_family_id=context.workflow_family_id,
     )
+    try:
+        agent_type_selections = validate_agent_type_selections(
+            config,
+            roles,
+            parse_agent_type_selections(tuple(args.select_agent_type)),
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 1
     selected_skills = suggested_skills(
         args.task_id,
         context.workflow_family_id,
@@ -518,6 +556,8 @@ def main() -> int:
             ),
             default_review_pack_ids=context.default_review_pack_ids,
             selected_skills=selected_skills,
+            task_catalog=catalog,
+            agent_type_selections=agent_type_selections,
         )
     )
     active_pointer = context.report_root / ".active_run"
@@ -526,11 +566,15 @@ def main() -> int:
     )
     write_task_authority_baselines(context.report_dir, context.report_root)
     runtime = TaskStartRuntime(
-        roles=roles, created_files=created_files, active_pointer=active_pointer
+        roles=roles,
+        created_files=created_files,
+        active_pointer=active_pointer,
+        agent_type_selections=agent_type_selections,
     )
     _, _, start_declaration = emit_task_start_output(
         args=args,
         config=config,
+        catalog=catalog,
         context=context,
         workspace_root=workspace_root,
         preflight=preflight,

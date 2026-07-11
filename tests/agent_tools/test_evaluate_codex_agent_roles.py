@@ -16,8 +16,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+from agent_team import (  # noqa: E402
+    load_task_catalog,
+    load_team_config,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    select_roles,
+)
+
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25
 SECOND_RUNTIME_TOKENS = 50
@@ -36,6 +48,22 @@ def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def copy_eval_root(root: Path) -> None:
+    """Copy the runtime surfaces needed by the role evaluator."""
+    shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
+    (root / ".codex").mkdir(exist_ok=True)
+    shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
+    (root / "agents").mkdir()
+    shutil.copy2(
+        PROJECT_ROOT / "agents" / "agents_config.json",
+        root / "agents" / "agents_config.json",
+    )
+    shutil.copy2(
+        PROJECT_ROOT / "agents" / "task_catalog.yaml",
+        root / "agents" / "task_catalog.yaml",
+    )
+
+
 class CodexAgentRoleEvalTest(unittest.TestCase):
     """Verify Codex custom agent role eval behavior."""
 
@@ -47,13 +75,204 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:gpt-5.5:xhigh", result.stdout)
+        self.assertIn("skill_evaluator:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("worker:gpt-5.6-luna:xhigh", result.stdout)
+        self.assertIn("diff_triage_reviewer:gpt-5.6-luna:high", result.stdout)
         self.assertIn("experiment_runner:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("explorer:gpt-5.4-mini:medium", result.stdout)
-        self.assertIn("manager_reviewer:gpt-5.5:xhigh", result.stdout)
-        self.assertIn("plan_reviewer:gpt-5.5:xhigh", result.stdout)
+        self.assertIn("manager_reviewer:gpt-5.6-luna:high", result.stdout)
+        self.assertIn("plan_reviewer:gpt-5.6-luna:high", result.stdout)
         self.assertIn("spark_worker:gpt-5.3-codex-spark:low", result.stdout)
-        self.assertIn("ship_reviewer:gpt-5.5:xhigh", result.stdout)
+        self.assertIn("ship_reviewer:gpt-5.6-luna:xhigh", result.stdout)
+
+    def test_evaluator_policy_is_read_only_and_fresh(self) -> None:
+        """The role evaluator rejects an unsafe empirical evaluator policy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            evaluator = root / ".codex" / "agents" / "skill_evaluator.toml"
+            text = evaluator.read_text(encoding="utf-8")
+            evaluator.write_text(
+                text.replace('sandbox_mode = "read-only"', 'sandbox_mode = "workspace-write"')
+                .replace('approval_policy = "never"', 'approval_policy = "on-request"')
+                .replace("call nested agents", "call agents"),
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("evaluator-not-read-only", result.stdout)
+            self.assertIn("evaluator-approval-policy-not-never", result.stdout)
+            self.assertIn("evaluator-missing-no-nested-agent-rule", result.stdout)
+
+    def test_missing_skill_evaluator_toml_is_reported_without_traceback(self) -> None:
+        """A copied root reports a missing target TOML as a structured finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            (root / ".codex" / "agents" / "skill_evaluator.toml").unlink()
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=registration:skill_evaluator:missing-toml",
+                result.stdout,
+            )
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_materialization_uses_target_registry_without_current_checkout_fallback(self) -> None:
+        """Copied-root availability controls candidate materialization."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            (root / ".codex" / "agents" / "worker.toml").unlink()
+            config = load_team_config(root / "agents" / "agents_config.json")
+            catalog = load_task_catalog(config, root=root)
+            roles = select_roles(
+                config,
+                ["implementer"],
+                full_team=False,
+                catalog=catalog,
+                workflow_family_id="owner_bounded_change",
+            )
+            initial_wave = recommended_initial_subagent_wave(
+                roles,
+                4,
+                catalog,
+                agent_root=root / ".codex" / "agents",
+            )
+            expansion_waves = recommended_dynamic_expansion_wave_slots(
+                roles,
+                4,
+                initial_wave,
+                catalog,
+                agent_root=root / ".codex" / "agents",
+            )
+
+            materialized = [
+                slot.agent_type for wave in expansion_waves for slot in wave
+            ]
+            self.assertIn("spark_worker", materialized)
+            self.assertNotIn("worker", materialized)
+
+    def test_dynamic_expansion_rejects_mismatched_initial_wave(self) -> None:
+        """Dynamic expansion must validate the caller's initial agent types."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        roles = select_roles(
+            config,
+            ["implementer"],
+            full_team=False,
+            catalog=catalog,
+            workflow_family_id="owner_bounded_change",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "initial_wave does not match"):
+            recommended_dynamic_expansion_wave_slots(
+                roles,
+                4,
+                ("worker",),
+                catalog,
+                agent_root=PROJECT_ROOT / ".codex" / "agents",
+            )
+
+    def test_evaluator_grammar_is_packet_driven_and_parent_scored(self) -> None:
+        """Evaluator output stays observational while the parent owns scoring."""
+        evaluator = (PROJECT_ROOT / ".codex" / "agents" / "skill_evaluator.toml").read_text(
+            encoding="utf-8"
+        )
+        checklist = (PROJECT_ROOT / "documents" / "prompt-skill-evaluation-checklist.md").read_text(
+            encoding="utf-8"
+        )
+        checklist_flat = " ".join(checklist.split())
+        subagents = (PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("R<integer>=<pass|fail|malformed>: <short evidence>", evaluator)
+        self.assertNotIn("R1=", evaluator)
+        self.assertNotIn("R2=", evaluator)
+        self.assertIn("extra_refs=<comma-separated extra references or none>", evaluator)
+        self.assertNotIn("status=<pass|fail|malformed>", evaluator)
+        self.assertNotIn("score_percent=", evaluator)
+        self.assertNotIn("critical_pass=", evaluator)
+        self.assertIn("missing or duplicated packet-listed requirement IDs", checklist_flat)
+        self.assertIn("unknown requirement IDs", checklist_flat)
+        self.assertIn("parent_score_percent=<0..100>", checklist_flat)
+        self.assertIn("parent_critical_pass=<yes|no>", checklist_flat)
+        self.assertIn("`parent_score_percent`", subagents)
+        self.assertIn("`parent_critical_pass`", subagents)
+
+    def test_role_eval_rejects_tier_and_service_tier_profile_keys(self) -> None:
+        """Repository agent TOMLs must not introduce tier selectors."""
+        for key in ("tier", "service_tier"):
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                worker = root / ".codex" / "agents" / "worker.toml"
+                worker.write_text(
+                    worker.read_text(encoding="utf-8") + f'\n{key} = "unsupported"\n',
+                    encoding="utf-8",
+                )
+
+                result = run_eval("--root", str(root))
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(
+                    f"CODEX_AGENT_ROLE_FINDING=schema:worker:unsupported-profile-key-{key}",
+                    result.stdout,
+                )
+
+    def test_role_eval_rejects_non_explicit_evaluator_registration(self) -> None:
+        """The evaluator must be registered only on the explicit evaluation task."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            comprehensive = next(
+                family
+                for family in catalog["workflow_families"]
+                if family["id"] == "comprehensive_development"
+            )
+            comprehensive["roles"]["specialists"].append("skill_evaluator")
+            t12 = next(task for task in catalog["tasks"] if task["id"] == "T12")
+            t12["specialists"].append("skill_evaluator")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=registration:skill_evaluator:must-be-only-in-explicit-evaluation-task",
+                result.stdout,
+            )
+
+    def test_role_eval_rejects_evaluator_in_non_evaluation_family(self) -> None:
+        """The role evaluator must enforce the shared family-membership policy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            comprehensive = next(
+                family
+                for family in catalog["workflow_families"]
+                if family["id"] == "comprehensive_development"
+            )
+            comprehensive["roles"]["specialists"].append("skill_evaluator")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=routing:comprehensive_development:"
+                "skill-evaluator-only-in-skill-evaluation",
+                result.stdout,
+            )
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
@@ -112,7 +331,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             payload = json.loads(compact.read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["finding_count"], 0)
-            self.assertIn("gpt-5.5", payload["model_counts"])
+            self.assertIn("gpt-5.6-luna", payload["model_counts"])
+            self.assertNotIn("gpt-5.5", payload["model_counts"])
 
     def test_accumulate_writes_role_eval_report(self) -> None:
         """Role evals should accumulate through the shared eval result contract."""
@@ -157,14 +377,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         """--root should validate the target checkout's routing, not the script checkout."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
-            (root / ".codex").mkdir(exist_ok=True)
-            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
-            (root / "agents").mkdir()
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "agents_config.json",
-                root / "agents" / "agents_config.json",
-            )
+            copy_eval_root(root)
             task_catalog = (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(
                 encoding="utf-8"
             )
@@ -178,22 +391,209 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:T1:must-use-owner-bounded-change", result.stdout)
 
+    def test_routing_reports_missing_stage_waves(self) -> None:
+        """The role evaluator should reject catalogs without topology stages."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            del catalog["role_topology_defaults"]["stage_waves"]
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=routing:role_topology_defaults:missing-stage-waves",
+                result.stdout,
+            )
+
+    def test_routing_reports_malformed_stage_waves_without_traceback(self) -> None:
+        """Malformed stage_waves entries should become findings instead of tracebacks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            catalog["role_topology_defaults"]["stage_waves"][0] = "not-a-mapping"
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("malformed-stage-wave", result.stdout)
+            self.assertIn("materialization-failed", result.stdout)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_routing_reports_duplicate_stage_role(self) -> None:
+        """One permanent role should not appear in multiple catalog stages."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            evaluation_stage = next(
+                stage
+                for stage in catalog["role_topology_defaults"]["stage_waves"]
+                if stage["id"] == "skill_evaluation"
+            )
+            evaluation_stage["role_ids"].append("manager")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("duplicate-stage-role", result.stdout)
+
+    def test_routing_reports_reversed_producer_reviewer_order(self) -> None:
+        """Reviewer stages must come after their producer stages."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            stage_waves = catalog["role_topology_defaults"]["stage_waves"]
+            intake_index = next(
+                index for index, wave in enumerate(stage_waves) if wave["id"] == "intake"
+            )
+            review_index = next(
+                index
+                for index, wave in enumerate(stage_waves)
+                if wave["id"] == "intake_review"
+            )
+            stage_waves[intake_index], stage_waves[review_index] = (
+                stage_waves[review_index],
+                stage_waves[intake_index],
+            )
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("producer-reviewer-stage-order", result.stdout)
+
+    def test_routing_reports_missing_stage_role(self) -> None:
+        """Every permanent role should appear exactly once in stage_waves."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            final_stage = catalog["role_topology_defaults"]["stage_waves"][-1]
+            final_stage["role_ids"].remove("auditor")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("CODEX_AGENT_ROLE_FINDING=routing:auditor:missing-stage-role", result.stdout)
+
+    def test_routing_reports_missing_skill_evaluator_stage(self) -> None:
+        """The evaluator must not be exempt from executable stage topology."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            for stage in catalog["role_topology_defaults"]["stage_waves"]:
+                if "skill_evaluator" in stage["role_ids"]:
+                    stage["role_ids"].remove("skill_evaluator")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=routing:skill_evaluator:missing-stage-role",
+                result.stdout,
+            )
+
+    def test_routing_reports_t14_normal_delivery_route(self) -> None:
+        """T14 must not use the comprehensive worker/reviewer route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            comprehensive = next(
+                family
+                for family in catalog["workflow_families"]
+                if family["id"] == "comprehensive_development"
+            )
+            comprehensive["roles"]["specialists"].append("skill_evaluator")
+            t14 = next(task for task in catalog["tasks"] if task["id"] == "T14")
+            t14["family"] = "comprehensive_development"
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=routing:T14:must-use-skill-evaluation-family",
+                result.stdout,
+            )
+
+    def test_routing_reports_stale_implementation_role_family(self) -> None:
+        """The catalog implementation family must prefer worker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            catalog["role_topology_defaults"]["role_families"]["implementation"] = [
+                "spark_worker",
+                "worker",
+            ]
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "implementation-role-family-order",
+                result.stdout,
+            )
+
+    def test_routing_reports_t12_overdefault_specialist(self) -> None:
+        """T12 should not default evidence-gated specialist roles."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            catalog_path = root / "agents" / "task_catalog.yaml"
+            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+            t12 = next(task for task in catalog["tasks"] if task["id"] == "T12")
+            t12["specialists"].append("python_reviewer")
+            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("t12-overdefault-specialist", result.stdout)
+
+    def test_routing_reports_bad_candidate_order(self) -> None:
+        """Ordered codex_agents lists should preserve default candidate semantics."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            config_path = root / "agents" / "agents_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            implementer = next(
+                role for role in config["always_on_roles"] if role["id"] == "implementer"
+            )
+            implementer["codex_agents"] = ["spark_worker", "worker"]
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("role-candidate-order", result.stdout)
+
     def test_spark_model_is_reserved_for_spark_worker(self) -> None:
         """Only spark_worker should use the Spark model."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
-            (root / ".codex").mkdir(exist_ok=True)
-            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
-            (root / "agents").mkdir()
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "agents_config.json",
-                root / "agents" / "agents_config.json",
-            )
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "task_catalog.yaml",
-                root / "agents" / "task_catalog.yaml",
-            )
+            copy_eval_root(root)
             explorer = root / ".codex" / "agents" / "explorer.toml"
             explorer.write_text(
                 explorer.read_text(encoding="utf-8").replace(
@@ -212,27 +612,16 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_review_roles_require_frontier_model(self) -> None:
-        """Reviewer and quality-check roles should stay on the frontier route."""
+    def test_review_roles_require_luna_high(self) -> None:
+        """Ordinary reviewer roles should stay on the Luna/high child route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
-            (root / ".codex").mkdir(exist_ok=True)
-            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
-            (root / "agents").mkdir()
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "agents_config.json",
-                root / "agents" / "agents_config.json",
-            )
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "task_catalog.yaml",
-                root / "agents" / "task_catalog.yaml",
-            )
+            copy_eval_root(root)
             python_reviewer = root / ".codex" / "agents" / "python_reviewer.toml"
             python_reviewer.write_text(
                 python_reviewer.read_text(encoding="utf-8")
-                .replace('model = "gpt-5.5"', 'model = "gpt-5.4-mini"')
-                .replace('model_reasoning_effort = "xhigh"', 'model_reasoning_effort = "medium"'),
+                .replace('model = "gpt-5.6-luna"', 'model = "gpt-5.4-mini"')
+                .replace('model_reasoning_effort = "high"', 'model_reasoning_effort = "medium"'),
                 encoding="utf-8",
             )
 
@@ -240,11 +629,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-model-gpt-5.5",
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-model-gpt-5.6-luna",
                 result.stdout,
             )
             self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-xhigh-reasoning",
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-high-reasoning",
                 result.stdout,
             )
 
@@ -252,22 +641,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         """Deprecated Codex model slugs should stay out of role TOML."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            shutil.copytree(PROJECT_ROOT / ".codex" / "agents", root / ".codex" / "agents")
-            (root / ".codex").mkdir(exist_ok=True)
-            shutil.copy2(PROJECT_ROOT / ".codex" / "config.toml", root / ".codex" / "config.toml")
-            (root / "agents").mkdir()
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "agents_config.json",
-                root / "agents" / "agents_config.json",
-            )
-            shutil.copy2(
-                PROJECT_ROOT / "agents" / "task_catalog.yaml",
-                root / "agents" / "task_catalog.yaml",
-            )
+            copy_eval_root(root)
             worker = root / ".codex" / "agents" / "worker.toml"
             worker.write_text(
                 worker.read_text(encoding="utf-8").replace(
-                    'model = "gpt-5.5"',
+                    'model = "gpt-5.6-luna"',
                     'model = "gpt-5.3-codex"',
                 ),
                 encoding="utf-8",

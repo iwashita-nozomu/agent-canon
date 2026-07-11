@@ -80,8 +80,8 @@ README、workflow、guide、migration、specification など file responsibility
 1. 詳細設計
 1. 詳細設計レビュー
 1. 文書通読レビュー
-1. テストケース設計（behavior-changing / regression-prone / high-risk の場合）
 1. 実装
+1. 条件付きテストケース設計
 1. 実装 checkpoint review
 1. 最終受け入れ review
 1. audit / gate close
@@ -89,8 +89,7 @@ README、workflow、guide、migration、specification など file responsibility
 `Scoped Change` のような bounded 差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビューを省略しません。
 文書通読レビューは reader-facing docs、新用語、公開 API、workflow surface がある場合の active gate として扱います。
 また、`計画レビュー`、`詳細設計レビュー`、active な `文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
-behavior-changing、regression-prone、または high-risk code pass では、実装前に
-`test_designer` を独立に立て、static path と nasty case を test plan として固定します。
+`test_designer` は default の実装前 gate ではありません。実装が owning mechanism を確立または修復した後、static analysis、既存 checker、targeted validation が所有しない具体的な oracle / specification / regression / failure-mode risk が残る場合だけ、条件付きの post-implementation route として起動します。ordinary code change、bug fix、parser change、validation failure だけでは起動しません。
 `cause_classification=implementation_bug` の validation failure は、
 `failing_contract`、`observation_level`、`cause_classification`、
 `intent_preservation`、`evidence` を記録した後、追加 test planning で止めずに
@@ -170,10 +169,12 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `revise` は Gate 8 へ戻します
   - `revise`、`required_change`、または rejected slice への応答は、同じ
     request clause と approved design intent を保つ修正として行います
-  - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
+  - `escalate` は Gate 5 へ戻して詳細設計を修正し、test-design route が
+    active な場合だけ Gate 8.5 の evidence も更新します
 - 完了条件:
-- diff が approved design と test plan に一致する
-- 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
+- diff が approved design と canonical validation evidence に一致する
+- 各実装 slice が design artifact、design section、request clause ID を引用し、
+  test-design route が active な場合だけ test plan item も引用している
 - tracked tree に non-canonical design doc、implementation copy、snapshot、backup path を増やしていない
 - regression、style drift、stale path、missing test が blocker なしになる
 
@@ -405,14 +406,14 @@ exit 条件:
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Abstract Design Frame` には、実装対象 file や直近 finding へ絞る前の抽象責務、概念 graph または layer model、非対象、将来拡張 layer、評価軸、既存正本との関係を列挙します。`File-By-File Design`、`Design-To-Implementation Trace`、validation はこの frame から導きます
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
-- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、active な場合の `document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
-- `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、validation / test-plan item に接続します
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、active な場合の `document_flow_review.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します。`test_plan.md` は Gate 8.5 が active になった後の review packet にだけ加えます
+- `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、canonical validation evidence に接続します。test-design route が active な場合だけ test-plan item も接続します
 - `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
 - 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、duplicate directory を作らないことを明示します
 - `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
-- `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
+- `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、validation evidence を対応付けます。test-design route が active な場合だけ test plan item も対応付けます
 - 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - 新規または rename する variable、function、class、file、CLI flag、config key、public API identifier は、既存 precedent、採用名、却下した代替案、review 観点を明記します
@@ -435,7 +436,7 @@ exit 条件:
 - 実装対象 file、helper、current finding に絞る前の抽象責務と概念 model が `Abstract Design Frame` だけで分かる
 - 設計判断の downstream side effect が `Design Side-Effect Map` から owner stage、review gate、validation route へ辿れる
 - worker が編集前に読む upstream dependency context と、編集後に確認する downstream dependency context を `Dependency Manifest Plan` だけで分かる
-- 各予定差分が `Design-To-Implementation Trace` で clause、source、test、validation へ結び付いている
+- 各予定差分が `Design-To-Implementation Trace` で clause、source、validation へ結び付いている。test-design route が active な場合だけ test evidence にも結び付いている
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
 - refactor pass では move / rename / split と挙動保存境界が文書だけで追える
@@ -467,12 +468,12 @@ exit 条件:
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
   - `Abstract Design Frame` が実装対象 file、既存 helper、current finding より先に抽象責務、概念 model、非対象、将来 layer、評価軸、既存正本との関係を固定し、そこから実装 slice を導いているか確認する
   - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
-  - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path、test plan を列挙しているか確認する
-  - `Design Side-Effect Map` が主要設計判断から downstream surface、owner stage、review gate、validation / test-plan item へ trace できるか確認する
+  - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path を列挙し、test plan を実装前提にしていないか確認する
+  - `Design Side-Effect Map` が主要設計判断から downstream surface、owner stage、review gate、canonical validation evidence へ trace できるか確認する
   - `Dependency Manifest Plan` が各 touched file の `@dependency-start` block、upstream / downstream edge、reverse edge、読む順序、検証 command に落ちているか確認する
   - 旧 `Dependency Files:` block を新規・変更 file に残す設計を blocker として扱う
   - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
-  - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
+  - 各予定差分が design section、request clause ID、reuse/source 文書または code path、validation evidence へ trace できるか確認し、test-design route が active な場合だけ test plan item も確認する
   - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
   - identifier naming plan が既存 precedent または明示 rationale に結び付いているか確認する
   - worker が reusable / user-facing な名前を発明する余地が残っていないか確認する
@@ -531,36 +532,6 @@ exit 条件:
 - `document_flow_review.md` が `resolved` になっている
 - 上から順に読んだときの意味の飛び、定義不足、section order の問題が解消している
 
-### Gate 7.5. テストケース設計
-
-目的:
-- behavior-changing、regression-prone、high-risk、または oracle / spec risk がある場合に、実装前の static path、境界ケース、failure path、regression-prone case を test plan に落とす
-
-主担当:
-- `test_designer`
-
-条件付き追加 subagent:
-- `test_designer`
-- 必要に応じて `explorer`
-
-最低限の記録:
-- `Static Path Survey:`
-- `Nasty Cases:`
-- `Regression Cases To Keep:`
-- `Implementation Notes:`
-
-ルール:
-- `test_designer` は read-only とし、repo file は編集しません
-- 既存 test style、fixture layout、naming を先に調べ、そこへ寄せます
-- design や code path の静的解析から出る nasty case を曖昧な助言ではなく具体ケースとして残します
-- `cause_classification=implementation_bug` と判断でき、contract と oracle が安定している場合は、Gate 7.5 を再度広げず Gate 8 の owning implementation repair へ戻します
-- 実装者は test plan を読んで tests を同じ pass で落とし込みます
-
-exit 条件:
-- `test_plan.md` が作られている
-- boundary case、malformed input、error path、state transition、regression case が明示されている
-- `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate test"` が pass している
-
 ### Gate 8. 実装
 
 目的:
@@ -568,11 +539,13 @@ exit 条件:
 
 主担当:
 - write-capable Codex implementer selected from `IMPLEMENTATION_CODEX_AGENTS`
-  (`spark_worker` for bounded low-risk slices, otherwise `worker`)
+  (`worker` by default; `spark_worker` only through
+  `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout /
+  manifest for a bounded low-risk slice)
 - parent is the gate owner / integrator only
 
 条件付き追加 subagent:
-- additional write-capable `spark_worker` / `worker` instances only when
+- additional selected write-capable implementer instances only when
   dependency order, disjoint write scope, integration order, and review gate are
   fixed in the handoff packet
 
@@ -588,24 +561,28 @@ exit 条件:
   records the current design artifact, `design_review.md decision=approve`, and
   `waterfall-gate-check --gate design` pass evidence.
 - Parent-Direct Context Note is a routing / handoff artifact, not edit
-  authorization. Once edit scope is known, launch or schedule `spark_worker` /
-  `worker`; if blocked, record `WRITE_SUBAGENT_AUTHORIZATION=required` or
+  authorization. Once edit scope is known, launch or schedule the selected
+  write-capable implementer. If the selected candidate is blocked, record
+  local/tool evidence with `selected_agent_type`,
+  `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and
+  `status=blocked`; changing candidates requires a revised parent packet and
+  wave.
+  Record `WRITE_SUBAGENT_AUTHORIZATION=required` or
   `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
-- 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、active な場合の `document_flow_review.md`、`test_plan.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します
+- 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、active な場合の `document_flow_review.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します。`test_plan.md` は test-design route が明示的に activate された場合だけ参照し、実装の前提にしません
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
 - 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
 - design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
 - 実装は 1 つの change request に閉じます
-- docs と tests は同じ pass で更新します
-- `test_plan.md` の nasty case を最低限どこへ落とし込んだか説明できるようにします
+- tests は concrete behavior regression oracle が承認された場合だけ変更し、docs と同じ pass での更新を既定にしません
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
 - validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md`、`agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md` を参照します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
-- design section、request clause ID、test plan item に trace できない変更は実装しません
+- design section、request clause ID に trace できない変更は実装しません。test-design route が activate された場合だけ、その evidence を test-plan item に trace します
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
 - 既存コード、既存 helper、既存 naming、既存 test style、既存 docs style を優先します
@@ -619,7 +596,7 @@ exit 条件:
 
 必須レビュー:
 - `change_reviewer`
-  - 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、test plan item、request clause ID を引用しているか確認する
+  - 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、request clause ID を引用し、test-design route が active な場合だけ test plan item も引用しているか確認する
   - changed slice と関連 docs / workflow / prompt/config / validation / dependency-manifest update が approved `Design Side-Effect Map` に trace できるか確認する
   - changed slice が nearest file、helper、current finding、chat context だけで正当化され、抽象責務 model へ trace できない場合は revise blocker として扱う
   - changed human-authored text file が `@dependency-start` / `@dependency-end` 形式を持ち、旧 `Dependency Files:` block を残していないか確認する
@@ -634,7 +611,7 @@ exit 条件:
 
 exit 条件:
 - 差分が requirements / plan / design に一致している
-- 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、test plan item、request clause ID を引用している
+- 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、request clause ID を引用し、test-design route が active な場合だけ test plan item も引用している
 - nearest file、helper、current finding、chat context だけで正当化された changed slice がない
 - changed-file dependency manifest checks が pass している
 - canonical path 以外の design / implementation truth surface が残っていない
@@ -642,6 +619,38 @@ exit 条件:
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate implementation"` が pass している
+
+### Gate 8.5. 実装後の条件付きテストケース設計
+
+目的:
+- 実装が owning mechanism を確立または修復した後、static analysis、既存 checker、targeted validation が所有しない具体的な oracle / specification / regression / failure-mode risk が残る場合だけ、test-design evidence を追加する
+
+主担当:
+- `test_designer`
+
+起動条件:
+- implementer が mechanism の確立または修復を記録している
+- parent が具体的な unresolved risk と、既存 validation がその risk を所有しない根拠を記録している
+
+最低限の記録:
+- `Activation Decision:`
+- `Static Path Survey:`
+- `Nasty Cases:`
+- `Regression Cases To Keep:`
+- `Implementation Notes:`
+
+ルール:
+- 条件を満たさない場合は `activation=not_needed` または `activation=deferred` だけを返し、`test_plan.md` を必須にせず、test-design tool を実行しません
+- `test_designer` は read-only とし、repo file は編集しません
+- checker-owned property は static analysis、checker、formatter、dependency review、type checking、lint、docs check、または targeted validation へ戻します
+- tests は concrete behavior regression oracle がある場合だけ作成または編集し、既存 tests は evidence として扱います
+- validation test / check が失敗した場合は、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を先に記録し、意図を弱めて pass を作りません
+- `cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保った owning implementation repair へ戻します
+
+exit 条件:
+- activation decision が記録されている
+- `activation=required` の場合だけ、具体的な behavior regression oracle とその test-plan evidence が記録されている
+- `activation=not_needed` または `activation=deferred` の場合、不要な test-plan artifact や tool run を要求していない
 
 ### Gate 9. 最終受け入れ review
 
@@ -663,7 +672,7 @@ exit 条件:
 必須レビュー:
 - `final_reviewer`
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
-  - final diff が Abstract Design Frame、approved design section、Implementation Source Packet、request clause ID、test plan item に trace できるか確認する
+  - final diff が Abstract Design Frame、approved design section、Implementation Source Packet、request clause ID、canonical validation evidence に trace でき、test-design route が active な場合だけ test plan item にも trace できるか確認する
   - final diff の side-effect coverage が approved Design Side-Effect Map と一致しているか確認する
   - final diff が Dependency Manifest Plan に trace でき、changed-file manifest scan / format / graph evidence が closeout に残っているか確認する
   - current tree head 以外の design / implementation truth surface が残っていないか確認する
@@ -808,7 +817,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
 - Gate 3 では `Write Scope Ledger:`、`Writer Wave Order:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
-- Gate 8-9 では言語差分に応じて `python_reviewer` や `cpp_reviewer` と `project_reviewer` を通し、slice 単位ではなく全体整合を見ます
+- Gate 8-9 の post-implementation change review は `diff_triage_reviewer` が既定です。`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加し、T12 default-active の `project_reviewer` と全体整合を見ます
 - parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
 - write scope が重なる場合は、writer ごとに current checkout 内の後続 wave へ serialize してから統合します
 

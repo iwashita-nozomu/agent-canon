@@ -71,18 +71,26 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 
 # Template の現在値
 
+`.codex/config.toml` の代表部分です。全 skill / agent registry は正本を参照します。
+
 ```toml
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
-review_model = "gpt-5.5"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+review_model = "gpt-5.6-luna"
+model_context_window = 1000000
+tool_output_token_limit = 4096
 
 [features]
 hooks = true
 goals = true
+multi_agent = true
 
 [agents]
 max_threads = 24
+max_depth = 2
 job_max_runtime_seconds = 3600
 ```
 
@@ -92,7 +100,11 @@ job_max_runtime_seconds = 3600
 
 - 外部 sandbox 前提なので approval は `never`
 - filesystem sandbox は `danger-full-access`
+- 親 orchestrator は `gpt-5.6-sol/high`
+- named child の model / effort は `.codex/agents/*.toml` が所有
+- 1 tool output の context 取り込みは 4096 token まで
 - hooks を有効化し、runtime guardrail を組み込む
+- multi-agent と repo-owned skill / child-agent registry を有効化
 - subagent は最大 24 thread、job timeout 3600 秒
 - AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
 - Codex は project trust、hook context、apps / external connectors / session tool availability を所有する
@@ -101,25 +113,30 @@ job_max_runtime_seconds = 3600
 
 # Template に入っていないもの
 
-現在の `.codex/config.toml` に入っている top-level key は 6 つだけです。
+現在の `.codex/config.toml` が共有正本として持つ top-level surface は次です。
 
 - `approval_policy`
 - `sandbox_mode`
+- `model`
+- `model_reasoning_effort`
 - `review_model`
+- `model_context_window`
+- `tool_output_token_limit`
 - `features`
+- `skills.config`
 - `agents`
-- `mcp_servers`
 
-それ以外の official schema key は「Codex が受け付けるが、この template には未設定」です。
+それ以外の official schema key は「Codex が受け付けても、この template
+では共有していない設定」です。
 
 ---
 
 # 未設定 top-level の代表カテゴリ
 
-- model / provider / reasoning
+- additional model / provider / reasoning options
 - approvals reviewer / permissions / sandbox detail
 - project doc discovery / injected context
-- inline hooks / tools / skills / apps / plugins
+- inline hooks / tools / apps / plugins
 - MCP OAuth / credential stores
 - UI / history / logs / notifications
 - memory / OTEL / ghost snapshots
@@ -240,13 +257,13 @@ CLI override は一時操作に使います。repo の正本へ残すのは、�
 # Model 選択の実務
 
 OpenAI / Codex の最新 model guidance は `$openai-docs` で確認します。
-repo default を一律に重くするより、確認済み model ID を profile / custom
-agent へ寄せます。
+repo runtime は `.codex/config.toml` と role TOML の現在値から開始し、task
+名や見積もり規模で profile を先に選びません。
 
-- design / review: `$openai-docs` で選んだ frontier model + `reasoning_effort="high"`
-- bounded implementation: owner boundary、impact surface、validation route に応じて medium/high
-- trivial run: default profile
-- plan mode: `plan_mode_reasoning_effort` を別管理
+- parent: `.codex/config.toml` の `gpt-5.6-sol/high`
+- named child: `.codex/agents/*.toml` の model / effort
+- profile 変更: 観測済み token、latency、model-effort、tool-output evidence が原因 surface を示した後
+- current model support: `$openai-docs` で確認
 
 ---
 
@@ -410,20 +427,8 @@ enabled = true
 
 Profiles は operator mode を切り替えるための機構です。
 current Codex では project-local `.codex/config.toml` の `profiles` は warning 対象なので、`~/.codex/config.toml` か `$CODEX_HOME/config.toml` に置きます。
-
-```toml
-[profiles.review]
-model = "<model-id-from-openai-docs>"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
-```
-
-使い方:
-
-```bash
-codex --profile review
-```
+AgentCanon は user profile の名前や値を二重管理せず、task label から profile
+を先に決めません。観測 evidence に基づく変更は fresh session で適用します。
 
 ---
 

@@ -191,6 +191,15 @@ classification and regression placement. Test edits, new expected values,
 tolerance changes, and oracle design enter after the algorithm contract and
 repair mechanism are fixed.
 
+Test design follows establishment or repair of the production design,
+algorithm contract, and owning implementation mechanism. Activate
+`test_designer` only when a concrete unresolved oracle, specification,
+regression, or failure-mode risk remains outside static analysis, existing
+checkers, and targeted validation. Ordinary code changes, bug fixes, parser
+changes, and validation failures alone leave the role inactive. Existing tests
+remain evidence, while the owning implementation mechanism is the first edit
+surface.
+
 ## Context Construction
 
 Context construction is the primary runtime concern. Use
@@ -352,11 +361,12 @@ A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
 audits, or recorded parent-direct write exceptions; cite the advisory/read-only
 reason or recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
 
-If write-capable handoff was blocked, closeout records
-`WRITE_SUBAGENT_AUTHORIZATION=required` or
-`write_capable_handoff_blocker=<gate>` plus `fallback_exit_status`; it records
-the blocked-handoff fallback instead of ordinary `parent-direct/no-subagents`
-completion for repo-changing work.
+If write-capable handoff was blocked, closeout records one of:
+`WRITE_SUBAGENT_AUTHORIZATION=required` or `write_capable_handoff_blocker=<gate>`
+with typed local blocker evidence:
+`status=blocked`, `selected_agent_type`, `evidence`,
+`parent_packet_ref`. The selected candidate remains blocked until a revised
+explicit parent packet authorizes another candidate.
 
 For CI and hook failures, first decide whether the failure belongs to the
 changed surface or blocks the requested PR/update. Stale, duplicated, or legacy

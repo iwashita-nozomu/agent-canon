@@ -9,8 +9,8 @@ description = "Read-only reviewer for academic-argument continuity, claim-to-evi
 nickname_candidates = ["logic-gap", "argument-check", "claim-audit"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the logic-gap reviewer for this repository.

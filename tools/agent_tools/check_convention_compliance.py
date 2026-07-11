@@ -267,48 +267,64 @@ SKILL_ROUTING_MARKERS = (
     "task-shape skill",
     "check_convention_compliance.py",
 )
-FALLBACK_EXIT_POLICY_MARKERS = {
+EXIT_BLOCKER_POLICY_MARKERS = {
     ".agents/skills/agent-orchestration/SKILL.md": (
-        "fallback_exit_status",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "explicit_approval_evidence",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
         "router_unavailable_blocker",
     ),
     "agents/skills/agent-orchestration.md": (
-        "fallback_exit_status",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "explicit_approval_evidence",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
         "router_unavailable_blocker",
     ),
     ".agents/skills/codex-task-workflow/SKILL.md": (
-        "fallback_exit_status",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
         "canonical_rerun_pass",
         "durable_blocker_or_issue",
-        "explicit_approval_evidence",
         "router_unavailable_blocker",
+        "new state evidence",
+        "revised parent packet",
     ),
     "agents/skills/codex-task-workflow.md": (
-        "fallback_exit_status",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
         "canonical_rerun_pass",
         "durable_blocker_or_issue",
-        "explicit_approval_evidence",
         "router_unavailable_blocker",
+        "new state evidence",
+        "revised parent packet",
     ),
     ".agents/skills/subagent-bootstrap/SKILL.md": (
-        "fallback_exit_status",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "explicit_approval_evidence",
-        "router_unavailable_blocker",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
+        "new state evidence",
+        "explicit revised packet",
     ),
     "agents/skills/subagent-bootstrap.md": (
-        "fallback_exit_status",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "explicit_approval_evidence",
-        "router_unavailable_blocker",
+        "selected_agent_type",
+        "write_capable_handoff_blocker",
+        "evidence",
+        "parent_packet_ref",
+        "status=blocked",
+        "new state evidence",
+        "explicit revised packet",
     ),
     ".agents/skills/tool-finding-report/SKILL.md": (
         "tool_warning_exit_status",
@@ -332,7 +348,7 @@ FALLBACK_EXIT_POLICY_MARKERS = {
         "explicit_approval_evidence",
     ),
 }
-FALLBACK_EXIT_FORBIDDEN_RE = re.compile(
+EXIT_BLOCKER_FORBIDDEN_RE = re.compile(
     r"(?i)(?:"
     r"sole basis for path selection|"
     r"falling back to a parent-direct alternate route|"
@@ -576,20 +592,6 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "canonical command",
         "Validation repair scope",
     ),
-    "agents/skills/test-design.md": (
-        "contract-only wrapper",
-        "static contract validation",
-        "canonical command evidence",
-        "observable behavior",
-        "validation repair scope",
-    ),
-    ".agents/skills/test-design/SKILL.md": (
-        "contract-only wrapper",
-        "static contract validation",
-        "canonical command evidence",
-        "observable behavior",
-        "validation repair scope",
-    ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "contract-only wrapper",
         "static contract validation",
@@ -601,24 +603,7 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "behavior-owned cases",
     ),
 }
-VALIDATION_FAILURE_RESPONSE_MARKERS = {
-    "agents/skills/test-design.md": (
-        "failing contract",
-        "observation level",
-        "cause classification",
-        "approved intent",
-        "escalation",
-        "oracle weakening",
-    ),
-    ".agents/skills/test-design/SKILL.md": (
-        "failing contract",
-        "observation level",
-        "failure cause",
-        "approved intent",
-        "escalate",
-        "oracle weakening",
-    ),
-}
+VALIDATION_FAILURE_RESPONSE_MARKERS: dict[str, tuple[str, ...]] = {}
 MATHEMATICAL_NECESSITY_MARKERS = {
     "documents/conventions/common/05_docs.md": (
         "mathematical necessity gate",
@@ -627,18 +612,6 @@ MATHEMATICAL_NECESSITY_MARKERS = {
         "non-contractual mathematical judgment",
     ),
     "documents/coding-conventions-testing.md": (
-        "mathematical necessity gate",
-        "Numerical Trigger",
-        "Non-Numerical Alternative",
-        "checker-owned property",
-    ),
-    "agents/skills/test-design.md": (
-        "mathematical necessity gate",
-        "Numerical Trigger",
-        "Non-Numerical Alternative",
-        "checker-owned property",
-    ),
-    ".agents/skills/test-design/SKILL.md": (
         "mathematical necessity gate",
         "Numerical Trigger",
         "Non-Numerical Alternative",
@@ -1296,11 +1269,11 @@ def check_skill_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def check_fallback_exit_policy(root: Path) -> list[Finding]:
+def check_exit_blocker_policy(root: Path) -> list[Finding]:
     """Verify fallback paths are routed to explicit exit evidence."""
-    paths = tuple(FALLBACK_EXIT_POLICY_MARKERS)
-    findings = check_required_files(root, paths, "skill_fallback_exit_policy")
-    for path, markers in FALLBACK_EXIT_POLICY_MARKERS.items():
+    paths = tuple(EXIT_BLOCKER_POLICY_MARKERS)
+    findings = check_required_files(root, paths, "skill_exit_blocker_policy")
+    for path, markers in EXIT_BLOCKER_POLICY_MARKERS.items():
         resolved = readable_path(root, path)
         if resolved is None:
             continue
@@ -1309,16 +1282,16 @@ def check_fallback_exit_policy(root: Path) -> list[Finding]:
             if marker not in text:
                 findings.append(
                     Finding(
-                        "skill_fallback_exit_policy",
+                        "skill_exit_blocker_policy",
                         path,
                         f"missing-marker:{marker}",
                     )
                 )
-        for match in FALLBACK_EXIT_FORBIDDEN_RE.finditer(text):
+        for match in EXIT_BLOCKER_FORBIDDEN_RE.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             findings.append(
                 Finding(
-                    "skill_fallback_exit_policy",
+                    "skill_exit_blocker_policy",
                     path,
                     f"forbidden-fallback-completion-wording:{line_no}",
                 )
@@ -1326,7 +1299,7 @@ def check_fallback_exit_policy(root: Path) -> list[Finding]:
         if "accepted_with_reason" in text and "explicit_approval_evidence" not in text:
             findings.append(
                 Finding(
-                    "skill_fallback_exit_policy",
+                    "skill_exit_blocker_policy",
                     path,
                     "accepted-without-explicit-approval-evidence",
                 )
@@ -1851,7 +1824,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
-    findings.extend(check_fallback_exit_policy(root))
+    findings.extend(check_exit_blocker_policy(root))
     findings.extend(check_document_structure_routing(root))
     findings.extend(
         collect_marker_contract_findings(

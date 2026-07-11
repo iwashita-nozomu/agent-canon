@@ -169,7 +169,7 @@ new_issue_count: <n>
 merged_existing_count: <n>
 deferred_count: <n>
 issue_paths: <paths>
-subagent_partitions: <role:instance:packet>
+subagent_partitions: <role_id:instance_id:agent_type:packet>
 validation: <commands>
 ```
 
