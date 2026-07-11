@@ -21,7 +21,11 @@ template や派生 repo に配布する shared agent canon の正本をここに
 ## First Read Path
 
 この README は、AgentCanon source tree の役割、構造モデル、目的別 route、runtime profile、検索導線、保守ルールを扱います。
-Codex runtime の最初の命令入口は `AGENTS.md` です。人がこの repo を読む入口は次の順で固定します。
+Codex の自動 instruction は Codex home の global guidance の後、検出された
+project root から current working directory までの `AGENTS.override.md` /
+`AGENTS.md` / configured fallback file chain で決まります。この AgentCanon
+source tree が project root のときの repo instruction entrypoint は
+`AGENTS.md` です。人がこの repo を読む入口は次の順で固定します。
 
 1. `README.md`
 1. `PHILOSOPHY.md`
@@ -68,7 +72,7 @@ control-plane file を差し引く。2026-06-06 の再解析では、`exclude_pa
 
 | Scope | 種別 | 主な path | 役割 |
 | --- | --- | --- | --- |
-| `runtime-entrypoints` | primary | `AGENTS.md`, `ROOT_AGENTS.md`, `.agents/**`, `.codex/**`, `.devcontainer/**`, `.vscode/**`, `agents/**`, `mcp/**` | agent runtime の入口、workflow canon、skill、hook、MCP、runtime / editor config。 |
+| `runtime-entrypoints` | primary | `AGENTS.md`, `ROOT_AGENTS.md`, `.agents/**`, `.codex/**`, `.devcontainer/**`, `.vscode/**`, `agents/**` | agent runtime の入口、workflow canon、skill、hook、runtime / editor config。 |
 | `shared-tooling` | primary | `tools/**`, `rust/**`, `helper_inventory_guard_policy.json` | shared automation、static gate、OOP checker、Rust CLI、tool catalog。 |
 | `shared-policy-documents` | primary | `README.md`, `CONTAINER_OPERATIONS.md`, `responsibility-scope.toml`, `documents/**`, `notes/**`, `memory/**`, `references/**` | policy、convention、container、bootstrap、tool documentation、記憶と参照資料。 |
 | `test-surfaces` | primary | `tests/**` | shared tools、workflow、責務 policy を検証する test surface。 |

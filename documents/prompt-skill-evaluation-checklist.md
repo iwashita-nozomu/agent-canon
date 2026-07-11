@@ -4,6 +4,8 @@ contract reference
 responsibility Defines checklist and manifest format for skill, prompt, and workflow behavior evals.
 upstream design ../agents/canonical/skills.md defines skill registry.
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md defines subagent routing.
+upstream design ../.agents/skills/code-visualization/SKILL.md defines the runtime route under evaluation.
+upstream design ../agents/skills/code-visualization.md defines the canonical route contract under evaluation.
 downstream implementation ../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval cases.
 downstream implementation ../.github/ISSUE_TEMPLATE/eval-capture.yml captures new eval candidates.
 downstream implementation ../.github/PULL_REQUEST_TEMPLATE.md requires eval evidence.
@@ -52,3 +54,88 @@ linked rule/tool/workflow.
 
 Close an agent-behavior issue only after the eval is added, or after the issue
 body/PR body records why an eval would not be meaningful.
+
+## Empirical Scenario Protocol
+
+The parent owns empirical skill evaluation. Parent Iteration 0 freezes three
+answer-free Scenario Packets: generated `full`, generated `changed`, and a
+supplied-TSV hold-out. Every packet must include the full Prompt Under Test
+text and path, Canonical Target Files, Prompt Dependency Files, the frozen
+scenario, the requirements/checklist, the method, and the fixed report grammar.
+It must not include an expected command, expected artifacts, an answer, prior
+evaluator reasoning, or a prior result.
+
+The evaluator read allowlist is limited to the packet-listed Evaluation Skill,
+Prompt Under Test, Canonical Target Files, Prompt Dependency Files, and test
+documentation. A fresh evaluator receives one scenario only, with a unique
+instance ID, iteration ID, and packet digest. No evaluator instance is reused
+across scenarios, iterations, or malformed-report reruns. The evaluator is
+read-only, does not call nested agents, and does not become the renderer,
+checker, scanner, or implementation agent.
+
+## Observed Report Grammar
+
+The evaluator returns only the following ordered sections and fields:
+
+```text
+Output:
+command=<exact proposed command or none>
+artifacts=<comma-separated exact basenames or none>
+authority=<owner statement>
+route=<selected route>
+Requirement Results:
+R<integer>=<pass|fail|malformed>: <short evidence>
+Telemetry:
+retry_count=<integer>
+ambiguity=<none|token>
+extra_refs=<comma-separated extra references or none>
+Result Metadata:
+scenario_id=<id>
+iteration=<integer>
+provenance=fresh
+```
+
+The four `Output` keys are observed behavior, not an embedded answer. Every
+listed fixed field is mandatory exactly once: `command`, `artifacts`,
+`authority`, `route`, `retry_count`, `ambiguity`, `extra_refs`, `scenario_id`,
+`iteration`, and `provenance`. Missing or duplicated fields, reordered or
+duplicated headings, missing or duplicated packet-listed requirement IDs,
+unknown requirement IDs, invalid enum/value tokens, a `scenario_id` or
+`iteration` that differs from the packet, provenance other than `fresh`, or
+free text outside the four sections make the report malformed. The Scenario
+Packet defines the allowed integer requirement IDs; the evaluator reports each
+packet-listed ID exactly once and does not hard-code any fixed ID set. A
+malformed report is unscored and is rerun with a new fresh evaluator on the
+same frozen packet.
+
+## Parent Scoring And Convergence
+
+After each return, the parent scores the observed `Output` and requirement
+observations against this frozen checklist. The evaluator emits no score or
+status. The parent artifact owns the fields
+`parent_score_percent=<0..100>` and `parent_critical_pass=<yes|no>`; those
+fields are derived by the parent and cannot be supplied by the evaluator. The
+route requirements are:
+
+- `full` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
+- `changed` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
+- supplied TSV uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json`. A supplied scenario may replace only the values after `--graph-tsv` and `--bundle-dir`.
+- `--json` is invalid. `check_dependency_graph.sh` owns dependency pass/fail
+  authority. The renderer invokes that checker in generated mode and owns the
+  six projections; supplied-TSV checker status is `not_run`.
+- The bundle contains exactly `dependency_graph.tsv`,
+  `dependency_graph.ir.json`, `dependency_graph.md`, `dependency_graph.dot`,
+  `dependency_graph.html`, and `manifest.json`.
+- This route does not select a separate raw checker, scan, helper, or Mermaid
+  route.
+
+An iteration converges only when all three scenarios have valid reports,
+parent-passing requirements, `ambiguity=none`, and the exact route checks pass.
+Completion requires two consecutive converged iterations with matching
+per-scenario retry counts, zero retries, and a hold-out gap strictly below 15
+percentage points in both iterations. The parent records packet digest, raw
+report, parsed requirement results, score, retry count, ambiguity, provenance,
+and convergence decision. The parent artifact records
+`parent_score_percent`, `parent_critical_pass`, and the convergence decision.
+`repo-wide-test-inventory=absent` is a separate
+structural finding and is not replaced by this focused checklist.

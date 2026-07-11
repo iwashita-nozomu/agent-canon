@@ -42,8 +42,8 @@ artifact / notebook / README の契約が崩れていないかを確認します
 ## Suggested Static Search
 
 ```bash
-rg -n "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env=" \
-  experiments/<topic> experiments/registry.toml tools/experiments -S
+git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env=" -- \
+  experiments/<topic> experiments/registry.toml tools/experiments || true
 ```
 
 ## Findings Policy

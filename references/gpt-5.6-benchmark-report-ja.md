@@ -1,17 +1,17 @@
-# GPT‑5.6 系ベンチマーク、定性的特性、MoE 型マルチエージェント設計調査
 <!--
 @dependency-start
 contract report
 responsibility Records a dated benchmark interpretation and MoE-style multi-agent design for the GPT-5.6 model family.
-upstream design README.md repository entrypoint and OpenAI/Codex source route
-upstream design references/agent-canon-technology-bibliography.md external source-record and agent-method context
+upstream design ../README.md repository entrypoint and OpenAI/Codex source route
+upstream design agent-canon-technology-bibliography.md external source-record and agent-method context
 @dependency-end
 -->
 
+# GPT‑5.6 系ベンチマーク、定性的特性、MoE 型マルチエージェント設計調査
 
-> **調査基準日:** 2026年7月11日（JST）  
-> **対象:** GPT‑5.6 Sol / Terra / Luna、Sol Ultra、Responses API の Multi-agent / Programmatic Tool Calling  
-> **主な情報源:** OpenAI 公式発表・System Card・API ドキュメント、各ベンチマークの論文・公式サイト、Artificial Analysis  
+> **調査基準日:** 2026年7月11日（JST）
+> **対象:** GPT‑5.6 Sol / Terra / Luna、Sol Ultra、Responses API の Multi-agent / Programmatic Tool Calling
+> **主な情報源:** OpenAI 公式発表・System Card・API ドキュメント、各ベンチマークの論文・公式サイト、Artificial Analysis
 > **データ固定:** リーダーボード、モデル仕様、料金、ベータ API は更新され得る。本書は上記日時のスナップショットである。
 
 > [!IMPORTANT]
@@ -397,7 +397,7 @@ Expert = (
 
 安価なtierから高価なtierへ上げる条件は、モデル自身の「自信」だけにしない。
 
-**強いトリガー:** 
+**強いトリガー:**
 
 - 複数branchの結論または数値が不一致
 - 必須claimに出典・line reference・実行結果がない
@@ -487,8 +487,8 @@ Sol arbiter
 Policy gate / writer
 ```
 
-**適合:** 調査、レポート、RAG、財務分析、要件整理。  
-**長所:** Sol利用率を抑え、証拠不足だけ昇格。  
+**適合:** 調査、レポート、RAG、財務分析、要件整理。
+**長所:** Sol利用率を抑え、証拠不足だけ昇格。
 **弱点:** 直列段階が増えるのでP95遅延が伸びる。Luna branchを早期終了できる設計が必要。
 
 ### 9.2 Parallel panel：仮説競争
@@ -498,7 +498,7 @@ Policy gate / writer
 - Terra B: 反対仮説・失敗ケースの探索
 - Sol: evidence IDだけを見て裁定
 
-**適合:** 技術選定、原因究明、リスク分析、論争的な調査。  
+**適合:** 技術選定、原因究明、リスク分析、論争的な調査。
 **重要:** role prompt、data slice、toolを分ける。同じ質問を同じ文脈で4回聞くだけでは多様性が弱い。
 
 ### 9.3 Coding swarm
@@ -905,71 +905,71 @@ OpenAIはSolの事実誤りがGPT‑5.5より僅かに少なく、ユーザー�
 
 ### OpenAI公式
 
-<a id="src-s1"></a>**[S1]** [OpenAI — Introducing GPT‑5.6](https://openai.com/index/gpt-5-6/)（2026-07-09公開、2026-07-11参照）  
-<a id="src-s2"></a>**[S2]** [OpenAI — GPT‑5.6 System Card](https://deploymentsafety.openai.com/gpt-5-6)（2026-07-11参照）  
-<a id="src-s3"></a>**[S3]** OpenAI Developers — [GPT‑5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol) / [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) / [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna)  
-<a id="src-s4"></a>**[S4]** [OpenAI Developers — Model guidance / Using GPT‑5.6](https://developers.openai.com/api/docs/guides/latest-model)  
-<a id="src-s5"></a>**[S5]** [OpenAI Developers — Multi-agent](https://developers.openai.com/api/docs/guides/tools-multi-agent)  
-<a id="src-s6"></a>**[S6]** [OpenAI Developers — Programmatic Tool Calling](https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling)  
+<a id="src-s1"></a>**[S1]** [OpenAI — Introducing GPT‑5.6](https://openai.com/index/gpt-5-6/)（2026-07-09公開、2026-07-11参照）
+<a id="src-s2"></a>**[S2]** [OpenAI — GPT‑5.6 System Card](https://deploymentsafety.openai.com/gpt-5-6)（2026-07-11参照）
+<a id="src-s3"></a>**[S3]** OpenAI Developers — [GPT‑5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol) / [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) / [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna)
+<a id="src-s4"></a>**[S4]** [OpenAI Developers — Model guidance / Using GPT‑5.6](https://developers.openai.com/api/docs/guides/latest-model)
+<a id="src-s5"></a>**[S5]** [OpenAI Developers — Multi-agent](https://developers.openai.com/api/docs/guides/tools-multi-agent)
+<a id="src-s6"></a>**[S6]** [OpenAI Developers — Programmatic Tool Calling](https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling)
 
 ### 横断評価
 
-<a id="src-s7"></a>**[S7]** [Artificial Analysis — OpenAI provider and model measurements](https://artificialanalysis.ai/providers/openai)（2026-07-11参照）  
-<a id="src-s8"></a>**[S8]** [Artificial Analysis — GPT‑5.6 Has Landed](https://artificialanalysis.ai/articles/gpt-5-6-has-landed)（2026-07-09公開、2026-07-11参照）  
-<a id="src-s9"></a>**[S9]** [OpenAI — Separating signal from noise in coding evaluations](https://openai.com/index/separating-signal-from-noise-coding-evaluations/)（SWE‑Bench Pro監査）  
+<a id="src-s7"></a>**[S7]** [Artificial Analysis — OpenAI provider and model measurements](https://artificialanalysis.ai/providers/openai)（2026-07-11参照）
+<a id="src-s8"></a>**[S8]** [Artificial Analysis — GPT‑5.6 Has Landed](https://artificialanalysis.ai/articles/gpt-5-6-has-landed)（2026-07-09公開、2026-07-11参照）
+<a id="src-s9"></a>**[S9]** [OpenAI — Separating signal from noise in coding evaluations](https://openai.com/index/separating-signal-from-noise-coding-evaluations/)（SWE‑Bench Pro監査）
 
 ### プロフェッショナル業務
 
-<a id="src-s10"></a>**[S10]** [Agents’ Last Exam — Benchmark overview](https://agents-last-exam.org/)  
-<a id="src-s11"></a>**[S11]** [OpenAI — GDPval](https://openai.com/index/gdpval/)  
-<a id="src-s12"></a>**[S12]** [Artificial Analysis — GDPval‑AA](https://artificialanalysis.ai/evaluations/gdpval-aa)  
-<a id="src-s13"></a>**[S13]** [Rogo — Big Finance Benchmark](https://rogo.ai/news/introducing-the-big-finance-benchmark) / [paper](https://arxiv.org/abs/2606.03829)  
+<a id="src-s10"></a>**[S10]** [Agents’ Last Exam — Benchmark overview](https://agents-last-exam.org/)
+<a id="src-s11"></a>**[S11]** [OpenAI — GDPval](https://openai.com/index/gdpval/)
+<a id="src-s12"></a>**[S12]** [Artificial Analysis — GDPval‑AA](https://artificialanalysis.ai/evaluations/gdpval-aa)
+<a id="src-s13"></a>**[S13]** [Rogo — Big Finance Benchmark](https://rogo.ai/news/introducing-the-big-finance-benchmark) / [paper](https://arxiv.org/abs/2606.03829)
 
 ### コーディング
 
-<a id="src-s14"></a>**[S14]** [SWE‑Bench Pro paper](https://arxiv.org/abs/2509.16941)  
-<a id="src-s15"></a>**[S15]** [DeepSWE repository](https://github.com/datacurve-ai/deep-swe) / [paper](https://arxiv.org/abs/2607.07946)  
-<a id="src-s16"></a>**[S16]** [Terminal‑Bench — Terminal‑Bench 2.1](https://www.tbench.ai/news/terminal-bench-2-1) / [paper](https://arxiv.org/abs/2601.11868)  
+<a id="src-s14"></a>**[S14]** [SWE‑Bench Pro paper](https://arxiv.org/abs/2509.16941)
+<a id="src-s15"></a>**[S15]** [DeepSWE repository](https://github.com/datacurve-ai/deep-swe) / [paper](https://arxiv.org/abs/2607.07946)
+<a id="src-s16"></a>**[S16]** [Terminal‑Bench — Terminal‑Bench 2.1](https://www.tbench.ai/news/terminal-bench-2-1) / [paper](https://arxiv.org/abs/2601.11868)
 
 ### 科学・医療
 
-<a id="src-s17"></a>**[S17]** [GeneBench Pro preprint](https://www.biorxiv.org/content/10.64898/2026.06.29.735386v2)  
-<a id="src-s18"></a>**[S18]** [OpenAI — Introducing LifeSciBench](https://openai.com/index/introducing-life-sci-bench/)  
-<a id="src-s19"></a>**[S19]** [HealthBench Professional paper](https://arxiv.org/abs/2604.27470)  
-<a id="src-s38"></a>**[S38]** [OpenAI — New capabilities for GPT‑Rosalind](https://openai.com/index/introducing-new-capabilities-to-gpt-rosalind/)（MedChemBenchの公開説明）  
+<a id="src-s17"></a>**[S17]** [GeneBench Pro preprint](https://www.biorxiv.org/content/10.64898/2026.06.29.735386v2)
+<a id="src-s18"></a>**[S18]** [OpenAI — Introducing LifeSciBench](https://openai.com/index/introducing-life-sci-bench/)
+<a id="src-s19"></a>**[S19]** [HealthBench Professional paper](https://arxiv.org/abs/2604.27470)
+<a id="src-s38"></a>**[S38]** [OpenAI — New capabilities for GPT‑Rosalind](https://openai.com/index/introducing-new-capabilities-to-gpt-rosalind/)（MedChemBenchの公開説明）
 
 ### コンピューター・文書・CAD
 
-<a id="src-s20"></a>**[S20]** [OSWorld 2.0 paper](https://arxiv.org/abs/2606.29537)  
-<a id="src-s21"></a>**[S21]** [OpenAI — BrowseComp](https://openai.com/index/browsecomp/)  
-<a id="src-s22"></a>**[S22]** [BenchCAD](https://benchcad.com/) / [paper](https://arxiv.org/abs/2605.10865)  
-<a id="src-s23"></a>**[S23]** [Surge AI — gdp.pdf](https://surgehq.ai/blog/gdp-pdf-can-100b-ai-models-master-the-documents-that-run-the-world)  
+<a id="src-s20"></a>**[S20]** [OSWorld 2.0 paper](https://arxiv.org/abs/2606.29537)
+<a id="src-s21"></a>**[S21]** [OpenAI — BrowseComp](https://openai.com/index/browsecomp/)
+<a id="src-s22"></a>**[S22]** [BenchCAD](https://benchcad.com/) / [paper](https://arxiv.org/abs/2605.10865)
+<a id="src-s23"></a>**[S23]** [Surge AI — gdp.pdf](https://surgehq.ai/blog/gdp-pdf-can-100b-ai-models-master-the-documents-that-run-the-world)
 
 ### サイバー
 
-<a id="src-s24"></a>**[S24]** [SEC‑Bench](https://sec-bench.github.io/) / [paper](https://arxiv.org/abs/2605.26548)  
-<a id="src-s25"></a>**[S25]** [ExploitBench](https://exploitbench.ai/) / [paper](https://arxiv.org/abs/2605.14153)  
-<a id="src-s26"></a>**[S26]** [ExploitGym](https://www.cybergym.io/exploitgym/) / [paper](https://arxiv.org/abs/2605.11086)  
+<a id="src-s24"></a>**[S24]** [SEC‑Bench](https://sec-bench.github.io/) / [paper](https://arxiv.org/abs/2605.26548)
+<a id="src-s25"></a>**[S25]** [ExploitBench](https://exploitbench.ai/) / [paper](https://arxiv.org/abs/2605.14153)
+<a id="src-s26"></a>**[S26]** [ExploitGym](https://www.cybergym.io/exploitgym/) / [paper](https://arxiv.org/abs/2605.11086)
 
 ### 研究工学
 
-<a id="src-s27"></a>**[S27]** [PostTrainBench](https://posttrainbench.com/) / [paper](https://arxiv.org/abs/2603.08640)  
-<a id="src-s28"></a>**[S28]** [NanoGPT‑Bench repository](https://github.com/IntologyAI/NanoGPT-Bench) / [paper](https://arxiv.org/abs/2506.22419)  
-<a id="src-s29"></a>**[S29]** [KernelBench repository](https://github.com/ScalingIntelligence/KernelBench) / [paper](https://arxiv.org/abs/2502.10517)  
+<a id="src-s27"></a>**[S27]** [PostTrainBench](https://posttrainbench.com/) / [paper](https://arxiv.org/abs/2603.08640)
+<a id="src-s28"></a>**[S28]** [NanoGPT‑Bench repository](https://github.com/IntologyAI/NanoGPT-Bench) / [paper](https://arxiv.org/abs/2506.22419)
+<a id="src-s29"></a>**[S29]** [KernelBench repository](https://github.com/ScalingIntelligence/KernelBench) / [paper](https://arxiv.org/abs/2502.10517)
 
 ### マルチモーダル・学術・抽象推論
 
-<a id="src-s30"></a>**[S30]** [MMMU‑Pro paper](https://arxiv.org/abs/2409.02813)  
-<a id="src-s31"></a>**[S31]** [Epoch AI — FrontierMath Tiers 1–4](https://epoch.ai/frontiermath/tiers-1-4) / [Tier 4 v2](https://epoch.ai/benchmarks/frontiermath-tier-4-v2)  
-<a id="src-s32"></a>**[S32]** [GPQA paper](https://arxiv.org/abs/2311.12022)  
-<a id="src-s33"></a>**[S33]** [ARC Prize — ARC‑AGI‑3](https://arcprize.org/arc-agi/3) / [paper](https://arxiv.org/abs/2603.24621)  
+<a id="src-s30"></a>**[S30]** [MMMU‑Pro paper](https://arxiv.org/abs/2409.02813)
+<a id="src-s31"></a>**[S31]** [Epoch AI — FrontierMath Tiers 1–4](https://epoch.ai/frontiermath/tiers-1-4) / [Tier 4 v2](https://epoch.ai/benchmarks/frontiermath-tier-4-v2)
+<a id="src-s32"></a>**[S32]** [GPQA paper](https://arxiv.org/abs/2311.12022)
+<a id="src-s33"></a>**[S33]** [ARC Prize — ARC‑AGI‑3](https://arcprize.org/arc-agi/3) / [paper](https://arxiv.org/abs/2603.24621)
 
 ### ツール・長文
 
-<a id="src-s34"></a>**[S34]** [AutomationBench repository](https://github.com/zapier/AutomationBench) / [paper](https://arxiv.org/abs/2604.18934)  
-<a id="src-s35"></a>**[S35]** [Toolathlon repository](https://github.com/hkust-nlp/Toolathlon) / [paper](https://arxiv.org/abs/2510.25726)  
-<a id="src-s36"></a>**[S36]** [MRCR paper](https://arxiv.org/abs/2409.12640)  
-<a id="src-s37"></a>**[S37]** [OpenAI GraphWalks dataset](https://huggingface.co/datasets/openai/graphwalks)  
+<a id="src-s34"></a>**[S34]** [AutomationBench repository](https://github.com/zapier/AutomationBench) / [paper](https://arxiv.org/abs/2604.18934)
+<a id="src-s35"></a>**[S35]** [Toolathlon repository](https://github.com/hkust-nlp/Toolathlon) / [paper](https://arxiv.org/abs/2510.25726)
+<a id="src-s36"></a>**[S36]** [MRCR paper](https://arxiv.org/abs/2409.12640)
+<a id="src-s37"></a>**[S37]** [OpenAI GraphWalks dataset](https://huggingface.co/datasets/openai/graphwalks)
 
 ---
 

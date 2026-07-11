@@ -146,12 +146,21 @@ Execute the required and task-matching conditional commands that the packet prin
    next owner repair, residual, or escalation plan.
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
-   wave-scoped write-capable `worker`/`spark_worker` agents implement,
+   wave-scoped selected write-capable implementers implement (`worker` by
+   default; `spark_worker` only through
+   `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout /
+   manifest),
    `test_designer` defines regression coverage before behavior-changing or
    regression-prone code changes, and a
    separate read-only reviewer
-   (`python_reviewer`, `cpp_reviewer`, or `reviewer`) reviews the latest diff
+   (`diff_triage_reviewer` by default; `python_reviewer` / `cpp_reviewer` only
+   from changed-path evidence, parent packet evidence, or explicit review-pack
+   activation; `reviewer` for broad escalation) reviews the latest diff
    with before/after scan, impact evidence, and `diff_linked_findings`.
+   A blocked implementation candidate records local/tool evidence with
+   `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`,
+   `parent_packet_ref`, and `status=blocked`; changing candidates requires a
+   revised parent packet and wave.
    Low-level dependency/root slices run first with the fewest write-capable
    agents. Conflict risk must be resolved by task order, not by shrinking the
    repair batch to one finding: place conflicting targets into predecessor /

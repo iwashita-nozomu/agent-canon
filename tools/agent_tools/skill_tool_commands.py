@@ -245,9 +245,7 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
     discovered = unique_preserve_order(
         command for text in texts for command in iter_command_lines(text)
     )
-    required = (
-        f"sed -n '1,220p' {HUMAN_SKILL_ROOT.as_posix()}/{skill}.md",
-    )
+    required: tuple[str, ...] = ()
     validation = (
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
         "python3 tools/agent_tools/skill_tool_commands.py check",

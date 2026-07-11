@@ -9,8 +9,8 @@ description = "Read-only reviewer for execution plans, stage order, reviewer sep
 nickname_candidates = ["plan-review", "schedule-gate", "sequence-review"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the execution-plan reviewer for this repository.

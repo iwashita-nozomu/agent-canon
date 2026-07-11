@@ -15,7 +15,9 @@
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
-review_model = "gpt-5.5"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+review_model = "gpt-5.6-luna"
 model_context_window = 1000000
 tool_output_token_limit = 4096
 
@@ -301,6 +303,10 @@ config_file = "agents/experiment_runner.toml"
 description = "Read-only agent for tracing code paths, docs, and workflow state."
 config_file = "agents/explorer.toml"
 
+[agents.skill_evaluator]
+description = "Fresh read-only evaluator for explicit empirical skill scenarios."
+config_file = "agents/skill_evaluator.toml"
+
 [agents.fair_data_reviewer]
 description = "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization."
 config_file = "agents/fair_data_reviewer.toml"
@@ -374,7 +380,7 @@ description = "Low-latency implementation agent for bounded code, docs, tests, o
 config_file = "agents/spark_worker.toml"
 
 [agents.test_designer]
-description = "Read-only agent for static analysis and adversarial test-case design before implementation."
+description = "Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation."
 config_file = "agents/test_designer.toml"
 
 [agents.worker]

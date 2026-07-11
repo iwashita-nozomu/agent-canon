@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
 # @dependency-end
@@ -85,11 +86,6 @@ DEFERRED_SPAWN_ROLE_IDS = {
     "verifier",
     "auditor",
 }
-INITIAL_INTAKE_AGENT_TYPES = (
-    "requirements_organizer",
-    "explorer",
-    "execution_planner",
-)
 STANDARD_AGENT_WAVE_SEQUENCE = ("plan", "review", "edit")
 STANDARD_AGENT_WAVE_SEQUENCE_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Wave Plan Contract"
@@ -232,41 +228,6 @@ DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
 )
-DYNAMIC_EXPANSION_ROLE_STAGE_WAVES = (
-    (
-        "manager_reviewer",
-        "scheduler",
-        "schedule_reviewer",
-        "project_reviewer",
-        "docs_workflow_steward",
-        "prompt_config_reviewer",
-        "researcher",
-    ),
-    ("designer",),
-    ("design_reviewer", "document_flow_reviewer", "test_designer"),
-    ("implementer", "experimenter", "infra_steward"),
-    (
-        "change_reviewer",
-        "research_reviewer",
-        "experiment_reviewer",
-        "report_reviewer",
-        "reproducibility_reviewer",
-        "artifact_reviewer",
-        "scientific_computing_reviewer",
-        "benchmark_reviewer",
-        "fair_data_reviewer",
-        "ml_science_reviewer",
-        "citation_evidence_reviewer",
-        "notation_definition_reviewer",
-        "logic_gap_reviewer",
-        "infra_reviewer",
-        "python_reviewer",
-        "cpp_reviewer",
-    ),
-    ("final_reviewer",),
-)
-
-
 def validation_failure_response_policy() -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
     global _validation_failure_response_policy_cache
@@ -306,14 +267,15 @@ def validation_failure_response_policy() -> dict[str, object]:
 NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
 SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
-    "identity_key": "role_type+instance_id",
+    "identity_key": "role_id+instance_id+agent_type",
     "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
     "parallel_write": "allowed_only_with_disjoint_write_scopes_and_parent_integration_order",
     "collision_policy": "serialize_current_checkout_waves",
 }
 SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
-    "role_type",
+    "role_id",
     "instance_id",
+    "agent_type",
     "input_packet",
     "allowed_paths",
     "do_not_read",
@@ -327,7 +289,7 @@ SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
     '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
     "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
     "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
-    "spawned_roles=<roles-or-none> role_instances=<role:instance:packet> "
+    "spawned_roles=<roles-or-none> role_instances=<role_id:instance_id:agent_type:packet> "
     "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
     "write_scope=<scope> validation_route=<route> review_gate=<gate> "
     'handoff_artifacts=<artifacts> status=<status>"'
@@ -357,6 +319,23 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "pre_edit_rejection_prediction",
     "dependency_files_header_plan",
     "next_review_gate",
+)
+EVALUATOR_PROMPT_MUST_INCLUDE = (
+    "current_scenario_packet",
+    "packet_listed_evaluation_files",
+    "do_not_read",
+    "expected_output_schema",
+)
+STANDARD_RUN_ARTIFACT_KEYS = (
+    "user_request_contract",
+    "schedule",
+    "work_log",
+    "team_manifest",
+    "verification",
+    "closeout_gate",
+    "agent_evaluation",
+    "workflow_monitoring",
+    "final_review",
 )
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
@@ -397,9 +376,13 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "schedule",
             "design_brief",
             "design_review",
+            "work_log",
         ],
         "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
-        "notes": "Test design derives cases from the approved design packet.",
+        "notes": (
+            "Conditional test design starts from the implemented mechanism, approved design, "
+            "and recorded unresolved risk."
+        ),
     },
     "implementer": {
         "artifact_keys": [
@@ -408,7 +391,6 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "design_brief",
             "design_review",
             "document_flow_review",
-            "test_plan",
         ],
         "workspace_paths": [
             "agents/workflows/implementation-waterfall-workflow.md",
@@ -445,6 +427,33 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         "artifact_keys": ["user_request_contract", "schedule"],
         "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
         "notes": "Scheduling reads explicit requirement and plan surfaces.",
+    },
+}
+ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
+    "designer": {
+        "agents/workflows/implementation-waterfall-workflow.md": (
+            "Gate 5. 詳細設計",
+            "Gate 6. 詳細設計レビュー",
+            "Gate 7. 文書通読レビュー",
+        ),
+        "agents/canonical/CODEX_WORKFLOW.md": (
+            "4. Run Bootstrap",
+            "5. Implementation",
+        ),
+    },
+    "implementer": {
+        "agents/workflows/implementation-waterfall-workflow.md": (
+            "Gate 5. 詳細設計",
+            "Gate 6. 詳細設計レビュー",
+            "Gate 7. 文書通読レビュー",
+            "Gate 8. 実装",
+            "Gate 8.5. 実装後の条件付きテストケース設計",
+            "Gate 9. 最終受け入れ review",
+        ),
+        "agents/canonical/CODEX_WORKFLOW.md": (
+            "4. Run Bootstrap",
+            "5. Implementation",
+        ),
     },
 }
 COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
@@ -520,12 +529,36 @@ class SubagentWaveSlot:
     """One executable subagent instance in a stage wave."""
 
     role_id: str
+    instance_id: str
     agent_type: str
 
+    def __post_init__(self) -> None:
+        """Default the role instance id from the selected executable agent."""
+        if not self.instance_id:
+            object.__setattr__(self, "instance_id", f"{self.role_id}_{self.agent_type}")
+
     @property
-    def instance_id(self) -> str:
-        """Return a stable role-instance id for wave ledgers."""
-        return f"{self.role_id}_{self.agent_type}"
+    def executable_identity(self) -> str:
+        """Return the authoritative executable role identity."""
+        return f"{self.role_id}:{self.instance_id}:{self.agent_type}"
+
+
+@dataclass(frozen=True)
+class AgentTypeSelection:
+    """Explicit parent-packet selection of one executable agent for a role."""
+
+    role_id: str
+    agent_type: str
+    evidence: str
+
+
+@dataclass(frozen=True)
+class StageWave:
+    """One catalog-owned subagent stage wave."""
+
+    id: str
+    stage_class: str
+    role_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -543,11 +576,21 @@ class RoleWriteScope:
 
 
 @dataclass(frozen=True)
+class DocumentSectionLocator:
+    """One exact markdown section a role must read within a document."""
+
+    heading: str
+    anchor: str
+    required: bool = True
+
+
+@dataclass(frozen=True)
 class DocumentPacketEntry:
     """One explicit path a role must read before work."""
 
     path: Path
     rationale: str
+    sections: tuple[DocumentSectionLocator, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -626,6 +669,8 @@ class RunBundleSpec:
     default_review_packs_enabled: bool = False
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
+    task_catalog: TaskCatalog | None = None
+    agent_type_selections: tuple[AgentTypeSelection, ...] = ()
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -830,22 +875,19 @@ def repo_tool_routing_policy_output_lines(
 ) -> tuple[str, ...]:
     """Return stdout lines for selected-skill repo tool routing."""
     skill_names = selected_skill_names(selected_skills)
-    packet_commands = tuple(skill_tool_packet_command(skill) for skill in skill_names)
-    first_command = packet_commands[0] if packet_commands else "-"
     skill_list = format_public_skill_list(skill_names)
     dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
     return (
-        f"REPO_TOOL_ROUTING_POLICY={REPO_TOOL_ROUTING_STATUS}",
+        "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
+        f"REPO_TOOL_COMMAND_PACKET_COMMAND={REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE}",
+        f"REPO_TOOL_SELECTED_SKILLS={skill_list}",
+        f"REPO_TOOL_DYNAMIC_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_TOOL_ROUTING_SOURCE={REPO_TOOL_ROUTING_POLICY_SOURCE}",
         f"REPO_TOOL_ROUTING_OWNER={REPO_TOOL_ROUTING_OWNER}",
         f"REPO_TOOL_ROUTING_ROUTE_BASIS={REPO_TOOL_ROUTING_ROUTE_BASIS}",
         f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
         f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
-        f"REPO_TOOL_ROUTING_NEXT_COMMAND={first_command}",
         f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
-        f"REPO_TOOL_ROUTING_SKILLS={skill_list}",
-        f"REPO_TOOL_ROUTING_PACKET_COUNT={len(packet_commands)}",
-        f"REPO_TOOL_ROUTING_PACKET_COMMANDS={';'.join(packet_commands) or '-'}",
         f"REPO_TOOL_ROUTING_CHECK={REPO_TOOL_ROUTING_CHECK_COMMAND}",
         f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
         f"REPO_DYNAMIC_SKILL_ROUTING_COMMAND={REPO_DYNAMIC_SKILL_ROUTING_COMMAND}",
@@ -866,16 +908,17 @@ def default_quality_check_role_ids(roles: tuple[Role, ...]) -> tuple[str, ...]:
 
 
 def default_quality_check_agent_types(roles: tuple[Role, ...]) -> tuple[str, ...]:
-    """Return active Codex agent types that provide the default quality-check path."""
+    """Return default Codex agent types for active quality-check responsibilities."""
     roles_by_id = {role.id: role for role in roles}
+    available_agents = registered_codex_agent_types()
     agent_types: list[str] = []
     for role_id in DEFAULT_QUALITY_CHECK_ROLE_IDS:
         role = roles_by_id.get(role_id)
         if role is None:
             continue
-        for agent_type in role.codex_agents:
-            if agent_type not in agent_types:
-                agent_types.append(agent_type)
+        agent_type = _select_codex_agent_candidate(role, available_agents, {})
+        if agent_type is not None and agent_type not in agent_types:
+            agent_types.append(agent_type)
     return tuple(agent_types)
 
 
@@ -1131,6 +1174,86 @@ def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, in
     return active, max_write
 
 
+def workflow_topology_policy_violations(
+    catalog: TaskCatalog,
+) -> tuple[tuple[str, str], ...]:
+    """Return lean-topology violations without duplicating catalog role lists."""
+    owner_bounded_always_on = ("manager", "implementer", "verifier", "auditor")
+    delivery_always_on = (
+        "manager",
+        "designer",
+        "implementer",
+        "verifier",
+        "auditor",
+    )
+    deferred_delivery_reviews = {
+        "manager_reviewer",
+        "design_reviewer",
+        "document_flow_reviewer",
+        "change_reviewer",
+        "final_reviewer",
+    }
+    violations: list[tuple[str, str]] = []
+    for family in catalog.workflow_families:
+        family_id = family.get("id")
+        if not isinstance(family_id, str):
+            violations.append(("<unknown>", "missing-family-id"))
+            continue
+        roles_raw = family.get("roles")
+        if not isinstance(roles_raw, dict):
+            violations.append((family_id, "malformed-roles"))
+            continue
+        roles = cast(dict[str, object], roles_raw)
+        always_on_raw = roles.get("always_on")
+        specialists_raw = roles.get("specialists")
+        if not isinstance(always_on_raw, list) or not all(
+            isinstance(role_id, str)
+            for role_id in cast(list[object], always_on_raw)
+        ):
+            violations.append((family_id, "malformed-always-on"))
+            continue
+        if not isinstance(specialists_raw, list) or not all(
+            isinstance(role_id, str)
+            for role_id in cast(list[object], specialists_raw)
+        ):
+            violations.append((family_id, "malformed-specialists"))
+            continue
+        always_on = tuple(cast(list[str], always_on_raw))
+        specialists = tuple(cast(list[str], specialists_raw))
+        if len(always_on) != len(set(always_on)) or len(specialists) != len(
+            set(specialists)
+        ):
+            violations.append((family_id, "duplicate-role-id"))
+        if set(always_on) & set(specialists):
+            violations.append((family_id, "always-on-specialist-overlap"))
+        if family_id != "skill_evaluation" and "skill_evaluator" in (
+            *always_on,
+            *specialists,
+        ):
+            violations.append((family_id, "skill-evaluator-only-in-skill-evaluation"))
+
+        if family_id == "skill_evaluation":
+            if always_on or specialists != ("skill_evaluator",):
+                violations.append((family_id, "evaluator-only-topology"))
+            expected_budget = (1, 1)
+        elif family_id == "owner_bounded_change":
+            if always_on != owner_bounded_always_on:
+                violations.append((family_id, "owner-bounded-producer-core"))
+            if "change_reviewer" not in specialists:
+                violations.append((family_id, "change-reviewer-not-deferred"))
+            expected_budget = (4, 2)
+        else:
+            if always_on != delivery_always_on:
+                violations.append((family_id, "delivery-producer-core"))
+            missing_reviews = deferred_delivery_reviews - set(specialists)
+            if missing_reviews:
+                violations.append((family_id, "reviewers-not-deferred"))
+            expected_budget = (4, 2)
+        if workflow_spawn_budget(catalog, family_id) != expected_budget:
+            violations.append((family_id, "spawn-budget"))
+    return tuple(violations)
+
+
 def codex_runtime_max_threads() -> int:
     """Return the configured runtime max_threads from .codex/config.toml."""
     return codex_runtime_agent_int("max_threads")
@@ -1173,22 +1296,205 @@ def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str
     return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
 
 
-def _role_stage_slots(
+def parse_agent_type_selections(raw_values: tuple[str, ...]) -> tuple[AgentTypeSelection, ...]:
+    """Parse explicit role-to-agent selections from parent-packet CLI values."""
+    selections: list[AgentTypeSelection] = []
+    for raw_value in raw_values:
+        role_id, has_role_separator, remainder = raw_value.partition("=")
+        agent_type, has_evidence_separator, evidence = remainder.partition(":")
+        if (
+            not has_role_separator
+            or not has_evidence_separator
+            or not role_id.strip()
+            or not agent_type.strip()
+            or not evidence.strip()
+        ):
+            raise RuntimeError(
+                "agent type selections must use ROLE_ID=AGENT_TYPE:EVIDENCE"
+            )
+        selections.append(
+            AgentTypeSelection(
+                role_id=role_id.strip(),
+                agent_type=agent_type.strip(),
+                evidence=evidence.strip(),
+            )
+        )
+    return tuple(selections)
+
+
+def format_agent_type_selections(selections: tuple[AgentTypeSelection, ...]) -> str:
+    """Render explicit role-to-agent selections for stdout."""
+    if not selections:
+        return "none"
+    return ",".join(
+        f"{selection.role_id}={selection.agent_type}:{selection.evidence}"
+        for selection in selections
+    )
+
+
+def validate_agent_type_selections(
+    config: TeamConfig,
+    active_roles: tuple[Role, ...],
+    selections: tuple[AgentTypeSelection, ...],
+    registered_agents: set[str] | None = None,
+) -> tuple[AgentTypeSelection, ...]:
+    """Validate explicit non-default candidate selections against active roles."""
+    if not selections:
+        return ()
+    configured_roles = {
+        role.id: role for role in config.always_on_roles + config.specialist_roles
+    }
+    active_roles_by_id = {role.id: role for role in active_roles}
+    available_agents = (
+        registered_codex_agent_types()
+        if registered_agents is None
+        else registered_agents
+    )
+    seen_roles: set[str] = set()
+    for selection in selections:
+        if selection.role_id in seen_roles:
+            raise RuntimeError(
+                f"duplicate agent type selection for role: {selection.role_id}"
+            )
+        seen_roles.add(selection.role_id)
+        role = configured_roles.get(selection.role_id)
+        if role is None:
+            raise RuntimeError(
+                f"agent type selection references unknown role: {selection.role_id}"
+            )
+        if selection.role_id not in active_roles_by_id:
+            raise RuntimeError(
+                f"agent type selection references inactive role: {selection.role_id}"
+            )
+        if selection.agent_type not in role.codex_agents:
+            raise RuntimeError(
+                f"agent type selection for {selection.role_id} must be one of "
+                f"{','.join(role.codex_agents)}"
+            )
+        if selection.agent_type not in available_agents:
+            raise RuntimeError(
+                f"agent type selection references unregistered Codex agent: {selection.agent_type}"
+            )
+    return selections
+
+
+def agent_type_selection_map(
+    selections: tuple[AgentTypeSelection, ...],
+) -> dict[str, AgentTypeSelection]:
+    """Return validated selections keyed by role id."""
+    return {selection.role_id: selection for selection in selections}
+
+
+def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
+    """Return catalog-owned role topology stages."""
+    topology = _as_object_mapping(
+        catalog.raw.get("role_topology_defaults"),
+        "role_topology_defaults",
+    )
+    waves = _as_mapping_tuple(topology.get("stage_waves"), "role_topology_defaults.stage_waves")
+    return tuple(
+        StageWave(
+            id=_as_required_string(wave.get("id"), "stage_waves[].id"),
+            stage_class=_as_required_string(
+                wave.get("stage_class"),
+                "stage_waves[].stage_class",
+            ),
+            role_ids=_as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"),
+        )
+        for wave in waves
+    )
+
+
+def _select_codex_agent_candidate(
+    role: Role,
+    available_agents: set[str],
+    selections: dict[str, AgentTypeSelection],
+) -> str | None:
+    """Select the executable Codex agent candidate for one active role."""
+    selection = selections.get(role.id)
+    if selection is not None:
+        if selection.agent_type not in role.codex_agents:
+            raise RuntimeError(
+                f"agent type selection for {role.id} must be one of "
+                f"{','.join(role.codex_agents)}"
+            )
+        if selection.agent_type not in available_agents:
+            raise RuntimeError(
+                f"agent type selection references unregistered Codex agent: {selection.agent_type}"
+            )
+        return selection.agent_type
+    return next(
+        (
+            agent_type
+            for agent_type in role.codex_agents
+            if agent_type in available_agents
+        ),
+        None,
+    )
+
+
+def _materialize_stage_wave_slots(
     roles_by_id: dict[str, Role],
     role_ids: tuple[str, ...],
     available_agents: set[str],
-    used_slots: set[tuple[str, str]],
+    used_role_ids: set[str],
+    selections: dict[str, AgentTypeSelection],
 ) -> tuple[SubagentWaveSlot, ...]:
-    """Return stage-ready slots without collapsing shared agent types."""
-    return tuple(
-        SubagentWaveSlot(role_id=role.id, agent_type=agent_type)
-        for role_id in role_ids
-        for role in (roles_by_id.get(role_id),)
-        if role is not None
-        for agent_type in role.codex_agents
-        if agent_type in available_agents
-        if (role.id, agent_type) not in used_slots
+    """Return one default executable slot for each active role in the stage."""
+    slots: list[SubagentWaveSlot] = []
+    for role_id in role_ids:
+        role = roles_by_id.get(role_id)
+        if role is None or role.id in used_role_ids:
+            continue
+        agent_type = _select_codex_agent_candidate(role, available_agents, selections)
+        if agent_type is None:
+            continue
+        slots.append(
+            SubagentWaveSlot(
+                role_id=role.id,
+                instance_id=f"{role.id}_{agent_type}",
+                agent_type=agent_type,
+            )
+        )
+    return tuple(slots)
+
+
+def _initial_stage_wave_slots(
+    roles: tuple[Role, ...],
+    active_subagents: int,
+    catalog: TaskCatalog,
+    agent_type_selections: tuple[AgentTypeSelection, ...] = (),
+    agent_root: Path = CODEX_AGENT_ROOT,
+) -> tuple[SubagentWaveSlot, ...]:
+    """Return intake-stage slots derived from active roles and catalog topology."""
+    if active_subagents < 1:
+        return ()
+    stage_waves = catalog_stage_waves(catalog)
+    roles_by_id = {role.id: role for role in roles}
+    stage_id = (
+        "skill_evaluation"
+        if "skill_evaluator" in roles_by_id and "manager" not in roles_by_id
+        else "intake"
     )
+    intake_wave = next((wave for wave in stage_waves if wave.id == stage_id), None)
+    if intake_wave is None:
+        raise RuntimeError(
+            f"role_topology_defaults.stage_waves must include {stage_id} stage"
+        )
+    available_agents = registered_codex_agent_types(agent_root)
+    selections = agent_type_selection_map(agent_type_selections)
+    slots = _materialize_stage_wave_slots(
+        roles_by_id,
+        intake_wave.role_ids,
+        available_agents,
+        set(),
+        selections,
+    )
+    return tuple(
+        slot
+        for slot in slots
+        if slot.role_id not in {"verifier", "auditor"}
+    )[:active_subagents]
 
 
 def _chunk_wave_slots(
@@ -1208,30 +1514,41 @@ def _chunk_wave_slots(
 def recommended_initial_subagent_wave(
     roles: tuple[Role, ...],
     active_subagents: int,
+    catalog: TaskCatalog,
+    agent_type_selections: tuple[AgentTypeSelection, ...] = (),
+    agent_root: Path = CODEX_AGENT_ROOT,
 ) -> tuple[str, ...]:
-    """Return executable agent_type values for the stage-ready intake wave."""
-    if active_subagents < 1:
-        return ()
-    available_agents = set(unique_codex_agents_for_roles(roles))
-    available_agents.update(registered_codex_agent_types())
-    intake_agents = tuple(
-        agent_type
-        for agent_type in INITIAL_INTAKE_AGENT_TYPES
-        if agent_type in available_agents
+    """Return executable agent_type values for active catalog intake roles."""
+    return tuple(
+        slot.agent_type
+        for slot in _initial_stage_wave_slots(
+            roles,
+            active_subagents,
+            catalog,
+            agent_type_selections,
+            agent_root,
+        )
     )
-    return intake_agents[:active_subagents]
 
 
 def recommended_dynamic_expansion_waves(
     roles: tuple[Role, ...],
     active_subagents: int,
     initial_wave: tuple[str, ...],
+    catalog: TaskCatalog,
+    agent_type_selections: tuple[AgentTypeSelection, ...] = (),
+    agent_root: Path = CODEX_AGENT_ROOT,
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
     return tuple(
         tuple(slot.agent_type for slot in wave)
         for wave in recommended_dynamic_expansion_wave_slots(
-            roles, active_subagents, initial_wave
+            roles,
+            active_subagents,
+            initial_wave,
+            catalog,
+            agent_type_selections,
+            agent_root,
         )
     )
 
@@ -1240,47 +1557,49 @@ def recommended_dynamic_expansion_wave_slots(
     roles: tuple[Role, ...],
     active_subagents: int,
     initial_wave: tuple[str, ...],
+    catalog: TaskCatalog,
+    agent_type_selections: tuple[AgentTypeSelection, ...] = (),
+    agent_root: Path = CODEX_AGENT_ROOT,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
+    initial_slots = _initial_stage_wave_slots(
+        roles,
+        active_subagents,
+        catalog,
+        agent_type_selections,
+        agent_root,
+    )
+    expected_initial_wave = tuple(slot.agent_type for slot in initial_slots)
+    if initial_wave != expected_initial_wave:
+        raise RuntimeError(
+            "initial_wave does not match target registry materialization: "
+            f"expected {expected_initial_wave}, got {initial_wave}"
+        )
     if active_subagents < 1:
         return ()
-    initial_agent_types = set(initial_wave)
-    available_agents = set(unique_codex_agents_for_roles(roles))
+    initial_role_ids = {slot.role_id for slot in initial_slots}
+    available_agents = registered_codex_agent_types(agent_root)
     roles_by_id = {role.id: role for role in roles}
-    used_slots: set[tuple[str, str]] = set()
+    stage_waves = catalog_stage_waves(catalog)
+    selections = agent_type_selection_map(agent_type_selections)
+    used_role_ids: set[str] = set()
     waves: list[tuple[SubagentWaveSlot, ...]] = []
-    staged_role_ids = {
-        role_id
-        for stage_role_ids in DYNAMIC_EXPANSION_ROLE_STAGE_WAVES
-        for role_id in stage_role_ids
-    }
-    for stage_role_ids in DYNAMIC_EXPANSION_ROLE_STAGE_WAVES[:-1]:
-        stage_slots = _role_stage_slots(
-            roles_by_id, stage_role_ids, available_agents, used_slots
+    for stage_wave in stage_waves:
+        stage_slots = _materialize_stage_wave_slots(
+            roles_by_id,
+            stage_wave.role_ids,
+            available_agents,
+            used_role_ids,
+            selections,
         )
-        used_slots.update((slot.role_id, slot.agent_type) for slot in stage_slots)
+        stage_slots = tuple(
+            slot
+            for slot in stage_slots
+            if slot.role_id not in NON_SPAWN_WAVE_ROLE_IDS
+            and slot.role_id not in initial_role_ids
+        )
+        used_role_ids.update(slot.role_id for slot in stage_slots)
         waves.extend(_chunk_wave_slots(stage_slots, active_subagents))
-    fallback_role_ids = tuple(
-        role.id
-        for role in roles
-        if role.id not in staged_role_ids
-        and role.id not in NON_SPAWN_WAVE_ROLE_IDS
-        and any(
-            agent_type not in initial_agent_types for agent_type in role.codex_agents
-        )
-    )
-    fallback_slots = _role_stage_slots(
-        roles_by_id, fallback_role_ids, available_agents, used_slots
-    )
-    used_slots.update((slot.role_id, slot.agent_type) for slot in fallback_slots)
-    waves.extend(_chunk_wave_slots(fallback_slots, active_subagents))
-    final_stage_slots = _role_stage_slots(
-        roles_by_id,
-        DYNAMIC_EXPANSION_ROLE_STAGE_WAVES[-1],
-        available_agents,
-        used_slots,
-    )
-    waves.extend(_chunk_wave_slots(final_stage_slots, active_subagents))
     return tuple(waves)
 
 
@@ -1334,7 +1653,7 @@ def format_subagent_role_instance_wave_chunks(
     return ";".join(
         f"WAVE-{index + 2}="
         + ",".join(
-            f"{slot.role_id}:{slot.agent_type}:{slot.instance_id}" for slot in wave
+            slot.executable_identity for slot in wave
         )
         for index, wave in enumerate(waves)
     )
@@ -1402,7 +1721,10 @@ def select_roles(
 ) -> tuple[Role, ...]:
     """Return the active roles for one run."""
     if full_team:
-        return config.always_on_roles + config.specialist_roles
+        all_roles = config.always_on_roles + config.specialist_roles
+        if workflow_family_id == "skill_evaluation":
+            return tuple(role for role in all_roles if role.id == "skill_evaluator")
+        return tuple(role for role in all_roles if role.id != "skill_evaluator")
     always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
     enabled_roles = tuple(resolve_role(config, name) for name in enabled_specialists)
     selected_roles = list(always_on_roles)
@@ -1440,12 +1762,12 @@ def workflow_always_on_roles(
         cast(object, family_roles),
         f"workflow_families[{workflow_family_id}].roles",
     )
+    if "always_on" not in family_roles:
+        return config.always_on_roles
     role_ids = _as_string_tuple(
         family_roles.get("always_on"),
         f"workflow_families[{workflow_family_id}].roles.always_on",
     )
-    if not role_ids:
-        return config.always_on_roles
     return tuple(resolve_role(config, role_id) for role_id in role_ids)
 
 
@@ -1480,9 +1802,8 @@ def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ..
     return tuple(
         dict.fromkeys(
             (
+                *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
                 *(output for role in roles for output in role.required_outputs),
-                config.artifacts["team_manifest"],
-                config.artifacts["verification"],
             )
         )
     )
@@ -1516,6 +1837,7 @@ def resolve_role_document_packet(
             DocumentPacketEntry(
                 path=resolved_path,
                 rationale=entry.rationale,
+                sections=entry.sections,
             )
         )
 
@@ -1531,10 +1853,16 @@ def resolve_role_document_packet(
             )
         )
     for relative_path in workspace_paths:
+        resolved_path = resolve_workspace_document_path(workspace_root, relative_path)
         add_entry(
             DocumentPacketEntry(
-                path=resolve_workspace_document_path(workspace_root, relative_path),
+                path=resolved_path,
                 rationale=f"workspace doc:{relative_path}",
+                sections=resolve_document_section_locators(
+                    role.id,
+                    relative_path,
+                    resolved_path,
+                ),
             )
         )
     for entry in resolve_cross_cutting_document_packet(workspace_root):
@@ -1545,6 +1873,55 @@ def resolve_role_document_packet(
         must_cite_before_edit=bool(spec.get("must_cite_before_edit", False)),
         notes=str(spec.get("notes", "")),
     )
+
+
+def markdown_heading_anchor(heading: str) -> str:
+    """Return the stable markdown anchor for one exact heading."""
+    lowered = heading.strip().lower()
+    stripped = re.sub(r"[^\w\s.-]", "", lowered, flags=re.UNICODE)
+    dashed = re.sub(r"\s+", "-", stripped)
+    return dashed.strip("-")
+
+
+def markdown_document_headings(path: Path) -> tuple[str, ...]:
+    """Return exact markdown heading text without leading hash marks."""
+    if not path.exists():
+        return ()
+    headings: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if match is not None:
+            headings.append(match.group(2).strip())
+    return tuple(headings)
+
+
+def resolve_document_section_locators(
+    role_id: str,
+    relative_path: str,
+    resolved_path: Path,
+) -> tuple[DocumentSectionLocator, ...]:
+    """Return validated section locators for one role document path."""
+    requested_headings = ROLE_DOCUMENT_PACKET_SECTION_SPECS.get(role_id, {}).get(
+        relative_path,
+        (),
+    )
+    if not requested_headings:
+        return ()
+    headings = set(markdown_document_headings(resolved_path))
+    locators: list[DocumentSectionLocator] = []
+    for heading in requested_headings:
+        if heading not in headings:
+            raise RuntimeError(
+                f"section_locator_heading_missing:{resolved_path}:{heading}"
+            )
+        locators.append(
+            DocumentSectionLocator(
+                heading=heading,
+                anchor=markdown_heading_anchor(heading),
+                required=True,
+            )
+        )
+    return tuple(locators)
 
 
 def strip_dependency_manifest(text: str) -> str:
@@ -1680,11 +2057,18 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
     """Record the parent runtime gate for the first recommended subagent wave."""
     if not spec.workflow_family_id:
         return
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for initial wave materialization")
     active_subagents, _max_write_subagents = workflow_spawn_budget(
-        load_task_catalog(spec.config),
+        spec.task_catalog,
         spec.workflow_family_id,
     )
-    initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
+    initial_wave = recommended_initial_subagent_wave(
+        spec.roles,
+        active_subagents,
+        spec.task_catalog,
+        spec.agent_type_selections,
+    )
     if not initial_wave:
         return
     row = initial_wave_gate_fields(
@@ -1820,8 +2204,10 @@ def build_manifest(spec: RunBundleSpec) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
     if spec.workflow_family_id:
+        if spec.task_catalog is None:
+            raise RuntimeError("task catalog is required for workflow manifest rendering")
         workflow_family = resolve_workflow_family(
-            load_task_catalog(spec.config),
+            spec.task_catalog,
             spec.workflow_family_id,
         )
     lines = manifest_run_lines(spec, workflow_family)
@@ -1898,14 +2284,21 @@ def manifest_run_lines(
     for field in COMMON_PROMPT_MUST_INCLUDE:
         lines.insert(insert_index, f"      - {field}")
         insert_index += 1
+    lines.insert(insert_index, "    evaluator_prompt_must_include:")
+    insert_index += 1
+    for field in EVALUATOR_PROMPT_MUST_INCLUDE:
+        lines.insert(insert_index, f"      - {field}")
+        insert_index += 1
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(
             f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}"
         )
     if workflow_family is not None:
+        if spec.task_catalog is None:
+            raise RuntimeError("task catalog is required for spawn wave recommendation")
         active_subagents, max_write_subagents = workflow_spawn_budget(
-            load_task_catalog(spec.config),
+            spec.task_catalog,
             spec.workflow_family_id,
         )
         lines.append("  spawn_budget:")
@@ -1918,11 +2311,18 @@ def manifest_run_lines(
         lines.append(f"    runtime_max_depth: {codex_runtime_max_depth()}")
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
-        initial_wave = recommended_initial_subagent_wave(spec.roles, active_subagents)
+        initial_wave = recommended_initial_subagent_wave(
+            spec.roles,
+            active_subagents,
+            spec.task_catalog,
+            spec.agent_type_selections,
+        )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
             active_subagents,
             initial_wave,
+            spec.task_catalog,
+            spec.agent_type_selections,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
@@ -1933,6 +2333,14 @@ def manifest_run_lines(
         lines.append("    initial_wave_agent_types:")
         for agent_type in initial_wave:
             lines.append(f"      - {agent_type}")
+        if spec.agent_type_selections:
+            lines.append("    agent_type_selections:")
+            for selection in spec.agent_type_selections:
+                lines.append(f"      - role_id: {selection.role_id}")
+                lines.append(f"        agent_type: {selection.agent_type}")
+                lines.append(f"        evidence: {selection.evidence!r}")
+        else:
+            lines.append("    agent_type_selections: []")
         lines.append("    dynamic_expansion_waves:")
         if expansion_wave_slots:
             for index, wave in enumerate(expansion_wave_slots, start=2):
@@ -1947,7 +2355,7 @@ def manifest_run_lines(
                 for slot in wave:
                     lines.append(
                         "          - "
-                        f"{slot.role_id}:{slot.instance_id}:team_manifest.yaml#roles.{slot.role_id}"
+                        f"{slot.executable_identity}:team_manifest.yaml#roles.{slot.role_id}"
                     )
         else:
             lines.append("      - wave_id: none")
@@ -2015,7 +2423,7 @@ def manifest_run_lines(
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
         lines.append("      - tool_route")
-        lines.append("      - tool_commands")
+        lines.append("      - tool_command_packet_command")
         lines.append("      - tool_evidence")
         lines.append("      - allowed_paths")
         lines.append("      - do_not_read")
@@ -2045,7 +2453,7 @@ def manifest_run_lines(
             "write-capable handoff when design_brief.md exists"
         )
         lines.append(
-            "      - include run.repo_tool_routing_policy selected-skill command sequence, "
+            "      - include run.repo_tool_routing_policy selected-skill packet commands, "
             "dynamic skill candidates, and tool evidence in every handoff packet"
         )
         lines.append(
@@ -2256,18 +2664,6 @@ def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]
             lines.append(f"          - ${skill}")
     else:
         lines.append("          - none")
-    lines.append("        commands:")
-    lines.append("          show_skill_packet:")
-    lines.append(f"            - {skill_tool_packet_command(packet.skill)!r}")
-    lines.append("          required_commands:")
-    for command in packet.required_commands:
-        lines.append(f"            - {command!r}")
-    lines.append("          task_matching_conditional_commands:")
-    for command in conditional_commands_for_packet(packet):
-        lines.append(f"            - {command!r}")
-    lines.append("          validation_commands:")
-    for command in packet.validation_commands:
-        lines.append(f"            - {command!r}")
     return lines
 
 
@@ -2384,9 +2780,17 @@ def manifest_prompt_contract_lines(
         "      assignment_prompt_source: "
         "'tools/agent_tools/agent_team.py#role_prompt_contract'"
     )
-    lines.append(
-        "      common_prompt_must_include_ref: run.handoff_context_policy.common_prompt_must_include"
-    )
+    if role.id == "skill_evaluator":
+        lines.append("      common_prompt_must_include_ref: 'not_applicable'")
+        lines.append(
+            "      evaluator_prompt_must_include_ref: "
+            "run.handoff_context_policy.evaluator_prompt_must_include"
+        )
+    else:
+        lines.append(
+            "      common_prompt_must_include_ref: "
+            "run.handoff_context_policy.common_prompt_must_include"
+        )
     lines.append("      role_prompt_must_include:")
     for item in role_prompt_must_include(role):
         lines.append(f"        - {item!r}")
@@ -2443,6 +2847,14 @@ def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]
     for entry in role_specific_document_entries(document_packet):
         lines.append(f"        - path: {str(entry.path)!r}")
         lines.append(f"          rationale: {entry.rationale!r}")
+        if entry.sections:
+            lines.append("          sections:")
+            for section in entry.sections:
+                lines.append(f"            - heading: {section.heading!r}")
+                lines.append(f"              anchor: {section.anchor!r}")
+                lines.append(
+                    f"              required: {str(section.required).lower()}"
+                )
     return lines
 
 
@@ -2542,6 +2954,21 @@ def render_role_topology(
                     f"strings or booleans: {key}"
                 )
             lines.append(f"{indent}    {key}: {rendered_value}")
+    stage_waves = topology.get("stage_waves")
+    if isinstance(stage_waves, list):
+        lines.append(f"{indent}  stage_waves:")
+        for wave in _as_mapping_tuple(
+            cast(object, stage_waves),
+            "role_topology.stage_waves",
+        ):
+            lines.append(f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}")
+            lines.append(
+                f"{indent}      stage_class: "
+                f"{_as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
+            )
+            lines.append(f"{indent}      role_ids:")
+            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"):
+                lines.append(f"{indent}        - {role_id}")
     return lines
 
 
@@ -2563,7 +2990,7 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}    - {SUBAGENT_STARTUP_ROUTE!r}")
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(
-        f"{indent}  tool_commands: 'run.repo_tool_routing_policy.sequential_tool_routes'"
+        f"{indent}  tool_command_packet_command: {REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE!r}"
     )
     lines.append(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
@@ -2571,7 +2998,7 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
     lines.append(f"{indent}  required_tool_fields:")
     lines.append(f"{indent}    - tool_route")
-    lines.append(f"{indent}    - tool_commands")
+    lines.append(f"{indent}    - tool_command_packet_command")
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}    - tool_rejection_prediction")
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
@@ -2601,7 +3028,7 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
-        "Carry run.repo_tool_routing_policy tool_route, tool_commands, and tool_evidence into "
+        "Carry run.repo_tool_routing_policy tool_route, tool_command_packet_command, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "
@@ -2619,6 +3046,13 @@ def compact_role_prompt_contract(
         if workflow_family is not None
         else "the selected workflow"
     )
+    if role.id == "skill_evaluator":
+        return (
+            "skill_evaluator for the frozen Scenario Packet; fresh and read-only; "
+            "use only current_scenario_packet, packet_listed_evaluation_files, "
+            "do_not_read, and expected_output_schema; do not receive common or "
+            "cross-cutting run context."
+        )
     write_scope = (
         "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
     )
@@ -2633,6 +3067,13 @@ def compact_role_prompt_contract(
 def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     """Return handoff fields every invocation prompt should include for one role."""
     common: list[str] = []
+    if role.id == "skill_evaluator":
+        return (
+            "fresh_evaluator",
+            "read_only",
+            "no_nested_agents",
+            "fixed_output_grammar",
+        )
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
     if role.id == "designer":

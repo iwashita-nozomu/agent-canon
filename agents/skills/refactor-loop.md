@@ -369,7 +369,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - regression case、nasty case、behavior-preservation assertions を設計し、
      実装 agent へ渡します。
 1. Write-capable implementation agent
-   - 既定は `worker` です。低遅延で閉じる write scope では `spark_worker` も使えます。
+   - 既定は `worker` です。低遅延で閉じる write scope でも、`spark_worker` は parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使えます。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。
    - write-capable agent は既定 1 体ですが、parent が dependency order、
      wave plan、disjoint write scope、integration order、review gate を明示した
      場合は、複数 writer を同一 wave で並列化できます。衝突する target は禁止
@@ -384,8 +384,10 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - 実装 agent は review を完了扱いにしてはいけません。
 1. Read-only review agent
    - 実装 agent とは別 instance にします。
-   - Python 差分は `python_reviewer`、C/C++ 差分は `cpp_reviewer`、Rust/tool
-     差分や mixed diff は `reviewer` または task-specific reviewer を使います。
+   - post-implementation change review は `diff_triage_reviewer` が既定です。
+     `python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet
+     evidence、または明示 review-pack activation がある場合だけ追加し、broad
+     diff は `reviewer` または task-specific reviewer へ上げます。
    - reviewer には latest diff、scan before/after、impact diff、test evidence、
      behavior contract、`diff_linked_findings` を渡します。
    - reviewer は approve / revise / escalate を artifact または parent への

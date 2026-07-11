@@ -57,8 +57,17 @@ class VendorSkillAdaptersTest(unittest.TestCase):
         """Write a manifest body with the required version."""
         self.write_file(root, "vendor/skills/manifest.toml", "version = 1\n\n" + body)
 
-    def write_prompt_eval_manifest(self, root: Path, expected_count: int) -> None:
+    def write_prompt_eval_manifest(
+        self,
+        root: Path,
+        expected_count: int | None,
+    ) -> None:
         """Write a minimal prompt eval manifest for runtime skill shims."""
+        count_line = (
+            [f"expected_count = {expected_count}"]
+            if expected_count is not None
+            else []
+        )
         self.write_file(
             root,
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
@@ -69,7 +78,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                     "[[evals]]",
                     'id = "runtime-skill-shims"',
                     'target_glob = ".agents/skills/*/SKILL.md"',
-                    f"expected_count = {expected_count}",
+                    *count_line,
                     'kind = "skill"',
                     'description = "runtime skill shims"',
                     "",
@@ -185,8 +194,8 @@ class VendorSkillAdaptersTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("conflicts-with-canonical-skill", result.stdout)
 
-    def test_enabled_adapter_requires_prompt_eval_count_coverage(self) -> None:
-        """Vendored runtime adapters should not bypass prompt eval growth checks."""
+    def test_enabled_adapter_uses_growing_prompt_eval_glob(self) -> None:
+        """Vendored runtime adapters reject a fixed count on the growing skill glob."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_file(
@@ -215,10 +224,9 @@ class VendorSkillAdaptersTest(unittest.TestCase):
 
             sync_result = self.run_cli(root, "--sync")
             self.assertEqual(sync_result.returncode, 1)
-            self.assertIn("prompt-eval-expected-count-mismatch", sync_result.stdout)
-            self.assertIn("expected=0 actual=1", sync_result.stdout)
+            self.assertIn("prompt-eval-static-count-forbidden", sync_result.stdout)
 
-            self.write_prompt_eval_manifest(root, expected_count=1)
+            self.write_prompt_eval_manifest(root, expected_count=None)
             final_result = self.run_cli(root)
             self.assertEqual(final_result.returncode, 0, final_result.stdout + final_result.stderr)
 

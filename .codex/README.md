@@ -51,7 +51,7 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
 - `/goal <objective>` を使う task では、`agents/workflows/codex-goals-workflow.md` の Goal-Specified Plan-Mode Entry に従い、`/goal` 設定後に `/plan` で contract と evidence map を固定してから実装します
-- token 消費を抑える task では `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile と agent mode を先に宣言します
+- token 消費を見直す場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、既存 session / role metric から重複 fan-out、再読、過大 tool output を特定します。task 名や見積もり規模から profile / agent mode を先に固定しません
 
 ## Goal And Plan Mode
 
@@ -65,39 +65,12 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 
 ## User-Level Token Profiles
 
-`codex -p <profile>` uses profiles from the user-level Codex config, not this
-project-local config. Keep reusable operator profiles in `~/.codex/config.toml`
-or `$CODEX_HOME/config.toml`:
-
-```toml
-[profiles.token-lite]
-model_reasoning_effort = "minimal"
-plan_mode_reasoning_effort = "minimal"
-model_verbosity = "low"
-tool_output_token_limit = 2000
-
-[profiles.token-standard]
-model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
-model_verbosity = "medium"
-tool_output_token_limit = 3000
-
-[profiles.token-deep]
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-model_verbosity = "medium"
-tool_output_token_limit = 6000
-
-[profiles.review]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
-```
-
-Use `codex -p token-lite` for bounded diagnosis, `codex -p token-standard` for
-normal staged repo work, and `codex -p token-deep` for architecture, research,
-or high-risk review. Profiles do not waive workflow gates.
+`codex -p <profile>` reads machine-local user config, not this repository.
+AgentCanon therefore does not duplicate profile values or assign profiles from
+task labels. The project starts from `.codex/config.toml`; an operator may
+change a user profile for a fresh session after observed token, latency, or
+tool-output evidence identifies a runtime constraint. Profile changes do not
+waive workflow gates and do not authorize dropping decision-relevant context.
 
 ## Runtime Spawn Limits
 
@@ -108,16 +81,15 @@ or high-risk review. Profiles do not waive workflow gates.
 - `max_depth = 2`
   - one bounded child-subagent layer を許可します
 - 同時 spawn の既定 budget は workflow family 側で決めます
-  - `Owner-Bounded Change`: 4
-  - `Scoped Change`: 8
-  - `Large Delivery` / `Platform And Environment`: 10
-  - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
-- `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
+  - repo-changing workflow family: active 4 / write-capable 2
+  - `Skill Evaluation` / T14: evaluator-only active 1 / write-capable cap 1
+  - specialist は decision ごとの wave で入れ替え、全 role を同時起動しない
+- `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。write-capable 上限は総同時起動 cap と区別します。
 - same-role instance policy は `agents/task_catalog.yaml` と generated
   `team_manifest.yaml` の `run.delegated_spawn_policy` が正本です。
   `.codex/config.toml` の `[agents]` には Codex runtime が読む runtime
   limit と `[agents.<role>]` registry だけを置き、policy 文字列を置きません。
-  `role_type+instance_id` が instance key で、`max_threads` は runtime cap であり
+  `role_id+instance_id+agent_type` が instance key で、`max_threads` は runtime cap であり
   role cardinality の source ではありません。
 - write-capable subagent instance は既定 1 体から始めます。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、同じ role type を含む複数 writer instance を spawn budget 内で並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
@@ -137,7 +109,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `Stop` は `hooks/codex_runtime_summary_logger.py` で bounded runtime summary を書いた後、`hooks/runtime_log_auto_sync.py` で `runtime_log_archive_git.py sync` を best-effort 実行します。これにより hook JSONL、eval report、Codex runtime summary、`reports/agents/` run bundle は通常 agent の手動 push なしで log archive の `logs/<repo-key>` branch に集約されます。network / SSH / archive 不在の失敗は fail-open で作業を止めません。
-- `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。`rg --files`、`rg -l "<pattern>" <bounded dirs>`、specific file / bounded dir への `rg -n`、`--max-count` 付き検索、または `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` を除外した検索は通常 quiet です。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
+- `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。この hook は `rg` を canonical search にするものではありません。repo discovery は構造 intake の後に `find`、`git grep`、または owner directory への targeted `grep` で行います。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を確認します。普通の相談、read-only search、validation command では child guard を起動しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行します。current finding は warning context と hook log に残し、closeout 前の修復対象にします。
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
@@ -158,17 +130,17 @@ or high-risk review. Profiles do not waive workflow gates.
 
 - `.codex/agents/*.toml` is the source of truth for each Codex subagent's
   `model` and `model_reasoning_effort`.
-- `.codex/config.toml` owns project features, runtime limits,
-  skill registration, and the agent registry only; it does not carry a second
-  model settings table.
+- `.codex/config.toml` owns the Sol/high parent default, the Luna `/review`
+  default, project features, runtime limits, skill registration, and the agent
+  registry. Child model settings remain in role TOMLs.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Review, quality-check, diff review, bounded review, and test-design roles use
-  frontier reviewer TOML files; repo inventory, tool-drift, machine-report
-  summary, and execution-only log roles stay on mini helper TOML files; broad
-  design, implementation, and ship-decision roles use frontier TOML files.
-- `xhigh` is a manual session escalation, not a project-wide default.
+- Ordinary planning, authoring, and review children use Luna/high. `worker` and
+  `ship_reviewer` use Luna/xhigh; mini helpers retain bounded exploration,
+  execution, and skill evaluation; Spark remains explicit mechanical work.
+- The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
+  an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います

@@ -16,11 +16,11 @@ import argparse
 import os
 import re
 import sys
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
 
 import yaml
 
@@ -522,23 +522,15 @@ class VendorSkillValidator:
             entry = as_mapping(raw_entry)
             if entry is None or entry.get("target_glob") != RUNTIME_SKILL_TARGET_GLOB:
                 continue
-            expected = entry.get("expected_count")
-            actual = len(
-                [
-                    path
-                    for path in self.root.glob(RUNTIME_SKILL_TARGET_GLOB)
-                    if path.is_file()
+            if "expected_count" in entry:
+                return [
+                    Finding(
+                        "eval",
+                        PROMPT_EVAL_MANIFEST.as_posix(),
+                        f"prompt-eval-static-count-forbidden:{RUNTIME_SKILL_TARGET_GLOB}",
+                    )
                 ]
-            )
-            if expected == actual:
-                return []
-            return [
-                Finding(
-                    "eval",
-                    PROMPT_EVAL_MANIFEST.as_posix(),
-                    f"prompt-eval-expected-count-mismatch:{RUNTIME_SKILL_TARGET_GLOB}:expected={expected} actual={actual}",
-                )
-            ]
+            return []
         return [
             Finding(
                 "eval",

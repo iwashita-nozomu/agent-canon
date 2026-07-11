@@ -17,13 +17,13 @@ import hashlib
 import json
 import subprocess
 import sys
+import tomllib
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
-import tomllib
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -33,6 +33,11 @@ from agent_team import (  # noqa: E402
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    select_roles,
+    workflow_spawn_budget,
+    workflow_topology_policy_violations,
 )
 from runtime_log_paths import eval_results_dir  # noqa: E402
 
@@ -43,20 +48,21 @@ GIT_COMMAND_TIMEOUT_SECONDS = 5
 VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 SPARK_MODEL = "gpt-5.3-codex-spark"
 MINI_MODEL = "gpt-5.4-mini"
-FRONTIER_MODEL = "gpt-5.5"
+LUNA_MODEL = "gpt-5.6-luna"
+PARENT_MODEL = "gpt-5.6-sol"
+PARENT_REASONING_EFFORT = "high"
+REVIEW_MODEL = "gpt-5.6-luna"
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
 SPARK_MODEL_AGENT_IDS = {"spark_worker"}
 MINI_MEDIUM_AGENT_IDS = {
     "experiment_runner",
     "explorer",
+    "skill_evaluator",
 }
-FRONTIER_XHIGH_AGENT_IDS = {
-    "diff_triage_reviewer",
-    "docs_workflow_steward",
-    "reviewer",
-    "ship_reviewer",
-    "test_designer",
-}
+LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
+EVALUATOR_AGENT_ID = "skill_evaluator"
+EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
+FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 
 
 @dataclass(frozen=True)
@@ -176,12 +182,55 @@ def validate_no_legacy_model_policy(root: Path) -> list[Finding]:
     payload = load_toml(config_path.read_text(encoding="utf-8"))
     if "agent_model_policy" in payload:
         findings.append(Finding("model-settings", ".codex/config.toml", "legacy-agent-model-policy"))
+    for key, expected in (
+        ("model", PARENT_MODEL),
+        ("model_reasoning_effort", PARENT_REASONING_EFFORT),
+        ("review_model", REVIEW_MODEL),
+    ):
+        if payload.get(key) != expected:
+            findings.append(
+                Finding("model-settings", ".codex/config.toml", f"expected-{key}-{expected}")
+            )
+    for key in ("service_tier", "flex", "tier"):
+        if key in payload:
+            findings.append(
+                Finding("model-settings", ".codex/config.toml", f"unsupported-profile-key-{key}")
+            )
     return findings
 
 
 def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
     """Return roles keyed by id."""
     return {role.id: role for role in roles}
+
+
+def extract_stage_waves(catalog_raw: dict[str, object]) -> tuple[tuple[dict[str, object], ...], list[Finding]]:
+    """Extract catalog stage_waves as typed mappings and report malformed topology."""
+    findings: list[Finding] = []
+    topology_raw = catalog_raw.get("role_topology_defaults")
+    if not isinstance(topology_raw, dict):
+        findings.append(Finding("routing", "role_topology_defaults", "missing-stage-waves"))
+        return (), findings
+    topology = cast(dict[str, object], topology_raw)
+    stage_waves_raw = topology.get("stage_waves")
+    if not isinstance(stage_waves_raw, list) or not stage_waves_raw:
+        findings.append(Finding("routing", "role_topology_defaults", "missing-stage-waves"))
+        return (), findings
+    stage_waves: list[dict[str, object]] = []
+    raw_stage_waves = cast(list[object], stage_waves_raw)
+    for index, raw_wave in enumerate(raw_stage_waves):
+        if not isinstance(raw_wave, dict):
+            findings.append(Finding("routing", f"stage_waves[{index}]", "malformed-stage-wave"))
+            continue
+        stage_waves.append(cast(dict[str, object], raw_wave))
+    same_role_raw = topology.get("same_role_parallel_instances")
+    if not isinstance(same_role_raw, dict):
+        findings.append(Finding("routing", "role_topology_defaults", "legacy-identity-key"))
+    else:
+        same_role = cast(dict[str, object], same_role_raw)
+        if same_role.get("identity_key") != "role_id+instance_id+agent_type":
+            findings.append(Finding("routing", "role_topology_defaults", "legacy-identity-key"))
+    return tuple(stage_waves), findings
 
 
 def evaluate_static_agent_configs(
@@ -191,6 +240,8 @@ def evaluate_static_agent_configs(
     """Evaluate static role TOML schema, behavior, and executable model settings."""
     findings: list[Finding] = []
     for agent_id, config in configs.items():
+        for key in sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config)):
+            findings.append(Finding("schema", agent_id, f"unsupported-profile-key-{key}"))
         for field in ("name", "description", "developer_instructions"):
             if not str(config.get(field, "")).strip():
                 findings.append(Finding("schema", agent_id, f"missing-{field}"))
@@ -207,15 +258,25 @@ def evaluate_static_agent_configs(
         if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
             findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
         if agent_id in MINI_MEDIUM_AGENT_IDS:
-            if model != MINI_MODEL:
-                findings.append(Finding("model-settings", agent_id, f"expected-model-{MINI_MODEL}"))
-            if effort != "medium":
-                findings.append(Finding("model-settings", agent_id, "expected-medium-reasoning"))
-        if agent_id.endswith("_reviewer") or agent_id in FRONTIER_XHIGH_AGENT_IDS:
-            if model != FRONTIER_MODEL:
-                findings.append(Finding("model-settings", agent_id, f"expected-model-{FRONTIER_MODEL}"))
-            if effort != "xhigh":
-                findings.append(Finding("model-settings", agent_id, "expected-xhigh-reasoning"))
+            expected_model, expected_effort = MINI_MODEL, "medium"
+        elif agent_id in SPARK_MODEL_AGENT_IDS:
+            expected_model, expected_effort = SPARK_MODEL, "low"
+        elif agent_id in LUNA_XHIGH_AGENT_IDS:
+            expected_model, expected_effort = LUNA_MODEL, "xhigh"
+        else:
+            expected_model, expected_effort = LUNA_MODEL, "high"
+        if model != expected_model:
+            findings.append(
+                Finding("model-settings", agent_id, f"expected-model-{expected_model}")
+            )
+        if effort != expected_effort:
+            findings.append(
+                Finding("model-settings", agent_id, f"expected-{expected_effort}-reasoning")
+            )
+        if model == PARENT_MODEL:
+            findings.append(Finding("model-settings", agent_id, "child-model-must-not-use-sol"))
+        if model == "gpt-5.5":
+            findings.append(Finding("model-settings", agent_id, "gpt-5.5-assignment-forbidden"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
     return findings
 
@@ -240,6 +301,7 @@ def evaluate_role_behavior(
             "reviewer",
             "ship_reviewer",
             "test_designer",
+            EVALUATOR_AGENT_ID,
         }
     )
     if read_only_role:
@@ -258,6 +320,27 @@ def evaluate_role_behavior(
                 findings.append(Finding("behavior", agent_id, f"spark-worker-missing-{phrase}"))
     if agent_id == "worker" and "parent-assigned write scope" not in lower_instructions:
         findings.append(Finding("behavior", agent_id, "worker-missing-parent-managed-write-scope"))
+    if agent_id == EVALUATOR_AGENT_ID:
+        if sandbox_mode != "read-only":
+            findings.append(Finding("behavior", agent_id, "evaluator-not-read-only"))
+        if config.get("approval_policy") != "never":
+            findings.append(Finding("behavior", agent_id, "evaluator-approval-policy-not-never"))
+        for phrase, finding in (
+            ("scenario packet", "evaluator-missing-scenario-packet-boundary"),
+            ("do not edit", "evaluator-missing-no-edit-rule"),
+            ("nested agents", "evaluator-missing-no-nested-agent-rule"),
+            ("reused", "evaluator-missing-no-reuse-rule"),
+            ("output:", "evaluator-missing-output-grammar"),
+            ("requirement results:", "evaluator-missing-requirement-grammar"),
+            ("telemetry:", "evaluator-missing-telemetry-grammar"),
+            ("result metadata:", "evaluator-missing-metadata-grammar"),
+            ("evaluation status:", "evaluator-missing-status-grammar"),
+            ("evaluation_status=", "evaluator-missing-evaluation-status"),
+            ("feedback_actions_resolved=no", "evaluator-missing-feedback-status"),
+            ("learning_capture_complete=no", "evaluator-missing-learning-status"),
+        ):
+            if phrase not in lower_instructions:
+                findings.append(Finding("behavior", agent_id, finding))
     if agent_id == "experiment_runner" and "do not edit repository source" not in lower_instructions:
         findings.append(Finding("behavior", agent_id, "experiment-runner-may-edit-source"))
     if agent_id == "diff_triage_reviewer" and "escalate" not in lower_instructions:
@@ -272,18 +355,196 @@ def evaluate_routing(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     config = load_team_config(root / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, root=root)
+    agent_root = root / ".codex" / "agents"
     roles = role_by_id(config.always_on_roles + config.specialist_roles)
+    evaluator = roles.get(EVALUATOR_AGENT_ID)
+    if evaluator is None:
+        findings.append(Finding("registration", EVALUATOR_AGENT_ID, "missing-permanent-role"))
+    else:
+        if evaluator.activation != EVALUATOR_ACTIVATION:
+            findings.append(Finding("registration", EVALUATOR_AGENT_ID, "activation-must-be-explicit"))
+        if evaluator.id in {role.id for role in config.always_on_roles}:
+            findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-not-be-always-on"))
+        if evaluator.write_policy.mode != "artifacts_only":
+            findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-be-artifacts-only"))
+        if "skill_evaluation" not in evaluator.write_policy.allowed_artifacts:
+            findings.append(Finding("registration", EVALUATOR_AGENT_ID, "missing-skill-evaluation-artifact"))
+    project_config_path = root / ".codex" / "config.toml"
+    project_config: dict[str, object] = {}
+    if project_config_path.is_file():
+        parsed_project_config = tomllib.loads(
+            project_config_path.read_text(encoding="utf-8")
+        )
+        project_config = cast(dict[str, object], parsed_project_config)
+    agent_registry_raw = project_config.get("agents", {})
+    agent_registry = (
+        cast(dict[str, object], agent_registry_raw)
+        if isinstance(agent_registry_raw, dict)
+        else {}
+    )
+    non_default_agent_types = tuple(
+        dict.fromkeys(
+            agent_type
+            for role in roles.values()
+            for agent_type in role.codex_agents
+            if agent_type != "default"
+        )
+    )
+    registration_agent_types = tuple(
+        dict.fromkeys((*non_default_agent_types, EVALUATOR_AGENT_ID))
+    )
+    target_toml_stems = {
+        path.stem
+        for path in (root / ".codex" / "agents").glob("*.toml")
+        if path.is_file()
+    }
+    for agent_type in registration_agent_types:
+        registered_raw = agent_registry.get(agent_type)
+        if not isinstance(registered_raw, dict):
+            findings.append(
+                Finding(
+                    "registration",
+                    agent_type,
+                    "missing-project-registration",
+                )
+            )
+        else:
+            registered = cast(dict[str, object], registered_raw)
+            expected_config_file = f"agents/{agent_type}.toml"
+            if registered.get("config_file") != expected_config_file:
+                findings.append(
+                    Finding(
+                        "registration",
+                        agent_type,
+                        "mismatched-config-file",
+                    )
+                )
+        if agent_type not in target_toml_stems:
+            findings.append(
+                Finding(
+                    "registration",
+                    agent_type,
+                    "missing-toml",
+                )
+            )
+    tasks_with_evaluator = [
+        str(task.get("id"))
+        for task in catalog.tasks
+        if EVALUATOR_AGENT_ID in cast(list[object], task.get("specialists", []))
+    ]
+    if tasks_with_evaluator != ["T14"]:
+        findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-be-only-in-explicit-evaluation-task"))
 
     expected_agent_order = {
-        "change_reviewer": ("python_reviewer", "cpp_reviewer", "diff_triage_reviewer", "reviewer"),
+        "change_reviewer": ("diff_triage_reviewer", "python_reviewer", "cpp_reviewer", "reviewer"),
         "experimenter": ("experiment_runner", "worker"),
         "final_reviewer": ("ship_reviewer", "reviewer", "project_reviewer"),
-        "implementer": ("spark_worker", "worker"),
+        "implementer": ("worker", "spark_worker"),
     }
     for role_id, expected in expected_agent_order.items():
         observed = roles[role_id].codex_agents[: len(expected)]
         if observed != expected:
-            findings.append(Finding("routing", role_id, f"codex-agent-order-expected-{expected}"))
+            findings.append(Finding("routing", role_id, f"role-candidate-order-expected-{expected}"))
+
+    topology_raw = catalog.raw.get("role_topology_defaults")
+    if isinstance(topology_raw, dict):
+        topology = cast(dict[str, object], topology_raw)
+        role_families_raw = topology.get("role_families")
+        role_families = (
+            cast(dict[str, object], role_families_raw)
+            if isinstance(role_families_raw, dict)
+            else None
+        )
+        if role_families is None or role_families.get("implementation") != [
+            "worker",
+            "spark_worker",
+        ]:
+            findings.append(
+                Finding(
+                    "routing",
+                    "role_topology_defaults.role_families.implementation",
+                    "implementation-role-family-order",
+                )
+            )
+        if role_families is None or role_families.get("test_design") != ["test_designer"]:
+            findings.append(
+                Finding(
+                    "routing",
+                    "role_topology_defaults.role_families.test_design",
+                    "test-design-role-family",
+                )
+            )
+        design_family_raw: object = (
+            role_families.get("design") if role_families is not None else None
+        )
+        design_family = (
+            cast(list[object], design_family_raw)
+            if isinstance(design_family_raw, list)
+            else []
+        )
+        if "test_designer" in design_family:
+            findings.append(Finding("routing", "role_topology_defaults.role_families.design", "test-designer-must-be-post-implementation"))
+
+    stage_waves, topology_findings = extract_stage_waves(catalog.raw)
+    findings.extend(topology_findings)
+    role_stage: dict[str, tuple[int, str]] = {}
+    stage_ids: set[str] = set()
+    for stage_index, wave in enumerate(stage_waves):
+        stage_id = str(wave.get("id", ""))
+        if stage_id in stage_ids:
+            findings.append(Finding("routing", stage_id, "duplicate-stage-id"))
+        stage_ids.add(stage_id)
+        role_ids_raw = wave.get("role_ids")
+        if not isinstance(role_ids_raw, list):
+            findings.append(Finding("routing", stage_id or f"stage-{stage_index}", "malformed-stage-role-ids"))
+            continue
+        role_ids = cast(list[object], role_ids_raw)
+        for raw_role_id in role_ids:
+            if not isinstance(raw_role_id, str):
+                findings.append(Finding("routing", stage_id or f"stage-{stage_index}", "malformed-stage-role-id"))
+                continue
+            role_id = str(raw_role_id)
+            previous_stage = role_stage.get(role_id)
+            if previous_stage is not None:
+                findings.append(Finding("routing", role_id, f"duplicate-stage-role-{previous_stage[1]}-{stage_id}"))
+            role_stage[role_id] = (stage_index, stage_id)
+    stage_required_roles = set(roles)
+    missing_stage_roles = sorted(stage_required_roles - set(role_stage))
+    for role_id in missing_stage_roles:
+        findings.append(Finding("routing", role_id, "missing-stage-role"))
+    implementer_stage = role_stage.get("implementer")
+    test_designer_stage = role_stage.get("test_designer")
+    change_reviewer_stage = role_stage.get("change_reviewer")
+    if (
+        implementer_stage is None
+        or test_designer_stage is None
+        or change_reviewer_stage is None
+        or not (
+            implementer_stage[0] < test_designer_stage[0] < change_reviewer_stage[0]
+        )
+    ):
+        findings.append(Finding("routing", "test_designer", "test-design-must-follow-implementation"))
+    if test_designer_stage is not None and test_designer_stage[1] != "test_design":
+        findings.append(Finding("routing", "test_designer", "test-designer-stage-owner"))
+    producer_reviewer_pairs = {
+        "manager": ("manager_reviewer",),
+        "researcher": ("research_reviewer",),
+        "scheduler": ("schedule_reviewer",),
+        "infra_steward": ("infra_reviewer",),
+        "designer": ("design_reviewer", "document_flow_reviewer"),
+        "experimenter": ("experiment_reviewer", "report_reviewer"),
+        "implementer": ("test_designer", "change_reviewer", "python_reviewer", "cpp_reviewer"),
+    }
+    for producer, reviewers in producer_reviewer_pairs.items():
+        for reviewer in reviewers:
+            producer_stage = role_stage.get(producer)
+            reviewer_stage = role_stage.get(reviewer)
+            if producer_stage is None or reviewer_stage is None:
+                continue
+            if producer_stage[0] == reviewer_stage[0]:
+                findings.append(Finding("routing", reviewer, f"producer-reviewer-same-stage-{producer}"))
+            elif producer_stage[0] > reviewer_stage[0]:
+                findings.append(Finding("routing", reviewer, f"producer-reviewer-stage-order-{producer}"))
 
     for task_id in ("T1", "T2"):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
@@ -295,15 +556,111 @@ def evaluate_routing(root: Path) -> list[Finding]:
         if active_forbidden:
             findings.append(Finding("routing", task_id, f"lite-route-heavy-specialists-{active_forbidden}"))
 
+    t12_specialists = default_specialists_for_task(config, catalog, "T12")
+    expected_t12 = (
+        "scheduler",
+        "schedule_reviewer",
+        "project_reviewer",
+        "docs_workflow_steward",
+        "prompt_config_reviewer",
+    )
+    if t12_specialists != expected_t12:
+        findings.append(Finding("routing", "T12", f"t12-overdefault-specialist-{t12_specialists}"))
+
+    for family_id, code in workflow_topology_policy_violations(catalog):
+        findings.append(Finding("routing", family_id, code))
+
     review_pack = next(pack for pack in catalog.review_packs if pack["id"] == "research_perspective_review")
     if review_pack.get("default_for_tasks"):
         findings.append(Finding("routing", "research_perspective_review", "full-pack-must-not-default"))
+    integration_pack = next(pack for pack in catalog.review_packs if pack["id"] == "repo_integration_review")
+    if "T12" in cast(list[str], integration_pack.get("default_for_tasks", [])):
+        findings.append(Finding("routing", "repo_integration_review", "t12-overdefault-specialist"))
+
+    t14 = next(task for task in catalog.tasks if task.get("id") == "T14")
+    if t14.get("family") != "skill_evaluation":
+        findings.append(Finding("routing", "T14", "must-use-skill-evaluation-family"))
+    else:
+        t14_family = next(
+            family
+            for family in catalog.workflow_families
+            if family.get("id") == "skill_evaluation"
+        )
+        t14_roles_raw = t14_family.get("roles", {})
+        t14_roles = (
+            cast(dict[str, object], t14_roles_raw)
+            if isinstance(t14_roles_raw, dict)
+            else None
+        )
+        if t14_roles is None or t14_roles.get("always_on") != []:
+            findings.append(Finding("routing", "T14", "evaluation-route-has-default-roles"))
+        if t14_roles is None or t14_roles.get("specialists") != [EVALUATOR_AGENT_ID]:
+            findings.append(Finding("routing", "T14", "evaluation-route-specialists-must-be-evaluator-only"))
+        try:
+            t14_default_specialists = default_specialists_for_task(config, catalog, "T14")
+            t14_roles_active = select_roles(
+                config,
+                list(t14_default_specialists),
+                full_team=False,
+                catalog=catalog,
+                workflow_family_id="skill_evaluation",
+            )
+            t14_budget, _ = workflow_spawn_budget(catalog, "skill_evaluation")
+            t14_initial_wave = recommended_initial_subagent_wave(
+                t14_roles_active,
+                t14_budget,
+                catalog,
+                agent_root=agent_root,
+            )
+            t14_waves = recommended_dynamic_expansion_wave_slots(
+                t14_roles_active,
+                t14_budget,
+                t14_initial_wave,
+                catalog,
+                agent_root=agent_root,
+            )
+            if t14_initial_wave != (EVALUATOR_AGENT_ID,) or t14_waves:
+                findings.append(Finding("routing", "T14", "evaluation-route-materialization-topology"))
+        except (KeyError, RuntimeError, TypeError, ValueError):
+            findings.append(Finding("routing", "T14", "evaluation-route-materialization-failed"))
     triage_pack = next(pack for pack in catalog.review_packs if pack["id"] == "research_perspective_triage")
     if set(cast(list[str], triage_pack.get("specialists", []))) != {
         "reproducibility_reviewer",
         "artifact_reviewer",
     }:
         findings.append(Finding("routing", "research_perspective_triage", "unexpected-triage-specialists"))
+    for task in catalog.tasks:
+        task_id = str(task["id"])
+        task_specialists = default_specialists_for_task(config, catalog, task_id)
+        task_roles = select_roles(
+            config,
+            list(task_specialists),
+            False,
+            catalog,
+            str(task["family"]),
+        )
+        active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
+        try:
+            initial_wave = recommended_initial_subagent_wave(
+                task_roles,
+                active_budget,
+                catalog,
+                agent_root=agent_root,
+            )
+            wave_slots = recommended_dynamic_expansion_wave_slots(
+                task_roles,
+                active_budget,
+                initial_wave,
+                catalog,
+                agent_root=agent_root,
+            )
+        except RuntimeError as exc:
+            findings.append(Finding("routing", task_id, f"materialization-failed-{exc}"))
+            continue
+        role_counts = Counter(slot.role_id for wave in wave_slots for slot in wave)
+        fanout_roles = sorted(role_id for role_id, count in role_counts.items() if count > 1)
+        if fanout_roles:
+            findings.append(Finding("routing", task_id, f"role-candidate-fanout-{fanout_roles}"))
     return findings
 
 

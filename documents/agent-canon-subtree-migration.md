@@ -155,7 +155,7 @@ remote 名や一台の host path に合わせて変えません。
 root 側は owner class ごとに薄い wrapper、symlink view、copy surface、regular active contract を分けます。
 
 - AgentCanon-owned symlink views:
-  - `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, `tools/`
+  - `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/`
   - AgentCanon-owned shared policy docs listed in `documents/shared-runtime-surfaces.toml`
   - AgentCanon-owned `tests/agent_tools/` and `tests/tools/` mirror tests
 - GitHub path constraint copy surfaces:

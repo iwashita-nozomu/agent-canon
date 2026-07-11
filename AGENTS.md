@@ -25,15 +25,23 @@ owner surfaces it names.
 
 ## Codex Loading Priority In This Tree
 
-When Codex starts with the current working directory inside this AgentCanon
-checkout, this `AGENTS.md` is the source-tree repo instruction entrypoint.
-When Codex starts from a template or derived parent root, the parent
-`/AGENTS.md` runtime view loads `ROOT_AGENTS.md` instead. In that parent-root
-session, this file is not automatically loaded merely because a task mentions
-AgentCanon or edits `vendor/agent-canon/`; read it manually only when the
-AgentCanon source checkout is selected as owner evidence. It becomes automatic
-repo instruction context only when the Codex session starts with its current
-working directory inside the AgentCanon checkout.
+Codex still applies global Codex-home guidance before repository guidance. For
+repository guidance, it walks from the detected project root to the current
+working directory, selecting at most one instruction file in each directory:
+`AGENTS.override.md`, then `AGENTS.md`, then fallback names listed in
+`project_doc_fallback_filenames`. Empty instruction files are skipped, and
+Codex stops adding project-doc content when the combined size reaches
+`project_doc_max_bytes`.
+
+When the detected project root is this AgentCanon checkout, this `AGENTS.md` is
+the source-tree repo instruction entrypoint. When Codex starts from a template
+or derived parent root, the parent `/AGENTS.md` runtime view loads
+`ROOT_AGENTS.md` instead. In that parent-root session, this file is not
+automatically loaded merely because a task mentions AgentCanon or edits
+`vendor/agent-canon/`; read it manually only when the AgentCanon source
+checkout is selected as owner evidence. It becomes automatic repo instruction
+context only when Codex's project-root/CWD chain is inside the AgentCanon
+checkout.
 
 Do not copy rules between these files to "make sure" Codex sees them. Put
 template-root runtime behavior in `ROOT_AGENTS.md`, standalone AgentCanon source

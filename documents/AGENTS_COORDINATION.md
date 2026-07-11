@@ -23,15 +23,26 @@ upstream design ../AGENTS.md standalone AgentCanon Codex runtime instruction sur
 
 ## Codex Loading Priority
 
-Codex の自動 instruction 読み込みは、repo root から current working directory
-へ進む runtime chain で決まります。この文書は legacy adapter であり、
-Codex が常に自動で読む runtime instruction surface ではありません。
+Codex loading-priority policy is owned by `ROOT_AGENTS.md` and `AGENTS.md`;
+this file only maps legacy references to the current owner surfaces. Codex の
+自動 instruction 読み込みは Codex home の global guidance から始まり、その後
+project root から current working directory へ進む runtime chain で決まります。
+各 directory では `AGENTS.override.md`、`AGENTS.md`、
+`project_doc_fallback_filenames` の順に最大 1 file だけが入ります。current working
+directory に近い file ほど後に結合され、広い guidance を局所的に上書きします。
+この文書は legacy adapter であり、Codex が常に自動で読む runtime instruction
+surface ではありません。
 
 Template / derived repo root から Codex を開始した場合、`/AGENTS.md` runtime
 view が `vendor/agent-canon/ROOT_AGENTS.md` を読み込みます。AgentCanon source
 checkout 内を current working directory として開始した場合、この tree の
 `AGENTS.md` が standalone source-tree entrypoint になります。`.github/AGENTS.md`
 は `.github/` subtree に入ったときの overlay です。
+
+Skills は repository instruction chain とは別 surface です。Codex は skill
+metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。hook、rules、MCP、
+plugin、`.codex/config.toml` も runtime behavior の owner surface であり、この
+legacy adapter に重複 policy を置きません。
 
 ## Runtime Instruction Surfaces
 
@@ -105,7 +116,7 @@ checkout 内を current working directory として開始した場合、この t
 `notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
 `citation_evidence_reviewer` が有効な run では、論文 draft の major claim が citation、figure、table、derivation、appendix、result に辿れるかを別 reviewer で閉じます。
 code change を含む run では `test_designer` が `test_plan.md` を作り、worker はそれを test 実装へ落とします。
-包括的開発では bundle に加えて `project_reviewer` を parent が read-only で立て、必要なら `docs_workflow_steward`、`python_reviewer`、`cpp_reviewer` を追加します。
+T12 の default-active specialists は `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。post-implementation change review は `diff_triage_reviewer` が既定で、`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加します。
 `--task-id` は task catalog の default specialist と default review pack をそのまま bundle に反映します。
 
 Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。

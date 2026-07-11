@@ -606,61 +606,7 @@ skill_families:
       - oop-readability-check
     routing:
       stage_policy: active
-      reason: code, repository, or document-embedded visualization needs context-question and evidence-source selection before rendering
-      triggers:
-        - ["コード", "可視化"]
-        - ["コード", "図示"]
-        - ["文書", "図"]
-        - ["文書", "図示"]
-        - ["文書", "Mermaid"]
-        - ["文書", "visual_plan"]
-        - ["埋め込む", "図"]
-        - ["埋め込み", "図"]
-        - ["README", "図"]
-        - ["design doc", "diagram"]
-        - ["document", "diagram"]
-        - ["embedded", "diagram"]
-        - ["visual_plan", "diagram"]
-        - ["visual_plan", "Mermaid"]
-        - ["図示", "選択"]
-        - ["図", "選択"]
-        - ["図の", "種類"]
-        - ["フローチャート"]
-        - ["アクティビティ図"]
-        - ["コールグラフ"]
-        - ["制御フローグラフ"]
-        - ["シーケンス図"]
-        - ["状態遷移図"]
-        - ["データフロー図"]
-        - ["依存関係図"]
-        - ["依存グラフ"]
-        - ["依存", "グラフ"]
-        - ["タイミング図"]
-        - ["並行シーケンス図"]
-        - ["関数", "呼び出し関係"]
-        - ["実行経路", "分岐"]
-        - ["処理", "順番"]
-        - ["状態", "変化"]
-        - ["データ", "流れ"]
-        - ["モジュール間", "依存"]
-        - ["並行処理", "時間関係"]
-        - ["code", "visualization"]
-        - ["code", "diagram"]
-        - ["dependency", "graph"]
-        - ["call", "graph"]
-        - ["control-flow", "graph"]
-        - ["control", "flow", "graph"]
-        - ["sequence", "diagram"]
-        - ["state", "diagram"]
-        - ["data-flow", "diagram"]
-        - ["data", "flow", "diagram"]
-        - ["timing", "diagram"]
-        - ["concurrency", "diagram"]
-        - ["class", "diagram"]
-        - ["type", "diagram"]
-        - ["html", "dashboard", "コード"]
-        - ["html", "dashboard", "graph"]
-        - ["graph", "visualization"]
+      reason: Codex skill metadata selection or an explicit public skill id owns route activation; prose remains context evidence
   - id: html-output
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md
@@ -680,7 +626,7 @@ skill_families:
     canonical_doc: agents/skills/html-experiment-report.md
     shim: .agents/skills/html-experiment-report/SKILL.md
   - id: test-design
-    purpose: Statically diagnose brittle tests and design resilient behavior contracts, oracles, property/metamorphic candidates, and adversarial cases before implementation.
+    purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
     related_skills:
@@ -688,32 +634,17 @@ skill_families:
       - change-review
     routing:
       stage_policy: active
-      reason: test strategy, brittle tests, contract-only wrappers, or unnecessary numerical tests are in scope
+      reason: explicit unresolved oracle, specification, regression, or failure-mode risk remains after the owning implementation mechanism exists
       triggers:
-        - ["regression", "case"]
-        - ["既存テスト"]
-        - ["public", "behavior"]
-        - ["bounded", "behavior"]
-        - ["仕様解釈"]
+        - ["unresolved", "oracle"]
+        - ["unresolved", "spec"]
+        - ["oracle", "risk"]
+        - ["spec", "risk"]
+        - ["regression", "risk"]
+        - ["failure-mode", "risk"]
         - ["test-design"]
         - ["test", "design"]
         - ["テスト", "設計"]
-        - ["アルゴリズム", "テストから"]
-        - ["アルゴリズム", "テスト", "直し"]
-        - ["algorithm", "test", "first"]
-        - ["test", "first", "algorithm"]
-        - ["contract-only", "wrapper"]
-        - ["contract", "only", "wrapper"]
-        - ["契約だけ"]
-        - ["契約", "wrapper"]
-        - ["static", "contract", "validation"]
-        - ["pytest", "smoke"]
-        - ["execution-only", "test"]
-        - ["no-crash", "test"]
-        - ["不要", "テスト"]
-        - ["不要", "数値テスト"]
-        - ["数値テスト"]
-        - ["数値", "テスト"]
         - ["numerical", "test"]
         - ["numeric", "test"]
         - ["unnecessary", "test"]

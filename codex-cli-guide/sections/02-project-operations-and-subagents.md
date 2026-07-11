@@ -85,7 +85,7 @@ _ルート検出_
 
 #### 図解: 58 代替指示名
 
-`alternate route names` → `find per directory` → `one file per dir`
+`fallback names` → `find per directory` → `one file per dir`
 
 _AGENTS代替ファイル_
 
@@ -543,7 +543,7 @@ web_search = "cached"
 
 # プロジェクト指示の読み込み上限と代替名。
 project_doc_max_bytes = 65536
-project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 
 # workspace-write時の細かい境界。必要なものだけ許可する。
 [sandbox_workspace_write]
@@ -670,12 +670,12 @@ monorepo/
 
 ### 代替ファイル名
 
-既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_alternate route_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
+既存プロジェクトが`TEAM_GUIDE.md`や`CONTRIBUTING.md`に規約を持っている場合、`project_doc_fallback_filenames`で代替名を登録できる。ただし、Codexが読むファイルが増えすぎるとコンテキストが膨らむ。まずは`AGENTS.md`へCodex向けの要点を集約し、必要な補足だけリンクする。
 
 
 ```
 # ~/.codex/config.toml または .codex/config.toml
-project_doc_alternate route_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
 project_doc_max_bytes = 65536
 ```
 
@@ -1469,10 +1469,10 @@ After I approve the plan, process packages one at a time.
 
 
 ```
-codex exec 
-  --sandbox read-only 
-  --ask-for-approval never 
-  --output-schema review-schema.json 
+codex exec
+  --sandbox read-only
+  --ask-for-approval never
+  --output-schema review-schema.json
   "Review the diff against main. Return JSON findings only. Do not edit files."
 ```
 
@@ -1640,4 +1640,3 @@ L{0.35} L{0.50}}
 
 
 ---
-

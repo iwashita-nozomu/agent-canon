@@ -40,7 +40,55 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill code-visualization
 Execute the required and task-matching conditional commands that the packet prints.
 <!-- skill-tool-commands:end -->
 
+## Small-Model Direct Route
+
+For repository/code-space dependency visualization, use this self-sufficient
+route before reading the canonical document or the generic visualization
+decision tree. The generated full-scope command is exact:
+
+```bash
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
+```
+
+Use `--scope changed` only when the request explicitly asks for changed scope:
+
+```bash
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
+```
+
+For a supplied TSV path, use the same renderer and bundle with the exact input
+flag:
+
+```bash
+python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json
+```
+
+Treat these three commands as immutable flag templates. Copy the selected
+command with every shown flag: `--root .` and `--format json` are mandatory in
+all three routes. Do not remove, add, or rename any flag. For a supplied TSV,
+only the path value after `--graph-tsv` and the path value after `--bundle-dir`
+may be replaced with user-provided paths; keep every other token unchanged.
+
+`--json` is invalid; use `--format json`.
+`check_dependency_graph.sh` owns dependency pass/fail authority. In generated
+mode, the renderer invokes that checker for the
+generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest
+projection creation. For a supplied TSV, checker status is `not_run`: the
+supplied TSV producer owns source facts and the renderer owns only projections.
+This route does not call a separate raw checker, scan, helper, or Mermaid route
+because the renderer invokes that checker in generated mode. The generated
+bundle contains exactly these six basenames:
+
+1. `dependency_graph.tsv`
+2. `dependency_graph.ir.json`
+3. `dependency_graph.md`
+4. `dependency_graph.dot`
+5. `dependency_graph.html`
+6. `manifest.json`
+
 1. Read `agents/skills/code-visualization.md`.
+1. If the request is repository/code-space dependency visualization, follow the
+   Source Evidence Routes in `agents/skills/code-visualization.md` only.
 1. Record a context-derived `Visualization Selection` before rendering:
    - `context_question`
    - `embedding_context`
@@ -71,23 +119,7 @@ Execute the required and task-matching conditional commands that the packet prin
    `$md-style-check` for Mermaid / Markdown checks.
    Treat this as `Document Embedded Diagrams`: the section claim, reader path,
    and embedding context are part of the visualization selection.
-1. Route source evidence through the owning tool or skill:
-   - dependency graph:
-     `bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges`
-   - file-level code dependency surface:
-     `bash tools/agent_tools/scan_code_dependencies.sh --changed`
-   - Python function call surface:
-     `python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json`
-   - skill and owner selection:
-     `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
-   - related skill command packets:
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-analysis --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill algorithm-flowchart --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill prose-reasoning-graph --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill html-output --format text`
-     `python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text`
+1. Route source ownership and delegation through owning skills and packets only.
 1. Keep pass/fail authority with the source producer. The diagram is a
    projection of extracted facts; code, dependency, proof, or runtime checkers
    own correctness claims.

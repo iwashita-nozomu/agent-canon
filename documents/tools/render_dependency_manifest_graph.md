@@ -3,7 +3,6 @@
 contract reference
 responsibility Documents dependency manifest graph report rendering.
 upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
-upstream implementation ../../tools/agent_tools/check_dependency_graph.sh writes dependency graph TSV artifacts.
 upstream design ../dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
@@ -13,63 +12,144 @@ downstream implementation ../../tests/agent_tools/test_render_dependency_manifes
 
 # render_dependency_manifest_graph.py
 
-Use this read-only tool when a review needs a repo-local dependency-manifest
-graph representation instead of raw edge output. The tool can render a
-versioned Graph IR JSON, Markdown, Graphviz DOT, and a self-contained HTML
-graph workbench from the same graph TSV artifact.
-
-This tool is the dependency-manifest graph adapter for the shared Graph DSL Core
-projection contract. `check_dependency_graph.sh` keeps dependency validation
-authority. This renderer maps TSV source/target edges into a repo-local lower
-graph and inspectable projection artifacts. The Graph IR is the durable
-intermediate representation for local graph tooling; Markdown, DOT, and HTML
-are projection views over it. Future reusable graph UI work should flow through
-the projection payload described in
-`documents/structured-analysis/graph-dsl.md`; this tool keeps the
-domain-specific TSV extraction and compatibility route. When dependency graph
-views are embedded in prose workflows, prose-specific vocabulary remains owned
-by `documents/prose-reasoning-graph/dsl-spec.md`.
+Use this tool when a review needs a repo-local dependency-manifest graph artifact.
 
 ## Reader Map
 
-- Owns the usage contract for rendering dependency manifests into Mermaid,
-  Graphviz, HTML, and summary artifacts.
-- Main path: the opening description explains the render target, and Evidence
-  And Assumption Ledger records sources, assumptions, and validation.
-- Read this when producing visual dependency-manifest projections from an
-  existing graph artifact.
-- Boundary: this tool renders validated dependency data; schema and dependency
-  semantics remain with the manifest and validation docs.
+- Owns: CLI and output contract for dependency manifest bundle creation and named
+  projection mode.
+- Reads: repo-local dependency TSV from checker outputs under `check_dependency_graph.sh`
+  or a supplied `--graph-tsv`.
+- Produces: three canonical bundle routes, named projections, manifest and Graph IR
+  schema commitments, and self-contained HTML behavior.
 
-## Evidence And Assumption Ledger
+## Skill / Evaluator Exact-Three Route
 
-- Evidence sources:
-  `../structured-analysis/graph-dsl.md`,
-  `../prose-reasoning-graph/dsl-spec.md`,
-  `../../tools/agent_tools/render_dependency_manifest_graph.py`, and
-  `../../tools/agent_tools/check_dependency_graph.sh`.
-- Assumption:
-  DSL vocabulary in this document names Graph DSL Core projection terms.
-  Dependency validation remains with `check_dependency_graph.sh`.
-- Parent-doc alignment:
-  `../structured-analysis/graph-dsl.md` owns storage vocabulary. The prose graph
-  DSL owns prose-specific projection vocabulary used when dependency graph views
-  appear inside prose workflows.
-
-Adapter mapping uses each dependency manifest entry as the source-truth anchor
-and records the manifest source span when available. Repository files,
-logical artifacts, or checker findings become `repo_path` node record entries;
-dependency, upstream, downstream, and coverage relations become typed relation
-edge record entries. The IR also infers `directory` nodes and `contains` edges
-from repository path prefixes so local graph tools can recover directory
-containment without reparsing display labels. `payload_json` carries native
-locators such as path, line, dependency kind, checker id, graph TSV row, and
-containment parent/child paths. The exported Markdown, DOT, and HTML views are
-projection view products over this lower graph of dependency facts, with
-reader-state and macro-claim context supplied by the surrounding review packet.
+Skill and evaluator execution uses exactly one of these three bundle commands.
+The first command covers the full repository, the second covers the current
+change set, and the third renders a supplied TSV snapshot.
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --graph-tsv reports/dependency_graph.tsv
+python3 tools/agent_tools/render_dependency_manifest_graph.py \
+  --root . \
+  --scope full \
+  --bundle-dir reports/dependency-graph \
+  --format json
+```
+
+```bash
+python3 tools/agent_tools/render_dependency_manifest_graph.py \
+  --root . \
+  --scope changed \
+  --bundle-dir reports/dependency-graph \
+  --format json
+```
+
+```bash
+python3 tools/agent_tools/render_dependency_manifest_graph.py \
+  --root . \
+  --graph-tsv reports/dependency_graph.tsv \
+  --bundle-dir reports/dependency-graph \
+  --format json
+```
+
+In the supplied route, only the values passed to `--graph-tsv` and
+`--bundle-dir` vary.
+
+## Scope and Source
+
+- `--scope` controls the set of nodes/edges the tool accepts as input.
+- `full` scope is default.
+- `changed` scope is explicit and should be used when reviewing changed graph output.
+- `--graph-tsv` accepts an externally supplied TSV snapshot and does not force full scope.
+- Directional topology cycle diagnostics are renderer observations and do not change the
+  manifest checker status.
+- Canonical source provenance is normalized in `source.root` and recorded in the
+  manifest.
+- Full evidence output is emitted without fixed artifact-count caps.
+
+## Checker Abort Semantics
+
+- `check_dependency_graph.sh` nonzero status means abort output generation.
+- A checker failure does not emit a generated bundle and must be treated as a hard stop
+  for this route.
+- Renderer topology diagnostics are observational and do not define checker pass/fail.
+
+## Bundle Outputs
+
+Bundle mode requires `--bundle-dir` and emits:
+
+- `dependency_graph.tsv`
+- `dependency_graph.ir.json`
+- `dependency_graph.md`
+- `dependency_graph.dot`
+- `dependency_graph.html`
+- `manifest.json`
+
+The bundle command emits deterministic outputs; each artifact descriptor includes a
+`sha256` digest, byte size, and media type, with full evidence retention for a
+single invocation.
+
+`manifest.json` contains stable, bundle-local locators and deterministic hashes:
+
+- `artifacts[].path`: stable locator path relative to `--bundle-dir`
+- `artifacts[].sha256`: digest for generated outputs
+- `artifacts[].bytes`: exact byte size of each artifact
+
+Rendered output is emitted as bundle text and JSON:
+- bundle text at markdown and dot outputs
+- bundle JSON at `dependency_graph.ir.json` and `manifest.json`
+
+The bundle command fails fast on broken inputs (`fail-on-broken`) and does not
+partial-write to an existing path on hard failure.
+
+## Named Output Projections
+
+This direct CLI mode is outside the exact-three skill/evaluator route.
+
+Projection mode omits `--bundle-dir` and requires at least one of:
+
+- `--ir-out`
+- `--markdown-out`
+- `--dot-out`
+- `--html-out`
+
+When provided, only requested output files are rendered.
+
+## Manifest / Artifact Contract
+
+- Manifest schema: `agent_canon.dependency_graph_bundle.v1`.
+- Manifest fields:
+  - `schema`
+  - `status`
+  - `scope`
+  - `source`
+  - `checker`
+  - `summary`
+  - `artifacts`
+- Manifest status for successful generated bundles is `pass`.
+- Checker status is `pass` for checker generated bundles and `not_run` for supplied
+  TSV projections.
+- `manifest.json` uses UTF-8, LF, sorted-key indented JSON.
+- Artifact descriptors in manifest include `path`, `media_type`, `bytes`, and `sha256`.
+
+The Graph IR schema is `agent_canon.graph_ir.v2`. Its `documents` records source
+projections, `metadata` records deterministic producer and checker context, and
+`diagnostics` records renderer observations. Directional cycles are represented
+as separate `cycles.upstream` and `cycles.downstream` arrays.
+
+## HTML Behavior
+
+- Rendered HTML is a single in-file workbench with static graph/table evidence and
+  inline interaction script.
+- No external network requests.
+- IR is embedded in-page via JSON script for inspector/filter parity.
+- Keyboard entry for interactive controls follows standard activation parity with
+  pointer behavior and explicit focus semantics.
+
+## CLI and Reference
+
+```bash
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
   --graph-tsv reports/dependency_graph.tsv \
   --ir-out reports/dependency_graph.ir.json \
@@ -77,54 +157,3 @@ python3 tools/agent_tools/render_dependency_manifest_graph.py \
   --dot-out reports/dependency_graph.dot \
   --html-out reports/dependency_graph.html
 ```
-
-The IR output uses schema `agent_canon.graph_ir.v1`. It keeps source-truth
-locators, graph-local node and edge records, dependency relation metadata,
-metrics, display labels, and projection hints such as `code_territory_map` and
-`dense_group_static_graph`. Full paths remain in `text`, `source_locator`, and
-`payload_json`; shortened labels live only in `display` fields for visualization.
-For compatibility, `summary.nodes` and `summary.edges` remain the dependency
-projection counts. Directory containment is reported separately through
-`summary.directoryNodes`, `summary.containmentEdges`, `summary.totalNodes`, and
-`summary.totalEdges`.
-
-The Markdown report summarizes node count, edge count, cycles, broken targets,
-and high-degree nodes. The DOT output is suitable for Graphviz or CI artifacts.
-The HTML output is a single-file browser-readable graph workbench. Its primary
-view is a complete static graph surface: header metrics, Voronoi-style code
-territory map, dense path-level SVG map using shortened node labels,
-fixed-viewport `viewBox` zoom/pan controls, complete dependency node table,
-complete dependency edge table, and a directory-containment table. DOT and the
-interactive dependency graph remain dependency-projection views; containment
-stays in the IR and dedicated HTML table. A secondary filtered explorer keeps
-search, direction/kind filters, focus-depth navigation, SVG graph rendering,
-and a node inspector for local inspection.
-
-The HTML graph workbench targets ordinary browser execution, including the VS
-Code Integrated Browser and Microsoft Live Preview local-server path. JavaScript
-is part of the canonical interaction contract: zoom buttons, range input, wheel
-zoom, drag-pan, and filtered explorer behavior all run in the same HTML file.
-The static SVG and tables remain present in the markup before JavaScript runs,
-but no companion `*_zoom_*.html` files are generated. Generic Webview-style
-previews that disable scripts can display the complete static graph and tables,
-but they are not the canonical zoom backend for this tool.
-
-These reports are review evidence. The dependency header checker remains the
-source for dependency pass/fail decisions, and generated HTML is a reproducible
-projection artifact.
-
-For PR gates with known graph-cycle debt, use the graph report together with:
-
-```bash
-PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
-trap 'rm -rf "${PR_CHECK_TMP}"' EXIT
-bash tools/agent_tools/run_repo_dependency_review.sh \
-  --fail-missing \
-  --cycle-report-only \
-  --report-dir "${PR_CHECK_TMP}/dependency-review/agent-canon-pr"
-```
-
-The wrapper still blocks missing or malformed manifests, but cycles remain a
-reported review artifact instead of hidden terminal output. PR gates keep this
-artifact under the temp directory and run `generated_artifact_guard.py` before
-closeout so regenerated reports do not remain in `reports/`.

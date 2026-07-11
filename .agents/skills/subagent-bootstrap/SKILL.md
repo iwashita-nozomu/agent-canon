@@ -2,6 +2,7 @@
 name: subagent-bootstrap
 description: Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing.
 ---
+
 <!--
 @dependency-start
 contract skill
@@ -11,7 +12,6 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 upstream design ../../../agents/internal-routines/subagent-startup.md owns the canonical private subagent startup route
 @dependency-end
 -->
-
 
 # Subagent Bootstrap
 
@@ -38,7 +38,6 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill subagent-bootstrap
 Execute the required and task-matching conditional commands that the packet prints.
 <!-- skill-tool-commands:end -->
 
-
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
 1. Read `agents/internal-routines/subagent-startup.md` before preparing
@@ -50,9 +49,9 @@ Execute the required and task-matching conditional commands that the packet prin
    authorization, and closeout mechanics; it does not create a second capsule
    schema.
 1. For repo-changing tasks, create or inspect a run bundle before implementation.
-1. For goal-driven repo-changing tasks, create a provisional run bundle and start read-only `requirements_organizer` / `explorer` before `/goal` is finalized when the exact objective is not yet fixed.
+1. For goal-driven repo-changing tasks, create a provisional run bundle and materialize read-only WAVE-1 from the active role set and catalog `intake` stage. The standard catalog materializes `manager` as `requirements_organizer`; add `explorer`, `execution_planner`, or `plan_reviewer` only in evidence-gated dynamic waves.
 1. For goal-driven tasks only, keep write-capable implementation subagents blocked until `goal.md` is parseable, the Codex goal view is mirrored or queued, and Plan-mode evidence mapping exists.
-1. For ordinary repo-changing coding, implementation, patch, or doc-edit work, do not apply the goal-driven `goal.md` block. After the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule `spark_worker` / `worker`; read-only waves are setup evidence, not a substitute for the implementation handoff. The parent remains orchestrator / integrator and does not become the default implementer.
+1. For ordinary repo-changing coding, implementation, patch, or doc-edit work, do not apply the goal-driven `goal.md` block. After the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule the selected write-capable implementer; read-only waves are setup evidence, not a substitute for the implementation handoff. The parent remains orchestrator / integrator and does not become the default implementer.
 1. If the active runtime requires explicit user authorization before `spawn_agent`, do not silently spawn even read-only pre-goal agents. Record the fan-out plan, handoff packets, and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` in the run bundle, then wait for or request authorization.
 1. Use `--task-id` so `agents/task_catalog.yaml` expands default specialists and review packs.
 1. Keep requirements review, plan review, detailed design review, and document flow review as separate agents.
@@ -65,14 +64,14 @@ Execute the required and task-matching conditional commands that the packet prin
    `DEFAULT_QUALITY_CHECK_ROLES`, and `DEFAULT_QUALITY_CHECK_AGENT_TYPES`.
    Review and edit handoffs include `team_manifest.yaml`
    `run.default_quality_check_policy`.
-1. If `IMPLEMENTATION_CODEX_AGENTS` starts with `spark_worker,worker`, send only approved, low-risk implementation slices derived from the Abstract Design Frame and design trace to `spark_worker` first.
+1. Require `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker`; `worker` is the default. Select `spark_worker` only when the parent packet supplies `--select-agent-type implementer=spark_worker:<evidence>`, and require the selection in `SUBAGENT_AGENT_TYPE_SELECTIONS` and `team_manifest.yaml`.
 1. Read the corresponding `.codex/agents/<role>.toml` before choosing model / reasoning for a spawned role.
 1. Before assigning read-only exploration, run the canonical checker, router, semantic index, or dashboard when one owns the question. Use subagents to interpret ambiguous structured tool artifacts or independently review non-tool-covered judgment, not to repeat deterministic tool checks by reading the same documents.
 1. For repo inventory, tool drift survey, and machine-report summarization, use mini helper roles only when they are independent verification that does not delay the implementation critical path.
-1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, use frontier review role TOMLs.
-1. For coding / implementation / patch / doc-edit requests, describe the default route as write-capable handoff first. Once route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet, schedule or launch `spark_worker` / `worker`; parent owns the handoff packet, integration order, review gate, and final responsibility.
-1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, pass deterministic fallback output as a provisional source-packet seed or record `router_unavailable_blocker` before handoff. Fallback routing reaches `fallback_exit_status` through `canonical_rerun_pass`, `durable_blocker_or_issue`, or `explicit_approval_evidence`.
+1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, select one accountable `gpt-5.6-luna/high` review role for the active decision; use `gpt-5.6-luna/xhigh` only for `ship_reviewer` findings.
+1. For coding / implementation / patch / doc-edit requests, describe the default route as write-capable handoff first. Once route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet, schedule or launch the selected write-capable implementer; parent owns the handoff packet, integration order, review gate, and final responsibility.
+1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable. Eligibility does not replace the explicit typed parent-packet selection.
+1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, retain deterministic router recovery output only as local provisional source-packet evidence or record `router_unavailable_blocker` before handoff. This evidence does not select a new candidate or public route; confirm the handoff paths through responsibility search and dependency scope.
 1. Treat every spawned subagent as fresh: build the `Fresh Subagent Context Capsule` through `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`. Keep full packets, raw stdout, raw logs, broad chat summaries, and full dashboards in local/tool context by path instead of pasting them into the prompt.
 1. When `team_manifest.yaml` provides
    `run.subagent_prompt_packet.subagent_startup_route`, carry that structural
@@ -87,8 +86,9 @@ Execute the required and task-matching conditional commands that the packet prin
    the stated checker / validation route and confirmed it targets the same public
    root.
 1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
-1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent using that role TOML's `model` and `model_reasoning_effort` before escalating to the parent or a frontier role.
+1. If the selected candidate cannot launch, record local/tool evidence with `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires an explicit revised parent packet and wave.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
+1. For T12, keep default-active specialists exactly `scheduler`, `schedule_reviewer`, `project_reviewer`, `docs_workflow_steward`, and `prompt_config_reviewer`. When the change-review decision activates, use `diff_triage_reviewer` as its default executable; materialize `python_reviewer` / `cpp_reviewer` only from changed-path evidence, parent packet evidence, or explicit review-pack activation.
 1. If a write-capable coding / docs-edit subagent cannot be launched because authorization or tool gates are missing, record `WRITE_SUBAGENT_AUTHORIZATION=required` or the gate-specific blocker in the run bundle and stop expanding read-only analysis for that slice. Parent-direct is allowed only as a recorded exception with blocked route, exception rationale, owner boundary, and targeted validation.
 1. Default to one writer in the current checkout. If multiple writers are necessary, use them only when `team_manifest.yaml` fixes dependency order, wave plan, disjoint write scope, integration order, and review gate; colliding writers are serialized into later waves in the current checkout instead of split into separate worktrees.
 1. For multiple independent workstreams, schedule a stage owner per workstream and let that owner create a vertical dynamic wave under `run.delegated_spawn_policy` instead of flattening every role into one parent wave. Only sibling waves with disjoint input packets, write scopes, validation routes, and review gates may run together.
@@ -105,6 +105,6 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For user instructions added while the same active task is still running, do not drop the active multi-agent wave. The parent must classify the input as `same_active_task_delta`, `scope_or_contract_change`, or `new_task`; record a checkpoint in the run bundle, Agent Wave Ledger, and workflow monitoring; then either send the updated packet to the still-valid run-local agent or spawn a fresh follow-up wave when scope, allowed paths, owner, or review gate changed.
 1. When context changes mid-task, update the capsule artifact path and send that path; do not append unbounded chat summaries to old handoff prompts.
 1. Include `team_manifest.yaml` `run.subagent_lifecycle_policy` in every subagent handoff prompt, especially `fresh_subagents_required: true` and `reuse_for_new_task: forbidden`.
-1. If `wait_agent` times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` before closing, replacing, or escalating that agent. Include agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, cause hypothesis, and selected action: `continue_wait`, `status_probe_same_task`, `close_and_replace_fresh_wave`, or `escalate_runtime_issue`.
+1. If `wait_agent` times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` with agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, and cause hypothesis. Record the current status and recovered evidence, then return control to the parent decision point. Another wait or status probe requires `new state evidence` or `explicit revised packet`; scope, owner, allowed-path, or review-gate changes require a fresh follow-up wave from that packet.
 1. Before assigning write-capable work, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and include `TOOL_REJECTION_PREDICTED_GATE` lines, `rejection_preflight_command`, and the gate-specific repair plan in the handoff. Treat hook runtime, skill mirror sync, tool catalog, agent protocol convention, and log-surface inventory gates as implementation blockers until the repair command is run or explicitly scheduled in the same handoff.
 1. Before closeout, close run-local subagents and record `subagents_closed=yes` plus `Subagent Lifecycle Evidence` in `closeout_gate.md`.

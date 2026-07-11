@@ -30,7 +30,8 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/user-guided-debugging.md`.
 1. Select exactly one next target issue.
 1. If implementation repair is in scope, prepare a fresh work-capable subagent worker for that target issue before handoff; use the task-appropriate implementation agent from `.codex/agents/*.toml`.
-   - Prefer `spark_worker` only when eligible; otherwise use `worker`.
+   - `worker` is the default. Select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` for an eligible bounded repair, and require the selection in stdout / manifest.
+   - If the selected candidate is blocked, record local/tool evidence with `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires an explicit revised parent packet and wave.
    - Pass the visible problem statement, scoped repair surface, forbidden drift, and validation route to that worker.
 1. Before editing, show the user:
    - target object or path

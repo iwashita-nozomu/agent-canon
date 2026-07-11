@@ -23,8 +23,8 @@ from tools.agent_tools.check_convention_compliance import (
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
     DOCUMENT_SPLIT_DECISION_MARKERS,
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    EXIT_BLOCKER_POLICY_MARKERS,
     EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
-    FALLBACK_EXIT_POLICY_MARKERS,
     IMPLEMENTATION_GUARDRAIL_MARKERS,
     LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
@@ -258,8 +258,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "design_issue_blocker implementation shortcut "
         "before `$research-workflow` source packet adoption/exclusion "
         "parent-direct SKILL.md "
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "revised parent packet\n"
     ),
     ".agents/skills/codex-task-workflow/SKILL.md": skill_fixture(
         "codex-task-workflow",
@@ -276,8 +278,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker "
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "revised parent packet "
         "$oop-readability-check SOLID principle signal OOP dimension "
         "finding kind tools/oop/shared/readability_core.py check_solid_evidence.py "
         "scanned_paths classes Protocol responsibility_scope owner scope "
@@ -296,8 +300,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".agents/skills/subagent-bootstrap/SKILL.md": skill_fixture(
         "subagent-bootstrap",
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "explicit revised packet\n"
     ),
     ".agents/skills/tool-finding-report/SKILL.md": skill_fixture(
         "tool-finding-report",
@@ -385,8 +391,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
         "parent-direct SKILL.md "
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked explicit_approval_evidence "
+        "router_unavailable_blocker "
+        "revised parent packet\n"
     ),
     "agents/skills/codex-task-workflow.md": (
         "codex task workflow prose-reasoning-graph structure-planning "
@@ -402,8 +410,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker "
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "revised parent packet\n"
         "$oop-readability-check SOLID principle signal OOP dimension finding kind "
         "tools/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
         "class Protocol responsibility_scope owner scope protecting tools "
@@ -423,8 +433,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "behavior or contract delta evidence route\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
-        "fallback_exit_status canonical_rerun_pass durable_blocker_or_issue "
-        "explicit_approval_evidence router_unavailable_blocker\n"
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "explicit revised packet\n"
     ),
     "agents/skills/tool-finding-report.md": (
         "tool_warning_exit_status resolved deferred_with_issue "
@@ -667,7 +679,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "git branch <name>/-c/-C/-f/--force\n"
     ),
     ".codex/hooks/direct_rg_context_guard.py": (
-        "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
+        "DIRECT_RG_CONTEXT_RISK=warn repository structure git grep targeted `grep` .agent-canon/log-archive "
         "reports *.jsonl\n"
     ),
     "tools/agent_tools/task_close.py": (
@@ -911,7 +923,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             (root / ".codex" / "hooks" / "direct_rg_context_guard.py").write_text(
-                "DIRECT_RG_CONTEXT_RISK=warn rg -l\n",
+                "DIRECT_RG_CONTEXT_RISK=warn repository structure\n",
                 encoding="utf-8",
             )
 
@@ -919,7 +931,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("hook_guardrail_policy:.codex/hooks/direct_rg_context_guard.py", result.stdout)
-            self.assertIn("missing-marker:--max-count", result.stdout)
+            self.assertIn("missing-marker:git grep", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""
@@ -1085,18 +1097,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("skill_fallback_exit_policy", result.stdout)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
             self.assertIn("forbidden-fallback-completion-wording", result.stdout)
 
     def test_fallback_exit_policy_requires_exit_markers(self) -> None:
-        """Fallback route surfaces keep canonical exit status markers."""
+        """Fallback route surfaces keep positive blocker evidence markers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             skill = root / "agents" / "skills" / "agent-orchestration.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
-                    " explicit_approval_evidence",
+                    " status=blocked",
                     "",
                 ),
                 encoding="utf-8",
@@ -1105,8 +1117,25 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("skill_fallback_exit_policy", result.stdout)
-            self.assertIn("missing-marker:explicit_approval_evidence", result.stdout)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn("missing-marker:status=blocked", result.stdout)
+
+    def test_fallback_exit_policy_requires_event_driven_wait_recovery_markers(self) -> None:
+        """Timeout recovery requires status + new-state or revised-packet evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            updated = skill.read_text(encoding="utf-8").replace(
+                "new state evidence", "", 1
+            )
+            skill.write_text(updated, encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn("missing-marker:new state evidence", result.stdout)
 
     def test_warning_acceptance_requires_explicit_approval_evidence(self) -> None:
         """Accepted warning closeout requires approval evidence."""
@@ -1125,7 +1154,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("skill_fallback_exit_policy", result.stdout)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
             self.assertIn(
                 "accepted-without-explicit-approval-evidence",
                 result.stdout,
@@ -1135,7 +1164,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         """The minimal test fixture includes every fallback exit policy surface."""
         missing = sorted(
             path
-            for path in FALLBACK_EXIT_POLICY_MARKERS
+            for path in EXIT_BLOCKER_POLICY_MARKERS
             if path not in MINIMAL_REPO_FILES
         )
 

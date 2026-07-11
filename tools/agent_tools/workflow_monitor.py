@@ -705,7 +705,7 @@ def validate_mid_task_target_and_evidence(
         or is_empty_policy_value(fields.get("role_instances", ""))
     ):
         raise ValueError(
-            f"mid-task role_instances for {classification} must identify role_type+instance_id"
+            f"mid-task role_instances for {classification} must identify role_id+instance_id+agent_type"
         )
     if classification in MID_TASK_EVIDENCE_FIELDS:
         skipped_roles = fields.get("skipped_roles", "")

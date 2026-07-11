@@ -93,7 +93,6 @@ paths = [
   ".vscode/**",
   "evidence",
   "evidence/**",
-  "mcp/**",
   "tools/**",
   "AGENTS.md",
 ]

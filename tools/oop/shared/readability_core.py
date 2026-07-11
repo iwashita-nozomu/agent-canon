@@ -3776,11 +3776,15 @@ def summarize_findings(
     gate_signal_count = decision_counts.get(SIGNAL_CLASS_GATE, 0)
     error_signal_count = decision_counts.get(SIGNAL_CLASS_ERROR, 0)
     dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
-    solid_counts = Counter(
+    solid_signal_counts = Counter(
         principle
         for finding in findings
         for principle in solid_principles_for_finding(finding)
     )
+    solid_counts = {
+        principle: solid_signal_counts.get(principle, 0)
+        for principle in SOLID_PRINCIPLES.values()
+    }
     warn_or_error = sum(
         1 for finding in findings if finding.severity in {"error", "warn"}
     )

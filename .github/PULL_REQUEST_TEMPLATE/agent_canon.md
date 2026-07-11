@@ -108,9 +108,8 @@ Issue / edit-scope evidence:
 - [ ] `vendor/agent-canon/documents/github-copilot-configuration.md` was
   reviewed in template roots, or `documents/github-copilot-configuration.md`
   was reviewed in standalone AgentCanon.
-- [ ] `.github/copilot-instructions.md` changed / reviewed / not affected.
-- [ ] `.github/instructions/*.instructions.md` changed / reviewed / not affected.
-- [ ] `.github/agents/*.md` changed / reviewed / not affected.
+- [ ] Existing Copilot instruction surfaces changed / reviewed / not affected.
+- [ ] Optional future `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, or `.github/agents/*.md` surfaces were not introduced accidentally.
 - [ ] GitHub Copilot MCP, `copilot-setup-steps.yml`, or Copilot environment settings changed / reviewed / not affected.
 - [ ] PR template routing still separates this template / derived repo AgentCanon-pin PR from standalone AgentCanon repository PRs.
 

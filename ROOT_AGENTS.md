@@ -33,14 +33,25 @@ template-owned active contract.
 Codex instruction loading is runtime-defined and must be reflected in this
 repository's rule layout:
 
-1. User/global Codex guidance loads from Codex home before repository guidance.
-1. Project guidance loads from the project root down to the current working
-   directory. In each directory, an override file wins over `AGENTS.md`, and
-   Codex includes at most one instruction file per directory.
+1. Codex home guidance loads before repository guidance. `AGENTS.override.md`
+   wins over `AGENTS.md` at that global layer, and Codex uses only the first
+   non-empty file there.
+1. Project guidance is discovered from the project root down to the current
+   working directory. In each directory, Codex checks `AGENTS.override.md`,
+   then `AGENTS.md`, then fallback names listed in
+   `project_doc_fallback_filenames`; at most one instruction file from that
+   directory is included.
 1. Files closer to the current working directory appear later in the combined
-   prompt and therefore carry the local override surface.
+   prompt and therefore override earlier, broader guidance. The chain is built
+   once for the run or TUI session. Empty instruction files are skipped, and
+   Codex stops adding project-doc content when the combined size reaches
+   `project_doc_max_bytes`.
+1. Project `.codex/config.toml`, hooks, rules, MCP configuration, skills, and
+   plugins are separate Codex surfaces. They can affect runtime behavior, but
+   they are not a substitute for repository instruction discovery.
 1. Skills are selected from metadata first; `SKILL.md` is read only after the
-   skill is chosen.
+   skill is chosen. Skill instructions are task workflows, not always-loaded
+   repository rules.
 
 For this template, `/AGENTS.md` is the top repo instruction surface and is a
 runtime view of `vendor/agent-canon/ROOT_AGENTS.md`. Nested files such as
@@ -179,6 +190,15 @@ mechanism that must change. Existing tests are evidence for contract
 classification and regression placement. Test edits, new expected values,
 tolerance changes, and oracle design enter after the algorithm contract and
 repair mechanism are fixed.
+
+Test design follows establishment or repair of the production design,
+algorithm contract, and owning implementation mechanism. Activate
+`test_designer` only when a concrete unresolved oracle, specification,
+regression, or failure-mode risk remains outside static analysis, existing
+checkers, and targeted validation. Ordinary code changes, bug fixes, parser
+changes, and validation failures alone leave the role inactive. Existing tests
+remain evidence, while the owning implementation mechanism is the first edit
+surface.
 
 ## Context Construction
 
@@ -341,11 +361,12 @@ A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
 audits, or recorded parent-direct write exceptions; cite the advisory/read-only
 reason or recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
 
-If write-capable handoff was blocked, closeout records
-`WRITE_SUBAGENT_AUTHORIZATION=required` or
-`write_capable_handoff_blocker=<gate>` plus `fallback_exit_status`; it records
-the blocked-handoff fallback instead of ordinary `parent-direct/no-subagents`
-completion for repo-changing work.
+If write-capable handoff was blocked, closeout records one of:
+`WRITE_SUBAGENT_AUTHORIZATION=required` or `write_capable_handoff_blocker=<gate>`
+with typed local blocker evidence:
+`status=blocked`, `selected_agent_type`, `evidence`,
+`parent_packet_ref`. The selected candidate remains blocked until a revised
+explicit parent packet authorizes another candidate.
 
 For CI and hook failures, first decide whether the failure belongs to the
 changed surface or blocks the requested PR/update. Stale, duplicated, or legacy

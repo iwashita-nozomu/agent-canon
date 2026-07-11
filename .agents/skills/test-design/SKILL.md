@@ -1,6 +1,6 @@
 ---
 name: test-design
-description: Use when a change needs oracle/spec-risk classification or resilient, adversarial static test design, including behavior contracts, oracle choice, property/metamorphic candidates, mutation adequacy, or brittle-test diagnosis.
+description: Use only after the owning implementation mechanism exists when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond static analysis, existing checkers, and targeted validation.
 ---
 <!--
 @dependency-start
@@ -26,11 +26,11 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `agents/skills/test-design.md`.
-1. Record target code paths and related test paths as survey and placement evidence. Do not treat path evidence as authority to freeze API shape, private helper names, return shape, error prose, mock order or internal call sequence.
-1. If related tests exist, run `tools/bin/agent-canon test-design check <related-test-paths...>` before reading whole files. Use `fix-now`, `review`, and `design-hint` findings as the first test-plan inputs.
-1. Statically inspect branches, parsing, error handling, state transitions, observable behavior, and public contract boundaries.
-1. Use this skill to classify oracle/spec risk and design tests when the changed behavior, regression risk, or unstable oracle needs it. Do not make test design a mandatory detour for every validation failure.
+1. Read `agents/skills/test-design.md` and return `Activation Decision` first.
+1. Confirm that the owning production design / algorithm contract and implementation mechanism are established or repaired. If not, return `activation=deferred` with the owning repair route; do not run tools or require `test_plan.md`.
+1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not activate this skill.
+1. If the risk is absent or checker-owned, return `activation=not_needed` with the canonical validation route; do not run test-design tools or require `test_plan.md`.
+1. Only for `activation=required`, record code paths and related test paths as survey and placement evidence, inspect branches/parsing/error/state transitions, and design a concrete behavior-regression oracle.
 1. For algorithm fixes, enter through the algorithm contract and code-side
    repair route before changing tests. Read the public entrypoint, recurrence or
    state transition, invariant, stopping or acceptance rule, failure semantics,
@@ -49,7 +49,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Before allowing behavior simplification, revert, intended-behavior removal, feature/test deletion, or oracle weakening, record a short failure-cause note in `test_plan.md`, work log, or review evidence.
 1. For a `contract-only wrapper` or thin adapter, classify whether it adds observable behavior, branch logic, parser/error behavior, state mutation, diagnostic keys, serialization shape, or external process behavior. Names, types, forwards, configuration, and documentation for an existing contract use static contract validation and canonical command evidence.
 1. Use API shape, helper identity, return shape, error prose, mock order or internal call sequence as test oracles only when the user request, approved design, documented external contract, or public behavior already fixes them. Otherwise record them under placement notes or `Do Not Freeze`.
-1. For each test case, fix `Contract Source`, `Behavior Contract`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, and `Do Not Freeze`.
+1. For each required test case, fix `Contract Source`, `Behavior Contract`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, and `Do Not Freeze`.
 1. Classify generated execution-only placeholders such as `test_runs`, `test_smoke`, `test_generated_*`, or `test_can_run` as checker-command validation candidates when they observe only process success, import success, no-crash, or exit code 0.
 1. Route mathematical judgments, oracles, and assertions through the `mathematical necessity gate`: connect them to `Numerical Trigger`, `Non-Numerical Alternative`, checker-owned property, proof obligation, or approved design acceptance criterion before making them test evidence.
 1. Before proposing numerical, randomized, tolerance, solver, convergence,
@@ -59,6 +59,6 @@ Execute the required and task-matching conditional commands that the packet prin
    the omission reason instead. Do not propose CPU computational tests as a
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
-1. Record nasty edge cases and regression cases in `test_plan.md`.
+1. Record nasty edge cases and regression cases in `test_plan.md` only when `activation=required`.
 1. Keep cases concrete at the stable observation level: contract source, input, observable outcome, oracle, `Do Not Freeze`, and why the case is nasty.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.

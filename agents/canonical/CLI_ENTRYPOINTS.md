@@ -21,23 +21,31 @@ upstream design README.md canonical workflow index
 
 ## 共通ルール
 
-- repo root で起動する
-- まず `AGENTS.md` を読む
+- 目的の repository または submodule checkout を project root として扱える
+  directory から起動する。template / derived parent root と
+  `vendor/agent-canon/` source checkout は instruction chain が異なる。
+- Codex は起動時に Codex home の global guidance を読み、その後 project root
+  から current working directory まで `AGENTS.override.md`、`AGENTS.md`、
+  configured fallback names の順に各 directory から最大 1 file を読み込む。
+  人が確認するときは、その chain の repo 側 entrypoint を `AGENTS.md` から辿る。
 - reusable workflow は `agents/` と skill directory で保守する
 - task 固有の run artifact は `reports/agents/<run-id>/` に寄せる
 
 ## Codex
 
 入口:
-- `AGENTS.md`
-- `.agents/skills/`
+- Codex instruction chain: Codex home guidance, then project-root-to-CWD
+  `AGENTS.override.md` / `AGENTS.md` / configured fallback files
+- Repository entrypoint: root `AGENTS.md` for the active project root
+- Skill discovery metadata: `.agents/skills/`
 
 使いどころ:
 - local repository 上の実装、review、文書整備
 - `AGENTS.md` を起点に canonical docs を読む運用
 
 補足:
-- skill の discovery path は `.agents/skills/<skill>/SKILL.md`
+- skill discovery は metadata が先で、選択後に
+  `.agents/skills/<skill>/SKILL.md` を読む
 - task 実行の標準順序は `agents/canonical/CODEX_WORKFLOW.md`
 - subagent routing は `agents/canonical/CODEX_SUBAGENTS.md`
 - repo-wide の正本変更は `agents/` を先に更新する
@@ -75,7 +83,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 環境変更では `--task-id T8`、学術文章では `--task-id T10` を起点にします。
 
-包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定 stack として立てます。
+包括的開発では次を起点にします。T12 の default-active specialists は
+`scheduler`、`schedule_reviewer`、`project_reviewer`、
+`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
@@ -84,6 +94,19 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
+
+実装 candidate は `worker,spark_worker` の順で、`worker` が既定です。
+bounded slice で `spark_worker` を選ぶ場合だけ、parent packet から
+`--select-agent-type implementer=spark_worker:<evidence>` を追加します。選択は
+`SUBAGENT_AGENT_TYPE_SELECTIONS` と `team_manifest.yaml` に記録されます。
+選択済み candidate が blocked の場合は local/tool context に
+`selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、
+`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は
+parent packet と wave の改訂を必須にします。
+
+post-implementation change review は `diff_triage_reviewer` が既定です。
+`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、
+または明示 review-pack activation がある場合だけ materialize します。
 
 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 

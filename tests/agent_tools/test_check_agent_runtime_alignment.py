@@ -14,7 +14,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
+
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
@@ -27,11 +30,30 @@ from agent_team import (  # noqa: E402
     codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
+    resolve_document_section_locators,
     resolve_role,
     resolve_role_document_packet,
     workflow_spawn_budget,
+    workflow_topology_policy_violations,
 )
 from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
+
+
+def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
+    """Build a TaskCatalog value from parsed YAML."""
+    return TaskCatalog(
+        raw=raw,
+        workflow_families=tuple(raw["workflow_families"]),  # type: ignore[arg-type]
+        tasks=tuple(raw["tasks"]),  # type: ignore[arg-type]
+        review_packs=tuple(raw["review_packs"]),  # type: ignore[arg-type]
+    )
+
+
+def loaded_task_catalog_raw() -> dict[str, object]:
+    """Return a mutable copy of the checked-in task catalog."""
+    return yaml.safe_load(
+        (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
+    )
 
 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
@@ -62,6 +84,194 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             "permanent-team mapping missing roles: verifier",
         ):
             validate_permanent_team_mapping(config, text_without_verifier)
+
+    def test_skill_evaluator_is_staged_only_for_the_evaluation_route(self) -> None:
+        """The evaluator is catalog-staged without becoming a default for other tasks."""
+        config = load_team_config()
+        evaluator = resolve_role(config, "skill_evaluator")
+        self.assertIn(evaluator, config.specialist_roles)
+        self.assertEqual(evaluator.activation, "explicit_empirical_skill_evaluation")
+        catalog = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], catalog["role_topology_defaults"])
+        stage_waves = cast(list[object], topology["stage_waves"])
+        staged_ids: set[str] = set()
+        intake_role_ids: list[str] = []
+        evaluation_role_ids: list[str] = []
+        for raw_wave in stage_waves:
+            wave = cast(dict[str, object], raw_wave)
+            wave_role_ids = cast(list[object], wave["role_ids"])
+            if wave["id"] == "intake":
+                intake_role_ids = [cast(str, role_id) for role_id in wave_role_ids]
+            if wave["id"] == "skill_evaluation":
+                evaluation_role_ids = [cast(str, role_id) for role_id in wave_role_ids]
+            for raw_role_id in wave_role_ids:
+                staged_ids.add(cast(str, raw_role_id))
+        self.assertIn("skill_evaluator", staged_ids)
+        self.assertEqual(intake_role_ids, ["manager"])
+        self.assertEqual(evaluation_role_ids, ["skill_evaluator"])
+
+    def test_full_team_keeps_skill_evaluator_isolated(self) -> None:
+        """Full-team routes must not leak the empirical evaluator across workflows."""
+        config = load_team_config()
+        catalog = runtime_alignment.load_task_catalog(config)
+
+        comprehensive_roles = runtime_alignment.select_roles(
+            config,
+            [],
+            full_team=True,
+            catalog=catalog,
+            workflow_family_id="comprehensive_development",
+        )
+        evaluation_roles = runtime_alignment.select_roles(
+            config,
+            [],
+            full_team=True,
+            catalog=catalog,
+            workflow_family_id="skill_evaluation",
+        )
+
+        self.assertNotIn("skill_evaluator", {role.id for role in comprehensive_roles})
+        self.assertEqual([role.id for role in evaluation_roles], ["skill_evaluator"])
+
+    def test_workflow_topology_rejects_evaluator_in_non_evaluation_family(self) -> None:
+        """The shared topology policy must isolate the evaluator by family."""
+        raw = loaded_task_catalog_raw()
+        families = cast(list[dict[str, object]], raw["workflow_families"])
+        comprehensive = next(
+            family for family in families if family["id"] == "comprehensive_development"
+        )
+        roles = cast(dict[str, object], comprehensive["roles"])
+        specialists = cast(list[str], roles["specialists"])
+        specialists.append("skill_evaluator")
+        catalog = task_catalog_from_raw(raw)
+
+        self.assertIn(
+            (
+                "comprehensive_development",
+                "skill-evaluator-only-in-skill-evaluation",
+            ),
+            workflow_topology_policy_violations(catalog),
+        )
+
+    def test_skill_evaluator_context_is_packet_only(self) -> None:
+        """The evaluator receives only its scenario packet and listed files."""
+        config = load_team_config()
+        policy = next(
+            policy
+            for policy in config.context_policies
+            if policy.get("roles") == ["skill_evaluator"]
+        )
+
+        self.assertEqual(
+            policy["share_only"],
+            ["current_scenario_packet", "packet_listed_evaluation_files"],
+        )
+        self.assertTrue(
+            {
+                "user_request_contract.md",
+                "team_manifest.yaml",
+                "agent_evaluation.md",
+                "prior_answers",
+                "prior_reports",
+                "evaluator_artifacts",
+                "full_session_context",
+            }.issubset(set(cast(list[str], policy["do_not_share"]))),
+        )
+
+    def test_t14_materializes_only_skill_evaluator(self) -> None:
+        """T14 must not inherit worker or reviewer waves from comprehensive delivery."""
+        config = load_team_config()
+        catalog = runtime_alignment.load_task_catalog(config)
+        specialists = runtime_alignment.default_specialists_for_task(config, catalog, "T14")
+        roles = runtime_alignment.select_roles(
+            config,
+            list(specialists),
+            full_team=False,
+            catalog=catalog,
+            workflow_family_id="skill_evaluation",
+        )
+        active_budget, _ = runtime_alignment.workflow_spawn_budget(catalog, "skill_evaluation")
+        initial_wave = runtime_alignment.recommended_initial_subagent_wave(
+            roles, active_budget, catalog
+        )
+        expansion_waves = runtime_alignment.recommended_dynamic_expansion_wave_slots(
+            roles, active_budget, initial_wave, catalog
+        )
+        materialized = list(initial_wave) + [
+            slot.agent_type for wave in expansion_waves for slot in wave
+        ]
+
+        self.assertEqual([role.id for role in roles], ["skill_evaluator"])
+        self.assertEqual(initial_wave, ("skill_evaluator",))
+        self.assertEqual(expansion_waves, ())
+        self.assertEqual(materialized, ["skill_evaluator"])
+        self.assertNotIn("worker", materialized)
+        self.assertNotIn("spark_worker", materialized)
+
+    def test_task_catalog_rejects_t14_comprehensive_route(self) -> None:
+        """Alignment must reject T14 when it regresses to the normal delivery family."""
+        raw = loaded_task_catalog_raw()
+        tasks = cast(list[dict[str, object]], raw["tasks"])
+        t14 = next(task for task in tasks if task["id"] == "T14")
+        t14["family"] = "comprehensive_development"
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "skill_evaluation workflow family"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_task_catalog_rejects_stale_implementation_role_family(self) -> None:
+        """Alignment must keep worker as the default implementation family member."""
+        raw = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], raw["role_topology_defaults"])
+        families = cast(dict[str, object], topology["role_families"])
+        families["implementation"] = ["spark_worker", "worker"]
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "implementation role family"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_checked_in_workflow_topologies_use_active_decision_roles(self) -> None:
+        """Repo-changing families keep reviewers deferred until their decision exists."""
+        catalog = task_catalog_from_raw(loaded_task_catalog_raw())
+
+        self.assertEqual(workflow_topology_policy_violations(catalog), ())
+
+    def test_workflow_topology_policy_rejects_always_on_delivery_reviewer(self) -> None:
+        """A delivery reviewer must not return to an always-on child wave."""
+        raw = loaded_task_catalog_raw()
+        families = cast(list[dict[str, object]], raw["workflow_families"])
+        scoped = next(family for family in families if family["id"] == "scoped_change")
+        roles = cast(dict[str, object], scoped["roles"])
+        always_on = cast(list[str], roles["always_on"])
+        specialists = cast(list[str], roles["specialists"])
+        always_on.append("manager_reviewer")
+        specialists.remove("manager_reviewer")
+        catalog = task_catalog_from_raw(raw)
+
+        self.assertIn(
+            ("scoped_change", "delivery-producer-core"),
+            workflow_topology_policy_violations(catalog),
+        )
+
+    def test_alignment_rejects_worker_model_policy_drift(self) -> None:
+        """Alignment enforces the exact worker model and effort."""
+        configs = runtime_alignment.parse_codex_agents()
+        configs["worker"] = {**configs["worker"], "model": "gpt-5.5"}
+
+        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
+            with self.assertRaisesRegex(RuntimeError, "worker model must be gpt-5.6-luna"):
+                runtime_alignment.validate_codex_agent_settings()
+
+    def test_alignment_rejects_agent_tier_profile_keys(self) -> None:
+        """Alignment rejects tier selectors in repository agent TOMLs."""
+        configs = runtime_alignment.parse_codex_agents()
+        configs["worker"] = {**configs["worker"], "service_tier": "unsupported"}
+
+        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
+            with self.assertRaisesRegex(RuntimeError, "unsupported profile keys: service_tier"):
+                runtime_alignment.validate_codex_agent_settings()
 
     def test_workflow_spawn_budget_rejects_write_budget_above_active(self) -> None:
         """Write-capable subagents must be bounded by the active spawn budget."""
@@ -136,7 +346,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_project_config_rejects_agent_policy_scalar_keys(self) -> None:
         """Task policy strings must stay out of Codex's [agents] runtime table."""
         config = {
-            "review_model": "gpt-5.5",
+            "model": runtime_alignment.PARENT_MODEL,
+            "model_reasoning_effort": runtime_alignment.PARENT_REASONING_EFFORT,
+            "review_model": runtime_alignment.REVIEW_MODEL,
             "model_context_window": runtime_alignment.EXPECTED_MODEL_CONTEXT_WINDOW,
             "tool_output_token_limit": runtime_alignment.EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
             "features": {
@@ -159,6 +371,91 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "unsupported scalar keys under"),
         ):
             runtime_alignment.validate_project_config()
+
+    def test_task_catalog_rejects_legacy_same_role_identity_key(self) -> None:
+        """The alignment checker should reject the old role_type identity key."""
+        raw = loaded_task_catalog_raw()
+        raw["role_topology_defaults"]["same_role_parallel_instances"][  # type: ignore[index]
+            "identity_key"
+        ] = "role_type+instance_id"
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "role_id\\+instance_id\\+agent_type"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_task_catalog_rejects_missing_stage_waves(self) -> None:
+        """The task catalog must own materialization stage order."""
+        raw = loaded_task_catalog_raw()
+        del raw["role_topology_defaults"]["stage_waves"]  # type: ignore[index]
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "stage_waves"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_task_catalog_rejects_reversed_producer_reviewer_order(self) -> None:
+        """Producer stage indexes must be lower than their reviewer stages."""
+        raw = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], raw["role_topology_defaults"])
+        stage_waves = cast(list[dict[str, object]], topology["stage_waves"])
+        intake_index = next(
+            index for index, wave in enumerate(stage_waves) if wave["id"] == "intake"
+        )
+        review_index = next(
+            index
+            for index, wave in enumerate(stage_waves)
+            if wave["id"] == "intake_review"
+        )
+        stage_waves[intake_index], stage_waves[review_index] = (
+            stage_waves[review_index],
+            stage_waves[intake_index],
+        )
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "must precede reviewer"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_task_catalog_rejects_missing_staged_role(self) -> None:
+        """Every permanent role must be present in stage_waves exactly once."""
+        raw = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], raw["role_topology_defaults"])
+        stage_waves = topology["stage_waves"]
+        self.assertIsInstance(stage_waves, list)
+        final_stage = cast(dict[str, object], cast(list[object], stage_waves)[-1])
+        role_ids = final_stage["role_ids"]
+        self.assertIsInstance(role_ids, list)
+        cast(list[object], role_ids).remove("auditor")
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "missing permanent roles"):
+                runtime_alignment.validate_task_catalog_references()
+
+    def test_task_catalog_rejects_t12_default_review_pack(self) -> None:
+        """T12 should not inherit the repo integration review pack by default."""
+        raw = loaded_task_catalog_raw()
+        review_packs = raw["review_packs"]
+        self.assertIsInstance(review_packs, list)
+        matching_pack: dict[str, object] | None = None
+        for raw_pack in cast(list[object], review_packs):
+            if not isinstance(raw_pack, dict):
+                continue
+            candidate_pack = cast(dict[str, object], raw_pack)
+            if candidate_pack.get("id") == "repo_integration_review":
+                matching_pack = candidate_pack
+                break
+        self.assertIsNotNone(matching_pack)
+        pack = cast(dict[str, object], matching_pack)
+        default_for_tasks = pack["default_for_tasks"]
+        self.assertIsInstance(default_for_tasks, list)
+        cast(list[object], default_for_tasks).append("T12")
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "T12 default-active specialists"):
+                runtime_alignment.validate_task_catalog_references()
 
     def test_skill_config_accepts_project_owned_skill_overlay(self) -> None:
         """Parent repos may add skills through .codex/project-config.toml."""
@@ -670,6 +967,44 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             self.assertIn(review_process, non_artifact_paths)
             self.assertTrue(all(path.exists() for path in non_artifact_paths))
+
+    def test_document_packet_sections_are_typed_and_required(self) -> None:
+        """Section locators stay separate from paths and fail if required headings move."""
+        config = load_team_config()
+        role = resolve_role(config, "implementer")
+        packet = resolve_role_document_packet(
+            config=config,
+            role=role,
+            report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
+            workspace_root=PROJECT_ROOT,
+        )
+        sectioned_entries = [
+            entry for entry in packet.read_before_work if entry.sections
+        ]
+
+        self.assertTrue(sectioned_entries)
+        self.assertTrue(all("#" not in str(entry.path) for entry in sectioned_entries))
+        self.assertIn(
+            "5. Implementation",
+            {
+                section.heading
+                for entry in sectioned_entries
+                for section in entry.sections
+            },
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            missing_heading_doc = Path(tmp_dir) / "CODEX_WORKFLOW.md"
+            missing_heading_doc.write_text("# Workflow\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "section_locator_heading_missing:",
+            ):
+                resolve_document_section_locators(
+                    "implementer",
+                    "agents/canonical/CODEX_WORKFLOW.md",
+                    missing_heading_doc,
+                )
 
 
 if __name__ == "__main__":

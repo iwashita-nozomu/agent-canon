@@ -5,6 +5,8 @@
 # responsibility Tests short task routing helper behavior.
 # upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 # upstream design ../../documents/tool-skill-routing-refactor.md defines naming policy
+# upstream design ../../.agents/skills/code-visualization/SKILL.md owns the runtime direct-route text
+# upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
 # @dependency-end
 
 from __future__ import annotations
@@ -416,41 +418,176 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("tool-finding-report", decision["related_skill_candidates"])
         self.assertIn("agent-log-analysis", decision["related_skill_candidates"])
 
-    def test_prompt_routes_code_visualization_selection(self) -> None:
-        """Code visualization prompts should enter the diagram selector skill."""
-        prompts = (
-            (
-                "コードの可視化にはフローチャート、コールグラフ、制御フローグラフ、"
-                "シーケンス図、状態遷移図、データフロー図、依存関係図、"
-                "タイミング図など色々な図示があるので適切に選択して"
-            ),
-            "HTML dashboardでコードの依存グラフを見たい",
-            "文書に埋め込む図も文脈から適切に選んで",
-            "READMEのvisual_planにMermaid図を入れる",
+    def test_prompt_routes_explicit_code_visualization_to_code_visualization_skill(self) -> None:
+        """Explicit public id should select code-visualization."""
+        result = self.run_route("--prompt", "$code-visualization で依存図を見たい", "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("code-visualization", decision["matched_skills"])
+        self.assertIn("code-visualization", decision["active_skills"])
+
+    def test_prompt_routes_visualization_keyword_alone_should_not_select_code_visualization(self) -> None:
+        """Prose keyword alone should not route to code-visualization."""
+        result = self.run_route(
+            "--prompt",
+            "この可視化は、図の配色や見栄えが重要です。",
+            "--format",
+            "json",
         )
 
-        for prompt in prompts:
-            with self.subTest(prompt=prompt):
-                result = self.run_route("--prompt", prompt, "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("code-visualization", decision["matched_skills"])
+        self.assertNotIn("code-visualization", decision["active_skills"])
 
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertIn("code-visualization", decision["matched_skills"])
-                self.assertIn("code-visualization", decision["active_skills"])
-                self.assertIn(
-                    "dependency-analysis", decision["related_skill_candidates"]
-                )
-                self.assertIn(
-                    "structure-planning", decision["related_skill_candidates"]
-                )
-                self.assertIn(
-                    "algorithm-flowchart", decision["related_skill_candidates"]
-                )
-                self.assertIn("html-output", decision["related_skill_candidates"])
-                self.assertIn("md-style-check", decision["related_skill_candidates"])
-                self.assertNotEqual(
-                    decision["evidence"], "mode=repo-changing;matched=none"
-                )
+    def test_prompt_routes_code_visualization_public_name(self) -> None:
+        """Calling the public skill name should select code-visualization."""
+        result = self.run_route(
+            "--prompt",
+            "Please apply code-visualization to this dependency graph.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("code-visualization", decision["matched_skills"])
+        self.assertIn("code-visualization", decision["active_skills"])
+
+    def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
+        """The runtime skill exposes the exact renderer route before generic guidance."""
+        runtime_text = (PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        direct_start = runtime_text.index("## Small-Model Direct Route")
+        canonical_read = runtime_text.index("1. Read `agents/skills/code-visualization.md`.")
+        generic_tree = runtime_text.index("1. Infer the context question")
+        direct_text = runtime_text[direct_start:canonical_read]
+        self.assertLess(direct_start, canonical_read)
+        self.assertLess(canonical_read, generic_tree)
+        for command in (
+            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
+        ):
+            self.assertIn(command, direct_text)
+        self.assertNotIn("<path>", direct_text)
+        self.assertNotIn("<provided-path>", direct_text)
+        self.assertIn("--scope changed` only when the request explicitly asks for changed scope", direct_text)
+        self.assertIn("`--json` is invalid", direct_text)
+        direct_flat = " ".join(direct_text.split())
+        for invariant in (
+            "Treat these three commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Do not remove, add, or rename any flag.",
+            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
+        ):
+            self.assertIn(invariant, direct_flat)
+        for boundary in (
+            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
+            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
+            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+        ):
+            self.assertIn(boundary, direct_flat)
+        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", direct_flat)
+        self.assertIn(
+            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            direct_flat,
+        )
+        packet_result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"),
+                "show",
+                "--skill",
+                "code-visualization",
+                "--format",
+                "json",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(packet_result.returncode, 0, packet_result.stdout + packet_result.stderr)
+        self.assertNotIn("check_dependency_graph.sh", packet_result.stdout)
+        self.assertNotIn("sed -n", packet_result.stdout)
+        packet_payload = json.loads(packet_result.stdout)
+        self.assertEqual(packet_payload["required_commands"], [])
+        self.assertEqual(
+            packet_payload["discovered_commands"],
+            [
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
+            ],
+        )
+        for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
+            self.assertNotIn(forbidden, packet_payload["discovered_commands"])
+        self.assertEqual(
+            [
+                "dependency_graph.tsv",
+                "dependency_graph.ir.json",
+                "dependency_graph.md",
+                "dependency_graph.dot",
+                "dependency_graph.html",
+                "manifest.json",
+            ],
+            [
+                line.split("`", 2)[1]
+                for line in direct_text.splitlines()
+                if line.strip().startswith(tuple(f"{index}." for index in range(1, 7)))
+            ],
+        )
+
+    def test_code_visualization_canonical_skill_mirrors_renderer_invariant(self) -> None:
+        """The canonical owner keeps generated and supplied-TSV routes synchronized."""
+        canonical_text = (PROJECT_ROOT / "agents" / "skills" / "code-visualization.md").read_text(
+            encoding="utf-8"
+        )
+        source_start = canonical_text.index("## Source Evidence Routes")
+        source_text = canonical_text[source_start:]
+        self.assertIn("changed-scope command only when changed scope is explicit", source_text)
+        self.assertIn("--graph-tsv reports/dependency_graph.tsv", source_text)
+        self.assertIn("--bundle-dir reports/dependency-graph", source_text)
+        self.assertNotIn("<path>", source_text)
+        self.assertNotIn("<provided-path>", source_text)
+        self.assertIn("`--json` is invalid", source_text)
+        source_flat = " ".join(source_text.split())
+        for invariant in (
+            "Treat these three commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Do not remove, add, or rename any flag.",
+            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
+        ):
+            self.assertIn(invariant, source_flat)
+        for boundary in (
+            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
+            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
+            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+        ):
+            self.assertIn(boundary, source_flat)
+        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", source_flat)
+        self.assertIn(
+            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            source_flat,
+        )
+        self.assertNotIn(
+            "renderer invokes the external checker and owns checker authority",
+            source_flat,
+        )
+        for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
+            self.assertNotIn(forbidden, source_text)
+        for basename in (
+            "dependency_graph.tsv",
+            "dependency_graph.ir.json",
+            "dependency_graph.md",
+            "dependency_graph.dot",
+            "dependency_graph.html",
+            "manifest.json",
+        ):
+            self.assertIn(f"`{basename}`", source_text)
 
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""

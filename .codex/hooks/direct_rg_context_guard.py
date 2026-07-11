@@ -225,14 +225,15 @@ def warning_payload(command: str) -> dict[str, object]:
         "decision": "approve",
         "reason": (
             "DIRECT_RG_CONTEXT_RISK=warn: direct `rg -n` over a broad or root scope can "
-            "dump large logs/reports into context. Use `rg -l` first, bound the path, "
-            "exclude `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl`, or add "
-            "`--max-count` before printing matches."
+            "dump large logs/reports into context. Start from repository structure, then "
+            "use `git grep` or targeted `grep` from owner directories with generated logs "
+            "and reports excluded."
         ),
-        "next_action": "replace_broad_rg_with_bounded_or_compact_search",
+        "next_action": "replace_broad_rg_with_structure_first_git_grep",
         "remediation": [
-            "`rg --files` or `rg -l '<pattern>' <bounded dirs>` for discovery.",
-            "`rg -n '<pattern>' <specific files or bounded dirs>` for line details.",
+            "`find <owner dirs> -maxdepth <n>` or the structure tools for discovery.",
+            "`git grep -n -E '<pattern>' -- <owner dirs>` for tracked line details.",
+            "`grep -n -E '<pattern>' <specific generated files>` only after the generated artifact is selected.",
             "Exclude `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl` for ordinary repo search.",
             "This warning is non-blocking; record unresolved direct-rg findings before closeout.",
         ],
