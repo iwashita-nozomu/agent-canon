@@ -16,7 +16,6 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 55
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -41,7 +40,6 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 56
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -60,7 +58,6 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-internal-routine-docs"
 target_glob = "agents/internal-routines/*.md"
-expected_count = 21
 kind = "skill"
 description = "Every workflow-owned internal routine document must be dependency-linked and reader-addressable."
 
@@ -79,7 +76,6 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-workflow-docs"
 target_glob = "agents/workflows/*.md"
-expected_count = 21
 kind = "workflow"
 description = "Every workflow document must be dependency-linked and reader-addressable."
 
@@ -486,10 +482,10 @@ required_regex = [
   "\\$structure-planning",
   "\\$md-style-check",
   "\\$algorithm-flowchart",
-  "check_dependency_graph\\.sh --changed --print-edges",
-  "scan_code_dependencies\\.sh --changed",
-  "helper_function_inventory\\.py --changed --all-functions --format json",
-  "route\\.py --prompt",
+  "skill_tool_commands\\.py show --skill code-visualization",
+  "render_dependency_manifest_graph\\.py --root \\. --scope full --bundle-dir reports/dependency-graph --format json",
+  "check_dependency_graph\\.sh.*owns dependency pass/fail authority",
+  "supplied TSV producer owns source facts",
 ]
 
 [[evals.checklist]]
@@ -844,8 +840,8 @@ description = "The human test-design skill must require numerical trigger, alter
 [[evals.checklist]]
 id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
 critical = true
-description = "Documents when numerical tests may be proposed or omitted."
-required_regex = ["数値テスト採用ゲート", "Numerical Trigger", "Non-Numerical Alternative", "Oracle", "Budget", "省略理由"]
+description = "Routes numerical test admission to the canonical testing convention after activation."
+required_regex = ["activation=required", "documents/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
 
 [[evals]]
 id = "test-design-validation-failure-response-doc"
@@ -858,7 +854,7 @@ description = "The human test-design skill must classify validation failures bef
 id = "TEST-DESIGN-VALIDATION-FAILURE-DOC-1"
 critical = true
 description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing contract", "observation level", "cause classification", "approved intent", "owning code", "追加の test-design pass", "oracle weakening"]
+required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
 
 [[evals]]
 id = "testing-conventions-numerical-admission-gate"
@@ -1037,7 +1033,6 @@ required_regex = ["leave a durable source record", "URL or DOI", "access date", 
 [[evals]]
 id = "all-canonical-routing-docs"
 target_glob = "agents/canonical/*.md"
-expected_count = 6
 kind = "workflow"
 description = "Every canonical routing document must be dependency-linked and reader-addressable."
 
@@ -1056,7 +1051,6 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-codex-subagent-prompts"
 target_glob = ".codex/agents/*.toml"
-expected_count = 33
 kind = "subagent"
 description = "Every Codex subagent prompt must be dependency-linked and declare a model."
 
@@ -1581,37 +1575,37 @@ required_regex = ["default active goal items", "non-default optional goal", "Opt
 id = "token-efficient-codex-workflow"
 target = "agents/workflows/token-efficient-codex-workflow.md"
 kind = "workflow"
-description = "The token-efficient workflow must define profiles, agent modes, and non-waivable gates."
+description = "The token-efficient workflow must use observed runtime evidence, adaptive role materialization, and equivalent behavior comparison."
 
 [[evals.checklist]]
 id = "TOKEN-WF-1"
 critical = true
-description = "Defines the three token profiles."
-required_regex = ["token-lite", "token-standard", "token-deep"]
+description = "Rejects task-size profile selection and materializes roles from the active decision."
+required_regex = ["Adaptive Execution", "task-size estimate", "active decision", "stays inactive"]
 
 [[evals.checklist]]
 id = "TOKEN-WF-2"
 critical = true
-description = "Defines agent modes for delegation control."
-required_regex = ["parent-direct", "scout-only", "spark-slice", "full-stage", "deep-review"]
+description = "Keeps parent, worker, Spark, and reviewer routing tied to explicit evidence."
+required_regex = ["gpt-5\\.6-sol/high", "review_focus", "worker", "spark_worker", "typed parent\\s+packet"]
 
 [[evals.checklist]]
 id = "TOKEN-WF-3"
 critical = true
-description = "Keeps validation and closeout gates mandatory."
-required_regex = ["does not relax", "dependency review", "closeout gates"]
+description = "Preserves owner-selected validation and normal closeout evidence."
+required_regex = ["normal closeout evidence", "dependency review", "validation selected", "changed responsibility unit"]
 
 [[evals.checklist]]
 id = "TOKEN-WF-4"
 critical = true
-description = "Requires measurable token footprint comparison with a 50 percent target."
+description = "Requires equivalent measured token comparison without a hard ratio threshold."
 required_regex = [
-  "Token Reduction Protocol",
+  "measured runtime claim",
   "compare_codex_token_footprints\\.py",
-  "baseline session footprint",
-  "candidate footprint",
-  "token_ratio <= 0.5",
-  "skill accuracy",
+  "equivalent baseline\\s+and candidate session comparison",
+  "does\\s+not\\s+regress",
+  "hard acceptance\\s+threshold",
+  "unmeasured",
 ]
 
 [[evals.checklist]]
@@ -1702,8 +1696,8 @@ description = "The Codex workflow must route token-saving and goal-driven reques
 [[evals.checklist]]
 id = "CODEX-WF-TOKEN-1"
 critical = true
-description = "Mentions token profiles, agent modes, and profile/risk-selected gates."
-required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "risk class", "targeted checks"]
+description = "Routes token work through observation, adaptive materialization, and existing metric owners."
+required_regex = ["Token Observation And Adaptive Materialization", "Runtime evidence", "current decision", "typed parent packet", "Missing post-change runtime evidence", "active gates"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"

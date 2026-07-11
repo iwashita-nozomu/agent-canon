@@ -56,9 +56,9 @@ subjects = [
 
 [[case_groups]]
 id = "scoped-change-behavior"
-description = "Narrow behavior changes with tests should route as scoped change."
+description = "Narrow behavior changes route as scoped change; test design remains a post-implementation risk decision."
 expected_workflows = ["scoped-change", "codex-task-workflow"]
-expected_skills = ["codex-task-workflow", "test-design"]
+expected_skills = ["codex-task-workflow"]
 limit = 25
 prompt_templates = [
   "repo-changing patch として {subject} の public behavior を bounded scope で修正し、既存テストも見て",
