@@ -105,6 +105,16 @@ production entrypoint がその Lean design transition と certificate predicate
 という refinement theorem です。実装中にアルゴリズムを変える場合は、先に
 `$lean-algorithm-design` へ戻って設計定理を更新します。
 
+## Algorithm Repair Ordering
+
+Algorithm repair begins with the theorem target, public entrypoint, IR-backed
+implementation mechanism, frontier board, and selected algorithm-change row.
+Tests and expected values are validation-oracle evidence after that route is
+fixed. Existing failing tests help classify symptoms and regression placement,
+but the repair target is the algorithmic mechanism: initializer, recurrence,
+update rule, stopping scalar, line search, solver handoff, regularization, or
+certificate construction.
+
 ## Completion Condition
 
 この skill の終了条件は、目的の public-root theorem に対する Goal checklist が
