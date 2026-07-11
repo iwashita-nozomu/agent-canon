@@ -119,10 +119,20 @@ surfaces when the route packet makes them part of the product contract.
 1. Classify the algorithm surface: unconstrained optimization, constrained optimization, least squares, root finding, linear solve, preconditioning, or benchmark-only.
 1. Read existing algorithm docs, source dependency headers, tests, and experiment records before changing code.
 1. Write the optimization contract in the run bundle or design packet before implementation.
-1. Identify the first bad iteration for failures; do not diagnose only from the final NaN, Inf, or residual.
-1. Create an adversarial numeric test plan before implementation: exact small case, ill-conditioned case, constraint-boundary case, non-finite guard, not-converged status, derivative check, and device / dtype case when relevant.
+1. Identify the implemented recurrence, state transition, stopping scalar,
+   acceptance rule, and failure semantics that the contract requires.
+1. Identify the first bad iteration or first contract-violating code-side
+   mechanism for failures; final NaN, Inf, residual, or failing assertion is
+   only symptom evidence.
+1. Select the algorithmic repair route before editing tests: initializer,
+   update rule, line search, inner-solver policy, regularization, feasibility
+   restoration, scaling, or status semantics.
+1. Create the adversarial numeric validation plan after the contract and repair
+   route are fixed: exact small case, ill-conditioned case,
+   constraint-boundary case, non-finite guard, not-converged status, derivative
+   check, and device / dtype case when relevant.
 1. Implement the responsibility-preserving change that matches the contract and
-   test plan.
+   validation plan.
 1. Validate with targeted tests and one protocol-consistent GPU run; record
    skipped GPU, benchmark, or formal run evidence as a blocker with reason
    instead of replacing it with CPU computation.

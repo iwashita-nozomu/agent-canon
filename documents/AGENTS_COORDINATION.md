@@ -4,6 +4,8 @@
 contract reference
 responsibility Documents エージェント運用の入口 for this repository.
 upstream design README.md durable document index
+upstream design ../ROOT_AGENTS.md template-root Codex runtime instruction surface
+upstream design ../AGENTS.md standalone AgentCanon Codex runtime instruction surface
 @dependency-end
 -->
 
@@ -17,9 +19,28 @@ upstream design README.md durable document index
 - 古い `documents/AGENTS_COORDINATION.md` 参照を見つけたときや、
   runtime entrypoint の正本を確認するときに読みます。
 - 境界: 新しい stage rule や skill policy はここではなく、リンク先の
-  `agents/` と `AGENTS.md` が所有します。
+  runtime instruction surface、`agents/`、skill owner surface が所有します。
 
-## 正本
+## Codex Loading Priority
+
+Codex の自動 instruction 読み込みは、repo root から current working directory
+へ進む runtime chain で決まります。この文書は legacy adapter であり、
+Codex が常に自動で読む runtime instruction surface ではありません。
+
+Template / derived repo root から Codex を開始した場合、`/AGENTS.md` runtime
+view が `vendor/agent-canon/ROOT_AGENTS.md` を読み込みます。AgentCanon source
+checkout 内を current working directory として開始した場合、この tree の
+`AGENTS.md` が standalone source-tree entrypoint になります。`.github/AGENTS.md`
+は `.github/` subtree に入ったときの overlay です。
+
+## Runtime Instruction Surfaces
+
+- [ROOT_AGENTS.md](../ROOT_AGENTS.md)
+- [AGENTS.md](../AGENTS.md)
+- [.github/AGENTS.md](../.github/AGENTS.md)
+- [.codex/README.md](../.codex/README.md)
+
+## Workflow And Skill Canon
 
 - [agents/README.md](../agents/README.md)
 - [agents/canonical/README.md](../agents/canonical/README.md)
@@ -32,11 +53,6 @@ upstream design README.md durable document index
 - [agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md)
 - [agents/skills/README.md](../agents/skills/README.md)
 - [agents/skills/catalog.yaml](../agents/skills/catalog.yaml)
-
-## Runtime Entry Points
-
-- [AGENTS.md](../AGENTS.md)
-- [.codex/README.md](../.codex/README.md)
 
 ## Skills
 

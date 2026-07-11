@@ -66,6 +66,9 @@ approved design と既存 code/test path を静的解析し、oracle / spec risk
 - 数理的な判定・oracle・assertion は `mathematical necessity gate` を通し、
   `Numerical Trigger`、`Non-Numerical Alternative`、checker-owned property、
   proof obligation、または approved design の acceptance criterion に接続している
+- algorithm repair では、test plan が最初の修正面ではなく、algorithm contract、
+  public entrypoint、recurrence / state transition、invariant、stopping /
+  acceptance rule、failure semantics、code-side repair route の後に置かれている
 
 ## Mandatory Checklist
 
@@ -91,6 +94,10 @@ approved design と既存 code/test path を静的解析し、oracle / spec risk
 - `cause_classification=implementation_bug` は approved intent を保ったまま owning
   code / config / docs / workflow repair へ進め、追加の test-design pass で
   implementation repair を止めない。必要な場合だけ同じ intent を保つ test を直すか追加する
+- algorithm bug や solver bug では、関連 test は symptom / regression placement /
+  oracle-risk evidence として扱い、先に algorithm contract と code-side repair route を
+  固定する。test expectation、expected value、tolerance、oracle の変更は、その後で
+  contract に合わせて判断する
 - behavior simplification、revert、feature / test deletion、oracle weakening、
   intended behavior の削除を許す前に、短い failure-cause note を
   `test_plan.md`、work log、review evidence のいずれかに残している
@@ -109,6 +116,11 @@ approved design と既存 code/test path を静的解析し、oracle / spec risk
 ## Default Sequence
 
 1. approved design と既存 code/test path を読み、code path と関連 test path を survey / placement evidence として記録します。target function / module / script は配置調査の根拠であり、未承認 API shape や internal call sequence を作る根拠ではありません。behavior-changing、regression-prone、high-risk、または oracle / spec risk がある場合に test design を深掘りします。
+1. algorithm repair の場合は、`computational-optimization`、
+   `algorithm-proof-exploration`、または該当する design owner が固定した
+   algorithm contract、public entrypoint、recurrence / state transition、
+   invariant、stopping / acceptance rule、failure semantics、code-side repair route
+   を先に読む。関連 test はこの時点では survey / symptom / placement evidence です
 1. 関連 test path がある場合は `tools/bin/agent-canon test-design check <paths...>` を実行します。新規 test の場合は `documents/coding-conventions-testing.md` を読み、同種の既存 test style を確認します。
 1. `fix-now` finding は先に修正対象へ入れます。特に static-analysis duplicate や
    generated execution-only placeholder は、canonical checker validation へ戻すか、

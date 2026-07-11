@@ -724,6 +724,49 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("task-routing", decision["active_skills"])
         self.assertIn("runtime-log-repair", decision["related_skill_candidates"])
 
+    def test_prompt_routes_codex_loading_priority_document_sweep(self) -> None:
+        """Codex loading-priority document sweeps should route structure and document canon."""
+        result = self.run_route(
+            "--prompt",
+            "レポのルールを丁寧に見て，Codexの読み込みプライオリティを考えて上位文書から怪文書に至るまで漏らさず修正",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("structure-refactor", decision["matched_skills"])
+        self.assertIn("document-canon-cleanup", decision["matched_skills"])
+        self.assertIn("structure-refactor", decision["active_skills"])
+        self.assertIn("document-canon-cleanup", decision["active_skills"])
+        self.assertNotIn("agent-log-analysis", decision["matched_skills"])
+
+    def test_prompt_routes_algorithm_test_first_feedback(self) -> None:
+        """Algorithm repair feedback should route to algorithm owners before test design."""
+        result = self.run_route(
+            "--prompt",
+            "アルゴリズム修正時にテストから直し始めるのをやめてください",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        for skill in (
+            "computational-optimization",
+            "algorithm-proof-exploration",
+            "test-design",
+            "agent-learning",
+        ):
+            self.assertIn(skill, decision["matched_skills"])
+        for skill in (
+            "computational-optimization",
+            "algorithm-proof-exploration",
+            "test-design",
+        ):
+            self.assertIn(skill, decision["active_skills"])
+        self.assertIn("agent-learning", decision["deferred_skills"])
+
     def test_prompt_routes_runtime_dashboard_repair_to_runtime_log_repair(self) -> None:
         """Runtime dashboard repair prompts should activate runtime-log-repair."""
         result = self.run_route(
