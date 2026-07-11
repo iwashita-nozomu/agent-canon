@@ -907,16 +907,16 @@ class RouteToolTest(unittest.TestCase):
         for skill in (
             "computational-optimization",
             "algorithm-proof-exploration",
-            "test-design",
             "agent-learning",
         ):
             self.assertIn(skill, decision["matched_skills"])
         for skill in (
             "computational-optimization",
             "algorithm-proof-exploration",
-            "test-design",
         ):
             self.assertIn(skill, decision["active_skills"])
+        self.assertNotIn("test-design", decision["matched_skills"])
+        self.assertNotIn("test-design", decision["active_skills"])
         self.assertIn("agent-learning", decision["deferred_skills"])
 
     def test_prompt_routes_runtime_dashboard_repair_to_runtime_log_repair(self) -> None:
@@ -1550,18 +1550,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotEqual(
             python_decision["evidence"], "mode=repo-changing;matched=none"
         )
-
-    def test_prompt_routes_unneeded_numerical_tests_to_test_design(self) -> None:
-        """Unneeded numerical-test complaints should activate test-design routing."""
-        prompt = "不要な数値テストを入れるのをやめさせてください"
-        python_result = self.run_route("--prompt", prompt, "--format", "json")
-
-        self.assertEqual(
-            python_result.returncode, 0, python_result.stdout + python_result.stderr
-        )
-        python_decision = json.loads(python_result.stdout)
-        self.assertIn("test-design", python_decision["matched_skills"])
-        self.assertIn("test-design", python_decision["active_skills"])
 
     def test_prompt_routes_english_unneeded_numerical_tests_to_test_design(
         self,

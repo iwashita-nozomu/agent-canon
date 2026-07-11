@@ -184,6 +184,12 @@ hypothesis を `workflow_monitoring.md` と closeout evidence に残し、現在
 同種の wait または status probe を再度実行するには `new state evidence`
 または `explicit revised packet` を必須にします。scope、allowed paths、
 owner、review gate が変わる場合は explicit revised packet を記録した
-fresh follow-up wave へ切り替えます。
+fresh follow-up wave へ切り替えます。timeout、empty status、final response
+未着は `termination_action=preserve_running_instance` と
+`resolution_decision=await_new_state|continue_disjoint_parent_work` に写像します。
+prior agent が非終端なら `write_scope=reserved` と
+`overlapping_writer=blocked` を保持します。
 
-closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` に close evidence を残します。
+`close_agent` authority は runtime status `completed|errored|shutdown` または
+user の明示取消です。非終端の no-return instance は
+`subagents_closed=no`、`lifecycle_gate=pending` とします。

@@ -17,10 +17,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RENDER_GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "render_dependency_manifest_graph.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from render_dependency_manifest_graph import GraphIR  # noqa: E402
 
 
 def run_renderer(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -327,7 +329,10 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            ir_payload: dict[str, Any] = json.loads(ir_out.read_text(encoding="utf-8"))
+            ir_payload = cast(
+                GraphIR,
+                json.loads(ir_out.read_text(encoding="utf-8")),
+            )
             self.assertEqual(ir_payload["schema"], "agent_canon.graph_ir.v2")
             self.assertEqual(ir_payload["summary"]["upstreamCycles"], 1)
             self.assertEqual(ir_payload["summary"]["downstreamCycles"], 1)
@@ -469,7 +474,10 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             result = run_renderer("--root", str(root), "--graph-tsv", str(graph), "--ir-out", str(ir_out))
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            ir_payload: dict[str, Any] = json.loads(ir_out.read_text(encoding="utf-8"))
+            ir_payload = cast(
+                GraphIR,
+                json.loads(ir_out.read_text(encoding="utf-8")),
+            )
             self.assertIn("documents", ir_payload)
             self.assertIn("metadata", ir_payload)
             self.assertIn("diagnostics", ir_payload)

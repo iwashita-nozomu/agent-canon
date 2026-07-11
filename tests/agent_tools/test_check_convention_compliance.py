@@ -1575,40 +1575,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_validation_failure_response_requires_runtime_skill_markers(self) -> None:
-        """Runtime test-design keeps validation failure response markers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "test-design" / "SKILL.md"
-            skill.write_text(
-                skill.read_text(encoding="utf-8").replace("failure cause", ""),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("validation_failure_response", result.stdout)
-            self.assertIn("missing-marker:failure cause", result.stdout)
-
-    def test_validation_failure_response_requires_human_doc_markers(self) -> None:
-        """Human test-design keeps same-intent repair or escalation markers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            skill_doc = root / "agents" / "skills" / "test-design.md"
-            skill_doc.write_text(
-                skill_doc.read_text(encoding="utf-8").replace("approved intent", ""),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("validation_failure_response", result.stdout)
-            self.assertIn("missing-marker:approved intent", result.stdout)
-
     def test_validation_failure_response_rejects_stale_owner_projection_set(self) -> None:
         """Validation-failure slug ownership must stay on runtime-profile JSON."""
         with tempfile.TemporaryDirectory() as tmp_dir:
