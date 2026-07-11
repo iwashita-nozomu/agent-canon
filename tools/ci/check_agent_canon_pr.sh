@@ -19,6 +19,16 @@
 
 set -euo pipefail
 
+AGENT_CANON_PR_CHECK_PROFILE="full"
+if [[ "${1:-}" == "--integration-only" ]]; then
+  AGENT_CANON_PR_CHECK_PROFILE="integration_only"
+  shift
+fi
+if [[ "$#" -ne 0 ]]; then
+  echo "usage: $0 [--integration-only]" >&2
+  exit 2
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SUPERPROJECT_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
 if [ -n "${SUPERPROJECT_ROOT}" ]; then
@@ -62,6 +72,11 @@ if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   AGENT_CANON_REPOSITORY_MODE="template_or_derived"
 else
   AGENT_CANON_REPOSITORY_MODE="standalone_source"
+fi
+if [[ "${AGENT_CANON_PR_CHECK_PROFILE}" == "integration_only" \
+  && "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
+  echo "AGENT_CANON_PR_CHECK_PROFILE_ERROR=integration_only_requires_template_or_derived" >&2
+  exit 2
 fi
 
 run_direct_agent_checks() {
@@ -156,6 +171,11 @@ run_pr_agent_checks() {
 }
 
 run_pr_quick_ci() {
+  if [[ "${AGENT_CANON_PR_CHECK_PROFILE}" == "integration_only" ]]; then
+    echo "AGENT_CANON_PR_REPOSITORY_CI_OWNER=repository_ci_job"
+    echo "AGENT_CANON_PR_REPOSITORY_CI_STATUS=delegated"
+    return
+  fi
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     run_standalone_static_gate_ci
     return
@@ -244,6 +264,7 @@ echo "=========================================="
 echo "workspace_root=${WORKSPACE_ROOT}"
 echo "agent_canon_pr_temp_root=${AGENT_CANON_PR_TEMP_ROOT}"
 echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
+echo "agent_canon_pr_check_profile=${AGENT_CANON_PR_CHECK_PROFILE}"
 echo "agent_canon_remote=${REMOTE_URL}"
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
   echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"

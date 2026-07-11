@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Checks that a fresh clone can run the expected repository validations.
+# responsibility Checks fresh-clone bootstrap, AgentCanon update, and runtime surfaces.
 # upstream design ../README.md shared automation index
 # upstream environment ../../documents/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # @dependency-end
@@ -110,6 +110,6 @@ grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks
-make ci-quick
+echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
 
 echo "FRESH_CLONE_ACCEPTANCE=pass"

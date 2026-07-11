@@ -2196,9 +2196,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
             self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_ROLES=test_designer,docs_workflow_steward,python_reviewer",
+                "DEFAULT_QUALITY_CHECK_ROLES=docs_workflow_steward,python_reviewer",
                 result.stdout,
             )
+            self.assertNotIn("test_designer", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
                 result.stdout,
@@ -2321,7 +2322,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 default_quality_check_policy["roles"],
                 [
-                    "test_designer",
                     "docs_workflow_steward",
                     "python_reviewer",
                 ],
@@ -2329,7 +2329,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 default_quality_check_policy["codex_agent_types"],
                 [
-                    "test_designer",
                     "docs_workflow_steward",
                     "python_reviewer",
                 ],

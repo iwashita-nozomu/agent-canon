@@ -21,9 +21,9 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TypedDict, cast
 
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
@@ -120,6 +120,199 @@ class GraphInput:
     origin_locator: str
 
 
+class DisplayRecord(TypedDict):
+    """Display labels shared by dependency and directory nodes."""
+
+    label: str
+    parent: str
+    full: str
+
+
+class ArtifactDescriptor(TypedDict):
+    """One deterministic output artifact descriptor."""
+
+    path: str
+    media_type: str
+    bytes: int
+    sha256: str
+
+
+class GraphNodeRecord(TypedDict):
+    """One node in the dependency graph IR."""
+
+    id: str
+    document_id: str
+    layer: str
+    kind: str
+    label: str
+    text: str
+    source_start: int
+    source_end: int
+    confidence: float
+    group: str
+    display: DisplayRecord
+    source_locator: str
+    incoming: int
+    outgoing: int
+    degree: int
+    broken: bool
+    payload_json: dict[str, object]
+
+
+class GraphEdgeRecord(TypedDict):
+    """One dependency or containment edge in the graph IR."""
+
+    id: str
+    document_id: str
+    layer: str
+    kind: str
+    relation: str
+    from_node_id: str
+    to_node_id: str
+    order_kind: str
+    label: str
+    source_locator: str
+    source_start: int
+    source_end: int
+    confidence: float
+    payload_json: dict[str, object]
+
+
+class GraphDiagnosticRecord(TypedDict):
+    """One deterministic graph diagnostic."""
+
+    id: str
+    severity: str
+    kind: str
+    message: str
+    document_id: str
+    node_ids: list[str]
+    payload_json: dict[str, object]
+
+
+class GraphIR(TypedDict):
+    """Typed repository dependency graph IR v2 payload."""
+
+    schema: str
+    version: int
+    id: str
+    producer: str
+    source: dict[str, str]
+    documents: list[dict[str, str]]
+    metadata: list[dict[str, str]]
+    summary: dict[str, int]
+    nodes: list[GraphNodeRecord]
+    edges: list[GraphEdgeRecord]
+    diagnostics: list[GraphDiagnosticRecord]
+    directions: list[str]
+    kinds: list[str]
+    highDegree: list[dict[str, object]]
+    cycles: dict[str, list[list[str]]]
+    brokenTargets: list[str]
+    views: dict[str, dict[str, str]]
+
+
+class HtmlGraphNode(TypedDict):
+    """Node fields consumed by the self-contained HTML viewer."""
+
+    id: str
+    group: str
+    label: str
+    parentLabel: str
+    incoming: int
+    outgoing: int
+    degree: int
+    broken: bool
+
+
+class HtmlDirectoryNode(TypedDict):
+    """Directory fields consumed by the HTML viewer."""
+
+    id: str
+    path: str
+    group: str
+    label: str
+    parentLabel: str
+    degree: int
+
+
+class DependencyPayload(TypedDict):
+    """Dependency edge payload exposed to HTML projections."""
+
+    direction: str
+    kind: str
+    source: str
+    target: str
+    row: int
+
+
+class ContainmentPayload(TypedDict):
+    """Directory containment edge payload exposed to HTML projections."""
+
+    source: str
+    target: str
+    parentPath: str
+    childPath: str
+    childKind: str
+
+
+class DirectoryTreePayload(TypedDict):
+    """Directory nodes and containment edges for HTML projections."""
+
+    nodes: list[HtmlDirectoryNode]
+    edges: list[ContainmentPayload]
+
+
+class HtmlGraphPayload(TypedDict):
+    """Typed data block embedded in the HTML viewer."""
+
+    summary: dict[str, int]
+    nodes: list[HtmlGraphNode]
+    edges: list[DependencyPayload]
+    directoryTree: DirectoryTreePayload
+    directions: list[str]
+    kinds: list[str]
+    highDegree: list[dict[str, object]]
+    cycles: dict[str, list[list[str]]]
+    brokenTargets: list[str]
+    views: dict[str, dict[str, str]]
+
+
+class SourceEnvelope(TypedDict):
+    """Source identity fields shared by output envelopes."""
+
+    root: str
+    origin_kind: str
+    origin_locator: str
+    graph_tsv_sha256: str
+
+
+class CheckerEnvelope(TypedDict):
+    """Checker authority fields shared by output envelopes."""
+
+    authority: str
+    status: str
+
+
+class OptionalManifestFields(TypedDict, total=False):
+    """Fields added after a bundle manifest is committed."""
+
+    manifest_path: str
+    manifest_sha256: str
+
+
+class OutputEnvelope(OptionalManifestFields):
+    """Bundle or named-projection command output."""
+
+    schema: str
+    status: str
+    scope: str
+    source: SourceEnvelope
+    checker: CheckerEnvelope
+    summary: dict[str, int]
+    artifacts: list[ArtifactDescriptor]
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -147,7 +340,7 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def file_descriptor(path: Path, *, artifact_name: str | None = None) -> dict[str, Any]:
+def file_descriptor(path: Path, *, artifact_name: str | None = None) -> ArtifactDescriptor:
     """Return a deterministic manifest artifact descriptor for a committed file."""
     payload = path.read_bytes()
     media_types = {
@@ -259,7 +452,7 @@ def repo_path_parts(path: str) -> tuple[str, ...]:
     return tuple(part for part in stripped.split("/") if part and part != ".")
 
 
-def directory_display(path: str) -> dict[str, str]:
+def directory_display(path: str) -> DisplayRecord:
     """Return display labels for an inferred directory node."""
     if path == ".":
         return {"label": ".", "parent": "repository", "full": path}
@@ -461,7 +654,7 @@ def compact_middle(value: str, *, limit: int = 42) -> str:
     return value[:head] + "..." + value[-tail:]
 
 
-def path_display(path: str) -> dict[str, str]:
+def path_display(path: str) -> DisplayRecord:
     """Return display labels while preserving full path separately."""
     group = path_group(path)
     if "://" in path:
@@ -502,7 +695,7 @@ def dependency_node_record(
     incoming: Counter[str],
     outgoing: Counter[str],
     broken_targets: set[str],
-) -> dict[str, Any]:
+) -> GraphNodeRecord:
     """Return an IR node record for one dependency graph artifact path."""
     display = path_display(node)
     group = path_group(node)
@@ -543,7 +736,7 @@ def directory_node_record(
     *,
     incoming: Counter[str],
     outgoing: Counter[str],
-) -> dict[str, Any]:
+) -> GraphNodeRecord:
     """Return an IR node record for one inferred repository directory."""
     display = directory_display(directory_path)
     node_id = directory_id(directory_path)
@@ -580,7 +773,7 @@ def directory_node_record(
     }
 
 
-def dependency_edge_records(edges: tuple[Edge, ...]) -> list[dict[str, Any]]:
+def dependency_edge_records(edges: tuple[Edge, ...]) -> list[GraphEdgeRecord]:
     """Return IR edge records for dependency graph TSV rows."""
     return [
         {
@@ -597,13 +790,19 @@ def dependency_edge_records(edges: tuple[Edge, ...]) -> list[dict[str, Any]]:
             "source_start": index + 2,
             "source_end": index + 2,
             "confidence": 1.0,
-            "payload_json": asdict(edge) | {"row": index},
+            "payload_json": {
+                "direction": edge.direction,
+                "kind": edge.kind,
+                "source": edge.source,
+                "target": edge.target,
+                "row": index,
+            },
         }
         for index, edge in enumerate(edges)
     ]
 
 
-def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[dict[str, Any]]:
+def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[GraphEdgeRecord]:
     """Return IR edge records for inferred directory containment."""
     return [
         {
@@ -632,9 +831,9 @@ def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[dict[st
     ]
 
 
-def graph_diagnostics(report: GraphReport) -> list[dict[str, Any]]:
+def graph_diagnostics(report: GraphReport) -> list[GraphDiagnosticRecord]:
     """Return deterministic graph IR diagnostics."""
-    diagnostics: list[dict[str, Any]] = []
+    diagnostics: list[GraphDiagnosticRecord] = []
     for direction, cycles in (
         ("upstream", report.upstream_cycles),
         ("downstream", report.downstream_cycles),
@@ -676,7 +875,7 @@ def graph_diagnostics(report: GraphReport) -> list[dict[str, Any]]:
     return diagnostics
 
 
-def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> dict[str, Any]:
+def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> GraphIR:
     """Return the repo-local graph intermediate representation."""
     incoming = Counter[str]()
     outgoing = Counter[str]()
@@ -690,7 +889,7 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> dict[
         containment_outgoing[edge.source] += 1
         containment_incoming[edge.target] += 1
     broken_targets = set(report.broken_targets)
-    nodes = [
+    nodes: list[GraphNodeRecord] = [
         dependency_node_record(node, incoming=incoming, outgoing=outgoing, broken_targets=broken_targets)
         for node in report.nodes
     ]
@@ -785,14 +984,14 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> dict[
     }
 
 
-def graph_payload(report: GraphReport) -> dict[str, Any]:
+def graph_payload(report: GraphReport) -> HtmlGraphPayload:
     """Return the JSON-serializable graph payload used by the HTML viewer."""
     ir = graph_ir(report)
     dependency_nodes = [node for node in ir["nodes"] if node["kind"] == "repo_path"]
     directory_nodes = [node for node in ir["nodes"] if node["kind"] == "directory"]
     dependency_edges = [edge for edge in ir["edges"] if edge["relation"] != "contains"]
     containment_edges = [edge for edge in ir["edges"] if edge["relation"] == "contains"]
-    nodes = [
+    nodes: list[HtmlGraphNode] = [
         {
             "id": str(node["id"]),
             "group": str(node["group"]),
@@ -808,7 +1007,10 @@ def graph_payload(report: GraphReport) -> dict[str, Any]:
     return {
         "summary": ir["summary"],
         "nodes": nodes,
-        "edges": [edge["payload_json"] for edge in dependency_edges],
+        "edges": [
+            cast(DependencyPayload, edge["payload_json"])
+            for edge in dependency_edges
+        ],
         "directoryTree": {
             "nodes": [
                 {
@@ -821,7 +1023,10 @@ def graph_payload(report: GraphReport) -> dict[str, Any]:
                 }
                 for node in directory_nodes
             ],
-            "edges": [edge["payload_json"] for edge in containment_edges],
+            "edges": [
+                cast(ContainmentPayload, edge["payload_json"])
+                for edge in containment_edges
+            ],
         },
         "directions": ir["directions"],
         "kinds": ir["kinds"],
@@ -837,7 +1042,7 @@ def render_ir(report: GraphReport, *, source_locator: str) -> str:
     return json.dumps(graph_ir(report, source_locator=source_locator), indent=2, sort_keys=True) + "\n"
 
 
-def script_json(payload: dict[str, Any]) -> str:
+def script_json(payload: object) -> str:
     """Return JSON that is safe inside a script-like HTML data block."""
     return (
         json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -865,10 +1070,10 @@ def static_group_node_columns(count: int) -> int:
 
 
 def static_graph_layout(
-    nodes: list[dict[str, object]],
+    nodes: list[HtmlGraphNode],
 ) -> tuple[dict[str, tuple[int, int]], dict[str, tuple[int, int, int, int]], int, int]:
     """Pack graph nodes into dense group blocks."""
-    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    grouped: dict[str, list[HtmlGraphNode]] = defaultdict(list)
     for node in nodes:
         grouped[str(node["group"])].append(node)
     for group_nodes in grouped.values():
@@ -922,7 +1127,7 @@ def static_graph_layout(
     return positions, group_boxes, width, height
 
 
-def static_graph_dimensions_from_nodes(nodes: list[dict[str, object]]) -> tuple[int, int]:
+def static_graph_dimensions_from_nodes(nodes: list[HtmlGraphNode]) -> tuple[int, int]:
     """Return static SVG layout dimensions for rendered node payloads."""
     _positions, _group_boxes, width, height = static_graph_layout(nodes)
     return width, height
@@ -2340,7 +2545,7 @@ def graph_summary(report: GraphReport) -> dict[str, int]:
     }
 
 
-def source_envelope(root: Path, graph_input: GraphInput) -> dict[str, Any]:
+def source_envelope(root: Path, graph_input: GraphInput) -> SourceEnvelope:
     """Return the deterministic source envelope."""
     return {
         "root": normalized_cli_token(root),
@@ -2350,7 +2555,7 @@ def source_envelope(root: Path, graph_input: GraphInput) -> dict[str, Any]:
     }
 
 
-def checker_envelope(graph_input: GraphInput) -> dict[str, Any]:
+def checker_envelope(graph_input: GraphInput) -> CheckerEnvelope:
     """Return the checker authority envelope."""
     if graph_input.origin_kind == "supplied":
         status = "not_run"
@@ -2379,7 +2584,7 @@ def build_manifest(
     graph_input: GraphInput,
     report: GraphReport,
     bundle_dir: Path,
-) -> dict[str, Any]:
+) -> OutputEnvelope:
     """Return the committed bundle manifest object, excluding manifest itself."""
     return {
         "schema": BUNDLE_SCHEMA,
@@ -2402,7 +2607,7 @@ def write_bundle(
     graph_tsv: Path | None,
     bundle_dir: Path,
     title: str,
-) -> tuple[dict[str, Any], GraphReport]:
+) -> tuple[OutputEnvelope, GraphReport]:
     """Write a fixed dependency graph bundle through an absent-target transaction."""
     target_dir = bundle_dir.resolve()
     if target_dir.exists():
@@ -2454,7 +2659,12 @@ def write_bundle(
         raise
 
     committed_manifest_path = target_dir / "manifest.json"
-    committed_manifest = json.loads(committed_manifest_path.read_text(encoding="utf-8"))
+    committed_payload: object = json.loads(
+        committed_manifest_path.read_text(encoding="utf-8")
+    )
+    if not isinstance(committed_payload, dict):
+        raise TypeError("invalid committed manifest")
+    committed_manifest = cast(OutputEnvelope, committed_payload)
     committed_manifest["manifest_path"] = (target_dir / "manifest.json").as_posix()
     committed_manifest["manifest_sha256"] = sha256_bytes(committed_manifest_path.read_bytes())
     return committed_manifest, report
@@ -2537,7 +2747,7 @@ def build_projection_envelope(
     graph_input: GraphInput,
     report: GraphReport,
     paths: dict[str, Path],
-) -> dict[str, Any]:
+) -> OutputEnvelope:
     """Return the projection stdout JSON envelope."""
     return {
         "schema": PROJECTION_SCHEMA,
@@ -2560,7 +2770,7 @@ def write_projection(
     graph_tsv: Path | None,
     paths: dict[str, Path],
     title: str,
-) -> tuple[dict[str, Any], GraphReport]:
+) -> tuple[OutputEnvelope, GraphReport]:
     """Write selected named projections through sibling atomic replaces."""
     temp_tsv: Path | None = None
     try:
@@ -2602,16 +2812,11 @@ def write_projection(
             temp_tsv.unlink(missing_ok=True)
 
 
-def print_text_envelope(envelope: dict[str, Any]) -> None:
+def print_text_envelope(envelope: OutputEnvelope) -> None:
     """Print a stable text envelope for bundle or projection mode."""
-    summary = envelope["summary"]
-    source = envelope["source"]
-    checker = envelope["checker"]
-    if not isinstance(summary, dict) or not isinstance(source, dict) or not isinstance(checker, dict):
-        raise TypeError("invalid projection envelope")
-    summary_values = cast(dict[str, int], summary)
-    source_values = cast(dict[str, str], source)
-    checker_values = cast(dict[str, str], checker)
+    summary_values = envelope["summary"]
+    source_values = envelope["source"]
+    checker_values = envelope["checker"]
     print(f"schema={envelope['schema']}")
     print(f"status={envelope['status']}")
     print(f"scope={envelope['scope']}")
@@ -2627,11 +2832,7 @@ def print_text_envelope(envelope: dict[str, Any]) -> None:
         print(f"manifest.path={envelope['manifest_path']}")
     if "manifest_sha256" in envelope:
         print(f"manifest.hash={envelope['manifest_sha256']}")
-    artifacts = envelope["artifacts"]
-    if not isinstance(artifacts, list):
-        raise TypeError("invalid projection artifacts")
-    artifact_values = cast(list[dict[str, Any]], artifacts)
-    for artifact in artifact_values:
+    for artifact in envelope["artifacts"]:
         print(f"artifact.{artifact['path']}.sha256={artifact['sha256']}")
 
 

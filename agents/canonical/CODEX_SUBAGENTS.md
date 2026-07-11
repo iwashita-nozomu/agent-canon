@@ -109,13 +109,13 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - parent は requirements / planning / design / review / implementation を wave で切り替えます
 - delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
-- running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は close より同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または interrupt による現状報告で、完了済み変更、未完了点、判断理由を回収します。timeout 後は status と回収済み evidence を記録して control を戻し、同種の wait を続けるには新しい state evidence または explicit revised packet を必須にします。同期できた場合は、その成果を統合し、parent または後続 subagent の作業境界を更新してから作業を続けます。同期不能または scope 変更で役割が終了した場合だけ、理由と回収済み evidence を `schedule.md`、`workflow_monitoring.md`、または `work_log.md` に残して close します。
+- running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または `interrupt=false` の status request で、完了済み変更、未完了点、判断理由を回収します。timeout、empty status、final response 未着は `resolution_decision=await_new_state|continue_disjoint_parent_work` と `termination_action=preserve_running_instance` に写像します。parent は status と回収済み evidence を記録して control を戻します。同種の wait を続けるには new state evidence または explicit revised packet を必須にします。scope 変更後も非終端 subagent の write scope は保持し、`overlapping_writer=blocked` とします。`close_agent` の authority は runtime status `completed|errored|shutdown` または user の明示取消です。
 - parent は stage gate を通過したら完了した instance を閉じます
 - 新規 user request では新しい run bundle と fresh subagent を起こします
 - 前 task の文脈は run bundle と artifact path で渡し、新規 task は fresh subagent で開始します
 - 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint と updated packet path を追記し、unchanged role scope がある場合に run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
-- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を user-facing completion の readiness evidence にします
+- closeout 前に終端 status の run-local subagent を lifecycle cleanup として閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を user-facing completion の readiness evidence にします。非終端の no-return instance は `subagents_closed=no`、`termination_action=preserve_running_instance`、`lifecycle_gate=pending` とします
 
 ## Handoff Context Contract
 
@@ -306,8 +306,9 @@ stdout line は、implementation handoff 前に既定の quality-check route を
 `wait_agent` timeout, empty wait status, or an absent final response at a wave
 decision point is a subagent lifecycle signal. The parent records
 `subagent_no_return_investigation`, returns control to the parent decision
-point, and does not repeat the same wait without new state evidence or an
-explicit revised packet.
+point, and gates another wait on new state evidence or an explicit revised
+packet. These signals map to `termination_action=preserve_running_instance` and
+`resolution_decision=await_new_state|continue_disjoint_parent_work`.
 
 The investigation record includes `agent_id`, `wave_id`, wait command and
 timeout, last known status, last workflow-monitor event, runtime / tool error,
@@ -315,7 +316,11 @@ log or dashboard pointers, cause hypothesis, and the owner action taken after
 control returns. Another wait or probe is valid only after new state evidence
 arrives or the parent records an explicit revised packet. Scope, owner,
 allowed-path, or review-gate changes move through the fresh follow-up wave path
-already defined by the wave contract and lifecycle policy.
+already defined by the wave contract and lifecycle policy, but the prior
+nonterminal agent keeps its write scope with `overlapping_writer=blocked`.
+`close_agent` authority is runtime status `completed|errored|shutdown` or an
+explicit user cancellation. Timeout and absent-response inference preserve the
+nonterminal status.
 
 ## Intake Responsibility Wave
 
