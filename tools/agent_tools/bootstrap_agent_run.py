@@ -16,6 +16,7 @@ from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 from agent_team import (
+    ActiveDesignPacketConfig,
     AgentTypeSelection,
     Role,
     RunBundleSpec,
@@ -41,6 +42,7 @@ from agent_team import (
     load_task_catalog,
     load_team_config,
     make_run_id,
+    parse_active_design_packet_input,
     parse_agent_type_selections,
     pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
@@ -53,6 +55,7 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    run_active_design_packet,
     same_role_subagent_policy_output_lines,
     select_roles,
     standard_agent_wave_sequence_output_lines,
@@ -94,6 +97,7 @@ class BootstrapRuntime:
     created_files: tuple[str, ...]
     active_pointer: Path
     agent_type_selections: tuple[AgentTypeSelection, ...]
+    active_design_packet: ActiveDesignPacketConfig
 
 
 def suggested_skills(
@@ -118,6 +122,7 @@ def document_packet_output(
     role_id: str,
     report_dir: Path,
     workspace_root: Path,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> str:
     """Render one role's explicit document packet as a CSV-like path list."""
     role = next(
@@ -125,7 +130,13 @@ def document_packet_output(
         for role in config.always_on_roles + config.specialist_roles
         if role.id == role_id
     )
-    packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+    packet = resolve_role_document_packet(
+        config,
+        role,
+        report_dir,
+        workspace_root,
+        active_design_packet,
+    )
     return ",".join(str(entry.path) for entry in packet.read_before_work)
 
 
@@ -168,6 +179,15 @@ def build_parser(
     parser.add_argument(
         "--run-id",
         help="Optional explicit run id. Defaults to a timestamped slug.",
+    )
+    parser.add_argument(
+        "--active-design-packet",
+        metavar="JSON",
+        help=(
+            "Atomic waterfall.design_packet.v1 JSON object for a nonstandard "
+            "run packet. All schema, path, and document_flow_required fields "
+            "are required."
+        ),
     )
     parser.add_argument(
         "--enable",
@@ -495,11 +515,11 @@ def emit_bootstrap_output(
     )
     print(
         "DESIGN_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root)}"
+        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root, runtime.active_design_packet)}"
     )
     print(
         "IMPLEMENTATION_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root)}"
+        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root, runtime.active_design_packet)}"
     )
     print(f"ACTIVE_ROLES={','.join(role.id for role in runtime.roles)}")
     print(f"CREATED_FILES={','.join(runtime.created_files)}")
@@ -539,6 +559,13 @@ def main() -> int:
     config = load_team_config()
     catalog = load_task_catalog(config)
     args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
+    try:
+        explicit_active_design_packet = parse_active_design_packet_input(
+            args.active_design_packet
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 2
     workspace_root = Path(args.workspace_root).resolve()
     try:
         preflight = run_agent_canon_preflight(
@@ -570,29 +597,30 @@ def main() -> int:
         context.workflow_family_id,
         args.task,
     )
-    created_files = create_run_bundle(
-        RunBundleSpec(
-            config=config,
-            report_dir=context.report_dir,
-            run_id=context.run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=context.created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root,
-            workflow_family_id=context.workflow_family_id or "",
-            manual_specialists=context.manual_specialists,
-            task_default_specialists=context.task_default_specialists,
-            auto_specialists=context.auto_specialists,
-            default_review_packs_enabled=bool(
-                args.task_id is not None and not args.no_default_review_packs
-            ),
-            default_review_pack_ids=context.default_review_pack_ids,
-            selected_skills=selected_skills,
-            task_catalog=catalog,
-            agent_type_selections=agent_type_selections,
-        )
+    run_spec = RunBundleSpec(
+        config=config,
+        report_dir=context.report_dir,
+        run_id=context.run_id,
+        task=args.task,
+        owner=args.owner,
+        created_at_iso=context.created_at_iso,
+        roles=roles,
+        workspace_root=workspace_root,
+        active_design_packet=explicit_active_design_packet,
+        workflow_family_id=context.workflow_family_id or "",
+        manual_specialists=context.manual_specialists,
+        task_default_specialists=context.task_default_specialists,
+        auto_specialists=context.auto_specialists,
+        default_review_packs_enabled=bool(
+            args.task_id is not None and not args.no_default_review_packs
+        ),
+        default_review_pack_ids=context.default_review_pack_ids,
+        selected_skills=selected_skills,
+        task_catalog=catalog,
+        agent_type_selections=agent_type_selections,
     )
+    active_design_packet = run_active_design_packet(run_spec)
+    created_files = create_run_bundle(run_spec)
     active_pointer = context.report_root / ".active_run"
     active_pointer.write_text(
         str(context.report_dir.resolve()) + "\n", encoding="utf-8"
@@ -603,6 +631,7 @@ def main() -> int:
         created_files=created_files,
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
+        active_design_packet=active_design_packet,
     )
     review_roles = selected_review_roles(roles)
     emit_bootstrap_output(

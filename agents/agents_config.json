@@ -1661,6 +1661,13 @@
     "design_brief": "design_brief.md",
     "design_review": "design_review.md",
     "document_flow_review": "document_flow_review.md",
+    "active_design_packet": {
+      "schema": "waterfall.design_packet.v1",
+      "design_artifact": "design_brief.md",
+      "design_review_artifact": "design_review.md",
+      "document_flow_review_artifact": "document_flow_review.md",
+      "document_flow_required": true
+    },
     "change_review": "change_review.md",
     "final_review": "final_review.md",
     "verification": "verification.txt",

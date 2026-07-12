@@ -10,13 +10,28 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
+
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from agent_team import render_template, suggested_public_skills  # noqa: E402
+from agent_team import (  # noqa: E402
+    ActiveDesignPacketConfig,
+    RunBundleSpec,
+    TaskCatalog,
+    build_manifest,
+    create_run_bundle,
+    load_task_catalog,
+    load_team_config,
+    render_template,
+    resolve_role,
+    suggested_public_skills,
+)
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -67,6 +82,247 @@ class AgentTeamTemplateTest(unittest.TestCase):
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
         )
+
+    def test_workflow_selected_packet_is_materialized_and_owned_by_roles(self) -> None:
+        """A workflow packet selection controls files and role manifest paths."""
+        config = load_team_config()
+        base_catalog = load_task_catalog(config)
+        selected_family = next(
+            family
+            for family in base_catalog.workflow_families
+            if family.get("id") == "scoped_change"
+        )
+        custom_family = {
+            **selected_family,
+            "active_design_packet": {
+                "schema": "waterfall.design_packet.v1",
+                "design_artifact": "packet/custom-design.md",
+                "design_review_artifact": "packet/custom-technical-review.md",
+                "document_flow_review_artifact": "packet/custom-flow-review.md",
+                "document_flow_required": True,
+            },
+        }
+        catalog = TaskCatalog(
+            raw=base_catalog.raw,
+            workflow_families=tuple(
+                custom_family if family is selected_family else family
+                for family in base_catalog.workflow_families
+            ),
+            tasks=base_catalog.tasks,
+            review_packs=base_catalog.review_packs,
+        )
+        roles = tuple(
+            resolve_role(config, role_id)
+            for role_id in (
+                "designer",
+                "design_reviewer",
+                "document_flow_reviewer",
+            )
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "custom-packet"
+            spec = RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id="custom-packet",
+                task="materialize selected packet",
+                owner="codex",
+                created_at_iso="2026-07-13T00:00:00Z",
+                roles=roles,
+                workspace_root=PROJECT_ROOT,
+                workflow_family_id="scoped_change",
+                task_catalog=catalog,
+            )
+
+            created = create_run_bundle(spec)
+
+            selected_paths = (
+                "packet/custom-design.md",
+                "packet/custom-technical-review.md",
+                "packet/custom-flow-review.md",
+            )
+            for path in selected_paths:
+                self.assertIn(path, created)
+                self.assertTrue((report_dir / path).is_file())
+            for path in (
+                "design_brief.md",
+                "design_review.md",
+                "document_flow_review.md",
+            ):
+                self.assertFalse((report_dir / path).exists())
+
+            manifest_value = yaml.safe_load(
+                (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            )
+            self.assertIsInstance(manifest_value, dict)
+            manifest = manifest_value
+            packet = manifest["run"]["active_design_packet"]
+            self.assertEqual(packet["design_artifact"], selected_paths[0])
+            self.assertEqual(packet["design_review_artifact"], selected_paths[1])
+            self.assertEqual(
+                packet["document_flow_review_artifact"],
+                selected_paths[2],
+            )
+            roles_by_id = {role["id"]: role for role in manifest["roles"]}
+            expected_outputs = {
+                "designer": selected_paths[0],
+                "design_reviewer": selected_paths[1],
+                "document_flow_reviewer": selected_paths[2],
+            }
+            for role_id, expected_output in expected_outputs.items():
+                role = roles_by_id[role_id]
+                self.assertEqual(role["required_outputs"], [expected_output])
+                self.assertEqual(
+                    role["write_policy"]["allowed_files"],
+                    [str((report_dir / expected_output).resolve())],
+                )
+            read_paths = {
+                entry["path"]
+                for entry in roles_by_id["design_reviewer"]["document_packet"][
+                    "role_specific_read_before_work"
+                ]
+            }
+            self.assertIn(
+                str((report_dir / selected_paths[0]).resolve()),
+                read_paths,
+            )
+            packet_artifacts = {
+                "design_brief.md": selected_paths[0],
+                "design_review.md": selected_paths[1],
+                "document_flow_review.md": selected_paths[2],
+            }
+            rendered_policies = cast(
+                "list[dict[str, object]]",
+                manifest["context_policies"],
+            )
+            self.assertEqual(len(rendered_policies), len(config.context_policies))
+            for configured, rendered in zip(
+                config.context_policies,
+                rendered_policies,
+                strict=True,
+            ):
+                configured_share_only = cast(
+                    "list[str]",
+                    configured["share_only"],
+                )
+                rendered_share_only = cast(
+                    "list[str]",
+                    rendered["share_only"],
+                )
+                self.assertEqual(
+                    rendered_share_only,
+                    [
+                        packet_artifacts.get(artifact, artifact)
+                        for artifact in configured_share_only
+                    ],
+                )
+            self.assertEqual(
+                manifest["run"]["pre_handoff_gate_status"]["applies_when"],
+                "run.active_design_packet.design_artifact="
+                "packet/custom-design.md;"
+                "condition=exists_before_implementation_or_handoff",
+            )
+
+    def test_generation_and_manifest_reject_selected_final_symlink(self) -> None:
+        """A selected final symlink cannot write or publish outside the bundle."""
+        config = load_team_config()
+        roles = (resolve_role(config, "designer"),)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report_dir = root / "reports" / "final-symlink"
+            report_dir.mkdir(parents=True)
+            outside_path = root / "outside-design.md"
+            outside_path.write_text("outside sentinel\n", encoding="utf-8")
+            (report_dir / "design_brief.md").symlink_to(outside_path)
+            spec = RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id="final-symlink",
+                task="reject final symlink",
+                owner="codex",
+                created_at_iso="2026-07-13T00:00:00Z",
+                roles=roles,
+                workspace_root=PROJECT_ROOT,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
+                create_run_bundle(spec)
+            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
+                build_manifest(spec)
+
+            self.assertEqual(
+                outside_path.read_text(encoding="utf-8"),
+                "outside sentinel\n",
+            )
+            self.assertFalse((report_dir / "team_manifest.yaml").exists())
+
+    def test_generation_and_manifest_reject_selected_symlink_parent(self) -> None:
+        """A selected symlink parent cannot write or publish outside the bundle."""
+        config = load_team_config()
+        roles = (
+            resolve_role(config, "designer"),
+            resolve_role(config, "design_reviewer"),
+            resolve_role(config, "document_flow_reviewer"),
+        )
+        packet = ActiveDesignPacketConfig(
+            schema="waterfall.design_packet.v1",
+            design_artifact="packet/graph_design_brief.md",
+            design_review_artifact="packet/graph_design_review.md",
+            document_flow_review_artifact="packet/graph_document_flow_review.md",
+            document_flow_required=True,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report_dir = root / "reports" / "parent-symlink"
+            outside_dir = root / "outside-packet"
+            report_dir.mkdir(parents=True)
+            outside_dir.mkdir()
+            (report_dir / "packet").symlink_to(
+                outside_dir,
+                target_is_directory=True,
+            )
+            spec = RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id="parent-symlink",
+                task="reject symlink parent",
+                owner="codex",
+                created_at_iso="2026-07-13T00:00:00Z",
+                roles=roles,
+                workspace_root=PROJECT_ROOT,
+                active_design_packet=packet,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
+                create_run_bundle(spec)
+            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
+                build_manifest(spec)
+
+            self.assertEqual(tuple(outside_dir.iterdir()), ())
+            self.assertFalse((report_dir / "team_manifest.yaml").exists())
+
+    def test_generation_rejects_existing_nonregular_packet_target(self) -> None:
+        """An existing packet target must be a regular file."""
+        config = load_team_config()
+        roles = (resolve_role(config, "designer"),)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "nonregular-target"
+            (report_dir / "design_brief.md").mkdir(parents=True)
+            spec = RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id="nonregular-target",
+                task="reject nonregular target",
+                owner="codex",
+                created_at_iso="2026-07-13T00:00:00Z",
+                roles=roles,
+                workspace_root=PROJECT_ROOT,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "nonregular_target"):
+                create_run_bundle(spec)
+
+            self.assertFalse((report_dir / "team_manifest.yaml").exists())
 
 
 if __name__ == "__main__":

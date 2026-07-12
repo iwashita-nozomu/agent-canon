@@ -68,6 +68,22 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
+nonstandard design packet を run-local input として固定する場合は、
+`bootstrap_agent_run.py` と `task_start.py` の共通 flag
+`--active-design-packet JSON` を使います。JSON は schema、3 つの相対 artifact
+path、`document_flow_required` を一度に指定し、全 field がそろった場合だけ run を
+作成します。生成後の authority は `team_manifest.yaml` の
+`run.active_design_packet` です。
+
+```bash
+python3 tools/agent_tools/bootstrap_agent_run.py \
+  --task "graph design packet run" \
+  --task-id T12 \
+  --owner codex \
+  --workspace-root "$PWD" \
+  --active-design-packet '{"schema":"waterfall.design_packet.v1","design_artifact":"graph_design_brief.md","design_review_artifact":"graph_design_review.md","document_flow_review_artifact":"graph_document_flow_review.md","document_flow_required":true}'
+```
+
 task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
 `--task` の文面は `route.py --prompt` にも使われ、prompt-derived skill は
 `SUGGESTED_SKILLS` と `team_manifest.yaml` の `run.repo_tool_routing_policy`

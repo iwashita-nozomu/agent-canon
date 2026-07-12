@@ -38,6 +38,13 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
+GRAPH_ACTIVE_DESIGN_PACKET: dict[str, object] = {
+    "schema": "waterfall.design_packet.v1",
+    "design_artifact": "graph_design_brief.md",
+    "design_review_artifact": "graph_design_review.md",
+    "document_flow_review_artifact": "graph_document_flow_review.md",
+    "document_flow_required": True,
+}
 
 
 def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
@@ -726,6 +733,98 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 continue
             self.assert_role_prompt_includes(manifest, role_id, fields)
 
+    def assert_graph_active_packet_bundle(
+        self,
+        report_dir: Path,
+        stdout: str,
+    ) -> None:
+        """Assert one entrypoint persisted and propagated the graph packet."""
+        selected_paths = (
+            "graph_design_brief.md",
+            "graph_design_review.md",
+            "graph_document_flow_review.md",
+        )
+        for path in selected_paths:
+            self.assertTrue((report_dir / path).is_file(), path)
+        for path in (
+            "design_brief.md",
+            "design_review.md",
+            "document_flow_review.md",
+        ):
+            self.assertFalse((report_dir / path).exists(), path)
+
+        manifest_text = (report_dir / "team_manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+        manifest_value: object = yaml.safe_load(manifest_text)
+        self.assertIsInstance(manifest_value, dict)
+        manifest = cast("dict[str, object]", manifest_value)
+        run = cast("dict[str, object]", manifest["run"])
+        self.assertEqual(run["active_design_packet"], GRAPH_ACTIVE_DESIGN_PACKET)
+        pre_handoff_status = cast(
+            "dict[str, object]",
+            run["pre_handoff_gate_status"],
+        )
+        self.assertEqual(
+            pre_handoff_status["applies_when"],
+            "run.active_design_packet.design_artifact="
+            "graph_design_brief.md;"
+            "condition=exists_before_implementation_or_handoff",
+        )
+        for unselected_basename in (
+            "design_brief.md",
+            "design_review.md",
+            "document_flow_review.md",
+        ):
+            stale_reference = re.search(
+                rf"(?m)(?<![A-Za-z0-9_]){re.escape(unselected_basename)}"
+                r"(?=$|[^A-Za-z0-9])",
+                manifest_text,
+            )
+            self.assertIsNone(
+                stale_reference,
+                f"unselected packet basename remains: {unselected_basename}",
+            )
+        artifact_inventory = cast("list[object]", manifest["artifacts"])
+        for path in selected_paths:
+            self.assertIn(path, artifact_inventory)
+
+        role_entries = cast("list[object]", manifest["roles"])
+        roles_by_id = {
+            str(role["id"]): role
+            for value in role_entries
+            if isinstance(value, dict)
+            for role in (cast("dict[str, object]", value),)
+        }
+        expected_outputs = {
+            "designer": selected_paths[0],
+            "design_reviewer": selected_paths[1],
+            "document_flow_reviewer": selected_paths[2],
+        }
+        for role_id, expected_output in expected_outputs.items():
+            role = roles_by_id[role_id]
+            self.assertEqual(role["required_outputs"], [expected_output])
+            write_policy = cast("dict[str, object]", role["write_policy"])
+            self.assertEqual(
+                write_policy["allowed_files"],
+                [str((report_dir / expected_output).resolve())],
+            )
+
+        implementer = roles_by_id["implementer"]
+        document_packet = cast("dict[str, object]", implementer["document_packet"])
+        read_entries = cast(
+            "list[object]",
+            document_packet["role_specific_read_before_work"],
+        )
+        read_paths = {
+            str(cast("dict[str, object]", entry)["path"])
+            for entry in read_entries
+            if isinstance(entry, dict)
+        }
+        for path in selected_paths:
+            self.assertIn(str((report_dir / path).resolve()), read_paths)
+            self.assertIn(path, stdout)
+
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -764,6 +863,164 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn(
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
+
+    def test_bootstrap_generates_explicit_graph_active_packet(self) -> None:
+        """Bootstrap should persist one explicit nonstandard packet end to end."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            report_root = root / "reports"
+            workspace_root.mkdir()
+            run_id = "bootstrap-graph-packet"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "bootstrap graph packet",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--full-team",
+                    "--no-auto-language-reviewers",
+                    "--active-design-packet",
+                    json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assert_graph_active_packet_bundle(
+                report_root / run_id,
+                result.stdout,
+            )
+
+    def test_task_start_generates_explicit_graph_active_packet(self) -> None:
+        """Task start should persist one explicit nonstandard packet end to end."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            report_root = root / "reports"
+            workspace_root.mkdir()
+            run_id = "task-start-graph-packet"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "task-start graph packet",
+                    "--task-id",
+                    "T12",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--full-team",
+                    "--no-auto-language-reviewers",
+                    "--active-design-packet",
+                    json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assert_graph_active_packet_bundle(
+                report_root / run_id,
+                result.stdout,
+            )
+
+    def test_entrypoints_reject_partial_or_invalid_active_packet_atomically(
+        self,
+    ) -> None:
+        """Both entrypoints reject malformed packet input before creating a run."""
+        partial_packet = {
+            key: value
+            for key, value in GRAPH_ACTIVE_DESIGN_PACKET.items()
+            if key != "document_flow_review_artifact"
+        }
+        absolute_packet = {
+            **GRAPH_ACTIVE_DESIGN_PACKET,
+            "design_artifact": "/tmp/graph_design_brief.md",
+        }
+        wrong_bool_packet = {
+            **GRAPH_ACTIVE_DESIGN_PACKET,
+            "document_flow_required": "true",
+        }
+        cases = (
+            (
+                "partial",
+                partial_packet,
+                "active_design_packet:field_missing:document_flow_review_artifact",
+            ),
+            (
+                "absolute",
+                absolute_packet,
+                "active_design_packet:field_invalid:design_artifact",
+            ),
+            (
+                "wrong-bool",
+                wrong_bool_packet,
+                "active_design_packet:field_invalid:document_flow_required",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            workspace_root.mkdir()
+            for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
+                for case_name, packet, expected_error in cases:
+                    with self.subTest(script=script.name, case=case_name):
+                        report_root = root / f"reports-{script.stem}-{case_name}"
+                        run_id = f"invalid-{script.stem}-{case_name}"
+                        result = subprocess.run(
+                            [
+                                sys.executable,
+                                str(script),
+                                "--task",
+                                "reject invalid packet",
+                                "--owner",
+                                "codex",
+                                "--run-id",
+                                run_id,
+                                "--workspace-root",
+                                str(workspace_root),
+                                "--report-root",
+                                str(report_root),
+                                "--active-design-packet",
+                                json.dumps(packet, separators=(",", ":")),
+                                "--skip-agent-canon-preflight",
+                            ],
+                            cwd=PROJECT_ROOT,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                        )
+
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn(
+                            expected_error,
+                            result.stdout + result.stderr,
+                        )
+                        self.assertFalse((report_root / run_id).exists())
 
     def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
         """Dirty shared-canon surfaces should not point only to commit-or-stash."""
@@ -2044,6 +2301,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
+            for packet_artifact in (
+                "design_brief.md",
+                "design_review.md",
+                "document_flow_review.md",
+            ):
+                self.assertTrue((report_dir / packet_artifact).is_file())
             self.assertTrue((report_dir / "task_authority.yaml").is_file())
             self.assertTrue((report_dir / "task_authority.yaml.sha256").is_file())
             self.assertTrue(
@@ -2063,6 +2326,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("cross_cutting_document_packet:", manifest_text)
             self.assertIn("document_packet:", manifest_text)
+            self.assertIn("schema: waterfall.design_packet.v1", manifest_text)
+            self.assertIn("design_artifact: design_brief.md", manifest_text)
+            self.assertIn("design_review_artifact: design_review.md", manifest_text)
+            self.assertIn(
+                "document_flow_review_artifact: document_flow_review.md",
+                manifest_text,
+            )
             self.assertNotIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("must_cite_before_edit: true", manifest_text)
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)

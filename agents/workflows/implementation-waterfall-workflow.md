@@ -108,6 +108,32 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 
 `WATERFALL_GATE_READY=no` の場合は、`NEXT_ACTION` に出た owner stage へ戻し、空テンプレート、未承認 review、未記入 artifact を直してから再実行します。
 
+### Active design packet
+
+Design gate は `run.active_design_packet` に宣言された packet だけを読みます。
+packet は `waterfall.design_packet.v1` で、`design_artifact`、
+`design_review_artifact`、`document_flow_review_artifact`、
+`document_flow_required` を必須とします。generator の ownership precedence は
+entrypoint の explicit `--active-design-packet`、workflow-specific record、config
+registry の standard record の順です。explicit input は complete JSON record として
+一度に検証し、選択された record を新しい run manifest へコピーします。宣言された
+packet file は role execution より先に生成します。role の `required_outputs`、write
+scope、reader packet は同じ選択 record を参照し、生成後は manifest record が run
+authority になります。
+
+gate は manifest-declared path だけを active artifact route として消費します。
+active packet set は historical artifact、sibling run、undeclared basename を
+除外します。path acceptance は lexical component が non-symlink、run bundle
+containment、regular file の三条件を要求します。schema、必須 field、
+outside-bundle path、missing artifact は typed design-owner blocker です。
+technical review と required な document-flow review は、それぞれ
+`Design artifact path:` が manifest の `design_artifact` と一致し、
+`review_target_sha256` がその file bytes と一致し、最終 decision が `approve` の
+場合に approval evidence になります。
+standalone の `--gate document_flow` も manifest-selected review path を使います。
+`document_flow_required=false` の packet では Gate 7 を inactive として扱い、
+approval blocker なしで次の gate へ進めます。
+
 ### Cycle A. 実行計画 -> 計画レビュー
 
 - 対象:

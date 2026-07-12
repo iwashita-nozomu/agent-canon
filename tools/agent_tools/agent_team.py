@@ -16,6 +16,7 @@ import json
 import re
 import subprocess
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -501,6 +502,61 @@ def resolve_report_root(
     return (base_root / candidate).resolve()
 
 
+class ReportBundleArtifactPathError(RuntimeError):
+    """Report one rejected run-artifact path and its containment reason."""
+
+    def __init__(self, declared_path: str, reason: str) -> None:
+        """Record the rejected declaration and stable reason code."""
+        self.declared_path = declared_path
+        self.reason = reason
+        super().__init__(
+            f"report_bundle_artifact_path_invalid:{reason}:{declared_path}"
+        )
+
+
+def resolve_report_bundle_artifact_path(
+    report_dir: Path,
+    declared_path: str,
+    *,
+    require_existing_regular_file: bool = False,
+) -> Path:
+    """Resolve one lexical bundle path without following symlink components."""
+    relative_path = Path(declared_path)
+    if not declared_path or relative_path.is_absolute():
+        raise ReportBundleArtifactPathError(declared_path, "not_relative")
+    parts = tuple(part for part in relative_path.parts if part not in {"", "."})
+    if not parts:
+        raise ReportBundleArtifactPathError(declared_path, "not_relative")
+
+    report_root = report_dir.resolve()
+    lexical_path = report_root
+    for index, component in enumerate(parts):
+        if component == "..":
+            raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
+        lexical_path = lexical_path / component
+        if lexical_path.is_symlink():
+            raise ReportBundleArtifactPathError(declared_path, "symlink_component")
+        if not lexical_path.exists():
+            continue
+        is_final_component = index == len(parts) - 1
+        if is_final_component and not lexical_path.is_file():
+            raise ReportBundleArtifactPathError(declared_path, "nonregular_target")
+        if not is_final_component and not lexical_path.is_dir():
+            raise ReportBundleArtifactPathError(declared_path, "non_directory_parent")
+
+    candidate = lexical_path.resolve()
+    try:
+        candidate.relative_to(report_root)
+    except ValueError as exc:
+        raise ReportBundleArtifactPathError(
+            declared_path,
+            "outside_bundle",
+        ) from exc
+    if require_existing_regular_file and not candidate.is_file():
+        raise ReportBundleArtifactPathError(declared_path, "missing_regular_file")
+    return candidate
+
+
 @dataclass(frozen=True)
 class WritePolicy:
     """Describe how one role may write to the filesystem."""
@@ -603,6 +659,17 @@ class RoleDocumentPacket:
     notes: str
 
 
+@dataclass(frozen=True)
+class ActiveDesignPacketConfig:
+    """Artifact-registry declaration for a run's active design packet."""
+
+    schema: str
+    design_artifact: str
+    design_review_artifact: str
+    document_flow_review_artifact: str
+    document_flow_required: bool
+
+
 def resolve_cross_cutting_document_packet(
     workspace_root: Path,
 ) -> tuple[DocumentPacketEntry, ...]:
@@ -637,6 +704,7 @@ class TeamConfig:
     context_policies: tuple[dict[str, object], ...]
     activation_rules: tuple[dict[str, object], ...]
     quality_gates: tuple[str, ...]
+    artifact_registry: dict[str, object]
     artifacts: dict[str, str]
 
 
@@ -662,6 +730,7 @@ class RunBundleSpec:
     created_at_iso: str
     roles: tuple[Role, ...]
     workspace_root: Path
+    active_design_packet: ActiveDesignPacketConfig | None = None
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
@@ -694,9 +763,11 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
         raw.get("activation_rules"), "activation_rules"
     )
     quality_gates = _as_string_tuple(raw.get("quality_gates"), "quality_gates")
+    artifact_registry = _as_object_mapping(raw.get("artifacts"), "artifacts")
     artifacts = {
         key: _as_required_string(value, f"artifacts.{key}")
-        for key, value in _as_object_mapping(raw.get("artifacts"), "artifacts").items()
+        for key, value in artifact_registry.items()
+        if key != "active_design_packet"
     }
     return TeamConfig(
         raw=raw,
@@ -707,8 +778,108 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
         context_policies=context_policies,
         activation_rules=activation_rules,
         quality_gates=quality_gates,
+        artifact_registry=artifact_registry,
         artifacts=artifacts,
     )
+
+
+ACTIVE_DESIGN_PACKET_FIELDS = (
+    "schema",
+    "design_artifact",
+    "design_review_artifact",
+    "document_flow_review_artifact",
+    "document_flow_required",
+)
+
+
+def normalize_active_design_packet_config(
+    raw_packet: object,
+    field_prefix: str,
+) -> ActiveDesignPacketConfig:
+    """Normalize one complete active-packet record into its typed boundary."""
+    packet = _as_object_mapping(raw_packet, field_prefix)
+    missing = [field for field in ACTIVE_DESIGN_PACKET_FIELDS if field not in packet]
+    if missing:
+        raise RuntimeError(f"{field_prefix}:field_missing:" + ",".join(missing))
+    schema = _as_required_string(
+        packet["schema"],
+        f"{field_prefix}.schema",
+    )
+    if schema != "waterfall.design_packet.v1":
+        raise RuntimeError(f"{field_prefix}:schema_unknown:{schema}")
+    values: dict[str, str] = {}
+    for field in (
+        "design_artifact",
+        "design_review_artifact",
+        "document_flow_review_artifact",
+    ):
+        value = _as_required_string(
+            packet[field],
+            f"{field_prefix}.{field}",
+        )
+        path = Path(value)
+        if not value or path.is_absolute() or ".." in path.parts:
+            raise RuntimeError(f"{field_prefix}:field_invalid:{field}")
+        values[field] = value
+    document_flow_required = packet["document_flow_required"]
+    if not isinstance(document_flow_required, bool):
+        raise RuntimeError(
+            f"{field_prefix}:field_invalid:document_flow_required"
+        )
+    return ActiveDesignPacketConfig(
+        schema=schema,
+        design_artifact=values["design_artifact"],
+        design_review_artifact=values["design_review_artifact"],
+        document_flow_review_artifact=values["document_flow_review_artifact"],
+        document_flow_required=document_flow_required,
+    )
+
+
+def parse_active_design_packet_input(
+    value: str | None,
+) -> ActiveDesignPacketConfig | None:
+    """Parse one atomic JSON packet supplied by a run entrypoint."""
+    if value is None:
+        return None
+    try:
+        parsed: object = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("active_design_packet:json_invalid") from exc
+    packet = _as_object_mapping(parsed, "active_design_packet")
+    unknown = sorted(set(packet).difference(ACTIVE_DESIGN_PACKET_FIELDS))
+    if unknown:
+        raise RuntimeError("active_design_packet:field_unknown:" + ",".join(unknown))
+    return normalize_active_design_packet_config(packet, "active_design_packet")
+
+
+def resolve_active_design_packet_config(
+    config: TeamConfig,
+    workflow_family: Mapping[str, object] | None = None,
+) -> ActiveDesignPacketConfig:
+    """Resolve the workflow-selected packet or the standard config record."""
+    if workflow_family is not None and "active_design_packet" in workflow_family:
+        raw_packet = workflow_family["active_design_packet"]
+        field_prefix = "workflow_family.active_design_packet"
+    else:
+        raw_packet = config.artifact_registry.get("active_design_packet")
+        field_prefix = "artifacts.active_design_packet"
+    if raw_packet is None:
+        raise RuntimeError("artifacts.active_design_packet:missing")
+    return normalize_active_design_packet_config(raw_packet, field_prefix)
+
+
+def manifest_active_design_packet_lines(
+    packet: ActiveDesignPacketConfig,
+) -> list[str]:
+    """Render the run.active_design_packet declaration."""
+    return [
+        "  active_design_packet:",
+        f"    schema: {packet.schema}",
+        f"    design_artifact: {packet.design_artifact}",
+        f"    design_review_artifact: {packet.design_review_artifact}",
+        f"    document_flow_review_artifact: {packet.document_flow_review_artifact}",
+        f"    document_flow_required: {str(packet.document_flow_required).lower()}",
+    ]
 
 
 def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
@@ -1802,13 +1973,60 @@ def codex_agent_model_matrix_for_roles(
     return tuple(dict.fromkeys(rows))
 
 
-def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ...]:
+def active_design_packet_artifact_map(
+    config: TeamConfig,
+    packet: ActiveDesignPacketConfig,
+) -> dict[str, str]:
+    """Map standard design artifact names to the selected packet outputs."""
+    return {
+        config.artifacts["design_brief"]: packet.design_artifact,
+        config.artifacts["design_review"]: packet.design_review_artifact,
+        config.artifacts["document_flow_review"]: packet.document_flow_review_artifact,
+    }
+
+
+def selected_role_outputs(
+    config: TeamConfig,
+    role: Role,
+    packet: ActiveDesignPacketConfig,
+) -> tuple[str, ...]:
+    """Return role outputs aligned with the selected design packet."""
+    artifact_map = active_design_packet_artifact_map(config, packet)
+    return tuple(artifact_map.get(output, output) for output in role.required_outputs)
+
+
+def selected_artifact_name(
+    config: TeamConfig,
+    artifact_key: str,
+    packet: ActiveDesignPacketConfig,
+) -> str:
+    """Resolve one logical artifact key through the selected design packet."""
+    artifact_name = config.artifacts[artifact_key]
+    return active_design_packet_artifact_map(config, packet).get(
+        artifact_name,
+        artifact_name,
+    )
+
+
+def iter_artifacts(
+    config: TeamConfig,
+    roles: tuple[Role, ...],
+    active_design_packet: ActiveDesignPacketConfig | None = None,
+) -> tuple[str, ...]:
     """Return unique artifact filenames in deterministic order."""
+    packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         dict.fromkeys(
             (
                 *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
-                *(output for role in roles for output in role.required_outputs),
+                packet.design_artifact,
+                packet.design_review_artifact,
+                packet.document_flow_review_artifact,
+                *(
+                    output
+                    for role in roles
+                    for output in selected_role_outputs(config, role, packet)
+                ),
             )
         )
     )
@@ -1819,6 +2037,7 @@ def resolve_role_document_packet(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> RoleDocumentPacket:
     """Resolve explicit read-before-work packet for one role."""
     spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
@@ -1832,6 +2051,12 @@ def resolve_role_document_packet(
     )
     entries: list[DocumentPacketEntry] = []
     seen_paths: set[Path] = set()
+    active_packet = active_design_packet or resolve_active_design_packet_config(config)
+    active_packet_paths = {
+        "design_brief": active_packet.design_artifact,
+        "design_review": active_packet.design_review_artifact,
+        "document_flow_review": active_packet.document_flow_review_artifact,
+    }
 
     def add_entry(entry: DocumentPacketEntry) -> None:
         resolved_path = entry.path.resolve()
@@ -1847,13 +2072,30 @@ def resolve_role_document_packet(
         )
 
     for artifact_key in artifact_keys:
+        if artifact_key in active_packet_paths:
+            add_entry(
+                DocumentPacketEntry(
+                    path=resolve_report_bundle_artifact_path(
+                        report_dir,
+                        active_packet_paths[artifact_key],
+                    ),
+                    rationale=(
+                        f"run artifact:{artifact_key}; "
+                        "source=run.active_design_packet"
+                    ),
+                )
+            )
+            continue
         if artifact_key not in config.artifacts:
             raise RuntimeError(
                 f"document packet artifact key missing for role {role.id}: {artifact_key}"
             )
         add_entry(
             DocumentPacketEntry(
-                path=(report_dir / config.artifacts[artifact_key]).resolve(),
+                path=resolve_report_bundle_artifact_path(
+                    report_dir,
+                    config.artifacts[artifact_key],
+                ),
                 rationale=f"run artifact:{artifact_key}",
             )
         )
@@ -2002,6 +2244,31 @@ def required_output_templates_missing(
     )
 
 
+def run_workflow_family(spec: RunBundleSpec) -> dict[str, object] | None:
+    """Return the workflow-family record selected for one run."""
+    if not spec.workflow_family_id:
+        return None
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for workflow manifest rendering")
+    return resolve_workflow_family(spec.task_catalog, spec.workflow_family_id)
+
+
+def run_active_design_packet(
+    spec: RunBundleSpec,
+    workflow_family: Mapping[str, object] | None = None,
+) -> ActiveDesignPacketConfig:
+    """Resolve the explicit run, workflow, or standard packet for one run."""
+    if spec.active_design_packet is not None:
+        return spec.active_design_packet
+    selected_workflow = (
+        workflow_family if workflow_family is not None else run_workflow_family(spec)
+    )
+    return resolve_active_design_packet_config(
+        spec.config,
+        workflow_family=selected_workflow,
+    )
+
+
 def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     """Create the standard files for a run."""
     replacements = {
@@ -2011,18 +2278,33 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         "CREATED_AT": spec.created_at_iso,
     }
     spec.report_dir.mkdir(parents=True, exist_ok=True)
-    created_files = list(iter_artifacts(spec.config, spec.roles))
+    workflow_family = run_workflow_family(spec)
+    active_design_packet = run_active_design_packet(spec, workflow_family)
+    created_files = list(
+        iter_artifacts(spec.config, spec.roles, active_design_packet)
+    )
+    artifact_paths = {
+        artifact: resolve_report_bundle_artifact_path(spec.report_dir, artifact)
+        for artifact in (*created_files, AUTHORITY_FILE_NAME)
+    }
+    selected_templates = {
+        active_design_packet.design_artifact: spec.config.artifacts["design_brief"],
+        active_design_packet.design_review_artifact: spec.config.artifacts["design_review"],
+        active_design_packet.document_flow_review_artifact: spec.config.artifacts[
+            "document_flow_review"
+        ],
+    }
     for artifact in created_files:
-        if has_template(artifact):
-            (spec.report_dir / artifact).write_text(
-                render_template(artifact, replacements),
+        template_name = selected_templates.get(artifact, artifact)
+        if has_template(template_name):
+            output_path = artifact_paths[artifact]
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(
+                render_template(template_name, replacements),
                 encoding="utf-8",
             )
-    (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
-        build_manifest(spec),
-        encoding="utf-8",
-    )
-    (spec.report_dir / spec.config.artifacts["verification"]).write_text(
+    write_team_manifest(spec)
+    artifact_paths[spec.config.artifacts["verification"]].write_text(
         "\n".join(
             [
                 f"run_id={spec.run_id}",
@@ -2041,7 +2323,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
-    (spec.report_dir / AUTHORITY_FILE_NAME).write_text(
+    artifact_paths[AUTHORITY_FILE_NAME].write_text(
         build_default_task_authority(
             run_id=spec.run_id,
             task=spec.task,
@@ -2056,6 +2338,18 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         if artifact not in unique_created_files:
             unique_created_files.append(artifact)
     return tuple(unique_created_files)
+
+
+def write_team_manifest(spec: RunBundleSpec) -> Path:
+    """Serialize and write only the authoritative run team manifest."""
+    manifest_path = resolve_report_bundle_artifact_path(
+        spec.report_dir,
+        spec.config.artifacts["team_manifest"],
+    )
+    manifest_text = build_manifest(spec)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(manifest_text, encoding="utf-8")
+    return manifest_path
 
 
 def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
@@ -2207,25 +2501,22 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
 
 def build_manifest(spec: RunBundleSpec) -> str:
     """Build the team manifest yaml."""
-    workflow_family = None
-    if spec.workflow_family_id:
-        if spec.task_catalog is None:
-            raise RuntimeError("task catalog is required for workflow manifest rendering")
-        workflow_family = resolve_workflow_family(
-            spec.task_catalog,
-            spec.workflow_family_id,
-        )
-    lines = manifest_run_lines(spec, workflow_family)
-    lines.extend(manifest_role_lines(spec, workflow_family))
-    lines.extend(manifest_context_policy_lines(spec.config))
+    workflow_family = run_workflow_family(spec)
+    active_design_packet = run_active_design_packet(spec, workflow_family)
+    lines = manifest_run_lines(spec, workflow_family, active_design_packet)
+    lines.extend(manifest_role_lines(spec, workflow_family, active_design_packet))
+    lines.extend(manifest_context_policy_lines(spec.config, active_design_packet))
     lines.extend(manifest_quality_gate_lines(spec.config))
-    lines.extend(manifest_artifact_lines(spec.config, spec.roles))
+    lines.extend(
+        manifest_artifact_lines(spec.config, spec.roles, active_design_packet)
+    )
     return "\n".join(lines) + "\n"
 
 
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
+    active_design_packet: ActiveDesignPacketConfig,
 ) -> list[str]:
     """Render run-level manifest fields."""
     lines = [
@@ -2239,6 +2530,7 @@ def manifest_run_lines(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
+        *manifest_active_design_packet_lines(active_design_packet),
         "  subagent_lifecycle_policy:",
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
@@ -2272,7 +2564,7 @@ def manifest_run_lines(
         *manifest_user_facing_language_policy_lines(),
         *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
-        *manifest_pre_handoff_gate_status_lines(),
+        *manifest_pre_handoff_gate_status_lines(active_design_packet),
         *manifest_repo_tool_routing_policy_lines(spec),
         *manifest_default_quality_check_policy_lines(spec),
         "  agent_report_collection:",
@@ -2455,7 +2747,8 @@ def manifest_run_lines(
         )
         lines.append(
             "      - include run.pre_handoff_gate_status before implementation or "
-            "write-capable handoff when design_brief.md exists"
+            "write-capable handoff when run.active_design_packet.design_artifact "
+            f"({active_design_packet.design_artifact}) exists"
         )
         lines.append(
             "      - include run.repo_tool_routing_policy selected-skill packet commands, "
@@ -2591,8 +2884,15 @@ def manifest_pre_handoff_scope_policy_lines() -> list[str]:
     return lines
 
 
-def manifest_pre_handoff_gate_status_lines() -> list[str]:
+def manifest_pre_handoff_gate_status_lines(
+    active_design_packet: ActiveDesignPacketConfig,
+) -> list[str]:
     """Render the pre-handoff gate status contract."""
+    applies_when = (
+        "run.active_design_packet.design_artifact="
+        f"{active_design_packet.design_artifact};"
+        "condition=exists_before_implementation_or_handoff"
+    )
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",
@@ -2605,7 +2905,7 @@ def manifest_pre_handoff_gate_status_lines() -> list[str]:
     lines.extend(
         [
             "    design_gate_command: 'python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design'",
-            "    applies_when: design_brief.md_exists_before_implementation_or_handoff",
+            f"    applies_when: {applies_when!r}",
             "    document_flow_review: conditional_when_workflow_gate_active",
         ]
     )
@@ -2736,17 +3036,26 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
 def manifest_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
+    active_design_packet: ActiveDesignPacketConfig,
 ) -> list[str]:
     """Render role entries for the team manifest."""
     lines = ["roles:"]
     for role in spec.roles:
-        lines.extend(manifest_one_role_lines(spec, workflow_family, role))
+        lines.extend(
+            manifest_one_role_lines(
+                spec,
+                workflow_family,
+                active_design_packet,
+                role,
+            )
+        )
     return lines
 
 
 def manifest_one_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
+    active_design_packet: ActiveDesignPacketConfig,
     role: Role,
 ) -> list[str]:
     """Render one role entry for the team manifest."""
@@ -2764,10 +3073,10 @@ def manifest_one_role_lines(
     for responsibility in role.owns:
         lines.append(f"      - {responsibility}")
     lines.append("    required_outputs:")
-    for output in role.required_outputs:
+    for output in selected_role_outputs(spec.config, role, active_design_packet):
         lines.append(f"      - {output}")
-    lines.extend(manifest_write_policy_lines(spec, role))
-    lines.extend(manifest_document_packet_lines(spec, role))
+    lines.extend(manifest_write_policy_lines(spec, role, active_design_packet))
+    lines.extend(manifest_document_packet_lines(spec, role, active_design_packet))
     return lines
 
 
@@ -2802,13 +3111,18 @@ def manifest_prompt_contract_lines(
     return lines
 
 
-def manifest_write_policy_lines(spec: RunBundleSpec, role: Role) -> list[str]:
+def manifest_write_policy_lines(
+    spec: RunBundleSpec,
+    role: Role,
+    active_design_packet: ActiveDesignPacketConfig,
+) -> list[str]:
     """Render resolved write policy lines for one role."""
     scope = resolve_role_write_scope(
         config=spec.config,
         role=role,
         report_dir=spec.report_dir,
         workspace_root=spec.workspace_root,
+        active_design_packet=active_design_packet,
     )
     lines = ["    write_policy:"]
     lines.append(f"      mode: {scope.mode}")
@@ -2830,13 +3144,18 @@ def manifest_write_policy_lines(spec: RunBundleSpec, role: Role) -> list[str]:
     return lines
 
 
-def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]:
+def manifest_document_packet_lines(
+    spec: RunBundleSpec,
+    role: Role,
+    active_design_packet: ActiveDesignPacketConfig,
+) -> list[str]:
     """Render explicit document packet lines for one role."""
     document_packet = resolve_role_document_packet(
         spec.config,
         role,
         spec.report_dir,
         spec.workspace_root,
+        active_design_packet,
     )
     lines = ["    document_packet:"]
     lines.append(
@@ -2874,8 +3193,15 @@ def role_specific_document_entries(
     )
 
 
-def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
+def manifest_context_policy_lines(
+    config: TeamConfig,
+    active_design_packet: ActiveDesignPacketConfig,
+) -> list[str]:
     """Render context-sharing policy lines."""
+    packet_artifacts = active_design_packet_artifact_map(
+        config,
+        active_design_packet,
+    )
     lines = ["context_policies:"]
     for policy in config.context_policies:
         lines.append("  - roles:")
@@ -2887,7 +3213,7 @@ def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
         for artifact in _as_string_tuple(
             policy.get("share_only"), "context_policies.share_only"
         ):
-            lines.append(f"      - {artifact}")
+            lines.append(f"      - {packet_artifacts.get(artifact, artifact)}")
         lines.append("    do_not_share:")
         for artifact in _as_string_tuple(
             policy.get("do_not_share"), "context_policies.do_not_share"
@@ -2904,10 +3230,14 @@ def manifest_quality_gate_lines(config: TeamConfig) -> list[str]:
     return lines
 
 
-def manifest_artifact_lines(config: TeamConfig, roles: tuple[Role, ...]) -> list[str]:
+def manifest_artifact_lines(
+    config: TeamConfig,
+    roles: tuple[Role, ...],
+    active_design_packet: ActiveDesignPacketConfig,
+) -> list[str]:
     """Render artifact lines."""
     lines = ["artifacts:"]
-    for artifact in iter_artifacts(config, roles):
+    for artifact in iter_artifacts(config, roles, active_design_packet):
         lines.append(f"  - {artifact}")
     return lines
 
@@ -3142,9 +3472,15 @@ def resolve_role_write_scope(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
-    allowed_files = role_allowed_artifact_files(config, role, report_dir)
+    allowed_files = role_allowed_artifact_files(
+        config,
+        role,
+        report_dir,
+        active_design_packet,
+    )
     allowed_directories = role_allowed_directories(role, workspace_root)
     unresolved_reason = role_write_scope_unresolved_reason(role, allowed_directories)
     return RoleWriteScope(
@@ -3163,12 +3499,17 @@ def role_allowed_artifact_files(
     config: TeamConfig,
     role: Role,
     report_dir: Path,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
+    packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         sorted(
             {
-                (report_dir / config.artifacts[artifact_key]).resolve()
+                resolve_report_bundle_artifact_path(
+                    report_dir,
+                    selected_artifact_name(config, artifact_key, packet),
+                )
                 for artifact_key in role.write_policy.allowed_artifacts
             },
             key=str,

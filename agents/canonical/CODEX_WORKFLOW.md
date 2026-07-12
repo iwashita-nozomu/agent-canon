@@ -223,9 +223,27 @@ routing / handoff artifact として扱い、edit authorization は別 gate で�
 `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
 `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` が必要です。
 Gate 5 で作成された設計文書は、作成直後に Gate 6 の detailed design review を
-受けます。`design_review.md` が同一の design artifact path と対象 revision /
-section を `approve` した後に、その設計を implementation handoff、worker input、
-または follow-up 実装判断の根拠にします。
+受けます。`run.active_design_packet.design_review_artifact` が同一の design
+artifact path と対象 revision / section を `approve` した後に、その設計を
+implementation handoff、worker input、または follow-up 実装判断の根拠にします。
+
+実装前の design gate は、run manifest の `run.active_design_packet` を唯一の
+artifact ownership source とします。schema は `waterfall.design_packet.v1` で、
+design artifact、technical design review、document-flow review の相対 path と
+`document_flow_required` を必須にします。generator の canonical active-design-packet
+precedence は、explicit run `--active-design-packet` input、workflow-specific record、
+standard `agents_config` artifact registry の順です。generator は選択 record を
+生成済み run manifest に永続化し、以後その manifest が persisted authority になります。
+gate は persisted manifest の `run.active_design_packet` を唯一の runtime input として
+読みます。
+選択 record が明示した path を gate は run bundle 内の regular file として解決し、
+manifest-declared path だけを active artifact route として消費します。active packet
+set は historical run、sibling artifact、undeclared basename を除外します。
+missing / unknown schema / invalid field / outside-bundle path は typed blocker と
+して design owner に戻します。implementation handoff は、manifest-declared
+design artifact、両 review の一致する `Design artifact path:` と
+`review_target_sha256`、最終 `decision=approve`、および required な
+document-flow approval を要求します。
 
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
