@@ -352,6 +352,8 @@ still contains parent-owned request, schedule, manifest, work-log, review,
 verification, monitoring, evaluation, and closeout artifacts. They are not part
 of the evaluator prompt; its prompt contract references only the current
 Scenario Packet, packet-listed files, `do_not_read`, and the fixed output schema.
+The evaluator's `gpt-5.4-mini/medium` setting is reserved for this explicit T14
+lane; no permanent team role uses that model assignment.
 
 1. Parent Iteration 0 freezes one answer-free Scenario Packet for each frozen
    scenario: `full`, `changed`, and the supplied-TSV hold-out. The packet carries
@@ -661,12 +663,12 @@ workflow docs、task catalog は agent TOML を参照します。
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は product-evidence route を示します。
-- この repo では、parent orchestrator / integrator は Sol/high、通常の planning / authoring / review child は Luna/high、`worker` と `ship_reviewer` は Luna/xhigh にします。repo inventory、tool drift survey、machine-report summarization、execution-only experiment / log work、skill evaluation は mini helper role TOML に残し、`spark_worker` は explicit parent-packet selection がある機械的実装だけに使います。
+- この repo では、parent orchestrator / integrator は Sol/high、通常の planning / authoring / exploration / inventory / machine-report summarization / experiment execution / review child は Luna/high、`worker` と `ship_reviewer` は Luna/xhigh にします。`gpt-5.4-mini/medium` は fresh read-only artifact-only の `skill_evaluator` が明示的な T14 `skill_evaluation` で使う評価専用設定であり、permanent team role には割り当てません。`spark_worker` は explicit parent-packet selection がある機械的実装だけに使います。
 - 親の既定は Sol/high とし、Sol/xhigh は high-risk / final escalation evidence があるときに起動します
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop は `spark_worker` selection の evidence になり得ますが、`worker` 既定を切り替えるには explicit parent-packet selection が必要です
 - review / quality-check role TOML は Luna/high を使い、findings を親へ返します。`ship_reviewer` だけが Luna/xhigh で final findings を作り、final judgment と scope を変える統合判断は親 Sol が持ちます
-- Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only helper work は mini helper role TOML に置きます
+- Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only experiment / log work は Luna/high の通常 role に置きます。mini/medium は明示的な T14 skill validation の `skill_evaluator` に限ります。
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、typed parent-packet selection が stdout / manifest に記録されていることです
 - 明示 spawn 許可がある repo-changing task では、coding / implementation / patch / doc-edit work の implementation critical path を pre-handoff investigation packet で作ってから、次の判断を変える独立検証を Luna review child へ切ります。各 gate は一つの accountable review child を持ち、文書 flow、requirements / plan、report traceability、research perspective は該当 decision / artifact があるときに specialist wave として起動します。
 - coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は `worker` を既定として起動または schedule し、`spark_worker` は explicit parent-packet selection が記録された場合だけ使います。completion route は write-capable handoff、integration、review、validation で構成します。parent-direct は explicit exception rationale と validation evidence がある場合だけ completion route にできます。

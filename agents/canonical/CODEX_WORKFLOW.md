@@ -546,7 +546,7 @@ handoff はこの policy を含めます。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は mini helper role TOML に残します。通常の planning / authoring / review child は `gpt-5.6-luna/high`、`worker` と `ship_reviewer` は `gpt-5.6-luna/xhigh` とし、final judgment は `.codex/config.toml` の `gpt-5.6-sol/high` parent が持ちます。`spark_worker` は Abstract Design Frame と design trace で完全に切れ、typed parent-packet selection がある機械的 slice だけに使います。
+default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は Luna/high の通常 role TOML に置きます。通常の planning / authoring / review child は `gpt-5.6-luna/high`、`worker` と `ship_reviewer` は `gpt-5.6-luna/xhigh` とし、final judgment は `.codex/config.toml` の `gpt-5.6-sol/high` parent が持ちます。`gpt-5.4-mini/medium` は fresh read-only artifact-only の `skill_evaluator` が明示的な T14 `skill_evaluation` で使う評価専用設定で、permanent team role にはありません。`spark_worker` は Abstract Design Frame と design trace で完全に切れ、typed parent-packet selection がある機械的 slice だけに使います。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。すべての repo-changing family は同時 active 4 体、write-capable 2 体までとし、`Skill Evaluation` / T14 は evaluator-only の `1/1` です。各 decision wave は、その decision が選んだ specialist だけを起動します。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
@@ -673,7 +673,7 @@ cost を無視して review coverage を優先する run では、research-drive
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
   `documents/conventions/common/02_naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
-- 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は mini helper role TOML へ、static validation failure triage と diff-local language review は該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
+- 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は Luna/high の通常 role TOML へ、static validation failure triage と diff-local language review も該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`gpt-5.4-mini/medium` は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。design trace と dependency-expanded handoff scope は必要 evidence であり、実際の選択には `--select-agent-type implementer=spark_worker:<evidence>` が必要です。
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を local/tool context 参照として扱い、prompt には選択済み `Fresh Subagent Context Capsule` fields を入れる
@@ -701,7 +701,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
 - checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- implementation の既定 candidate は `gpt-5.6-luna/xhigh` の `worker` とし、review / quality-check は active decision ごとに一つの `gpt-5.6-luna/high` role を選びます。Abstract Design Frame と design trace から導かれた機械的 slice は explicit parent-packet selection がある場合だけ `spark_worker` を使い、execution-only experiment / log work は mini helper role TOML とします
+- implementation の既定 candidate は `gpt-5.6-luna/xhigh` の `worker` とし、review / quality-check は active decision ごとに一つの `gpt-5.6-luna/high` role を選びます。Abstract Design Frame と design trace から導かれた機械的 slice は explicit parent-packet selection がある場合だけ `spark_worker` を使い、execution-only experiment / log work は Luna/high の `experiment_runner` に渡します。mini/medium は明示 T14 `skill_evaluation` の `skill_evaluator` だけです。
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ
