@@ -5,6 +5,7 @@
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation dependency_manifest.rs owns canonical manifest parsing and snapshots
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation local_llm.rs routes local LLM responsibility, search, index, and eval commands
 // downstream implementation migration_audit.rs validates migration boundaries
@@ -13,6 +14,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
+mod dependency_manifest;
 mod docs;
 mod jit_ir_to_lean;
 mod local_llm;
@@ -48,6 +50,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "docs" {
         std::process::exit(docs::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "dependency-manifest" {
+        std::process::exit(dependency_manifest::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
