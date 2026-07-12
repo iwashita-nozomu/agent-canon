@@ -17,6 +17,9 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from tools.agent_tools import check_design_doc_claims as checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
@@ -249,6 +252,251 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertIn("claim-token-without-evidence", result.stdout)
             self.assertIn("token=../README.md", result.stdout)
 
+    def test_dot_relative_path_token_resolves_from_claim_document(self) -> None:
+        """Dot-relative paths resolve from the claim document directory."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `./evidence.md`.
+                - Assumptions: dot-relative paths use the claim document context.
+
+                ## Claims
+
+                - The design reads `./evidence.md`.
+                """,
+            )
+            write(root / "documents" / "design" / "evidence.md", "# Evidence\n")
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
+    def test_missing_dot_relative_path_is_not_supported_by_root_file(self) -> None:
+        """A missing dot-relative path remains a strict claim finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: current implementation.
+                - Assumptions: a missing dot-relative path is unsupported.
+
+                ## Claims
+
+                - The design reads `./missing.md`.
+                """,
+            )
+            write(root / "missing.md", "# Unrelated root file\n")
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertIn("token=./missing.md", result.stdout)
+
+    def test_math_set_difference_requires_evidence_without_path_resolution(self) -> None:
+        """Math notation is evidence-checked and never treated as a path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/evidence.py evidence fixture
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/evidence.py`.
+                - Assumptions: set difference is a defined notation.
+
+                ## Claims
+
+                - The design preserves `P(S)\\setminus E_src(S)`.
+                """,
+            )
+            write(
+                root / "tools" / "evidence.py",
+                """
+                # @dependency-start
+                # responsibility Provides math evidence.
+                # @dependency-end
+
+                notation = "P(S)\\setminus E_src(S)"
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_math_set_difference_without_evidence_remains_strict(self) -> None:
+        """Unknown math notation does not auto-pass a strict claim."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/evidence.py evidence fixture
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/evidence.py`.
+                - Assumptions: unknown set notation still needs evidence.
+
+                ## Claims
+
+                - The design preserves `P(S)\\setminus Unknown(S)`.
+                """,
+            )
+            write(root / "tools" / "evidence.py", "known = True\n")
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("Traceback", result.stdout + result.stderr)
+            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertIn("P(S)\\setminus Unknown(S)", result.stdout)
+
+    def test_relative_wildcard_path_uses_claim_document_context(self) -> None:
+        """Wildcard path support remains bounded to the claim document context."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: current implementation.
+                - Assumptions: wildcard paths stay claim-relative.
+
+                ## Claims
+
+                - The design scans `./evidence-*.md`.
+                """,
+            )
+            write(root / "documents" / "design" / "evidence-one.md", "# Evidence\n")
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
+    def test_invalid_os_path_emits_typed_finding_without_traceback(self) -> None:
+        """An invalid filesystem token is reported instead of escaping the checker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            invalid_token = "tools/\x00invalid"
+            write(
+                root / "documents" / "design" / "feature.md",
+                f"""
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: current implementation.
+                - Assumptions: invalid paths remain typed findings.
+
+                ## Claims
+
+                - The design reads `{invalid_token}`.
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("Traceback", result.stdout + result.stderr)
+            self.assertIn("unsupported-reference:path-invalid", result.stdout)
+
+    def test_glob_oserror_emits_typed_claim_finding(self) -> None:
+        """A filesystem OSError becomes the selected typed claim finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            claim = checker.Claim(
+                path="documents/design/feature.md",
+                line=17,
+                text="- The design reads `./*.md`.",
+                tokens=("./*.md",),
+            )
+
+            with mock.patch.object(
+                checker.glob,
+                "glob",
+                side_effect=OSError("injected glob failure"),
+            ):
+                supported, findings = checker.check_claim_support(
+                    root,
+                    (claim,),
+                    {},
+                )
+
+            self.assertEqual(supported, 0)
+            self.assertEqual(
+                findings,
+                [
+                    checker.Finding(
+                        kind="claim-token-without-evidence",
+                        path=claim.path,
+                        line=claim.line,
+                        detail=(
+                            "token=./*.md;"
+                            "unsupported-reference:path-invalid:./*.md"
+                        ),
+                    )
+                ],
+            )
+
     def test_wildcard_and_status_tokens_can_be_supported_by_evidence(self) -> None:
         """Wildcard and key-value status tokens match implementation evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -289,6 +537,45 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
+    def test_python_key_value_token_requires_same_record_evidence(self) -> None:
+        """Python-compatible lower-case key/value tokens stay same-record strict."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/feature_runner.py runner implementation
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/feature_runner.py`.
+                - Assumptions: Python-compatible key/value tokens are records.
+
+                ## Claims
+
+                - The loop can emit `status=blocked`.
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                """
+                status = "ready"
+                message = "worker blocked on an unrelated condition"
+                """,
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertIn("token=status=blocked", result.stdout)
 
     def test_fail_key_value_token_requires_same_record_evidence(self) -> None:
         """A key and value in separate evidence records do not support a pair claim."""

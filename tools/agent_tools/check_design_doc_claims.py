@@ -12,13 +12,15 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
 import subprocess
 from collections import deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
+from enum import Enum
 from itertools import groupby
 from pathlib import Path
 
@@ -78,6 +80,23 @@ ASSUMPTION_TERM_RE = re.compile(
 )
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
 TOKEN_RE = re.compile(r"`([^`]+)`")
+KEY_VALUE_TOKEN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*=\S+$")
+MATH_OPERATOR_RE = re.compile(
+    r"(?:\\(?:cap|cup|in|mapsto|notin|setminus|subset|subseteq|supset|"
+    r"supseteq|times|to|varnothing)\b|[∖∪∩⊂⊆⊃⊇∈∉∅×→↦])"
+)
+MATH_WRAPPER_RE = re.compile(r"^(?:\$.*\$|\\\(.*\\\)|\\\[.*\\\])$", re.DOTALL)
+MATH_EXPRESSION_RE = re.compile(
+    r"^[A-Za-z][A-Za-z0-9_]*\([^)]*\)\s*(?:=|<|>|≤|≥|∈|⊂|⊆|⊃|⊇)"
+)
+
+
+class ClaimTokenClass(str, Enum):  # noqa: UP042 - supports the repository's Python floor.
+    """Classification used before any claim token reaches filesystem APIs."""
+
+    PATH = "path"
+    EVIDENCE = "evidence"
+    MATH_OR_PROSE = "math_or_prose"
 
 
 @dataclass(frozen=True)
@@ -197,15 +216,31 @@ def resolve_repo_path(root: Path, path: str | Path) -> Path:
     return direct
 
 
-def resolve_claim_token_path(root: Path, claim_path: str, token_path: str) -> Path:
-    """Resolve one path-like claim token from its claim document."""
-    candidate = Path(token_path)
-    if candidate.is_absolute():
-        return candidate
-    if token_path.startswith("../"):
-        claim_file = resolve_repo_path(root, claim_path)
-        return Path(os.path.normpath((claim_file.parent / candidate).as_posix()))
-    return resolve_repo_path(root, candidate)
+def resolve_claim_token_path(
+    root: Path,
+    claim_path: str,
+    token_path: str,
+) -> tuple[Path | None, str | None]:
+    """Resolve a path-like token using the claim document as its context."""
+    try:
+        resolved_root = root.resolve(strict=False)
+        claim_file = Path(claim_path)
+        if not claim_file.is_absolute():
+            claim_file = resolved_root / claim_file
+        claim_file = claim_file.resolve(strict=False)
+        if not path_is_under_root(resolved_root, claim_file):
+            return None, f"unsupported-reference:path-invalid:{token_path}"
+
+        candidate = Path(token_path)
+        if candidate.is_absolute():
+            resolved = candidate
+        elif token_path.startswith(("./", "../")):
+            resolved = claim_file.parent / candidate
+        else:
+            resolved = resolved_root / candidate
+        return Path(os.path.normpath(resolved.as_posix())), None
+    except (OSError, ValueError, RuntimeError):
+        return None, f"unsupported-reference:path-invalid:{token_path}"
 
 
 def path_is_under_root(root: Path, path: Path) -> bool:
@@ -213,7 +248,7 @@ def path_is_under_root(root: Path, path: Path) -> bool:
     try:
         path.resolve(strict=False).relative_to(root.resolve(strict=False))
         return True
-    except ValueError:
+    except (OSError, ValueError, RuntimeError):
         return False
 
 
@@ -584,8 +619,38 @@ def normalized_checkable_token(raw_token: str) -> str | None:
     return token
 
 
+def classify_claim_token(token: str) -> ClaimTokenClass:
+    """Classify a claim token before selecting an evidence or path check."""
+    stripped = token.strip()
+    if (
+        MATH_WRAPPER_RE.fullmatch(stripped)
+        or MATH_OPERATOR_RE.search(stripped)
+        or MATH_EXPRESSION_RE.match(stripped)
+    ):
+        return ClaimTokenClass.MATH_OR_PROSE
+    if KEY_VALUE_TOKEN_RE.fullmatch(stripped):
+        return ClaimTokenClass.EVIDENCE
+    try:
+        candidate = Path(stripped)
+        if candidate.is_absolute() or stripped.startswith(("./", "../")):
+            return ClaimTokenClass.PATH
+        if "/" in stripped:
+            return ClaimTokenClass.PATH
+        if any(marker in stripped for marker in ("*", "?", "[")) and candidate.suffix:
+            return ClaimTokenClass.PATH
+        if candidate.suffix and not any(char.isspace() for char in stripped):
+            return ClaimTokenClass.PATH
+    except (OSError, ValueError, RuntimeError):
+        return ClaimTokenClass.PATH
+    return ClaimTokenClass.EVIDENCE
+
+
 def is_checkable_token(token: str) -> bool:
     """Return whether a Markdown code span is a checkable code/path token."""
+    if classify_claim_token(token) is ClaimTokenClass.MATH_OR_PROSE:
+        return True
+    if KEY_VALUE_TOKEN_RE.fullmatch(token):
+        return True
     if any(sep in token for sep in ("/", "\\", "::", ".", "_", "-")):
         return True
     if token.startswith("--"):
@@ -646,27 +711,45 @@ def token_path_candidates(token: str) -> tuple[str, ...]:
     normalized: list[str] = []
     for part in parts:
         candidate = part.strip("'\";,")
-        if candidate.startswith("./"):
-            candidate = candidate[2:]
         normalized.append(candidate)
     return tuple(dict.fromkeys(normalized))
 
 
-def token_is_path_in_repo(root: Path, claim_path: str, token: str) -> bool:
-    """Return whether one token points to an existing repo path."""
+def token_is_path_in_repo(
+    root: Path,
+    claim_path: str,
+    token: str,
+) -> tuple[bool, str | None]:
+    """Return whether one path-class token points to an existing repo path."""
     for candidate in token_path_candidates(token):
-        if "*" in candidate:
-            base = resolve_repo_path(root, claim_path).parent if candidate.startswith("../") else root
-            if any(path_is_under_root(root, path) for path in base.glob(candidate)):
-                return True
-            continue
-        path = resolve_claim_token_path(root, claim_path, candidate)
-        if path_is_under_root(root, path) and path.exists():
-            return True
-    return False
+        path, error = resolve_claim_token_path(root, claim_path, candidate)
+        if error is not None or path is None:
+            return False, error
+        if "\x00" in str(path):
+            return False, f"unsupported-reference:path-invalid:{token}"
+        try:
+            resolved_root = root.resolve(strict=False)
+            resolved_path = path.resolve(strict=False)
+            resolved_path.relative_to(resolved_root)
+        except ValueError:
+            return False, f"unsupported-reference:path-outside-root:{token}"
+        except (OSError, RuntimeError):
+            return False, f"unsupported-reference:path-invalid:{token}"
+
+        try:
+            if glob.has_magic(str(path)):
+                matches = glob.glob(str(path), recursive=True)
+                if any(path_is_under_root(resolved_root, Path(match)) for match in matches):
+                    return True, None
+                continue
+            if path.exists():
+                return True, None
+        except (OSError, ValueError, RuntimeError):
+            return False, f"unsupported-reference:path-invalid:{token}"
+    return False, None
 
 
-def key_value_token_in_evidence(token: str, texts: dict[str, str]) -> bool:
+def key_value_token_in_evidence(token: str, texts: Mapping[str, str]) -> bool:
     """Return whether a key/value token has same-record evidence."""
     for separator in (":", "="):
         if separator not in token:
@@ -683,11 +766,10 @@ def key_value_token_in_evidence(token: str, texts: dict[str, str]) -> bool:
     return False
 
 
-def token_in_evidence(token: str, texts: dict[str, str]) -> bool:
+def token_in_evidence(token: str, texts: Mapping[str, str]) -> bool:
     """Return whether one token appears in any evidence text."""
     token_lower = token.lower()
     candidates = [token_lower]
-    candidates.extend(candidate.lower() for candidate in token_path_candidates(token))
     if any(candidate and candidate in text.lower() for text in texts.values() for candidate in candidates):
         return True
     if "*" in token:
@@ -696,6 +778,19 @@ def token_in_evidence(token: str, texts: dict[str, str]) -> bool:
     if key_value_token_in_evidence(token, texts):
         return True
     return False
+
+
+def dispatch_claim_token(
+    root: Path,
+    claim_path: str,
+    token: str,
+    evidence_texts: Mapping[str, str],
+) -> tuple[bool, str | None]:
+    """Dispatch one token to its strict evidence or path validation route."""
+    token_class = classify_claim_token(token)
+    if token_class is ClaimTokenClass.PATH:
+        return token_is_path_in_repo(root, claim_path, token)
+    return token_in_evidence(token, evidence_texts), None
 
 
 def has_evidence_ledger(text: str) -> bool:
@@ -808,16 +903,25 @@ def check_claim_support(
                 )
             )
             continue
-        token_findings = []
+        token_findings: list[Finding] = []
         for token in claim.tokens:
-            if token_is_path_in_repo(root, claim.path, token) or token_in_evidence(token, evidence):
+            supported_token, reason = dispatch_claim_token(
+                root,
+                claim.path,
+                token,
+                evidence,
+            )
+            if supported_token:
                 continue
+            detail = f"token={token}"
+            if reason is not None:
+                detail = f"{detail};{reason}"
             token_findings.append(
                 Finding(
                     "claim-token-without-evidence",
                     claim.path,
                     claim.line,
-                    f"token={token}",
+                    detail,
                 )
             )
         if token_findings:

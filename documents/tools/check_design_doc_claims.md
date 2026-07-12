@@ -63,8 +63,17 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
   graph.
 - Recursive expansion follows `design` and `implementation` dependency edges
   up to `--recursive-depth`.
-- Backticked code, path, CLI flag, and command tokens in claim lines are checked
-  against existing repo paths or text in the expanded evidence corpus.
+- Backticked claim tokens are classified as `path`, `evidence`, or
+  `math_or_prose` before path resolution. Only `path` tokens reach filesystem
+  APIs; unknown evidence is not auto-supported.
+- Python-compatible key/value tokens use exactly
+  `^[A-Za-z][A-Za-z0-9_.-]*=\S+$` and require same-record evidence.
+- Root-relative paths resolve from `--root`. `./` and `../` paths, including
+  wildcard paths, resolve from the claim document's directory. Absolute paths
+  must remain inside the root. Invalid filesystem paths produce a typed finding
+  and do not terminate the checker.
+- Math notation such as set difference is checked as evidence, never as a path
+  candidate, and still obeys strict claim support requirements.
 - `Evidence And Assumption Ledger` records evidence sources, first-use DSL or
   standard-form assumptions, parent-doc alignment, and refactor handoff.
 - Upstream parent design documents are scanned for deterministic modal
