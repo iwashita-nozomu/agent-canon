@@ -67,14 +67,9 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
   `bash tools/sync_agent_canon.sh check` を実行し、両方の pass 後だけ
   `agentcanon_structure_followup=pass` を PR / run evidence に記録します。
 - standalone AgentCanon repo では Makefile 前提を置かず、下の explicit validation commands を使います。
-- template / derived repo では `make agent-canon-pr-check` を使います。
+- template / derived repo では `make agent-canon-pr-check` を AgentCanon の full maintenance/source route として使います。
 - `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
-- template / derived repo の GitHub Actions では `Repository CI` が Python
-  suite を一度だけ所有します。並列の `AgentCanon PR Gate` は
-  `bash tools/ci/check_agent_canon_pr.sh --integration-only` で pin、shared
-  surface、runtime、dependency、docs、generated artifact を確認します。
-  `Fresh Clone Acceptance` は clone、AgentCanon update、runtime surface を
-  所有し、repository test suite は `Repository CI` の結果を参照します。
+- template / derived repo では `Repository CI` が repository test suite を所有します。AgentCanon pin / root-view validation は `git submodule status vendor/agent-canon` と `bash tools/sync_agent_canon.sh check` で確認します。`Fresh Clone Acceptance` は clone、AgentCanon update、runtime surface を所有します。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
@@ -270,16 +265,6 @@ template / derived repo:
 ```bash
 make agent-canon-pr-check
 ```
-
-template / derived repo の GitHub Actions integration job:
-
-```bash
-bash tools/ci/check_agent_canon_pr.sh --integration-only
-```
-
-この integration profile は parallel `Repository CI` の Python suite 結果を
-参照し、同じ pytest / pyright / pydocstyle / ruff pass を反復しません。local
-merge confidence は通常の `make agent-canon-pr-check` が所有します。
 
 template / derived repo でこの段階の `make agent-canon-pr-check` が `AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest` を出した場合は、failure を PR-first handoff evidence として扱います。
 そのまま pin を戻したり `sync_agent_canon.sh push` で bypass せず、AgentCanon PR merge 後にこの check を再実行します。

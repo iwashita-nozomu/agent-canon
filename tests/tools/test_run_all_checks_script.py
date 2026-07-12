@@ -69,6 +69,15 @@ class RunAllChecksScriptTest(unittest.TestCase):
             pr_text,
         )
 
+    def test_pr_gate_has_no_legacy_profile(self) -> None:
+        """The PR gate must keep one explicit full maintenance/source route."""
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+
+        legacy_flag = "--integration" + "-only"
+        legacy_profile = "integration" + "_only"
+        self.assertNotIn(legacy_flag, pr_text)
+        self.assertNotIn(legacy_profile, pr_text)
+
     def test_python_quality_checks_are_shared(self) -> None:
         """Run-all and pre-review should use the same Python quality runner."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
