@@ -20,6 +20,7 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 - The first sections define common rules and communication surfaces; the packet sections then specify exactly what must be handed between parent, subagents, reviewers, and implementers.
 - Use `## Pre-Edit Repository Investigation Packet` before selecting edit paths, and `## Fresh Subagent Context Capsule` before launching or reusing any run-local subagent.
 - For chunked reading, start from the packet type required by the current transition and read only the fields needed to make that transition auditable.
+- After context compaction, follow `## Post-Compaction Objective Re-Declaration Contract` before any resumed action.
 
 ## 基本ルール
 
@@ -54,6 +55,17 @@ shape, ownership, and traceability, not token minimization.
 | `llm_visible_context` | Instructions, request clauses, selected source-packet fields, exact file sections, and evidence needed for the next decision. | May be large when required, but every item is tied to an owner, path, source packet, or request clause. |
 | `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
 | `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
+
+## Post-Compaction Objective Re-Declaration Contract
+
+After context compaction is detected, the first user-facing update from the parent agent before continuing must:
+
+- declare the final user objective and completion condition;
+- reconcile that objective against the latest user instruction and durable task/plan evidence (`request_clause_ids`, packets, design evidence, or ticketed decisions), and reject stale intermediate objectives;
+- only then state or execute the next concrete action.
+
+This applies before any tool call, file edit, or subagent instruction.
+Compaction is not a substitute for durable task evidence or record.
 
 ## Structure Intake Packet
 
