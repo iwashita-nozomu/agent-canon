@@ -31,12 +31,14 @@ Rules:
 - do not use WORKTREE_SCOPE.md as scope authority for new work; it is legacy cleanup evidence only
 - edit only inside the parent-assigned `allowed_paths`, `team_manifest.yaml` write scope, and approved Implementation Source Packet; do not touch paths assigned to another writer
 - log scope updates, edit starts, tests, experiment start/stop, and carry-over decisions before moving to the next step
-- do not start if requirements, plan, detailed design, design review, or document flow review are still unresolved
+- do not start if requirements, plan, detailed design, or design review are still unresolved, and do not block on `document_flow_review.md` unless the active workflow/touched surface selects it
 - do not start if the design brief lacks an Abstract Design Frame, Implementation Source Packet, or trace from the abstract frame to implementation slices
-- do not start if the Implementation Source Packet does not list the docs, code paths, reviews, and test plan that must be read before editing
-- before editing, read the Abstract Design Frame, Implementation Source Packet, `user_request_contract.md`, `design_brief.md`, `design_review.md`, `document_flow_review.md`, `test_plan.md`, and every repo doc or code path named by the design
+- do not start if the Implementation Source Packet does not list the docs, code paths, and reviews that must be read before editing; require `test_plan.md` only when the active workflow or touched surface selects post-implementation test design and that activation requires `test_plan.md`
+- before editing, read the Abstract Design Frame, the active Implementation Source Packet, every repository document or code path named by the approved design, and only additional artifacts selected by the active workflow or touched surface. Keep `user_request_contract.md` and any active approved design/review artifacts required by that workflow.
+- `document_flow_review.md` is required only when reader-facing docs, new terms, public APIs, or workflow surfaces in scope activate document-flow review.
+- `test_plan.md` and test-plan citations are required only when the active workflow or touched surface selects post-implementation test design and that activation produced or requires `test_plan.md`.
 - before each implementation slice, confirm the slice is derived from the Abstract Design Frame rather than only from the nearest file, helper, or current finding
-- before each implementation slice, cite the design artifact path and section, the test plan section, and the user-request clause IDs being satisfied
+- before each implementation slice, cite the design artifact path and section, and the user-request clause IDs being satisfied. Cite `test_plan.md` sections only when the active workflow or touched surface selects post-implementation test design and that activation produced or requires `test_plan.md`.
 - do not implement from conversation context when approved design artifacts exist; if chat and design disagree, stop and return to detailed design review
 - follow existing code paths, naming, tests, and doc style before introducing anything new
 - do not invent variable names, function names, class names, file names, CLI flags, config keys, or public API identifiers when the approved design or local precedent does not fix them

@@ -70,6 +70,9 @@ navigation unless this file or an owner surface explicitly routes to them.
   entry, base runtime packet, shared canon flow, closeout evidence, and
   validation commands are selected by the active profile or touched surface;
   they are not a default checklist.
+- After context compaction, invoke the final-objective declaration required by
+  `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
+  Re-Declaration Contract` before any work resumes.
 - Read it at the beginning of repository work or when resolving whether a rule
   belongs to the root view, AgentCanon source, a generated task packet, or a
   checker.

@@ -1411,6 +1411,11 @@ def _select_codex_agent_candidate(
     selections: dict[str, AgentTypeSelection],
 ) -> str | None:
     """Select the executable Codex agent candidate for one active role."""
+    if role.id != "skill_evaluator" and "skill_evaluator" in role.codex_agents:
+        raise RuntimeError(
+            f"{role.id} codex_agents must not include skill_evaluator; "
+            "the evaluator candidate is reserved for the skill_evaluator role"
+        )
     selection = selections.get(role.id)
     if selection is not None:
         if selection.agent_type not in role.codex_agents:

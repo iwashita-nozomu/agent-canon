@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -132,6 +133,29 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertNotIn("skill_evaluator", {role.id for role in comprehensive_roles})
         self.assertEqual([role.id for role in evaluation_roles], ["skill_evaluator"])
+
+    def test_team_config_rejects_skill_evaluator_candidate_on_ordinary_role(self) -> None:
+        """An ordinary role cannot retain the evaluator as a trailing fallback."""
+        config = load_team_config()
+        experimenter = resolve_role(config, "experimenter")
+        mutated_experimenter = replace(
+            experimenter,
+            codex_agents=(*experimenter.codex_agents, "skill_evaluator"),
+        )
+        mutated_config = replace(
+            config,
+            specialist_roles=tuple(
+                mutated_experimenter if role.id == "experimenter" else role
+                for role in config.specialist_roles
+            ),
+        )
+
+        with patch.object(runtime_alignment, "load_team_config", return_value=mutated_config):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "experimenter codex_agents must not include skill_evaluator",
+            ):
+                runtime_alignment.validate_team_config_references()
 
     def test_workflow_topology_rejects_evaluator_in_non_evaluation_family(self) -> None:
         """The shared topology policy must isolate the evaluator by family."""
@@ -262,6 +286,38 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
             with self.assertRaisesRegex(RuntimeError, "worker model must be gpt-5.6-luna"):
+                runtime_alignment.validate_codex_agent_settings()
+
+    def test_alignment_assigns_mini_only_to_skill_evaluator(self) -> None:
+        """Ordinary roles use Luna/high while T14 owns the mini exception."""
+        configs = runtime_alignment.parse_codex_agents()
+
+        for role_id in ("explorer", "experiment_runner"):
+            self.assertEqual(configs[role_id]["model"], "gpt-5.6-luna")
+            self.assertEqual(configs[role_id]["model_reasoning_effort"], "high")
+
+        mini_roles = {
+            role_id
+            for role_id, config in configs.items()
+            if config.get("model") == "gpt-5.4-mini"
+        }
+        self.assertEqual(mini_roles, {"skill_evaluator"})
+        self.assertEqual(configs["skill_evaluator"]["model_reasoning_effort"], "medium")
+
+    def test_alignment_rejects_mini_model_on_ordinary_role(self) -> None:
+        """A normal role cannot claim the T14 skill-validation model."""
+        configs = runtime_alignment.parse_codex_agents()
+        configs["explorer"] = {
+            **configs["explorer"],
+            "model": "gpt-5.4-mini",
+            "model_reasoning_effort": "medium",
+        }
+
+        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "explorer may use gpt-5.4-mini only for explicit T14 skill_evaluation via skill_evaluator",
+            ):
                 runtime_alignment.validate_codex_agent_settings()
 
     def test_alignment_rejects_agent_tier_profile_keys(self) -> None:

@@ -22,6 +22,9 @@ Map` to find the owner of runtime contracts, `Task Entry` to start
 repo-changing work, and `Validation` before closeout. This file routes readers;
 the detailed workflow, skill, role, profile, and closeout rules remain in the
 owner surfaces it names.
+- After context compaction, invoke the final-objective declaration required by
+  `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
+  Re-Declaration Contract` before any work resumes.
 
 ## Codex Loading Priority In This Tree
 

@@ -136,9 +136,11 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Ordinary planning, authoring, and review children use Luna/high. `worker` and
-  `ship_reviewer` use Luna/xhigh; mini helpers retain bounded exploration,
-  execution, and skill evaluation; Spark remains explicit mechanical work.
+- Ordinary planning, authoring, exploration, experiment execution, and review
+  children use Luna/high. `worker` and `ship_reviewer` use Luna/xhigh; Spark
+  remains explicit mechanical work. `gpt-5.4-mini/medium` is reserved for the
+  fresh, read-only, artifact-only `skill_evaluator` lane in explicit T14
+  `skill_evaluation` and is absent from permanent team roles.
 - The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
   an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い

@@ -78,8 +78,15 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("skill_evaluator:gpt-5.4-mini:medium", result.stdout)
         self.assertIn("worker:gpt-5.6-luna:xhigh", result.stdout)
         self.assertIn("diff_triage_reviewer:gpt-5.6-luna:high", result.stdout)
-        self.assertIn("experiment_runner:gpt-5.4-mini:medium", result.stdout)
-        self.assertIn("explorer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("experiment_runner:gpt-5.6-luna:high", result.stdout)
+        self.assertIn("explorer:gpt-5.6-luna:high", result.stdout)
+        matrix = next(
+            line for line in result.stdout.splitlines() if line.startswith("ROLE_MODEL_MATRIX=")
+        )
+        self.assertEqual(
+            [entry for entry in matrix.split("=", 1)[1].split(";") if "gpt-5.4-mini" in entry],
+            ["skill_evaluator:gpt-5.4-mini:medium"],
+        )
         self.assertIn("manager_reviewer:gpt-5.6-luna:high", result.stdout)
         self.assertIn("plan_reviewer:gpt-5.6-luna:high", result.stdout)
         self.assertIn("spark_worker:gpt-5.3-codex-spark:low", result.stdout)
@@ -589,6 +596,72 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("role-candidate-order", result.stdout)
 
+    def test_routing_rejects_skill_evaluator_candidate_on_ordinary_role(self) -> None:
+        """The static evaluator rejects a trailing evaluator fallback."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            config_path = root / "agents" / "agents_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            experimenter = next(
+                role for role in config["specialist_roles"] if role["id"] == "experimenter"
+            )
+            experimenter["codex_agents"].append("skill_evaluator")
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            result = run_eval("--root", str(root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=registration:experimenter:"
+                "skill-evaluator-candidate-reserved-for-skill-evaluator-role",
+                result.stdout,
+            )
+
+    def test_materialization_rejects_skill_evaluator_fallback_for_ordinary_role(self) -> None:
+        """Unavailable ordinary candidates cannot fall through to the evaluator."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            copy_eval_root(root)
+            config_path = root / "agents" / "agents_config.json"
+            config_raw = json.loads(config_path.read_text(encoding="utf-8"))
+            experimenter_raw = next(
+                role
+                for role in config_raw["specialist_roles"]
+                if role["id"] == "experimenter"
+            )
+            experimenter_raw["codex_agents"].append("skill_evaluator")
+            config_path.write_text(json.dumps(config_raw), encoding="utf-8")
+            (root / ".codex" / "agents" / "experiment_runner.toml").unlink()
+            (root / ".codex" / "agents" / "worker.toml").unlink()
+            config = load_team_config(config_path)
+            catalog = load_task_catalog(config, root=root)
+            roles = select_roles(
+                config,
+                ["experimenter"],
+                full_team=False,
+                catalog=catalog,
+                workflow_family_id="research_driven_change",
+            )
+            initial_wave = recommended_initial_subagent_wave(
+                roles,
+                4,
+                catalog,
+                agent_root=root / ".codex" / "agents",
+            )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "experimenter codex_agents must not include skill_evaluator",
+            ):
+                recommended_dynamic_expansion_wave_slots(
+                    roles,
+                    4,
+                    initial_wave,
+                    catalog,
+                    agent_root=root / ".codex" / "agents",
+                )
+
     def test_spark_model_is_reserved_for_spark_worker(self) -> None:
         """Only spark_worker should use the Spark model."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -597,7 +670,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             explorer = root / ".codex" / "agents" / "explorer.toml"
             explorer.write_text(
                 explorer.read_text(encoding="utf-8").replace(
-                    'model = "gpt-5.4-mini"',
+                    'model = "gpt-5.6-luna"',
                     'model = "gpt-5.3-codex-spark"',
                 ),
                 encoding="utf-8",
@@ -613,7 +686,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             )
 
     def test_review_roles_require_luna_high(self) -> None:
-        """Ordinary reviewer roles should stay on the Luna/high child route."""
+        """Ordinary reviewer roles cannot claim the T14 mini exception."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             copy_eval_root(root)
@@ -628,6 +701,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             result = run_eval("--root", str(root))
 
             self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:"
+                "skill-validation-model-reserved-for-skill-evaluator-t14",
+                result.stdout,
+            )
             self.assertIn(
                 "CODEX_AGENT_ROLE_FINDING=model-settings:python_reviewer:expected-model-gpt-5.6-luna",
                 result.stdout,

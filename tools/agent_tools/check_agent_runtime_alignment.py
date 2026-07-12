@@ -72,12 +72,12 @@ PARENT_REASONING_EFFORT = "high"
 REVIEW_MODEL = "gpt-5.6-luna"
 LUNA_MODEL = "gpt-5.6-luna"
 SPARK_MODEL = "gpt-5.3-codex-spark"
-MINI_MODEL = "gpt-5.4-mini"
+SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
 LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
-MINI_MEDIUM_AGENT_IDS = {"explorer", "experiment_runner", "skill_evaluator"}
 SPARK_LOW_AGENT_IDS = {"spark_worker"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
+SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 SCOPED_MODEL_POLICY_KEYS = {
     "model",
@@ -544,10 +544,15 @@ def validate_codex_agent_settings() -> None:
             isinstance(effort, str) and effort in valid_efforts,
             f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
         )
+        if model == SKILL_VALIDATION_MODEL:
+            ensure(
+                role_id in SKILL_VALIDATION_AGENT_IDS,
+                f"{role_id} may use {SKILL_VALIDATION_MODEL} only for explicit T14 skill_evaluation via skill_evaluator",
+            )
         if role_id in LUNA_XHIGH_AGENT_IDS:
             expected_model, expected_effort = LUNA_MODEL, "xhigh"
-        elif role_id in MINI_MEDIUM_AGENT_IDS:
-            expected_model, expected_effort = MINI_MODEL, "medium"
+        elif role_id in SKILL_VALIDATION_AGENT_IDS:
+            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
         elif role_id in SPARK_LOW_AGENT_IDS:
             expected_model, expected_effort = SPARK_MODEL, "low"
         else:
@@ -604,6 +609,12 @@ def validate_team_config_references() -> None:
     )
 
     for role in config.always_on_roles + config.specialist_roles:
+        ensure(
+            role.id == EVALUATOR_AGENT_ID
+            or EVALUATOR_AGENT_ID not in role.codex_agents,
+            f"{role.id} codex_agents must not include {EVALUATOR_AGENT_ID}; "
+            f"the evaluator candidate is reserved for the {EVALUATOR_AGENT_ID} role",
+        )
         ensure(bool(role.required_outputs), f"{role.id} must declare required_outputs")
         ensure(
             bool(role.write_policy.allowed_artifacts),

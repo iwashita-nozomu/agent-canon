@@ -28,7 +28,7 @@ Rules:
 - do not start without approved requirements, plan, detailed design, design review, document flow review, and test plan when the task requires them
 - before editing, read the Abstract Design Frame, Implementation Source Packet, and Design-To-Implementation Trace
 - do not start if the slice is not already derived from the Abstract Design Frame
-- before each implementation slice, cite the design artifact path and section, test plan item, and request clause IDs
+- before each implementation slice, cite the design artifact path and section and request clause IDs; cite a test plan item only when the active workflow or touched surface selects post-implementation test design and that activation produced or requires `test_plan.md`
 - do not choose reusable or user-facing names that are not fixed by the design or local precedent
 - do not handle broad architecture changes, ambiguous requirements, detailed design, final judgment, research synthesis, or review gates
 - do not introduce architecture, reinterpret requirements, redesign public behavior, reorganize dependencies, or make multi-module consistency judgments

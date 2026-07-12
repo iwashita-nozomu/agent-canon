@@ -47,21 +47,17 @@ RUN_ID_DIGEST_LENGTH = 10
 GIT_COMMAND_TIMEOUT_SECONDS = 5
 VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 SPARK_MODEL = "gpt-5.3-codex-spark"
-MINI_MODEL = "gpt-5.4-mini"
+SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
 LUNA_MODEL = "gpt-5.6-luna"
 PARENT_MODEL = "gpt-5.6-sol"
 PARENT_REASONING_EFFORT = "high"
 REVIEW_MODEL = "gpt-5.6-luna"
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
 SPARK_MODEL_AGENT_IDS = {"spark_worker"}
-MINI_MEDIUM_AGENT_IDS = {
-    "experiment_runner",
-    "explorer",
-    "skill_evaluator",
-}
 LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
+SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 
 
@@ -257,8 +253,16 @@ def evaluate_static_agent_configs(
             findings.append(Finding("model-settings", agent_id, "spark-model-reserved-for-spark-worker"))
         if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
             findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
-        if agent_id in MINI_MEDIUM_AGENT_IDS:
-            expected_model, expected_effort = MINI_MODEL, "medium"
+        if model == SKILL_VALIDATION_MODEL and agent_id not in SKILL_VALIDATION_AGENT_IDS:
+            findings.append(
+                Finding(
+                    "model-settings",
+                    agent_id,
+                    "skill-validation-model-reserved-for-skill-evaluator-t14",
+                )
+            )
+        if agent_id in SKILL_VALIDATION_AGENT_IDS:
+            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
         elif agent_id in SPARK_MODEL_AGENT_IDS:
             expected_model, expected_effort = SPARK_MODEL, "low"
         elif agent_id in LUNA_XHIGH_AGENT_IDS:
@@ -369,6 +373,15 @@ def evaluate_routing(root: Path) -> list[Finding]:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-be-artifacts-only"))
         if "skill_evaluation" not in evaluator.write_policy.allowed_artifacts:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "missing-skill-evaluation-artifact"))
+    for role_id, role in roles.items():
+        if role_id != EVALUATOR_AGENT_ID and EVALUATOR_AGENT_ID in role.codex_agents:
+            findings.append(
+                Finding(
+                    "registration",
+                    role_id,
+                    "skill-evaluator-candidate-reserved-for-skill-evaluator-role",
+                )
+            )
     project_config_path = root / ".codex" / "config.toml"
     project_config: dict[str, object] = {}
     if project_config_path.is_file():
