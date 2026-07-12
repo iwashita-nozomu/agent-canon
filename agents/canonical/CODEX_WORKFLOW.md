@@ -651,7 +651,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
-- 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path、test plan を読了する
+- 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path を読了する。test plan は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ読了する
 - 実装前に `design_review.md` を読み、`Design Artifact Under Review` が
   現在の `design_brief.md` を指し、decision が `approve` であることを確認する。
   設計を修正した後は Gate 6 で現行設計の approve を取り直す
@@ -660,14 +660,14 @@ cost を無視して review coverage を優先する run では、research-drive
   と `waterfall-gate-check --gate design` pass evidence を記録する
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
-- worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、test plan item、request clause ID です
+- worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test plan、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
+- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
