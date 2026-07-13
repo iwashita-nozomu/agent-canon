@@ -332,7 +332,7 @@ findings for resilient test planning.
     `caller_analysis.integration_candidates` を生成します。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
-  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
+  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で read-only update plan と shared-surface check を実行します。更新が必要でも approval を生成したり mutating make を自動実行したりせず、明示 approval が必要な machine-readable next action を返します。eval transient blocker は planning より先に判定します。
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
   - `search.py` は `--purpose` から text / LLM card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers llm,tool,vector` のように絞れます。
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
@@ -398,7 +398,7 @@ findings for resilient test planning.
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
-    - `ensure-latest` は task 開始時に upstream `agent-canon` と local `vendor/agent-canon` を揃えます。submodule repo では `vendor/agent-canon` の local branch、HEAD、dirty state を先に確認し、`agent_canon_latest_submodule_local_state_checked=yes` を evidence として出します。
+    - `ensure-latest` は明示的に承認された更新時だけ upstream `agent-canon` と local `vendor/agent-canon` を揃えます。submodule repo では `vendor/agent-canon` の local branch、HEAD、dirty state を先に確認し、`agent_canon_latest_submodule_local_state_checked=yes` を evidence として出します。直接入口も branch/worktree authority/reason と destructive authority/reason の全 4 値を要求します。
     - `agent-canon` remote が未設定なら GitHub canonical remote `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
     - submodule repo では gitlink commit を確認し、必要なら submodule pointer を fast-forward 更新します。
   - legacy subtree repo では subtree metadata / snapshot import route を使います。
@@ -428,8 +428,8 @@ findings for resilient test planning.
 通常の派生 repo では `update_agent_canon.sh latest` を入口にします。
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
-1. `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で通常の AgentCanon `main` 更新、eval / hook log parking、root view check、compiled tool rebuild、親 repo update TODO routing / acknowledge を tool に任せます。
-1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を出します。その場合は agent が conflict workflow に入り、必要なら `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
+1. Plan が mutation を要求したら current-task user approval を得て、全 4 inline Git authority/reason field を同じ segment に置いた `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で更新します。
+1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は conflict workflow route を出します。current-task user approval と全 4 inline Git authority/reason field を得た場合だけ protected merge wrapper で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
 1. AgentCanon PR が merge された後も `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `update_agent_canon.sh latest` を通り、pin 更新後に `tools/rebuild_agent_tools.sh` を走らせます。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば `latest` は成功終了のまま `updated_with_pending_todos` を出し、親 repo の agent が先に適用します。完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。

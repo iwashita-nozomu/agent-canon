@@ -65,10 +65,9 @@ TODO state up to date.
    update blocker.
 1. Use the high-level route first:
 
-```bash
-make agent-canon-update-plan
-make agent-canon-ensure-latest
-```
+Run `make agent-canon-update-plan` first. If it reports an update, request
+current-task user approval and rerun `make agent-canon-ensure-latest` with all
+four inline Git authority/reason fields in the same command segment.
 
 1. Let `make agent-canon-ensure-latest` classify dirty submodule state. When the
    dirty checkout can be preserved mechanically, it runs the preserve-dirty
@@ -80,10 +79,10 @@ make agent-canon-ensure-latest
    detached head, merge conflict, restore conflict, or other unsafe state, move
    the work through an AgentCanon source branch/PR:
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
+After current-task user approval, run the protected
+`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
+authority/reason fields, then push the already-current branch. Detached or
+colliding checkout state returns to the user instead of creating or switching.
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh AgentCanon branch only because the

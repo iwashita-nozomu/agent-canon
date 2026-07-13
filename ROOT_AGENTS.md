@@ -108,7 +108,10 @@ named in an approval request; explicit destructive approval remains required.
 A protected mutation proceeds only when the user
 explicitly approves it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Collision handling keeps the current
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
+requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
+the creation and destructive requirements are an AND gate. Collision handling keeps the current
 branch/worktree and requests user direction.
 
 ## Structure-First Scope Formation
@@ -268,7 +271,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, local-llm search, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
-| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval or `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |

@@ -775,6 +775,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "shared canon candidate\n",
                 encoding="utf-8",
             )
+            (workspace_root / "Makefile").write_text(
+                "agent-canon-update-plan:\n\t@touch plan-sentinel\n"
+                "agent-canon-ensure-latest:\n\t@touch ensure-sentinel\n",
+                encoding="utf-8",
+            )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
 
             result = subprocess.run(
@@ -804,6 +809,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("open_agent-canon_PR", result.stdout)
+            self.assertIn("preserve_current_checkout", result.stdout)
+            self.assertIn("request_current_task_user_approval", result.stdout)
+            self.assertIn("four_inline_git_authority_and_reason", result.stdout)
+            self.assertFalse((workspace_root / "plan-sentinel").exists())
+            self.assertFalse((workspace_root / "ensure-sentinel").exists())
             self.assertNotIn(
                 "AGENT_CANON_PREFLIGHT_NEXT=commit_or_stash_then_run_make_agent-canon-ensure-latest",
                 result.stdout,
@@ -855,7 +865,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
 
-    def test_task_start_allows_unrelated_parent_dirty_state_for_submodule_update(
+    def test_task_start_uses_read_only_plan_with_unrelated_parent_dirty_state(
         self,
     ) -> None:
         """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
@@ -872,7 +882,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             checklist.parent.mkdir(parents=True)
             checklist.write_text("# Checklist\n", encoding="utf-8")
             (workspace_root / "Makefile").write_text(
+                "agent-canon-update-plan:\n\t@echo agent_canon_plan_route=already_current_tree\n"
                 "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
+                encoding="utf-8",
+            )
+            (workspace_root / "tools").mkdir()
+            (workspace_root / "tools" / "sync_agent_canon.sh").write_text(
+                "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
@@ -881,6 +897,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "git",
                     "add",
                     "Makefile",
+                    "tools/sync_agent_canon.sh",
                     "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
                 ],
                 cwd=workspace_root,
@@ -943,7 +960,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
                 result.stdout,
             )
-            self.assertTrue((workspace_root / "make-sentinel").is_file())
+            self.assertFalse((workspace_root / "make-sentinel").exists())
             self.assertTrue(
                 (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
             )
@@ -963,7 +980,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             checklist.parent.mkdir(parents=True)
             checklist.write_text("# Checklist\n", encoding="utf-8")
             (workspace_root / "Makefile").write_text(
+                "agent-canon-update-plan:\n\t@echo agent_canon_plan_route=already_current_tree\n"
                 "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
+                encoding="utf-8",
+            )
+            (workspace_root / "tools").mkdir()
+            (workspace_root / "tools" / "sync_agent_canon.sh").write_text(
+                "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
@@ -972,6 +995,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "git",
                     "add",
                     "Makefile",
+                    "tools/sync_agent_canon.sh",
                     "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
                 ],
                 cwd=workspace_root,
@@ -1071,7 +1095,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
-            self.assertTrue((workspace_root / "make-sentinel").is_file())
+            self.assertFalse((workspace_root / "make-sentinel").exists())
 
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
@@ -1108,7 +1132,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest",
+                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan",
                 result.stdout,
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)

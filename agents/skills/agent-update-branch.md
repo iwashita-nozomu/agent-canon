@@ -29,7 +29,10 @@ instructions, bounded follow-ups, and checklist or evidence updates. Create a ne
 `agent-updates/*` branch only when the current branch is merged, closed,
 unpushable, has an unrelated ownership lane, needs explicit review isolation, or
 would mix incompatible pin / memory / eval ownership. Record
-`branch_creation_reason=<reason>` before creating it.
+`branch_creation_reason=<reason>` before requesting current-task user approval.
+Creation proceeds only when that approval exists and the same command segment
+carries both creation authority/reason and destructive authority/reason. If the
+checkout collides with another chat, keep it unchanged and request direction.
 
 ## Required Gates
 

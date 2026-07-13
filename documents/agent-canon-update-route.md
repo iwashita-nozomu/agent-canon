@@ -14,10 +14,9 @@ downstream design ../agents/skills/agent-update-branch.md separates canon-pin an
 
 The canonical parent-repo route is:
 
-```bash
-make agent-canon-update-plan
-make agent-canon-latest
-```
+Run `make agent-canon-update-plan` first. If it reports a mutation route,
+request current-task user approval before invoking `make agent-canon-latest`
+with all four inline Git authority/reason fields in the same segment.
 
 `latest` is the user-facing high-level route. It may update the parent pin,
 repair root views, rebuild shared tools, and report pending parent TODOs. It
@@ -30,7 +29,9 @@ current AgentCanon source branch or parent update branch already owns the same
 surface, continue it. Do not create a branch just to start fresh, avoid dirty
 state, split a small addendum, or handle an additional user instruction. A new
 branch requires `branch_creation_reason=<reason>` in run evidence or the PR body
-before it is created.
+before approval is requested. Creation additionally requires current-task user
+approval and all four authority/reason fields in the same command segment.
+Workflow authority and a reason alone are not sufficient.
 
 Every AgentCanon source, parent submodule pin, `.gitmodules`, root runtime
 view, shared root-copy surface, and parent root sync change opens the mandatory

@@ -60,7 +60,9 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
    shared-canon follow-up. Do not create a new branch for a fresh start,
    dirty-state avoidance, small addendum, or mid-task user instruction. If a new
    branch is required, record `branch_creation_reason=<reason>` and why the
-   existing branch cannot continue before creating it.
+   existing branch cannot continue before requesting current-task user
+   approval. Creation requires both creation and destructive authority/reason
+   fields in the same command segment.
 
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
 
@@ -72,9 +74,9 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 
 1. Update AgentCanon before planning or implementation.
 
-```bash
-make agent-canon-ensure-latest
-```
+If the read-only update plan reports a mutation, request current-task user
+approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
+authority/reason fields in the same command segment.
 
 This target also runs the compiled AgentCanon tool rebuild. Treat
 `AGENT_CANON_TOOL_REBUILD_RUST=rebuilt` or
@@ -89,10 +91,10 @@ binary just because the source commit has not changed yet.
 
 1. If latest preserves dirty AgentCanon checkout state, continue the AgentCanon branch/PR flow with the restored state. If latest reports a detached head, merge conflict, restore conflict, `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk, fix that recovery target before rerunning latest.
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
+After current-task user approval, invoke the protected
+`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
+authority/reason fields, then push the already-current branch. Detached or
+colliding checkout state is a user-direction boundary.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 

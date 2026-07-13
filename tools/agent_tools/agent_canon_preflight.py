@@ -125,7 +125,7 @@ def run_agent_canon_preflight(
         return base_preflight_result(
             status="skipped_by_flag",
             reason="agent-canon preflight skipped by command-line flag",
-            next_step="run make agent-canon-ensure-latest manually before editing shared surfaces",
+            next_step="run_read_only_agent_canon_update_plan_before_editing_shared_surfaces",
             checklist_path=checklist_path,
             checklist_status=checklist_status,
         )
@@ -183,22 +183,73 @@ def run_agent_canon_preflight(
             checklist_status=checklist_status,
         )
 
-    ensure_result = subprocess.run(
-        ["make", "agent-canon-ensure-latest"],
+    if update_surface_status.strip():
+        return base_preflight_result(
+            status="blocked_shared_canon_workflow",
+            reason=(
+                "AgentCanon-owned update surface already contains unknown or "
+                "concurrent-chat state; preserve the current checkout and route "
+                "the existing changes through its current AgentCanon branch PR"
+            ),
+            next_step=(
+                "preserve_current_checkout_route_existing_agentcanon_owned_changes_"
+                "through_current_branch_open_agent-canon_PR_or_if_new_branch_is_"
+                "actually_needed_request_current_task_user_approval_then_rerun_"
+                "with_four_inline_git_authority_and_reason"
+            ),
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
+        )
+
+    plan_result = subprocess.run(
+        ["make", "agent-canon-update-plan"],
         cwd=project_root,
         check=False,
         capture_output=True,
         text=True,
     )
-    if ensure_result.returncode != 0:
-        detail = (ensure_result.stderr or ensure_result.stdout).strip()
+    if plan_result.returncode != 0:
+        detail = (plan_result.stderr or plan_result.stdout).strip()
         return base_preflight_result(
             status="blocked_shared_canon_workflow",
-            reason=detail or "make agent-canon-ensure-latest failed",
+            reason=detail or "make agent-canon-update-plan failed",
+            next_step="repair_read_only_agent_canon_update_plan_then_rerun_preflight",
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
+        )
+
+    plan_fields = parse_agent_canon_plan_fields(plan_result.stdout)
+    current_routes = {
+        "already_current_submodule",
+        "already_current_tree",
+        "already_current_split",
+        "local_contains_remote",
+        "deferred_branch_pr",
+    }
+    if plan_fields.get("agent_canon_plan_route", "") not in current_routes:
+        return base_preflight_result(
+            status="blocked_update_approval_required",
+            reason="AgentCanon update is needed and preflight cannot invent protected Git approval",
             next_step=(
-                "commit_agentcanon_branch_then_merge-main-into-current-preserve-dirty_then_open_agent-canon_PR_"
-                "then_after_merge_run_make_agent-canon-ensure-latest"
+                "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
             ),
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
+        )
+
+    check_result = subprocess.run(
+        ["bash", "tools/sync_agent_canon.sh", "check"],
+        cwd=project_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if check_result.returncode != 0:
+        detail = (check_result.stderr or check_result.stdout).strip()
+        return base_preflight_result(
+            status="blocked_shared_canon_workflow",
+            reason=detail or "read-only AgentCanon shared-surface check failed",
+            next_step="repair_shared_surface_drift_with_explicit_user_approval",
             checklist_path=checklist_path,
             checklist_status=checklist_status,
         )
@@ -321,6 +372,18 @@ def parse_machine_fields(text: str) -> dict[str, str]:
             continue
         key, value = line.split("=", maxsplit=1)
         if key.startswith("AGENT_CANON_UPDATE_TODO_"):
+            fields[key] = value
+    return fields
+
+
+def parse_agent_canon_plan_fields(text: str) -> dict[str, str]:
+    """Parse machine-readable fields from the read-only update plan."""
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", maxsplit=1)
+        if key.startswith("agent_canon_plan_"):
             fields[key] = value
     return fields
 

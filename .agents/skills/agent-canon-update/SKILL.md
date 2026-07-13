@@ -58,24 +58,24 @@ Execute the required and task-matching conditional commands that the packet prin
    dirt remains allowed.
 1. Prefer the high-level parent route:
 
-```bash
-make agent-canon-update-plan
-make agent-canon-ensure-latest
-```
+Run `make agent-canon-update-plan` first. If it reports an update, request
+current-task user approval and rerun `make agent-canon-ensure-latest` with all
+four inline Git authority/reason fields in the same command segment.
 
 1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
    dirty state, do not hide them in a parent pin update. Route them through an
    AgentCanon branch/PR first:
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current
-git -C vendor/agent-canon push origin HEAD
-```
+After current-task user approval, invoke the protected merge wrapper with all
+four inline Git authority/reason fields, then push the already-current branch.
+Do not switch or create a checkout as a recovery shortcut.
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh branch for a bounded follow-up,
    mid-task user instruction, dirty-state avoidance, or checklist addendum.
-   Record a reason before creating any new branch.
+   Record a reason before requesting approval for any new branch. A reason or
+   workflow route does not authorize creation: current-task user approval and
+   all four same-command authority/reason values are required.
 
 1. After a safe update or PR merge, repair and verify root views:
 

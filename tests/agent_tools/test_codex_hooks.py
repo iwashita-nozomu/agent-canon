@@ -1554,6 +1554,101 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
                 self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {destructive} {command}"))
 
+    def test_shared_checkout_guard_protects_agent_canon_update_wrappers(self) -> None:
+        """Update wrappers inherit the creation plus destructive authority profile."""
+        approved = (
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+            "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update"
+        )
+        commands = [
+            "bash tools/update_agent_canon.sh latest",
+            "tools/update_agent_canon.sh latest",
+            "./tools/update_agent_canon.sh apply",
+            "bash tools/update_agent_canon.sh apply",
+            "bash tools/update_agent_canon.sh merge-main-into-current",
+            "bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
+            "bash tools/sync_agent_canon.sh ensure-latest",
+            "./tools/sync_agent_canon.sh ensure-latest",
+            "bash --rcfile /tmp/agent-canon-test-rc tools/update_agent_canon.sh latest",
+            "bash -o pipefail tools/update_agent_canon.sh latest",
+            "exec ./tools/update_agent_canon.sh latest",
+            "exec -- ./tools/sync_agent_canon.sh ensure-latest",
+            "exec -a agent-canon ./tools/update_agent_canon.sh apply",
+            "exec -a canon -c ./tools/update_agent_canon.sh latest",
+            "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
+            "exec -c ./tools/sync_agent_canon.sh ensure-latest",
+            "exec -l ./tools/update_agent_canon.sh merge-main-into-current",
+            "exec -cl ./tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
+            "make agent-canon-ensure-latest",
+            "make agent-canon-latest",
+            "make agent-canon-update",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                payload = self._run_shared_checkout_guard(command)
+                self.assertIsNotNone(payload)
+                assert payload is not None
+                self.assertIn("DESTRUCTIVE_GIT_GUARD=block", cast(str, payload["reason"]))
+                self.assertIn(
+                    "BRANCH_WORKTREE_CREATION_GUARD=block", cast(str, payload["reason"])
+                )
+                self.assertEqual(
+                    payload["next_action"],
+                    "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
+                )
+                self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
+
+    def test_shared_checkout_guard_wrapper_authority_does_not_leak(self) -> None:
+        """Prior segments and ambient variables never authorize an update wrapper."""
+        approved = (
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+            "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update"
+        )
+        commands = (
+            "exec ./tools/update_agent_canon.sh latest",
+            "exec -- ./tools/sync_agent_canon.sh ensure-latest",
+            "exec -a canon -c ./tools/update_agent_canon.sh latest",
+            "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(
+                        command,
+                        extra_env={
+                            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+                            "AGENT_CANON_BRANCH_WORKTREE_REASON": "ambient",
+                            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "ambient",
+                        },
+                    )
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"{approved}; {command}")
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"export {approved}; {command}")
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                        + command
+                    )
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(f"{approved} {command}")
+                )
+
+        self.assertIsNone(
+            self._run_shared_checkout_guard(
+                f"{approved} bash -o pipefail tools/update_agent_canon.sh latest"
+            )
+        )
+
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""
         commands = [
