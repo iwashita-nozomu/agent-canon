@@ -92,6 +92,11 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 
 既存 branch / PR が現在の task、追加 user instruction、または follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch / worktree 作成 route は、作成前に route authority と理由を記録する 1 gate に集約します。
 
+- 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存し、除去目的の `git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune を実行しません。proven exact task ownership は approval request に含める path を限定するだけで、explicit destructive approval を迂回しません。
+- protected Git mutation は user がその操作を明示承認し、同じ command segment で Git の直前に `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` と非空の `AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>` を渡す場合だけ実行できます。ambient environment、前の command segment、過去 turn の authority は使えません。
+- `branch_worktree_guard.py` は critical PreToolUse child です。session 開始時に dispatcher と child registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体を load していない既存 session は保護対象に追加できないため restart が必要です。
+- 衝突回避のための追加 branch/worktree 作成や checkout switch は行いません。current checkout の exact task-owned path だけで進められない場合は status を保存して user の指示を待ちます。
+
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。shell 実行では `branch_worktree_guard.py` の PreToolUse gate に `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` または `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow` と `AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>` を渡します。

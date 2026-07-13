@@ -223,6 +223,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
         "AgentCanon branch / PR workflow "
         "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason> proven exact task ownership "
+        "session restart "
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
         "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>\n"
@@ -664,15 +667,20 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/environment-maintenance.md": "container_config.py\n",
     ".codex/README.md": (
         "dispatcher は fail-open AGENT_CANON_HOOK_STRICT_BLOCKS "
-        "systemMessage hookSpecificOutput.additionalContext\n"
+        "systemMessage hookSpecificOutput.additionalContext branch_worktree_guard.py "
+        "user/other-chat owned proven exact task ownership fail-closed empty stdout "
+        "session restart\n"
     ),
     ".codex/hooks/hook_dispatcher.py": (
         "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
         "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py "
-        "branch_worktree_guard.py PreToolUse\n"
+        "branch_worktree_guard.py critical_child_invalid critical_child_failure_payload "
+        "PreToolUse\n"
     ),
     ".codex/hooks/branch_worktree_guard.py": (
-        "BRANCH_WORKTREE_CREATION_GUARD=block "
+        "DESTRUCTIVE_GIT_GUARD=block BRANCH_WORKTREE_CREATION_GUARD=block "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON same shell segment git restore "
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY user_request agent_canon_workflow "
         "AGENT_CANON_BRANCH_WORKTREE_REASON "
         "git worktree add git switch -c/-C git checkout -b/-B/--orphan "
@@ -689,6 +697,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "document_split_decision_ready\n"
     ),
     "ROOT_AGENTS.md": (
+        "Multiple chats or sessions unknown dirty Proven exact task ownership "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "Design Integrity Gate responsibility model Abstract Design Frame "
         "Design-To-Implementation Trace design_issue_blocker "
         "implementation shortcut\n"
@@ -713,6 +724,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (
+        "Multiple chats or sessions unknown dirty Proven exact task ownership "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "## Runtime Owner Map\n\n"
         "| Contract | Owner Surface | Validation |\n"
         "| -------- | ------------- | ---------- |\n"
