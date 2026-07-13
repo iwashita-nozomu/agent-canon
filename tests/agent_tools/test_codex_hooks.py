@@ -1140,8 +1140,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertEqual(payload["reason"], "branch worktree stop")
 
-    def test_hook_dispatcher_child_launch_failure_warns_after_later_hooks(self) -> None:
-        """Dispatcher should fail open on child hook failures after later hooks run."""
+    def test_hook_dispatcher_critical_launch_failure_blocks_after_later_hooks(self) -> None:
+        """Dispatcher fails closed for a critical launch failure after later hooks run."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             hook_dir = temp_root / "hooks"
@@ -1193,15 +1193,8 @@ class CodexHooksTest(unittest.TestCase):
             payload = cast("dict[str, object]", json.loads(result.stdout))
             invocations = log_path.read_text(encoding="utf-8").splitlines()
 
-        self.assertNotIn("decision", payload)
-        self.assertIn("hookSpecificOutput", payload)
-        self.assertIn("log_archive_mount_warning.py", cast(str, payload["systemMessage"]))
-        hook_output = cast("dict[str, object]", payload["hookSpecificOutput"])
-        self.assertEqual(hook_output["hookEventName"], "UserPromptSubmit")
-        self.assertIn(
-            "fail-open by default",
-            cast(str, hook_output["additionalContext"]),
-        )
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("prompt_secret_guard.py", cast(str, payload["reason"]))
         self.assertEqual(
             invocations,
             [
@@ -1256,13 +1249,13 @@ class CodexHooksTest(unittest.TestCase):
             hook_dir = temp_root / "hooks"
             hook_dir.mkdir()
             outputs = {
-                "log_archive_mount_warning.py": "",
-                "prompt_secret_guard.py": {
+                "log_archive_mount_warning.py": {
                     "decision": "approve",
                     "reason": "first warning",
                     "next_action": "first_action",
                     "remediation": ["first remediation"],
                 },
+                "prompt_secret_guard.py": "",
                 "skill_usage_logger.py": "plain diagnostic",
                 "reference_capture_guard.py": "",
             }
@@ -1468,6 +1461,22 @@ class CodexHooksTest(unittest.TestCase):
             f"{destructive}; git restore file.py"
         ))
 
+    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(self) -> None:
+        """A parsed safe Git segment never hides opaque protected Git elsewhere."""
+        commands = [
+            "git status && sudo git reset --hard",
+            "git status; nice git restore file.py",
+            "git status && ( sudo git checkout main )",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                payload = self._run_shared_checkout_guard(command)
+                self.assertIsNotNone(payload)
+                self.assertIn(
+                    "opaque protected Git mutation",
+                    cast(str, cast("dict[str, object]", payload)["reason"]),
+                )
+
     def test_shared_checkout_guard_allows_explicit_read_only_table(self) -> None:
         """Read-only diagnostics and combined clean dry-run forms stay quiet."""
         commands = [
@@ -1510,6 +1519,10 @@ class CodexHooksTest(unittest.TestCase):
             "git checkout --orphan topic",
             "git branch -ctopic main",
             "git branch topic",
+            "git branch --track topic origin/main",
+            "git branch --track=direct topic origin/main",
+            "git branch --no-track topic origin/main",
+            "git branch --create-reflog topic origin/main",
             "git worktree add -b topic ../topic",
             "git worktree add --orphan topic ../topic",
         ]
@@ -1570,7 +1583,10 @@ class CodexHooksTest(unittest.TestCase):
             "missing": None,
             "nonzero": "import sys\nsys.exit(3)\n",
             "timeout": "import time\ntime.sleep(11)\n",
-            "malformed": "print('not-json')\n",
+            "non_json": "print('not-json')\n",
+            "array": "print('[]')\n",
+            "empty_object": "print('{}')\n",
+            "approve": "print('{\"decision\":\"approve\"}')\n",
             "empty": "",
         }
         for mode, branch_script in cases.items():
@@ -1912,6 +1928,7 @@ class CodexHooksTest(unittest.TestCase):
                 hook_dir = temp_root / "hooks"
                 hook_dir.mkdir()
                 log_path = temp_root / "invocations.txt"
+                (hook_dir / "branch_worktree_guard.py").write_text("", encoding="utf-8")
                 (hook_dir / "cause_investigation_guard.py").write_text(
                     "\n".join(
                         [

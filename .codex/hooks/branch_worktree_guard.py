@@ -8,7 +8,7 @@
 # upstream design ../../agents/skills/worktree-health.md owns worktree drift diagnostics.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates destructive Git and creation blocks.
 # @dependency-end
-"""Guard destructive Git and branch/worktree creation in a shared checkout."""
+"""Guard shared-checkout Git mutation such as ``git restore`` and creation."""
 
 from __future__ import annotations
 
@@ -65,6 +65,11 @@ READ_ONLY_BRANCH_VALUE_OPTIONS = {
 BRANCH_NORMAL_CREATE_SHORTS = {"c"}
 BRANCH_FORCE_SHORTS = {"C", "f"}
 BRANCH_DESTRUCTIVE_SHORTS = {"D", "M", "d", "m"}
+BRANCH_CREATION_MODIFIERS = {
+    "--create-reflog",
+    "--no-track",
+    "--track",
+}
 PROTECTED_LITERAL = re.compile(
     r"(?:^|[;&|()!\s])git(?:\s+(?:-[A-Za-z]|--[^\s]+)(?:\s+[^\s]+)?)*\s+"
     r"(?:restore|reset|clean|checkout|switch|stash|branch|worktree)(?:\s|$)"
@@ -290,23 +295,6 @@ def wrapper_script(segment: tuple[str, ...]) -> str:
     return ""
 
 
-def visible_git_commands(command: str) -> tuple[GitCommand, ...]:
-    """Return every reliably visible Git command, including wrapper scripts."""
-    tokens = shell_tokens(command)
-    if not tokens:
-        return ()
-    commands: list[GitCommand] = []
-    for segment in command_segments(tokens):
-        script = wrapper_script(segment)
-        if script:
-            commands.extend(visible_git_commands(script))
-            continue
-        git_command = normalized_git_command(segment)
-        if git_command is not None:
-            commands.append(git_command)
-    return tuple(commands)
-
-
 def short_option_letters(arguments: tuple[str, ...]) -> set[str]:
     """Return letters from combined short options before `--`."""
     letters: set[str] = set()
@@ -369,6 +357,11 @@ def branch_intent(arguments: tuple[str, ...]) -> GitIntent | None:
         return GitIntent("destructive_git", "branch", "git branch delete/rename", False, True)
     if letters & BRANCH_NORMAL_CREATE_SHORTS or has_long_option(arguments, "--copy"):
         return GitIntent("branch_creation", "branch", "git branch create/copy", True, False)
+    if (
+        has_long_option(arguments, *BRANCH_CREATION_MODIFIERS)
+        and any(not argument.startswith("-") for argument in arguments)
+    ):
+        return GitIntent("branch_creation", "branch", "git branch create with tracking/reflog", True, False)
     if arguments and not arguments[0].startswith("-"):
         return GitIntent("branch_creation", "branch", "git branch <name>", True, False)
     return GitIntent("destructive_git", "branch", "git branch metadata mutation", False, True)
@@ -488,13 +481,23 @@ def block_payload(command: str, intent: GitIntent) -> dict[str, object]:
 
 def first_block(command: str) -> GitIntent | None:
     """Return the first unauthorized protected intent."""
-    git_commands = visible_git_commands(command)
-    for git_command in git_commands:
-        intent = git_intent(git_command)
-        if intent is not None and not intent_authorized(git_command, intent):
-            return intent
-    if not git_commands:
+    tokens = shell_tokens(command)
+    if not tokens:
         return opaque_protected_intent(command)
+    for segment in command_segments(tokens):
+        script = wrapper_script(segment)
+        if script:
+            if intent := first_block(script):
+                return intent
+            continue
+        git_command = normalized_git_command(segment)
+        if git_command is not None:
+            intent = git_intent(git_command)
+            if intent is not None and not intent_authorized(git_command, intent):
+                return intent
+            continue
+        if intent := opaque_protected_intent(" ".join(segment)):
+            return intent
     return None
 
 

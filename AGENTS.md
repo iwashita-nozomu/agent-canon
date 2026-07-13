@@ -74,15 +74,16 @@ surfaces listed below.
 
 Multiple chats or sessions may use this checkout concurrently. Treat every
 unknown dirty, staged, untracked, branch, and worktree state as owned by the
-user or another chat. Never use `git restore`, `git reset`, forced `git clean`,
-mutating `git stash`, checkout/switch, or branch/worktree create, delete, move,
-rename, or prune to remove that state. Proven exact task ownership only bounds
-which paths may be named in an approval request; it never bypasses explicit
-destructive approval. A protected mutation proceeds only when the user
+user or another chat, and preserve that state across routing and repair.
+Protected Git operations include `git restore`, `git reset`, forced `git clean`,
+mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
+rename, or prune. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required.
+A protected mutation proceeds only when the user
 explicitly approves it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Do not create an extra branch/worktree or
-switch checkout as a collision workaround.
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Collision handling keeps the current
+branch/worktree and requests user direction.
 
 ## Runtime Owner Map
 

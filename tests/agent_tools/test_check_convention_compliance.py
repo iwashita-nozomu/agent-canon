@@ -726,7 +726,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "AGENTS.md": (
         "Multiple chats or sessions unknown dirty Proven exact task ownership "
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-        "AGENT_CANON_DESTRUCTIVE_GIT_REASON "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON\n"
         "## Runtime Owner Map\n\n"
         "| Contract | Owner Surface | Validation |\n"
         "| -------- | ------------- | ---------- |\n"

@@ -734,12 +734,12 @@ def should_preserve_block(result: HookResult) -> bool:
 
 
 def critical_child_invalid(result: HookResult) -> bool:
-    """Return whether a critical child failed or emitted malformed nonempty output."""
+    """Return whether a critical child failed or emitted a non-block payload."""
     if result.spec.script not in CRITICAL_BLOCKING_CHILD_HOOKS:
         return False
     if result.failed():
         return True
-    return bool(result.stdout.strip()) and result.json_stdout() is None
+    return bool(result.stdout.strip()) and not result.blocks()
 
 
 def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
@@ -749,13 +749,14 @@ def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
     return {
         "decision": "block",
         "reason": (
-            "Critical hook child emitted malformed nonempty output; fail closed before "
+            "Critical hook child emitted nonempty output other than a valid "
+            "decision=block payload; fail closed before "
             f"the requested tool action.\n{result.spec.script}\n{result.stdout.strip()}"
         ),
         "next_action": "fix_critical_child_output_then_retry",
         "remediation": [
             f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
-            "Fix the critical child so it emits empty stdout to allow or one valid JSON hook payload to block.",
+            "Fix the critical child so it emits empty stdout to allow or one valid JSON decision=block payload.",
         ],
     }
 

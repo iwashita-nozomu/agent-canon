@@ -20,7 +20,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 273,
+      "line": 512,
       "path": ".codex/hooks/branch_worktree_guard.py",
       "surface": "hook"
     },
@@ -564,7 +564,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 903,
+      "line": 935,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -572,7 +572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "systemMessage",
-      "line": 825,
+      "line": 853,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -4732,7 +4732,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 305,
+      "line": 331,
+      "path": "tools/agent_tools/agent_canon_preflight.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS",
+      "line": 168,
       "path": "tools/agent_tools/agent_canon_preflight.py",
       "surface": "tool"
     },
@@ -4740,7 +4748,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE",
-      "line": 158,
+      "line": 164,
       "path": "tools/agent_tools/agent_canon_preflight.py",
       "surface": "tool"
     },
@@ -4748,7 +4756,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_PREFLIGHT_UPDATE_SURFACE_DIRTY",
-      "line": 154,
+      "line": 160,
       "path": "tools/agent_tools/agent_canon_preflight.py",
       "surface": "tool"
     },
