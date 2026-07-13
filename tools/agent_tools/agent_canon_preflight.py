@@ -8,6 +8,7 @@
 # upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived AgentCanon branch routing
 # upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md defines parent update TODO routing
 # upstream implementation agent_canon_update_todos.py reports AgentCanon update TODO state
+# upstream implementation ./report_artifact_checks.py classifies eval transient captures
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
 # downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
@@ -19,6 +20,11 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+from report_artifact_checks import (
+    generated_eval_transient_blockers,
+    join_artifact_blockers,
+)
 
 GIT_STATUS_PATH_COLUMN = 3
 RENAMED_PATH_SPLIT_MAX = 1
@@ -156,6 +162,26 @@ def run_agent_canon_preflight(
         print(update_surface_status)
     if status_result.stdout.strip():
         print("AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes")
+
+    eval_transient_blockers = generated_eval_transient_blockers(project_root)
+    if eval_transient_blockers:
+        print(
+            "AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS="
+            f"{join_artifact_blockers(eval_transient_blockers)}"
+        )
+        return base_preflight_result(
+            status="blocked_eval_transient_artifacts",
+            reason=(
+                "eval transient captures require durable archive verification, "
+                "summary, and explicit cleanup before AgentCanon update"
+            ),
+            next_step=(
+                "sync_eval_archive_then_summarize_and_delete_transient_captures_"
+                "then_rerun_preflight"
+            ),
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
+        )
 
     ensure_result = subprocess.run(
         ["make", "agent-canon-ensure-latest"],

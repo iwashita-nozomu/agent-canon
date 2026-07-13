@@ -298,6 +298,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `AGENT_CANON_PREFLIGHT_STATUS`
 - `AGENT_CANON_PREFLIGHT_REASON`
 - `AGENT_CANON_PREFLIGHT_NEXT`
+- `AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS` when eval captures block the update
 - `AGENT_CANON_PREFLIGHT_CHECKLIST`
 - `AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS`
 - `AGENT_CANON_UPDATE_TODO_STATUS`
@@ -321,6 +322,14 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 ## Failure Routes
 
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
+- `blocked_eval_transient_artifacts`: task entry found an exact tracked,
+  untracked, or ignored
+  `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` / `.stderr.txt`
+  capture and stopped before `make agent-canon-ensure-latest`. Preserve the
+  capture until the eval archive is synced and verified, write the bounded
+  summary, delete the transient explicitly, then rerun preflight. The emitted
+  next action is
+  `sync_eval_archive_then_summarize_and_delete_transient_captures_then_rerun_preflight`.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.

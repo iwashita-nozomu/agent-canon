@@ -872,7 +872,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             checklist.parent.mkdir(parents=True)
             checklist.write_text("# Checklist\n", encoding="utf-8")
             (workspace_root / "Makefile").write_text(
-                "agent-canon-ensure-latest:\n\t@echo latest-ok\n",
+                "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
@@ -943,9 +943,135 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
                 result.stdout,
             )
+            self.assertTrue((workspace_root / "make-sentinel").is_file())
             self.assertTrue(
                 (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
             )
+
+    def test_task_start_blocks_eval_transient_until_explicit_cleanup(self) -> None:
+        """Eval captures stop make, remain intact, and allow a rerun after cleanup."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            checklist = (
+                workspace_root
+                / "vendor"
+                / "agent-canon"
+                / "documents"
+                / "agent-canon-parent-repo-latest-checklist.md"
+            )
+            checklist.parent.mkdir(parents=True)
+            checklist.write_text("# Checklist\n", encoding="utf-8")
+            (workspace_root / "Makefile").write_text(
+                "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "add",
+                    "Makefile",
+                    "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                ],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Start Test",
+                    "-c",
+                    "user.email=task-start@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: seed workspace",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "local-note.md").write_text(
+                "unrelated\n", encoding="utf-8"
+            )
+            capture = (
+                workspace_root
+                / "reports"
+                / "agent-eval-runs"
+                / "eval-run"
+                / "01-skill.stdout.txt"
+            )
+            capture.parent.mkdir(parents=True)
+            capture.write_text("diagnostic evidence\n", encoding="utf-8")
+
+            blocked = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "eval transient blocks update",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "eval-transient-blocked",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(blocked.returncode, 0, blocked.stderr)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=blocked_eval_transient_artifacts",
+                blocked.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS="
+                "generated_report_artifact_untracked_left_in_tree:"
+                "reports/agent-eval-runs/eval-run/01-skill.stdout.txt",
+                blocked.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_NEXT="
+                "sync_eval_archive_then_summarize_and_delete_transient_captures_"
+                "then_rerun_preflight",
+                blocked.stdout,
+            )
+            self.assertFalse((workspace_root / "make-sentinel").exists())
+            self.assertTrue(capture.is_file())
+
+            capture.unlink()
+            resumed = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "eval transient cleanup rerun",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "eval-transient-resumed",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
+            self.assertTrue((workspace_root / "make-sentinel").is_file())
 
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""

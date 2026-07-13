@@ -12,6 +12,7 @@ upstream design ../../../documents/agent-canon-update-route.md canonical AgentCa
 upstream design ../../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 upstream implementation ../../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodule sync helper
+upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py blocks unsafe task-entry updates
 @dependency-end
 -->
 
@@ -49,6 +50,12 @@ Execute the required and task-matching conditional commands that the packet prin
 1. In parent repos, classify dirty state by AgentCanon update surface:
    `vendor/agent-canon/`, parent gitlink, `.gitmodules`, and AgentCanon-owned
    root views. Do not let unrelated parent dirty files block the update route.
+1. Before the high-level update runs, task-start preflight fails closed when an
+   exact `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` or
+   `.stderr.txt` capture remains tracked, untracked, or ignored. Preserve the
+   capture, sync and verify the eval archive, write its bounded summary, delete
+   the transient explicitly, and rerun preflight. Ordinary unrelated parent
+   dirt remains allowed.
 1. Prefer the high-level parent route:
 
 ```bash

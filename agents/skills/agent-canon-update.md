@@ -8,6 +8,7 @@ upstream design ../../documents/agent-canon-update-route.md canonical AgentCanon
 upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 upstream implementation ../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../tools/sync_agent_canon.sh root-view and submodule sync helper
+upstream implementation ../../tools/agent_tools/agent_canon_preflight.py blocks unsafe task-entry updates
 downstream design ./agent-update-branch.md separates parent update branch lanes from source AgentCanon PR work
 @dependency-end
 -->
@@ -55,6 +56,13 @@ TODO state up to date.
    - legacy subtree or committed snapshot compatibility repo
 1. In parent repos, classify the dirty state by update surface, not by the
    whole worktree. Unrelated parent dirty paths do not block the update.
+1. At task entry, fail closed before `make agent-canon-ensure-latest` when an
+   exact `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` or
+   `.stderr.txt` capture remains tracked, untracked, or ignored. Keep the
+   capture until the eval archive is synced and verified, summarize it through
+   the owning eval route, delete the transient explicitly, and rerun preflight.
+   This narrow exception does not turn ordinary unrelated parent dirt into an
+   update blocker.
 1. Use the high-level route first:
 
 ```bash

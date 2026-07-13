@@ -17,6 +17,10 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+from report_artifact_checks import generated_eval_transient_blockers  # noqa: E402
+
 GUARD_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generated_artifact_guard.py"
 
 
@@ -191,6 +195,97 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("GENERATED_ARTIFACT_GUARD=pass", result.stdout)
+
+    def test_eval_transient_classifier_reports_git_state_in_path_order(self) -> None:
+        """The narrow classifier covers tracked, untracked, and ignored captures."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.init_repo(root)
+            (root / ".gitignore").write_text(
+                "reports/agent-eval-runs/ignored-run/\n",
+                encoding="utf-8",
+            )
+            tracked = (
+                root
+                / "reports"
+                / "agent-eval-runs"
+                / "tracked-run"
+                / "01-role.stdout.txt"
+            )
+            tracked.parent.mkdir(parents=True)
+            tracked.write_text("tracked\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", ".gitignore", tracked.relative_to(root).as_posix()],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Generated Artifact Guard Test",
+                    "-c",
+                    "user.email=generated-artifact-guard@example.invalid",
+                    "commit",
+                    "-m",
+                    "track eval capture",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            untracked = (
+                root
+                / "reports"
+                / "agent-eval-runs"
+                / "untracked-run"
+                / "02-role.stderr.txt"
+            )
+            untracked.parent.mkdir(parents=True)
+            untracked.write_text("untracked\n", encoding="utf-8")
+            ignored = (
+                root
+                / "reports"
+                / "agent-eval-runs"
+                / "ignored-run"
+                / "03-role.stderr.txt"
+            )
+            ignored.parent.mkdir(parents=True)
+            ignored.write_text("ignored\n", encoding="utf-8")
+
+            self.assertEqual(
+                generated_eval_transient_blockers(root),
+                [
+                    "generated_report_artifact_ignored_left_in_tree:"
+                    "reports/agent-eval-runs/ignored-run/03-role.stderr.txt",
+                    "generated_report_artifact_tracked_left_in_tree:"
+                    "reports/agent-eval-runs/tracked-run/01-role.stdout.txt",
+                    "generated_report_artifact_untracked_left_in_tree:"
+                    "reports/agent-eval-runs/untracked-run/02-role.stderr.txt",
+                ],
+            )
+
+    def test_eval_transient_classifier_excludes_other_generated_outputs(self) -> None:
+        """Only exact two-level eval stdout/stderr captures block preflight."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.init_repo(root)
+            excluded_paths = (
+                root / "reports" / "agent-eval-runs" / "run" / "summary.json",
+                root
+                / "reports"
+                / "agent-eval-runs"
+                / "run"
+                / "nested"
+                / "role.stdout.txt",
+                root / "reports" / "agent-runtime-dashboard" / "role.stdout.txt",
+            )
+            for path in excluded_paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("generated\n", encoding="utf-8")
+
+            self.assertEqual(generated_eval_transient_blockers(root), [])
 
 
 if __name__ == "__main__":
