@@ -10,6 +10,8 @@ downstream design ../prose-reasoning-graph/dsl-spec.md prose adapter/profile ove
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs graph contract implementation
 downstream design ../tools/prose_reasoning_graph.md documents the prose graph adapter command surface
 downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph projection rendering
+downstream implementation ../../tools/agent_tools/dependency_manifest_records.py supplies the exact normalized-record adapter input
+downstream implementation ../../tools/agent_tools/bind_r2_scope.py supplies non-circular review-evidence binding
 @dependency-end
 -->
 
@@ -257,6 +259,7 @@ layer is promoted here.
 | --- | --- |
 | Prose Reasoning Graph | Source spans correspond to `source`/`form`; claims, evidence, discourse, presentation features, diagnostics, edit operations, and projections correspond to their matching layers in `../prose-reasoning-graph/dsl-spec.md`. |
 | Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../dependency-manifest-design.md`. |
+| Generic normalized transport | The Rust reader and `dependency_manifest_records.py` enforce canonical LF-delimited JSONL bytes, actual caller-registry authority, family snapshot/ID linkage, source-universe endpoints, identity/fact/pair derivations, complete attestation/observation membership, reconciliation, source-content provenance, and summary count/fingerprint linkage. The Python aggregate deep-freezes every wire family and projects `surface_relations` plus derived `source_universe` without owning parent SQLite materialization. |
 | Code dependency graph | Source files and symbols correspond to `code` nodes or payload locators; imports/includes/source references correspond to `code` edges. |
 | Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../rust/agent-canon/src/structured_analysis.rs`. |
 | Document canon | Inventory rows and findings correspond to document-canon layer nodes, edges, and diagnostics in `../../rust/agent-canon/src/structured_analysis.rs`. |
@@ -306,6 +309,19 @@ The current Rust structured-analysis implementation materializes the core with:
 Dedicated attached databases or projection-specific tables may add richer
 storage. They remain faithful to this object contract by keeping stable ids,
 layer-qualified semantics, source/provenance payloads, and authority records.
+
+The generic dependency-manifest adapter stops before this SQLite boundary. The
+Rust JSONL decoder is the lossless transport reader; parent-owned schema code
+may consume its deeply immutable aggregate and materialize `surface_relations`
+and `source_universe` only after parent validation. Review scope manifests and
+closeouts are evidence artifacts, not graph nodes or materialization inputs;
+closeout re-hashes every bound source, fixture, and registry byte set before it
+binds two unique canonical review decisions.
+Transport identity resolution is valid only after raw duplicate-key checks and
+a globally injective locator preflight spanning repo paths, canonical locators,
+and alternate locators. An exact source ID derived for an absent declaration
+span remains diagnostic evidence for `unresolved_source`; it is not a graph
+node and does not relax target membership.
 
 ## Extension Rule
 

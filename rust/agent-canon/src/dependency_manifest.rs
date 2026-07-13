@@ -236,7 +236,25 @@ pub(crate) struct NormalizeRequest {
     pub profile: String,
     pub snapshot_jsonl: PathBuf,
     pub evidence_jsonl: Vec<PathBuf>,
+    pub relation_registry_json: PathBuf,
     pub output_jsonl: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationRegistryEntryV1 {
+    pub capability_id: String,
+    pub discriminator: String,
+    pub family: String,
+    pub layer: String,
+    pub raw_kind: String,
+    pub stored_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationRegistryArtifactV1 {
+    pub entries: Vec<RelationRegistryEntryV1>,
+    pub registry_fingerprint: String,
+    pub registry_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -350,6 +368,7 @@ pub(crate) struct NormalizedRecordSet {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg(test)]
 pub(crate) struct RelationKindSpec {
     pub capability_id: &'static str,
     pub raw_kind: &'static str,
@@ -359,6 +378,9 @@ pub(crate) struct RelationKindSpec {
     pub query_family: &'static str,
 }
 
+#[cfg(test)]
+// Non-authoritative compiled baseline for fixture conformance and supported-value translation.
+// Runtime semantic acceptance is always derived from RelationRegistryArtifactV1.
 pub(crate) const RELATION_KIND_REGISTRY: &[RelationKindSpec] = &[
     RelationKindSpec {
         capability_id: "header-target-resolver.v1",
@@ -611,6 +633,114 @@ struct IdentityBuild {
     surface: Option<(String, String, String, bool, String, String)>,
 }
 
+#[derive(Debug)]
+struct SourceIdentityLookups {
+    path_by_id: BTreeMap<String, String>,
+    id_by_locator: BTreeMap<String, String>,
+}
+
+fn preflight_source_identities(
+    source_identities: &[SourceIdentity],
+) -> Result<SourceIdentityLookups, ManifestError> {
+    let mut identity_ids = BTreeSet::new();
+    let mut repo_paths = BTreeSet::new();
+    let mut canonical_locators = BTreeSet::new();
+    let mut logical_ids = BTreeSet::new();
+    for identity in source_identities {
+        if !identity_ids.insert(identity.identity_id.as_str()) {
+            return Err(ManifestError::Transport(
+                "duplicate source identity record ID".to_string(),
+            ));
+        }
+        if !repo_paths.insert(identity.repo_rel_path.as_str()) {
+            return Err(ManifestError::Transport(
+                "duplicate source identity path".to_string(),
+            ));
+        }
+        if !canonical_locators.insert(identity.canonical_locator.as_str()) {
+            return Err(ManifestError::Transport(
+                "duplicate source identity canonical locator".to_string(),
+            ));
+        }
+        if !logical_ids.insert(identity.logical_id.as_str()) {
+            return Err(ManifestError::Transport(
+                "duplicate source identity logical ID".to_string(),
+            ));
+        }
+        let alternate_locators = identity
+            .alternate_locators
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        if alternate_locators.len() != identity.alternate_locators.len()
+            || alternate_locators.iter().copied().collect::<Vec<_>>()
+                != identity
+                    .alternate_locators
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+        {
+            return Err(ManifestError::Transport(format!(
+                "alternate locators are not unique and sorted for {}",
+                identity.repo_rel_path
+            )));
+        }
+    }
+
+    let mut locator_owners = BTreeMap::<&str, &str>::new();
+    for identity in source_identities {
+        for locator in std::iter::once(identity.repo_rel_path.as_str())
+            .chain(std::iter::once(identity.canonical_locator.as_str()))
+            .chain(identity.alternate_locators.iter().map(String::as_str))
+        {
+            if locator_owners
+                .insert(locator, identity.identity_id.as_str())
+                .is_some_and(|owner| owner != identity.identity_id)
+            {
+                return Err(ManifestError::Transport(format!(
+                    "source identity locator namespace collision for {locator}"
+                )));
+            }
+        }
+    }
+
+    let path_by_id = source_identities
+        .iter()
+        .map(|identity| (identity.identity_id.clone(), identity.repo_rel_path.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut id_by_locator = BTreeMap::new();
+    for identity in source_identities {
+        for locator in std::iter::once(&identity.repo_rel_path)
+            .chain(std::iter::once(&identity.canonical_locator))
+            .chain(identity.alternate_locators.iter())
+        {
+            id_by_locator.insert(locator.clone(), identity.identity_id.clone());
+        }
+    }
+    Ok(SourceIdentityLookups {
+        path_by_id,
+        id_by_locator,
+    })
+}
+
+fn write_success_output(
+    output_jsonl: &Path,
+    bytes: &[u8],
+    stdout: &mut dyn Write,
+    status: &mut dyn Write,
+) -> Result<(), ManifestError> {
+    if output_jsonl == Path::new("-") {
+        stdout
+            .write_all(bytes)
+            .map_err(|error| ManifestError::Io(error.to_string()))?;
+    } else {
+        write_atomic(output_jsonl, bytes)?;
+    }
+    status
+        .write_all(b"DEPENDENCY_MANIFEST_STATUS=ok\n")
+        .map_err(|error| ManifestError::Io(error.to_string()))
+}
+
 pub fn run(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("normalize") {
         return run_normalize(args);
@@ -646,15 +776,12 @@ pub fn run(args: &[String]) -> i32 {
         eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
         return 24;
     }
-    if request.output_jsonl == Path::new("-") {
-        if let Err(error) = io::stdout().write_all(&bytes) {
-            eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
-            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
-            return 24;
-        }
-        return 0;
-    }
-    if let Err(error) = write_atomic(&request.output_jsonl, &bytes) {
+    if let Err(error) = write_success_output(
+        &request.output_jsonl,
+        &bytes,
+        &mut io::stdout(),
+        &mut io::stderr(),
+    ) {
         eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
         eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
         return 24;
@@ -699,6 +826,7 @@ fn parse_normalize_args(args: &[String]) -> Result<NormalizeRequest, String> {
     let mut profile = None;
     let mut snapshot_jsonl = None;
     let mut evidence_jsonl = Vec::new();
+    let mut relation_registry_json = None;
     let mut output_jsonl = None;
     let mut index = 1;
     while index < args.len() {
@@ -715,6 +843,16 @@ fn parse_normalize_args(args: &[String]) -> Result<NormalizeRequest, String> {
             "--evidence-jsonl" | "--evidence-input" => {
                 let flag = args[index].clone();
                 evidence_jsonl.push(PathBuf::from(next_arg(args, &mut index, &flag)?));
+            }
+            "--relation-registry-json" => {
+                if relation_registry_json.is_some() {
+                    return Err("duplicate --relation-registry-json".to_string());
+                }
+                relation_registry_json = Some(PathBuf::from(next_arg(
+                    args,
+                    &mut index,
+                    "--relation-registry-json",
+                )?));
             }
             "--output-jsonl" => {
                 output_jsonl = Some(PathBuf::from(next_arg(args, &mut index, "--output-jsonl")?))
@@ -737,8 +875,477 @@ fn parse_normalize_args(args: &[String]) -> Result<NormalizeRequest, String> {
         profile,
         snapshot_jsonl: snapshot_jsonl.ok_or_else(|| "missing --snapshot-jsonl".to_string())?,
         evidence_jsonl,
+        relation_registry_json: relation_registry_json
+            .ok_or_else(|| "missing --relation-registry-json".to_string())?,
         output_jsonl: output_jsonl.ok_or_else(|| "missing --output-jsonl".to_string())?,
     })
+}
+
+fn relation_registry_entry_value(entry: &RelationRegistryEntryV1) -> Value {
+    json!({
+        "capability_id": entry.capability_id,
+        "discriminator": entry.discriminator,
+        "family": entry.family,
+        "layer": entry.layer,
+        "raw_kind": entry.raw_kind,
+        "stored_kind": entry.stored_kind,
+    })
+}
+
+fn relation_registry_entries_value(entries: &[RelationRegistryEntryV1]) -> Value {
+    Value::Array(entries.iter().map(relation_registry_entry_value).collect())
+}
+
+fn relation_registry_fingerprint(
+    entries: &[RelationRegistryEntryV1],
+    registry_version: &str,
+) -> Result<String, ManifestError> {
+    let value = json!({
+        "entries": relation_registry_entries_value(entries),
+        "registry_version": registry_version,
+    });
+    let bytes =
+        serde_json::to_vec(&value).map_err(|error| ManifestError::Transport(error.to_string()))?;
+    Ok(sha256_bytes(&bytes))
+}
+
+struct StrictJsonKeyScanner<'a> {
+    bytes: &'a [u8],
+    cursor: usize,
+}
+
+impl<'a> StrictJsonKeyScanner<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, cursor: 0 }
+    }
+
+    fn scan_document(mut self) -> Result<(), String> {
+        self.scan_value()?;
+        self.skip_whitespace();
+        if self.cursor != self.bytes.len() {
+            return Err(format!(
+                "unexpected trailing JSON bytes at offset {}",
+                self.cursor
+            ));
+        }
+        Ok(())
+    }
+
+    fn scan_value(&mut self) -> Result<(), String> {
+        self.skip_whitespace();
+        match self.peek() {
+            Some(b'{') => self.scan_object(),
+            Some(b'[') => self.scan_array(),
+            Some(b'"') => self.scan_string_token().map(|_| ()),
+            Some(b't') => self.scan_literal(b"true"),
+            Some(b'f') => self.scan_literal(b"false"),
+            Some(b'n') => self.scan_literal(b"null"),
+            Some(b'-' | b'0'..=b'9') => self.scan_number(),
+            Some(byte) => Err(format!(
+                "unexpected JSON byte 0x{byte:02x} at offset {}",
+                self.cursor
+            )),
+            None => Err("unexpected end of JSON value".to_string()),
+        }
+    }
+
+    fn scan_object(&mut self) -> Result<(), String> {
+        self.expect(b'{')?;
+        self.skip_whitespace();
+        if self.consume(b'}') {
+            return Ok(());
+        }
+        let mut keys = BTreeSet::new();
+        loop {
+            self.skip_whitespace();
+            let (start, end) = self.scan_string_token()?;
+            let key = serde_json::from_slice::<String>(&self.bytes[start..end])
+                .map_err(|error| format!("invalid JSON object key: {error}"))?;
+            if !keys.insert(key.clone()) {
+                return Err(format!("duplicate JSON key: {key}"));
+            }
+            self.skip_whitespace();
+            self.expect(b':')?;
+            self.scan_value()?;
+            self.skip_whitespace();
+            if self.consume(b'}') {
+                return Ok(());
+            }
+            self.expect(b',')?;
+        }
+    }
+
+    fn scan_array(&mut self) -> Result<(), String> {
+        self.expect(b'[')?;
+        self.skip_whitespace();
+        if self.consume(b']') {
+            return Ok(());
+        }
+        loop {
+            self.scan_value()?;
+            self.skip_whitespace();
+            if self.consume(b']') {
+                return Ok(());
+            }
+            self.expect(b',')?;
+        }
+    }
+
+    fn scan_string_token(&mut self) -> Result<(usize, usize), String> {
+        let start = self.cursor;
+        self.expect(b'"')?;
+        while let Some(byte) = self.peek() {
+            match byte {
+                b'"' => {
+                    self.cursor += 1;
+                    return Ok((start, self.cursor));
+                }
+                b'\\' => {
+                    self.cursor += 1;
+                    let escape = self
+                        .peek()
+                        .ok_or_else(|| "unterminated JSON escape at end of input".to_string())?;
+                    self.cursor += 1;
+                    if escape == b'u' {
+                        for _ in 0..4 {
+                            let digit = self
+                                .peek()
+                                .ok_or_else(|| "unterminated JSON unicode escape".to_string())?;
+                            if !digit.is_ascii_hexdigit() {
+                                return Err(format!(
+                                    "invalid JSON unicode escape at offset {}",
+                                    self.cursor
+                                ));
+                            }
+                            self.cursor += 1;
+                        }
+                    } else if !matches!(
+                        escape,
+                        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't'
+                    ) {
+                        return Err(format!("invalid JSON escape at offset {}", self.cursor - 1));
+                    }
+                }
+                0x00..=0x1f => {
+                    return Err(format!(
+                        "unescaped JSON control byte at offset {}",
+                        self.cursor
+                    ));
+                }
+                _ => self.cursor += 1,
+            }
+        }
+        Err("unterminated JSON string".to_string())
+    }
+
+    fn scan_literal(&mut self, literal: &[u8]) -> Result<(), String> {
+        if self.bytes.get(self.cursor..self.cursor + literal.len()) != Some(literal) {
+            return Err(format!("invalid JSON literal at offset {}", self.cursor));
+        }
+        self.cursor += literal.len();
+        Ok(())
+    }
+
+    fn scan_number(&mut self) -> Result<(), String> {
+        self.consume(b'-');
+        match self.peek() {
+            Some(b'0') => self.cursor += 1,
+            Some(b'1'..=b'9') => {
+                self.cursor += 1;
+                while matches!(self.peek(), Some(b'0'..=b'9')) {
+                    self.cursor += 1;
+                }
+            }
+            _ => return Err(format!("invalid JSON number at offset {}", self.cursor)),
+        }
+        if self.consume(b'.') {
+            if !matches!(self.peek(), Some(b'0'..=b'9')) {
+                return Err(format!(
+                    "invalid JSON number fraction at offset {}",
+                    self.cursor
+                ));
+            }
+            while matches!(self.peek(), Some(b'0'..=b'9')) {
+                self.cursor += 1;
+            }
+        }
+        if matches!(self.peek(), Some(b'e' | b'E')) {
+            self.cursor += 1;
+            if matches!(self.peek(), Some(b'+' | b'-')) {
+                self.cursor += 1;
+            }
+            if !matches!(self.peek(), Some(b'0'..=b'9')) {
+                return Err(format!(
+                    "invalid JSON number exponent at offset {}",
+                    self.cursor
+                ));
+            }
+            while matches!(self.peek(), Some(b'0'..=b'9')) {
+                self.cursor += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn skip_whitespace(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\n' | b'\r' | b'\t')) {
+            self.cursor += 1;
+        }
+    }
+
+    fn expect(&mut self, expected: u8) -> Result<(), String> {
+        if self.consume(expected) {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected JSON byte 0x{expected:02x} at offset {}",
+                self.cursor
+            ))
+        }
+    }
+
+    fn consume(&mut self, expected: u8) -> bool {
+        if self.peek() == Some(expected) {
+            self.cursor += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.bytes.get(self.cursor).copied()
+    }
+}
+
+fn parse_strict_json_value(bytes: &[u8], label: &str) -> Result<Value, ManifestError> {
+    StrictJsonKeyScanner::new(bytes)
+        .scan_document()
+        .map_err(|message| ManifestError::Transport(format!("{label}: {message}")))?;
+    serde_json::from_slice::<Value>(bytes)
+        .map_err(|error| ManifestError::Transport(format!("{label}: {error}")))
+}
+
+fn read_canonical_jsonl(reader: impl BufRead, label: &str) -> Result<Vec<Value>, ManifestError> {
+    let mut values = Vec::new();
+    let mut reader = reader;
+    let mut raw_line = Vec::new();
+    let mut line_number = 0usize;
+    loop {
+        raw_line.clear();
+        let read = reader
+            .read_until(b'\n', &mut raw_line)
+            .map_err(|error| ManifestError::Transport(format!("{label}: {error}")))?;
+        if read == 0 {
+            break;
+        }
+        line_number += 1;
+        if !raw_line.ends_with(b"\n") || raw_line.ends_with(b"\r\n") {
+            return Err(ManifestError::Transport(format!(
+                "{label} line {line_number} is not one canonical LF-terminated record"
+            )));
+        }
+        let json_bytes = &raw_line[..raw_line.len() - 1];
+        if json_bytes.is_empty() {
+            return Err(ManifestError::Transport(format!(
+                "blank {label} JSONL line {line_number}"
+            )));
+        }
+        if line_number == 1 && json_bytes.starts_with(b"\xef\xbb\xbf") {
+            return Err(ManifestError::Transport(format!(
+                "{label} must not contain a UTF-8 BOM"
+            )));
+        }
+        let value = parse_strict_json_value(json_bytes, &format!("{label} line {line_number}"))?;
+        let canonical = serde_json::to_vec(&value)
+            .map_err(|error| ManifestError::Transport(error.to_string()))?;
+        if canonical != json_bytes {
+            return Err(ManifestError::Transport(format!(
+                "{label} line {line_number} is not canonical JSON"
+            )));
+        }
+        values.push(value);
+    }
+    Ok(values)
+}
+
+#[cfg(test)]
+fn canonical_relation_registry_entries() -> Vec<RelationRegistryEntryV1> {
+    let mut entries = RELATION_KIND_REGISTRY
+        .iter()
+        .map(|spec| RelationRegistryEntryV1 {
+            capability_id: spec.capability_id.to_string(),
+            discriminator: spec.discriminator.to_string(),
+            family: spec.query_family.to_string(),
+            layer: spec.layer.to_string(),
+            raw_kind: spec.raw_kind.to_string(),
+            stored_kind: spec.stored_kind.to_string(),
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        (
+            &left.capability_id,
+            &left.raw_kind,
+            &left.discriminator,
+            &left.stored_kind,
+            &left.layer,
+            &left.family,
+        )
+            .cmp(&(
+                &right.capability_id,
+                &right.raw_kind,
+                &right.discriminator,
+                &right.stored_kind,
+                &right.layer,
+                &right.family,
+            ))
+    });
+    entries
+}
+
+#[cfg(test)]
+fn builtin_relation_registry_artifact() -> Result<RelationRegistryArtifactV1, ManifestError> {
+    let entries = canonical_relation_registry_entries();
+    let registry_version = "relation_registry.v1".to_string();
+    let registry_fingerprint = relation_registry_fingerprint(&entries, &registry_version)?;
+    Ok(RelationRegistryArtifactV1 {
+        entries,
+        registry_fingerprint,
+        registry_version,
+    })
+}
+
+fn parse_relation_registry_artifact_bytes(
+    bytes: &[u8],
+) -> Result<RelationRegistryArtifactV1, ManifestError> {
+    if bytes.last() != Some(&b'\n') {
+        return Err(ManifestError::Transport(
+            "relation registry artifact must end with one LF".to_string(),
+        ));
+    }
+    let json_bytes = &bytes[..bytes.len() - 1];
+    let value = parse_strict_json_value(json_bytes, "relation registry JSON")?;
+    let canonical =
+        serde_json::to_vec(&value).map_err(|error| ManifestError::Transport(error.to_string()))?;
+    if canonical != json_bytes {
+        return Err(ManifestError::Transport(
+            "relation registry artifact is not canonical JSON".to_string(),
+        ));
+    }
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("relation registry artifact must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &["entries", "registry_fingerprint", "registry_version"],
+    )?;
+    let registry_version = string_field(object, "registry_version")?;
+    if registry_version != "relation_registry.v1" {
+        return Err(ManifestError::Transport(format!(
+            "unsupported relation registry version {registry_version}"
+        )));
+    }
+    let entries_value = object
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ManifestError::Transport("relation registry entries must be an array".to_string())
+        })?;
+    let mut entries = Vec::with_capacity(entries_value.len());
+    for value in entries_value {
+        let entry = value.as_object().ok_or_else(|| {
+            ManifestError::Transport("relation registry entry must be an object".to_string())
+        })?;
+        ensure_exact_keys(
+            entry,
+            &[
+                "capability_id",
+                "discriminator",
+                "family",
+                "layer",
+                "raw_kind",
+                "stored_kind",
+            ],
+        )?;
+        entries.push(RelationRegistryEntryV1 {
+            capability_id: string_field(entry, "capability_id")?,
+            discriminator: string_field(entry, "discriminator")?,
+            family: string_field(entry, "family")?,
+            layer: string_field(entry, "layer")?,
+            raw_kind: string_field(entry, "raw_kind")?,
+            stored_kind: string_field(entry, "stored_kind")?,
+        });
+    }
+    if entries.is_empty()
+        || entries.iter().any(|entry| {
+            entry.capability_id.is_empty()
+                || entry.raw_kind.is_empty()
+                || entry.stored_kind.is_empty()
+                || entry.layer.is_empty()
+                || entry.family.is_empty()
+        })
+    {
+        return Err(ManifestError::Transport(
+            "relation registry entries contain an empty required field".to_string(),
+        ));
+    }
+    let mut semantic_keys = BTreeSet::new();
+    if entries.iter().any(|entry| {
+        !semantic_keys.insert((
+            entry.capability_id.as_str(),
+            entry.raw_kind.as_str(),
+            entry.discriminator.as_str(),
+        ))
+    }) {
+        return Err(ManifestError::Transport(
+            "relation registry entries contain a duplicate semantic key".to_string(),
+        ));
+    }
+    let mut sorted_entries = entries.clone();
+    sorted_entries.sort_by(|left, right| {
+        (
+            &left.capability_id,
+            &left.raw_kind,
+            &left.discriminator,
+            &left.stored_kind,
+            &left.layer,
+            &left.family,
+        )
+            .cmp(&(
+                &right.capability_id,
+                &right.raw_kind,
+                &right.discriminator,
+                &right.stored_kind,
+                &right.layer,
+                &right.family,
+            ))
+    });
+    if entries != sorted_entries {
+        return Err(ManifestError::Transport(
+            "relation registry entries are not in canonical order".to_string(),
+        ));
+    }
+    let registry_fingerprint = string_field(object, "registry_fingerprint")?;
+    let expected_fingerprint = relation_registry_fingerprint(&entries, &registry_version)?;
+    if registry_fingerprint != expected_fingerprint {
+        return Err(ManifestError::Transport(
+            "relation registry fingerprint mismatch".to_string(),
+        ));
+    }
+    Ok(RelationRegistryArtifactV1 {
+        entries,
+        registry_fingerprint,
+        registry_version,
+    })
+}
+
+pub(crate) fn load_relation_registry_artifact(
+    path: &Path,
+) -> Result<RelationRegistryArtifactV1, ManifestError> {
+    let bytes = fs::read(path).map_err(|error| {
+        ManifestError::Transport(format!("relation registry artifact: {error}"))
+    })?;
+    parse_relation_registry_artifact_bytes(&bytes)
 }
 
 fn run_normalize(args: &[String]) -> i32 {
@@ -748,6 +1355,14 @@ fn run_normalize(args: &[String]) -> i32 {
             eprintln!("DEPENDENCY_MANIFEST_STATUS=usage");
             eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=usage:{message}");
             return 2;
+        }
+    };
+    let relation_registry = match load_relation_registry_artifact(&request.relation_registry_json) {
+        Ok(registry) => registry,
+        Err(error) => {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=transport-invalid");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+            return 22;
         }
     };
     let root = match fs::canonicalize(&request.root) {
@@ -794,7 +1409,7 @@ fn run_normalize(args: &[String]) -> i32 {
         eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=snapshot/root/profile mismatch");
         return 20;
     }
-    let records = match normalize_snapshot(&request, snapshot) {
+    let records = match normalize_snapshot(&request, snapshot, &relation_registry) {
         Ok(records) => records,
         Err(error) => {
             let exit = match error {
@@ -815,18 +1430,17 @@ fn run_normalize(args: &[String]) -> i32 {
         }
     };
     let mut bytes = Vec::new();
-    if let Err(error) = write_normalized_record_set(&records, &mut bytes) {
+    if let Err(error) = write_normalized_record_set(&records, &relation_registry, &mut bytes) {
         eprintln!("DEPENDENCY_MANIFEST_STATUS=transport-invalid");
         eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
         return 22;
     }
-    if request.output_jsonl == Path::new("-") {
-        if let Err(error) = io::stdout().write_all(&bytes) {
-            eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
-            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
-            return 24;
-        }
-    } else if let Err(error) = write_atomic(&request.output_jsonl, &bytes) {
+    if let Err(error) = write_success_output(
+        &request.output_jsonl,
+        &bytes,
+        &mut io::stdout(),
+        &mut io::stderr(),
+    ) {
         eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
         eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
         return 24;
@@ -942,19 +1556,7 @@ pub(crate) fn capture_snapshot(
         }
         source_identities.push(identity);
     }
-    let identity_by_path = source_identities
-        .iter()
-        .map(|identity| (identity.repo_rel_path.clone(), identity.identity_id.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let identity_by_locator = source_identities
-        .iter()
-        .map(|identity| {
-            (
-                identity.canonical_locator.clone(),
-                identity.identity_id.clone(),
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
+    let identity_lookups = preflight_source_identities(&source_identities)?;
 
     let mut diagnostics = Vec::new();
     let mut raw_declarations = Vec::new();
@@ -1031,10 +1633,7 @@ pub(crate) fn capture_snapshot(
                         dependency.target.clone()
                     }
                 };
-            let resolved_target_identity_id = identity_by_path
-                .get(&target)
-                .cloned()
-                .or_else(|| identity_by_locator.get(&target).cloned());
+            let resolved_target_identity_id = identity_lookups.id_by_locator.get(&target).cloned();
             if resolved_target_identity_id.is_none() {
                 diagnostics.push(Diagnostic {
                     code: "dependency.target_unresolved".to_string(),
@@ -1056,10 +1655,7 @@ pub(crate) fn capture_snapshot(
         .into_iter()
         .map(|raw| {
             let target = raw.dependency.target.clone();
-            let resolved_target_identity_id = identity_by_path
-                .get(&target)
-                .cloned()
-                .or_else(|| identity_by_locator.get(&target).cloned());
+            let resolved_target_identity_id = identity_lookups.id_by_locator.get(&target).cloned();
             let start_line = raw.dependency.source_span.start_line.to_string();
             let end_line = raw.dependency.source_span.end_line.to_string();
             let declaration_id = hash_parts(&[
@@ -1104,10 +1700,10 @@ pub(crate) fn capture_snapshot(
         .into_iter()
         .map(
             |(source_id, source_path, relation_type, target_path, owner, equal, mode, status)| {
-                let target_id = identity_by_path
+                let target_id = identity_lookups
+                    .id_by_locator
                     .get(&target_path)
                     .cloned()
-                    .or_else(|| identity_by_locator.get(&target_path).cloned())
                     .unwrap_or_else(|| {
                         hash_parts(&["source_identity.v1", &before.parent_repo_id, &target_path])
                     });
@@ -2726,7 +3322,8 @@ struct RelationCandidate {
 }
 
 impl RelationNormalizer {
-    fn validate_relation_kind_registry() -> Result<(), ManifestError> {
+    #[cfg(test)]
+    fn validate_compiled_registry_conformance_baseline() -> Result<(), ManifestError> {
         let mut keys = BTreeSet::new();
         for spec in RELATION_KIND_REGISTRY {
             if spec.capability_id.is_empty()
@@ -2750,22 +3347,23 @@ impl RelationNormalizer {
     }
 
     pub(crate) fn normalize_relation_kind(
+        registry: &RelationRegistryArtifactV1,
         capability_id: &str,
         raw_kind: &str,
         discriminator: &str,
-    ) -> Result<RelationKindSpec, String> {
-        Self::validate_relation_kind_registry().map_err(|error| error.to_string())?;
-        let matches = RELATION_KIND_REGISTRY
+    ) -> Result<RelationRegistryEntryV1, String> {
+        let matches = registry
+            .entries
             .iter()
             .filter(|spec| {
                 spec.capability_id == capability_id
                     && spec.raw_kind == raw_kind
                     && spec.discriminator == discriminator
             })
-            .copied()
+            .cloned()
             .collect::<Vec<_>>();
         match matches.as_slice() {
-            [spec] => Ok(*spec),
+            [spec] => Ok(spec.clone()),
             [] => Err(format!(
                 "unregistered relation kind {capability_id}:{raw_kind}:{discriminator}"
             )),
@@ -2775,10 +3373,14 @@ impl RelationNormalizer {
         }
     }
 
-    pub(crate) fn allowed_kinds_for_family(family: &str) -> Vec<String> {
-        let kinds = RELATION_KIND_REGISTRY
+    pub(crate) fn allowed_kinds_for_family(
+        registry: &RelationRegistryArtifactV1,
+        family: &str,
+    ) -> Vec<String> {
+        let kinds = registry
+            .entries
             .iter()
-            .filter(|spec| spec.query_family == family)
+            .filter(|spec| spec.family == family)
             .map(|spec| spec.stored_kind.to_string())
             .collect::<BTreeSet<_>>();
         kinds.iter().cloned().collect()
@@ -2815,6 +3417,7 @@ impl RelationNormalizer {
     }
 
     pub(crate) fn least_fixed_point(
+        registry: &RelationRegistryArtifactV1,
         identities: &[SourceIdentity],
         source_exclusions: &[SourceExclusion],
         ambiguities: &[AmbiguityA],
@@ -2823,8 +3426,7 @@ impl RelationNormalizer {
         query_family: &str,
         allowed_relation_kinds: &[String],
     ) -> Result<ClosureResult, ManifestError> {
-        Self::validate_relation_kind_registry()?;
-        let registered_family_kinds = Self::allowed_kinds_for_family(query_family)
+        let registered_family_kinds = Self::allowed_kinds_for_family(registry, query_family)
             .into_iter()
             .collect::<BTreeSet<_>>();
         if registered_family_kinds.is_empty() {
@@ -2869,9 +3471,10 @@ impl RelationNormalizer {
                 "accepted direct facts overlap ambiguity candidates".to_string(),
             ));
         }
-        let registered_stored_kinds = RELATION_KIND_REGISTRY
+        let registered_stored_kinds = registry
+            .entries
             .iter()
-            .map(|spec| spec.stored_kind)
+            .map(|spec| spec.stored_kind.as_str())
             .collect::<BTreeSet<_>>();
         for relation in relations.iter().filter(|relation| relation.accepted) {
             if !registered_stored_kinds.contains(relation.relation_kind.as_str()) {
@@ -2980,13 +3583,15 @@ impl RelationNormalizer {
 
 pub(crate) struct RelationNormalizer;
 
-fn producer_capability_rows() -> Vec<(String, String, Vec<String>)> {
+fn producer_capability_rows(
+    registry: &RelationRegistryArtifactV1,
+) -> Vec<(String, String, Vec<String>)> {
     let mut raw_kinds = BTreeMap::<String, BTreeSet<String>>::new();
-    for spec in RELATION_KIND_REGISTRY {
+    for spec in &registry.entries {
         raw_kinds
-            .entry(spec.capability_id.to_string())
+            .entry(spec.capability_id.clone())
             .or_default()
-            .insert(spec.raw_kind.to_string());
+            .insert(spec.raw_kind.clone());
     }
     raw_kinds
         .into_iter()
@@ -3001,13 +3606,14 @@ fn producer_capability_rows() -> Vec<(String, String, Vec<String>)> {
 }
 
 fn capability_rejection_reason(
+    registry: &RelationRegistryArtifactV1,
     capability: Option<&ExtractorCapability>,
     observation: &ObservedEvidence,
 ) -> Option<String> {
     let Some(capability) = capability else {
         return Some("capability_unknown".to_string());
     };
-    let expected = producer_capability_rows()
+    let expected = producer_capability_rows(registry)
         .into_iter()
         .find(|(capability_id, _, _)| capability_id == &capability.capability_id);
     let Some((_, expected_extractor, expected_raw_kinds)) = expected else {
@@ -3049,11 +3655,12 @@ fn capability_rejection_reason(
 }
 
 fn observation_producer_rejection_reason(
+    registry: &RelationRegistryArtifactV1,
     observation: &ObservedEvidence,
     capability: Option<&ExtractorCapability>,
-    spec: Option<&RelationKindSpec>,
+    spec: Option<&RelationRegistryEntryV1>,
 ) -> Option<String> {
-    capability_rejection_reason(capability, observation)
+    capability_rejection_reason(registry, capability, observation)
         .or_else(|| {
             let classification = observation.classification.to_ascii_lowercase();
             (classification.contains("dynamic")
@@ -3071,16 +3678,40 @@ fn observation_producer_rejection_reason(
         .or_else(|| (!observation.accepted).then(|| "unsupported_relation".to_string()))
         .or_else(|| spec.is_none().then(|| "kind_unregistered".to_string()))
         .or_else(|| {
-            spec.filter(|registered| registered.query_family.is_empty())
+            spec.filter(|registered| registered.family.is_empty())
                 .map(|_| "query_family_unregistered".to_string())
         })
+}
+
+fn merge_surface_relations(
+    snapshot_relations: Vec<SurfaceRelation>,
+    evidence_relations: Vec<SurfaceRelation>,
+) -> Result<Vec<SurfaceRelation>, ManifestError> {
+    let mut merged = BTreeMap::<String, SurfaceRelation>::new();
+    for relation in snapshot_relations.into_iter().chain(evidence_relations) {
+        match merged.get(&relation.relation_id) {
+            Some(previous) if previous == &relation => {
+                // Exact cross-input duplicates are explicitly idempotent.
+            }
+            Some(_) => {
+                return Err(ManifestError::Transport(format!(
+                    "conflicting snapshot/evidence surface relation {}",
+                    relation.relation_id
+                )))
+            }
+            None => {
+                merged.insert(relation.relation_id.clone(), relation);
+            }
+        }
+    }
+    Ok(merged.into_values().collect())
 }
 
 pub(crate) fn normalize_snapshot(
     request: &NormalizeRequest,
     snapshot: ManifestSnapshot,
+    registry: &RelationRegistryArtifactV1,
 ) -> Result<NormalizedRecordSet, NormalizationError> {
-    RelationNormalizer::validate_relation_kind_registry()?;
     if snapshot.header.schema_version != SNAPSHOT_SCHEMA_VERSION
         || snapshot.header.profile != request.profile
         || !snapshot.header.snapshot_consistent
@@ -3089,10 +3720,11 @@ pub(crate) fn normalize_snapshot(
             "normalization requires a consistent source_snapshot.v1".to_string(),
         ));
     }
-    let (mut observations, supplied_capabilities, mut supplied_surfaces, _) =
+    let (mut observations, supplied_capabilities, supplied_surfaces, _) =
         read_evidence_inputs(&request.evidence_jsonl, &snapshot.header.snapshot_id)?;
     observations.sort_by(|left, right| left.observation_id.cmp(&right.observation_id));
     let capabilities = materialize_capabilities(
+        registry,
         &supplied_capabilities,
         &observations,
         &request.evidence_jsonl,
@@ -3101,13 +3733,10 @@ pub(crate) fn normalize_snapshot(
         .iter()
         .map(|capability| (capability.capability_id.as_str(), capability))
         .collect::<BTreeMap<_, _>>();
-    supplied_surfaces.sort_by(|left, right| left.relation_id.cmp(&right.relation_id));
     let mut declarations = snapshot.declarations.clone();
     declarations.sort_by(|left, right| left.declaration_id.cmp(&right.declaration_id));
-    let mut surface_relations = snapshot.surface_relations.clone();
-    surface_relations.extend(supplied_surfaces);
-    surface_relations.sort_by(|left, right| left.relation_id.cmp(&right.relation_id));
-    surface_relations.dedup_by(|left, right| left.relation_id == right.relation_id);
+    let surface_relations =
+        merge_surface_relations(snapshot.surface_relations.clone(), supplied_surfaces)?;
 
     let identities_by_id = snapshot
         .source_identities
@@ -3131,7 +3760,8 @@ pub(crate) fn normalize_snapshot(
     let mut rejected_observations = BTreeSet::new();
 
     for capability in &supplied_capabilities {
-        if !RELATION_KIND_REGISTRY
+        if !registry
+            .entries
             .iter()
             .any(|spec| spec.capability_id == capability.capability_id)
         {
@@ -3152,6 +3782,7 @@ pub(crate) fn normalize_snapshot(
 
     for declaration in &declarations {
         let spec = match RelationNormalizer::normalize_relation_kind(
+            registry,
             "header-target-resolver.v1",
             "header_context",
             &format!("declared_kind={}", declaration.declared_kind),
@@ -3220,7 +3851,7 @@ pub(crate) fn normalize_snapshot(
                     &reason,
                     &[],
                     &[declaration.declared_target.clone()],
-                    spec.stored_kind,
+                    &spec.stored_kind,
                 ),
             );
             continue;
@@ -3231,7 +3862,7 @@ pub(crate) fn normalize_snapshot(
             &dependent,
             &prerequisite,
         );
-        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, spec.stored_kind]);
+        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, &spec.stored_kind]);
         candidates.push(RelationCandidate {
             attestation,
             from_identity_id: dependent,
@@ -3247,6 +3878,7 @@ pub(crate) fn normalize_snapshot(
     for observation in &mut observations {
         let discriminator = observation_discriminator(observation);
         let spec = RelationNormalizer::normalize_relation_kind(
+            registry,
             &observation.capability_id,
             &observation.relation_kind,
             &discriminator,
@@ -3263,6 +3895,7 @@ pub(crate) fn normalize_snapshot(
             observed_endpoints(observation, &identities_by_id, &excluded);
         let rejection = rejection.or_else(|| {
             observation_producer_rejection_reason(
+                registry,
                 observation,
                 capabilities_by_id
                     .get(observation.capability_id.as_str())
@@ -3275,8 +3908,9 @@ pub(crate) fn normalize_snapshot(
         let dependent = dependent.unwrap_or_default();
         let prerequisite = prerequisite.unwrap_or_default();
         let stored_kind = spec
-            .map(|registered| registered.stored_kind)
-            .unwrap_or(observation.relation_kind.as_str());
+            .as_ref()
+            .map(|registered| registered.stored_kind.clone())
+            .unwrap_or_else(|| observation.relation_kind.clone());
         let attestation = Attestation {
             attestation_id: attestation_id.clone(),
             attestation_key: attestation_key.clone(),
@@ -3312,7 +3946,7 @@ pub(crate) fn normalize_snapshot(
             rejected_observations.insert(observation.observation_id.clone());
             add_ambiguity(
                 &mut ambiguities,
-                ambiguity_for_observation(observation, &reason, stored_kind),
+                ambiguity_for_observation(observation, &reason, &stored_kind),
             );
             continue;
         }
@@ -3323,7 +3957,7 @@ pub(crate) fn normalize_snapshot(
             &dependent,
             &prerequisite,
         );
-        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, spec.stored_kind]);
+        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, &spec.stored_kind]);
         candidates.push(RelationCandidate {
             attestation,
             from_identity_id: dependent,
@@ -3574,7 +4208,7 @@ pub(crate) fn normalize_snapshot(
     records.summary.ambiguity_count = records.ambiguities.len();
     records.summary.record_counts = normalized_record_counts(&records);
     records.summary.normalized_record_fingerprint = normalized_record_fingerprint(&records)?;
-    validate_normalized_record_set(&records)?;
+    validate_normalized_record_set(&records, registry)?;
     Ok(records)
 }
 
@@ -3785,20 +4419,8 @@ fn read_evidence_inputs(
         let bytes = fs::read(path).map_err(|error| {
             ManifestError::Transport(format!("evidence input {}: {error}", path.display()))
         })?;
-        for (line_number, line) in String::from_utf8(bytes)
-            .map_err(|error| ManifestError::Transport(format!("evidence input UTF-8: {error}")))?
-            .lines()
-            .enumerate()
-        {
-            if line.trim().is_empty() {
-                return Err(ManifestError::Transport(format!(
-                    "blank evidence JSONL line {}",
-                    line_number + 1
-                )));
-            }
-            let value: Value = serde_json::from_str(line).map_err(|error| {
-                ManifestError::Transport(format!("evidence line {}: {error}", line_number + 1))
-            })?;
+        let label = format!("evidence input {}", path.display());
+        for value in read_canonical_jsonl(Cursor::new(bytes), &label)? {
             let record_type = value
                 .get("record_type")
                 .and_then(Value::as_str)
@@ -3884,6 +4506,7 @@ fn read_evidence_inputs(
 }
 
 fn materialize_capabilities(
+    registry: &RelationRegistryArtifactV1,
     supplied: &[ExtractorCapability],
     observations: &[ObservedEvidence],
     evidence_paths: &[PathBuf],
@@ -3892,9 +4515,10 @@ fn materialize_capabilities(
         .iter()
         .map(|capability| (capability.capability_id.clone(), capability.clone()))
         .collect::<BTreeMap<_, _>>();
-    let known_capability_ids = RELATION_KIND_REGISTRY
+    let known_capability_ids = registry
+        .entries
         .iter()
-        .map(|spec| spec.capability_id)
+        .map(|spec| spec.capability_id.as_str())
         .collect::<BTreeSet<_>>();
     let mut result = supplied
         .iter()
@@ -3908,7 +4532,7 @@ fn materialize_capabilities(
             (capability_id.clone(), capability)
         })
         .collect::<BTreeMap<_, _>>();
-    for (capability_id, extractor_id, raw_kinds) in producer_capability_rows() {
+    for (capability_id, extractor_id, raw_kinds) in producer_capability_rows(registry) {
         if supplied.contains_key(&capability_id) {
             continue;
         }
@@ -4229,9 +4853,10 @@ fn normalized_record_fingerprint(records: &NormalizedRecordSet) -> Result<String
 
 pub(crate) fn write_normalized_record_set(
     records: &NormalizedRecordSet,
+    registry: &RelationRegistryArtifactV1,
     writer: impl Write,
 ) -> Result<(), TransportError> {
-    validate_normalized_record_set(records)?;
+    validate_normalized_record_set(records, registry)?;
     let mut writer = writer;
     write_envelope(
         &mut writer,
@@ -4710,25 +5335,14 @@ fn parse_normalization_summary(
 pub(crate) fn read_normalized_record_set(
     reader: impl BufRead,
     expected_snapshot_id: &str,
+    registry: &RelationRegistryArtifactV1,
 ) -> Result<NormalizedRecordSet, TransportError> {
     if !is_hex_id(expected_snapshot_id) {
         return Err(ManifestError::Transport(
             "expected snapshot ID must be lowercase 64-hex".to_string(),
         ));
     }
-    let mut values = Vec::new();
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = line.map_err(|error| ManifestError::Transport(error.to_string()))?;
-        if line.trim().is_empty() {
-            return Err(ManifestError::Transport(format!(
-                "blank normalized JSONL line {}",
-                line_number + 1
-            )));
-        }
-        values.push(serde_json::from_str::<Value>(&line).map_err(|error| {
-            ManifestError::Transport(format!("normalized line {}: {error}", line_number + 1))
-        })?);
-    }
+    let values = read_canonical_jsonl(reader, "normalized")?;
     if values.len() < 3 {
         return Err(ManifestError::Transport(
             "normalized record set requires header, snapshot, and summary".to_string(),
@@ -4968,12 +5582,14 @@ pub(crate) fn read_normalized_record_set(
         summary,
     };
     validate_normalized_record_order(&normalized_record_values(&records))?;
-    validate_normalized_record_set(&records)?;
+    validate_normalized_record_set(&records, registry)?;
     Ok(records)
 }
 
-fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), ManifestError> {
-    RelationNormalizer::validate_relation_kind_registry()?;
+fn validate_normalized_record_set(
+    records: &NormalizedRecordSet,
+    registry: &RelationRegistryArtifactV1,
+) -> Result<(), ManifestError> {
     if records.header.schema_version != SNAPSHOT_SCHEMA_VERSION
         || records.header.profile != "parent"
         || !records.header.snapshot_consistent
@@ -5062,7 +5678,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
         .iter()
         .map(|capability| (capability.capability_id.as_str(), capability))
         .collect::<BTreeMap<_, _>>();
-    let registered_capability_ids = producer_capability_rows()
+    let registered_capability_ids = producer_capability_rows(registry)
         .into_iter()
         .map(|(capability_id, _, _)| capability_id)
         .collect::<BTreeSet<_>>();
@@ -5168,7 +5784,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
                 "extractor capability provenance is incomplete".to_string(),
             ));
         }
-        let known = producer_capability_rows()
+        let known = producer_capability_rows(registry)
             .into_iter()
             .find(|(capability_id, _, _)| capability_id == &capability.capability_id);
         if let Some((_, extractor_id, raw_kinds)) = known {
@@ -5210,6 +5826,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
             ));
         }
         let registered_kind = RelationNormalizer::normalize_relation_kind(
+            &registry,
             &observation.capability_id,
             &observation.relation_kind,
             &observation_discriminator(observation),
@@ -5238,6 +5855,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
             .or_else(|| contradiction.then(|| "kind_contradiction".to_string()))
             .or_else(|| {
                 observation_producer_rejection_reason(
+                    registry,
                     observation,
                     capabilities_by_id
                         .get(observation.capability_id.as_str())
@@ -5247,8 +5865,8 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
             });
         let expected_kind = registered_kind
             .as_ref()
-            .map(|spec| spec.stored_kind)
-            .unwrap_or(observation.relation_kind.as_str());
+            .map(|spec| spec.stored_kind.clone())
+            .unwrap_or_else(|_| observation.relation_kind.clone());
         if attestation.attestation_key
             != hash_parts(&[
                 "observed_attestation.v1",
@@ -5528,9 +6146,10 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
         .iter()
         .map(|relation| (relation.fact_id.as_str(), relation))
         .collect::<BTreeMap<_, _>>();
-    let registered_stored_kinds = RELATION_KIND_REGISTRY
+    let registered_stored_kinds = registry
+        .entries
         .iter()
-        .map(|spec| spec.stored_kind)
+        .map(|spec| spec.stored_kind.as_str())
         .collect::<BTreeSet<_>>();
     let mut consumed_accepted_attestations = BTreeSet::new();
     for relation in &records.relations {
@@ -5722,6 +6341,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
             ));
         }
         let registered_kind = RelationNormalizer::normalize_relation_kind(
+            &registry,
             "header-target-resolver.v1",
             "header_context",
             &format!("declared_kind={}", declaration.declared_kind),
@@ -5742,8 +6362,8 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
             .or_else(|| contradiction.then(|| "kind_contradiction".to_string()));
         let expected_kind = registered_kind
             .as_ref()
-            .map(|spec| spec.stored_kind)
-            .unwrap_or(declaration.declared_kind.as_str());
+            .map(|spec| spec.stored_kind.clone())
+            .unwrap_or_else(|_| declaration.declared_kind.clone());
         if attestation.attestation_key != declaration.attestation_key
             || attestation.declaring_identity_id != declaration.source_identity_id
             || attestation.dependent_identity_id != dependent.clone().unwrap_or_default()
@@ -5769,7 +6389,7 @@ fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), M
                 &dependent,
                 &prerequisite,
             );
-            let fact = hash_parts(&["normalized_relation.v1", &pair, expected_kind]);
+            let fact = hash_parts(&["normalized_relation.v1", &pair, &expected_kind]);
             if !relation_by_fact.contains_key(fact.as_str()) {
                 return Err(ManifestError::Transport(
                     "accepted declaration has no direct fact".to_string(),
@@ -5910,19 +6530,7 @@ fn normalized_record_counts(records: &NormalizedRecordSet) -> BTreeMap<String, u
 }
 
 pub(crate) fn parse_snapshot(reader: impl BufRead) -> Result<ManifestSnapshot, ManifestError> {
-    let mut records = Vec::new();
-    for (line_index, line) in reader.lines().enumerate() {
-        let line = line.map_err(|error| ManifestError::Transport(error.to_string()))?;
-        if line.trim().is_empty() {
-            return Err(ManifestError::Transport(format!(
-                "blank JSONL line {}",
-                line_index + 1
-            )));
-        }
-        records.push(serde_json::from_str::<Value>(&line).map_err(|error| {
-            ManifestError::Transport(format!("line {}: {error}", line_index + 1))
-        })?);
-    }
+    let records = read_canonical_jsonl(reader, "source snapshot")?;
     let first = records
         .first()
         .ok_or_else(|| ManifestError::Transport("empty snapshot".to_string()))?;
@@ -5945,6 +6553,9 @@ pub(crate) fn parse_snapshot(reader: impl BufRead) -> Result<ManifestSnapshot, M
     let mut declarations = Vec::new();
     let mut source_exclusions = Vec::new();
     let mut surface_relations = Vec::new();
+    let mut seen_record_ids = BTreeSet::<(String, String)>::new();
+    let mut last_rank = 0usize;
+    let mut last_order_key = None::<String>;
     for value in records.iter().skip(1) {
         let record_type = value
             .get("record_type")
@@ -5954,12 +6565,54 @@ pub(crate) fn parse_snapshot(reader: impl BufRead) -> Result<ManifestSnapshot, M
         if envelope.snapshot_id != snapshot_id {
             return Err(ManifestError::Transport("mixed snapshot IDs".to_string()));
         }
-        match record_type {
-            SNAPSHOT_SCHEMA_VERSION => {
-                return Err(ManifestError::Transport(
-                    "duplicate source snapshot header record ID".to_string(),
-                ));
+        if record_type == SNAPSHOT_SCHEMA_VERSION {
+            return Err(ManifestError::Transport(
+                "duplicate source snapshot header record ID".to_string(),
+            ));
+        }
+        let payload = envelope.payload.as_object().ok_or_else(|| {
+            ManifestError::Transport(format!("{record_type} payload must be an object"))
+        })?;
+        let (rank, order_key, family_label) = match record_type {
+            "source_identity.v1" => (
+                1,
+                string_field(payload, "repo_rel_path")?,
+                "source identity",
+            ),
+            "surface_relation.v1" => (2, envelope.record_id.to_string(), "surface relation"),
+            "source_exclusion.v1" => (
+                3,
+                string_field(payload, "repo_rel_path")?,
+                "source exclusion",
+            ),
+            "dependency_declaration.v1" => {
+                (4, envelope.record_id.to_string(), "dependency declaration")
             }
+            _ => {
+                return Err(ManifestError::Transport(format!(
+                    "unknown snapshot record type {record_type}"
+                )))
+            }
+        };
+        if !seen_record_ids.insert((record_type.to_string(), envelope.record_id.to_string())) {
+            return Err(ManifestError::Transport(format!(
+                "duplicate {family_label} record ID {}",
+                envelope.record_id
+            )));
+        }
+        if rank < last_rank
+            || (rank == last_rank
+                && last_order_key
+                    .as_deref()
+                    .is_some_and(|previous| previous >= order_key.as_str()))
+        {
+            return Err(ManifestError::Transport(
+                "snapshot records are not in canonical family and record order".to_string(),
+            ));
+        }
+        last_rank = rank;
+        last_order_key = Some(order_key);
+        match record_type {
             "source_identity.v1" => {
                 let record = parse_source_identity(envelope.record_id, envelope.payload)?;
                 if record.snapshot_id != snapshot_id {
@@ -5996,11 +6649,7 @@ pub(crate) fn parse_snapshot(reader: impl BufRead) -> Result<ManifestSnapshot, M
                 }
                 surface_relations.push(record);
             }
-            _ => {
-                return Err(ManifestError::Transport(format!(
-                    "unknown snapshot record type {record_type}"
-                )))
-            }
+            _ => unreachable!("snapshot family validated before projection"),
         }
     }
     if !header.snapshot_consistent {
@@ -6432,28 +7081,9 @@ fn validate_snapshot_transport(
         ));
     }
 
-    let identities_by_id = source_identities
-        .iter()
-        .map(|identity| (identity.identity_id.clone(), identity.repo_rel_path.clone()))
-        .collect::<BTreeMap<_, _>>();
-    if identities_by_id.len() != source_identities.len() {
-        return Err(ManifestError::Transport(
-            "duplicate source identity record ID".to_string(),
-        ));
-    }
-    let identity_by_path = source_identities
-        .iter()
-        .map(|identity| (identity.repo_rel_path.clone(), identity.identity_id.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let identity_by_locator = source_identities
-        .iter()
-        .map(|identity| {
-            (
-                identity.canonical_locator.clone(),
-                identity.identity_id.clone(),
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
+    let identity_lookups = preflight_source_identities(source_identities)?;
+    let identities_by_id = &identity_lookups.path_by_id;
+    let identity_by_locator = &identity_lookups.id_by_locator;
     for identity in source_identities.iter() {
         if identity.snapshot_id != header.snapshot_id {
             return Err(ManifestError::Transport(
@@ -6494,19 +7124,6 @@ fn validate_snapshot_transport(
                 identity.repo_rel_path
             )));
         }
-        let alternate_locators = identity
-            .alternate_locators
-            .iter()
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        if alternate_locators.len() != identity.alternate_locators.len()
-            || alternate_locators.iter().cloned().collect::<Vec<_>>() != identity.alternate_locators
-        {
-            return Err(ManifestError::Transport(format!(
-                "alternate locators are not unique and sorted for {}",
-                identity.repo_rel_path
-            )));
-        }
     }
 
     let mut classifications = BTreeMap::<String, (String, String)>::new();
@@ -6528,10 +7145,9 @@ fn validate_snapshot_transport(
                 relation.relation_id
             )));
         }
-        let expected_target_identity_id = identity_by_path
+        let expected_target_identity_id = identity_by_locator
             .get(&relation.target_path)
             .cloned()
-            .or_else(|| identity_by_locator.get(&relation.target_path).cloned())
             .unwrap_or_else(|| {
                 hash_parts(&[
                     "source_identity.v1",
@@ -6884,6 +7500,8 @@ mod tests {
         include_str!("../../../tests/fixtures/dependency_manifest/source_universe.jsonl");
     const RELATION_FIXTURE: &str =
         include_str!("../../../tests/fixtures/dependency_manifest/relation_reconciliation.jsonl");
+    const TRANSPORT_FIXTURE: &str =
+        include_str!("../../../tests/fixtures/dependency_manifest/transport_conformance.jsonl");
     const KIND_REGISTRY_FIXTURE: &str =
         include_str!("../../../tests/fixtures/knowledge_graph/query_kind_registry.jsonl");
     const CLOSURE_FIXTURE: &str =
@@ -6891,6 +7509,842 @@ mod tests {
     const RETAINED_PARENT_SNAPSHOT: &str = include_str!(
         "../../../reports/agents/20260712-090608-context-packettool-skill-routing/validation/source_snapshot.v1.jsonl"
     );
+
+    #[test]
+    fn relation_registry_cli_requires_exactly_one_artifact_path() {
+        let valid = vec![
+            "normalize".to_string(),
+            "--root".to_string(),
+            "/tmp/root".to_string(),
+            "--profile".to_string(),
+            "parent".to_string(),
+            "--snapshot-jsonl".to_string(),
+            "snapshot.jsonl".to_string(),
+            "--relation-registry-json".to_string(),
+            "registry.json".to_string(),
+            "--output-jsonl".to_string(),
+            "output.jsonl".to_string(),
+        ];
+        let request = parse_normalize_args(&valid).expect("registry path accepted");
+        assert_eq!(
+            request.relation_registry_json,
+            PathBuf::from("registry.json")
+        );
+
+        let mut missing = valid.clone();
+        let flag = missing
+            .iter()
+            .position(|value| value == "--relation-registry-json")
+            .expect("registry flag");
+        missing.drain(flag..=flag + 1);
+        assert_eq!(
+            parse_normalize_args(&missing).expect_err("missing registry must fail"),
+            "missing --relation-registry-json"
+        );
+
+        let mut duplicate = valid;
+        duplicate.splice(
+            9..9,
+            [
+                "--relation-registry-json".to_string(),
+                "other.json".to_string(),
+            ],
+        );
+        assert_eq!(
+            parse_normalize_args(&duplicate).expect_err("duplicate registry must fail"),
+            "duplicate --relation-registry-json"
+        );
+    }
+
+    #[test]
+    fn relation_registry_loader_uses_canonical_caller_artifact_as_authority() {
+        let path = unique_temp_path("agent-canon-relation-registry");
+        let expected = builtin_relation_registry_artifact().expect("builtin registry");
+        let artifact = json!({
+            "entries": relation_registry_entries_value(&expected.entries),
+            "registry_fingerprint": expected.registry_fingerprint,
+            "registry_version": expected.registry_version,
+        });
+        let artifact_bytes = serde_json::to_vec(&artifact)
+            .expect("registry JSON")
+            .into_iter()
+            .chain([b'\n'])
+            .collect::<Vec<_>>();
+        fs::write(&path, &artifact_bytes).expect("registry artifact");
+        let artifact = load_relation_registry_artifact(&path).expect("registry artifact loads");
+        assert_eq!(artifact.entries.len(), 20);
+        assert_eq!(artifact.registry_version, "relation_registry.v1");
+        assert_eq!(
+            artifact.registry_fingerprint,
+            "1308cf12d7d9c2aa8d67b3cff250484d905e70304a6fb3dafdd7da94a7925624"
+        );
+
+        let mut caller_entries = artifact.entries.clone();
+        caller_entries[0].stored_kind = "caller_owned_kind".to_string();
+        let caller_fingerprint =
+            relation_registry_fingerprint(&caller_entries, "relation_registry.v1")
+                .expect("caller registry fingerprint");
+        let caller_artifact = json!({
+            "entries": relation_registry_entries_value(&caller_entries),
+            "registry_fingerprint": caller_fingerprint,
+            "registry_version": "relation_registry.v1",
+        });
+        let caller_bytes = serde_json::to_vec(&caller_artifact)
+            .expect("caller registry JSON")
+            .into_iter()
+            .chain([b'\n'])
+            .collect::<Vec<_>>();
+        fs::write(&path, caller_bytes).expect("caller registry artifact");
+        let caller_registry =
+            load_relation_registry_artifact(&path).expect("caller registry accepted");
+        assert_eq!(caller_registry.entries[0].stored_kind, "caller_owned_kind");
+
+        let mut noncanonical = vec![b' '];
+        noncanonical.extend_from_slice(&artifact_bytes);
+        fs::write(&path, noncanonical).expect("noncanonical registry artifact");
+        assert!(matches!(
+            load_relation_registry_artifact(&path),
+            Err(ManifestError::Transport(message)) if message.contains("canonical")
+        ));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn snapshot_stdout_success_keeps_jsonl_and_emits_one_status_line() {
+        let bytes = b"{\"record\":\"snapshot\"}\n";
+        let mut stdout = Vec::new();
+        let mut status = Vec::new();
+        write_success_output(Path::new("-"), bytes, &mut stdout, &mut status)
+            .expect("stdout publication");
+        assert_eq!(stdout, bytes);
+        assert_eq!(status, b"DEPENDENCY_MANIFEST_STATUS=ok\n");
+        assert_eq!(
+            String::from_utf8(status)
+                .expect("UTF-8 status")
+                .lines()
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn normalized_transport_fixture_executes_every_exact_byte_case() {
+        let snapshot = parse_snapshot(Cursor::new(RETAINED_PARENT_SNAPSHOT.as_bytes()))
+            .expect("retained parent snapshot");
+        let snapshot_id = snapshot.header.snapshot_id.clone();
+        let registry = builtin_relation_registry_artifact().expect("builtin registry");
+        let records = normalize_snapshot(
+            &NormalizeRequest {
+                root: PathBuf::from("/mnt/l/workspace/project_template"),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("retained-parent-snapshot.v1.jsonl"),
+                evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot,
+            &registry,
+        )
+        .expect("retained normalization");
+        let mut canonical = Vec::new();
+        write_normalized_record_set(&records, &registry, &mut canonical)
+            .expect("canonical normalized transport");
+        let mut executed = BTreeSet::new();
+        for line in TRANSPORT_FIXTURE.lines() {
+            let case = serde_json::from_str::<Value>(line).expect("transport fixture");
+            let name = case["case"].as_str().expect("transport case");
+            match name {
+                "r2-transport-canonical-envelope-order" => {
+                    read_normalized_record_set(
+                        Cursor::new(canonical.clone()),
+                        &snapshot_id,
+                        &registry,
+                    )
+                    .expect("canonical transport accepted");
+                    assert_eq!(case["expected"], "accept");
+                }
+                "r2-reader-same-family-reorder" => {
+                    let mut values = normalized_values(&records);
+                    let positions = values
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, value)| value["record_type"] == "source_identity.v1")
+                        .map(|(index, _)| index)
+                        .take(2)
+                        .collect::<Vec<_>>();
+                    assert_eq!(positions.len(), 2);
+                    values.swap(positions[0], positions[1]);
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                    assert_eq!(case["refresh_normalized_record_fingerprint"], true);
+                }
+                "r2-reader-refreshed-fingerprint" => {
+                    let mut values = normalized_values(&records);
+                    let summary = values.last_mut().expect("normalization summary");
+                    let count = summary["payload"]["record_counts"]["source_identity.v1"]
+                        .as_u64()
+                        .expect("source identity count");
+                    summary["payload"]["record_counts"]["source_identity.v1"] =
+                        Value::from(count + 1);
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                    assert_eq!(case["refresh_summary_counts"], true);
+                    assert_eq!(case["refresh_normalized_record_fingerprint"], true);
+                }
+                "r2-reader-cross-family-snapshot-refresh" => {
+                    let mut values = normalized_values(&records);
+                    let family = case["family"].as_str().expect("transport family");
+                    let snapshot_field = case["snapshot_field"]
+                        .as_str()
+                        .expect("transport snapshot field");
+                    let family_count = values
+                        .iter()
+                        .filter(|value| value["record_type"] == family)
+                        .count();
+                    let family_record = values
+                        .iter_mut()
+                        .find(|value| value["record_type"] == family)
+                        .expect("transport family record");
+                    family_record["payload"][snapshot_field] = Value::String("f".repeat(64));
+                    values.last_mut().expect("normalization summary")["payload"]["record_counts"]
+                        [family] = Value::from(family_count);
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                    assert_eq!(case["refresh_summary_counts"], true);
+                    assert_eq!(case["refresh_normalized_record_fingerprint"], true);
+                }
+                "r2-reader-registry-kind-authority" => {
+                    let mut values = normalized_values(&records);
+                    first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                        ["relation_kind"] = Value::String("unregistered_kind".to_string());
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-source-universe-endpoint" => {
+                    let mut values = normalized_values(&records);
+                    first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                        ["from_identity_id"] = Value::String("0".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-identity-id-derivation" => {
+                    let mut values = normalized_values(&records);
+                    let identity = values
+                        .iter_mut()
+                        .find(|value| value["record_type"] == "source_identity.v1")
+                        .expect("source identity");
+                    identity["record_id"] = Value::String("0".repeat(64));
+                    identity["payload"]["identity_id"] = Value::String("0".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-source-identity-uniqueness" => {
+                    let mutations = case["mutations"]
+                        .as_array()
+                        .expect("source identity uniqueness mutations");
+                    for mutation in mutations {
+                        let (field, expected) = match mutation
+                            .as_str()
+                            .expect("source identity uniqueness mutation")
+                        {
+                            "duplicate_canonical_locator" => (
+                                "canonical_locator",
+                                "duplicate source identity canonical locator",
+                            ),
+                            "duplicate_logical_id" => {
+                                ("logical_id", "duplicate source identity logical ID")
+                            }
+                            other => panic!("unknown source identity mutation {other}"),
+                        };
+                        let mut values = normalized_values(&records);
+                        let positions = values
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, value)| value["record_type"] == "source_identity.v1")
+                            .map(|(index, _)| index)
+                            .take(2)
+                            .collect::<Vec<_>>();
+                        assert_eq!(positions.len(), 2);
+                        let duplicate = values[positions[0]]["payload"][field].clone();
+                        values[positions[1]]["payload"][field] = duplicate;
+                        refresh_normalized_value_fingerprint(&mut values);
+                        let error = assert_normalized_transport_error(values, &snapshot_id);
+                        assert!(
+                            error.to_string().contains(expected),
+                            "expected {expected:?}, got {error:?}"
+                        );
+                    }
+                }
+                "r2-reader-fact-id-derivation" => {
+                    let mut values = normalized_values(&records);
+                    let relation = values
+                        .iter_mut()
+                        .find(|value| value["record_type"] == "normalized_relation.v1")
+                        .expect("normalized relation");
+                    relation["record_id"] = Value::String("0".repeat(64));
+                    relation["payload"]["fact_id"] = Value::String("0".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-pair-id-derivation" => {
+                    let mut values = normalized_values(&records);
+                    first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                        ["pair_identity"] = Value::String("0".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-attestation-membership" => {
+                    let mut values = normalized_values(&records);
+                    first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                        ["attestation_ids"] = Value::Array(Vec::new());
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-attestation-endpoint" => {
+                    let mut values = normalized_values(&records);
+                    let attestation_id = values
+                        .iter()
+                        .find(|value| value["record_type"] == "normalized_relation.v1")
+                        .and_then(|value| value["payload"]["attestation_ids"].as_array())
+                        .and_then(|ids| ids.first())
+                        .and_then(Value::as_str)
+                        .expect("relation attestation")
+                        .to_string();
+                    let attestation = values
+                        .iter_mut()
+                        .find(|value| {
+                            value["record_type"] == "attestation.v1"
+                                && value["record_id"] == attestation_id
+                        })
+                        .expect("consumed attestation");
+                    attestation["payload"]["dependent_identity_id"] = Value::String("0".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-observation-membership" => {
+                    let mut values = normalized_values(&records);
+                    first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                        ["observation_ids"] =
+                        Value::Array(vec![Value::String(format!("O-{}", "0".repeat(64)))]);
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-reconciliation-partition" => {
+                    let mut values = normalized_values(&records);
+                    let relation =
+                        first_normalized_payload_mut(&mut values, "normalized_relation.v1");
+                    relation["reconciliation_status"] = Value::String("matched".to_string());
+                    relation["authority"] = Value::String("declaration+observation".to_string());
+                    let counts = values.last_mut().expect("summary")["payload"]["record_counts"]
+                        .as_object_mut()
+                        .expect("summary counts");
+                    let matched = counts["matched_count"].as_u64().expect("matched count");
+                    let declared = counts["declared_only_count"]
+                        .as_u64()
+                        .expect("declared count");
+                    counts.insert("matched_count".to_string(), Value::from(matched + 1));
+                    counts.insert("declared_only_count".to_string(), Value::from(declared - 1));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-reader-source-content-provenance" => {
+                    let mut values = normalized_values(&records);
+                    let hashes =
+                        first_normalized_payload_mut(&mut values, "normalized_relation.v1")
+                            ["source_content_hashes"]
+                            .as_array_mut()
+                            .expect("source hashes");
+                    hashes[0] = Value::String("f".repeat(64));
+                    refresh_normalized_value_fingerprint(&mut values);
+                    assert_normalized_transport_error(values, &snapshot_id);
+                }
+                "r2-json-duplicate-key-preflight" => {
+                    let registry_bytes = canonical_registry_bytes(&registry);
+                    let relation = records
+                        .surface_relations
+                        .first()
+                        .expect("surface relation for evidence byte gate");
+                    let mut evidence_bytes = Vec::new();
+                    write_envelope(
+                        &mut evidence_bytes,
+                        "surface_relation.v1",
+                        &relation.relation_id,
+                        &snapshot_id,
+                        surface_relation_payload(relation),
+                    )
+                    .expect("canonical evidence bytes");
+                    let evidence_path = unique_temp_path("agent-canon-duplicate-evidence-key");
+                    let mut expected_mutations = fixture_strings(&case, "shared_mutations");
+                    expected_mutations.extend(fixture_strings(&case, "rust_only_mutations"));
+                    let mut executed_mutations = BTreeSet::new();
+                    for mutation in &expected_mutations {
+                        let error = match mutation.as_str() {
+                            "registry_top_level" => {
+                                parse_relation_registry_artifact_bytes(&duplicate_json_field(
+                                    &registry_bytes,
+                                    "registry_version",
+                                    Value::String("relation_registry.v1".to_string()),
+                                    0,
+                                ))
+                                .expect_err("duplicate registry top-level key accepted")
+                            }
+                            "registry_nested" => {
+                                parse_relation_registry_artifact_bytes(&duplicate_json_field(
+                                    &registry_bytes,
+                                    "capability_id",
+                                    Value::String(registry.entries[0].capability_id.clone()),
+                                    0,
+                                ))
+                                .expect_err("duplicate registry nested key accepted")
+                            }
+                            "normalized_top_level" => read_normalized_record_set(
+                                Cursor::new(duplicate_json_field(
+                                    &canonical,
+                                    "record_type",
+                                    Value::String("normalized_record_set_header.v1".to_string()),
+                                    0,
+                                )),
+                                &snapshot_id,
+                                &registry,
+                            )
+                            .expect_err("duplicate normalized top-level key accepted"),
+                            "normalized_nested" => read_normalized_record_set(
+                                Cursor::new(duplicate_json_field(
+                                    &canonical,
+                                    "schema_version",
+                                    Value::String(NORMALIZED_RECORD_SET_VERSION.to_string()),
+                                    0,
+                                )),
+                                &snapshot_id,
+                                &registry,
+                            )
+                            .expect_err("duplicate normalized nested key accepted"),
+                            "normalized_escaped_equivalent" => read_normalized_record_set(
+                                Cursor::new(replace_first_bytes(
+                                    &duplicate_json_field(
+                                        &canonical,
+                                        "record_type",
+                                        Value::String(
+                                            "normalized_record_set_header.v1".to_string(),
+                                        ),
+                                        0,
+                                    ),
+                                    b"\"record_type\":",
+                                    b"\"\\u0072ecord_type\":",
+                                )),
+                                &snapshot_id,
+                                &registry,
+                            )
+                            .expect_err("escaped-equivalent duplicate normalized key accepted"),
+                            "snapshot_top_level" => {
+                                parse_snapshot(Cursor::new(duplicate_json_field(
+                                    RETAINED_PARENT_SNAPSHOT.as_bytes(),
+                                    "record_type",
+                                    Value::String(SNAPSHOT_SCHEMA_VERSION.to_string()),
+                                    0,
+                                )))
+                                .expect_err("duplicate snapshot top-level key accepted")
+                            }
+                            "snapshot_nested" => parse_snapshot(Cursor::new(duplicate_json_field(
+                                RETAINED_PARENT_SNAPSHOT.as_bytes(),
+                                "schema_version",
+                                Value::String(SNAPSHOT_SCHEMA_VERSION.to_string()),
+                                0,
+                            )))
+                            .expect_err("duplicate snapshot nested key accepted"),
+                            "evidence_top_level" | "evidence_nested" => {
+                                let (field, value) = if mutation == "evidence_top_level" {
+                                    (
+                                        "record_type",
+                                        Value::String("surface_relation.v1".to_string()),
+                                    )
+                                } else {
+                                    ("status", Value::String(relation.status.clone()))
+                                };
+                                fs::write(
+                                    &evidence_path,
+                                    duplicate_json_field(&evidence_bytes, field, value, 0),
+                                )
+                                .expect("duplicate evidence input");
+                                read_evidence_inputs(
+                                    std::slice::from_ref(&evidence_path),
+                                    &snapshot_id,
+                                )
+                                .expect_err("duplicate evidence key accepted")
+                            }
+                            other => panic!("unknown duplicate-key mutation {other}"),
+                        };
+                        assert!(
+                            error.to_string().contains("duplicate JSON key"),
+                            "{mutation}: duplicate key was not rejected before Value: {error}"
+                        );
+                        executed_mutations.insert(mutation.clone());
+                    }
+                    assert_eq!(
+                        executed_mutations,
+                        expected_mutations.into_iter().collect::<BTreeSet<_>>()
+                    );
+                    let _ = fs::remove_file(evidence_path);
+                }
+                "r2-evidence-jsonl-raw-byte-gate" => {
+                    let relation = records
+                        .surface_relations
+                        .first()
+                        .expect("surface relation for evidence byte gate");
+                    let mut evidence_bytes = Vec::new();
+                    write_envelope(
+                        &mut evidence_bytes,
+                        "surface_relation.v1",
+                        &relation.relation_id,
+                        &snapshot_id,
+                        surface_relation_payload(relation),
+                    )
+                    .expect("canonical evidence bytes");
+                    let evidence_value = serde_json::from_slice::<Value>(
+                        &evidence_bytes[..evidence_bytes.len() - 1],
+                    )
+                    .expect("evidence fixture value");
+                    let evidence_path = unique_temp_path("agent-canon-evidence-byte-gate");
+                    let mut executed_mutations = BTreeSet::new();
+                    for mutation in fixture_strings(&case, "mutations") {
+                        let mutated = match mutation.as_str() {
+                            "bom" => b"\xef\xbb\xbf"
+                                .iter()
+                                .copied()
+                                .chain(evidence_bytes.iter().copied())
+                                .collect(),
+                            "crlf" => evidence_bytes[..evidence_bytes.len() - 1]
+                                .iter()
+                                .copied()
+                                .chain([b'\r', b'\n'])
+                                .collect(),
+                            "missing_final_lf" => {
+                                evidence_bytes[..evidence_bytes.len() - 1].to_vec()
+                            }
+                            "noncanonical_key_order" => {
+                                noncanonical_envelope_bytes(&evidence_value)
+                            }
+                            other => panic!("unknown evidence byte mutation {other}"),
+                        };
+                        fs::write(&evidence_path, mutated).expect("evidence byte mutation");
+                        assert!(
+                            read_evidence_inputs(
+                                std::slice::from_ref(&evidence_path),
+                                &snapshot_id,
+                            )
+                            .is_err(),
+                            "evidence raw-byte mutation accepted: {mutation}"
+                        );
+                        executed_mutations.insert(mutation);
+                    }
+                    assert_eq!(
+                        executed_mutations,
+                        fixture_strings(&case, "mutations")
+                            .into_iter()
+                            .collect::<BTreeSet<_>>()
+                    );
+                    let _ = fs::remove_file(evidence_path);
+                }
+                "r2-reader-global-locator-namespace" => {
+                    let mut executed_mutations = BTreeSet::new();
+                    for mutation in fixture_strings(&case, "mutations") {
+                        let mut values = normalized_values(&records);
+                        let positions = values
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, value)| value["record_type"] == "source_identity.v1")
+                            .map(|(index, _)| index)
+                            .collect::<Vec<_>>();
+                        assert!(positions.len() >= 2);
+                        match mutation.as_str() {
+                            "path_vs_canonical" => {
+                                let path_position = *positions
+                                    .iter()
+                                    .find(|position| {
+                                        values[**position]["payload"]["repo_rel_path"]
+                                            != values[**position]["payload"]["canonical_locator"]
+                                    })
+                                    .expect("identity path distinct from canonical locator");
+                                let collision_position = *positions
+                                    .iter()
+                                    .find(|position| **position != path_position)
+                                    .expect("second identity");
+                                let path_locator = values[path_position]["payload"]
+                                    ["repo_rel_path"]
+                                    .as_str()
+                                    .expect("repo path")
+                                    .to_string();
+                                values[collision_position]["payload"]["canonical_locator"] =
+                                    Value::String(path_locator.clone());
+                                values[collision_position]["payload"]["logical_id"] =
+                                    Value::String(hash_parts(&[
+                                        "logical_source.v1",
+                                        &records.header.parent_repo_id,
+                                        &path_locator,
+                                    ]));
+                            }
+                            "alternate_vs_alternate" => {
+                                for position in positions.iter().take(2) {
+                                    values[*position]["payload"]["alternate_locators"] =
+                                        Value::Array(vec![Value::String(
+                                            "alternate://shared-collision".to_string(),
+                                        )]);
+                                }
+                            }
+                            other => panic!("unknown locator namespace mutation {other}"),
+                        }
+                        refresh_normalized_value_fingerprint(&mut values);
+                        let error = assert_normalized_transport_error(values, &snapshot_id);
+                        assert!(
+                            error
+                                .to_string()
+                                .contains("source identity locator namespace collision"),
+                            "{mutation}: unexpected locator collision error: {error}"
+                        );
+                        executed_mutations.insert(mutation);
+                    }
+                    assert_eq!(
+                        executed_mutations,
+                        fixture_strings(&case, "mutations")
+                            .into_iter()
+                            .collect::<BTreeSet<_>>()
+                    );
+                    let mut executed_preflight = BTreeSet::new();
+                    for mutation in fixture_strings(&case, "rust_preflight_mutations") {
+                        let mut identities = vec![test_identity("first"), test_identity("second")];
+                        let expected = match mutation.as_str() {
+                            "duplicate_identity_id" => {
+                                identities[1].identity_id = identities[0].identity_id.clone();
+                                "duplicate source identity record ID"
+                            }
+                            "duplicate_repo_path" => {
+                                identities[1].repo_rel_path = identities[0].repo_rel_path.clone();
+                                "duplicate source identity path"
+                            }
+                            "duplicate_canonical_locator" => {
+                                identities[1].canonical_locator =
+                                    identities[0].canonical_locator.clone();
+                                "duplicate source identity canonical locator"
+                            }
+                            "duplicate_logical_id" => {
+                                identities[1].logical_id = identities[0].logical_id.clone();
+                                "duplicate source identity logical ID"
+                            }
+                            other => panic!("unknown identity preflight mutation {other}"),
+                        };
+                        let error = preflight_source_identities(&identities)
+                            .expect_err("identity preflight accepted duplicate key");
+                        assert!(
+                            error.to_string().contains(expected),
+                            "{mutation}: unexpected identity preflight error: {error}"
+                        );
+                        executed_preflight.insert(mutation);
+                    }
+                    assert_eq!(
+                        executed_preflight,
+                        fixture_strings(&case, "rust_preflight_mutations")
+                            .into_iter()
+                            .collect::<BTreeSet<_>>()
+                    );
+                    assert_eq!(case["producer_mutation"], "tracked_symlink_and_target");
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::symlink;
+
+                        let root = unique_temp_path("agent-canon-locator-producer");
+                        fs::create_dir_all(&root).expect("locator producer root");
+                        fs::write(root.join("target.txt"), "target\n").expect("locator target");
+                        symlink("target.txt", root.join("alias.txt")).expect("locator alias");
+                        initialize_and_commit(&root);
+                        let error = capture_snapshot(&snapshot_request(&root))
+                            .expect_err("producer accepted duplicate canonical identity");
+                        assert!(
+                            error
+                                .to_string()
+                                .contains("duplicate source identity canonical locator"),
+                            "unexpected producer preflight error: {error}"
+                        );
+                        let _ = fs::remove_dir_all(root);
+                    }
+                }
+                other => panic!("unknown transport fixture case {other}"),
+            }
+            executed.insert(name.to_string());
+        }
+        assert_eq!(executed.len(), TRANSPORT_FIXTURE.lines().count());
+    }
+
+    #[test]
+    fn normalized_reader_rejects_noncanonical_and_duplicate_key_bytes() {
+        let snapshot = parse_snapshot(Cursor::new(RETAINED_PARENT_SNAPSHOT.as_bytes()))
+            .expect("retained parent snapshot");
+        let snapshot_id = snapshot.header.snapshot_id.clone();
+        let registry = builtin_relation_registry_artifact().expect("builtin registry");
+        let records = normalize_snapshot(
+            &NormalizeRequest {
+                root: PathBuf::from("/mnt/l/workspace/project_template"),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("retained-parent-snapshot.v1.jsonl"),
+                evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot,
+            &registry,
+        )
+        .expect("retained normalization");
+        let mut canonical = Vec::new();
+        write_normalized_record_set(&records, &registry, &mut canonical)
+            .expect("canonical normalized transport");
+
+        let mut whitespace = canonical.clone();
+        whitespace.insert(1, b' ');
+        let mut duplicate = canonical.clone();
+        duplicate.splice(
+            1..1,
+            b"\"schema_version\":\"dependency_manifest.normalized.v1\","
+                .iter()
+                .copied(),
+        );
+        let mut missing_final_lf = canonical;
+        assert_eq!(missing_final_lf.pop(), Some(b'\n'));
+        for mutation in [whitespace, duplicate, missing_final_lf] {
+            assert!(
+                read_normalized_record_set(Cursor::new(mutation), &snapshot_id, &registry).is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn source_snapshot_reader_rejects_noncanonical_bytes_and_pre_sort_order() {
+        let canonical = RETAINED_PARENT_SNAPSHOT.as_bytes().to_vec();
+        parse_snapshot(Cursor::new(canonical.clone())).expect("canonical retained snapshot");
+        let lines = RETAINED_PARENT_SNAPSHOT
+            .lines()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let record_type = |line: &str| {
+            serde_json::from_str::<Value>(line).expect("snapshot fixture line")["record_type"]
+                .as_str()
+                .expect("snapshot record type")
+                .to_string()
+        };
+        let identity_positions = lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| record_type(line) == "source_identity.v1")
+            .map(|(index, _)| index)
+            .take(2)
+            .collect::<Vec<_>>();
+        let surface_position = lines
+            .iter()
+            .position(|line| record_type(line) == "surface_relation.v1")
+            .expect("surface family");
+        let declaration_position = lines
+            .iter()
+            .position(|line| record_type(line) == "dependency_declaration.v1")
+            .expect("declaration family");
+        let encode = |values: &[String]| {
+            values
+                .iter()
+                .flat_map(|line| line.as_bytes().iter().copied().chain([b'\n']))
+                .collect::<Vec<_>>()
+        };
+
+        let mut bom = b"\xef\xbb\xbf".to_vec();
+        bom.extend_from_slice(&canonical);
+        let mut crlf = canonical.clone();
+        let first_lf = crlf.iter().position(|byte| *byte == b'\n').expect("LF");
+        crlf.insert(first_lf, b'\r');
+        let mut missing_final_lf = canonical.clone();
+        assert_eq!(missing_final_lf.pop(), Some(b'\n'));
+        let mut duplicate_key = canonical.clone();
+        duplicate_key.splice(
+            1..1,
+            b"\"schema_version\":\"dependency_manifest.normalized.v1\","
+                .iter()
+                .copied(),
+        );
+        let mut family_reorder = lines.clone();
+        family_reorder.swap(surface_position, declaration_position);
+        let mut id_reorder = lines.clone();
+        id_reorder.swap(identity_positions[0], identity_positions[1]);
+        let mut duplicate_id = lines;
+        duplicate_id.insert(
+            identity_positions[0] + 1,
+            duplicate_id[identity_positions[0]].clone(),
+        );
+        for (name, mutation) in [
+            ("bom", bom),
+            ("crlf", crlf),
+            ("missing-final-lf", missing_final_lf),
+            ("duplicate-key", duplicate_key),
+            ("family-reorder", encode(&family_reorder)),
+            ("record-order", encode(&id_reorder)),
+            ("duplicate-id", encode(&duplicate_id)),
+        ] {
+            assert!(
+                parse_snapshot(Cursor::new(mutation)).is_err(),
+                "source snapshot mutation accepted: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn snapshot_evidence_surface_merge_is_explicit_and_conflict_closed() {
+        let snapshot = parse_snapshot(Cursor::new(RETAINED_PARENT_SNAPSHOT.as_bytes()))
+            .expect("retained parent snapshot");
+        let relation = snapshot
+            .surface_relations
+            .first()
+            .expect("retained surface relation")
+            .clone();
+        let evidence_path = unique_temp_path("agent-canon-surface-merge");
+        let mut exact_bytes = Vec::new();
+        write_envelope(
+            &mut exact_bytes,
+            "surface_relation.v1",
+            &relation.relation_id,
+            &snapshot.header.snapshot_id,
+            surface_relation_payload(&relation),
+        )
+        .expect("exact surface evidence");
+        fs::write(&evidence_path, exact_bytes).expect("surface evidence input");
+        let request = NormalizeRequest {
+            root: PathBuf::from("/mnt/l/workspace/project_template"),
+            profile: "parent".to_string(),
+            snapshot_jsonl: PathBuf::from("retained-parent-snapshot.v1.jsonl"),
+            evidence_jsonl: vec![evidence_path.clone()],
+            relation_registry_json: PathBuf::from("relation-registry.v1.json"),
+            output_jsonl: PathBuf::from("-"),
+        };
+        let registry = builtin_relation_registry_artifact().expect("builtin registry");
+        let exact = normalize_snapshot(&request, snapshot.clone(), &registry)
+            .expect("exact cross-input duplicate is idempotent");
+        assert_eq!(
+            exact.surface_relations.len(),
+            snapshot.surface_relations.len()
+        );
+
+        let mut conflicting = relation;
+        conflicting.status = "conflicting-review-status".to_string();
+        let mut conflicting_bytes = Vec::new();
+        write_envelope(
+            &mut conflicting_bytes,
+            "surface_relation.v1",
+            &conflicting.relation_id,
+            &snapshot.header.snapshot_id,
+            surface_relation_payload(&conflicting),
+        )
+        .expect("conflicting surface evidence");
+        fs::write(&evidence_path, conflicting_bytes).expect("conflicting evidence input");
+        assert!(matches!(
+            normalize_snapshot(&request, snapshot, &registry),
+            Err(ManifestError::Transport(message))
+                if message.contains("conflicting snapshot/evidence surface relation")
+        ));
+        let _ = fs::remove_file(evidence_path);
+    }
 
     #[test]
     fn r2_parent_gitlink_relation_preserves_index_identity() {
@@ -6932,9 +8386,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("retained-parent-snapshot.v1.jsonl"),
                 evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("parent snapshot normalization");
         let relation = records
@@ -7100,6 +8556,7 @@ mod tests {
                 row["prerequisite"].as_str().expect("expected prerequisite")
             );
             let spec = RelationNormalizer::normalize_relation_kind(
+                &builtin_relation_registry_artifact().expect("builtin registry"),
                 "header-target-resolver.v1",
                 "header_context",
                 &format!("declared_kind={kind}"),
@@ -7123,8 +8580,9 @@ mod tests {
     }
 
     #[test]
-    fn r2_relation_kind_registry_fixture_is_the_single_conversion_authority() {
-        RelationNormalizer::validate_relation_kind_registry().expect("valid static registry");
+    fn r2_compiled_registry_conformance_baseline_matches_fixture() {
+        RelationNormalizer::validate_compiled_registry_conformance_baseline()
+            .expect("valid compiled conformance baseline");
         let registry_keys = RELATION_KIND_REGISTRY
             .iter()
             .map(|spec| {
@@ -7151,12 +8609,16 @@ mod tests {
                 "duplicate registry fixture key"
             );
             fixture_rows += 1;
-            let spec =
-                RelationNormalizer::normalize_relation_kind(producer, raw_kind, discriminator)
-                    .expect("registered conversion");
+            let spec = RelationNormalizer::normalize_relation_kind(
+                &builtin_relation_registry_artifact().expect("builtin registry"),
+                producer,
+                raw_kind,
+                discriminator,
+            )
+            .expect("registered conversion");
             assert_eq!(spec.stored_kind, case["stored_kind"]);
             assert_eq!(spec.layer, case["layer"]);
-            assert_eq!(spec.query_family, case["query_family"]);
+            assert_eq!(spec.family, case["query_family"]);
         }
         assert_eq!(fixture_rows, RELATION_KIND_REGISTRY.len());
         assert_eq!(fixture_keys, registry_keys);
@@ -7177,13 +8639,17 @@ mod tests {
             "intentional shared stored kind must be preserved"
         );
         assert!(RelationNormalizer::normalize_relation_kind(
+            &builtin_relation_registry_artifact().expect("builtin registry"),
             "code-static.v1",
             "code_reference",
             "reference_kind=unknown"
         )
         .is_err());
         assert_eq!(
-            RelationNormalizer::allowed_kinds_for_family("dependency"),
+            RelationNormalizer::allowed_kinds_for_family(
+                &builtin_relation_registry_artifact().expect("builtin registry"),
+                "dependency",
+            ),
             vec!["design", "environment", "implementation"]
         );
     }
@@ -7240,6 +8706,7 @@ mod tests {
                 .unwrap_or_default();
             let query_family = case["query_family"].as_str().expect("query family");
             let result = RelationNormalizer::least_fixed_point(
+                &builtin_relation_registry_artifact().expect("builtin registry"),
                 &identities,
                 &exclusions,
                 &ambiguities,
@@ -7296,6 +8763,7 @@ mod tests {
                 assert_eq!(permutations.len(), 6, "three-edge permutation count");
                 for permutation in permutations {
                     let permuted = RelationNormalizer::least_fixed_point(
+                        &builtin_relation_registry_artifact().expect("builtin registry"),
                         &identities,
                         &exclusions,
                         &ambiguities,
@@ -7403,9 +8871,15 @@ mod tests {
             profile: "parent".to_string(),
             snapshot_jsonl: PathBuf::from("-"),
             evidence_jsonl: vec![evidence_path.clone()],
+            relation_registry_json: PathBuf::from("relation-registry.v1.json"),
             output_jsonl: PathBuf::from("-"),
         };
-        let records = normalize_snapshot(&request, snapshot.clone()).expect("R2 normalization");
+        let records = normalize_snapshot(
+            &request,
+            snapshot.clone(),
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+        )
+        .expect("R2 normalization");
         let duplicate_fixture = RELATION_FIXTURE
             .lines()
             .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
@@ -7432,10 +8906,14 @@ mod tests {
                 && (capability.completeness_claim.contains("unavailable")
                     || capability.completeness_claim.contains("provided-empty"))));
         let mut bytes = Vec::new();
-        write_normalized_record_set(&records, &mut bytes).expect("normalized transport");
-        let parsed =
-            read_normalized_record_set(Cursor::new(bytes.clone()), &snapshot.header.snapshot_id)
-                .expect("strict normalized reader");
+        let registry = builtin_relation_registry_artifact().expect("builtin registry");
+        write_normalized_record_set(&records, &registry, &mut bytes).expect("normalized transport");
+        let parsed = read_normalized_record_set(
+            Cursor::new(bytes.clone()),
+            &snapshot.header.snapshot_id,
+            &registry,
+        )
+        .expect("strict normalized reader");
         assert_eq!(parsed, records);
 
         let duplicate_path = unique_temp_path("agent-canon-r2-evidence-duplicate");
@@ -7454,8 +8932,12 @@ mod tests {
         let mut second_order = request.clone();
         second_order.evidence_jsonl = vec![duplicate_path.clone(), evidence_path.clone()];
         for duplicate_request in [first_order, second_order] {
-            let error = normalize_snapshot(&duplicate_request, snapshot.clone())
-                .expect_err("duplicate observation accepted");
+            let error = normalize_snapshot(
+                &duplicate_request,
+                snapshot.clone(),
+                &builtin_relation_registry_artifact().expect("builtin registry"),
+            )
+            .expect_err("duplicate observation accepted");
             assert!(error.to_string().contains("exact duplicate observation"));
         }
         assert_eq!(duplicate_fixture["duplicate_transport_expected"], "reject");
@@ -7556,8 +9038,10 @@ mod tests {
             1
         );
         let mut bytes = Vec::new();
-        write_normalized_record_set(&records, &mut bytes).expect("contradiction transport");
-        read_normalized_record_set(Cursor::new(bytes), &snapshot.header.snapshot_id)
+        let registry = builtin_relation_registry_artifact().expect("builtin registry");
+        write_normalized_record_set(&records, &registry, &mut bytes)
+            .expect("contradiction transport");
+        read_normalized_record_set(Cursor::new(bytes), &snapshot.header.snapshot_id, &registry)
             .expect("strict contradiction round trip");
         let _ = fs::remove_file(evidence_path);
         let _ = fs::remove_dir_all(root);
@@ -7646,7 +9130,12 @@ mod tests {
                         .all(|window| window[0] < window[1])
             }));
             let mut bytes = Vec::new();
-            write_normalized_record_set(&records, &mut bytes).expect("ordered output");
+            write_normalized_record_set(
+                &records,
+                &builtin_relation_registry_artifact().expect("builtin registry"),
+                &mut bytes,
+            )
+            .expect("ordered output");
             outputs.push(bytes);
         }
         assert_eq!(outputs.len(), 3);
@@ -7671,9 +9160,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("retained-order-snapshot.v1.jsonl"),
                 evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             snapshot.clone(),
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("order normalization");
         let mut tampered = normalized_values(&records);
@@ -8150,6 +9641,7 @@ mod tests {
                 let error = read_normalized_record_set(
                     Cursor::new(unchecked_normalized_bytes(&ghost)),
                     &snapshot.header.snapshot_id,
+                    &builtin_relation_registry_artifact().expect("builtin registry"),
                 )
                 .expect_err("ghost ambiguity evidence accepted");
                 assert!(matches!(error, ManifestError::Transport(_)));
@@ -8194,6 +9686,7 @@ mod tests {
             let error = read_normalized_record_set(
                 Cursor::new(unchecked_normalized_bytes(&tampered)),
                 &snapshot.header.snapshot_id,
+                &builtin_relation_registry_artifact().expect("builtin registry"),
             )
             .expect_err("semantic accepted-bit tamper accepted");
             assert!(matches!(&error, ManifestError::Transport(_)));
@@ -8313,6 +9806,7 @@ mod tests {
                 read_normalized_record_set(
                     Cursor::new(unchecked_normalized_bytes(&tampered)),
                     &snapshot.header.snapshot_id,
+                    &builtin_relation_registry_artifact().expect("builtin registry"),
                 )
                 .is_err(),
                 "summary tamper accepted: {field}"
@@ -8359,6 +9853,7 @@ mod tests {
                 read_normalized_record_set(
                     Cursor::new(unchecked_normalized_bytes(&tampered)),
                     &snapshot.header.snapshot_id,
+                    &builtin_relation_registry_artifact().expect("builtin registry"),
                 )
                 .is_err(),
                 "provenance tamper accepted after refreshed fingerprint: {tamper_case}"
@@ -8391,9 +9886,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("-"),
                 evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             snapshot.clone(),
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("freshness normalization");
         let baseline = normalized_values(&records);
@@ -8486,9 +9983,15 @@ mod tests {
             profile: "parent".to_string(),
             snapshot_jsonl: PathBuf::from("-"),
             evidence_jsonl: Vec::new(),
+            relation_registry_json: PathBuf::from("relation-registry.v1.json"),
             output_jsonl: PathBuf::from("-"),
         };
-        let records = normalize_snapshot(&request, snapshot).expect("R2 empty O normalization");
+        let records = normalize_snapshot(
+            &request,
+            snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+        )
+        .expect("R2 empty O normalization");
         assert!(records.observations.is_empty());
         assert_eq!(
             records.summary.record_counts["accepted_direct_fact_count"],
@@ -8504,10 +10007,12 @@ mod tests {
             .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
             .find(|case| case["case"] == "r2-empty-o-capability-transport")
             .expect("empty-O capability fixture");
-        let registered_capability_ids = producer_capability_rows()
-            .into_iter()
-            .map(|(capability_id, _, _)| capability_id)
-            .collect::<BTreeSet<_>>();
+        let registered_capability_ids = producer_capability_rows(
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+        )
+        .into_iter()
+        .map(|(capability_id, _, _)| capability_id)
+        .collect::<BTreeSet<_>>();
         let materialized_capability_ids = records
             .capabilities
             .iter()
@@ -8539,6 +10044,7 @@ mod tests {
             let error = read_normalized_record_set(
                 Cursor::new(unchecked_normalized_bytes(&tampered)),
                 &records.header.snapshot_id,
+                &builtin_relation_registry_artifact().expect("builtin registry"),
             )
             .expect_err("empty-O capability mutation accepted");
             assert!(matches!(error, ManifestError::Transport(_)));
@@ -8578,9 +10084,15 @@ mod tests {
             profile: "parent".to_string(),
             snapshot_jsonl: PathBuf::from("-"),
             evidence_jsonl: Vec::new(),
+            relation_registry_json: PathBuf::from("relation-registry.v1.json"),
             output_jsonl: PathBuf::from("-"),
         };
-        let records = normalize_snapshot(&request, snapshot).expect("R2 diagnostics");
+        let records = normalize_snapshot(
+            &request,
+            snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+        )
+        .expect("R2 diagnostics");
         let reasons = records
             .ambiguities
             .iter()
@@ -8641,9 +10153,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("-"),
                 evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             accepted_snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("accepted D normalization");
         let accepted_declaration = accepted_records
@@ -8665,9 +10179,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("-"),
                 evidence_jsonl: Vec::new(),
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             rejected_snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("rejected D normalization");
         let rejected_ambiguity = rejected_records
@@ -8729,6 +10245,7 @@ mod tests {
             let error = read_normalized_record_set(
                 Cursor::new(unchecked_normalized_bytes(&tampered)),
                 &tampered.header.snapshot_id,
+                &builtin_relation_registry_artifact().expect("builtin registry"),
             )
             .expect_err("A closure mutation accepted");
             assert!(matches!(error, ManifestError::Transport(_)));
@@ -8844,9 +10361,11 @@ mod tests {
                     profile: "parent".to_string(),
                     snapshot_jsonl: PathBuf::from("D-adversary-snapshot.v1.jsonl"),
                     evidence_jsonl: Vec::new(),
+                    relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                     output_jsonl: PathBuf::from("-"),
                 },
                 snapshot,
+                &builtin_relation_registry_artifact().expect("builtin registry"),
             )
             .expect("D endpoint diagnostic normalization");
             let attestation = records
@@ -9190,6 +10709,26 @@ mod tests {
             let fake_id = replacement.to_string().repeat(64);
             tampered[index]["record_id"] = Value::String(fake_id.clone());
             tampered[index]["payload"][payload_id] = Value::String(fake_id);
+            if matches!(
+                record_type,
+                "dependency_declaration.v1" | "surface_relation.v1"
+            ) {
+                let mut family = tampered
+                    .iter()
+                    .filter(|value| value["record_type"] == record_type)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                family.sort_by(|left, right| {
+                    left["record_id"].as_str().cmp(&right["record_id"].as_str())
+                });
+                let mut family = family.into_iter();
+                for value in tampered
+                    .iter_mut()
+                    .filter(|value| value["record_type"] == record_type)
+                {
+                    *value = family.next().expect("sorted family row");
+                }
+            }
             assert_transport_error(tampered, expected);
         }
 
@@ -9220,6 +10759,19 @@ mod tests {
         tampered[relation_index]["payload"]["target_identity_id"] =
             Value::String(fake_target_identity_id);
         tampered[relation_index]["payload"]["evidence_id"] = Value::String(fake_relation_id);
+        let mut family = tampered
+            .iter()
+            .filter(|value| value["record_type"] == "surface_relation.v1")
+            .cloned()
+            .collect::<Vec<_>>();
+        family.sort_by(|left, right| left["record_id"].as_str().cmp(&right["record_id"].as_str()));
+        let mut family = family.into_iter();
+        for value in tampered
+            .iter_mut()
+            .filter(|value| value["record_type"] == "surface_relation.v1")
+        {
+            *value = family.next().expect("sorted surface relation row");
+        }
         assert_transport_error(tampered, "surface relation target identity ID mismatch");
 
         let mut tampered = values.clone();
@@ -9479,12 +11031,28 @@ mod tests {
 
     fn normalized_values(records: &NormalizedRecordSet) -> Vec<Value> {
         let mut bytes = Vec::new();
-        write_normalized_record_set(records, &mut bytes).expect("normalized JSONL");
+        write_normalized_record_set(
+            records,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+            &mut bytes,
+        )
+        .expect("normalized JSONL");
         String::from_utf8(bytes)
             .expect("UTF-8 normalized JSONL")
             .lines()
             .map(|line| serde_json::from_str(line).expect("normalized record"))
             .collect()
+    }
+
+    fn first_normalized_payload_mut<'a>(
+        values: &'a mut [Value],
+        record_type: &str,
+    ) -> &'a mut Value {
+        values
+            .iter_mut()
+            .find(|value| value["record_type"] == record_type)
+            .map(|value| &mut value["payload"])
+            .expect("normalized family payload")
     }
 
     fn unchecked_normalized_bytes(records: &NormalizedRecordSet) -> Vec<u8> {
@@ -9527,16 +11095,45 @@ mod tests {
         bytes
     }
 
-    fn assert_normalized_transport_error(values: Vec<Value>, expected_snapshot_id: &str) {
+    fn assert_normalized_transport_error(
+        values: Vec<Value>,
+        expected_snapshot_id: &str,
+    ) -> ManifestError {
         let mut bytes = Vec::new();
         for value in values {
             serde_json::to_writer(&mut bytes, &value).expect("tampered normalized JSON");
             bytes.push(b'\n');
         }
-        assert!(
-            read_normalized_record_set(Cursor::new(bytes), expected_snapshot_id).is_err(),
-            "tampered normalized transport accepted"
-        );
+        read_normalized_record_set(
+            Cursor::new(bytes),
+            expected_snapshot_id,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
+        )
+        .expect_err("tampered normalized transport accepted")
+    }
+
+    fn refresh_normalized_value_fingerprint(values: &mut [Value]) {
+        let mut bytes = Vec::new();
+        for value in values.iter().filter(|value| {
+            !matches!(
+                value["record_type"].as_str(),
+                Some("normalized_record_set_header.v1" | "normalization_summary.v1")
+            )
+        }) {
+            serde_json::to_writer(
+                &mut bytes,
+                &json!({
+                    "record_type": value["record_type"],
+                    "record_id": value["record_id"],
+                    "payload": value["payload"],
+                }),
+            )
+            .expect("refreshed normalized fingerprint record");
+            bytes.push(0);
+        }
+        let fingerprint = sha256_bytes(&bytes);
+        values.last_mut().expect("normalization summary")["payload"]
+            ["normalized_record_fingerprint"] = Value::String(fingerprint);
     }
 
     fn fixture_strings(case: &Value, field: &str) -> Vec<String> {
@@ -9696,9 +11293,11 @@ mod tests {
                 profile: "parent".to_string(),
                 snapshot_jsonl: PathBuf::from("-"),
                 evidence_jsonl: vec![evidence_path],
+                relation_registry_json: PathBuf::from("relation-registry.v1.json"),
                 output_jsonl: PathBuf::from("-"),
             },
             snapshot,
+            &builtin_relation_registry_artifact().expect("builtin registry"),
         )
         .expect("fixture normalization")
     }
@@ -9780,6 +11379,81 @@ mod tests {
             .collect()
     }
 
+    fn canonical_registry_bytes(registry: &RelationRegistryArtifactV1) -> Vec<u8> {
+        serde_json::to_vec(&json!({
+            "entries": relation_registry_entries_value(&registry.entries),
+            "registry_fingerprint": registry.registry_fingerprint,
+            "registry_version": registry.registry_version,
+        }))
+        .expect("canonical registry bytes")
+        .into_iter()
+        .chain([b'\n'])
+        .collect()
+    }
+
+    fn duplicate_json_field(raw: &[u8], field: &str, value: Value, occurrence: usize) -> Vec<u8> {
+        let mut object = Map::new();
+        object.insert(field.to_string(), value);
+        let encoded_object = serde_json::to_vec(&Value::Object(object)).expect("JSON field bytes");
+        let encoded_field = &encoded_object[1..encoded_object.len() - 1];
+        let positions = raw
+            .windows(encoded_field.len())
+            .enumerate()
+            .filter_map(|(index, candidate)| (candidate == encoded_field).then_some(index))
+            .collect::<Vec<_>>();
+        let position = *positions
+            .get(occurrence)
+            .unwrap_or_else(|| panic!("missing {field} occurrence {occurrence}"));
+        let mut mutated = Vec::with_capacity(raw.len() + encoded_field.len() + 1);
+        mutated.extend_from_slice(&raw[..position]);
+        mutated.extend_from_slice(encoded_field);
+        mutated.push(b',');
+        mutated.extend_from_slice(&raw[position..]);
+        mutated
+    }
+
+    fn replace_first_bytes(raw: &[u8], needle: &[u8], replacement: &[u8]) -> Vec<u8> {
+        let position = raw
+            .windows(needle.len())
+            .position(|candidate| candidate == needle)
+            .expect("replacement needle");
+        let mut replaced = Vec::with_capacity(raw.len() + replacement.len() - needle.len());
+        replaced.extend_from_slice(&raw[..position]);
+        replaced.extend_from_slice(replacement);
+        replaced.extend_from_slice(&raw[position + needle.len()..]);
+        replaced
+    }
+
+    fn noncanonical_envelope_bytes(value: &Value) -> Vec<u8> {
+        let object = value.as_object().expect("envelope object");
+        let mut bytes = vec![b'{'];
+        for (index, field) in [
+            "record_id",
+            "payload",
+            "record_type",
+            "schema_version",
+            "snapshot_id",
+        ]
+        .iter()
+        .enumerate()
+        {
+            if index > 0 {
+                bytes.push(b',');
+            }
+            bytes.extend_from_slice(
+                &serde_json::to_vec(&Value::String((*field).to_string()))
+                    .expect("envelope field name"),
+            );
+            bytes.push(b':');
+            bytes.extend_from_slice(
+                &serde_json::to_vec(object.get(*field).expect("envelope field"))
+                    .expect("envelope field value"),
+            );
+        }
+        bytes.extend_from_slice(b"}\n");
+        bytes
+    }
+
     fn unique_temp_path(prefix: &str) -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -9836,7 +11510,7 @@ mod tests {
             "generated\n",
         )
         .expect("generated fixture");
-        fs::write(root.join(".gitignore"), "ignored.txt\n").expect("gitignore");
+        fs::write(root.join(".gitignore"), "ignored.txt\ninside-target.txt\n").expect("gitignore");
         fs::write(root.join("ignored.txt"), "ignored\n").expect("ignored fixture");
 
         let submodule = root.join("vendor/agent-canon");

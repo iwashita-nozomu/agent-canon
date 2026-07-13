@@ -5,21 +5,39 @@
 # responsibility Tests dependency manifest shell tool behavior.
 # upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/dependency-manifest-design.md manifest design
+# upstream design ../../reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md approved generic protocol/tool slice
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
 # upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh scans code
+# upstream implementation ../../tools/agent_tools/dependency_manifest_records.py decodes normalized records and produces registry artifact
+# upstream implementation ../../tools/agent_tools/bind_r2_scope.py binds R2 review evidence
+# downstream implementation ../../tests/fixtures/dependency_manifest/transport_conformance.jsonl supplies transport adversaries
 # @dependency-end
 
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import cast
+
+from tools.agent_tools import dependency_manifest_records as dependency_records
+from tools.agent_tools.bind_r2_scope import closeout, manifest
+from tools.agent_tools.dependency_manifest_records import (
+    TransportInvalid,
+    load_normalized_record_set,
+    load_relation_registry_artifact,
+    write_relation_registry_conformance_artifact,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
@@ -32,6 +50,233 @@ WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
+TRANSPORT_CONFORMANCE = (
+    PROJECT_ROOT / "tests" / "fixtures" / "dependency_manifest" / "transport_conformance.jsonl"
+)
+RELATION_RECONCILIATION = (
+    PROJECT_ROOT
+    / "tests"
+    / "fixtures"
+    / "dependency_manifest"
+    / "relation_reconciliation.jsonl"
+)
+RELATION_REGISTRY_SOURCE = (
+    PROJECT_ROOT / "tests" / "fixtures" / "knowledge_graph" / "query_kind_registry.jsonl"
+)
+RETAINED_RELATION_REGISTRY = (
+    PROJECT_ROOT
+    / "reports"
+    / "agents"
+    / "20260712-090608-context-packettool-skill-routing"
+    / "validation"
+    / "r2-source-pr"
+    / "agentcanon_relation_registry.v1.json"
+)
+RETAINED_NORMALIZED_RECORD_SET = (
+    PROJECT_ROOT
+    / "reports"
+    / "agents"
+    / "20260712-090608-context-packettool-skill-routing"
+    / "validation"
+    / "r2-normalized-record-set.v1.jsonl"
+)
+
+JsonObject = dict[str, object]
+JsonMapping = Mapping[str, object]
+ValidateSnapshotDerivations = Callable[
+    [
+        JsonMapping,
+        tuple[JsonMapping, ...],
+        tuple[JsonMapping, ...],
+        tuple[JsonMapping, ...],
+        tuple[JsonMapping, ...],
+    ],
+    tuple[dict[str, JsonMapping], set[str], dict[str, str]],
+]
+DeclarationEndpoints = Callable[
+    [JsonMapping, Mapping[str, JsonMapping], set[str]],
+    tuple[str | None, str | None, str | None],
+]
+VALIDATE_SNAPSHOT_DERIVATIONS = cast(
+    ValidateSnapshotDerivations,
+    getattr(dependency_records, "_validate_snapshot_derivations"),
+)
+DECLARATION_ENDPOINTS = cast(
+    DeclarationEndpoints,
+    getattr(dependency_records, "_declaration_endpoints"),
+)
+
+
+def _json_object(value: object, label: str) -> JsonObject:
+    if not isinstance(value, dict):
+        raise AssertionError(f"{label} must be an object with string keys")
+    raw_object = cast(dict[object, object], value)
+    for key in raw_object:
+        if not isinstance(key, str):
+            raise AssertionError(f"{label} must be an object with string keys")
+    return cast(JsonObject, raw_object)
+
+
+def _parse_json_object(value: str | bytes, label: str) -> JsonObject:
+    return _json_object(cast(object, json.loads(value)), label)
+
+
+def _object_field(value: JsonObject, field: str, label: str) -> JsonObject:
+    return _json_object(value[field], f"{label}.{field}")
+
+
+def _string_field(value: JsonObject, field: str, label: str) -> str:
+    field_value = value[field]
+    if not isinstance(field_value, str):
+        raise AssertionError(f"{label}.{field} must be a string")
+    return field_value
+
+
+def _int_field(value: JsonObject, field: str, label: str) -> int:
+    field_value = value[field]
+    if not isinstance(field_value, int) or isinstance(field_value, bool):
+        raise AssertionError(f"{label}.{field} must be an integer")
+    return field_value
+
+
+def _string_list_field(value: JsonObject, field: str, label: str) -> list[str]:
+    field_value = value[field]
+    if not isinstance(field_value, list):
+        raise AssertionError(f"{label}.{field} must be a string list")
+    raw_values = cast(list[object], field_value)
+    if any(not isinstance(item, str) for item in raw_values):
+        raise AssertionError(f"{label}.{field} must be a string list")
+    return cast(list[str], raw_values)
+
+
+def _canonical_record_bytes(records: list[JsonObject]) -> bytes:
+    return b"".join(
+        json.dumps(
+            record,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+        for record in records
+    )
+
+
+def _hash_parts(*parts: str) -> str:
+    digest = hashlib.sha256()
+    for part in parts:
+        digest.update(part.encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _duplicate_json_field(
+    raw: bytes,
+    field: str,
+    value: object,
+    *,
+    occurrence: int = 0,
+) -> bytes:
+    encoded_field = json.dumps(
+        field,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    ).encode("utf-8") + b":" + json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    positions: list[int] = []
+    offset = 0
+    while True:
+        position = raw.find(encoded_field, offset)
+        if position < 0:
+            break
+        positions.append(position)
+        offset = position + len(encoded_field)
+    if occurrence >= len(positions):
+        raise AssertionError(
+            f"JSON field {field} occurrence {occurrence} is absent from fixture bytes"
+        )
+    position = positions[occurrence]
+    return raw[:position] + encoded_field + b"," + raw[position:]
+
+
+def _noncanonical_first_envelope(raw: bytes) -> bytes:
+    lines = raw.splitlines(keepends=True)
+    first = _parse_json_object(lines[0], "normalized header")
+    reordered = {
+        field: first[field]
+        for field in ("record_id", "payload", "record_type", "schema_version", "snapshot_id")
+    }
+    first_line = json.dumps(
+        reordered,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    ).encode("utf-8") + b"\n"
+    return first_line + b"".join(lines[1:])
+
+
+def _refreshed_normalized_fingerprint(records: list[JsonObject]) -> str:
+    body = [
+        {
+            "record_type": _string_field(record, "record_type", "normalized record"),
+            "record_id": _string_field(record, "record_id", "normalized record"),
+            "payload": record["payload"],
+        }
+        for record in records
+        if _string_field(record, "record_type", "normalized record")
+        not in {"normalized_record_set_header.v1", "normalization_summary.v1"}
+    ]
+    return hashlib.sha256(
+        b"".join(
+            json.dumps(
+                record,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            + b"\0"
+            for record in body
+        )
+    ).hexdigest()
+
+
+def _write_registry(root: Path) -> Path:
+    path = root / "agentcanon_relation_registry.v1.json"
+    write_relation_registry_conformance_artifact(RELATION_REGISTRY_SOURCE, path)
+    return path
+
+
+def _write_scope_fixture(
+    root: Path,
+) -> tuple[Path, str, Path, Path, Path]:
+    source = root / "source.txt"
+    fixture = root / "fixture.txt"
+    source.write_text("source\n", encoding="utf-8")
+    fixture.write_text("fixture\n", encoding="utf-8")
+    registry = _write_registry(root)
+    manifest_path = root / "scope.json"
+    status = manifest(
+        [
+            "--source", str(source), "--fixture", str(fixture),
+            "--registry-artifact", str(registry), "--command-id", "CMD-R2-PY",
+            "--output", str(manifest_path),
+        ]
+    )
+    if status != 0:
+        raise AssertionError(f"scope fixture manifest failed with status {status}")
+    manifest_value = _parse_json_object(
+        manifest_path.read_text(encoding="utf-8"), "scope manifest"
+    )
+    manifest_id = _string_field(manifest_value, "scope_manifest_id", "scope manifest")
+    return manifest_path, manifest_id, source, fixture, registry
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -47,6 +292,978 @@ def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
 
 class DependencyManifestToolTest(unittest.TestCase):
     """Exercise the dependency manifest shell tools."""
+
+    def test_relation_registry_producer_matches_exact_generic_artifact(self) -> None:
+        """The generic producer emits the frozen 20-row canonical artifact."""
+        fixture = PROJECT_ROOT / "tests" / "fixtures" / "knowledge_graph" / "query_kind_registry.jsonl"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output = Path(tmp_dir) / "agentcanon_relation_registry.v1.json"
+            artifact = write_relation_registry_conformance_artifact(fixture, output)
+            self.assertEqual(output.stat().st_size, 3323)
+            self.assertEqual(
+                hashlib.sha256(output.read_bytes()).hexdigest(),
+                "e2601dcd34a2d6896526f6efc519a7faee7c9a47ccd50bdd29d04ecc8cf6ac69",
+            )
+            self.assertEqual(len(artifact["entries"]), 20)
+            self.assertEqual(
+                artifact["registry_fingerprint"],
+                "1308cf12d7d9c2aa8d67b3cff250484d905e70304a6fb3dafdd7da94a7925624",
+            )
+
+    def test_runtime_registry_artifact_is_the_decoder_authority(self) -> None:
+        """A self-consistent caller artifact, not a built-in set, drives semantics."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            baseline = _write_registry(root)
+            value = _parse_json_object(baseline.read_text(encoding="utf-8"), "registry")
+            entries_value = value["entries"]
+            if not isinstance(entries_value, list):
+                self.fail("registry entries must be a list")
+            entries = cast(list[object], entries_value)
+            entries.append(
+                {
+                    "capability_id": "zz-review-only.v1",
+                    "discriminator": "",
+                    "family": "review",
+                    "layer": "artifact",
+                    "raw_kind": "review_link",
+                    "stored_kind": "review_link",
+                }
+            )
+            entries.sort(
+                key=lambda item: (
+                    _string_field(_json_object(item, "registry entry"), "capability_id", "registry entry"),
+                    _string_field(_json_object(item, "registry entry"), "raw_kind", "registry entry"),
+                    _string_field(_json_object(item, "registry entry"), "discriminator", "registry entry"),
+                    _string_field(_json_object(item, "registry entry"), "stored_kind", "registry entry"),
+                    _string_field(_json_object(item, "registry entry"), "layer", "registry entry"),
+                    _string_field(_json_object(item, "registry entry"), "family", "registry entry"),
+                )
+            )
+            value["registry_fingerprint"] = hashlib.sha256(
+                json.dumps(
+                    {"entries": entries, "registry_version": "relation_registry.v1"},
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            extended = root / "extended-registry.json"
+            extended.write_bytes(
+                json.dumps(
+                    value,
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                + b"\n"
+            )
+            validated = load_relation_registry_artifact(extended)
+            self.assertEqual(len(validated.entries), 21)
+            retained = [
+                _parse_json_object(line, f"normalized line {index}")
+                for index, line in enumerate(
+                    RETAINED_NORMALIZED_RECORD_SET.read_text(encoding="utf-8").splitlines(),
+                    1,
+                )
+            ]
+            with self.assertRaises(TransportInvalid):
+                load_normalized_record_set(
+                    RETAINED_NORMALIZED_RECORD_SET,
+                    expected_root=PROJECT_ROOT.parent.parent,
+                    expected_snapshot_id=_string_field(
+                        retained[0], "record_id", "normalized header"
+                    ),
+                    relation_registry_path=extended,
+                )
+
+    def test_normalized_record_set_projection_is_deeply_immutable(self) -> None:
+        """Post-load nested mutation cannot alter verified aggregate decisions."""
+        values = [
+            _parse_json_object(line, f"normalized line {index}")
+            for index, line in enumerate(
+                RETAINED_NORMALIZED_RECORD_SET.read_text(encoding="utf-8").splitlines(),
+                1,
+            )
+        ]
+        record_set = load_normalized_record_set(
+            RETAINED_NORMALIZED_RECORD_SET,
+            expected_root=PROJECT_ROOT.parent.parent,
+            expected_snapshot_id=_string_field(values[0], "record_id", "normalized header"),
+            relation_registry_path=RETAINED_RELATION_REGISTRY,
+        )
+        original_snapshot_id = record_set.summary["snapshot_id"]
+        with self.assertRaises(TypeError):
+            cast(dict[str, object], record_set.summary)["snapshot_id"] = "f" * 64
+        counts = record_set.summary["record_counts"]
+        with self.assertRaises(TypeError):
+            cast(dict[str, object], counts)["accepted_direct_fact_count"] = 0
+        alternates = record_set.source_identities[0]["alternate_locators"]
+        with self.assertRaises(AttributeError):
+            cast(list[object], alternates).append("forged")
+        self.assertEqual(record_set.summary["snapshot_id"], original_snapshot_id)
+
+    def test_r2_scope_closeout_rehashes_every_bound_input(self) -> None:
+        """Stale or missing source, fixture, and registry bytes block closeout."""
+        for target_name in ("source", "fixture", "registry"):
+            for mutation in ("stale", "missing"):
+                with self.subTest(target=target_name, mutation=mutation), tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    manifest_path, manifest_id, source, fixture, registry = _write_scope_fixture(root)
+                    change_review = root / "change.md"
+                    logic_review = root / "logic.md"
+                    change_review.write_text(
+                        f"# Change\n\ndecision: approve\nbound_scope_manifest_id: {manifest_id}\n",
+                        encoding="utf-8",
+                    )
+                    logic_review.write_text(
+                        f"# Logic\n\ndecision: approve\nbound_scope_manifest_id: {manifest_id}\n",
+                        encoding="utf-8",
+                    )
+                    target = {"source": source, "fixture": fixture, "registry": registry}[target_name]
+                    if mutation == "stale":
+                        target.write_bytes(target.read_bytes() + b"stale\n")
+                    else:
+                        target.unlink()
+                    output = root / "closeout.json"
+                    self.assertEqual(
+                        closeout(
+                            [
+                                "--manifest", str(manifest_path),
+                                "--change-review", str(change_review),
+                                "--logic-review", str(logic_review),
+                                "--output", str(output),
+                            ]
+                        ),
+                        21,
+                    )
+                    self.assertFalse(output.exists())
+
+    def test_r2_scope_review_machine_fields_are_unique_and_canonical(self) -> None:
+        """Only one exact decision and manifest binding line is accepted per review."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            manifest_path, manifest_id, _, _, _ = _write_scope_fixture(root)
+            change_review = root / "change.md"
+            logic_review = root / "logic.md"
+            change_review.write_text(
+                f"# Change\n\ndecision: approve\nbound_scope_manifest_id: {manifest_id}\n",
+                encoding="utf-8",
+            )
+            logic_review.write_text(
+                f"# Logic\n\ndecision: approve\nbound_scope_manifest_id: {manifest_id}\n",
+                encoding="utf-8",
+            )
+            output = root / "closeout.json"
+            self.assertEqual(
+                closeout(
+                    [
+                        "--manifest", str(manifest_path),
+                        "--change-review", str(change_review),
+                        "--logic-review", str(logic_review),
+                        "--output", str(output),
+                    ]
+                ),
+                0,
+            )
+            self.assertTrue(output.is_file())
+            canonical = (
+                f"# Change\n\ndecision: approve\nbound_scope_manifest_id: {manifest_id}\n"
+            ).encode()
+            invalid_reviews = {
+                "duplicate-decision": canonical + b"decision: revise\n",
+                "duplicate-bound": canonical + f"bound_scope_manifest_id: {'0' * 64}\n".encode(),
+                "malformed-decision": canonical.replace(b"decision: approve", b"decision : approve"),
+                "indented-bound": canonical.replace(b"bound_scope", b" bound_scope"),
+                "crlf": canonical.replace(b"\n", b"\r\n"),
+                "bom": b"\xef\xbb\xbf" + canonical,
+                "missing-final-lf": canonical[:-1],
+                "invalid-utf8": canonical + b"\xff\n",
+            }
+            for name, raw in invalid_reviews.items():
+                with self.subTest(name=name):
+                    change_review.write_bytes(raw)
+                    self.assertEqual(
+                        closeout(
+                            [
+                                "--manifest", str(manifest_path),
+                                "--change-review", str(change_review),
+                                "--logic-review", str(logic_review),
+                                "--output", str(output),
+                            ]
+                        ),
+                        21,
+                    )
+                    self.assertFalse(output.exists())
+
+    def test_r2_scope_binding_fails_closed_without_bound_reviews(self) -> None:
+        """The post-review phase cannot claim approval from unbound reviews."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.txt"
+            fixture = root / "fixture.txt"
+            registry = root / "registry.json"
+            invalid_registry = root / "invalid-registry.json"
+            manifest_path = root / "scope.json"
+            closeout_path = root / "closeout.json"
+            source.write_text("source\n", encoding="utf-8")
+            fixture.write_text("fixture\n", encoding="utf-8")
+            invalid_registry.write_text(
+                json.dumps({"registry_fingerprint": "1" * 64}) + "\n",
+                encoding="utf-8",
+            )
+            invalid_status = manifest(
+                [
+                    "--source", str(source), "--fixture", str(fixture),
+                    "--registry-artifact", str(invalid_registry), "--command-id", "CMD-R2-PY",
+                    "--output", str(manifest_path),
+                ]
+            )
+            self.assertEqual(invalid_status, 22)
+            self.assertFalse(manifest_path.exists())
+            write_relation_registry_conformance_artifact(
+                PROJECT_ROOT / "tests" / "fixtures" / "knowledge_graph" / "query_kind_registry.jsonl",
+                registry,
+            )
+            self.assertEqual(
+                manifest(
+                    [
+                        "--source", str(source), "--fixture", str(fixture),
+                        "--registry-artifact", str(registry), "--command-id", "CMD-R2-PY",
+                        "--output", str(manifest_path),
+                    ]
+                ),
+                0,
+            )
+            change_review = root / "change.md"
+            logic_review = root / "logic.md"
+            change_review.write_text("decision: approve\n", encoding="utf-8")
+            logic_review.write_text("decision: approve\n", encoding="utf-8")
+            self.assertEqual(
+                closeout(
+                    [
+                        "--manifest", str(manifest_path), "--change-review", str(change_review),
+                        "--logic-review", str(logic_review), "--output", str(closeout_path),
+                    ]
+                ),
+                21,
+            )
+            self.assertFalse(closeout_path.exists())
+
+    def test_r2_scope_closeout_rejects_review_aliases(self) -> None:
+        """Two review roles must bind distinct paths, identities, and content."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.txt"
+            fixture = root / "fixture.txt"
+            registry = root / "registry.json"
+            manifest_path = root / "scope.json"
+            source.write_text("source\n", encoding="utf-8")
+            fixture.write_text("fixture\n", encoding="utf-8")
+            write_relation_registry_conformance_artifact(
+                PROJECT_ROOT / "tests" / "fixtures" / "knowledge_graph" / "query_kind_registry.jsonl",
+                registry,
+            )
+            self.assertEqual(
+                manifest(
+                    [
+                        "--source", str(source), "--fixture", str(fixture),
+                        "--registry-artifact", str(registry), "--command-id", "CMD-R2-PY",
+                        "--output", str(manifest_path),
+                    ]
+                ),
+                0,
+            )
+            manifest_id = _string_field(
+                _parse_json_object(
+                    manifest_path.read_text(encoding="utf-8"),
+                    "scope manifest",
+                ),
+                "scope_manifest_id",
+                "scope manifest",
+            )
+            change_review = root / "change.md"
+            change_review.write_text(
+                f"decision: approve\nbound_scope_manifest_id: {manifest_id}\n",
+                encoding="utf-8",
+            )
+            resolved_alias = root / "resolved-alias.md"
+            resolved_alias.symlink_to(change_review)
+            identity_alias = root / "identity-alias.md"
+            os.link(change_review, identity_alias)
+            content_alias = root / "content-alias.md"
+            content_alias.write_bytes(change_review.read_bytes())
+            for name, logic_review in (
+                ("same-path", change_review),
+                ("same-resolved-path", resolved_alias),
+                ("same-file-identity", identity_alias),
+                ("same-content", content_alias),
+            ):
+                with self.subTest(name=name):
+                    closeout_path = root / f"{name}-closeout.json"
+                    self.assertEqual(
+                        closeout(
+                            [
+                                "--manifest", str(manifest_path),
+                                "--change-review", str(change_review),
+                                "--logic-review", str(logic_review),
+                                "--output", str(closeout_path),
+                            ]
+                        ),
+                        21,
+                    )
+                    self.assertFalse(closeout_path.exists())
+
+    def test_transport_conformance_fixture_executes_every_case(self) -> None:
+        """The decoder executes every canonical and refreshed transport case."""
+        self.assertTrue(
+            RETAINED_NORMALIZED_RECORD_SET.is_file(),
+            f"required retained decoder input missing: {RETAINED_NORMALIZED_RECORD_SET}",
+        )
+        fixture_cases = [
+            _parse_json_object(line, f"transport fixture line {index}")
+            for index, line in enumerate(
+                TRANSPORT_CONFORMANCE.read_text(encoding="utf-8").splitlines(),
+                1,
+            )
+        ]
+        values = [
+            _parse_json_object(line, f"retained normalized line {index}")
+            for index, line in enumerate(
+                RETAINED_NORMALIZED_RECORD_SET.read_text(encoding="utf-8").splitlines(),
+                1,
+            )
+        ]
+        expected_snapshot_id = _string_field(values[0], "record_id", "normalized header")
+
+        def refresh_family_count(
+            records: list[JsonObject],
+            family: str,
+        ) -> None:
+            summary_payload = _object_field(
+                records[-1], "payload", "normalization summary"
+            )
+            record_counts = _object_field(
+                summary_payload,
+                "record_counts",
+                "normalization summary payload",
+            )
+            record_counts[family] = sum(
+                _string_field(record, "record_type", "normalized record") == family
+                for record in records
+            )
+
+        executed: set[str] = set()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            registry = _write_registry(root)
+            for case in fixture_cases:
+                name = _string_field(case, "case", "transport fixture")
+                candidate = copy.deepcopy(values)
+                if name == "r2-json-duplicate-key-preflight":
+                    shared_mutations = _string_list_field(
+                        case, "shared_mutations", name
+                    )
+                    self.assertEqual(
+                        set(shared_mutations),
+                        {
+                            "registry_top_level",
+                            "registry_nested",
+                            "normalized_top_level",
+                            "normalized_nested",
+                            "normalized_escaped_equivalent",
+                        },
+                    )
+                    self.assertEqual(
+                        set(_string_list_field(case, "rust_only_mutations", name)),
+                        {
+                            "snapshot_top_level",
+                            "snapshot_nested",
+                            "evidence_top_level",
+                            "evidence_nested",
+                        },
+                    )
+                    canonical_normalized = _canonical_record_bytes(values)
+                    for mutation in shared_mutations:
+                        if mutation == "registry_top_level":
+                            mutated = _duplicate_json_field(
+                                registry.read_bytes(),
+                                "registry_version",
+                                "relation_registry.v1",
+                            )
+                            path = root / f"{name}-{mutation}.json"
+                            path.write_bytes(mutated)
+                            with self.assertRaisesRegex(
+                                TransportInvalid, "duplicate JSON key"
+                            ):
+                                load_relation_registry_artifact(path)
+                        elif mutation == "registry_nested":
+                            mutated = _duplicate_json_field(
+                                registry.read_bytes(),
+                                "capability_id",
+                                "catalog-route.v1",
+                            )
+                            path = root / f"{name}-{mutation}.json"
+                            path.write_bytes(mutated)
+                            with self.assertRaisesRegex(
+                                TransportInvalid, "duplicate JSON key"
+                            ):
+                                load_relation_registry_artifact(path)
+                        elif mutation == "normalized_top_level":
+                            mutated = _duplicate_json_field(
+                                canonical_normalized,
+                                "record_type",
+                                "normalized_record_set_header.v1",
+                            )
+                            path = root / f"{name}-{mutation}.jsonl"
+                            path.write_bytes(mutated)
+                            with self.assertRaisesRegex(
+                                TransportInvalid, "duplicate JSON key"
+                            ):
+                                load_normalized_record_set(
+                                    path,
+                                    expected_root=PROJECT_ROOT.parent.parent,
+                                    expected_snapshot_id=expected_snapshot_id,
+                                    relation_registry_path=registry,
+                                )
+                        elif mutation == "normalized_nested":
+                            mutated = _duplicate_json_field(
+                                canonical_normalized,
+                                "schema_version",
+                                "normalized_record_set.v1",
+                            )
+                            path = root / f"{name}-{mutation}.jsonl"
+                            path.write_bytes(mutated)
+                            with self.assertRaisesRegex(
+                                TransportInvalid, "duplicate JSON key"
+                            ):
+                                load_normalized_record_set(
+                                    path,
+                                    expected_root=PROJECT_ROOT.parent.parent,
+                                    expected_snapshot_id=expected_snapshot_id,
+                                    relation_registry_path=registry,
+                                )
+                        elif mutation == "normalized_escaped_equivalent":
+                            mutated = _duplicate_json_field(
+                                canonical_normalized,
+                                "record_type",
+                                "normalized_record_set_header.v1",
+                            ).replace(
+                                b'"record_type":',
+                                b'"\\u0072ecord_type":',
+                                1,
+                            )
+                            path = root / f"{name}-{mutation}.jsonl"
+                            path.write_bytes(mutated)
+                            with self.assertRaisesRegex(
+                                TransportInvalid, "duplicate JSON key"
+                            ):
+                                load_normalized_record_set(
+                                    path,
+                                    expected_root=PROJECT_ROOT.parent.parent,
+                                    expected_snapshot_id=expected_snapshot_id,
+                                    relation_registry_path=registry,
+                                )
+                        else:
+                            self.fail(f"unknown shared duplicate-key mutation: {mutation}")
+                    executed.add(name)
+                    continue
+                if name == "r2-evidence-jsonl-raw-byte-gate":
+                    canonical_normalized = _canonical_record_bytes(values)
+                    for mutation in _string_list_field(case, "mutations", name):
+                        if mutation == "bom":
+                            mutated = b"\xef\xbb\xbf" + canonical_normalized
+                        elif mutation == "crlf":
+                            mutated = canonical_normalized.replace(b"\n", b"\r\n", 1)
+                        elif mutation == "missing_final_lf":
+                            mutated = canonical_normalized[:-1]
+                        elif mutation == "noncanonical_key_order":
+                            mutated = _noncanonical_first_envelope(canonical_normalized)
+                        else:
+                            self.fail(f"unknown JSONL byte-gate mutation: {mutation}")
+                        path = root / f"{name}-{mutation}.jsonl"
+                        path.write_bytes(mutated)
+                        with self.assertRaises(TransportInvalid):
+                            load_normalized_record_set(
+                                path,
+                                expected_root=PROJECT_ROOT.parent.parent,
+                                expected_snapshot_id=expected_snapshot_id,
+                                relation_registry_path=registry,
+                            )
+                    executed.add(name)
+                    continue
+                if name == "r2-reader-global-locator-namespace":
+                    for mutation in _string_list_field(case, "mutations", name):
+                        mutation_candidate = copy.deepcopy(values)
+                        identity_records = [
+                            record
+                            for record in mutation_candidate
+                            if _string_field(record, "record_type", "normalized record")
+                            == "source_identity.v1"
+                        ]
+                        self.assertGreaterEqual(len(identity_records), 2)
+                        if mutation == "path_vs_canonical":
+                            path_record = next(
+                                record
+                                for record in identity_records
+                                if _string_field(
+                                    _object_field(record, "payload", name),
+                                    "repo_rel_path",
+                                    name,
+                                )
+                                != _string_field(
+                                    _object_field(record, "payload", name),
+                                    "canonical_locator",
+                                    name,
+                                )
+                            )
+                            path_payload = _object_field(path_record, "payload", name)
+                            path_locator = _string_field(
+                                path_payload, "repo_rel_path", name
+                            )
+                            collision_record = next(
+                                record for record in identity_records if record is not path_record
+                            )
+                            collision_payload = _object_field(
+                                collision_record, "payload", name
+                            )
+                            collision_payload["canonical_locator"] = path_locator
+                            snapshot_record = next(
+                                record
+                                for record in mutation_candidate
+                                if _string_field(
+                                    record, "record_type", "normalized record"
+                                )
+                                == "source_snapshot.v1"
+                            )
+                            parent_repo_id = _string_field(
+                                _object_field(snapshot_record, "payload", name),
+                                "parent_repo_id",
+                                name,
+                            )
+                            collision_payload["logical_id"] = _hash_parts(
+                                "logical_source.v1", parent_repo_id, path_locator
+                            )
+                        elif mutation == "alternate_vs_alternate":
+                            shared_locator = "alternate://shared-collision"
+                            for record in identity_records[:2]:
+                                _object_field(record, "payload", name)[
+                                    "alternate_locators"
+                                ] = [shared_locator]
+                        else:
+                            self.fail(f"unknown locator namespace mutation: {mutation}")
+                        summary_payload = _object_field(
+                            mutation_candidate[-1], "payload", "normalization summary"
+                        )
+                        summary_payload["normalized_record_fingerprint"] = (
+                            _refreshed_normalized_fingerprint(mutation_candidate)
+                        )
+                        path = root / f"{name}-{mutation}.jsonl"
+                        path.write_bytes(_canonical_record_bytes(mutation_candidate))
+                        with self.assertRaisesRegex(
+                            TransportInvalid,
+                            "source identity locator namespace collision",
+                        ):
+                            load_normalized_record_set(
+                                path,
+                                expected_root=PROJECT_ROOT.parent.parent,
+                                expected_snapshot_id=expected_snapshot_id,
+                                relation_registry_path=registry,
+                            )
+                    self.assertEqual(
+                        _string_field(case, "producer_mutation", name),
+                        "tracked_symlink_and_target",
+                    )
+                    self.assertEqual(
+                        set(_string_list_field(case, "rust_preflight_mutations", name)),
+                        {
+                            "duplicate_identity_id",
+                            "duplicate_repo_path",
+                            "duplicate_canonical_locator",
+                            "duplicate_logical_id",
+                        },
+                    )
+                    executed.add(name)
+                    continue
+                if name == "r2-reader-same-family-reorder":
+                    family = _string_field(case, "family", name)
+                    positions = [
+                        index
+                        for index, record in enumerate(candidate)
+                        if _string_field(record, "record_type", "normalized record") == family
+                    ][:2]
+                    self.assertEqual(len(positions), 2)
+                    candidate[positions[0]], candidate[positions[1]] = (
+                        candidate[positions[1]], candidate[positions[0]]
+                    )
+                elif name == "r2-reader-refreshed-fingerprint":
+                    summary_payload = _object_field(
+                        candidate[-1], "payload", "normalization summary"
+                    )
+                    record_counts = _object_field(
+                        summary_payload,
+                        "record_counts",
+                        "normalization summary payload",
+                    )
+                    record_counts["source_identity.v1"] = _int_field(
+                        record_counts,
+                        "source_identity.v1",
+                        "normalization summary record counts",
+                    ) + 1
+                elif name == "r2-reader-cross-family-snapshot-refresh":
+                    family = _string_field(case, "family", name)
+                    snapshot_field = _string_field(case, "snapshot_field", name)
+                    family_record = next(
+                        record
+                        for record in candidate
+                        if _string_field(record, "record_type", "normalized record") == family
+                    )
+                    family_payload = _object_field(family_record, "payload", family)
+                    family_payload[snapshot_field] = "f" * 64
+                    refresh_family_count(candidate, family)
+                elif name == "r2-reader-registry-kind-authority":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    _object_field(relation, "payload", name)["relation_kind"] = "unregistered_kind"
+                elif name == "r2-reader-source-universe-endpoint":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    _object_field(relation, "payload", name)["from_identity_id"] = "0" * 64
+                elif name == "r2-reader-identity-id-derivation":
+                    identity = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "source_identity.v1"
+                    )
+                    identity["record_id"] = "0" * 64
+                    _object_field(identity, "payload", name)["identity_id"] = "0" * 64
+                elif name == "r2-reader-source-identity-uniqueness":
+                    for mutation in _string_list_field(case, "mutations", name):
+                        if mutation == "duplicate_canonical_locator":
+                            field = "canonical_locator"
+                            expected = "duplicate source identity canonical locator"
+                        elif mutation == "duplicate_logical_id":
+                            field = "logical_id"
+                            expected = "duplicate source identity logical ID"
+                        else:
+                            self.fail(f"unknown source identity mutation: {mutation}")
+                        mutation_candidate = copy.deepcopy(values)
+                        identities = [
+                            record
+                            for record in mutation_candidate
+                            if _string_field(record, "record_type", "normalized record")
+                            == "source_identity.v1"
+                        ][:2]
+                        self.assertEqual(len(identities), 2)
+                        first_payload = _object_field(identities[0], "payload", name)
+                        second_payload = _object_field(identities[1], "payload", name)
+                        second_payload[field] = _string_field(first_payload, field, name)
+                        summary_payload = _object_field(
+                            mutation_candidate[-1], "payload", "normalization summary"
+                        )
+                        summary_payload["normalized_record_fingerprint"] = (
+                            _refreshed_normalized_fingerprint(mutation_candidate)
+                        )
+                        path = root / f"{name}-{mutation}.jsonl"
+                        path.write_bytes(_canonical_record_bytes(mutation_candidate))
+                        with self.assertRaisesRegex(TransportInvalid, expected):
+                            load_normalized_record_set(
+                                path,
+                                expected_root=PROJECT_ROOT.parent.parent,
+                                expected_snapshot_id=expected_snapshot_id,
+                                relation_registry_path=registry,
+                            )
+                    executed.add(name)
+                    continue
+                elif name == "r2-reader-fact-id-derivation":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    relation["record_id"] = "0" * 64
+                    _object_field(relation, "payload", name)["fact_id"] = "0" * 64
+                elif name == "r2-reader-pair-id-derivation":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    _object_field(relation, "payload", name)["pair_identity"] = "0" * 64
+                elif name == "r2-reader-attestation-membership":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    _object_field(relation, "payload", name)["attestation_ids"] = []
+                elif name == "r2-reader-attestation-endpoint":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    relation_payload = _object_field(relation, "payload", name)
+                    attestation_id = _string_list_field(
+                        relation_payload, "attestation_ids", name
+                    )[0]
+                    attestation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "attestation.v1"
+                        and _string_field(record, "record_id", "attestation") == attestation_id
+                    )
+                    _object_field(attestation, "payload", name)["dependent_identity_id"] = "0" * 64
+                elif name == "r2-reader-observation-membership":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    _object_field(relation, "payload", name)["observation_ids"] = [
+                        f"O-{'0' * 64}"
+                    ]
+                elif name == "r2-reader-reconciliation-partition":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    relation_payload = _object_field(relation, "payload", name)
+                    relation_payload["reconciliation_status"] = "matched"
+                    relation_payload["authority"] = "declaration+observation"
+                    summary_payload = _object_field(
+                        candidate[-1], "payload", "normalization summary"
+                    )
+                    counts = _object_field(
+                        summary_payload, "record_counts", "normalization summary"
+                    )
+                    counts["matched_count"] = _int_field(
+                        counts, "matched_count", "normalization counts"
+                    ) + 1
+                    counts["declared_only_count"] = _int_field(
+                        counts, "declared_only_count", "normalization counts"
+                    ) - 1
+                elif name == "r2-reader-source-content-provenance":
+                    relation = next(
+                        record for record in candidate
+                        if _string_field(record, "record_type", "normalized record")
+                        == "normalized_relation.v1"
+                    )
+                    source_hashes = _string_list_field(
+                        _object_field(relation, "payload", name),
+                        "source_content_hashes",
+                        name,
+                    )
+                    source_hashes[0] = "f" * 64
+                elif name != "r2-transport-canonical-envelope-order":
+                    self.fail(f"unknown transport fixture case: {name}")
+                if case.get("refresh_normalized_record_fingerprint") is True:
+                    summary_payload = _object_field(
+                        candidate[-1], "payload", "normalization summary"
+                    )
+                    summary_payload["normalized_record_fingerprint"] = (
+                        _refreshed_normalized_fingerprint(candidate)
+                    )
+                path = root / f"{name}.jsonl"
+                path.write_bytes(_canonical_record_bytes(candidate))
+                if _string_field(case, "expected", name) == "accept":
+                    load_normalized_record_set(
+                        path,
+                        expected_root=PROJECT_ROOT.parent.parent,
+                        expected_snapshot_id=expected_snapshot_id,
+                        relation_registry_path=registry,
+                    )
+                else:
+                    with self.assertRaises(TransportInvalid):
+                        load_normalized_record_set(
+                            path,
+                            expected_root=PROJECT_ROOT.parent.parent,
+                            expected_snapshot_id=expected_snapshot_id,
+                            relation_registry_path=registry,
+                        )
+                executed.add(name)
+        self.assertEqual(
+            executed,
+            {_string_field(case, "case", "transport fixture") for case in fixture_cases},
+        )
+
+    def test_synthetic_missing_source_identity_is_narrow_and_source_first(self) -> None:
+        """Python accepts only Rust's derived missing source before endpoint diagnosis."""
+        relation_case = next(
+            _parse_json_object(line, "declaration endpoint fixture")
+            for line in RELATION_RECONCILIATION.read_text(encoding="utf-8").splitlines()
+            if _string_field(
+                _parse_json_object(line, "relation fixture"),
+                "case",
+                "relation fixture",
+            )
+            == "r2-declaration-endpoint-u-adversaries"
+        )
+        self.assertEqual(
+            _string_list_field(relation_case, "cases", "declaration endpoint fixture"),
+            ["excluded-source", "stale-source", "nonexistent-source"],
+        )
+        self.assertEqual(
+            _string_list_field(
+                relation_case, "expected_rejection", "declaration endpoint fixture"
+            ),
+            ["source_excluded_source", "stale_source", "unresolved_source"],
+        )
+
+        values = [
+            _parse_json_object(line, f"retained normalized line {index}")
+            for index, line in enumerate(
+                RETAINED_NORMALIZED_RECORD_SET.read_text(encoding="utf-8").splitlines(),
+                1,
+            )
+        ]
+
+        def family_payloads(family: str) -> list[JsonObject]:
+            return [
+                copy.deepcopy(_object_field(record, "payload", family))
+                for record in values
+                if _string_field(record, "record_type", "normalized record") == family
+            ]
+
+        normalized_header = _object_field(values[0], "payload", "normalized header")
+        snapshot_header = family_payloads("source_snapshot.v1")[0]
+        snapshot_header["source_fingerprint"] = _string_field(
+            normalized_header, "source_fingerprint", "normalized header"
+        )
+        snapshot_header["profile"] = _string_field(
+            normalized_header, "profile", "normalized header"
+        )
+        identities = family_payloads("source_identity.v1")
+        declarations = family_payloads("dependency_declaration.v1")
+        surface_relations = family_payloads("surface_relation.v1")
+        exclusions = family_payloads("source_exclusion.v1")
+        identity_ids = {
+            _string_field(identity, "identity_id", "source identity")
+            for identity in identities
+        }
+        declaration = next(
+            item
+            for item in declarations
+            if item["resolved_target_identity_id"] in identity_ids
+        )
+        source_span = _object_field(
+            declaration, "source_span", "dependency declaration"
+        )
+        missing_path = "synthetic-missing-source.txt"
+        source_span["path"] = missing_path
+        parent_repo_id = _string_field(
+            snapshot_header, "parent_repo_id", "source snapshot"
+        )
+        synthetic_source_id = _hash_parts(
+            "source_identity.v1", parent_repo_id, missing_path
+        )
+        declaration["source_identity_id"] = synthetic_source_id
+        start_line = str(_int_field(source_span, "start_line", "source span"))
+        end_line = str(_int_field(source_span, "end_line", "source span"))
+        direction = _string_field(
+            declaration, "declared_direction", "dependency declaration"
+        )
+        kind = _string_field(declaration, "declared_kind", "dependency declaration")
+        target = _string_field(
+            declaration, "declared_target", "dependency declaration"
+        )
+        raw_line_hash = _string_field(
+            declaration, "raw_line_hash", "dependency declaration"
+        )
+        snapshot_id = _string_field(snapshot_header, "snapshot_id", "source snapshot")
+        declaration["declaration_id"] = _hash_parts(
+            "dependency_declaration.v1",
+            synthetic_source_id,
+            start_line,
+            end_line,
+            direction,
+            kind,
+            target,
+            raw_line_hash,
+        )
+        declaration["attestation_key"] = _hash_parts(
+            "dependency_attestation.v1",
+            snapshot_id,
+            synthetic_source_id,
+            start_line,
+            end_line,
+            direction,
+            kind,
+            target,
+            raw_line_hash,
+        )
+
+        identities_by_id, excluded_ids, _ = (
+            VALIDATE_SNAPSHOT_DERIVATIONS(
+                snapshot_header,
+                tuple(identities),
+                tuple(declarations),
+                tuple(surface_relations),
+                tuple(exclusions),
+            )
+        )
+        _, _, reason = DECLARATION_ENDPOINTS(
+            declaration, identities_by_id, excluded_ids
+        )
+        self.assertEqual(reason, "unresolved_source")
+
+        unknown_target_declarations = copy.deepcopy(declarations)
+        unknown_target_declarations[declarations.index(declaration)][
+            "resolved_target_identity_id"
+        ] = "f" * 64
+        with self.assertRaisesRegex(
+            TransportInvalid, "dependency declaration target identity is unknown"
+        ):
+            VALIDATE_SNAPSHOT_DERIVATIONS(
+                snapshot_header,
+                tuple(identities),
+                tuple(unknown_target_declarations),
+                tuple(surface_relations),
+                tuple(exclusions),
+            )
+
+        wrong_source_declarations = copy.deepcopy(declarations)
+        wrong_source_declarations[declarations.index(declaration)][
+            "source_identity_id"
+        ] = "0" * 64
+        with self.assertRaisesRegex(
+            TransportInvalid, "dependency declaration source identity/path mismatch"
+        ):
+            VALIDATE_SNAPSHOT_DERIVATIONS(
+                snapshot_header,
+                tuple(identities),
+                tuple(wrong_source_declarations),
+                tuple(surface_relations),
+                tuple(exclusions),
+            )
+
+    def test_normalized_decoder_rejects_noncanonical_transport(self) -> None:
+        """The decoder rejects a whitespace mutation before projection."""
+        self.assertTrue(RETAINED_NORMALIZED_RECORD_SET.is_file())
+        raw_lines = RETAINED_NORMALIZED_RECORD_SET.read_bytes().splitlines(keepends=True)
+        mutated = raw_lines[0].replace(b"{", b"{ ", 1)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "mutated.jsonl"
+            path.write_bytes(mutated + b"".join(raw_lines[1:]))
+            first = _parse_json_object(raw_lines[0], "normalized header")
+            with self.assertRaises(TransportInvalid):
+                load_normalized_record_set(
+                    path,
+                    expected_root=PROJECT_ROOT.parent.parent,
+                    expected_snapshot_id=_string_field(
+                        first, "record_id", "normalized header"
+                    ),
+                    relation_registry_path=RETAINED_RELATION_REGISTRY,
+                )
 
     def test_scan_reports_missing_manifest(self) -> None:
         """The scan tool reports missing markers and can fail on request."""

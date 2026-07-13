@@ -14,6 +14,8 @@ downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extract
 downstream implementation ../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream implementation ../tools/agent_tools/dependency_manifest_records.py decodes the current Rust normalized-record wire and produces registry conformance artifacts
+downstream implementation ../tools/agent_tools/bind_r2_scope.py binds pre-review source scope and post-review decisions without circular dependencies
 downstream design ./structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ./structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
@@ -244,6 +246,90 @@ downstream<TAB>implementation<TAB>tools/example.py<TAB>tests/tools/test_example.
 
 This graph is header-manifest evidence only.
 It must not be merged with language import/include/source edges from `scan_code_dependencies.sh`.
+
+### Current normalized transport and registry handoff
+
+The current Rust normalized-record JSONL is the generic transport contract. Each
+line is one canonical UTF-8 JSON object followed by LF, with exactly
+`schema_version`, `record_type`, `record_id`, `snapshot_id`, and `payload`.
+The first line is `normalized_record_set_header.v1`, the body families retain
+the Rust order through `extractor_capability.v1`, and the final line is
+`normalization_summary.v1`. Family records and IDs are strictly ordered; a
+decoder must reject duplicate keys, noncanonical bytes, unknown families,
+missing fields, mismatched IDs, and inconsistent fingerprints rather than
+silently projecting a partial graph.
+Before any `serde_json::Value` or Python dictionary is materialized, the Rust
+registry, source-snapshot, normalized-record, and evidence readers and the
+Python registry/normalized readers reject duplicate raw object keys at every
+nesting depth. They then compare each raw LF-terminated JSONL line with
+canonical serialization, so a BOM, non-UTF-8 bytes, equivalent whitespace,
+key-order changes, CRLF, and a missing final LF are transport-invalid. The Rust
+evidence reader uses this same raw-byte gate before evidence semantics. The
+source-snapshot reader additionally verifies family order, family-specific
+canonical order, and duplicate IDs before any aggregate sorting.
+Snapshot/evidence surface-relation merge is explicitly idempotent only for an
+exact duplicate; an equal ID with unequal payload is transport-invalid rather
+than silently dropped.
+Before constructing an aggregate, the Python decoder also validates the actual
+caller registry artifact, source snapshot and normalization-summary payloads,
+every family snapshot/ID link, source-universe membership, identity/fact/pair
+derivations, attestation and observation membership, reconciliation,
+source-content provenance, exact counts, and the normalized-record
+fingerprint. Refreshing counts and the fingerprint cannot forge a mixed or
+semantically incomplete record set.
+Source identities require unique identity IDs, repo paths, canonical locators,
+and logical IDs. Repo paths, canonical locators, and alternate locators share
+one globally injective locator namespace: the same locator string may repeat
+across fields of one identity, but it cannot name two identities. Capture and
+both decoders perform this preflight before constructing resolution maps, so
+path-versus-canonical and alternate-versus-alternate collisions cannot be
+hidden by lookup precedence or map overwrite. A dependency declaration may
+name an absent source identity only when its ID is exactly the
+`source_identity.v1` hash derived from the snapshot `parent_repo_id` and its
+`source_span.path`; this narrow synthetic identity preserves
+`unresolved_source` diagnostics. It does not permit an unknown resolved target,
+and source rejection remains earlier than target diagnosis.
+
+`tools/agent_tools/dependency_manifest_records.py` is the AgentCanon-side
+decoder/projector. Its deeply immutable `NormalizedRecordSetV1` retains
+`source_identities`, `declarations`, `attestations`, `relations`,
+`observations`, `surface_relations`, `source_exclusions`, `ambiguities`, and
+`capabilities`, and derives `source_universe` from identities and exclusions.
+Nested objects are read-only mappings and nested arrays are tuples after
+validation, so post-load mutation cannot change a verified aggregate.
+It does not import parent graph code, infer paths from a parent checkout, open
+SQLite, or write parent graph state.
+
+Generic normalize receives a caller-owned canonical
+`relation_registry.v1` JSON artifact through the mandatory
+`--relation-registry-json` option. The artifact has exactly
+`registry_version`, `registry_fingerprint`, and `entries`; each entry maps
+`family` to the query family. Missing or duplicate options are usage errors
+(exit 2). An unreadable, noncanonical, wrong-version, empty-field,
+duplicate-key, non-sorted, or wrong-fingerprint artifact is transport-invalid
+(exit 22). Successful snapshot and normalize
+invocations emit exactly one `DEPENDENCY_MANIFEST_STATUS=ok` line on stderr,
+including `--output-jsonl -`; stdout remains JSONL-only. After loading, the
+validated artifact is the sole authority for relation conversion, capability
+materialization, closure accepted-kind checks, and normalized-record
+validation. The compiled 20-row mapping and exact producer fingerprint remain
+only non-authoritative conformance baselines; runtime acceptance never compares
+the caller entry set with that compiled set. The Python decoder likewise takes
+the artifact path and derives registry version, entries, and fingerprint from
+its canonical bytes rather than accepting a caller-supplied fingerprint string.
+
+Review binding is two phase. `bind_r2_scope.py manifest` hashes the exact
+source, fixture, command, and registry inputs before review. Later
+`closeout` re-reads and re-hashes every manifest source, fixture, and registry
+artifact before it reads the two named review decisions; it never mutates the
+manifest or source set. Missing, stale, mismatched, or non-approve review
+bindings fail closed with exit 21 and do not produce a closeout artifact. Each
+review must contain exactly one canonical `decision: ...` line and exactly one
+canonical `bound_scope_manifest_id: ...` line in canonical UTF-8/LF text. The
+manifest phase accepts only the canonical 20-entry registry artifact with its
+exact computed fingerprint and artifact hash. Closeout also requires change
+and logic reviews to differ by supplied path, resolved path, file identity,
+and content hash.
 
 When a repo has known graph-cycle debt, PR gates may run
 `run_repo_dependency_review.sh --cycle-report-only --report-dir <dir>` and
