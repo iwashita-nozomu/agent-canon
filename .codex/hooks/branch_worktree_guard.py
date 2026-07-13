@@ -231,7 +231,7 @@ def git_subcommand_index(tokens: tuple[str, ...], index: int) -> int:
     index += 1
     while index < len(tokens):
         token = tokens[index]
-        if token in {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}:
+        if token in {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}:
             index += 2
             continue
         if token in {"-p", "-P", "--paginate", "--no-pager", "--bare", "--no-replace-objects", "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs"}:
@@ -243,7 +243,7 @@ def git_subcommand_index(tokens: tuple[str, ...], index: int) -> int:
         if token.startswith(("-C", "-c")) and len(token) > 2:
             index += 1
             continue
-        if token.startswith(("--git-dir=", "--work-tree=", "--namespace=", "--exec-path=")):
+        if token.startswith(("--git-dir=", "--work-tree=", "--namespace=", "--exec-path=", "--config-env=")):
             index += 1
             continue
         break
@@ -379,9 +379,9 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
     if subcommand == "list":
         return None
     if subcommand == "add":
-        force_overwrite = "B" in short_option_letters(rest) or has_long_option(rest, "--force-create")
+        force_overwrite = bool(short_option_letters(rest) & {"B", "f"}) or has_long_option(rest, "--force")
         if force_overwrite:
-            return GitIntent("destructive_worktree_creation", "worktree", "git worktree add -B/force-create", True, True)
+            return GitIntent("destructive_worktree_creation", "worktree", "git worktree add -B/-f/--force", True, True)
         return GitIntent("worktree_creation", "worktree", "git worktree add/create/orphan", True, False)
     return GitIntent("destructive_git", "worktree", f"git worktree {subcommand}", False, True)
 
@@ -440,7 +440,10 @@ def destructive_authorized(command: GitCommand) -> bool:
 
 def intent_authorized(command: GitCommand, intent: GitIntent) -> bool:
     """Return whether every authority required by an intent is present."""
-    return (not intent.requires_creation or creation_authorized(command)) and (
+    return (
+        not intent.requires_creation
+        or (creation_authorized(command) and destructive_authorized(command))
+    ) and (
         not intent.requires_destructive or destructive_authorized(command)
     )
 
@@ -464,7 +467,8 @@ def block_payload(command: str, intent: GitIntent) -> dict[str, object]:
     requirements: list[str] = []
     if intent.requires_creation:
         requirements.append(f"same-segment {BRANCH_AUTHORITY_ENV}=user_request|agent_canon_workflow and nonempty {BRANCH_REASON_ENV}")
-    if intent.requires_destructive:
+        requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
+    elif intent.requires_destructive:
         requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
     return {
         "decision": "block",
@@ -495,6 +499,13 @@ def first_block(command: str) -> GitIntent | None:
             intent = git_intent(git_command)
             if intent is not None and not intent_authorized(git_command, intent):
                 return intent
+            if (
+                intent is None
+                and git_command.tokens
+                and git_command.tokens[0].startswith("-")
+                and (opaque := opaque_protected_intent(" ".join(segment)))
+            ):
+                return opaque
             continue
         if intent := opaque_protected_intent(" ".join(segment)):
             return intent

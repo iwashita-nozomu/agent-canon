@@ -1476,6 +1476,11 @@ class CodexHooksTest(unittest.TestCase):
                     "opaque protected Git mutation",
                     cast(str, cast("dict[str, object]", payload)["reason"]),
                 )
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard(
+                "git --config-env=core.editor=EDITOR reset --hard HEAD"
+            )
+        )
 
     def test_shared_checkout_guard_allows_explicit_read_only_table(self) -> None:
         """Read-only diagnostics and combined clean dry-run forms stay quiet."""
@@ -1532,12 +1537,16 @@ class CodexHooksTest(unittest.TestCase):
             "git branch -Ctopic main",
             "git branch -ftopic main",
             "git worktree add -B topic ../topic",
+            "git worktree add -f ../topic topic",
+            "git worktree add --force ../topic topic",
         ]
         for command in normal_create:
             with self.subTest(command=command, route="normal"):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
+                self.assertIsNotNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {destructive} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {destructive} {command}"))
         for command in force_create:
             with self.subTest(command=command, route="force"):
                 self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
