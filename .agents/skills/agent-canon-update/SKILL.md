@@ -70,6 +70,19 @@ After current-task user approval, invoke the protected merge wrapper with all
 four inline Git authority/reason fields, then push the already-current branch.
 Do not switch or create a checkout as a recovery shortcut.
 
+```bash
+# Run only after current-task user approval.
+AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
+AGENT_CANON_BRANCH_WORKTREE_REASON='<reason>' \
+AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+AGENT_CANON_DESTRUCTIVE_GIT_REASON='<reason>' \
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
+git -C vendor/agent-canon push origin HEAD
+```
+
+The push targets the already-current AgentCanon branch; the sequence does not
+authorize checkout switching or branch/worktree creation.
+
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh branch for a bounded follow-up,
    mid-task user instruction, dirty-state avoidance, or checklist addendum.
