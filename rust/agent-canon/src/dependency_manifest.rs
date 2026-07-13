@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Cursor, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
@@ -227,6 +227,322 @@ pub(crate) struct ManifestSnapshot {
     pub(crate) diagnostics: Vec<Diagnostic>,
 }
 
+pub(crate) type TransportError = ManifestError;
+pub(crate) type NormalizationError = ManifestError;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NormalizeRequest {
+    pub root: PathBuf,
+    pub profile: String,
+    pub snapshot_jsonl: PathBuf,
+    pub evidence_jsonl: Vec<PathBuf>,
+    pub output_jsonl: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ObservedEvidence {
+    pub observation_id: String,
+    pub extractor_id: String,
+    pub extractor_version: String,
+    pub capability_id: String,
+    pub relation_kind: String,
+    pub from_locator: String,
+    pub to_locator: String,
+    pub from_identity_id: String,
+    pub to_identity_id: String,
+    pub source_span: SourceSpan,
+    pub payload_hash: String,
+    pub classification: String,
+    pub accepted: bool,
+    pub snapshot_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExtractorCapability {
+    pub capability_id: String,
+    pub extractor_id: String,
+    pub extractor_version: String,
+    pub relation_kinds: Vec<String>,
+    pub input_scope: String,
+    pub supported_file_kinds: Vec<String>,
+    pub unsupported_behavior: String,
+    pub dynamic_behavior: String,
+    pub provenance_fields: Vec<String>,
+    pub completeness_claim: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Attestation {
+    pub attestation_id: String,
+    pub attestation_key: String,
+    pub evidence_type: String,
+    pub evidence_id: String,
+    pub declaring_identity_id: String,
+    pub dependent_identity_id: String,
+    pub prerequisite_identity_id: String,
+    pub declared_direction: String,
+    pub relation_kind: String,
+    pub source_span: SourceSpan,
+    pub reason: String,
+    pub raw_line_hash: String,
+    pub accepted: bool,
+    pub rejection_reason: String,
+    pub snapshot_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NormalizedRelation {
+    pub fact_id: String,
+    pub from_identity_id: String,
+    pub to_identity_id: String,
+    pub relation_kind: String,
+    pub semantic_direction: String,
+    pub pair_identity: String,
+    pub attestation_ids: Vec<String>,
+    pub observation_ids: Vec<String>,
+    pub authority: String,
+    pub accepted: bool,
+    pub reconciliation_status: String,
+    pub source_snapshot_id: String,
+    pub source_content_hashes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AmbiguityA {
+    pub ambiguity_id: String,
+    pub source_identity_id: String,
+    pub candidate_fact_ids: Vec<String>,
+    pub candidate_targets: Vec<String>,
+    pub relation_kind: String,
+    pub reason_code: String,
+    pub evidence_ids: Vec<String>,
+    pub resolution_required: bool,
+    pub covered: bool,
+    pub snapshot_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NormalizationSummary {
+    pub snapshot_id: String,
+    pub record_counts: BTreeMap<String, usize>,
+    pub accepted_fact_count: usize,
+    pub rejected_declaration_count: usize,
+    pub rejected_observation_count: usize,
+    pub ambiguity_count: usize,
+    pub source_exclusion_count: usize,
+    pub normalized_record_fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NormalizedRecordSet {
+    pub(crate) header: SnapshotHeader,
+    pub(crate) source_identities: Vec<SourceIdentity>,
+    pub(crate) declarations: Vec<DependencyDeclaration>,
+    pub(crate) attestations: Vec<Attestation>,
+    pub(crate) relations: Vec<NormalizedRelation>,
+    pub(crate) observations: Vec<ObservedEvidence>,
+    pub(crate) surface_relations: Vec<SurfaceRelation>,
+    pub(crate) source_exclusions: Vec<SourceExclusion>,
+    pub(crate) ambiguities: Vec<AmbiguityA>,
+    pub(crate) capabilities: Vec<ExtractorCapability>,
+    pub(crate) source_universe: SourceUniverse,
+    pub(crate) summary: NormalizationSummary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RelationKindSpec {
+    pub capability_id: &'static str,
+    pub raw_kind: &'static str,
+    pub discriminator: &'static str,
+    pub stored_kind: &'static str,
+    pub layer: &'static str,
+    pub query_family: &'static str,
+}
+
+pub(crate) const RELATION_KIND_REGISTRY: &[RelationKindSpec] = &[
+    RelationKindSpec {
+        capability_id: "header-target-resolver.v1",
+        raw_kind: "header_context",
+        discriminator: "declared_kind=design",
+        stored_kind: "design",
+        layer: "deps",
+        query_family: "dependency",
+    },
+    RelationKindSpec {
+        capability_id: "header-target-resolver.v1",
+        raw_kind: "header_context",
+        discriminator: "declared_kind=implementation",
+        stored_kind: "implementation",
+        layer: "deps",
+        query_family: "dependency",
+    },
+    RelationKindSpec {
+        capability_id: "header-target-resolver.v1",
+        raw_kind: "header_context",
+        discriminator: "declared_kind=environment",
+        stored_kind: "environment",
+        layer: "deps",
+        query_family: "dependency",
+    },
+    RelationKindSpec {
+        capability_id: "code-static.v1",
+        raw_kind: "code_reference",
+        discriminator: "reference_kind=import",
+        stored_kind: "import",
+        layer: "code",
+        query_family: "import",
+    },
+    RelationKindSpec {
+        capability_id: "code-static.v1",
+        raw_kind: "code_reference",
+        discriminator: "reference_kind=include",
+        stored_kind: "include",
+        layer: "code",
+        query_family: "import",
+    },
+    RelationKindSpec {
+        capability_id: "code-static.v1",
+        raw_kind: "code_reference",
+        discriminator: "reference_kind=source",
+        stored_kind: "source",
+        layer: "code",
+        query_family: "import",
+    },
+    RelationKindSpec {
+        capability_id: "rust-structured.v1",
+        raw_kind: "symbol",
+        discriminator: "",
+        stored_kind: "symbol_reference",
+        layer: "code",
+        query_family: "call",
+    },
+    RelationKindSpec {
+        capability_id: "rust-structured.v1",
+        raw_kind: "call",
+        discriminator: "",
+        stored_kind: "call",
+        layer: "code",
+        query_family: "call",
+    },
+    RelationKindSpec {
+        capability_id: "structure-contract.v1",
+        raw_kind: "contains",
+        discriminator: "",
+        stored_kind: "contains",
+        layer: "artifact",
+        query_family: "containment",
+    },
+    RelationKindSpec {
+        capability_id: "structure-contract.v1",
+        raw_kind: "generated_from",
+        discriminator: "",
+        stored_kind: "generated_from",
+        layer: "artifact",
+        query_family: "generated",
+    },
+    RelationKindSpec {
+        capability_id: "structure-contract.v1",
+        raw_kind: "view_of",
+        discriminator: "",
+        stored_kind: "view_of",
+        layer: "artifact",
+        query_family: "view",
+    },
+    RelationKindSpec {
+        capability_id: "responsibility-scope.v1",
+        raw_kind: "owned_by",
+        discriminator: "",
+        stored_kind: "owned_by",
+        layer: "artifact",
+        query_family: "ownership",
+    },
+    RelationKindSpec {
+        capability_id: "responsibility-scope.v1",
+        raw_kind: "contains",
+        discriminator: "",
+        stored_kind: "contains",
+        layer: "artifact",
+        query_family: "containment",
+    },
+    RelationKindSpec {
+        capability_id: "import-responsibility.v1",
+        raw_kind: "import_boundary",
+        discriminator: "",
+        stored_kind: "import_boundary",
+        layer: "code",
+        query_family: "import",
+    },
+    RelationKindSpec {
+        capability_id: "document-inventory.v1",
+        raw_kind: "document",
+        discriminator: "",
+        stored_kind: "document_relation",
+        layer: "document-canon",
+        query_family: "document",
+    },
+    RelationKindSpec {
+        capability_id: "document-inventory.v1",
+        raw_kind: "view_of",
+        discriminator: "",
+        stored_kind: "view_of",
+        layer: "artifact",
+        query_family: "view",
+    },
+    RelationKindSpec {
+        capability_id: "catalog-route.v1",
+        raw_kind: "catalog",
+        discriminator: "catalog_type=skill",
+        stored_kind: "skill_catalog_member",
+        layer: "artifact",
+        query_family: "catalog",
+    },
+    RelationKindSpec {
+        capability_id: "catalog-route.v1",
+        raw_kind: "catalog",
+        discriminator: "catalog_type=tool",
+        stored_kind: "tool_catalog_member",
+        layer: "artifact",
+        query_family: "catalog",
+    },
+    RelationKindSpec {
+        capability_id: "catalog-route.v1",
+        raw_kind: "catalog",
+        discriminator: "catalog_type=workflow",
+        stored_kind: "workflow_catalog_member",
+        layer: "artifact",
+        query_family: "catalog",
+    },
+    RelationKindSpec {
+        capability_id: "source-universe.v1",
+        raw_kind: "submodule_pin",
+        discriminator: "",
+        stored_kind: "submodule_pin",
+        layer: "artifact",
+        query_family: "submodule",
+    },
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ClosureResult {
+    pub reachable_identity_ids: Vec<String>,
+    pub direct_witness_fact_ids: Vec<String>,
+    pub allowed_relation_kinds: Vec<String>,
+    pub visited_trace: Vec<Vec<String>>,
+    pub iterations: usize,
+    pub termination_bound: usize,
+    pub monotone: bool,
+    pub order_independent: bool,
+    pub source_exclusion_count: usize,
+    pub ambiguity_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AdjacencyProjection {
+    pub downstream: BTreeMap<String, Vec<String>>,
+    pub upstream: BTreeMap<String, Vec<String>>,
+    pub direct_fact_count: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SnapshotRequest {
     pub root: PathBuf,
@@ -296,6 +612,9 @@ struct IdentityBuild {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args.first().map(String::as_str) == Some("normalize") {
+        return run_normalize(args);
+    }
     let request = match parse_snapshot_args(args) {
         Ok(request) => request,
         Err(message) => {
@@ -370,6 +689,160 @@ fn parse_snapshot_args(args: &[String]) -> Result<SnapshotRequest, String> {
         profile,
         output_jsonl: output_jsonl.ok_or_else(|| "missing --output-jsonl".to_string())?,
     })
+}
+
+fn parse_normalize_args(args: &[String]) -> Result<NormalizeRequest, String> {
+    if args.first().map(String::as_str) != Some("normalize") {
+        return Err("expected dependency-manifest normalize".to_string());
+    }
+    let mut root = None;
+    let mut profile = None;
+    let mut snapshot_jsonl = None;
+    let mut evidence_jsonl = Vec::new();
+    let mut output_jsonl = None;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => root = Some(next_arg(args, &mut index, "--root")?),
+            "--profile" => profile = Some(next_arg(args, &mut index, "--profile")?),
+            "--snapshot-jsonl" => {
+                snapshot_jsonl = Some(PathBuf::from(next_arg(
+                    args,
+                    &mut index,
+                    "--snapshot-jsonl",
+                )?))
+            }
+            "--evidence-jsonl" | "--evidence-input" => {
+                let flag = args[index].clone();
+                evidence_jsonl.push(PathBuf::from(next_arg(args, &mut index, &flag)?));
+            }
+            "--output-jsonl" => {
+                output_jsonl = Some(PathBuf::from(next_arg(args, &mut index, "--output-jsonl")?))
+            }
+            "--format" => {
+                let format = next_arg(args, &mut index, "--format")?;
+                if format != "jsonl" {
+                    return Err(format!("invalid format {format}"));
+                }
+            }
+            flag => return Err(format!("unknown flag {flag}")),
+        }
+    }
+    let profile = profile.ok_or_else(|| "missing --profile".to_string())?;
+    if profile != "parent" {
+        return Err(format!("invalid profile {profile}"));
+    }
+    Ok(NormalizeRequest {
+        root: PathBuf::from(root.ok_or_else(|| "missing --root".to_string())?),
+        profile,
+        snapshot_jsonl: snapshot_jsonl.ok_or_else(|| "missing --snapshot-jsonl".to_string())?,
+        evidence_jsonl,
+        output_jsonl: output_jsonl.ok_or_else(|| "missing --output-jsonl".to_string())?,
+    })
+}
+
+fn run_normalize(args: &[String]) -> i32 {
+    let request = match parse_normalize_args(args) {
+        Ok(request) => request,
+        Err(message) => {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=usage");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=usage:{message}");
+            return 2;
+        }
+    };
+    let root = match fs::canonicalize(&request.root) {
+        Ok(root) if root.is_dir() => root,
+        Ok(root) => {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=snapshot-invalid");
+            eprintln!(
+                "DEPENDENCY_MANIFEST_DIAGNOSTIC=root is not a directory: {}",
+                root.display()
+            );
+            return 20;
+        }
+        Err(error) => {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=snapshot-invalid");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=root: {error}");
+            return 20;
+        }
+    };
+    let snapshot_bytes = match fs::read(&request.snapshot_jsonl) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=snapshot-invalid");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=snapshot input: {error}");
+            return 20;
+        }
+    };
+    let snapshot = match parse_snapshot(Cursor::new(snapshot_bytes)) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            let status = if error.to_string().contains("schema mismatch") {
+                "schema-mismatch"
+            } else {
+                "snapshot-invalid"
+            };
+            eprintln!("DEPENDENCY_MANIFEST_STATUS={status}");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+            return if status == "schema-mismatch" { 21 } else { 20 };
+        }
+    };
+    if normalize_root_matches(&root, &snapshot.header.root_realpath).is_err()
+        || snapshot.header.profile != request.profile
+    {
+        eprintln!("DEPENDENCY_MANIFEST_STATUS=snapshot-invalid");
+        eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC=snapshot/root/profile mismatch");
+        return 20;
+    }
+    let records = match normalize_snapshot(&request, snapshot) {
+        Ok(records) => records,
+        Err(error) => {
+            let exit = match error {
+                ManifestError::Usage(_) => 2,
+                ManifestError::SnapshotInconsistent(_) => 20,
+                ManifestError::Transport(_) => 22,
+                ManifestError::Invalid { .. } => 23,
+                ManifestError::Io(_) | ManifestError::Git(_) => 23,
+            };
+            let status = if exit == 22 {
+                "transport-invalid"
+            } else {
+                "normalization-failed"
+            };
+            eprintln!("DEPENDENCY_MANIFEST_STATUS={status}");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+            return exit;
+        }
+    };
+    let mut bytes = Vec::new();
+    if let Err(error) = write_normalized_record_set(&records, &mut bytes) {
+        eprintln!("DEPENDENCY_MANIFEST_STATUS=transport-invalid");
+        eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+        return 22;
+    }
+    if request.output_jsonl == Path::new("-") {
+        if let Err(error) = io::stdout().write_all(&bytes) {
+            eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
+            eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+            return 24;
+        }
+    } else if let Err(error) = write_atomic(&request.output_jsonl, &bytes) {
+        eprintln!("DEPENDENCY_MANIFEST_STATUS=output-failed");
+        eprintln!("DEPENDENCY_MANIFEST_DIAGNOSTIC={error}");
+        return 24;
+    }
+    0
+}
+
+fn normalize_root_matches(root: &Path, snapshot_root: &str) -> Result<(), ManifestError> {
+    let snapshot_root = fs::canonicalize(snapshot_root)
+        .map_err(|error| ManifestError::SnapshotInconsistent(error.to_string()))?;
+    if root != snapshot_root {
+        return Err(ManifestError::SnapshotInconsistent(
+            "snapshot root does not match normalize root".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn next_arg(args: &[String], index: &mut usize, flag: &str) -> Result<String, String> {
@@ -2240,6 +2713,3202 @@ fn write_atomic_with_failure(
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+struct RelationCandidate {
+    attestation: Attestation,
+    from_identity_id: String,
+    to_identity_id: String,
+    relation_kind: String,
+    pair_identity: String,
+    evidence_type: String,
+    observation_id: Option<String>,
+    fact_id: String,
+}
+
+impl RelationNormalizer {
+    fn validate_relation_kind_registry() -> Result<(), ManifestError> {
+        let mut keys = BTreeSet::new();
+        for spec in RELATION_KIND_REGISTRY {
+            if spec.capability_id.is_empty()
+                || spec.raw_kind.is_empty()
+                || spec.stored_kind.is_empty()
+                || spec.layer.is_empty()
+                || spec.query_family.is_empty()
+            {
+                return Err(ManifestError::Transport(
+                    "relation kind registry contains an empty required field".to_string(),
+                ));
+            }
+            if !keys.insert((spec.capability_id, spec.raw_kind, spec.discriminator)) {
+                return Err(ManifestError::Transport(format!(
+                    "duplicate relation kind registry key {}:{}:{}",
+                    spec.capability_id, spec.raw_kind, spec.discriminator
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn normalize_relation_kind(
+        capability_id: &str,
+        raw_kind: &str,
+        discriminator: &str,
+    ) -> Result<RelationKindSpec, String> {
+        Self::validate_relation_kind_registry().map_err(|error| error.to_string())?;
+        let matches = RELATION_KIND_REGISTRY
+            .iter()
+            .filter(|spec| {
+                spec.capability_id == capability_id
+                    && spec.raw_kind == raw_kind
+                    && spec.discriminator == discriminator
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [spec] => Ok(*spec),
+            [] => Err(format!(
+                "unregistered relation kind {capability_id}:{raw_kind}:{discriminator}"
+            )),
+            _ => Err(format!(
+                "ambiguous relation kind {capability_id}:{raw_kind}:{discriminator}"
+            )),
+        }
+    }
+
+    pub(crate) fn allowed_kinds_for_family(family: &str) -> Vec<String> {
+        let kinds = RELATION_KIND_REGISTRY
+            .iter()
+            .filter(|spec| spec.query_family == family)
+            .map(|spec| spec.stored_kind.to_string())
+            .collect::<BTreeSet<_>>();
+        kinds.iter().cloned().collect()
+    }
+
+    pub(crate) fn derive_reverse_adjacency(
+        relations: &[NormalizedRelation],
+    ) -> AdjacencyProjection {
+        let mut downstream = BTreeMap::<String, BTreeSet<String>>::new();
+        let mut upstream = BTreeMap::<String, BTreeSet<String>>::new();
+        let mut direct_fact_count = 0;
+        for relation in relations.iter().filter(|relation| relation.accepted) {
+            direct_fact_count += 1;
+            downstream
+                .entry(relation.from_identity_id.clone())
+                .or_default()
+                .insert(relation.to_identity_id.clone());
+            upstream
+                .entry(relation.to_identity_id.clone())
+                .or_default()
+                .insert(relation.from_identity_id.clone());
+        }
+        AdjacencyProjection {
+            downstream: downstream
+                .into_iter()
+                .map(|(key, values)| (key, values.into_iter().collect()))
+                .collect(),
+            upstream: upstream
+                .into_iter()
+                .map(|(key, values)| (key, values.into_iter().collect()))
+                .collect(),
+            direct_fact_count,
+        }
+    }
+
+    pub(crate) fn least_fixed_point(
+        identities: &[SourceIdentity],
+        source_exclusions: &[SourceExclusion],
+        ambiguities: &[AmbiguityA],
+        relations: &[NormalizedRelation],
+        seeds: &[String],
+        query_family: &str,
+        allowed_relation_kinds: &[String],
+    ) -> Result<ClosureResult, ManifestError> {
+        Self::validate_relation_kind_registry()?;
+        let registered_family_kinds = Self::allowed_kinds_for_family(query_family)
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        if registered_family_kinds.is_empty() {
+            return Err(ManifestError::Transport(format!(
+                "unknown closure query family {query_family}"
+            )));
+        }
+        let allowed = allowed_relation_kinds
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if allowed.len() != allowed_relation_kinds.len()
+            || allowed
+                .iter()
+                .any(|kind| !registered_family_kinds.contains(kind))
+        {
+            return Err(ManifestError::Transport(format!(
+                "closure kinds must be unique members of query family {query_family}"
+            )));
+        }
+        let vertices = identities
+            .iter()
+            .filter(|identity| identity.exists)
+            .map(|identity| identity.identity_id.clone())
+            .collect::<BTreeSet<_>>();
+        let excluded = source_exclusions
+            .iter()
+            .map(|exclusion| exclusion.source_identity_id.as_str())
+            .collect::<BTreeSet<_>>();
+        let accepted_fact_ids = relations
+            .iter()
+            .filter(|relation| relation.accepted)
+            .map(|relation| relation.fact_id.as_str())
+            .collect::<BTreeSet<_>>();
+        if ambiguities.iter().any(|ambiguity| {
+            ambiguity
+                .candidate_fact_ids
+                .iter()
+                .any(|fact_id| accepted_fact_ids.contains(fact_id.as_str()))
+        }) {
+            return Err(ManifestError::Transport(
+                "accepted direct facts overlap ambiguity candidates".to_string(),
+            ));
+        }
+        let registered_stored_kinds = RELATION_KIND_REGISTRY
+            .iter()
+            .map(|spec| spec.stored_kind)
+            .collect::<BTreeSet<_>>();
+        for relation in relations.iter().filter(|relation| relation.accepted) {
+            if !registered_stored_kinds.contains(relation.relation_kind.as_str()) {
+                return Err(ManifestError::Transport(format!(
+                    "accepted relation uses unregistered kind {}",
+                    relation.relation_kind
+                )));
+            }
+            if !vertices.contains(&relation.from_identity_id)
+                || !vertices.contains(&relation.to_identity_id)
+                || excluded.contains(relation.from_identity_id.as_str())
+                || excluded.contains(relation.to_identity_id.as_str())
+            {
+                return Err(ManifestError::Transport(
+                    "accepted relation endpoint is outside U".to_string(),
+                ));
+            }
+        }
+        let trace = Self::closure_trace(&vertices, &excluded, relations, seeds, &allowed, false);
+        let reachable_set = trace.last().cloned().unwrap_or_default();
+        let reachable = reachable_set.iter().cloned().collect::<Vec<_>>();
+        let mut witness_fact_ids = relations
+            .iter()
+            .filter(|relation| {
+                relation.accepted
+                    && allowed.contains(&relation.relation_kind)
+                    && reachable_set.contains(&relation.from_identity_id)
+                    && reachable_set.contains(&relation.to_identity_id)
+            })
+            .map(|relation| relation.fact_id.clone())
+            .collect::<Vec<_>>();
+        witness_fact_ids.sort();
+        witness_fact_ids.dedup();
+        let mut reversed_seeds = seeds.to_vec();
+        reversed_seeds.reverse();
+        let reverse_trace = Self::closure_trace(
+            &vertices,
+            &excluded,
+            relations,
+            &reversed_seeds,
+            &allowed,
+            true,
+        );
+        let visited_trace = trace
+            .iter()
+            .map(|visited| visited.iter().cloned().collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let monotone = trace
+            .windows(2)
+            .all(|window| window[0].is_subset(&window[1]));
+        let iterations = trace.len().saturating_sub(1);
+        Ok(ClosureResult {
+            reachable_identity_ids: reachable,
+            direct_witness_fact_ids: witness_fact_ids,
+            allowed_relation_kinds: allowed.into_iter().collect(),
+            visited_trace,
+            iterations,
+            termination_bound: vertices.len(),
+            monotone,
+            order_independent: reverse_trace.last() == Some(&reachable_set),
+            source_exclusion_count: source_exclusions.len(),
+            ambiguity_count: ambiguities.len(),
+        })
+    }
+
+    fn closure_trace(
+        vertices: &BTreeSet<String>,
+        excluded: &BTreeSet<&str>,
+        relations: &[NormalizedRelation],
+        seeds: &[String],
+        allowed: &BTreeSet<String>,
+        reverse_relation_order: bool,
+    ) -> Vec<BTreeSet<String>> {
+        let mut visited = seeds
+            .iter()
+            .filter(|seed| vertices.contains(*seed) && !excluded.contains(seed.as_str()))
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let mut trace = vec![visited.clone()];
+        loop {
+            let mut next = visited.clone();
+            let mut consider = |relation: &NormalizedRelation| {
+                if relation.accepted
+                    && visited.contains(&relation.from_identity_id)
+                    && allowed.contains(&relation.relation_kind)
+                    && vertices.contains(&relation.to_identity_id)
+                    && !excluded.contains(relation.to_identity_id.as_str())
+                {
+                    next.insert(relation.to_identity_id.clone());
+                }
+            };
+            if reverse_relation_order {
+                relations.iter().rev().for_each(&mut consider);
+            } else {
+                relations.iter().for_each(&mut consider);
+            }
+            if next == visited {
+                break;
+            }
+            visited = next;
+            trace.push(visited.clone());
+        }
+        trace
+    }
+}
+
+pub(crate) struct RelationNormalizer;
+
+fn producer_capability_rows() -> Vec<(String, String, Vec<String>)> {
+    let mut raw_kinds = BTreeMap::<String, BTreeSet<String>>::new();
+    for spec in RELATION_KIND_REGISTRY {
+        raw_kinds
+            .entry(spec.capability_id.to_string())
+            .or_default()
+            .insert(spec.raw_kind.to_string());
+    }
+    raw_kinds
+        .into_iter()
+        .map(|(capability_id, kinds)| {
+            let extractor_id = capability_id
+                .strip_suffix(".v1")
+                .unwrap_or(&capability_id)
+                .to_string();
+            (capability_id, extractor_id, kinds.into_iter().collect())
+        })
+        .collect()
+}
+
+fn capability_rejection_reason(
+    capability: Option<&ExtractorCapability>,
+    observation: &ObservedEvidence,
+) -> Option<String> {
+    let Some(capability) = capability else {
+        return Some("capability_unknown".to_string());
+    };
+    let expected = producer_capability_rows()
+        .into_iter()
+        .find(|(capability_id, _, _)| capability_id == &capability.capability_id);
+    let Some((_, expected_extractor, expected_raw_kinds)) = expected else {
+        return Some("capability_unknown".to_string());
+    };
+    let required_provenance = ["payload_hash", "snapshot_id", "source_span"]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    let actual_provenance = capability
+        .provenance_fields
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let status = format!(
+        "{} {}",
+        capability.input_scope.to_ascii_lowercase(),
+        capability.completeness_claim.to_ascii_lowercase()
+    );
+    if !capability.input_scope.starts_with("connected:")
+        || !capability.completeness_claim.contains("connected")
+        || ["unavailable", "provided-empty", "o=empty", "coverage=0"]
+            .iter()
+            .any(|marker| status.contains(marker))
+    {
+        return Some("capability_unavailable".to_string());
+    }
+    if capability.extractor_id != expected_extractor
+        || capability.extractor_id != observation.extractor_id
+        || capability.extractor_version != observation.extractor_version
+        || capability.extractor_version.is_empty()
+        || capability.extractor_version == "unavailable"
+        || capability.relation_kinds != expected_raw_kinds
+        || actual_provenance != required_provenance
+    {
+        return Some("provenance_incomplete".to_string());
+    }
+    None
+}
+
+fn observation_producer_rejection_reason(
+    observation: &ObservedEvidence,
+    capability: Option<&ExtractorCapability>,
+    spec: Option<&RelationKindSpec>,
+) -> Option<String> {
+    capability_rejection_reason(capability, observation)
+        .or_else(|| {
+            let classification = observation.classification.to_ascii_lowercase();
+            (classification.contains("dynamic")
+                || classification.contains("reflection")
+                || classification.contains("runtime"))
+            .then(|| "dynamic_or_reflection".to_string())
+        })
+        .or_else(|| {
+            observation
+                .classification
+                .to_ascii_lowercase()
+                .contains("unresolved")
+                .then(|| "unsupported_relation".to_string())
+        })
+        .or_else(|| (!observation.accepted).then(|| "unsupported_relation".to_string()))
+        .or_else(|| spec.is_none().then(|| "kind_unregistered".to_string()))
+        .or_else(|| {
+            spec.filter(|registered| registered.query_family.is_empty())
+                .map(|_| "query_family_unregistered".to_string())
+        })
+}
+
+pub(crate) fn normalize_snapshot(
+    request: &NormalizeRequest,
+    snapshot: ManifestSnapshot,
+) -> Result<NormalizedRecordSet, NormalizationError> {
+    RelationNormalizer::validate_relation_kind_registry()?;
+    if snapshot.header.schema_version != SNAPSHOT_SCHEMA_VERSION
+        || snapshot.header.profile != request.profile
+        || !snapshot.header.snapshot_consistent
+    {
+        return Err(ManifestError::SnapshotInconsistent(
+            "normalization requires a consistent source_snapshot.v1".to_string(),
+        ));
+    }
+    let (mut observations, supplied_capabilities, mut supplied_surfaces, _) =
+        read_evidence_inputs(&request.evidence_jsonl, &snapshot.header.snapshot_id)?;
+    observations.sort_by(|left, right| left.observation_id.cmp(&right.observation_id));
+    let capabilities = materialize_capabilities(
+        &supplied_capabilities,
+        &observations,
+        &request.evidence_jsonl,
+    );
+    let capabilities_by_id = capabilities
+        .iter()
+        .map(|capability| (capability.capability_id.as_str(), capability))
+        .collect::<BTreeMap<_, _>>();
+    supplied_surfaces.sort_by(|left, right| left.relation_id.cmp(&right.relation_id));
+    let mut declarations = snapshot.declarations.clone();
+    declarations.sort_by(|left, right| left.declaration_id.cmp(&right.declaration_id));
+    let mut surface_relations = snapshot.surface_relations.clone();
+    surface_relations.extend(supplied_surfaces);
+    surface_relations.sort_by(|left, right| left.relation_id.cmp(&right.relation_id));
+    surface_relations.dedup_by(|left, right| left.relation_id == right.relation_id);
+
+    let identities_by_id = snapshot
+        .source_identities
+        .iter()
+        .map(|identity| (identity.identity_id.as_str(), identity))
+        .collect::<BTreeMap<_, _>>();
+    let excluded = snapshot
+        .source_exclusions
+        .iter()
+        .map(|exclusion| exclusion.source_identity_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let logical_by_id = identities_by_id
+        .iter()
+        .map(|(identity_id, identity)| (*identity_id, identity.logical_id.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let mut attestations_by_key = BTreeMap::<String, Attestation>::new();
+    let mut attestation_evidence_keys = BTreeSet::<(String, String)>::new();
+    let mut candidates = Vec::<RelationCandidate>::new();
+    let mut ambiguities = BTreeMap::<String, AmbiguityA>::new();
+    let mut rejected_declarations = BTreeSet::new();
+    let mut rejected_observations = BTreeSet::new();
+
+    for capability in &supplied_capabilities {
+        if !RELATION_KIND_REGISTRY
+            .iter()
+            .any(|spec| spec.capability_id == capability.capability_id)
+        {
+            add_ambiguity(
+                &mut ambiguities,
+                ambiguity_record(
+                    &snapshot.header.snapshot_id,
+                    "",
+                    Vec::new(),
+                    Vec::new(),
+                    "capability_unknown",
+                    "",
+                    vec![capability.capability_id.clone()],
+                ),
+            );
+        }
+    }
+
+    for declaration in &declarations {
+        let spec = match RelationNormalizer::normalize_relation_kind(
+            "header-target-resolver.v1",
+            "header_context",
+            &format!("declared_kind={}", declaration.declared_kind),
+        ) {
+            Ok(spec) => spec,
+            Err(_) => {
+                rejected_declarations.insert(declaration.declaration_id.clone());
+                add_ambiguity(
+                    &mut ambiguities,
+                    ambiguity_for_declaration(
+                        declaration,
+                        "kind_unregistered",
+                        &[],
+                        &[],
+                        &declaration.declared_kind,
+                    ),
+                );
+                continue;
+            }
+        };
+        let attestation_id = hash_parts(&["attestation.v1", &declaration.attestation_key]);
+        let (from, to, rejection) =
+            declaration_endpoints(declaration, &identities_by_id, &excluded);
+        let accepted = rejection.is_none();
+        let (dependent, prerequisite) = (
+            from.clone().unwrap_or_default(),
+            to.clone().unwrap_or_default(),
+        );
+        let attestation = Attestation {
+            attestation_id: attestation_id.clone(),
+            attestation_key: declaration.attestation_key.clone(),
+            evidence_type: "declaration".to_string(),
+            evidence_id: declaration.declaration_id.clone(),
+            declaring_identity_id: declaration.source_identity_id.clone(),
+            dependent_identity_id: dependent.clone(),
+            prerequisite_identity_id: prerequisite.clone(),
+            declared_direction: declaration.declared_direction.clone(),
+            relation_kind: spec.stored_kind.to_string(),
+            source_span: declaration.source_span.clone(),
+            reason: declaration.reason.clone(),
+            raw_line_hash: declaration.raw_line_hash.clone(),
+            accepted,
+            rejection_reason: rejection.clone().unwrap_or_default(),
+            snapshot_id: snapshot.header.snapshot_id.clone(),
+        };
+        let evidence_key = (
+            "declaration".to_string(),
+            declaration.declaration_id.clone(),
+        );
+        if !attestation_evidence_keys.insert(evidence_key)
+            || attestations_by_key
+                .insert(declaration.attestation_key.clone(), attestation.clone())
+                .is_some()
+        {
+            return Err(ManifestError::Transport(format!(
+                "duplicate declaration attestation provenance {}",
+                declaration.declaration_id
+            )));
+        }
+        if let Some(reason) = rejection {
+            rejected_declarations.insert(declaration.declaration_id.clone());
+            add_ambiguity(
+                &mut ambiguities,
+                ambiguity_for_declaration(
+                    declaration,
+                    &reason,
+                    &[],
+                    &[declaration.declared_target.clone()],
+                    spec.stored_kind,
+                ),
+            );
+            continue;
+        }
+        let pair_identity = pair_identity_for(
+            &snapshot.header.parent_repo_id,
+            &logical_by_id,
+            &dependent,
+            &prerequisite,
+        );
+        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, spec.stored_kind]);
+        candidates.push(RelationCandidate {
+            attestation,
+            from_identity_id: dependent,
+            to_identity_id: prerequisite,
+            relation_kind: spec.stored_kind.to_string(),
+            pair_identity,
+            evidence_type: "declaration".to_string(),
+            observation_id: None,
+            fact_id,
+        });
+    }
+
+    for observation in &mut observations {
+        let discriminator = observation_discriminator(observation);
+        let spec = RelationNormalizer::normalize_relation_kind(
+            &observation.capability_id,
+            &observation.relation_kind,
+            &discriminator,
+        )
+        .ok();
+        let attestation_key = hash_parts(&[
+            "observed_attestation.v1",
+            &observation.snapshot_id,
+            &observation.observation_id,
+            &observation.payload_hash,
+        ]);
+        let attestation_id = hash_parts(&["attestation.v1", &attestation_key]);
+        let (dependent, prerequisite, rejection) =
+            observed_endpoints(observation, &identities_by_id, &excluded);
+        let rejection = rejection.or_else(|| {
+            observation_producer_rejection_reason(
+                observation,
+                capabilities_by_id
+                    .get(observation.capability_id.as_str())
+                    .copied(),
+                spec.as_ref(),
+            )
+        });
+        let accepted = rejection.is_none();
+        observation.accepted = accepted;
+        let dependent = dependent.unwrap_or_default();
+        let prerequisite = prerequisite.unwrap_or_default();
+        let stored_kind = spec
+            .map(|registered| registered.stored_kind)
+            .unwrap_or(observation.relation_kind.as_str());
+        let attestation = Attestation {
+            attestation_id: attestation_id.clone(),
+            attestation_key: attestation_key.clone(),
+            evidence_type: "observation".to_string(),
+            evidence_id: observation.observation_id.clone(),
+            declaring_identity_id: observation.from_identity_id.clone(),
+            dependent_identity_id: dependent.clone(),
+            prerequisite_identity_id: prerequisite.clone(),
+            declared_direction: "observed".to_string(),
+            relation_kind: stored_kind.to_string(),
+            source_span: observation.source_span.clone(),
+            reason: observation.classification.clone(),
+            raw_line_hash: observation.payload_hash.clone(),
+            accepted,
+            rejection_reason: rejection.clone().unwrap_or_default(),
+            snapshot_id: snapshot.header.snapshot_id.clone(),
+        };
+        let evidence_key = (
+            "observation".to_string(),
+            observation.observation_id.clone(),
+        );
+        if !attestation_evidence_keys.insert(evidence_key)
+            || attestations_by_key
+                .insert(attestation_key, attestation.clone())
+                .is_some()
+        {
+            return Err(ManifestError::Transport(format!(
+                "duplicate observation attestation provenance {}",
+                observation.observation_id
+            )));
+        }
+        if let Some(reason) = rejection {
+            rejected_observations.insert(observation.observation_id.clone());
+            add_ambiguity(
+                &mut ambiguities,
+                ambiguity_for_observation(observation, &reason, stored_kind),
+            );
+            continue;
+        }
+        let spec = spec.expect("accepted observation kind registered");
+        let pair_identity = pair_identity_for(
+            &snapshot.header.parent_repo_id,
+            &logical_by_id,
+            &dependent,
+            &prerequisite,
+        );
+        let fact_id = hash_parts(&["normalized_relation.v1", &pair_identity, spec.stored_kind]);
+        candidates.push(RelationCandidate {
+            attestation,
+            from_identity_id: dependent,
+            to_identity_id: prerequisite,
+            relation_kind: spec.stored_kind.to_string(),
+            pair_identity,
+            evidence_type: "observation".to_string(),
+            observation_id: Some(observation.observation_id.clone()),
+            fact_id,
+        });
+    }
+
+    let mut by_pair = BTreeMap::<String, Vec<RelationCandidate>>::new();
+    for candidate in candidates {
+        by_pair
+            .entry(candidate.pair_identity.clone())
+            .or_default()
+            .push(candidate);
+    }
+    let mut relations = Vec::new();
+    let mut matched_count = 0;
+    let mut declared_only_count = 0;
+    let mut observed_only_count = 0;
+    for (pair, mut group) in by_pair {
+        group.sort_by(|left, right| {
+            left.attestation
+                .attestation_id
+                .cmp(&right.attestation.attestation_id)
+        });
+        let kinds = group
+            .iter()
+            .map(|candidate| candidate.relation_kind.clone())
+            .collect::<BTreeSet<_>>();
+        if kinds.len() > 1 {
+            for candidate in &group {
+                let attestation = attestations_by_key
+                    .get_mut(&candidate.attestation.attestation_key)
+                    .expect("candidate attestation retained");
+                attestation.accepted = false;
+                attestation.rejection_reason = "kind_contradiction".to_string();
+                match candidate.evidence_type.as_str() {
+                    "declaration" => {
+                        rejected_declarations.insert(candidate.attestation.evidence_id.clone());
+                    }
+                    _ => {
+                        rejected_observations.insert(candidate.attestation.evidence_id.clone());
+                        if let Some(observation) = observations.iter_mut().find(|observation| {
+                            observation.observation_id == candidate.attestation.evidence_id
+                        }) {
+                            observation.accepted = false;
+                        }
+                    }
+                }
+            }
+            let fact_ids = group
+                .iter()
+                .map(|candidate| candidate.fact_id.clone())
+                .collect::<BTreeSet<_>>();
+            let evidence_ids = group
+                .iter()
+                .map(|candidate| candidate.attestation.evidence_id.clone())
+                .collect::<BTreeSet<_>>();
+            let targets = group
+                .iter()
+                .flat_map(|candidate| {
+                    [
+                        candidate.from_identity_id.clone(),
+                        candidate.to_identity_id.clone(),
+                    ]
+                })
+                .collect::<BTreeSet<_>>();
+            add_ambiguity(
+                &mut ambiguities,
+                ambiguity_record(
+                    &snapshot.header.snapshot_id,
+                    &group[0].from_identity_id,
+                    fact_ids.into_iter().collect(),
+                    targets.into_iter().collect(),
+                    "kind_contradiction",
+                    "kind_contradiction",
+                    evidence_ids.into_iter().collect(),
+                ),
+            );
+            continue;
+        }
+        let first = &group[0];
+        let has_declaration = group
+            .iter()
+            .any(|candidate| candidate.evidence_type == "declaration");
+        let has_observation = group
+            .iter()
+            .any(|candidate| candidate.evidence_type == "observation");
+        let reconciliation_status = if has_declaration && has_observation {
+            matched_count += 1;
+            "matched"
+        } else if has_declaration {
+            declared_only_count += 1;
+            "declared_only"
+        } else {
+            observed_only_count += 1;
+            "observed_only"
+        };
+        let attestation_ids = group
+            .iter()
+            .map(|candidate| candidate.attestation.attestation_id.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let observation_ids = group
+            .iter()
+            .filter_map(|candidate| candidate.observation_id.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let authority = match (has_declaration, has_observation) {
+            (true, true) => "declaration+observation",
+            (true, false) => "declaration",
+            _ => "observation",
+        };
+        let source_content_hashes = [
+            first.from_identity_id.as_str(),
+            first.to_identity_id.as_str(),
+        ]
+        .iter()
+        .filter_map(|identity_id| {
+            identities_by_id
+                .get(identity_id)
+                .map(|identity| identity.content_hash.clone())
+        })
+        .collect::<Vec<_>>();
+        relations.push(NormalizedRelation {
+            fact_id: first.fact_id.clone(),
+            from_identity_id: first.from_identity_id.clone(),
+            to_identity_id: first.to_identity_id.clone(),
+            relation_kind: first.relation_kind.clone(),
+            semantic_direction: "depends_on".to_string(),
+            pair_identity: pair,
+            attestation_ids,
+            observation_ids,
+            authority: authority.to_string(),
+            accepted: true,
+            reconciliation_status: reconciliation_status.to_string(),
+            source_snapshot_id: snapshot.header.snapshot_id.clone(),
+            source_content_hashes,
+        });
+    }
+    relations.sort_by(|left, right| left.fact_id.cmp(&right.fact_id));
+    let mut ambiguities = ambiguities.into_values().collect::<Vec<_>>();
+    ambiguities.sort_by(|left, right| left.ambiguity_id.cmp(&right.ambiguity_id));
+    let attestations = attestations_by_key.into_values().collect::<Vec<_>>();
+    let mut record_counts = BTreeMap::new();
+    record_counts.insert("source_snapshot.v1".to_string(), 1);
+    record_counts.insert(
+        "source_identity.v1".to_string(),
+        snapshot.source_identities.len(),
+    );
+    record_counts.insert("dependency_declaration.v1".to_string(), declarations.len());
+    record_counts.insert("attestation.v1".to_string(), attestations.len());
+    record_counts.insert("normalized_relation.v1".to_string(), relations.len());
+    record_counts.insert("observed_evidence.v1".to_string(), observations.len());
+    record_counts.insert("surface_relation.v1".to_string(), surface_relations.len());
+    record_counts.insert(
+        "source_exclusion.v1".to_string(),
+        snapshot.source_exclusions.len(),
+    );
+    record_counts.insert("ambiguity_a.v1".to_string(), ambiguities.len());
+    record_counts.insert("extractor_capability.v1".to_string(), capabilities.len());
+    record_counts.insert("accepted_direct_fact_count".to_string(), relations.len());
+    record_counts.insert(
+        "rejected_declaration_count".to_string(),
+        rejected_declarations.len(),
+    );
+    record_counts.insert(
+        "rejected_observation_count".to_string(),
+        rejected_observations.len(),
+    );
+    record_counts.insert("matched_count".to_string(), matched_count);
+    record_counts.insert("declared_only_count".to_string(), declared_only_count);
+    record_counts.insert("observed_only_count".to_string(), observed_only_count);
+    record_counts.insert(
+        "excluded_count".to_string(),
+        snapshot.source_exclusions.len(),
+    );
+    record_counts.insert("unresolved_count".to_string(), ambiguities.len());
+    record_counts.insert("duplicate_evidence_count".to_string(), 0);
+    record_counts.insert("x_core_count".to_string(), 0);
+    let mut records = NormalizedRecordSet {
+        header: snapshot.header.clone(),
+        source_identities: snapshot.source_identities.clone(),
+        declarations,
+        attestations,
+        relations,
+        observations,
+        surface_relations,
+        source_exclusions: snapshot.source_exclusions.clone(),
+        ambiguities,
+        capabilities,
+        source_universe: snapshot.source_universe.clone(),
+        summary: NormalizationSummary {
+            snapshot_id: snapshot.header.snapshot_id.clone(),
+            record_counts,
+            accepted_fact_count: 0,
+            rejected_declaration_count: 0,
+            rejected_observation_count: 0,
+            ambiguity_count: 0,
+            source_exclusion_count: snapshot.source_exclusions.len(),
+            normalized_record_fingerprint: String::new(),
+        },
+    };
+    records.summary.accepted_fact_count = records.relations.len();
+    records
+        .source_identities
+        .sort_by(|left, right| left.identity_id.cmp(&right.identity_id));
+    records
+        .declarations
+        .sort_by(|left, right| left.declaration_id.cmp(&right.declaration_id));
+    records
+        .attestations
+        .sort_by(|left, right| left.attestation_id.cmp(&right.attestation_id));
+    records
+        .relations
+        .sort_by(|left, right| left.fact_id.cmp(&right.fact_id));
+    records
+        .observations
+        .sort_by(|left, right| left.observation_id.cmp(&right.observation_id));
+    records
+        .surface_relations
+        .sort_by(|left, right| left.relation_id.cmp(&right.relation_id));
+    records
+        .source_exclusions
+        .sort_by(|left, right| left.source_exclusion_id.cmp(&right.source_exclusion_id));
+    records
+        .ambiguities
+        .sort_by(|left, right| left.ambiguity_id.cmp(&right.ambiguity_id));
+    records
+        .capabilities
+        .sort_by(|left, right| left.capability_id.cmp(&right.capability_id));
+    records.summary.rejected_declaration_count = records
+        .attestations
+        .iter()
+        .filter(|attestation| attestation.evidence_type == "declaration" && !attestation.accepted)
+        .count();
+    records.summary.rejected_observation_count = records
+        .attestations
+        .iter()
+        .filter(|attestation| attestation.evidence_type == "observation" && !attestation.accepted)
+        .count();
+    records.summary.ambiguity_count = records.ambiguities.len();
+    records.summary.record_counts = normalized_record_counts(&records);
+    records.summary.normalized_record_fingerprint = normalized_record_fingerprint(&records)?;
+    validate_normalized_record_set(&records)?;
+    Ok(records)
+}
+
+fn observation_discriminator(observation: &ObservedEvidence) -> String {
+    if observation.classification.contains('=') {
+        observation.classification.clone()
+    } else {
+        String::new()
+    }
+}
+
+fn pair_identity_for(
+    parent_repo_id: &str,
+    logical_by_id: &BTreeMap<&str, &str>,
+    dependent: &str,
+    prerequisite: &str,
+) -> String {
+    let dependent = logical_by_id.get(dependent).copied().unwrap_or(dependent);
+    let prerequisite = logical_by_id
+        .get(prerequisite)
+        .copied()
+        .unwrap_or(prerequisite);
+    hash_parts(&["relation_pair.v1", parent_repo_id, dependent, prerequisite])
+}
+
+fn declaration_endpoints(
+    declaration: &DependencyDeclaration,
+    identities: &BTreeMap<&str, &SourceIdentity>,
+    excluded: &BTreeSet<&str>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    let source = identities.get(declaration.source_identity_id.as_str());
+    let target_id = declaration.resolved_target_identity_id.as_deref();
+    let target = target_id.and_then(|target_id| identities.get(target_id).copied());
+    let reason = if source.is_none() {
+        Some("unresolved_source".to_string())
+    } else if excluded.contains(declaration.source_identity_id.as_str()) {
+        Some("source_excluded_source".to_string())
+    } else if !source.expect("source checked").exists {
+        Some("stale_source".to_string())
+    } else if target_id.is_none() {
+        Some("missing_target".to_string())
+    } else if target.is_none() {
+        Some("unresolved_target".to_string())
+    } else if excluded.contains(target_id.expect("target checked")) {
+        Some("source_excluded_target".to_string())
+    } else if !target.expect("target checked").exists {
+        Some("stale_target".to_string())
+    } else {
+        None
+    };
+    let source_id = declaration.source_identity_id.clone();
+    let target_id = target_id.map(ToString::to_string);
+    match declaration.declared_direction.as_str() {
+        "upstream" => (Some(source_id), target_id, reason),
+        "downstream" => (target_id, Some(source_id), reason),
+        _ => (
+            Some(source_id),
+            target_id,
+            Some("invalid_direction".to_string()),
+        ),
+    }
+}
+
+fn observed_endpoints(
+    observation: &ObservedEvidence,
+    identities: &BTreeMap<&str, &SourceIdentity>,
+    excluded: &BTreeSet<&str>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    let from = identities.get(observation.from_identity_id.as_str());
+    let to = identities.get(observation.to_identity_id.as_str());
+    let reason = if from.is_none() || to.is_none() {
+        Some("unresolved_observation".to_string())
+    } else if observation.observation_id.is_empty()
+        || observation.extractor_id.is_empty()
+        || observation.extractor_version.is_empty()
+        || observation.capability_id.is_empty()
+        || observation.relation_kind.is_empty()
+        || observation.from_locator.is_empty()
+        || observation.to_locator.is_empty()
+        || observation.source_span.path.is_empty()
+        || !is_hex_id(&observation.payload_hash)
+        || observation.snapshot_id.is_empty()
+    {
+        Some("provenance_incomplete".to_string())
+    } else if !identity_matches_locator(from.expect("from checked"), &observation.from_locator)
+        || !identity_matches_locator(to.expect("to checked"), &observation.to_locator)
+        || !identity_matches_locator(from.expect("from checked"), &observation.source_span.path)
+    {
+        Some("provenance_incomplete".to_string())
+    } else if excluded.contains(observation.from_identity_id.as_str()) {
+        Some("source_excluded_source".to_string())
+    } else if excluded.contains(observation.to_identity_id.as_str()) {
+        Some("source_excluded_target".to_string())
+    } else if !from.expect("from checked").exists || !to.expect("to checked").exists {
+        Some("stale_target".to_string())
+    } else {
+        None
+    };
+    (
+        Some(observation.from_identity_id.clone()),
+        Some(observation.to_identity_id.clone()),
+        reason,
+    )
+}
+
+fn identity_matches_locator(identity: &SourceIdentity, locator: &str) -> bool {
+    locator == identity.repo_rel_path
+        || locator == identity.canonical_locator
+        || identity
+            .alternate_locators
+            .iter()
+            .any(|alternate| alternate == locator)
+}
+
+fn add_ambiguity(ambiguities: &mut BTreeMap<String, AmbiguityA>, ambiguity: AmbiguityA) {
+    ambiguities.insert(ambiguity.ambiguity_id.clone(), ambiguity);
+}
+
+fn ambiguity_for_declaration(
+    declaration: &DependencyDeclaration,
+    reason: &str,
+    candidate_fact_ids: &[String],
+    candidate_targets: &[String],
+    relation_kind: &str,
+) -> AmbiguityA {
+    ambiguity_record(
+        &declaration.snapshot_id,
+        &declaration.source_identity_id,
+        candidate_fact_ids.to_vec(),
+        candidate_targets.to_vec(),
+        reason,
+        relation_kind,
+        vec![declaration.declaration_id.clone()],
+    )
+}
+
+fn ambiguity_for_observation(
+    observation: &ObservedEvidence,
+    reason: &str,
+    relation_kind: &str,
+) -> AmbiguityA {
+    ambiguity_record(
+        &observation.snapshot_id,
+        &observation.from_identity_id,
+        Vec::new(),
+        vec![observation.to_identity_id.clone()],
+        reason,
+        relation_kind,
+        vec![observation.observation_id.clone()],
+    )
+}
+
+fn ambiguity_record(
+    snapshot_id: &str,
+    source_identity_id: &str,
+    mut candidate_fact_ids: Vec<String>,
+    mut candidate_targets: Vec<String>,
+    reason_code: &str,
+    relation_kind: &str,
+    mut evidence_ids: Vec<String>,
+) -> AmbiguityA {
+    candidate_fact_ids.sort();
+    candidate_fact_ids.dedup();
+    candidate_targets.sort();
+    candidate_targets.dedup();
+    evidence_ids.sort();
+    evidence_ids.dedup();
+    let ambiguity_id = hash_parts(&[
+        "ambiguity_a.v1",
+        snapshot_id,
+        source_identity_id,
+        reason_code,
+        relation_kind,
+        &candidate_fact_ids.join(","),
+        &candidate_targets.join(","),
+        &evidence_ids.join(","),
+    ]);
+    AmbiguityA {
+        ambiguity_id,
+        source_identity_id: source_identity_id.to_string(),
+        candidate_fact_ids,
+        candidate_targets,
+        relation_kind: relation_kind.to_string(),
+        reason_code: reason_code.to_string(),
+        evidence_ids,
+        resolution_required: true,
+        covered: false,
+        snapshot_id: snapshot_id.to_string(),
+    }
+}
+
+fn read_evidence_inputs(
+    paths: &[PathBuf],
+    snapshot_id: &str,
+) -> Result<
+    (
+        Vec<ObservedEvidence>,
+        Vec<ExtractorCapability>,
+        Vec<SurfaceRelation>,
+        usize,
+    ),
+    ManifestError,
+> {
+    let mut observations = BTreeMap::<String, ObservedEvidence>::new();
+    let mut capabilities = BTreeMap::<String, ExtractorCapability>::new();
+    let mut surfaces = BTreeMap::<String, SurfaceRelation>::new();
+    for path in paths {
+        let bytes = fs::read(path).map_err(|error| {
+            ManifestError::Transport(format!("evidence input {}: {error}", path.display()))
+        })?;
+        for (line_number, line) in String::from_utf8(bytes)
+            .map_err(|error| ManifestError::Transport(format!("evidence input UTF-8: {error}")))?
+            .lines()
+            .enumerate()
+        {
+            if line.trim().is_empty() {
+                return Err(ManifestError::Transport(format!(
+                    "blank evidence JSONL line {}",
+                    line_number + 1
+                )));
+            }
+            let value: Value = serde_json::from_str(line).map_err(|error| {
+                ManifestError::Transport(format!("evidence line {}: {error}", line_number + 1))
+            })?;
+            let record_type = value
+                .get("record_type")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ManifestError::Transport("evidence record_type is required".to_string())
+                })?;
+            let envelope = parse_envelope(&value, record_type, false)?;
+            if envelope.snapshot_id != snapshot_id {
+                return Err(ManifestError::Transport(
+                    "evidence snapshot mismatch".to_string(),
+                ));
+            }
+            match record_type {
+                "observed_evidence.v1" => {
+                    let observation =
+                        parse_observed_evidence(envelope.record_id, envelope.payload)?;
+                    if observation.snapshot_id != snapshot_id {
+                        return Err(ManifestError::Transport(
+                            "observation snapshot mismatch".to_string(),
+                        ));
+                    }
+                    if let Some(previous) = observations.get(&observation.observation_id) {
+                        let qualifier = if previous == &observation {
+                            "exact"
+                        } else {
+                            "conflicting"
+                        };
+                        return Err(ManifestError::Transport(format!(
+                            "{qualifier} duplicate observation {}",
+                            observation.observation_id
+                        )));
+                    } else {
+                        observations.insert(observation.observation_id.clone(), observation);
+                    }
+                }
+                "extractor_capability.v1" => {
+                    let capability =
+                        parse_extractor_capability(envelope.record_id, envelope.payload)?;
+                    if let Some(previous) = capabilities.get(&capability.capability_id) {
+                        let qualifier = if previous == &capability {
+                            "exact"
+                        } else {
+                            "conflicting"
+                        };
+                        return Err(ManifestError::Transport(format!(
+                            "{qualifier} duplicate capability {}",
+                            capability.capability_id
+                        )));
+                    } else {
+                        capabilities.insert(capability.capability_id.clone(), capability);
+                    }
+                }
+                "surface_relation.v1" => {
+                    let relation = parse_surface_relation(envelope.record_id, envelope.payload)?;
+                    if let Some(previous) = surfaces.get(&relation.relation_id) {
+                        let qualifier = if previous == &relation {
+                            "exact"
+                        } else {
+                            "conflicting"
+                        };
+                        return Err(ManifestError::Transport(format!(
+                            "{qualifier} duplicate surface relation {}",
+                            relation.relation_id
+                        )));
+                    } else {
+                        surfaces.insert(relation.relation_id.clone(), relation);
+                    }
+                }
+                _ => {
+                    return Err(ManifestError::Transport(format!(
+                        "unknown evidence record type {record_type}"
+                    )))
+                }
+            }
+        }
+    }
+    Ok((
+        observations.into_values().collect(),
+        capabilities.into_values().collect(),
+        surfaces.into_values().collect(),
+        0,
+    ))
+}
+
+fn materialize_capabilities(
+    supplied: &[ExtractorCapability],
+    observations: &[ObservedEvidence],
+    evidence_paths: &[PathBuf],
+) -> Vec<ExtractorCapability> {
+    let supplied = supplied
+        .iter()
+        .map(|capability| (capability.capability_id.clone(), capability.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let known_capability_ids = RELATION_KIND_REGISTRY
+        .iter()
+        .map(|spec| spec.capability_id)
+        .collect::<BTreeSet<_>>();
+    let mut result = supplied
+        .iter()
+        .map(|(capability_id, capability)| {
+            let mut capability = capability.clone();
+            if !known_capability_ids.contains(capability_id.as_str()) {
+                capability.input_scope = "unavailable:unregistered-capability".to_string();
+                capability.completeness_claim =
+                    "unavailable; O=empty; coverage=0; capability-unregistered".to_string();
+            }
+            (capability_id.clone(), capability)
+        })
+        .collect::<BTreeMap<_, _>>();
+    for (capability_id, extractor_id, raw_kinds) in producer_capability_rows() {
+        if supplied.contains_key(&capability_id) {
+            continue;
+        }
+        let used = observations
+            .iter()
+            .any(|observation| observation.capability_id == capability_id);
+        result.insert(
+            capability_id.clone(),
+            ExtractorCapability {
+                capability_id,
+                extractor_id,
+                extractor_version: "unavailable".to_string(),
+                relation_kinds: raw_kinds,
+                input_scope: if used {
+                    "unavailable:explicit-evidence-without-connected-capability".to_string()
+                } else if evidence_paths.is_empty() {
+                    "unavailable:no-adapter-connected".to_string()
+                } else {
+                    "explicit-evidence-input:empty".to_string()
+                },
+                supported_file_kinds: Vec::new(),
+                unsupported_behavior: "unsupported-and-unresolved-to-A".to_string(),
+                dynamic_behavior: "dynamic-reflection-to-A".to_string(),
+                provenance_fields: vec![
+                    "payload_hash".to_string(),
+                    "snapshot_id".to_string(),
+                    "source_span".to_string(),
+                ],
+                completeness_claim: if evidence_paths.is_empty() {
+                    "unavailable; O=empty; coverage=0; adapter-not-connected".to_string()
+                } else if used {
+                    "unavailable; supplied-O-rejected; coverage=0; capability-not-connected"
+                        .to_string()
+                } else {
+                    "provided-empty; O=empty; coverage=0".to_string()
+                },
+            },
+        );
+    }
+    result.into_values().collect()
+}
+
+fn parse_observed_evidence(
+    record_id: &str,
+    value: &Value,
+) -> Result<ObservedEvidence, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("observed evidence payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "observation_id",
+            "extractor_id",
+            "extractor_version",
+            "capability_id",
+            "relation_kind",
+            "from_locator",
+            "to_locator",
+            "from_identity_id",
+            "to_identity_id",
+            "source_span",
+            "payload_hash",
+            "classification",
+            "accepted",
+            "snapshot_id",
+        ],
+    )?;
+    let observation_id = string_field(object, "observation_id")?;
+    if observation_id != record_id || !observation_id.starts_with("O-") {
+        return Err(ManifestError::Transport(
+            "observation record_id must equal O-<sha256> observation_id".to_string(),
+        ));
+    }
+    let payload_hash = string_field(object, "payload_hash")?;
+    if !is_hex_id(&payload_hash) {
+        return Err(ManifestError::Transport(
+            "observation payload_hash must be lowercase 64-hex".to_string(),
+        ));
+    }
+    Ok(ObservedEvidence {
+        observation_id,
+        extractor_id: string_field(object, "extractor_id")?,
+        extractor_version: string_field(object, "extractor_version")?,
+        capability_id: string_field(object, "capability_id")?,
+        relation_kind: string_field(object, "relation_kind")?,
+        from_locator: string_field(object, "from_locator")?,
+        to_locator: string_field(object, "to_locator")?,
+        from_identity_id: string_field(object, "from_identity_id")?,
+        to_identity_id: string_field(object, "to_identity_id")?,
+        source_span: parse_source_span(object.get("source_span").ok_or_else(|| {
+            ManifestError::Transport("observation source_span missing".to_string())
+        })?)?,
+        payload_hash,
+        classification: string_field(object, "classification")?,
+        accepted: bool_field(object, "accepted")?,
+        snapshot_id: string_field(object, "snapshot_id")?,
+    })
+}
+
+fn parse_extractor_capability(
+    record_id: &str,
+    value: &Value,
+) -> Result<ExtractorCapability, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("extractor capability payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "capability_id",
+            "extractor_id",
+            "extractor_version",
+            "relation_kinds",
+            "input_scope",
+            "supported_file_kinds",
+            "unsupported_behavior",
+            "dynamic_behavior",
+            "provenance_fields",
+            "completeness_claim",
+        ],
+    )?;
+    let capability_id = string_field(object, "capability_id")?;
+    if capability_id != record_id {
+        return Err(ManifestError::Transport(
+            "extractor capability record_id mismatch".to_string(),
+        ));
+    }
+    Ok(ExtractorCapability {
+        capability_id,
+        extractor_id: string_field(object, "extractor_id")?,
+        extractor_version: string_field(object, "extractor_version")?,
+        relation_kinds: string_array_field(object, "relation_kinds")?,
+        input_scope: string_field(object, "input_scope")?,
+        supported_file_kinds: string_array_field(object, "supported_file_kinds")?,
+        unsupported_behavior: string_field(object, "unsupported_behavior")?,
+        dynamic_behavior: string_field(object, "dynamic_behavior")?,
+        provenance_fields: string_array_field(object, "provenance_fields")?,
+        completeness_claim: string_field(object, "completeness_claim")?,
+    })
+}
+
+fn source_snapshot_payload(header: &SnapshotHeader) -> Value {
+    json!({
+        "snapshot_id": header.snapshot_id,
+        "parent_repo_id": header.parent_repo_id,
+        "root_realpath": header.root_realpath,
+        "git_head": header.git_head,
+        "git_index_tree": header.git_index_tree,
+        "git_worktree_dirty": header.git_worktree_dirty,
+        "git_status_hash": header.git_status_hash,
+        "dirty_paths": header.dirty_paths,
+        "agentcanon_pin": header.agentcanon_pin,
+        "schema_version": header.schema_version,
+        "tool_version": header.tool_version,
+        "path_sort": header.path_sort,
+        "captured_before_hash": header.captured_before_hash,
+        "captured_after_hash": header.captured_after_hash,
+        "snapshot_consistent": header.snapshot_consistent,
+    })
+}
+
+fn normalized_header_payload(header: &SnapshotHeader) -> Value {
+    json!({
+        "schema_version": NORMALIZED_RECORD_SET_VERSION,
+        "snapshot_schema_version": SNAPSHOT_SCHEMA_VERSION,
+        "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
+        "relation_schema_version": "relation.v1",
+        "snapshot_id": header.snapshot_id,
+        "source_fingerprint": header.source_fingerprint,
+        "tool_version": header.tool_version,
+        "profile": header.profile,
+    })
+}
+
+fn normalized_record_values(records: &NormalizedRecordSet) -> Vec<(String, String, Value)> {
+    let mut values = Vec::new();
+    values.push((
+        SNAPSHOT_SCHEMA_VERSION.to_string(),
+        records.header.snapshot_id.clone(),
+        source_snapshot_payload(&records.header),
+    ));
+    for identity in &records.source_identities {
+        values.push((
+            "source_identity.v1".to_string(),
+            identity.identity_id.clone(),
+            json!({
+                "identity_id": identity.identity_id,
+                "logical_id": identity.logical_id,
+                "repo_rel_path": identity.repo_rel_path,
+                "canonical_locator": identity.canonical_locator,
+                "alternate_locators": identity.alternate_locators,
+                "locator_kind": identity.locator_kind,
+                "path_role": identity.path_role,
+                "file_mode": identity.file_mode,
+                "exists": identity.exists,
+                "is_dirty": identity.is_dirty,
+                "content_hash": identity.content_hash,
+                "git_blob_or_gitlink": identity.git_blob_or_gitlink,
+                "submodule_commit": identity.submodule_commit,
+                "snapshot_id": identity.snapshot_id,
+            }),
+        ));
+    }
+    for declaration in &records.declarations {
+        values.push((
+            "dependency_declaration.v1".to_string(),
+            declaration.declaration_id.clone(),
+            declaration_payload(declaration),
+        ));
+    }
+    for attestation in &records.attestations {
+        values.push((
+            "attestation.v1".to_string(),
+            attestation.attestation_id.clone(),
+            attestation_payload(attestation),
+        ));
+    }
+    for relation in &records.relations {
+        values.push((
+            "normalized_relation.v1".to_string(),
+            relation.fact_id.clone(),
+            normalized_relation_payload(relation),
+        ));
+    }
+    for observation in &records.observations {
+        values.push((
+            "observed_evidence.v1".to_string(),
+            observation.observation_id.clone(),
+            observed_evidence_payload(observation),
+        ));
+    }
+    for relation in &records.surface_relations {
+        values.push((
+            "surface_relation.v1".to_string(),
+            relation.relation_id.clone(),
+            surface_relation_payload(relation),
+        ));
+    }
+    for exclusion in &records.source_exclusions {
+        values.push((
+            "source_exclusion.v1".to_string(),
+            exclusion.source_exclusion_id.clone(),
+            source_exclusion_payload(exclusion),
+        ));
+    }
+    for ambiguity in &records.ambiguities {
+        values.push((
+            "ambiguity_a.v1".to_string(),
+            ambiguity.ambiguity_id.clone(),
+            ambiguity_payload(ambiguity),
+        ));
+    }
+    for capability in &records.capabilities {
+        values.push((
+            "extractor_capability.v1".to_string(),
+            capability.capability_id.clone(),
+            capability_payload(capability),
+        ));
+    }
+    values.sort_by(|left, right| {
+        normalized_record_family_rank(&left.0)
+            .cmp(&normalized_record_family_rank(&right.0))
+            .then_with(|| left.1.cmp(&right.1))
+    });
+    values
+}
+
+fn normalized_record_family_rank(record_type: &str) -> usize {
+    match record_type {
+        SNAPSHOT_SCHEMA_VERSION => 1,
+        "source_identity.v1" => 2,
+        "dependency_declaration.v1" => 3,
+        "attestation.v1" => 4,
+        "normalized_relation.v1" => 5,
+        "observed_evidence.v1" => 6,
+        "surface_relation.v1" => 7,
+        "source_exclusion.v1" => 8,
+        "ambiguity_a.v1" => 9,
+        "extractor_capability.v1" => 10,
+        other => panic!("unknown normalized record family {other}"),
+    }
+}
+
+fn validate_normalized_record_order(
+    values: &[(String, String, Value)],
+) -> Result<(), ManifestError> {
+    if values.first().map(|value| value.0.as_str()) != Some(SNAPSHOT_SCHEMA_VERSION) {
+        return Err(ManifestError::Transport(
+            "normalized body must begin with source snapshot".to_string(),
+        ));
+    }
+    for pair in values.windows(2) {
+        let previous_rank = normalized_record_family_rank(&pair[0].0);
+        let current_rank = normalized_record_family_rank(&pair[1].0);
+        if previous_rank > current_rank || (previous_rank == current_rank && pair[0].1 >= pair[1].1)
+        {
+            return Err(ManifestError::Transport(
+                "normalized records are not in canonical family and record-ID order".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn normalized_record_fingerprint(records: &NormalizedRecordSet) -> Result<String, ManifestError> {
+    let mut bytes = Vec::new();
+    for (record_type, record_id, payload) in normalized_record_values(records) {
+        serde_json::to_writer(
+            &mut bytes,
+            &json!({"record_type": record_type, "record_id": record_id, "payload": payload}),
+        )
+        .map_err(|error| ManifestError::Transport(error.to_string()))?;
+        bytes.push(0);
+    }
+    Ok(sha256_bytes(&bytes))
+}
+
+pub(crate) fn write_normalized_record_set(
+    records: &NormalizedRecordSet,
+    writer: impl Write,
+) -> Result<(), TransportError> {
+    validate_normalized_record_set(records)?;
+    let mut writer = writer;
+    write_envelope(
+        &mut writer,
+        "normalized_record_set_header.v1",
+        &records.header.snapshot_id,
+        &records.header.snapshot_id,
+        normalized_header_payload(&records.header),
+    )?;
+    let values = normalized_record_values(records);
+    validate_normalized_record_order(&values)?;
+    for (record_type, record_id, payload) in values {
+        write_envelope(
+            &mut writer,
+            &record_type,
+            &record_id,
+            &records.header.snapshot_id,
+            payload,
+        )?;
+    }
+    let summary_payload = json!({
+        "snapshot_id": records.summary.snapshot_id,
+        "record_counts": records.summary.record_counts,
+        "accepted_fact_count": records.summary.accepted_fact_count,
+        "rejected_declaration_count": records.summary.rejected_declaration_count,
+        "rejected_observation_count": records.summary.rejected_observation_count,
+        "ambiguity_count": records.summary.ambiguity_count,
+        "source_exclusion_count": records.summary.source_exclusion_count,
+        "normalized_record_fingerprint": records.summary.normalized_record_fingerprint,
+    });
+    write_envelope(
+        &mut writer,
+        "normalization_summary.v1",
+        &records.summary.snapshot_id,
+        &records.header.snapshot_id,
+        summary_payload,
+    )
+}
+
+fn declaration_payload(declaration: &DependencyDeclaration) -> Value {
+    json!({
+        "declaration_id": declaration.declaration_id,
+        "source_identity_id": declaration.source_identity_id,
+        "declared_direction": declaration.declared_direction,
+        "declared_kind": declaration.declared_kind,
+        "declared_target": declaration.declared_target,
+        "resolved_target_identity_id": declaration.resolved_target_identity_id,
+        "source_span": source_span_json(&declaration.source_span),
+        "reason": declaration.reason,
+        "raw_line_hash": declaration.raw_line_hash,
+        "attestation_key": declaration.attestation_key,
+        "snapshot_id": declaration.snapshot_id,
+    })
+}
+
+fn attestation_payload(attestation: &Attestation) -> Value {
+    json!({
+        "attestation_id": attestation.attestation_id,
+        "attestation_key": attestation.attestation_key,
+        "evidence_type": attestation.evidence_type,
+        "evidence_id": attestation.evidence_id,
+        "declaring_identity_id": attestation.declaring_identity_id,
+        "dependent_identity_id": attestation.dependent_identity_id,
+        "prerequisite_identity_id": attestation.prerequisite_identity_id,
+        "declared_direction": attestation.declared_direction,
+        "relation_kind": attestation.relation_kind,
+        "source_span": source_span_json(&attestation.source_span),
+        "reason": attestation.reason,
+        "raw_line_hash": attestation.raw_line_hash,
+        "accepted": attestation.accepted,
+        "rejection_reason": attestation.rejection_reason,
+        "snapshot_id": attestation.snapshot_id,
+    })
+}
+
+fn normalized_relation_payload(relation: &NormalizedRelation) -> Value {
+    json!({
+        "fact_id": relation.fact_id,
+        "from_identity_id": relation.from_identity_id,
+        "to_identity_id": relation.to_identity_id,
+        "relation_kind": relation.relation_kind,
+        "semantic_direction": relation.semantic_direction,
+        "pair_identity": relation.pair_identity,
+        "attestation_ids": relation.attestation_ids,
+        "observation_ids": relation.observation_ids,
+        "authority": relation.authority,
+        "accepted": relation.accepted,
+        "reconciliation_status": relation.reconciliation_status,
+        "source_snapshot_id": relation.source_snapshot_id,
+        "source_content_hashes": relation.source_content_hashes,
+    })
+}
+
+fn observed_evidence_payload(observation: &ObservedEvidence) -> Value {
+    json!({
+        "observation_id": observation.observation_id,
+        "extractor_id": observation.extractor_id,
+        "extractor_version": observation.extractor_version,
+        "capability_id": observation.capability_id,
+        "relation_kind": observation.relation_kind,
+        "from_locator": observation.from_locator,
+        "to_locator": observation.to_locator,
+        "from_identity_id": observation.from_identity_id,
+        "to_identity_id": observation.to_identity_id,
+        "source_span": source_span_json(&observation.source_span),
+        "payload_hash": observation.payload_hash,
+        "classification": observation.classification,
+        "accepted": observation.accepted,
+        "snapshot_id": observation.snapshot_id,
+    })
+}
+
+fn surface_relation_payload(relation: &SurfaceRelation) -> Value {
+    json!({
+        "relation_id": relation.relation_id,
+        "relation_type": relation.relation_type,
+        "source_identity_id": relation.source_identity_id,
+        "target_identity_id": relation.target_identity_id,
+        "source_path": relation.source_path,
+        "target_path": relation.target_path,
+        "owner_class": relation.owner_class,
+        "surface_mode": relation.surface_mode,
+        "content_hash_equal": relation.content_hash_equal,
+        "evidence_id": relation.evidence_id,
+        "status": relation.status,
+        "snapshot_id": relation.snapshot_id,
+    })
+}
+
+fn source_exclusion_payload(exclusion: &SourceExclusion) -> Value {
+    json!({
+        "source_exclusion_id": exclusion.source_exclusion_id,
+        "source_identity_id": exclusion.source_identity_id,
+        "repo_rel_path": exclusion.repo_rel_path,
+        "reason_code": exclusion.reason_code,
+        "rule_id": exclusion.rule_id,
+        "scope": exclusion.scope,
+        "evidence_id": exclusion.evidence_id,
+        "covered": exclusion.covered,
+        "snapshot_id": exclusion.snapshot_id,
+    })
+}
+
+fn ambiguity_payload(ambiguity: &AmbiguityA) -> Value {
+    json!({
+        "ambiguity_id": ambiguity.ambiguity_id,
+        "source_identity_id": ambiguity.source_identity_id,
+        "candidate_fact_ids": ambiguity.candidate_fact_ids,
+        "candidate_targets": ambiguity.candidate_targets,
+        "relation_kind": ambiguity.relation_kind,
+        "reason_code": ambiguity.reason_code,
+        "evidence_ids": ambiguity.evidence_ids,
+        "resolution_required": ambiguity.resolution_required,
+        "covered": ambiguity.covered,
+        "snapshot_id": ambiguity.snapshot_id,
+    })
+}
+
+fn capability_payload(capability: &ExtractorCapability) -> Value {
+    json!({
+        "capability_id": capability.capability_id,
+        "extractor_id": capability.extractor_id,
+        "extractor_version": capability.extractor_version,
+        "relation_kinds": capability.relation_kinds,
+        "input_scope": capability.input_scope,
+        "supported_file_kinds": capability.supported_file_kinds,
+        "unsupported_behavior": capability.unsupported_behavior,
+        "dynamic_behavior": capability.dynamic_behavior,
+        "provenance_fields": capability.provenance_fields,
+        "completeness_claim": capability.completeness_claim,
+    })
+}
+
+fn parse_attestation(record_id: &str, value: &Value) -> Result<Attestation, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("attestation payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "attestation_id",
+            "attestation_key",
+            "evidence_type",
+            "evidence_id",
+            "declaring_identity_id",
+            "dependent_identity_id",
+            "prerequisite_identity_id",
+            "declared_direction",
+            "relation_kind",
+            "source_span",
+            "reason",
+            "raw_line_hash",
+            "accepted",
+            "rejection_reason",
+            "snapshot_id",
+        ],
+    )?;
+    let attestation_id = string_field(object, "attestation_id")?;
+    if attestation_id != record_id {
+        return Err(ManifestError::Transport(
+            "attestation record_id mismatch".to_string(),
+        ));
+    }
+    Ok(Attestation {
+        attestation_id,
+        attestation_key: string_field(object, "attestation_key")?,
+        evidence_type: string_field(object, "evidence_type")?,
+        evidence_id: string_field(object, "evidence_id")?,
+        declaring_identity_id: string_field(object, "declaring_identity_id")?,
+        dependent_identity_id: string_field(object, "dependent_identity_id")?,
+        prerequisite_identity_id: string_field(object, "prerequisite_identity_id")?,
+        declared_direction: string_field(object, "declared_direction")?,
+        relation_kind: string_field(object, "relation_kind")?,
+        source_span: parse_source_span(object.get("source_span").ok_or_else(|| {
+            ManifestError::Transport("attestation source_span missing".to_string())
+        })?)?,
+        reason: string_field(object, "reason")?,
+        raw_line_hash: string_field(object, "raw_line_hash")?,
+        accepted: bool_field(object, "accepted")?,
+        rejection_reason: string_field(object, "rejection_reason")?,
+        snapshot_id: string_field(object, "snapshot_id")?,
+    })
+}
+
+fn parse_normalized_relation(
+    record_id: &str,
+    value: &Value,
+) -> Result<NormalizedRelation, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("normalized relation payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "fact_id",
+            "from_identity_id",
+            "to_identity_id",
+            "relation_kind",
+            "semantic_direction",
+            "pair_identity",
+            "attestation_ids",
+            "observation_ids",
+            "authority",
+            "accepted",
+            "reconciliation_status",
+            "source_snapshot_id",
+            "source_content_hashes",
+        ],
+    )?;
+    let fact_id = string_field(object, "fact_id")?;
+    if fact_id != record_id {
+        return Err(ManifestError::Transport(
+            "normalized relation record_id mismatch".to_string(),
+        ));
+    }
+    Ok(NormalizedRelation {
+        fact_id,
+        from_identity_id: string_field(object, "from_identity_id")?,
+        to_identity_id: string_field(object, "to_identity_id")?,
+        relation_kind: string_field(object, "relation_kind")?,
+        semantic_direction: string_field(object, "semantic_direction")?,
+        pair_identity: string_field(object, "pair_identity")?,
+        attestation_ids: string_array_field(object, "attestation_ids")?,
+        observation_ids: string_array_field(object, "observation_ids")?,
+        authority: string_field(object, "authority")?,
+        accepted: bool_field(object, "accepted")?,
+        reconciliation_status: string_field(object, "reconciliation_status")?,
+        source_snapshot_id: string_field(object, "source_snapshot_id")?,
+        source_content_hashes: string_array_field(object, "source_content_hashes")?,
+    })
+}
+
+fn parse_ambiguity(record_id: &str, value: &Value) -> Result<AmbiguityA, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("ambiguity payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "ambiguity_id",
+            "source_identity_id",
+            "candidate_fact_ids",
+            "candidate_targets",
+            "relation_kind",
+            "reason_code",
+            "evidence_ids",
+            "resolution_required",
+            "covered",
+            "snapshot_id",
+        ],
+    )?;
+    let ambiguity_id = string_field(object, "ambiguity_id")?;
+    if ambiguity_id != record_id {
+        return Err(ManifestError::Transport(
+            "ambiguity record_id mismatch".to_string(),
+        ));
+    }
+    Ok(AmbiguityA {
+        ambiguity_id,
+        source_identity_id: string_field(object, "source_identity_id")?,
+        candidate_fact_ids: string_array_field(object, "candidate_fact_ids")?,
+        candidate_targets: string_array_field(object, "candidate_targets")?,
+        relation_kind: string_field(object, "relation_kind")?,
+        reason_code: string_field(object, "reason_code")?,
+        evidence_ids: string_array_field(object, "evidence_ids")?,
+        resolution_required: bool_field(object, "resolution_required")?,
+        covered: bool_field(object, "covered")?,
+        snapshot_id: string_field(object, "snapshot_id")?,
+    })
+}
+
+fn parse_normalized_header(
+    record_id: &str,
+    value: &Value,
+) -> Result<
+    (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ),
+    ManifestError,
+> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("normalized record-set header must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "schema_version",
+            "snapshot_schema_version",
+            "manifest_schema_version",
+            "relation_schema_version",
+            "snapshot_id",
+            "source_fingerprint",
+            "tool_version",
+            "profile",
+        ],
+    )?;
+    let schema_version = string_field(object, "schema_version")?;
+    let snapshot_schema_version = string_field(object, "snapshot_schema_version")?;
+    let manifest_schema_version = string_field(object, "manifest_schema_version")?;
+    let relation_schema_version = string_field(object, "relation_schema_version")?;
+    let snapshot_id = string_field(object, "snapshot_id")?;
+    if record_id != snapshot_id {
+        return Err(ManifestError::Transport(
+            "normalized header record_id mismatch".to_string(),
+        ));
+    }
+    Ok((
+        schema_version,
+        snapshot_schema_version,
+        manifest_schema_version,
+        relation_schema_version,
+        snapshot_id,
+        string_field(object, "source_fingerprint")?,
+        string_field(object, "tool_version")?,
+        string_field(object, "profile")?,
+    ))
+}
+
+fn parse_normalized_source_snapshot(
+    value: &Value,
+    source_fingerprint: &str,
+    tool_version: &str,
+    profile: &str,
+) -> Result<SnapshotHeader, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("normalized source snapshot payload must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "snapshot_id",
+            "parent_repo_id",
+            "root_realpath",
+            "git_head",
+            "git_index_tree",
+            "git_worktree_dirty",
+            "git_status_hash",
+            "dirty_paths",
+            "agentcanon_pin",
+            "schema_version",
+            "tool_version",
+            "path_sort",
+            "captured_before_hash",
+            "captured_after_hash",
+            "snapshot_consistent",
+        ],
+    )?;
+    let payload_schema = string_field(object, "schema_version")?;
+    let payload_tool = string_field(object, "tool_version")?;
+    if payload_schema != SNAPSHOT_SCHEMA_VERSION || payload_tool != tool_version {
+        return Err(ManifestError::Transport(
+            "normalized source snapshot schema/tool mismatch".to_string(),
+        ));
+    }
+    Ok(SnapshotHeader {
+        snapshot_id: string_field(object, "snapshot_id")?,
+        parent_repo_id: string_field(object, "parent_repo_id")?,
+        root_realpath: string_field(object, "root_realpath")?,
+        git_head: string_field(object, "git_head")?,
+        git_index_tree: string_field(object, "git_index_tree")?,
+        git_worktree_dirty: bool_field(object, "git_worktree_dirty")?,
+        git_status_hash: string_field(object, "git_status_hash")?,
+        dirty_paths: string_array_field(object, "dirty_paths")?,
+        agentcanon_pin: string_field(object, "agentcanon_pin")?,
+        schema_version: payload_schema,
+        tool_version: payload_tool,
+        profile: profile.to_string(),
+        path_sort: string_field(object, "path_sort")?,
+        source_fingerprint: source_fingerprint.to_string(),
+        captured_before_hash: string_field(object, "captured_before_hash")?,
+        captured_after_hash: string_field(object, "captured_after_hash")?,
+        snapshot_consistent: bool_field(object, "snapshot_consistent")?,
+    })
+}
+
+fn parse_normalization_summary(
+    record_id: &str,
+    value: &Value,
+) -> Result<NormalizationSummary, ManifestError> {
+    let object = value.as_object().ok_or_else(|| {
+        ManifestError::Transport("normalization summary must be an object".to_string())
+    })?;
+    ensure_exact_keys(
+        object,
+        &[
+            "snapshot_id",
+            "record_counts",
+            "accepted_fact_count",
+            "rejected_declaration_count",
+            "rejected_observation_count",
+            "ambiguity_count",
+            "source_exclusion_count",
+            "normalized_record_fingerprint",
+        ],
+    )?;
+    let snapshot_id = string_field(object, "snapshot_id")?;
+    if record_id != snapshot_id {
+        return Err(ManifestError::Transport(
+            "normalization summary record_id mismatch".to_string(),
+        ));
+    }
+    let counts_object = object
+        .get("record_counts")
+        .and_then(Value::as_object)
+        .ok_or_else(|| ManifestError::Transport("record_counts must be an object".to_string()))?;
+    let mut record_counts = BTreeMap::new();
+    for (key, value) in counts_object {
+        let count = value
+            .as_u64()
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(|| {
+                ManifestError::Transport(format!(
+                    "record_counts.{key} must be a non-negative integer"
+                ))
+            })?;
+        record_counts.insert(key.clone(), count);
+    }
+    Ok(NormalizationSummary {
+        snapshot_id,
+        record_counts,
+        accepted_fact_count: usize_field(object, "accepted_fact_count")?,
+        rejected_declaration_count: usize_field(object, "rejected_declaration_count")?,
+        rejected_observation_count: usize_field(object, "rejected_observation_count")?,
+        ambiguity_count: usize_field(object, "ambiguity_count")?,
+        source_exclusion_count: usize_field(object, "source_exclusion_count")?,
+        normalized_record_fingerprint: string_field(object, "normalized_record_fingerprint")?,
+    })
+}
+
+pub(crate) fn read_normalized_record_set(
+    reader: impl BufRead,
+    expected_snapshot_id: &str,
+) -> Result<NormalizedRecordSet, TransportError> {
+    if !is_hex_id(expected_snapshot_id) {
+        return Err(ManifestError::Transport(
+            "expected snapshot ID must be lowercase 64-hex".to_string(),
+        ));
+    }
+    let mut values = Vec::new();
+    for (line_number, line) in reader.lines().enumerate() {
+        let line = line.map_err(|error| ManifestError::Transport(error.to_string()))?;
+        if line.trim().is_empty() {
+            return Err(ManifestError::Transport(format!(
+                "blank normalized JSONL line {}",
+                line_number + 1
+            )));
+        }
+        values.push(serde_json::from_str::<Value>(&line).map_err(|error| {
+            ManifestError::Transport(format!("normalized line {}: {error}", line_number + 1))
+        })?);
+    }
+    if values.len() < 3 {
+        return Err(ManifestError::Transport(
+            "normalized record set requires header, snapshot, and summary".to_string(),
+        ));
+    }
+    let header_value = &values[0];
+    let header_envelope = parse_envelope(header_value, "normalized_record_set_header.v1", true)?;
+    let (
+        schema_version,
+        snapshot_schema_version,
+        manifest_schema_version,
+        relation_schema_version,
+        snapshot_id,
+        source_fingerprint,
+        tool_version,
+        profile,
+    ) = parse_normalized_header(header_envelope.record_id, header_envelope.payload)?;
+    if schema_version != NORMALIZED_RECORD_SET_VERSION
+        || snapshot_schema_version != SNAPSHOT_SCHEMA_VERSION
+        || manifest_schema_version != MANIFEST_SCHEMA_VERSION
+        || relation_schema_version != "relation.v1"
+        || snapshot_id != expected_snapshot_id
+        || header_envelope.snapshot_id != expected_snapshot_id
+    {
+        return Err(ManifestError::Transport(
+            "normalized record-set schema or snapshot mismatch".to_string(),
+        ));
+    }
+    let mut header = None;
+    let mut source_identities = Vec::new();
+    let mut declarations = Vec::new();
+    let mut attestations = Vec::new();
+    let mut relations = Vec::new();
+    let mut observations = Vec::new();
+    let mut surface_relations = Vec::new();
+    let mut source_exclusions = Vec::new();
+    let mut ambiguities = Vec::new();
+    let mut capabilities = Vec::new();
+    let mut summary = None;
+    let mut last_rank = 0usize;
+    let mut last_record_id = None::<String>;
+    for (index, value) in values.iter().enumerate().skip(1) {
+        let record_type = value
+            .get("record_type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ManifestError::Transport("normalized record_type is required".to_string())
+            })?;
+        let envelope = parse_envelope(value, record_type, false)?;
+        if envelope.snapshot_id != expected_snapshot_id {
+            return Err(ManifestError::Transport(
+                "mixed normalized snapshot IDs".to_string(),
+            ));
+        }
+        let rank = match record_type {
+            SNAPSHOT_SCHEMA_VERSION
+            | "source_identity.v1"
+            | "dependency_declaration.v1"
+            | "attestation.v1"
+            | "normalized_relation.v1"
+            | "observed_evidence.v1"
+            | "surface_relation.v1"
+            | "source_exclusion.v1"
+            | "ambiguity_a.v1"
+            | "extractor_capability.v1" => normalized_record_family_rank(record_type),
+            "normalization_summary.v1" => 11,
+            _ => {
+                return Err(ManifestError::Transport(format!(
+                    "unknown normalized record type {record_type}"
+                )))
+            }
+        };
+        if rank < last_rank || (rank == 11 && index + 1 != values.len()) {
+            return Err(ManifestError::Transport(
+                "normalized record families are not in canonical order".to_string(),
+            ));
+        }
+        if rank == last_rank
+            && last_record_id
+                .as_deref()
+                .is_some_and(|previous| previous >= envelope.record_id)
+        {
+            return Err(ManifestError::Transport(
+                "normalized record IDs are not strictly increasing within a family".to_string(),
+            ));
+        }
+        last_rank = rank;
+        last_record_id = Some(envelope.record_id.to_string());
+        match record_type {
+            SNAPSHOT_SCHEMA_VERSION => {
+                if header.is_some() {
+                    return Err(ManifestError::Transport(
+                        "duplicate normalized source snapshot".to_string(),
+                    ));
+                }
+                let parsed = parse_normalized_source_snapshot(
+                    envelope.payload,
+                    &source_fingerprint,
+                    &tool_version,
+                    &profile,
+                )?;
+                if parsed.snapshot_id != expected_snapshot_id {
+                    return Err(ManifestError::Transport(
+                        "normalized source snapshot mismatch".to_string(),
+                    ));
+                }
+                header = Some(parsed);
+            }
+            "source_identity.v1" => {
+                source_identities.push(parse_source_identity(envelope.record_id, envelope.payload)?)
+            }
+            "dependency_declaration.v1" => {
+                declarations.push(parse_declaration(envelope.record_id, envelope.payload)?)
+            }
+            "attestation.v1" => {
+                attestations.push(parse_attestation(envelope.record_id, envelope.payload)?)
+            }
+            "normalized_relation.v1" => relations.push(parse_normalized_relation(
+                envelope.record_id,
+                envelope.payload,
+            )?),
+            "observed_evidence.v1" => observations.push(parse_observed_evidence(
+                envelope.record_id,
+                envelope.payload,
+            )?),
+            "surface_relation.v1" => surface_relations.push(parse_surface_relation(
+                envelope.record_id,
+                envelope.payload,
+            )?),
+            "source_exclusion.v1" => source_exclusions.push(parse_source_exclusion(
+                envelope.record_id,
+                envelope.payload,
+            )?),
+            "ambiguity_a.v1" => {
+                ambiguities.push(parse_ambiguity(envelope.record_id, envelope.payload)?)
+            }
+            "extractor_capability.v1" => capabilities.push(parse_extractor_capability(
+                envelope.record_id,
+                envelope.payload,
+            )?),
+            "normalization_summary.v1" => {
+                if summary.is_some() {
+                    return Err(ManifestError::Transport(
+                        "duplicate normalization summary".to_string(),
+                    ));
+                }
+                summary = Some(parse_normalization_summary(
+                    envelope.record_id,
+                    envelope.payload,
+                )?);
+            }
+            _ => unreachable!(),
+        }
+    }
+    let header = header.ok_or_else(|| {
+        ManifestError::Transport("missing normalized source snapshot".to_string())
+    })?;
+    let summary = summary
+        .ok_or_else(|| ManifestError::Transport("missing normalization summary".to_string()))?;
+    if header.source_fingerprint != source_fingerprint
+        || header.tool_version != tool_version
+        || header.profile != profile
+    {
+        return Err(ManifestError::Transport(
+            "normalized header/source metadata mismatch".to_string(),
+        ));
+    }
+    ensure_unique_record_ids(
+        "normalized source identity",
+        source_identities
+            .iter()
+            .map(|item| item.identity_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized declaration",
+        declarations.iter().map(|item| item.declaration_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized attestation",
+        attestations.iter().map(|item| item.attestation_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized relation",
+        relations.iter().map(|item| item.fact_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized observation",
+        observations.iter().map(|item| item.observation_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized surface relation",
+        surface_relations
+            .iter()
+            .map(|item| item.relation_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized exclusion",
+        source_exclusions
+            .iter()
+            .map(|item| item.source_exclusion_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized ambiguity",
+        ambiguities.iter().map(|item| item.ambiguity_id.as_str()),
+    )?;
+    ensure_unique_record_ids(
+        "normalized capability",
+        capabilities.iter().map(|item| item.capability_id.as_str()),
+    )?;
+    validate_snapshot_transport(
+        &header,
+        &mut source_identities,
+        &declarations,
+        &source_exclusions,
+        &surface_relations,
+    )?;
+    let source_universe = materialize_source_universe(
+        &source_identities
+            .iter()
+            .map(|identity| identity.repo_rel_path.clone())
+            .collect::<Vec<_>>(),
+        &source_identities,
+        &source_exclusions,
+    )?;
+    let records = NormalizedRecordSet {
+        header,
+        source_identities,
+        declarations,
+        attestations,
+        relations,
+        observations,
+        surface_relations,
+        source_exclusions,
+        ambiguities,
+        capabilities,
+        source_universe,
+        summary,
+    };
+    validate_normalized_record_order(&normalized_record_values(&records))?;
+    validate_normalized_record_set(&records)?;
+    Ok(records)
+}
+
+fn validate_normalized_record_set(records: &NormalizedRecordSet) -> Result<(), ManifestError> {
+    RelationNormalizer::validate_relation_kind_registry()?;
+    if records.header.schema_version != SNAPSHOT_SCHEMA_VERSION
+        || records.header.profile != "parent"
+        || !records.header.snapshot_consistent
+        || !is_hex_id(&records.header.snapshot_id)
+    {
+        return Err(ManifestError::Transport(
+            "normalized source snapshot is invalid".to_string(),
+        ));
+    }
+    let mut identities = records.source_identities.clone();
+    validate_snapshot_transport(
+        &records.header,
+        &mut identities,
+        &records.declarations,
+        &records.source_exclusions,
+        &records.surface_relations,
+    )?;
+    if identities.len() != records.source_identities.len() {
+        return Err(ManifestError::Transport(
+            "normalized identity count changed during validation".to_string(),
+        ));
+    }
+    let expected_candidate_paths = records
+        .source_identities
+        .iter()
+        .map(|identity| identity.repo_rel_path.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if records.source_universe.candidate_paths != expected_candidate_paths {
+        return Err(ManifestError::Transport(
+            "normalized source universe does not represent identities".to_string(),
+        ));
+    }
+    if !records
+        .source_universe
+        .eligible_equals_candidate_minus_excluded
+        || !records.source_universe.union_equals_candidate
+        || !records.source_universe.intersection_empty
+    {
+        return Err(ManifestError::Transport(
+            "normalized source algebra failed".to_string(),
+        ));
+    }
+    if records.source_exclusions.iter().any(|exclusion| {
+        exclusion.snapshot_id != records.header.snapshot_id
+            || exclusion.source_exclusion_id.is_empty()
+            || exclusion.source_identity_id.is_empty()
+            || exclusion.repo_rel_path.is_empty()
+            || exclusion.reason_code.is_empty()
+            || exclusion.rule_id.is_empty()
+            || exclusion.scope.is_empty()
+            || exclusion.evidence_id.is_empty()
+            || exclusion.covered
+    }) {
+        return Err(ManifestError::Transport(
+            "source-exclusion provenance is incomplete or covered".to_string(),
+        ));
+    }
+    let identities_by_id = records
+        .source_identities
+        .iter()
+        .map(|identity| (identity.identity_id.as_str(), identity))
+        .collect::<BTreeMap<_, _>>();
+    let logical_by_id = identities_by_id
+        .iter()
+        .map(|(identity_id, identity)| (*identity_id, identity.logical_id.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let excluded_identity_ids = records
+        .source_exclusions
+        .iter()
+        .map(|exclusion| exclusion.source_identity_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let declarations_by_id = records
+        .declarations
+        .iter()
+        .map(|declaration| (declaration.declaration_id.as_str(), declaration))
+        .collect::<BTreeMap<_, _>>();
+    let observations_by_id = records
+        .observations
+        .iter()
+        .map(|observation| (observation.observation_id.as_str(), observation))
+        .collect::<BTreeMap<_, _>>();
+    let capabilities_by_id = records
+        .capabilities
+        .iter()
+        .map(|capability| (capability.capability_id.as_str(), capability))
+        .collect::<BTreeMap<_, _>>();
+    let registered_capability_ids = producer_capability_rows()
+        .into_iter()
+        .map(|(capability_id, _, _)| capability_id)
+        .collect::<BTreeSet<_>>();
+    if records.capabilities.len() != capabilities_by_id.len()
+        || registered_capability_ids
+            .iter()
+            .any(|capability_id| !capabilities_by_id.contains_key(capability_id.as_str()))
+    {
+        return Err(ManifestError::Transport(
+            "registered capability transport is incomplete or duplicated".to_string(),
+        ));
+    }
+    if records.observations.is_empty() {
+        for capability_id in &registered_capability_ids {
+            let capability = capabilities_by_id
+                .get(capability_id.as_str())
+                .expect("registered capability presence checked");
+            if !capability.completeness_claim.contains("O=empty")
+                || !capability.completeness_claim.contains("coverage=0")
+                || (!capability.input_scope.contains("unavailable")
+                    && !capability.completeness_claim.contains("provided-empty"))
+            {
+                return Err(ManifestError::Transport(
+                    "empty observation set requires unavailable/provided-empty capability status"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    let mut attestation_by_id = BTreeMap::new();
+    let mut attestation_by_evidence = BTreeMap::new();
+    for attestation in &records.attestations {
+        if attestation.snapshot_id != records.header.snapshot_id
+            || attestation.attestation_key.is_empty()
+            || attestation.evidence_id.is_empty()
+            || attestation.declaring_identity_id.is_empty()
+            || attestation.declared_direction.is_empty()
+            || attestation.relation_kind.is_empty()
+            || attestation.source_span.path.is_empty()
+            || attestation.reason.is_empty()
+            || !is_hex_id(&attestation.attestation_key)
+            || !is_hex_id(&attestation.raw_line_hash)
+            || !matches!(
+                attestation.evidence_type.as_str(),
+                "declaration" | "observation"
+            )
+            || attestation.accepted == !attestation.rejection_reason.is_empty()
+        {
+            return Err(ManifestError::Transport(
+                "attestation provenance or rejection partition is invalid".to_string(),
+            ));
+        }
+        let expected_id = hash_parts(&["attestation.v1", &attestation.attestation_key]);
+        if expected_id != attestation.attestation_id {
+            return Err(ManifestError::Transport(format!(
+                "attestation ID mismatch for {}",
+                attestation.evidence_id
+            )));
+        }
+        if attestation_by_id
+            .insert(attestation.attestation_id.as_str(), attestation)
+            .is_some()
+        {
+            return Err(ManifestError::Transport(
+                "duplicate attestation ID".to_string(),
+            ));
+        }
+        if attestation_by_evidence
+            .insert(
+                (
+                    attestation.evidence_type.as_str(),
+                    attestation.evidence_id.as_str(),
+                ),
+                attestation,
+            )
+            .is_some()
+        {
+            return Err(ManifestError::Transport(
+                "duplicate attestation evidence provenance".to_string(),
+            ));
+        }
+    }
+    for capability in &records.capabilities {
+        if capability.capability_id.is_empty()
+            || capability.extractor_id.is_empty()
+            || capability.extractor_version.is_empty()
+            || capability.input_scope.is_empty()
+            || capability.unsupported_behavior.is_empty()
+            || capability.dynamic_behavior.is_empty()
+            || capability.completeness_claim.is_empty()
+            || capability.relation_kinds.is_empty()
+            || capability.provenance_fields.iter().any(String::is_empty)
+            || capability
+                .relation_kinds
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+            || capability
+                .provenance_fields
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+        {
+            return Err(ManifestError::Transport(
+                "extractor capability provenance is incomplete".to_string(),
+            ));
+        }
+        let known = producer_capability_rows()
+            .into_iter()
+            .find(|(capability_id, _, _)| capability_id == &capability.capability_id);
+        if let Some((_, extractor_id, raw_kinds)) = known {
+            if capability.extractor_id != extractor_id || capability.relation_kinds != raw_kinds {
+                return Err(ManifestError::Transport(format!(
+                    "registered capability {} disagrees with the relation registry",
+                    capability.capability_id
+                )));
+            }
+        } else if !capability.input_scope.contains("unavailable")
+            || !capability.completeness_claim.contains("unavailable")
+            || !records.ambiguities.iter().any(|ambiguity| {
+                ambiguity.reason_code == "capability_unknown"
+                    && ambiguity.evidence_ids.contains(&capability.capability_id)
+            })
+        {
+            return Err(ManifestError::Transport(
+                "unknown capability is not retained as typed unavailable/A".to_string(),
+            ));
+        }
+    }
+    for observation in &records.observations {
+        if observation.snapshot_id != records.header.snapshot_id
+            || observation.observation_id.is_empty()
+            || observation.extractor_id.is_empty()
+            || observation.extractor_version.is_empty()
+            || observation.capability_id.is_empty()
+            || observation.relation_kind.is_empty()
+            || observation.from_locator.is_empty()
+            || observation.to_locator.is_empty()
+            || observation.from_identity_id.is_empty()
+            || observation.to_identity_id.is_empty()
+            || observation.source_span.path.is_empty()
+            || observation.classification.is_empty()
+            || !is_hex_id(&observation.payload_hash)
+        {
+            return Err(ManifestError::Transport(
+                "observation provenance is incomplete".to_string(),
+            ));
+        }
+        let registered_kind = RelationNormalizer::normalize_relation_kind(
+            &observation.capability_id,
+            &observation.relation_kind,
+            &observation_discriminator(observation),
+        );
+        if !observation
+            .observation_id
+            .strip_prefix("O-")
+            .is_some_and(is_hex_id)
+        {
+            return Err(ManifestError::Transport(
+                "observation ID is invalid".to_string(),
+            ));
+        }
+        let attestation = attestation_by_evidence
+            .get(&("observation", observation.observation_id.as_str()))
+            .ok_or_else(|| {
+                ManifestError::Transport("observation attestation missing".to_string())
+            })?;
+        let (dependent, prerequisite, endpoint_rejection) =
+            observed_endpoints(observation, &identities_by_id, &excluded_identity_ids);
+        let contradiction = records.ambiguities.iter().any(|ambiguity| {
+            ambiguity.reason_code == "kind_contradiction"
+                && ambiguity.evidence_ids.contains(&observation.observation_id)
+        });
+        let expected_rejection = endpoint_rejection
+            .or_else(|| contradiction.then(|| "kind_contradiction".to_string()))
+            .or_else(|| {
+                observation_producer_rejection_reason(
+                    observation,
+                    capabilities_by_id
+                        .get(observation.capability_id.as_str())
+                        .copied(),
+                    registered_kind.as_ref().ok(),
+                )
+            });
+        let expected_kind = registered_kind
+            .as_ref()
+            .map(|spec| spec.stored_kind)
+            .unwrap_or(observation.relation_kind.as_str());
+        if attestation.attestation_key
+            != hash_parts(&[
+                "observed_attestation.v1",
+                &observation.snapshot_id,
+                &observation.observation_id,
+                &observation.payload_hash,
+            ])
+            || attestation.declaring_identity_id != observation.from_identity_id
+            || attestation.dependent_identity_id != dependent.unwrap_or_default()
+            || attestation.prerequisite_identity_id != prerequisite.unwrap_or_default()
+            || attestation.declared_direction != "observed"
+            || attestation.relation_kind != expected_kind
+            || attestation.source_span != observation.source_span
+            || attestation.reason != observation.classification
+            || attestation.raw_line_hash != observation.payload_hash
+            || attestation.accepted != expected_rejection.is_none()
+            || attestation.rejection_reason != expected_rejection.unwrap_or_default()
+            || observation.accepted != attestation.accepted
+        {
+            return Err(ManifestError::Transport(
+                "observation attestation consistency failed".to_string(),
+            ));
+        }
+    }
+    for ambiguity in &records.ambiguities {
+        let expected_ambiguity_id = hash_parts(&[
+            "ambiguity_a.v1",
+            &ambiguity.snapshot_id,
+            &ambiguity.source_identity_id,
+            &ambiguity.reason_code,
+            &ambiguity.relation_kind,
+            &ambiguity.candidate_fact_ids.join(","),
+            &ambiguity.candidate_targets.join(","),
+            &ambiguity.evidence_ids.join(","),
+        ]);
+        if ambiguity.snapshot_id != records.header.snapshot_id
+            || ambiguity.ambiguity_id != expected_ambiguity_id
+            || ambiguity.covered
+            || !ambiguity.resolution_required
+            || ambiguity.reason_code.is_empty()
+            || ambiguity.evidence_ids.is_empty()
+            || ambiguity.evidence_ids.iter().any(String::is_empty)
+            || ambiguity
+                .candidate_fact_ids
+                .iter()
+                .any(|fact_id| !is_hex_id(fact_id))
+            || ambiguity
+                .candidate_fact_ids
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+            || ambiguity
+                .candidate_targets
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+            || ambiguity
+                .evidence_ids
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+        {
+            return Err(ManifestError::Transport(
+                "ambiguity provenance is stale, mixed, covered, or non-canonical".to_string(),
+            ));
+        }
+        let contradiction = ambiguity.reason_code == "kind_contradiction";
+        if !contradiction && ambiguity.evidence_ids.len() != 1 {
+            return Err(ManifestError::Transport(
+                "non-contradiction ambiguity must own exactly one evidence row".to_string(),
+            ));
+        }
+        let mut expected_source_identity_id = String::new();
+        let mut expected_relation_kind = if contradiction {
+            "kind_contradiction".to_string()
+        } else {
+            String::new()
+        };
+        let mut expected_candidate_fact_ids = BTreeSet::new();
+        let mut expected_candidate_targets = BTreeSet::new();
+        let mut evidence_domain = None;
+        for evidence_id in &ambiguity.evidence_ids {
+            let declaration = declarations_by_id.get(evidence_id.as_str());
+            let observation = observations_by_id.get(evidence_id.as_str());
+            let capability = capabilities_by_id.get(evidence_id.as_str());
+            let domain_count = declaration.is_some() as usize
+                + observation.is_some() as usize
+                + capability.is_some() as usize;
+            if domain_count != 1 {
+                return Err(ManifestError::Transport(
+                    "ambiguity evidence is not a unique typed declaration, observation, or capability ID"
+                        .to_string(),
+                ));
+            }
+            if let Some(declaration) = declaration {
+                let attestation = attestation_by_evidence
+                    .get(&("declaration", declaration.declaration_id.as_str()))
+                    .ok_or_else(|| {
+                        ManifestError::Transport(
+                            "declaration ambiguity evidence lacks an attestation".to_string(),
+                        )
+                    })?;
+                if attestation.accepted || attestation.rejection_reason != ambiguity.reason_code {
+                    return Err(ManifestError::Transport(
+                        "ambiguity evidence must reference a rejected attestation with the exact reason"
+                            .to_string(),
+                    ));
+                }
+                if evidence_domain.is_some_and(|domain| {
+                    domain == "capability" || (!contradiction && domain != "declaration")
+                }) {
+                    return Err(ManifestError::Transport(
+                        "ambiguity evidence mixes typed declaration and non-declaration domains"
+                            .to_string(),
+                    ));
+                }
+                evidence_domain = Some("declaration");
+                if contradiction {
+                    if expected_source_identity_id.is_empty() {
+                        expected_source_identity_id = attestation.dependent_identity_id.clone();
+                    } else if expected_source_identity_id != attestation.dependent_identity_id {
+                        return Err(ManifestError::Transport(
+                            "contradiction ambiguity source closure is not exact".to_string(),
+                        ));
+                    }
+                    for endpoint in [
+                        &attestation.dependent_identity_id,
+                        &attestation.prerequisite_identity_id,
+                    ] {
+                        if !endpoint.is_empty() {
+                            expected_candidate_targets.insert(endpoint.clone());
+                        }
+                    }
+                    if let (Some(dependent), Some(prerequisite)) = (
+                        logical_by_id.get(attestation.dependent_identity_id.as_str()),
+                        logical_by_id.get(attestation.prerequisite_identity_id.as_str()),
+                    ) {
+                        let pair_identity = hash_parts(&[
+                            "relation_pair.v1",
+                            &records.header.parent_repo_id,
+                            dependent,
+                            prerequisite,
+                        ]);
+                        expected_candidate_fact_ids.insert(hash_parts(&[
+                            "normalized_relation.v1",
+                            &pair_identity,
+                            &attestation.relation_kind,
+                        ]));
+                    }
+                } else {
+                    expected_source_identity_id = declaration.source_identity_id.clone();
+                    expected_candidate_targets.insert(declaration.declared_target.clone());
+                    expected_relation_kind = attestation.relation_kind.clone();
+                }
+            }
+            if let Some(observation) = observation {
+                let attestation = attestation_by_evidence
+                    .get(&("observation", observation.observation_id.as_str()))
+                    .ok_or_else(|| {
+                        ManifestError::Transport(
+                            "observation ambiguity evidence lacks an attestation".to_string(),
+                        )
+                    })?;
+                if attestation.accepted || attestation.rejection_reason != ambiguity.reason_code {
+                    return Err(ManifestError::Transport(
+                        "ambiguity evidence must reference a rejected attestation with the exact reason"
+                            .to_string(),
+                    ));
+                }
+                if evidence_domain.is_some_and(|domain| {
+                    domain == "capability" || (!contradiction && domain != "observation")
+                }) {
+                    return Err(ManifestError::Transport(
+                        "ambiguity evidence mixes typed observation and non-observation domains"
+                            .to_string(),
+                    ));
+                }
+                evidence_domain = Some("observation");
+                if contradiction {
+                    if expected_source_identity_id.is_empty() {
+                        expected_source_identity_id = attestation.dependent_identity_id.clone();
+                    } else if expected_source_identity_id != attestation.dependent_identity_id {
+                        return Err(ManifestError::Transport(
+                            "contradiction ambiguity source closure is not exact".to_string(),
+                        ));
+                    }
+                    for endpoint in [
+                        &attestation.dependent_identity_id,
+                        &attestation.prerequisite_identity_id,
+                    ] {
+                        if !endpoint.is_empty() {
+                            expected_candidate_targets.insert(endpoint.clone());
+                        }
+                    }
+                    if let (Some(dependent), Some(prerequisite)) = (
+                        logical_by_id.get(attestation.dependent_identity_id.as_str()),
+                        logical_by_id.get(attestation.prerequisite_identity_id.as_str()),
+                    ) {
+                        let pair_identity = hash_parts(&[
+                            "relation_pair.v1",
+                            &records.header.parent_repo_id,
+                            dependent,
+                            prerequisite,
+                        ]);
+                        expected_candidate_fact_ids.insert(hash_parts(&[
+                            "normalized_relation.v1",
+                            &pair_identity,
+                            &attestation.relation_kind,
+                        ]));
+                    }
+                } else {
+                    expected_source_identity_id = observation.from_identity_id.clone();
+                    expected_candidate_targets.insert(observation.to_identity_id.clone());
+                    expected_relation_kind = attestation.relation_kind.clone();
+                }
+            }
+            if let Some(capability) = capability {
+                if evidence_domain.is_some_and(|domain| domain != "capability") {
+                    return Err(ManifestError::Transport(
+                        "ambiguity evidence mixes typed capability and non-capability domains"
+                            .to_string(),
+                    ));
+                }
+                evidence_domain = Some("capability");
+                if ambiguity.reason_code != "capability_unknown"
+                    || !ambiguity.source_identity_id.is_empty()
+                    || !ambiguity.candidate_fact_ids.is_empty()
+                    || !ambiguity.candidate_targets.is_empty()
+                    || capability.capability_id != *evidence_id
+                    || registered_capability_ids.contains(capability.capability_id.as_str())
+                {
+                    return Err(ManifestError::Transport(
+                        "capability ambiguity evidence is not an explicit capability diagnostic"
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+        if ambiguity.source_identity_id != expected_source_identity_id
+            || ambiguity.relation_kind != expected_relation_kind
+            || ambiguity
+                .candidate_fact_ids
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != expected_candidate_fact_ids
+            || ambiguity
+                .candidate_targets
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != expected_candidate_targets
+        {
+            return Err(ManifestError::Transport(
+                "ambiguity reason/source/candidate/fact closure is not exact".to_string(),
+            ));
+        }
+    }
+    for attestation in &records.attestations {
+        let matches = records
+            .ambiguities
+            .iter()
+            .filter(|ambiguity| ambiguity.evidence_ids.contains(&attestation.evidence_id))
+            .collect::<Vec<_>>();
+        if attestation.accepted && !matches.is_empty() {
+            return Err(ManifestError::Transport(
+                "accepted evidence cannot have ambiguity provenance".to_string(),
+            ));
+        }
+        if !attestation.accepted
+            && (matches.len() != 1 || matches[0].reason_code != attestation.rejection_reason)
+        {
+            return Err(ManifestError::Transport(
+                "rejected attestation must have exactly one matching ambiguity reason".to_string(),
+            ));
+        }
+    }
+    let relation_by_fact = records
+        .relations
+        .iter()
+        .map(|relation| (relation.fact_id.as_str(), relation))
+        .collect::<BTreeMap<_, _>>();
+    let registered_stored_kinds = RELATION_KIND_REGISTRY
+        .iter()
+        .map(|spec| spec.stored_kind)
+        .collect::<BTreeSet<_>>();
+    let mut consumed_accepted_attestations = BTreeSet::new();
+    for relation in &records.relations {
+        if !relation.accepted
+            || relation.semantic_direction != "depends_on"
+            || relation.source_snapshot_id != records.header.snapshot_id
+            || relation.attestation_ids.is_empty()
+            || !registered_stored_kinds.contains(relation.relation_kind.as_str())
+            || !matches!(
+                relation.reconciliation_status.as_str(),
+                "matched" | "declared_only" | "observed_only"
+            )
+        {
+            return Err(ManifestError::Transport(
+                "normalized direct fact contract failed".to_string(),
+            ));
+        }
+        let dependent = identities_by_id
+            .get(relation.from_identity_id.as_str())
+            .ok_or_else(|| {
+                ManifestError::Transport("relation dependent identity missing".to_string())
+            })?;
+        let prerequisite = identities_by_id
+            .get(relation.to_identity_id.as_str())
+            .ok_or_else(|| {
+                ManifestError::Transport("relation prerequisite identity missing".to_string())
+            })?;
+        if excluded_identity_ids.contains(relation.from_identity_id.as_str())
+            || excluded_identity_ids.contains(relation.to_identity_id.as_str())
+            || !dependent.exists
+            || !prerequisite.exists
+        {
+            return Err(ManifestError::Transport(
+                "accepted relation endpoint is outside U".to_string(),
+            ));
+        }
+        let expected_pair = hash_parts(&[
+            "relation_pair.v1",
+            &records.header.parent_repo_id,
+            &dependent.logical_id,
+            &prerequisite.logical_id,
+        ]);
+        let expected_fact = hash_parts(&[
+            "normalized_relation.v1",
+            &expected_pair,
+            &relation.relation_kind,
+        ]);
+        if relation.pair_identity != expected_pair || relation.fact_id != expected_fact {
+            return Err(ManifestError::Transport(format!(
+                "normalized fact identity mismatch {}",
+                relation.fact_id
+            )));
+        }
+        if relation
+            .attestation_ids
+            .windows(2)
+            .any(|window| window[0] >= window[1])
+            || relation
+                .observation_ids
+                .windows(2)
+                .any(|window| window[0] >= window[1])
+        {
+            return Err(ManifestError::Transport(
+                "fact provenance is not sorted and unique".to_string(),
+            ));
+        }
+        let mut expected_observation_ids = Vec::new();
+        let mut has_declaration = false;
+        let mut has_observation = false;
+        for attestation_id in &relation.attestation_ids {
+            let attestation = attestation_by_id
+                .get(attestation_id.as_str())
+                .ok_or_else(|| {
+                    ManifestError::Transport("relation attestation provenance missing".to_string())
+                })?;
+            if !attestation.accepted {
+                return Err(ManifestError::Transport(
+                    "rejected attestation promoted to fact".to_string(),
+                ));
+            }
+            if attestation.dependent_identity_id != relation.from_identity_id
+                || attestation.prerequisite_identity_id != relation.to_identity_id
+                || attestation.relation_kind != relation.relation_kind
+                || attestation.snapshot_id != relation.source_snapshot_id
+                || !consumed_accepted_attestations.insert(attestation.attestation_id.as_str())
+            {
+                return Err(ManifestError::Transport(
+                    "fact attestation endpoint, kind, snapshot, or membership mismatch".to_string(),
+                ));
+            }
+            match attestation.evidence_type.as_str() {
+                "declaration" => has_declaration = true,
+                "observation" => {
+                    has_observation = true;
+                    expected_observation_ids.push(attestation.evidence_id.clone());
+                }
+                _ => unreachable!("attestation evidence type validated"),
+            }
+        }
+        expected_observation_ids.sort();
+        if relation.observation_ids != expected_observation_ids {
+            return Err(ManifestError::Transport(
+                "fact observation provenance membership is incomplete".to_string(),
+            ));
+        }
+        for observation_id in &expected_observation_ids {
+            if !records
+                .observations
+                .iter()
+                .any(|observation| observation.observation_id == *observation_id)
+            {
+                return Err(ManifestError::Transport(
+                    "relation observation provenance missing".to_string(),
+                ));
+            }
+        }
+        let expected_status = match (has_declaration, has_observation) {
+            (true, true) => "matched",
+            (true, false) => "declared_only",
+            (false, true) => "observed_only",
+            (false, false) => unreachable!("nonempty attestation provenance"),
+        };
+        let expected_authority = match (has_declaration, has_observation) {
+            (true, true) => "declaration+observation",
+            (true, false) => "declaration",
+            (false, true) => "observation",
+            (false, false) => unreachable!("nonempty attestation provenance"),
+        };
+        let expected_hashes = vec![
+            dependent.content_hash.clone(),
+            prerequisite.content_hash.clone(),
+        ];
+        if relation.reconciliation_status != expected_status
+            || relation.authority != expected_authority
+            || relation.source_content_hashes != expected_hashes
+            || !content_identity_is_canonical(dependent, &relation.source_content_hashes[0])
+            || !content_identity_is_canonical(prerequisite, &relation.source_content_hashes[1])
+        {
+            return Err(ManifestError::Transport(
+                "relation content provenance incomplete".to_string(),
+            ));
+        }
+    }
+    let accepted_attestation_ids = records
+        .attestations
+        .iter()
+        .filter(|attestation| attestation.accepted)
+        .map(|attestation| attestation.attestation_id.as_str())
+        .collect::<BTreeSet<_>>();
+    if consumed_accepted_attestations != accepted_attestation_ids {
+        return Err(ManifestError::Transport(
+            "accepted fact provenance membership is incomplete".to_string(),
+        ));
+    }
+    let accepted_fact_ids = records
+        .relations
+        .iter()
+        .map(|relation| relation.fact_id.as_str())
+        .collect::<BTreeSet<_>>();
+    if records.ambiguities.iter().any(|ambiguity| {
+        ambiguity
+            .candidate_fact_ids
+            .iter()
+            .any(|candidate| accepted_fact_ids.contains(candidate.as_str()))
+    }) {
+        return Err(ManifestError::Transport(
+            "accepted facts overlap ambiguity candidates".to_string(),
+        ));
+    }
+    for declaration in &records.declarations {
+        let attestation = attestation_by_evidence
+            .get(&("declaration", declaration.declaration_id.as_str()))
+            .ok_or_else(|| {
+                ManifestError::Transport("declaration attestation missing".to_string())
+            })?;
+        if declaration.snapshot_id != records.header.snapshot_id
+            || declaration.declaration_id.is_empty()
+            || declaration.source_identity_id.is_empty()
+            || declaration.declared_direction.is_empty()
+            || declaration.declared_kind.is_empty()
+            || declaration.declared_target.is_empty()
+            || declaration.source_span.path.is_empty()
+            || declaration.reason.is_empty()
+            || declaration.attestation_key.is_empty()
+            || !is_hex_id(&declaration.raw_line_hash)
+        {
+            return Err(ManifestError::Transport(
+                "declaration provenance is incomplete".to_string(),
+            ));
+        }
+        let registered_kind = RelationNormalizer::normalize_relation_kind(
+            "header-target-resolver.v1",
+            "header_context",
+            &format!("declared_kind={}", declaration.declared_kind),
+        );
+        let (dependent, prerequisite, endpoint_rejection) =
+            declaration_endpoints(declaration, &identities_by_id, &excluded_identity_ids);
+        let contradiction = records.ambiguities.iter().any(|ambiguity| {
+            ambiguity.reason_code == "kind_contradiction"
+                && ambiguity.evidence_ids.contains(&declaration.declaration_id)
+        });
+        let expected_rejection = endpoint_rejection
+            .or_else(|| {
+                registered_kind
+                    .as_ref()
+                    .err()
+                    .map(|_| "kind_unregistered".to_string())
+            })
+            .or_else(|| contradiction.then(|| "kind_contradiction".to_string()));
+        let expected_kind = registered_kind
+            .as_ref()
+            .map(|spec| spec.stored_kind)
+            .unwrap_or(declaration.declared_kind.as_str());
+        if attestation.attestation_key != declaration.attestation_key
+            || attestation.declaring_identity_id != declaration.source_identity_id
+            || attestation.dependent_identity_id != dependent.clone().unwrap_or_default()
+            || attestation.prerequisite_identity_id != prerequisite.clone().unwrap_or_default()
+            || attestation.declared_direction != declaration.declared_direction
+            || attestation.relation_kind != expected_kind
+            || attestation.source_span != declaration.source_span
+            || attestation.reason != declaration.reason
+            || attestation.raw_line_hash != declaration.raw_line_hash
+            || attestation.accepted != expected_rejection.is_none()
+            || attestation.rejection_reason != expected_rejection.unwrap_or_default()
+        {
+            return Err(ManifestError::Transport(
+                "declaration attestation consistency failed".to_string(),
+            ));
+        }
+        if attestation.accepted {
+            let dependent = dependent.expect("accepted declaration dependent");
+            let prerequisite = prerequisite.expect("accepted declaration prerequisite");
+            let pair = pair_identity_for(
+                &records.header.parent_repo_id,
+                &logical_by_id,
+                &dependent,
+                &prerequisite,
+            );
+            let fact = hash_parts(&["normalized_relation.v1", &pair, expected_kind]);
+            if !relation_by_fact.contains_key(fact.as_str()) {
+                return Err(ManifestError::Transport(
+                    "accepted declaration has no direct fact".to_string(),
+                ));
+            }
+        }
+    }
+    let matched_count = records
+        .relations
+        .iter()
+        .filter(|relation| relation.reconciliation_status == "matched")
+        .count();
+    let declared_only_count = records
+        .relations
+        .iter()
+        .filter(|relation| relation.reconciliation_status == "declared_only")
+        .count();
+    let observed_only_count = records
+        .relations
+        .iter()
+        .filter(|relation| relation.reconciliation_status == "observed_only")
+        .count();
+    if matched_count + declared_only_count + observed_only_count != records.relations.len()
+        || records.attestations.len() != records.declarations.len() + records.observations.len()
+    {
+        return Err(ManifestError::Transport(
+            "accepted reconciliation or evidence partition is not exhaustive and disjoint"
+                .to_string(),
+        ));
+    }
+    let expected_counts = normalized_record_counts(records);
+    let rejected_declaration_count = records
+        .attestations
+        .iter()
+        .filter(|attestation| attestation.evidence_type == "declaration" && !attestation.accepted)
+        .count();
+    let rejected_observation_count = records
+        .attestations
+        .iter()
+        .filter(|attestation| attestation.evidence_type == "observation" && !attestation.accepted)
+        .count();
+    if records.summary.record_counts != expected_counts
+        || records.summary.accepted_fact_count != records.relations.len()
+        || records.summary.rejected_declaration_count != rejected_declaration_count
+        || records.summary.rejected_observation_count != rejected_observation_count
+        || records.summary.ambiguity_count != records.ambiguities.len()
+        || records.summary.source_exclusion_count != records.source_exclusions.len()
+        || records.summary.snapshot_id != records.header.snapshot_id
+    {
+        return Err(ManifestError::Transport(
+            "normalization summary count mismatch".to_string(),
+        ));
+    }
+    let expected_fingerprint = normalized_record_fingerprint(records)?;
+    if records.summary.normalized_record_fingerprint != expected_fingerprint {
+        return Err(ManifestError::Transport(
+            "normalized record fingerprint mismatch".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn normalized_record_counts(records: &NormalizedRecordSet) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    counts.insert("source_snapshot.v1".to_string(), 1);
+    counts.insert(
+        "source_identity.v1".to_string(),
+        records.source_identities.len(),
+    );
+    counts.insert(
+        "dependency_declaration.v1".to_string(),
+        records.declarations.len(),
+    );
+    counts.insert("attestation.v1".to_string(), records.attestations.len());
+    counts.insert(
+        "normalized_relation.v1".to_string(),
+        records.relations.len(),
+    );
+    counts.insert(
+        "observed_evidence.v1".to_string(),
+        records.observations.len(),
+    );
+    counts.insert(
+        "surface_relation.v1".to_string(),
+        records.surface_relations.len(),
+    );
+    counts.insert(
+        "source_exclusion.v1".to_string(),
+        records.source_exclusions.len(),
+    );
+    counts.insert("ambiguity_a.v1".to_string(), records.ambiguities.len());
+    counts.insert(
+        "extractor_capability.v1".to_string(),
+        records.capabilities.len(),
+    );
+    for status in ["matched", "declared_only", "observed_only"] {
+        counts.insert(
+            format!("{status}_count"),
+            records
+                .relations
+                .iter()
+                .filter(|relation| relation.reconciliation_status == status)
+                .count(),
+        );
+    }
+    counts.insert(
+        "accepted_direct_fact_count".to_string(),
+        records.relations.len(),
+    );
+    counts.insert(
+        "rejected_declaration_count".to_string(),
+        records
+            .attestations
+            .iter()
+            .filter(|attestation| {
+                attestation.evidence_type == "declaration" && !attestation.accepted
+            })
+            .count(),
+    );
+    counts.insert(
+        "rejected_observation_count".to_string(),
+        records
+            .attestations
+            .iter()
+            .filter(|attestation| {
+                attestation.evidence_type == "observation" && !attestation.accepted
+            })
+            .count(),
+    );
+    counts.insert(
+        "excluded_count".to_string(),
+        records.source_exclusions.len(),
+    );
+    counts.insert("unresolved_count".to_string(), records.ambiguities.len());
+    counts.insert("duplicate_evidence_count".to_string(), 0);
+    counts.insert("x_core_count".to_string(), 0);
+    counts
+}
+
 pub(crate) fn parse_snapshot(reader: impl BufRead) -> Result<ManifestSnapshot, ManifestError> {
     let mut records = Vec::new();
     for (line_index, line) in reader.lines().enumerate() {
@@ -2819,6 +6488,12 @@ fn validate_snapshot_transport(
                 identity.file_mode, identity.repo_rel_path
             )));
         }
+        if !content_identity_is_canonical(identity, &identity.content_hash) {
+            return Err(ManifestError::Transport(format!(
+                "content identity representation is invalid for {}",
+                identity.repo_rel_path
+            )));
+        }
         let alternate_locators = identity
             .alternate_locators
             .iter()
@@ -2944,13 +6619,24 @@ fn validate_snapshot_transport(
                 "declaration snapshot mismatch".to_string(),
             ));
         }
-        let Some(source_path) = identities_by_id.get(&declaration.source_identity_id) else {
+        let source_path = identities_by_id
+            .get(&declaration.source_identity_id)
+            .cloned()
+            .unwrap_or_else(|| declaration.source_span.path.clone());
+        if !identities_by_id.contains_key(&declaration.source_identity_id)
+            && declaration.source_identity_id
+                != hash_parts(&[
+                    "source_identity.v1",
+                    &header.parent_repo_id,
+                    &declaration.source_span.path,
+                ])
+        {
             return Err(ManifestError::Transport(format!(
                 "declaration {} references an unknown source identity",
                 declaration.declaration_id
             )));
-        };
-        if source_path != &declaration.source_span.path {
+        }
+        if source_path.as_str() != declaration.source_span.path.as_str() {
             return Err(ManifestError::Transport(format!(
                 "declaration {} source span path mismatch",
                 declaration.declaration_id
@@ -3043,7 +6729,9 @@ fn source_fingerprint_from_transport(
         header.tool_version.clone(),
         header.profile.clone(),
     ];
-    for identity in source_identities {
+    let mut sorted_identities = source_identities.iter().collect::<Vec<_>>();
+    sorted_identities.sort_by(|left, right| left.repo_rel_path.cmp(&right.repo_rel_path));
+    for identity in sorted_identities {
         parts.extend([
             identity.repo_rel_path.clone(),
             identity.file_mode.clone(),
@@ -3154,6 +6842,21 @@ fn is_hex_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
+fn is_git_object_id(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn content_identity_is_canonical(identity: &SourceIdentity, value: &str) -> bool {
+    match identity.file_mode.as_str() {
+        GITLINK_MODE => is_git_object_id(value) && value == identity.git_blob_or_gitlink,
+        "100644" | "100755" | "120000" => is_hex_id(value),
+        _ => false,
+    }
+}
+
 fn hash_parts(parts: &[&str]) -> String {
     let mut hasher = Sha256::new();
     for part in parts {
@@ -3179,6 +6882,80 @@ mod tests {
         include_str!("../../../tests/fixtures/dependency_manifest/parser_conformance.jsonl");
     const SOURCE_FIXTURE: &str =
         include_str!("../../../tests/fixtures/dependency_manifest/source_universe.jsonl");
+    const RELATION_FIXTURE: &str =
+        include_str!("../../../tests/fixtures/dependency_manifest/relation_reconciliation.jsonl");
+    const KIND_REGISTRY_FIXTURE: &str =
+        include_str!("../../../tests/fixtures/knowledge_graph/query_kind_registry.jsonl");
+    const CLOSURE_FIXTURE: &str =
+        include_str!("../../../tests/fixtures/knowledge_graph/freshness_atomic_closure.jsonl");
+    const RETAINED_PARENT_SNAPSHOT: &str = include_str!(
+        "../../../reports/agents/20260712-090608-context-packettool-skill-routing/validation/source_snapshot.v1.jsonl"
+    );
+
+    #[test]
+    fn r2_parent_gitlink_relation_preserves_index_identity() {
+        let snapshot = parse_snapshot(Cursor::new(RETAINED_PARENT_SNAPSHOT.as_bytes()))
+            .expect("retained parent snapshot");
+        let gitlink = source_identity(&snapshot, "vendor/agent-canon").clone();
+        assert_eq!(gitlink.file_mode, GITLINK_MODE);
+        assert!(is_git_object_id(&gitlink.content_hash));
+        assert!(is_git_object_id(&gitlink.git_blob_or_gitlink));
+        assert!(is_git_object_id(&gitlink.submodule_commit));
+        assert_eq!(gitlink.content_hash, gitlink.git_blob_or_gitlink);
+        assert_ne!(gitlink.content_hash, gitlink.submodule_commit);
+
+        let gitlink_fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-gitlink-transport-identity")
+            .expect("gitlink transport fixture");
+        let valid = gitlink.content_hash.clone();
+        assert!(content_identity_is_canonical(&gitlink, &valid));
+        for mutation in fixture_strings(&gitlink_fixture, "reject") {
+            let mut tampered = gitlink.clone();
+            tampered.content_hash = match mutation.as_str() {
+                "gitlink-39hex" => "a".repeat(39),
+                "gitlink-41hex" => "a".repeat(41),
+                "gitlink-nonhex" => "g".repeat(40),
+                "gitlink-mismatched-valid-40hex" => "b".repeat(40),
+                other => panic!("unknown gitlink mutation {other}"),
+            };
+            assert!(
+                !content_identity_is_canonical(&tampered, &tampered.content_hash),
+                "gitlink mutation accepted: {mutation}"
+            );
+        }
+
+        let records = normalize_snapshot(
+            &NormalizeRequest {
+                root: PathBuf::from("/mnt/l/workspace/project_template"),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("retained-parent-snapshot.v1.jsonl"),
+                evidence_jsonl: Vec::new(),
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot,
+        )
+        .expect("parent snapshot normalization");
+        let relation = records
+            .relations
+            .iter()
+            .find(|relation| {
+                relation.from_identity_id == gitlink.identity_id
+                    || relation.to_identity_id == gitlink.identity_id
+            })
+            .expect("parent gitlink relation");
+        let endpoint_index = if relation.from_identity_id == gitlink.identity_id {
+            0
+        } else {
+            1
+        };
+        assert_eq!(
+            relation.source_content_hashes[endpoint_index],
+            gitlink.content_hash
+        );
+        assert_eq!(relation.source_content_hashes[endpoint_index].len(), 40);
+    }
 
     #[test]
     fn parser_conformance_fixture_covers_valid_and_diagnostic_cases() {
@@ -3239,6 +7016,1899 @@ mod tests {
         assert!(seen.contains("duplicate_start"));
         assert!(seen.contains("malformed_reason"));
         assert!(seen.contains("unknown_kind"));
+    }
+
+    #[test]
+    fn r2_relation_fixture_covers_all_required_reconciliation_cases() {
+        let cases = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture JSON"))
+            .collect::<Vec<_>>();
+        let names = cases
+            .iter()
+            .map(|case| case["case"].as_str().expect("fixture case"))
+            .collect::<BTreeSet<_>>();
+        for required in [
+            "r2-direction-truth-table",
+            "r2-attestation-key-order-independence",
+            "r2-duplicate-multi-attestation",
+            "r2-kind-contradiction",
+            "r2-observation-locator-identity-mismatch",
+            "r2-observation-capability-authorization",
+            "r2-missing-stale-excluded-target",
+            "r2-reconciliation-partitions",
+            "r2-attestation-provenance-tamper",
+            "r2-summary-rejected-count-tamper",
+            "r2-one-edge-reverse-adjacency",
+            "r2-observation-acceptance-vetoes",
+            "r2-observation-excluded-endpoints",
+            "r2-valid-gitlink-relation",
+            "r2-normalized-record-order",
+            "r2-gitlink-transport-identity",
+            "r2-declaration-endpoint-u-adversaries",
+            "r2-ambiguity-evidence-forward-membership",
+        ] {
+            assert!(names.contains(required), "missing {required}");
+        }
+        let truth_table = cases
+            .iter()
+            .find(|case| case["case"] == "r2-direction-truth-table")
+            .expect("truth table");
+        assert_eq!(truth_table["rows"].as_array().expect("rows").len(), 6);
+        let source = test_identity("s");
+        let target = test_identity("t");
+        let identities = BTreeMap::from([
+            (source.identity_id.as_str(), &source),
+            (target.identity_id.as_str(), &target),
+        ]);
+        for (index, row) in truth_table["rows"]
+            .as_array()
+            .expect("direction rows")
+            .iter()
+            .enumerate()
+        {
+            let direction = row["declared_direction"].as_str().expect("direction");
+            let kind = row["declared_kind"].as_str().expect("kind");
+            let declaration = DependencyDeclaration {
+                declaration_id: format!("D-{index}"),
+                source_identity_id: source.identity_id.clone(),
+                declared_direction: direction.to_string(),
+                declared_kind: kind.to_string(),
+                declared_target: target.repo_rel_path.clone(),
+                resolved_target_identity_id: Some(target.identity_id.clone()),
+                source_span: SourceSpan {
+                    path: source.repo_rel_path.clone(),
+                    start_line: 1,
+                    start_column: 1,
+                    end_line: 1,
+                    end_column: 2,
+                },
+                reason: "fixture".to_string(),
+                raw_line_hash: hash_parts(&["direction", &index.to_string()]),
+                attestation_key: hash_parts(&["attestation", &index.to_string()]),
+                snapshot_id: "snapshot".to_string(),
+            };
+            let (dependent, prerequisite, rejection) =
+                declaration_endpoints(&declaration, &identities, &BTreeSet::new());
+            assert!(rejection.is_none(), "direction row {index}");
+            assert_eq!(
+                dependent.expect("dependent"),
+                row["dependent"].as_str().expect("expected dependent")
+            );
+            assert_eq!(
+                prerequisite.expect("prerequisite"),
+                row["prerequisite"].as_str().expect("expected prerequisite")
+            );
+            let spec = RelationNormalizer::normalize_relation_kind(
+                "header-target-resolver.v1",
+                "header_context",
+                &format!("declared_kind={kind}"),
+            )
+            .expect("direction kind");
+            assert_eq!(spec.stored_kind, row["stored_kind"]);
+        }
+        let partition = cases
+            .iter()
+            .find(|case| case["case"] == "r2-reconciliation-partitions")
+            .expect("partition fixture");
+        assert_eq!(
+            fixture_strings(partition, "accepted_comparable_partitions"),
+            vec!["matched", "declared_only", "observed_only"]
+        );
+        assert_eq!(
+            fixture_strings(partition, "rejected_evidence_partitions"),
+            vec!["excluded", "unresolved"]
+        );
+        assert_eq!(fixture_strings(partition, "reader_count_fields").len(), 5);
+    }
+
+    #[test]
+    fn r2_relation_kind_registry_fixture_is_the_single_conversion_authority() {
+        RelationNormalizer::validate_relation_kind_registry().expect("valid static registry");
+        let registry_keys = RELATION_KIND_REGISTRY
+            .iter()
+            .map(|spec| {
+                (
+                    spec.capability_id.to_string(),
+                    spec.raw_kind.to_string(),
+                    spec.discriminator.to_string(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let mut fixture_keys = BTreeSet::new();
+        let mut fixture_rows = 0;
+        for line in KIND_REGISTRY_FIXTURE.lines() {
+            let case: Value = serde_json::from_str(line).expect("registry fixture JSON");
+            let producer = case["producer"].as_str().expect("producer");
+            let raw_kind = case["raw_kind"].as_str().expect("raw kind");
+            let discriminator = case["discriminator"].as_str().expect("discriminator");
+            assert!(
+                fixture_keys.insert((
+                    producer.to_string(),
+                    raw_kind.to_string(),
+                    discriminator.to_string(),
+                )),
+                "duplicate registry fixture key"
+            );
+            fixture_rows += 1;
+            let spec =
+                RelationNormalizer::normalize_relation_kind(producer, raw_kind, discriminator)
+                    .expect("registered conversion");
+            assert_eq!(spec.stored_kind, case["stored_kind"]);
+            assert_eq!(spec.layer, case["layer"]);
+            assert_eq!(spec.query_family, case["query_family"]);
+        }
+        assert_eq!(fixture_rows, RELATION_KIND_REGISTRY.len());
+        assert_eq!(fixture_keys, registry_keys);
+        assert_eq!(
+            RELATION_KIND_REGISTRY
+                .iter()
+                .filter(|spec| spec.stored_kind == "view_of")
+                .count(),
+            2,
+            "intentional shared stored kind must be preserved"
+        );
+        assert_eq!(
+            RELATION_KIND_REGISTRY
+                .iter()
+                .filter(|spec| spec.stored_kind == "contains")
+                .count(),
+            2,
+            "intentional shared stored kind must be preserved"
+        );
+        assert!(RelationNormalizer::normalize_relation_kind(
+            "code-static.v1",
+            "code_reference",
+            "reference_kind=unknown"
+        )
+        .is_err());
+        assert_eq!(
+            RelationNormalizer::allowed_kinds_for_family("dependency"),
+            vec!["design", "environment", "implementation"]
+        );
+    }
+
+    #[test]
+    fn r2_closure_fixture_proves_monotone_termination_and_order_independence() {
+        let cases = CLOSURE_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("closure fixture JSON"))
+            .collect::<Vec<_>>();
+        let mut executed = BTreeSet::new();
+        for case in cases.iter().filter(|case| {
+            case["case"]
+                .as_str()
+                .is_some_and(|name| name.starts_with("r2-closure"))
+        }) {
+            let name = case["case"].as_str().expect("closure case");
+            let identities = fixture_strings(case, "vertices")
+                .iter()
+                .map(|path| test_identity(path))
+                .collect::<Vec<_>>();
+            let relations = fixture_relations(case);
+            let seeds = fixture_strings(case, "seeds");
+            let allowed = fixture_strings(case, "allowed_kinds");
+            let exclusions = fixture_strings(case, "excluded_vertices")
+                .into_iter()
+                .map(|identity_id| SourceExclusion {
+                    source_exclusion_id: hash_parts(&["fixture-exclusion", &identity_id]),
+                    source_identity_id: identity_id.clone(),
+                    repo_rel_path: identity_id.clone(),
+                    reason_code: "generated_output".to_string(),
+                    rule_id: "fixture".to_string(),
+                    scope: "closure".to_string(),
+                    evidence_id: hash_parts(&["fixture-exclusion-evidence", &identity_id]),
+                    covered: false,
+                    snapshot_id: "snapshot".to_string(),
+                })
+                .collect::<Vec<_>>();
+            let ambiguities = case
+                .get("ambiguity_edge_index")
+                .and_then(Value::as_u64)
+                .map(|index| {
+                    let relation = &relations[index as usize];
+                    vec![ambiguity_record(
+                        "snapshot",
+                        &relation.from_identity_id,
+                        vec![relation.fact_id.clone()],
+                        vec![relation.to_identity_id.clone()],
+                        "fixture_ambiguity",
+                        &relation.relation_kind,
+                        vec!["fixture-evidence".to_string()],
+                    )]
+                })
+                .unwrap_or_default();
+            let query_family = case["query_family"].as_str().expect("query family");
+            let result = RelationNormalizer::least_fixed_point(
+                &identities,
+                &exclusions,
+                &ambiguities,
+                &relations,
+                &seeds,
+                query_family,
+                &allowed,
+            );
+            if let Some(expected_error) = case.get("expected_error").and_then(Value::as_str) {
+                assert!(
+                    result.expect_err(name).to_string().contains(expected_error),
+                    "{name}: expected {expected_error}"
+                );
+                executed.insert(name.to_string());
+                continue;
+            }
+            let result = result.unwrap_or_else(|error| panic!("{name}: {error}"));
+            assert_eq!(
+                result.reachable_identity_ids,
+                fixture_strings(case, "expected_reachable"),
+                "{name}: reachable"
+            );
+            if case.get("expected_trace").is_some() {
+                let expected_trace = case["expected_trace"]
+                    .as_array()
+                    .expect("expected trace")
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_array()
+                            .expect("trace row")
+                            .iter()
+                            .map(|item| item.as_str().expect("trace identity").to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(result.visited_trace, expected_trace, "{name}: trace");
+            }
+            assert!(result.monotone, "{name}: monotone");
+            assert!(result.order_independent, "{name}: reverse order");
+            assert!(
+                result.iterations <= result.termination_bound,
+                "{name}: termination bound"
+            );
+            assert!(result.visited_trace.windows(2).all(|window| {
+                let left = window[0].iter().collect::<BTreeSet<_>>();
+                let right = window[1].iter().collect::<BTreeSet<_>>();
+                left.is_subset(&right)
+            }));
+            if case["execute_every_edge_permutation"].as_bool() == Some(true) {
+                let expected_reachable = result.reachable_identity_ids.clone();
+                let expected_witnesses = result.direct_witness_fact_ids.clone();
+                let permutations = all_permutations(&relations);
+                assert_eq!(permutations.len(), 6, "three-edge permutation count");
+                for permutation in permutations {
+                    let permuted = RelationNormalizer::least_fixed_point(
+                        &identities,
+                        &exclusions,
+                        &ambiguities,
+                        &permutation,
+                        &seeds,
+                        query_family,
+                        &allowed,
+                    )
+                    .expect("permuted closure");
+                    assert_eq!(permuted.reachable_identity_ids, expected_reachable);
+                    assert_eq!(permuted.direct_witness_fact_ids, expected_witnesses);
+                }
+            }
+            executed.insert(name.to_string());
+        }
+        let named_closure_cases = cases
+            .iter()
+            .filter_map(|case| case["case"].as_str())
+            .filter(|name| name.starts_with("r2-closure"))
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(executed, named_closure_cases);
+
+        let adjacency_relations = vec![test_relation(
+            "a",
+            "b",
+            "design",
+            &hash_parts(&["adjacency", "a", "b"]),
+        )];
+        let adjacency = RelationNormalizer::derive_reverse_adjacency(&adjacency_relations);
+        assert_eq!(adjacency.direct_fact_count, 1);
+        assert_eq!(adjacency.downstream["a"], vec!["b"]);
+        assert_eq!(adjacency.upstream["b"], vec!["a"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_normalization_emits_o_capability_status_and_strict_round_trip() {
+        let (root, outside_target) = source_universe_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("R2 snapshot");
+        let tracked = source_identity(&snapshot, "tracked.txt");
+        let modify = source_identity(&snapshot, "modify.txt");
+        let observation_id = format!("O-{}", "a".repeat(64));
+        let observation = ObservedEvidence {
+            observation_id: observation_id.clone(),
+            extractor_id: "header-target-resolver".to_string(),
+            extractor_version: "test".to_string(),
+            capability_id: "header-target-resolver.v1".to_string(),
+            relation_kind: "header_context".to_string(),
+            from_locator: tracked.repo_rel_path.clone(),
+            to_locator: modify.repo_rel_path.clone(),
+            from_identity_id: tracked.identity_id.clone(),
+            to_identity_id: modify.identity_id.clone(),
+            source_span: SourceSpan {
+                path: tracked.repo_rel_path.clone(),
+                start_line: 4,
+                start_column: 1,
+                end_line: 4,
+                end_column: 80,
+            },
+            payload_hash: "b".repeat(64),
+            classification: "declared_kind=implementation".to_string(),
+            accepted: true,
+            snapshot_id: snapshot.header.snapshot_id.clone(),
+        };
+        let capability = ExtractorCapability {
+            capability_id: "header-target-resolver.v1".to_string(),
+            extractor_id: "header-target-resolver".to_string(),
+            extractor_version: "test".to_string(),
+            relation_kinds: vec!["header_context".to_string()],
+            input_scope: "connected:explicit-evidence-input".to_string(),
+            supported_file_kinds: vec!["text".to_string()],
+            unsupported_behavior: "unsupported-and-unresolved-to-A".to_string(),
+            dynamic_behavior: "dynamic-reflection-to-A".to_string(),
+            provenance_fields: vec![
+                "payload_hash".to_string(),
+                "snapshot_id".to_string(),
+                "source_span".to_string(),
+            ],
+            completeness_claim:
+                "connected; supplied-records-complete; semantic-completeness-not-claimed"
+                    .to_string(),
+        };
+        let evidence_path = unique_temp_path("agent-canon-r2-evidence");
+        let mut evidence_bytes = Vec::new();
+        write_envelope(
+            &mut evidence_bytes,
+            "extractor_capability.v1",
+            &capability.capability_id,
+            &snapshot.header.snapshot_id,
+            capability_payload(&capability),
+        )
+        .expect("capability evidence JSONL");
+        write_envelope(
+            &mut evidence_bytes,
+            "observed_evidence.v1",
+            &observation.observation_id,
+            &snapshot.header.snapshot_id,
+            observed_evidence_payload(&observation),
+        )
+        .expect("evidence JSONL");
+        fs::write(&evidence_path, &evidence_bytes).expect("evidence file");
+        let request = NormalizeRequest {
+            root: root.clone(),
+            profile: "parent".to_string(),
+            snapshot_jsonl: PathBuf::from("-"),
+            evidence_jsonl: vec![evidence_path.clone()],
+            output_jsonl: PathBuf::from("-"),
+        };
+        let records = normalize_snapshot(&request, snapshot.clone()).expect("R2 normalization");
+        let duplicate_fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-duplicate-multi-attestation")
+            .expect("duplicate fixture");
+        assert_eq!(records.observations.len(), 1);
+        assert_eq!(
+            records.relations.len(),
+            duplicate_fixture["expected_direct_fact_count"]
+                .as_u64()
+                .expect("expected fact count") as usize
+        );
+        assert_eq!(records.relations[0].reconciliation_status, "matched");
+        assert_eq!(
+            records.relations[0].attestation_ids.len(),
+            duplicate_fixture["expected_attestation_count"]
+                .as_u64()
+                .expect("expected attestation count") as usize
+        );
+        assert!(records
+            .capabilities
+            .iter()
+            .any(|capability| capability.capability_id == "code-static.v1"
+                && (capability.completeness_claim.contains("unavailable")
+                    || capability.completeness_claim.contains("provided-empty"))));
+        let mut bytes = Vec::new();
+        write_normalized_record_set(&records, &mut bytes).expect("normalized transport");
+        let parsed =
+            read_normalized_record_set(Cursor::new(bytes.clone()), &snapshot.header.snapshot_id)
+                .expect("strict normalized reader");
+        assert_eq!(parsed, records);
+
+        let duplicate_path = unique_temp_path("agent-canon-r2-evidence-duplicate");
+        let mut duplicate_bytes = Vec::new();
+        write_envelope(
+            &mut duplicate_bytes,
+            "observed_evidence.v1",
+            &observation.observation_id,
+            &snapshot.header.snapshot_id,
+            observed_evidence_payload(&observation),
+        )
+        .expect("duplicate observation JSONL");
+        fs::write(&duplicate_path, duplicate_bytes).expect("duplicate evidence file");
+        let mut first_order = request.clone();
+        first_order.evidence_jsonl = vec![evidence_path.clone(), duplicate_path.clone()];
+        let mut second_order = request.clone();
+        second_order.evidence_jsonl = vec![duplicate_path.clone(), evidence_path.clone()];
+        for duplicate_request in [first_order, second_order] {
+            let error = normalize_snapshot(&duplicate_request, snapshot.clone())
+                .expect_err("duplicate observation accepted");
+            assert!(error.to_string().contains("exact duplicate observation"));
+        }
+        assert_eq!(duplicate_fixture["duplicate_transport_expected"], "reject");
+        assert_eq!(
+            records.summary.record_counts["duplicate_evidence_count"],
+            duplicate_fixture["expected_duplicate_evidence_count_for_valid_set"]
+                .as_u64()
+                .expect("valid duplicate count") as usize
+        );
+
+        let mut tampered: Vec<Value> = String::from_utf8(bytes)
+            .expect("UTF-8 normalized transport")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("normalized JSON"))
+            .collect();
+        let summary_index = tampered.len() - 1;
+        tampered[summary_index]["payload"]["accepted_fact_count"] = Value::from(99u64);
+        assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+        let mut tampered = normalized_values(&records);
+        tampered[0]["payload"]["schema_version"] = Value::String("wrong.v1".to_string());
+        assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+        let mut tampered = normalized_values(&records);
+        tampered[0]["unexpected"] = Value::Bool(true);
+        assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+
+        let _ = fs::remove_file(evidence_path);
+        let _ = fs::remove_file(duplicate_path);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_kind_contradiction_rejects_both_attestations_and_retains_a() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-kind-contradiction")
+            .expect("contradiction fixture");
+        let (root, outside_target) = source_universe_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("contradiction snapshot");
+        let tracked = source_identity(&snapshot, "tracked.txt");
+        let modify = source_identity(&snapshot, "modify.txt");
+        let observation = test_observation(
+            &snapshot.header.snapshot_id,
+            tracked,
+            modify,
+            'c',
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            "header_context",
+            "declared_kind=design",
+        );
+        let capability = connected_capability(
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            &["header_context"],
+        );
+        let evidence_path = write_evidence_input(
+            &snapshot.header.snapshot_id,
+            &[capability],
+            &[observation],
+            "agent-canon-r2-contradiction",
+        );
+        let records = normalize_with_evidence(&root, snapshot.clone(), evidence_path.clone());
+        assert_eq!(
+            records.summary.accepted_fact_count,
+            fixture["expected_accepted_fact_count"]
+                .as_u64()
+                .expect("expected fact count") as usize
+        );
+        assert!(records.relations.is_empty());
+        assert_eq!(records.attestations.len(), 2);
+        assert!(records.attestations.iter().all(|attestation| {
+            !attestation.accepted && attestation.rejection_reason == "kind_contradiction"
+        }));
+        assert!(records
+            .observations
+            .iter()
+            .all(|observation| !observation.accepted));
+        assert!(records.ambiguities.iter().any(|ambiguity| {
+            ambiguity.reason_code
+                == fixture["expected_ambiguity_reason"]
+                    .as_str()
+                    .expect("ambiguity reason")
+                && ambiguity.evidence_ids.len() == 2
+        }));
+        assert_eq!(records.summary.rejected_declaration_count, 1);
+        assert_eq!(records.summary.rejected_observation_count, 1);
+        assert_eq!(
+            records.summary.record_counts["rejected_declaration_count"],
+            1
+        );
+        assert_eq!(
+            records.summary.record_counts["rejected_observation_count"],
+            1
+        );
+        let mut bytes = Vec::new();
+        write_normalized_record_set(&records, &mut bytes).expect("contradiction transport");
+        read_normalized_record_set(Cursor::new(bytes), &snapshot.header.snapshot_id)
+            .expect("strict contradiction round trip");
+        let _ = fs::remove_file(evidence_path);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_attestation_fixture_permutations_are_byte_identical() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-attestation-key-order-independence")
+            .expect("attestation order fixture");
+        let (root, outside_target) = source_universe_git_repo();
+        fs::write(
+            root.join("tracked.txt"),
+            "# @dependency-start\n# contract implementation\n# responsibility Exercises R2 attestation order.\n# upstream implementation modify.txt first edge\n# upstream design rename.txt second edge\n# @dependency-end\n",
+        )
+        .expect("order manifest");
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("order snapshot");
+        assert_eq!(snapshot.declarations.len(), 2);
+        let tracked = source_identity(&snapshot, "tracked.txt");
+        let modify = source_identity(&snapshot, "modify.txt");
+        let observation = test_observation(
+            &snapshot.header.snapshot_id,
+            tracked,
+            modify,
+            'a',
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            "header_context",
+            "declared_kind=implementation",
+        );
+        let capability = connected_capability(
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            &["header_context"],
+        );
+        let evidence_path = write_evidence_input(
+            &snapshot.header.snapshot_id,
+            &[capability],
+            &[observation],
+            "agent-canon-r2-attestation-order",
+        );
+        let declaration_a = snapshot
+            .declarations
+            .iter()
+            .find(|declaration| declaration.declared_target == "modify.txt")
+            .expect("declaration a")
+            .clone();
+        let declaration_b = snapshot
+            .declarations
+            .iter()
+            .find(|declaration| declaration.declared_target == "rename.txt")
+            .expect("declaration b")
+            .clone();
+        let mut outputs = Vec::new();
+        for permutation in fixture["permutations"]
+            .as_array()
+            .expect("attestation permutations")
+        {
+            let mut permuted_snapshot = snapshot.clone();
+            permuted_snapshot.declarations = permutation
+                .as_array()
+                .expect("attestation permutation")
+                .iter()
+                .filter_map(|item| match item.as_str().expect("attestation item") {
+                    "declaration-a" => Some(declaration_a.clone()),
+                    "declaration-b" => Some(declaration_b.clone()),
+                    "observation-a" => None,
+                    other => panic!("unknown attestation fixture item {other}"),
+                })
+                .collect();
+            let records = normalize_with_evidence(&root, permuted_snapshot, evidence_path.clone());
+            assert!(records.relations.iter().all(|relation| {
+                relation
+                    .attestation_ids
+                    .windows(2)
+                    .all(|window| window[0] < window[1])
+                    && relation
+                        .observation_ids
+                        .windows(2)
+                        .all(|window| window[0] < window[1])
+            }));
+            let mut bytes = Vec::new();
+            write_normalized_record_set(&records, &mut bytes).expect("ordered output");
+            outputs.push(bytes);
+        }
+        assert_eq!(outputs.len(), 3);
+        assert!(outputs.windows(2).all(|window| window[0] == window[1]));
+        let _ = fs::remove_file(evidence_path);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[test]
+    fn r2_strict_reader_rejects_same_family_reorder_with_refreshed_fingerprint() {
+        let fixture = CLOSURE_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("closure fixture"))
+            .find(|case| case["case"] == "r2-reader-same-family-reorder")
+            .expect("same-family reorder fixture");
+        let root = temporary_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("order snapshot");
+        let records = normalize_snapshot(
+            &NormalizeRequest {
+                root: root.clone(),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("retained-order-snapshot.v1.jsonl"),
+                evidence_jsonl: Vec::new(),
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot.clone(),
+        )
+        .expect("order normalization");
+        let mut tampered = normalized_values(&records);
+        let source_indices = tampered
+            .iter()
+            .enumerate()
+            .filter(|(_, value)| value["record_type"] == fixture["family"])
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        assert!(
+            source_indices.len() >= 2,
+            "fixture needs two source identities"
+        );
+        let summary_index = tampered.len() - 1;
+        tampered[summary_index]["payload"]["normalized_record_fingerprint"] =
+            Value::String(normalized_record_fingerprint(&records).expect("fingerprint"));
+        tampered.swap(source_indices[0], source_indices[1]);
+        assert_eq!(
+            tampered[summary_index]["payload"]["normalized_record_fingerprint"],
+            records.summary.normalized_record_fingerprint
+        );
+        assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn r2_observation_locators_must_name_the_declared_identities() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-observation-locator-identity-mismatch")
+            .expect("locator fixture");
+        let root = temporary_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("locator snapshot");
+        let from = source_identity(&snapshot, "tracked.txt");
+        let to = source_identity(&snapshot, "rename.txt");
+        for (index, field) in fixture["mismatches"]
+            .as_array()
+            .expect("locator mismatches")
+            .iter()
+            .enumerate()
+        {
+            let mut observation = test_observation(
+                &snapshot.header.snapshot_id,
+                from,
+                to,
+                if index == 0 { 'd' } else { 'e' },
+                "header-target-resolver.v1",
+                "header-target-resolver",
+                "test",
+                "header_context",
+                "declared_kind=design",
+            );
+            match field.as_str().expect("locator field") {
+                "from_locator" => observation.from_locator = "wrong/from".to_string(),
+                "to_locator" => observation.to_locator = "wrong/to".to_string(),
+                other => panic!("unknown locator mismatch {other}"),
+            }
+            let capability = connected_capability(
+                "header-target-resolver.v1",
+                "header-target-resolver",
+                "test",
+                &["header_context"],
+            );
+            let evidence_path = write_evidence_input(
+                &snapshot.header.snapshot_id,
+                &[capability],
+                &[observation],
+                "agent-canon-r2-locator",
+            );
+            let records = normalize_with_evidence(&root, snapshot.clone(), evidence_path.clone());
+            assert!(records.relations.is_empty());
+            assert_eq!(records.observations.len(), 1);
+            assert!(!records.observations[0].accepted);
+            assert_eq!(records.attestations.len(), 1);
+            assert!(!records.attestations[0].accepted);
+            assert_eq!(
+                records.attestations[0].rejection_reason,
+                fixture["expected_ambiguity_reason"]
+                    .as_str()
+                    .expect("locator ambiguity reason")
+            );
+            assert!(records.ambiguities.iter().any(|ambiguity| {
+                ambiguity.reason_code == "provenance_incomplete"
+                    && ambiguity
+                        .evidence_ids
+                        .contains(&records.observations[0].observation_id)
+            }));
+            let _ = fs::remove_file(evidence_path);
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn r2_only_connected_provenance_complete_capabilities_authorize_o() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-observation-capability-authorization")
+            .expect("capability fixture");
+        let root = temporary_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("capability snapshot");
+        let from = source_identity(&snapshot, "tracked.txt");
+        let to = source_identity(&snapshot, "rename.txt");
+        let statuses = fixture["statuses"].as_array().expect("capability statuses");
+        for (index, status) in statuses.iter().enumerate() {
+            let status = status.as_str().expect("capability status");
+            let suffix = ['a', 'b', 'c', 'd'][index];
+            let (capability_id, extractor_id, relation_kind, classification) =
+                if status == "unknown" {
+                    (
+                        "unknown-producer.v1",
+                        "unknown-producer",
+                        "mystery",
+                        "unknown",
+                    )
+                } else {
+                    (
+                        "header-target-resolver.v1",
+                        "header-target-resolver",
+                        "header_context",
+                        "declared_kind=design",
+                    )
+                };
+            let observation = test_observation(
+                &snapshot.header.snapshot_id,
+                from,
+                to,
+                suffix,
+                capability_id,
+                extractor_id,
+                "test",
+                relation_kind,
+                classification,
+            );
+            let capabilities = match status {
+                "connected" => vec![connected_capability(
+                    capability_id,
+                    extractor_id,
+                    "test",
+                    &[relation_kind],
+                )],
+                "unavailable" => Vec::new(),
+                "provided-empty" => {
+                    let mut capability =
+                        connected_capability(capability_id, extractor_id, "test", &[relation_kind]);
+                    capability.input_scope = "explicit-evidence-input:empty".to_string();
+                    capability.completeness_claim =
+                        "provided-empty; O=empty; coverage=0".to_string();
+                    vec![capability]
+                }
+                "unknown" => vec![connected_capability(
+                    capability_id,
+                    extractor_id,
+                    "test",
+                    &[relation_kind],
+                )],
+                other => panic!("unknown capability fixture status {other}"),
+            };
+            let evidence_path = write_evidence_input(
+                &snapshot.header.snapshot_id,
+                &capabilities,
+                &[observation],
+                "agent-canon-r2-capability",
+            );
+            let records = normalize_with_evidence(&root, snapshot.clone(), evidence_path.clone());
+            let should_accept = status == "connected";
+            assert_eq!(records.observations[0].accepted, should_accept, "{status}");
+            assert_eq!(
+                records.relations.len(),
+                usize::from(should_accept),
+                "{status}"
+            );
+            if !should_accept {
+                let expected_reason = if status == "unknown" {
+                    "capability_unknown"
+                } else {
+                    "capability_unavailable"
+                };
+                assert_eq!(records.attestations[0].rejection_reason, expected_reason);
+                assert!(records.ambiguities.iter().any(|ambiguity| {
+                    ambiguity.reason_code == expected_reason
+                        && ambiguity
+                            .evidence_ids
+                            .contains(&records.observations[0].observation_id)
+                }));
+            }
+            if status == "unknown" {
+                let retained = records
+                    .capabilities
+                    .iter()
+                    .find(|capability| capability.capability_id == capability_id)
+                    .expect("unknown capability retained");
+                assert!(retained.input_scope.contains("unavailable"));
+                assert!(retained.completeness_claim.contains("unavailable"));
+                assert!(records.ambiguities.iter().any(|ambiguity| {
+                    ambiguity.reason_code == "capability_unknown"
+                        && ambiguity.evidence_ids.contains(&capability_id.to_string())
+                }));
+            }
+            let _ = fs::remove_file(evidence_path);
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_observation_acceptance_vetoes_dynamic_and_excluded_endpoints() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-observation-acceptance-vetoes")
+            .expect("acceptance veto fixture");
+        let endpoint_fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-observation-excluded-endpoints")
+            .expect("excluded endpoint fixture");
+        let (root, outside_target) = source_universe_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("acceptance snapshot");
+        let source = source_identity(&snapshot, "tracked.txt");
+        let target = source_identity(&snapshot, "modify.txt");
+        let excluded = source_identity(&snapshot, ".agent-canon/knowledge-graph/graph.sqlite");
+        let capability = connected_capability(
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            &["header_context"],
+        );
+        let mut observations = Vec::new();
+        for (index, classification) in fixture["classifications"]
+            .as_array()
+            .expect("classifications")
+            .iter()
+            .enumerate()
+        {
+            let mut observation = test_observation(
+                &snapshot.header.snapshot_id,
+                source,
+                target,
+                ['a', 'b', 'c'][index],
+                "header-target-resolver.v1",
+                "header-target-resolver",
+                "test",
+                "header_context",
+                classification.as_str().expect("classification"),
+            );
+            observation.accepted = fixture["producer_accepted"]
+                .as_bool()
+                .expect("producer bit");
+            observations.push(observation);
+        }
+        let mut source_excluded = test_observation(
+            &snapshot.header.snapshot_id,
+            excluded,
+            target,
+            'd',
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            "header_context",
+            "declared_kind=design",
+        );
+        source_excluded.accepted = true;
+        let mut target_excluded = test_observation(
+            &snapshot.header.snapshot_id,
+            source,
+            excluded,
+            'e',
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            "header_context",
+            "declared_kind=design",
+        );
+        target_excluded.accepted = true;
+        observations.extend([source_excluded, target_excluded]);
+        let evidence_path = write_evidence_input(
+            &snapshot.header.snapshot_id,
+            &[capability],
+            &observations,
+            "agent-canon-r2-acceptance-veto",
+        );
+        let records = normalize_with_evidence(&root, snapshot, evidence_path.clone());
+        for (index, expected_reason) in [
+            "dynamic_or_reflection",
+            "dynamic_or_reflection",
+            "dynamic_or_reflection",
+            "source_excluded_source",
+            "source_excluded_target",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let observation = &records.observations[index];
+            assert!(!observation.accepted, "observation {index} accepted");
+            let attestation = records
+                .attestations
+                .iter()
+                .find(|attestation| attestation.evidence_id == observation.observation_id)
+                .expect("observation attestation");
+            assert!(
+                !attestation.accepted,
+                "observation {index} attestation accepted"
+            );
+            assert_eq!(attestation.rejection_reason, expected_reason);
+            assert!(records.ambiguities.iter().any(|ambiguity| {
+                ambiguity.reason_code == expected_reason
+                    && ambiguity.evidence_ids.contains(&observation.observation_id)
+                    && !ambiguity.covered
+            }));
+            assert!(!records.relations.iter().any(|relation| relation
+                .observation_ids
+                .contains(&observation.observation_id)));
+        }
+        assert_eq!(endpoint_fixture["expected_accepted"].as_bool(), Some(false));
+        let _ = fs::remove_file(evidence_path);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_strict_reader_rejects_refreshed_observation_acceptance_tamper() {
+        let fixture = CLOSURE_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("closure fixture"))
+            .find(|case| case["case"] == "r2-reader-accepted-bit-tamper")
+            .expect("accepted-bit fixture");
+        let ghost_fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-ambiguity-evidence-forward-membership")
+            .expect("ghost ambiguity fixture");
+        let expected_cases = fixture_strings(&fixture, "mutations")
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            fixture["semantic_failure"],
+            "observation attestation consistency failed"
+        );
+        assert_eq!(
+            expected_cases,
+            BTreeSet::from([
+                "dynamic".to_string(),
+                "reflection".to_string(),
+                "runtime".to_string(),
+                "excluded_source".to_string(),
+                "excluded_target".to_string(),
+                "capability_unavailable".to_string(),
+                "capability_unknown".to_string(),
+            ])
+        );
+        let mut executed = BTreeSet::new();
+        for case_name in fixture_strings(&fixture, "mutations") {
+            let (root, outside_target) = source_universe_git_repo();
+            let snapshot = capture_snapshot(&snapshot_request(&root)).expect("tamper snapshot");
+            let source = source_identity(&snapshot, "tracked.txt");
+            let target = source_identity(&snapshot, "modify.txt");
+            let excluded = source_identity(&snapshot, ".agent-canon/knowledge-graph/graph.sqlite");
+            let observation = match case_name.as_str() {
+                "dynamic" | "reflection" | "runtime" => test_observation(
+                    &snapshot.header.snapshot_id,
+                    source,
+                    target,
+                    match case_name.as_str() {
+                        "dynamic" => 'a',
+                        "reflection" => 'b',
+                        "runtime" => 'c',
+                        _ => unreachable!(),
+                    },
+                    "header-target-resolver.v1",
+                    "header-target-resolver",
+                    "test",
+                    "header_context",
+                    &case_name,
+                ),
+                "excluded_source" => test_observation(
+                    &snapshot.header.snapshot_id,
+                    excluded,
+                    target,
+                    'd',
+                    "header-target-resolver.v1",
+                    "header-target-resolver",
+                    "test",
+                    "header_context",
+                    "declared_kind=design",
+                ),
+                "excluded_target" => test_observation(
+                    &snapshot.header.snapshot_id,
+                    source,
+                    excluded,
+                    'e',
+                    "header-target-resolver.v1",
+                    "header-target-resolver",
+                    "test",
+                    "header_context",
+                    "declared_kind=design",
+                ),
+                "capability_unavailable" => test_observation(
+                    &snapshot.header.snapshot_id,
+                    source,
+                    target,
+                    'f',
+                    "header-target-resolver.v1",
+                    "header-target-resolver",
+                    "test",
+                    "header_context",
+                    "declared_kind=design",
+                ),
+                "capability_unknown" => test_observation(
+                    &snapshot.header.snapshot_id,
+                    source,
+                    target,
+                    '0',
+                    "unknown-capability.v1",
+                    "unknown-capability",
+                    "test",
+                    "unknown_relation",
+                    "unknown",
+                ),
+                other => panic!("unknown accepted-bit mutation {other}"),
+            };
+            let capabilities = match case_name.as_str() {
+                "dynamic" | "reflection" | "runtime" | "excluded_source" | "excluded_target" => {
+                    vec![connected_capability(
+                        "header-target-resolver.v1",
+                        "header-target-resolver",
+                        "test",
+                        &["header_context"],
+                    )]
+                }
+                "capability_unavailable" => Vec::new(),
+                "capability_unknown" => vec![connected_capability(
+                    "unknown-capability.v1",
+                    "unknown-capability",
+                    "test",
+                    &["unknown_relation"],
+                )],
+                _ => unreachable!(),
+            };
+            let evidence_path = write_evidence_input(
+                &snapshot.header.snapshot_id,
+                &capabilities,
+                &[observation],
+                "agent-canon-r2-accepted-bit-tamper",
+            );
+            let records = normalize_with_evidence(&root, snapshot.clone(), evidence_path.clone());
+            assert_eq!(records.observations.len(), 1, "{case_name}: O retention");
+            assert_eq!(records.attestations.len(), records.declarations.len() + 1);
+            let observation = &records.observations[0];
+            assert!(!observation.accepted, "{case_name}: producer accepted O");
+            let attestation = records
+                .attestations
+                .iter()
+                .find(|attestation| attestation.evidence_id == observation.observation_id)
+                .expect("O attestation");
+            assert!(!attestation.accepted, "{case_name}: producer accepted T");
+            assert!(records.ambiguities.iter().any(|ambiguity| {
+                ambiguity.evidence_ids.contains(&observation.observation_id) && !ambiguity.covered
+            }));
+            assert!(records.relations.iter().all(|relation| {
+                !relation
+                    .observation_ids
+                    .contains(&observation.observation_id)
+            }));
+            if case_name == "dynamic" {
+                let mut ghost = records.clone();
+                ghost.ambiguities[0]
+                    .evidence_ids
+                    .push("ghost-ambiguity-evidence".to_string());
+                ghost.ambiguities[0].evidence_ids.sort();
+                refresh_normalized_summary(&mut ghost);
+                let error = read_normalized_record_set(
+                    Cursor::new(unchecked_normalized_bytes(&ghost)),
+                    &snapshot.header.snapshot_id,
+                )
+                .expect_err("ghost ambiguity evidence accepted");
+                assert!(matches!(error, ManifestError::Transport(_)));
+                assert!(ghost_fixture["refresh_fingerprint"].as_bool() == Some(true));
+            }
+
+            let mut tampered = records.clone();
+            let observation_index = tampered
+                .observations
+                .iter()
+                .position(|item| item.observation_id == observation.observation_id)
+                .expect("tampered observation");
+            tampered.observations[observation_index].accepted = true;
+            tampered.observations[observation_index].payload_hash =
+                hash_parts(&["refreshed-payload", &case_name]);
+            let tampered_payload_hash = tampered.observations[observation_index]
+                .payload_hash
+                .clone();
+            let attestation_index = tampered
+                .attestations
+                .iter()
+                .position(|item| item.evidence_id == observation.observation_id)
+                .expect("tampered attestation");
+            let attestation_key = hash_parts(&[
+                "observed_attestation.v1",
+                &tampered.observations[observation_index].snapshot_id,
+                &tampered.observations[observation_index].observation_id,
+                &tampered_payload_hash,
+            ]);
+            tampered.attestations[attestation_index].accepted = true;
+            tampered.attestations[attestation_index]
+                .rejection_reason
+                .clear();
+            tampered.attestations[attestation_index].attestation_key = attestation_key.clone();
+            tampered.attestations[attestation_index].raw_line_hash = tampered_payload_hash;
+            tampered.attestations[attestation_index].attestation_id =
+                hash_parts(&["attestation.v1", &attestation_key]);
+            tampered
+                .ambiguities
+                .retain(|ambiguity| !ambiguity.evidence_ids.contains(&observation.observation_id));
+            refresh_normalized_summary(&mut tampered);
+            let error = read_normalized_record_set(
+                Cursor::new(unchecked_normalized_bytes(&tampered)),
+                &snapshot.header.snapshot_id,
+            )
+            .expect_err("semantic accepted-bit tamper accepted");
+            assert!(matches!(&error, ManifestError::Transport(_)));
+            assert!(
+                error
+                    .to_string()
+                    .contains("observation attestation consistency failed"),
+                "{case_name}: accepted-bit mutation failed for another reason: {error}"
+            );
+            assert_eq!(
+                if matches!(&error, ManifestError::Transport(_)) {
+                    22
+                } else {
+                    0
+                },
+                22
+            );
+            assert_eq!(
+                if matches!(&error, ManifestError::Transport(_)) {
+                    "transport-invalid"
+                } else {
+                    "other"
+                },
+                fixture["expected_status"]
+                    .as_str()
+                    .expect("transport status")
+            );
+            executed.insert(case_name);
+            let _ = fs::remove_file(evidence_path);
+            let _ = fs::remove_dir_all(root);
+            let _ = fs::remove_file(outside_target);
+        }
+        assert_eq!(executed, expected_cases);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_strict_reader_recomputes_counts_and_rejects_provenance_tamper() {
+        let named_cases = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .filter(|case| {
+                matches!(
+                    case["case"].as_str(),
+                    Some("r2-attestation-provenance-tamper")
+                        | Some("r2-summary-rejected-count-tamper")
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(named_cases.len(), 2);
+        let (root, outside_target) = source_universe_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("tamper snapshot");
+        let tracked = source_identity(&snapshot, "tracked.txt");
+        let modify = source_identity(&snapshot, "modify.txt");
+        let observation = test_observation(
+            &snapshot.header.snapshot_id,
+            tracked,
+            modify,
+            'f',
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            "header_context",
+            "declared_kind=implementation",
+        );
+        let capability = connected_capability(
+            "header-target-resolver.v1",
+            "header-target-resolver",
+            "test",
+            &["header_context"],
+        );
+        let evidence_path = write_evidence_input(
+            &snapshot.header.snapshot_id,
+            &[capability],
+            &[observation],
+            "agent-canon-r2-reader-tamper",
+        );
+        let records = normalize_with_evidence(&root, snapshot.clone(), evidence_path.clone());
+        assert_eq!(records.relations.len(), 1);
+        assert_eq!(records.relations[0].attestation_ids.len(), 2);
+
+        for field in [
+            "rejected_declaration_count",
+            "rejected_observation_count",
+            "record_counts.rejected_declaration_count",
+            "record_counts.rejected_observation_count",
+            "record_counts.duplicate_evidence_count",
+        ] {
+            let mut tampered = records.clone();
+            match field {
+                "rejected_declaration_count" => tampered.summary.rejected_declaration_count += 1,
+                "rejected_observation_count" => tampered.summary.rejected_observation_count += 1,
+                "record_counts.rejected_declaration_count" => {
+                    *tampered
+                        .summary
+                        .record_counts
+                        .get_mut("rejected_declaration_count")
+                        .expect("declaration count") += 1
+                }
+                "record_counts.rejected_observation_count" => {
+                    *tampered
+                        .summary
+                        .record_counts
+                        .get_mut("rejected_observation_count")
+                        .expect("observation count") += 1
+                }
+                "record_counts.duplicate_evidence_count" => {
+                    *tampered
+                        .summary
+                        .record_counts
+                        .get_mut("duplicate_evidence_count")
+                        .expect("duplicate evidence count") += 1
+                }
+                _ => unreachable!(),
+            }
+            assert!(
+                read_normalized_record_set(
+                    Cursor::new(unchecked_normalized_bytes(&tampered)),
+                    &snapshot.header.snapshot_id,
+                )
+                .is_err(),
+                "summary tamper accepted: {field}"
+            );
+        }
+
+        for tamper_case in [
+            "duplicate_evidence_key",
+            "endpoint",
+            "kind",
+            "snapshot",
+            "dropped_attestation",
+            "dropped_fact_membership",
+            "empty_source_hash",
+        ] {
+            let mut tampered = records.clone();
+            match tamper_case {
+                "duplicate_evidence_key" => {
+                    let mut duplicate = tampered.attestations[0].clone();
+                    duplicate.attestation_key = hash_parts(&["duplicate-attestation-key"]);
+                    duplicate.attestation_id =
+                        hash_parts(&["attestation.v1", &duplicate.attestation_key]);
+                    tampered.attestations.push(duplicate);
+                }
+                "endpoint" => {
+                    tampered.attestations[0].dependent_identity_id =
+                        tampered.attestations[0].prerequisite_identity_id.clone();
+                }
+                "kind" => tampered.attestations[0].relation_kind = "design".to_string(),
+                "snapshot" => tampered.attestations[0].snapshot_id = "0".repeat(64),
+                "dropped_attestation" => {
+                    tampered.attestations.remove(0);
+                }
+                "dropped_fact_membership" => {
+                    tampered.relations[0].attestation_ids.remove(0);
+                }
+                "empty_source_hash" => {
+                    tampered.relations[0].source_content_hashes[0].clear();
+                }
+                _ => unreachable!(),
+            }
+            refresh_normalized_summary(&mut tampered);
+            assert!(
+                read_normalized_record_set(
+                    Cursor::new(unchecked_normalized_bytes(&tampered)),
+                    &snapshot.header.snapshot_id,
+                )
+                .is_err(),
+                "provenance tamper accepted after refreshed fingerprint: {tamper_case}"
+            );
+        }
+        let _ = fs::remove_file(evidence_path);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[test]
+    fn r2_freshness_and_reader_tamper_fixture_cases_are_executable() {
+        let cases = CLOSURE_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("closure fixture"))
+            .collect::<Vec<_>>();
+        let freshness = cases
+            .iter()
+            .find(|case| case["case"] == "r2-freshness-snapshot-mismatch")
+            .expect("freshness fixture");
+        let reader = cases
+            .iter()
+            .find(|case| case["case"] == "r2-reader-tamper-rejection")
+            .expect("reader fixture");
+        let root = temporary_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("freshness snapshot");
+        let records = normalize_snapshot(
+            &NormalizeRequest {
+                root: root.clone(),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("-"),
+                evidence_jsonl: Vec::new(),
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot.clone(),
+        )
+        .expect("freshness normalization");
+        let baseline = normalized_values(&records);
+        let mut executed_freshness = BTreeSet::new();
+        for mutation in fixture_strings(freshness, "mutations") {
+            let mut tampered = baseline.clone();
+            match mutation.as_str() {
+                "snapshot_id" => {
+                    tampered[0]["payload"]["snapshot_id"] = Value::String("0".repeat(64));
+                }
+                "schema_version" => {
+                    tampered[0]["payload"]["schema_version"] =
+                        Value::String("wrong.v1".to_string());
+                }
+                "tool_version" => {
+                    tampered[0]["payload"]["tool_version"] =
+                        Value::String("tampered-tool".to_string());
+                }
+                "agentcanon_pin" => {
+                    let snapshot_index = record_index(&tampered, SNAPSHOT_SCHEMA_VERSION);
+                    tampered[snapshot_index]["payload"]["agentcanon_pin"] =
+                        Value::String("tampered-pin".to_string());
+                }
+                "profile" => {
+                    tampered[0]["payload"]["profile"] = Value::String("wrong".to_string());
+                }
+                other => panic!("unknown freshness mutation {other}"),
+            }
+            assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+            executed_freshness.insert(mutation);
+        }
+        assert_eq!(
+            executed_freshness,
+            fixture_strings(freshness, "mutations")
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+
+        let mut executed_reader = BTreeSet::new();
+        for field in fixture_strings(reader, "tamper_fields") {
+            let mut tampered = baseline.clone();
+            let summary_index = tampered.len() - 1;
+            match field.as_str() {
+                "schema_version" => {
+                    tampered[0]["payload"]["schema_version"] =
+                        Value::String("wrong.v1".to_string());
+                }
+                "snapshot_id" => {
+                    tampered[0]["payload"]["snapshot_id"] = Value::String("0".repeat(64));
+                }
+                "record_counts" => {
+                    tampered[summary_index]["payload"]["record_counts"]["source_identity.v1"] =
+                        Value::from(999u64);
+                }
+                "rejected_declaration_count" => {
+                    tampered[summary_index]["payload"]["rejected_declaration_count"] =
+                        Value::from(999u64);
+                }
+                "rejected_observation_count" => {
+                    tampered[summary_index]["payload"]["rejected_observation_count"] =
+                        Value::from(999u64);
+                }
+                "normalized_record_fingerprint" => {
+                    tampered[summary_index]["payload"]["normalized_record_fingerprint"] =
+                        Value::String("0".repeat(64));
+                }
+                "unknown_top_level_field" => {
+                    tampered[0]["unexpected"] = Value::Bool(true);
+                }
+                other => panic!("unknown reader tamper field {other}"),
+            }
+            assert_normalized_transport_error(tampered, &snapshot.header.snapshot_id);
+            executed_reader.insert(field);
+        }
+        assert_eq!(
+            executed_reader,
+            fixture_strings(reader, "tamper_fields")
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn r2_normalization_without_evidence_is_explicitly_unavailable_not_covered() {
+        let root = temporary_git_repo();
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("R2 snapshot");
+        let request = NormalizeRequest {
+            root: root.clone(),
+            profile: "parent".to_string(),
+            snapshot_jsonl: PathBuf::from("-"),
+            evidence_jsonl: Vec::new(),
+            output_jsonl: PathBuf::from("-"),
+        };
+        let records = normalize_snapshot(&request, snapshot).expect("R2 empty O normalization");
+        assert!(records.observations.is_empty());
+        assert_eq!(
+            records.summary.record_counts["accepted_direct_fact_count"],
+            records.relations.len()
+        );
+        assert_eq!(records.summary.record_counts["x_core_count"], 0);
+        assert!(records.capabilities.iter().all(|capability| {
+            capability.completeness_claim.contains("unavailable")
+                || capability.completeness_claim.contains("provided-empty")
+        }));
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-empty-o-capability-transport")
+            .expect("empty-O capability fixture");
+        let registered_capability_ids = producer_capability_rows()
+            .into_iter()
+            .map(|(capability_id, _, _)| capability_id)
+            .collect::<BTreeSet<_>>();
+        let materialized_capability_ids = records
+            .capabilities
+            .iter()
+            .map(|capability| capability.capability_id.clone())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(materialized_capability_ids, registered_capability_ids);
+        let mut executed = BTreeSet::new();
+        for mutation in fixture_strings(&fixture, "mutations") {
+            let mut tampered = records.clone();
+            match mutation.as_str() {
+                "status-flip" => {
+                    let capability = tampered
+                        .capabilities
+                        .iter_mut()
+                        .find(|capability| capability.capability_id == "code-static.v1")
+                        .expect("registered capability row");
+                    capability.input_scope = "connected:tampered".to_string();
+                    capability.completeness_claim =
+                        "connected; supplied-records-complete; coverage=1".to_string();
+                }
+                "row-delete" => {
+                    tampered
+                        .capabilities
+                        .retain(|capability| capability.capability_id != "code-static.v1");
+                }
+                other => panic!("unknown empty-O capability mutation {other}"),
+            }
+            refresh_normalized_summary(&mut tampered);
+            let error = read_normalized_record_set(
+                Cursor::new(unchecked_normalized_bytes(&tampered)),
+                &records.header.snapshot_id,
+            )
+            .expect_err("empty-O capability mutation accepted");
+            assert!(matches!(error, ManifestError::Transport(_)));
+            let expected_error = if mutation == "status-flip" {
+                "empty observation set requires unavailable/provided-empty capability status"
+            } else {
+                "registered capability transport is incomplete or duplicated"
+            };
+            assert!(
+                error.to_string().contains(expected_error),
+                "{mutation}: unexpected capability error: {error}"
+            );
+            executed.insert(mutation);
+        }
+        assert_eq!(
+            executed,
+            fixture_strings(&fixture, "mutations")
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_missing_stale_and_excluded_targets_are_typed_a_and_never_facts() {
+        let (root, outside_target) = source_universe_git_repo();
+        fs::remove_file(root.join("delete.txt")).expect("stale target deletion");
+        fs::write(
+            root.join("tracked.txt"),
+            "# @dependency-start\n# contract implementation\n# responsibility Exercises R2 target diagnostics.\n# upstream implementation missing.txt missing target\n# upstream implementation delete.txt stale target\n# upstream implementation .agent-canon/knowledge-graph/graph.sqlite generated target\n# @dependency-end\n",
+        )
+        .expect("R2 diagnostic manifest");
+        let snapshot = capture_snapshot(&snapshot_request(&root)).expect("R2 diagnostic snapshot");
+        let request = NormalizeRequest {
+            root: root.clone(),
+            profile: "parent".to_string(),
+            snapshot_jsonl: PathBuf::from("-"),
+            evidence_jsonl: Vec::new(),
+            output_jsonl: PathBuf::from("-"),
+        };
+        let records = normalize_snapshot(&request, snapshot).expect("R2 diagnostics");
+        let reasons = records
+            .ambiguities
+            .iter()
+            .map(|ambiguity| ambiguity.reason_code.as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(reasons.contains("missing_target"));
+        assert!(reasons.contains("stale_target"));
+        assert!(reasons.contains("source_excluded_target"));
+        assert!(records.relations.is_empty());
+        assert_eq!(records.summary.accepted_fact_count, 0);
+        assert!(records
+            .ambiguities
+            .iter()
+            .all(|ambiguity| !ambiguity.covered));
+        assert!(records
+            .declarations
+            .iter()
+            .all(
+                |declaration| records.attestations.iter().any(|attestation| attestation
+                    .evidence_id
+                    == declaration.declaration_id
+                    && !attestation.accepted
+                    && attestation.rejection_reason
+                        == records
+                            .ambiguities
+                            .iter()
+                            .find(|ambiguity| ambiguity
+                                .evidence_ids
+                                .contains(&declaration.declaration_id))
+                            .expect("declaration ambiguity")
+                            .reason_code)
+            ));
+        assert_eq!(
+            records.summary.record_counts["unresolved_count"],
+            records.ambiguities.len()
+        );
+        assert_eq!(
+            records.summary.record_counts["excluded_count"],
+            records.source_exclusions.len()
+        );
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_ambiguity_provenance_is_bidirectionally_closed() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-ambiguity-closure-mutations")
+            .expect("ambiguity closure fixture");
+        let (root, outside_target) = source_universe_git_repo();
+        let accepted_snapshot = capture_snapshot(&snapshot_request(&root)).expect("D snapshot");
+        let accepted_records = normalize_snapshot(
+            &NormalizeRequest {
+                root: root.clone(),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("-"),
+                evidence_jsonl: Vec::new(),
+                output_jsonl: PathBuf::from("-"),
+            },
+            accepted_snapshot,
+        )
+        .expect("accepted D normalization");
+        let accepted_declaration = accepted_records
+            .declarations
+            .first()
+            .expect("accepted declaration")
+            .clone();
+        assert!(accepted_records.ambiguities.is_empty());
+
+        fs::write(
+            root.join("tracked.txt"),
+            "# @dependency-start\n# contract implementation\n# responsibility Provides the fixture manifest.\n# upstream implementation missing.txt unresolved fixture target\n# @dependency-end\n",
+        )
+        .expect("missing-target manifest");
+        let rejected_snapshot = capture_snapshot(&snapshot_request(&root)).expect("A snapshot");
+        let rejected_records = normalize_snapshot(
+            &NormalizeRequest {
+                root: root.clone(),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("-"),
+                evidence_jsonl: Vec::new(),
+                output_jsonl: PathBuf::from("-"),
+            },
+            rejected_snapshot,
+        )
+        .expect("rejected D normalization");
+        let rejected_ambiguity = rejected_records
+            .ambiguities
+            .iter()
+            .find(|ambiguity| ambiguity.reason_code == "missing_target")
+            .expect("missing-target ambiguity")
+            .clone();
+        let mut executed = BTreeSet::new();
+        for mutation in fixture_strings(&fixture, "mutations") {
+            let mut tampered = if mutation == "accepted" {
+                let mut records = accepted_records.clone();
+                records.ambiguities.push(ambiguity_for_declaration(
+                    &accepted_declaration,
+                    "missing_target",
+                    &[],
+                    std::slice::from_ref(&accepted_declaration.declared_target),
+                    "design",
+                ));
+                records
+            } else {
+                rejected_records.clone()
+            };
+            if mutation != "accepted" {
+                let index = tampered
+                    .ambiguities
+                    .iter()
+                    .position(|ambiguity| ambiguity.ambiguity_id == rejected_ambiguity.ambiguity_id)
+                    .expect("mutation ambiguity");
+                let (reason, candidate_fact_ids, candidate_targets) = match mutation.as_str() {
+                    "wrong-reason" => (
+                        "stale_target",
+                        rejected_ambiguity.candidate_fact_ids.clone(),
+                        rejected_ambiguity.candidate_targets.clone(),
+                    ),
+                    "wrong-candidate" => (
+                        "missing_target",
+                        rejected_ambiguity.candidate_fact_ids.clone(),
+                        vec!["wrong-candidate-target".to_string()],
+                    ),
+                    "ghost-fact" => (
+                        "missing_target",
+                        vec!["f".repeat(64)],
+                        rejected_ambiguity.candidate_targets.clone(),
+                    ),
+                    other => panic!("unknown ambiguity closure mutation {other}"),
+                };
+                tampered.ambiguities[index] = ambiguity_record(
+                    &rejected_ambiguity.snapshot_id,
+                    &rejected_ambiguity.source_identity_id,
+                    candidate_fact_ids,
+                    candidate_targets,
+                    reason,
+                    &rejected_ambiguity.relation_kind,
+                    rejected_ambiguity.evidence_ids.clone(),
+                );
+            }
+            refresh_normalized_summary(&mut tampered);
+            let error = read_normalized_record_set(
+                Cursor::new(unchecked_normalized_bytes(&tampered)),
+                &tampered.header.snapshot_id,
+            )
+            .expect_err("A closure mutation accepted");
+            assert!(matches!(error, ManifestError::Transport(_)));
+            let expected_error = if matches!(mutation.as_str(), "accepted" | "wrong-reason") {
+                "ambiguity evidence must reference a rejected attestation with the exact reason"
+            } else {
+                "ambiguity reason/source/candidate/fact closure is not exact"
+            };
+            assert!(
+                error.to_string().contains(expected_error),
+                "{mutation}: unexpected A closure error: {error}"
+            );
+            executed.insert(mutation);
+        }
+        assert_eq!(
+            executed,
+            fixture_strings(&fixture, "mutations")
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_file(outside_target);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn r2_declaration_endpoints_require_u_and_retain_source_diagnostics() {
+        let fixture = RELATION_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("relation fixture"))
+            .find(|case| case["case"] == "r2-declaration-endpoint-u-adversaries")
+            .expect("declaration endpoint fixture");
+        let fixture_cases = fixture_strings(&fixture, "cases")
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            fixture_cases,
+            BTreeSet::from([
+                "excluded-source".to_string(),
+                "stale-source".to_string(),
+                "nonexistent-source".to_string(),
+            ])
+        );
+
+        for (case_name, excluded_source, expected_reason) in [
+            ("excluded-source", true, "source_excluded_source"),
+            ("stale-source", false, "stale_source"),
+            ("nonexistent-source", false, "unresolved_source"),
+        ] {
+            let (root, outside_target) = source_universe_git_repo();
+            if case_name == "stale-source" {
+                fs::remove_file(root.join("delete.txt")).expect("stale source deletion");
+            }
+            let mut snapshot = capture_snapshot(&snapshot_request(&root)).expect("D snapshot");
+            let source_path = if excluded_source {
+                ".agent-canon/knowledge-graph/graph.sqlite"
+            } else if case_name == "nonexistent-source" {
+                "missing-source.txt"
+            } else {
+                "delete.txt"
+            };
+            let source = if case_name == "nonexistent-source" {
+                let mut source = test_identity(source_path);
+                source.identity_id = hash_parts(&[
+                    "source_identity.v1",
+                    &snapshot.header.parent_repo_id,
+                    source_path,
+                ]);
+                source.logical_id = hash_parts(&[
+                    "logical_source.v1",
+                    &snapshot.header.parent_repo_id,
+                    source_path,
+                ]);
+                source.snapshot_id = snapshot.header.snapshot_id.clone();
+                source
+            } else {
+                source_identity(&snapshot, source_path).clone()
+            };
+            let target = source_identity(&snapshot, "modify.txt").clone();
+            let declaration = snapshot
+                .declarations
+                .first_mut()
+                .expect("fixture declaration");
+            declaration.source_identity_id = source.identity_id.clone();
+            declaration.source_span.path = source.repo_rel_path.clone();
+            declaration.resolved_target_identity_id = Some(target.identity_id.clone());
+            let start_line = declaration.source_span.start_line.to_string();
+            let end_line = declaration.source_span.end_line.to_string();
+            declaration.declaration_id = hash_parts(&[
+                "dependency_declaration.v1",
+                &declaration.source_identity_id,
+                &start_line,
+                &end_line,
+                &declaration.declared_direction,
+                &declaration.declared_kind,
+                &declaration.declared_target,
+                &declaration.raw_line_hash,
+            ]);
+            declaration.attestation_key = hash_parts(&[
+                "dependency_attestation.v1",
+                &snapshot.header.snapshot_id,
+                &declaration.source_identity_id,
+                &start_line,
+                &end_line,
+                &declaration.declared_direction,
+                &declaration.declared_kind,
+                &declaration.declared_target,
+                &declaration.raw_line_hash,
+            ]);
+            let records = normalize_snapshot(
+                &NormalizeRequest {
+                    root: root.clone(),
+                    profile: "parent".to_string(),
+                    snapshot_jsonl: PathBuf::from("D-adversary-snapshot.v1.jsonl"),
+                    evidence_jsonl: Vec::new(),
+                    output_jsonl: PathBuf::from("-"),
+                },
+                snapshot,
+            )
+            .expect("D endpoint diagnostic normalization");
+            let attestation = records
+                .attestations
+                .iter()
+                .find(|attestation| attestation.evidence_type == "declaration")
+                .expect("declaration attestation");
+            assert!(!attestation.accepted, "{case_name}: declaration accepted");
+            assert_eq!(attestation.rejection_reason, expected_reason);
+            assert!(records.relations.is_empty(), "{case_name}: fact emitted");
+            assert!(records.ambiguities.iter().any(|ambiguity| {
+                ambiguity.reason_code == expected_reason
+                    && ambiguity.evidence_ids.contains(&attestation.evidence_id)
+                    && !ambiguity.covered
+            }));
+            assert_eq!(
+                records.ambiguities.len(),
+                1,
+                "{case_name}: normalized A count"
+            );
+            assert_eq!(records.summary.record_counts["unresolved_count"], 1);
+            let _ = fs::remove_dir_all(root);
+            let _ = fs::remove_file(outside_target);
+        }
+
+        let source = test_identity("missing-source");
+        let target = test_identity("target");
+        let identities = BTreeMap::from([(target.identity_id.as_str(), &target)]);
+        let declaration = DependencyDeclaration {
+            declaration_id: "D-missing-source".to_string(),
+            source_identity_id: source.identity_id.clone(),
+            declared_direction: "upstream".to_string(),
+            declared_kind: "design".to_string(),
+            declared_target: target.repo_rel_path.clone(),
+            resolved_target_identity_id: Some(target.identity_id.clone()),
+            source_span: SourceSpan {
+                path: source.repo_rel_path.clone(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 2,
+            },
+            reason: "missing source".to_string(),
+            raw_line_hash: hash_parts(&["missing-source"]),
+            attestation_key: hash_parts(&["missing-source-attestation"]),
+            snapshot_id: "snapshot".to_string(),
+        };
+        let (dependent, prerequisite, rejection) =
+            declaration_endpoints(&declaration, &identities, &BTreeSet::new());
+        assert_eq!(dependent.as_deref(), Some("missing-source"));
+        assert_eq!(prerequisite.as_deref(), Some("target"));
+        assert_eq!(rejection.as_deref(), Some("unresolved_source"));
+        let ambiguity = ambiguity_for_declaration(
+            &declaration,
+            rejection.as_deref().expect("source rejection"),
+            &[],
+            &[declaration.declared_target.clone()],
+            "design",
+        );
+        assert_eq!(ambiguity.evidence_ids, vec![declaration.declaration_id]);
+        assert!(ambiguity.candidate_fact_ids.is_empty());
+        assert!(fixture_cases.contains("nonexistent-source"));
     }
 
     #[cfg(unix)]
@@ -3611,6 +9281,11 @@ mod tests {
 
     #[test]
     fn atomic_output_failure_removes_candidate_and_preserves_old_output() {
+        let fixture: Value = CLOSURE_FIXTURE
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("closure fixture"))
+            .find(|case: &Value| case["case"] == "r2-atomic-candidate-failure")
+            .expect("atomic fixture");
         let root = unique_temp_path("agent-canon-r1-atomic");
         fs::create_dir_all(&root).expect("atomic fixture root");
         let output = root.join("source_snapshot.v1.jsonl");
@@ -3618,11 +9293,17 @@ mod tests {
             ".source_snapshot.v1.jsonl.{}.candidate",
             std::process::id()
         ));
-        for failure in [
-            AtomicFailurePoint::Write,
-            AtomicFailurePoint::Sync,
-            AtomicFailurePoint::Rename,
-        ] {
+        for failure in fixture["failure_points"]
+            .as_array()
+            .expect("atomic failure points")
+            .iter()
+            .map(|failure| match failure.as_str().expect("atomic failure") {
+                "write" => AtomicFailurePoint::Write,
+                "sync" => AtomicFailurePoint::Sync,
+                "rename" => AtomicFailurePoint::Rename,
+                other => panic!("unknown atomic failure {other}"),
+            })
+        {
             fs::write(&output, b"old-output\n").expect("old output");
             let error = write_atomic_with_failure(&output, b"new-output\n", failure)
                 .expect_err("injected atomic failure");
@@ -3794,6 +9475,299 @@ mod tests {
             error.to_string().contains(expected),
             "expected {expected:?}, got {error:?}"
         );
+    }
+
+    fn normalized_values(records: &NormalizedRecordSet) -> Vec<Value> {
+        let mut bytes = Vec::new();
+        write_normalized_record_set(records, &mut bytes).expect("normalized JSONL");
+        String::from_utf8(bytes)
+            .expect("UTF-8 normalized JSONL")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("normalized record"))
+            .collect()
+    }
+
+    fn unchecked_normalized_bytes(records: &NormalizedRecordSet) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        write_envelope(
+            &mut bytes,
+            "normalized_record_set_header.v1",
+            &records.header.snapshot_id,
+            &records.header.snapshot_id,
+            normalized_header_payload(&records.header),
+        )
+        .expect("unchecked normalized header");
+        for (record_type, record_id, payload) in normalized_record_values(records) {
+            write_envelope(
+                &mut bytes,
+                &record_type,
+                &record_id,
+                &records.header.snapshot_id,
+                payload,
+            )
+            .expect("unchecked normalized record");
+        }
+        write_envelope(
+            &mut bytes,
+            "normalization_summary.v1",
+            &records.summary.snapshot_id,
+            &records.header.snapshot_id,
+            json!({
+                "snapshot_id": records.summary.snapshot_id,
+                "record_counts": records.summary.record_counts,
+                "accepted_fact_count": records.summary.accepted_fact_count,
+                "rejected_declaration_count": records.summary.rejected_declaration_count,
+                "rejected_observation_count": records.summary.rejected_observation_count,
+                "ambiguity_count": records.summary.ambiguity_count,
+                "source_exclusion_count": records.summary.source_exclusion_count,
+                "normalized_record_fingerprint": records.summary.normalized_record_fingerprint,
+            }),
+        )
+        .expect("unchecked normalized summary");
+        bytes
+    }
+
+    fn assert_normalized_transport_error(values: Vec<Value>, expected_snapshot_id: &str) {
+        let mut bytes = Vec::new();
+        for value in values {
+            serde_json::to_writer(&mut bytes, &value).expect("tampered normalized JSON");
+            bytes.push(b'\n');
+        }
+        assert!(
+            read_normalized_record_set(Cursor::new(bytes), expected_snapshot_id).is_err(),
+            "tampered normalized transport accepted"
+        );
+    }
+
+    fn fixture_strings(case: &Value, field: &str) -> Vec<String> {
+        case.get(field)
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|value| value.as_str().expect("fixture string").to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn fixture_relations(case: &Value) -> Vec<NormalizedRelation> {
+        case["direct_edges"]
+            .as_array()
+            .expect("direct edges")
+            .iter()
+            .enumerate()
+            .map(|(index, edge)| {
+                let edge = edge.as_array().expect("edge tuple");
+                let from = edge[0].as_str().expect("edge from");
+                let kind = edge[1].as_str().expect("edge kind");
+                let to = edge[2].as_str().expect("edge to");
+                test_relation(
+                    from,
+                    to,
+                    kind,
+                    &hash_parts(&["fixture-fact", &index.to_string(), from, kind, to]),
+                )
+            })
+            .collect()
+    }
+
+    fn all_permutations<T: Clone>(values: &[T]) -> Vec<Vec<T>> {
+        if values.is_empty() {
+            return vec![Vec::new()];
+        }
+        let mut result = Vec::new();
+        for index in 0..values.len() {
+            let mut remaining = values.to_vec();
+            let head = remaining.remove(index);
+            for mut tail in all_permutations(&remaining) {
+                let mut permutation = vec![head.clone()];
+                permutation.append(&mut tail);
+                result.push(permutation);
+            }
+        }
+        result
+    }
+
+    fn connected_capability(
+        capability_id: &str,
+        extractor_id: &str,
+        extractor_version: &str,
+        relation_kinds: &[&str],
+    ) -> ExtractorCapability {
+        ExtractorCapability {
+            capability_id: capability_id.to_string(),
+            extractor_id: extractor_id.to_string(),
+            extractor_version: extractor_version.to_string(),
+            relation_kinds: relation_kinds
+                .iter()
+                .map(|kind| (*kind).to_string())
+                .collect(),
+            input_scope: "connected:explicit-evidence-input".to_string(),
+            supported_file_kinds: vec!["text".to_string()],
+            unsupported_behavior: "unsupported-and-unresolved-to-A".to_string(),
+            dynamic_behavior: "dynamic-reflection-to-A".to_string(),
+            provenance_fields: vec![
+                "payload_hash".to_string(),
+                "snapshot_id".to_string(),
+                "source_span".to_string(),
+            ],
+            completeness_claim:
+                "connected; supplied-records-complete; semantic-completeness-not-claimed"
+                    .to_string(),
+        }
+    }
+
+    fn test_observation(
+        snapshot_id: &str,
+        from: &SourceIdentity,
+        to: &SourceIdentity,
+        observation_suffix: char,
+        capability_id: &str,
+        extractor_id: &str,
+        extractor_version: &str,
+        relation_kind: &str,
+        classification: &str,
+    ) -> ObservedEvidence {
+        ObservedEvidence {
+            observation_id: format!("O-{}", observation_suffix.to_string().repeat(64)),
+            extractor_id: extractor_id.to_string(),
+            extractor_version: extractor_version.to_string(),
+            capability_id: capability_id.to_string(),
+            relation_kind: relation_kind.to_string(),
+            from_locator: from.canonical_locator.clone(),
+            to_locator: to.canonical_locator.clone(),
+            from_identity_id: from.identity_id.clone(),
+            to_identity_id: to.identity_id.clone(),
+            source_span: SourceSpan {
+                path: from.repo_rel_path.clone(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 2,
+            },
+            payload_hash: observation_suffix.to_string().repeat(64),
+            classification: classification.to_string(),
+            accepted: true,
+            snapshot_id: snapshot_id.to_string(),
+        }
+    }
+
+    fn write_evidence_input(
+        snapshot_id: &str,
+        capabilities: &[ExtractorCapability],
+        observations: &[ObservedEvidence],
+        prefix: &str,
+    ) -> PathBuf {
+        let path = unique_temp_path(prefix);
+        let mut bytes = Vec::new();
+        for capability in capabilities {
+            write_envelope(
+                &mut bytes,
+                "extractor_capability.v1",
+                &capability.capability_id,
+                snapshot_id,
+                capability_payload(capability),
+            )
+            .expect("capability evidence");
+        }
+        for observation in observations {
+            write_envelope(
+                &mut bytes,
+                "observed_evidence.v1",
+                &observation.observation_id,
+                snapshot_id,
+                observed_evidence_payload(observation),
+            )
+            .expect("observation evidence");
+        }
+        fs::write(&path, bytes).expect("evidence input");
+        path
+    }
+
+    fn normalize_with_evidence(
+        root: &Path,
+        snapshot: ManifestSnapshot,
+        evidence_path: PathBuf,
+    ) -> NormalizedRecordSet {
+        normalize_snapshot(
+            &NormalizeRequest {
+                root: root.to_path_buf(),
+                profile: "parent".to_string(),
+                snapshot_jsonl: PathBuf::from("-"),
+                evidence_jsonl: vec![evidence_path],
+                output_jsonl: PathBuf::from("-"),
+            },
+            snapshot,
+        )
+        .expect("fixture normalization")
+    }
+
+    fn refresh_normalized_summary(records: &mut NormalizedRecordSet) {
+        records.summary.record_counts = normalized_record_counts(records);
+        records.summary.accepted_fact_count = records.relations.len();
+        records.summary.rejected_declaration_count = records
+            .attestations
+            .iter()
+            .filter(|attestation| {
+                attestation.evidence_type == "declaration" && !attestation.accepted
+            })
+            .count();
+        records.summary.rejected_observation_count = records
+            .attestations
+            .iter()
+            .filter(|attestation| {
+                attestation.evidence_type == "observation" && !attestation.accepted
+            })
+            .count();
+        records.summary.ambiguity_count = records.ambiguities.len();
+        records.summary.source_exclusion_count = records.source_exclusions.len();
+        records.summary.normalized_record_fingerprint =
+            normalized_record_fingerprint(records).expect("refreshed normalized fingerprint");
+    }
+
+    fn test_identity(path: &str) -> SourceIdentity {
+        SourceIdentity {
+            identity_id: path.to_string(),
+            logical_id: path.to_string(),
+            repo_rel_path: path.to_string(),
+            canonical_locator: path.to_string(),
+            alternate_locators: Vec::new(),
+            locator_kind: "regular_file".to_string(),
+            path_role: "source".to_string(),
+            file_mode: "100644".to_string(),
+            exists: true,
+            is_dirty: false,
+            content_hash: hash_parts(&["content", path]),
+            git_blob_or_gitlink: hash_parts(&["blob", path]),
+            submodule_commit: String::new(),
+            snapshot_id: String::new(),
+            owner_class: "test".to_string(),
+            surface_mode: "regular".to_string(),
+        }
+    }
+
+    fn test_relation(
+        from_identity_id: &str,
+        to_identity_id: &str,
+        relation_kind: &str,
+        fact_id: &str,
+    ) -> NormalizedRelation {
+        NormalizedRelation {
+            fact_id: fact_id.to_string(),
+            from_identity_id: from_identity_id.to_string(),
+            to_identity_id: to_identity_id.to_string(),
+            relation_kind: relation_kind.to_string(),
+            semantic_direction: "depends_on".to_string(),
+            pair_identity: "pair".to_string(),
+            attestation_ids: vec![format!("attestation-{fact_id}")],
+            observation_ids: Vec::new(),
+            authority: "test".to_string(),
+            accepted: true,
+            reconciliation_status: "not_comparable".to_string(),
+            source_snapshot_id: "snapshot".to_string(),
+            source_content_hashes: vec!["source-a".to_string(), "source-b".to_string()],
+        }
     }
 
     fn fixture_case_names(fixture: &str) -> Vec<String> {
