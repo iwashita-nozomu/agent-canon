@@ -219,6 +219,12 @@ def creation_intent_from_git_tokens(tokens: tuple[str, ...]) -> CreationIntent |
         return None
     subcommand = tokens[0]
     arguments = tokens[1:]
+    if subcommand in {"switch", "checkout"} and arguments:
+        return CreationIntent(
+            "shared-checkout",
+            subcommand,
+            f"git {subcommand} changes the checkout used by concurrent sessions",
+        )
     if subcommand in CREATE_OPTIONS and uses_create_option(subcommand, arguments):
         return CreationIntent("branch", subcommand, CREATE_EVIDENCE[subcommand])
     if subcommand == "branch" and branch_creates_branch(arguments):
