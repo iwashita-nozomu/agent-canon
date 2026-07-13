@@ -1467,6 +1467,7 @@ class CodexHooksTest(unittest.TestCase):
             "git status && sudo git reset --hard",
             "git status; nice git restore file.py",
             "git status && ( sudo git checkout main )",
+            "sudo git " + "-A " * 2000 + "reset --hard HEAD",
         ]
         for command in commands:
             with self.subTest(command=command):

@@ -20,7 +20,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 523,
+      "line": 544,
       "path": ".codex/hooks/branch_worktree_guard.py",
       "surface": "hook"
     },

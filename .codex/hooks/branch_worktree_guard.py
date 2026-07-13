@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shlex
 import sys
 from dataclasses import dataclass
@@ -70,9 +69,11 @@ BRANCH_CREATION_MODIFIERS = {
     "--no-track",
     "--track",
 }
-PROTECTED_LITERAL = re.compile(
-    r"(?:^|[;&|()!\s])git(?:\s+(?:-[A-Za-z]|--[^\s]+)(?:\s+[^\s]+)?)*\s+"
-    r"(?:restore|reset|clean|checkout|switch|stash|branch|worktree)(?:\s|$)"
+PROTECTED_GIT_SUBCOMMANDS = frozenset(
+    {"restore", "reset", "clean", "checkout", "switch", "stash", "branch", "worktree"}
+)
+OPAQUE_GIT_OPTIONS_WITH_VALUES = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 )
 
 
@@ -450,8 +451,28 @@ def intent_authorized(command: GitCommand, intent: GitIntent) -> bool:
 
 def opaque_protected_intent(command: str) -> GitIntent | None:
     """Fail closed when literal protected Git remains opaque to the parser."""
-    if PROTECTED_LITERAL.search(command):
-        return GitIntent("destructive_git", "opaque", "opaque protected Git mutation", False, True)
+    tokens = shell_tokens(command)
+    for git_index, token in enumerate(tokens):
+        if command_basename(token) != "git":
+            continue
+        index = git_index + 1
+        while index < len(tokens):
+            option = tokens[index]
+            if option in OPAQUE_GIT_OPTIONS_WITH_VALUES:
+                index += 2
+                continue
+            if option.startswith("-"):
+                index += 1
+                continue
+            if option in PROTECTED_GIT_SUBCOMMANDS:
+                return GitIntent(
+                    "destructive_git",
+                    "opaque",
+                    "opaque protected Git mutation",
+                    False,
+                    True,
+                )
+            break
     return None
 
 
