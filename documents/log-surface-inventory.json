@@ -1604,7 +1604,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_SUBMODULE",
-      "line": 19,
+      "line": 26,
       "path": ".github/scripts/checkout_agent_canon_submodule.sh",
       "surface": "tool"
     },
@@ -1612,7 +1612,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_SUBMODULE",
-      "line": 25,
+      "line": 32,
       "path": ".github/scripts/checkout_agent_canon_submodule.sh",
       "surface": "tool"
     },
@@ -1620,7 +1620,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_SUBMODULE",
-      "line": 168,
+      "line": 128,
       "path": ".github/scripts/checkout_agent_canon_submodule.sh",
       "surface": "tool"
     },
@@ -1628,23 +1628,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_SUBMODULE_AUTH",
-      "line": 68,
-      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_AUTH",
-      "line": 80,
-      "path": ".github/scripts/checkout_agent_canon_submodule.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "GIT_SSH_COMMAND",
-      "line": 76,
+      "line": 89,
       "path": ".github/scripts/checkout_agent_canon_submodule.sh",
       "surface": "tool"
     },
@@ -16948,7 +16932,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "FRESH_CLONE_ACCEPTANCE",
-      "line": 115,
+      "line": 124,
       "path": "tools/ci/check_fresh_clone.sh",
       "surface": "tool"
     },
@@ -16956,7 +16940,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "FRESH_CLONE_REPOSITORY_CI_OWNER",
-      "line": 113,
+      "line": 122,
       "path": "tools/ci/check_fresh_clone.sh",
       "surface": "tool"
     },
