@@ -95,7 +95,11 @@ git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-plan.txt"
 grep -Eq "agent_canon_plan_route=(subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
-bash tools/update_agent_canon.sh apply
+AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
+AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
+AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
+  bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
@@ -107,7 +111,12 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 mkdir -p "${TMP_DIR}/missing-git-exec"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh apply
+AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
+AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
+AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
+  bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks
 echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
