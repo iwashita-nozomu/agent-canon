@@ -222,7 +222,7 @@ def build_parser(
     parser.add_argument(
         "--skip-agent-canon-preflight",
         action="store_true",
-        help="Skip the automatic make agent-canon-ensure-latest preflight.",
+        help="Skip the automatic read-only AgentCanon update-plan preflight.",
     )
     return parser
 
@@ -347,7 +347,7 @@ def emit_task_start_output(
         f"review={','.join(review_roles) or '-'}"
     )
     request_contract_path = context.report_dir / "user_request_contract.md"
-    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
+    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
     print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")

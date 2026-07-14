@@ -7,7 +7,7 @@
 # upstream design ../README.md documents dispatcher-based hook wiring.
 # downstream implementation ./codex_runtime_summary_logger.py exports bounded Codex runtime summaries on Stop
 # downstream implementation ./runtime_log_auto_sync.py syncs mounted runtime logs and agent reports on Stop
-# downstream implementation ./branch_worktree_guard.py blocks unconfirmed branch and worktree creation.
+# downstream implementation ./branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch order and hook count.
 # @dependency-end
 
@@ -733,6 +733,34 @@ def should_preserve_block(result: HookResult) -> bool:
     return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(STRICT_BLOCKS_ENV)
 
 
+def critical_child_invalid(result: HookResult) -> bool:
+    """Return whether a critical child failed or emitted a non-block payload."""
+    if result.spec.script not in CRITICAL_BLOCKING_CHILD_HOOKS:
+        return False
+    if result.failed():
+        return True
+    return bool(result.stdout.strip()) and not result.blocks()
+
+
+def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
+    """Fail closed when a critical child cannot provide a trustworthy decision."""
+    if result.failed():
+        return failure_payload(result)
+    return {
+        "decision": "block",
+        "reason": (
+            "Critical hook child emitted nonempty output other than a valid "
+            "decision=block payload; fail closed before "
+            f"the requested tool action.\n{result.spec.script}\n{result.stdout.strip()}"
+        ),
+        "next_action": "fix_critical_child_output_then_retry",
+        "remediation": [
+            f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
+            "Fix the critical child so it emits empty stdout to allow or one valid JSON decision=block payload.",
+        ],
+    }
+
+
 def downgraded_block_payload(event: str, result: HookResult) -> dict[str, object]:
     """Return a non-blocking warning for a non-critical child block."""
     payload = result.json_stdout() or {}
@@ -846,10 +874,14 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     ]
     if event == "PostToolUse":
         return 0
+    critical_failure = next((result for result in results if critical_child_invalid(result)), None)
     blocking = next((result for result in results if result.blocks()), None)
     failure = next((result for result in results if result.failed()), None)
     visible_payload = visible_output_payload(event, results)
 
+    if critical_failure is not None:
+        emit_json_payload(critical_child_failure_payload(critical_failure))
+        return 0
     if blocking is not None:
         if should_preserve_block(blocking):
             sys.stdout.write(blocking.stdout)

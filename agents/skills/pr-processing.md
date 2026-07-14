@@ -154,8 +154,9 @@ route を短く書きます。
    - 同じ root/runtime surface に触る PR は一つずつ main に取り込む
    - conflict は、先に入れる PR が確定してから後続 PR の head branch で解く
 1. Conflict repair は head branch 上で行います。
-   - `git fetch origin`
-   - `git switch <head-branch>`
+   - fetch without changing the current checkout
+   - if the current checkout is not `<head-branch>`, keep it unchanged and
+     request user direction; do not switch as a collision workaround
    - `git merge origin/<base>` または repo の標準 update route
    - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
    - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
@@ -195,7 +196,9 @@ AgentCanon source PR と template / derived PR が連動している場合は、
 
 1. Source PR を先に green にする。
 1. Source PR を merge する。
-1. Parent repo で `make agent-canon-ensure-latest` を実行する。
+1. Parent repo の read-only plan を確認し、mutation が必要なら current-task
+   user approval と全 4 inline Git authority/reason field を得て protected
+   latest route を実行する。
 1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
 1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
 1. Parent pin / root-view PR を作るか更新する。

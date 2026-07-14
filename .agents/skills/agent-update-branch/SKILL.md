@@ -39,7 +39,9 @@ Execute the required and task-matching conditional commands that the packet prin
    lane. Do not create `agent-updates/*` just to start fresh, split a small
    follow-up, avoid dirty state, or respond to a mid-task user instruction. A new
    branch requires `branch_creation_reason=<reason>` in the run bundle, work
-   log, or PR body.
+   log, or PR body plus current-task explicit user approval. The creation
+   authority/reason and destructive authority/reason must all appear in the
+   same command segment; the recorded reason alone never authorizes creation.
 1. Use a template-derived branch name:
    - `agent-updates/memory-eval/<slug>`
    - `agent-updates/canon-pin/<slug>`
