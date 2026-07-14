@@ -4,6 +4,7 @@
 # responsibility Provides report artifact checks agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
+# downstream implementation ./agent_canon_preflight.py blocks task-entry updates on eval transient captures
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""
@@ -80,6 +81,9 @@ MECHANICALLY_REGENERATED_REPORT_ROOTS = (
 )
 MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS = (
     re.compile(r"^reports/[^/]+\.(?:json|patch|txt)$"),
+)
+EVAL_TRANSIENT_CAPTURE_PATTERN = re.compile(
+    r"^reports/agent-eval-runs/[^/]+/[^/]+\.(?:stdout|stderr)\.txt$"
 )
 
 
@@ -254,6 +258,31 @@ def generated_report_artifact_blockers(workspace: Path) -> list[str]:
         ("--others", "--ignored", "--exclude-standard"),
     ):
         if is_mechanically_regenerated_report_path(path):
+            report_paths.setdefault(path, "ignored")
+    return [
+        f"generated_report_artifact_{state}_left_in_tree:{path}"
+        for path, state in sorted(report_paths.items())
+    ]
+
+
+def generated_eval_transient_blockers(workspace: Path) -> list[str]:
+    """Return exact two-level eval producer stdout/stderr captures in the tree."""
+    report_paths = {
+        path: "tracked"
+        for path in _git_report_paths(workspace, ())
+        if EVAL_TRANSIENT_CAPTURE_PATTERN.fullmatch(_normalized_git_path(path))
+    }
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--exclude-standard"),
+    ):
+        if EVAL_TRANSIENT_CAPTURE_PATTERN.fullmatch(_normalized_git_path(path)):
+            report_paths.setdefault(path, "untracked")
+    for path in _git_report_paths(
+        workspace,
+        ("--others", "--ignored", "--exclude-standard"),
+    ):
+        if EVAL_TRANSIENT_CAPTURE_PATTERN.fullmatch(_normalized_git_path(path)):
             report_paths.setdefault(path, "ignored")
     return [
         f"generated_report_artifact_{state}_left_in_tree:{path}"

@@ -95,8 +95,10 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 
 ```bash
 make agent-canon-update-plan
-make agent-canon-latest
 ```
+
+If the plan requires mutation, request current-task user approval before
+running protected latest with all four inline Git authority/reason fields.
 
 The command responsibility split is maintained in
 `documents/agent-canon-update-route.md`. Keep
@@ -123,7 +125,7 @@ merge し、conflict を submodule 内で解消してから同じ branch を PR 
 扱いは次の順に固定します。
 
 1. `vendor/agent-canon/` の shared canon 差分を dedicated branch / commit に分ける
-1. 派生 repo 起点なら `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を通してから AgentCanon branch を GitHub へ push する
+1. 派生 repo 起点なら current-task user approval と全 4 inline Git authority/reason field を得て protected `merge-main-into-current-preserve-dirty` を通し、already-current AgentCanon branch を GitHub へ push する
 1. standalone AgentCanon repo へ PR を作り、merge する
 1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行する
 1. `bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` を通す
@@ -337,13 +339,10 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 
 8. merge 後に template pin を更新する
 
-```bash
-git checkout main
-git pull --ff-only origin main
-make agent-canon-ensure-latest
-bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
-```
+Keep the current checkout. If it is not the authorized parent integration
+branch, request user direction instead of checking out another branch. After
+current-task approval, run the protected latest command with all four inline
+Git authority/reason fields, then repair and check root views.
 
 `make agent-canon-ensure-latest` rebuilds compiled AgentCanon tools after the
 pin update. In submodule repos, treat `vendor/agent-canon` local git state and
@@ -366,10 +365,9 @@ git -C /mnt/l/workspace/agent-canon pull --ff-only
 normal AgentCanon branch に積み、AgentCanon PR で review / merge します。
 local submodule divergence や unsafe local submodule state で `ensure-latest` が止まった場合も、この branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
+After current-task user approval, invoke the protected
+`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
+authority/reason fields, then push the already-current branch.
 
 ## Repo-Local Tool Collection PR
 

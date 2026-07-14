@@ -6,7 +6,7 @@ responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
-downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed branch and worktree creation
+downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations
 @dependency-end
 -->
 
@@ -72,6 +72,22 @@ surfaces listed below.
 - agent support tools and validation: `tools/`
 - agent-specific regression tests: `tests/agent_tools/`
 
+Multiple chats or sessions may use this checkout concurrently. Treat every
+unknown dirty, staged, untracked, branch, and worktree state as owned by the
+user or another chat, and preserve that state across routing and repair.
+Protected Git operations include `git restore`, `git reset`, forced `git clean`,
+mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
+rename, or prune. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required.
+A protected mutation proceeds only when the user
+explicitly approves it and the same command segment carries
+`AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
+requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
+the creation and destructive requirements are an AND gate. Collision handling keeps the current
+branch/worktree and requests user direction.
+
 ## Runtime Owner Map
 
 | Contract | Owner Surface | Validation |
@@ -82,7 +98,7 @@ surfaces listed below.
 | public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
 | internal routine placement | `agents/internal-routines/README.md`; `documents/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
-| branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
 | shared-canon update | `tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; `agents/workflows/agent-canon-pr-workflow.md` | AgentCanon PR gate |

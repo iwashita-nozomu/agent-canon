@@ -12,7 +12,7 @@ downstream implementation tools/agent_tools/task_start.py emits task workflow pa
 downstream implementation tools/agent_tools/bootstrap_agent_run.py creates run bundles.
 downstream implementation tools/agent_tools/task_close.py validates run-bundle closeout gates.
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment.
-downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed branch and worktree creation.
+downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations.
 @dependency-end
 -->
 
@@ -97,6 +97,22 @@ request: it is formed from request clauses plus repository structure, owner
 surface evidence, dependency edges, root-view state, and checker evidence.
 Adding a surface required by that evidence is part of scope formation; omitting
 it because it was not in the first edit guess is a scope error.
+
+Multiple chats or sessions may use the same checkout concurrently. Treat every
+unknown dirty, staged, untracked, branch, and worktree state as owned by the
+user or another chat, and preserve that state across routing and repair.
+Protected Git operations include `git restore`, `git reset`, forced `git clean`,
+mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
+rename, or prune. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required.
+A protected mutation proceeds only when the user
+explicitly approves it and the same command segment carries
+`AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
+requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
+the creation and destructive requirements are an AND gate. Collision handling keeps the current
+branch/worktree and requests user direction.
 
 ## Structure-First Scope Formation
 
@@ -255,7 +271,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, local-llm search, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
-| branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |

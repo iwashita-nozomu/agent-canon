@@ -60,7 +60,9 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
    shared-canon follow-up. Do not create a new branch for a fresh start,
    dirty-state avoidance, small addendum, or mid-task user instruction. If a new
    branch is required, record `branch_creation_reason=<reason>` and why the
-   existing branch cannot continue before creating it.
+   existing branch cannot continue before requesting current-task user
+   approval. Creation requires both creation and destructive authority/reason
+   fields in the same command segment.
 
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
 
@@ -72,9 +74,9 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 
 1. Update AgentCanon before planning or implementation.
 
-```bash
-make agent-canon-ensure-latest
-```
+If the read-only update plan reports a mutation, request current-task user
+approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
+authority/reason fields in the same command segment.
 
 This target also runs the compiled AgentCanon tool rebuild. Treat
 `AGENT_CANON_TOOL_REBUILD_RUST=rebuilt` or
@@ -89,10 +91,10 @@ binary just because the source commit has not changed yet.
 
 1. If latest preserves dirty AgentCanon checkout state, continue the AgentCanon branch/PR flow with the restored state. If latest reports a detached head, merge conflict, restore conflict, `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk, fix that recovery target before rerunning latest.
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
+After current-task user approval, invoke the protected
+`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
+authority/reason fields, then push the already-current branch. Detached or
+colliding checkout state is a user-direction boundary.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 
@@ -298,6 +300,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `AGENT_CANON_PREFLIGHT_STATUS`
 - `AGENT_CANON_PREFLIGHT_REASON`
 - `AGENT_CANON_PREFLIGHT_NEXT`
+- `AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS` when eval captures block the update
 - `AGENT_CANON_PREFLIGHT_CHECKLIST`
 - `AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS`
 - `AGENT_CANON_UPDATE_TODO_STATUS`
@@ -321,6 +324,14 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 ## Failure Routes
 
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
+- `blocked_eval_transient_artifacts`: task entry found an exact tracked,
+  untracked, or ignored
+  `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` / `.stderr.txt`
+  capture and stopped before `make agent-canon-ensure-latest`. Preserve the
+  capture until the eval archive is synced and verified, write the bounded
+  summary, delete the transient explicitly, then rerun preflight. The emitted
+  next action is
+  `sync_eval_archive_then_summarize_and_delete_transient_captures_then_rerun_preflight`.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.

@@ -12,6 +12,7 @@ upstream design ../../../documents/agent-canon-update-route.md canonical AgentCa
 upstream design ../../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 upstream implementation ../../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodule sync helper
+upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py blocks unsafe task-entry updates
 @dependency-end
 -->
 
@@ -49,26 +50,45 @@ Execute the required and task-matching conditional commands that the packet prin
 1. In parent repos, classify dirty state by AgentCanon update surface:
    `vendor/agent-canon/`, parent gitlink, `.gitmodules`, and AgentCanon-owned
    root views. Do not let unrelated parent dirty files block the update route.
+1. Before the high-level update runs, task-start preflight fails closed when an
+   exact `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` or
+   `.stderr.txt` capture remains tracked, untracked, or ignored. Preserve the
+   capture, sync and verify the eval archive, write its bounded summary, delete
+   the transient explicitly, and rerun preflight. Ordinary unrelated parent
+   dirt remains allowed.
 1. Prefer the high-level parent route:
 
-```bash
-make agent-canon-update-plan
-make agent-canon-ensure-latest
-```
+Run `make agent-canon-update-plan` first. If it reports an update, request
+current-task user approval and rerun `make agent-canon-ensure-latest` with all
+four inline Git authority/reason fields in the same command segment.
 
 1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
    dirty state, do not hide them in a parent pin update. Route them through an
    AgentCanon branch/PR first:
 
+After current-task user approval, invoke the protected merge wrapper with all
+four inline Git authority/reason fields, then push the already-current branch.
+Do not switch or create a checkout as a recovery shortcut.
+
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+# Run only after current-task user approval.
+AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
+AGENT_CANON_BRANCH_WORKTREE_REASON='<reason>' \
+AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+AGENT_CANON_DESTRUCTIVE_GIT_REASON='<reason>' \
+bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
+
+The push targets the already-current AgentCanon branch; the sequence does not
+authorize checkout switching or branch/worktree creation.
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh branch for a bounded follow-up,
    mid-task user instruction, dirty-state avoidance, or checklist addendum.
-   Record a reason before creating any new branch.
+   Record a reason before requesting approval for any new branch. A reason or
+   workflow route does not authorize creation: current-task user approval and
+   all four same-command authority/reason values are required.
 
 1. After a safe update or PR merge, repair and verify root views:
 

@@ -174,8 +174,20 @@ subagent context は chat 要約を蓄積するのではなく、run bundle 内�
 
 ## Subagent Return Investigation
 
-`wait_agent` の timeout、empty status、または wave decision point での final
-response 未着は `subagent_no_return_investigation` として扱います。parent は
+すべての非終端 subagent について、`wait_agent` timeout は polling boundary
+であり lifecycle deadline ではありません。各 blocking poll は
+`timeout_ms <= 60000` とし、全体の completion wait は required user-facing
+progress update と既存の new-state / revised-packet gate を各 poll 間で
+満たす bounded poll の反復として継続できます。timeout、empty update、
+応答遅延だけを理由に interrupt または cancellation を行ってはいけません。
+操作前に active runtime の status、message、interrupt、close capability を
+確認します。この runtime では非割込みの status 確認に `list_agents`、同一
+task の packet 配送に `send_message` を使い、`interrupt_agent` は user の
+明示取消後に限ります。利用不能な `send_input(interrupt=...)` または
+`close_agent` operation を作り出してはいけません。
+
+bounded poll の timeout、empty status、または wave decision point での
+final response 未着は `subagent_no_return_investigation` として扱います。parent は
 agent id、wave id、wait command と timeout、last known status、last
 workflow-monitor event、runtime / tool error、log / dashboard pointer、cause
 hypothesis を `workflow_monitoring.md` と closeout evidence に残し、現在の status
@@ -190,6 +202,10 @@ fresh follow-up wave へ切り替えます。timeout、empty status、final resp
 prior agent が非終端なら `write_scope=reserved` と
 `overlapping_writer=blocked` を保持します。
 
-`close_agent` authority は runtime status `completed|errored|shutdown` または
-user の明示取消です。非終端の no-return instance は
+active runtime に close operation がある場合だけ、runtime status
+`completed|errored|shutdown` または user の明示取消後にその operation を
+使います。active runtime に close operation がない場合は terminal status が
+観測されるまで instance を保持し、closeout_gate.md の Subagent Lifecycle
+Evidence に `runtime_no_close_operation:terminal_status_observed` を記録します。
+非終端の no-return instance は
 `subagents_closed=no`、`lifecycle_gate=pending` とします。

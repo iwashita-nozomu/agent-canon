@@ -22,6 +22,7 @@ else
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
+PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
 
 usage() {
   cat <<EOF
@@ -69,6 +70,65 @@ EOF
 die() {
   echo "update_agent_canon.sh: $*" >&2
   exit 1
+}
+
+require_protected_git_authority() {
+  local mode="$1"
+  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
+  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
+  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
+  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
+
+  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
+    && [ -n "$branch_reason" ] \
+    && [ "$destructive_authority" = "explicit_user_approval" ] \
+    && [ -n "$destructive_reason" ]; then
+    return 0
+  fi
+
+  echo "DESTRUCTIVE_GIT_GUARD=block"
+  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+}
+
+resolve_remote_branch_sha() {
+  local remote="$1"
+  local branch="$2"
+  local expected_ref="refs/heads/$branch"
+  local output=""
+  local candidate_sha=""
+  local candidate_ref=""
+  local resolved_sha=""
+  local match_count=0
+
+  output="$(git ls-remote --exit-code "$remote" "$expected_ref")" \
+    || die "remote branch '$remote#$branch' is missing or unreachable"
+  while read -r candidate_sha candidate_ref; do
+    [ "$candidate_ref" = "$expected_ref" ] || continue
+    resolved_sha="$candidate_sha"
+    match_count=$((match_count + 1))
+  done <<<"$output"
+  [ "$match_count" -eq 1 ] \
+    || die "remote branch '$remote#$branch' resolved ambiguously ($match_count matches)"
+  [[ "$resolved_sha" =~ ^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$ ]] \
+    || die "remote branch '$remote#$branch' returned invalid object id '$resolved_sha'"
+  printf '%s\n' "$resolved_sha"
+}
+
+ensure_remote_commit_object() {
+  local repo="$1"
+  local remote="$2"
+  local sha="$3"
+  local resolved=""
+
+  if ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+    git -C "$repo" fetch --no-write-fetch-head "$remote" "$sha" >/dev/null
+  fi
+  resolved="$(git -C "$repo" rev-parse --verify "$sha^{commit}" 2>/dev/null || true)"
+  [ "$resolved" = "$sha" ] \
+    || die "remote object '$sha' is not an available commit in '$repo'"
 }
 
 ensure_agent_canon_submodule() {
@@ -239,7 +299,7 @@ park_eval_log_dirty_state_if_safe() {
   git -C "$ROOT_DIR/$PREFIX" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
   stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
 
-  git -C "$ROOT_DIR/$PREFIX" fetch origin "$log_branch" >/dev/null 2>&1 || true
+  git -C "$ROOT_DIR/$PREFIX" fetch --no-write-fetch-head origin "$log_branch" >/dev/null 2>&1 || true
   if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
     log_start_ref="origin/$log_branch"
   elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
@@ -438,7 +498,7 @@ acknowledge_update_todos_if_available() {
   if [ -f "$state_path" ]; then
     git -C "$ROOT_DIR" add "$state_path"
     if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
-      git -C "$ROOT_DIR" commit -m "chore: acknowledge agent-canon update tasks"
+      git -C "$ROOT_DIR" commit --only -m "chore: acknowledge agent-canon update tasks" -- "$state_path"
       echo "AGENT_CANON_LATEST_TODOS=acknowledged_committed"
       return 0
     fi
@@ -587,8 +647,8 @@ cmd_merge_main_into_current() {
   remote_url="$(submodule_remote_url)"
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
 
-  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
-  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+  remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+  ensure_remote_commit_object "$ROOT_DIR/$PREFIX" "$remote_url" "$remote_sha"
   pre_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
   current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
@@ -611,7 +671,7 @@ cmd_merge_main_into_current() {
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_result=blocked_detached_head"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current-preserve-dirty"
+    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
     die "submodule '$PREFIX' is detached; create or switch to a branch before merging main"
   fi
 
@@ -640,7 +700,7 @@ cmd_merge_main_into_current() {
   fi
 
   merge_log="$(mktemp)"
-  if git -C "$ROOT_DIR/$PREFIX" merge --no-edit FETCH_HEAD >"$merge_log" 2>&1; then
+  if git -C "$ROOT_DIR/$PREFIX" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
     post_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"
@@ -686,7 +746,7 @@ cmd_merge_main_into_current_preserve_dirty() {
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_dirty_preserve_result=blocked_detached_head"
     echo "agent_canon_merge_dirty_preserve_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
-    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current-preserve-dirty"
+    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
     die "submodule '$PREFIX' is detached; create or switch to a branch before preserving dirty state and merging main"
   fi
 
@@ -733,6 +793,11 @@ cmd_merge_main_into_current_preserve_dirty() {
 
 main() {
   local subcommand="${1:-}"
+  case "$subcommand" in
+    latest|apply|merge-main-into-current|merge-main-into-current-preserve-dirty)
+      require_protected_git_authority "$subcommand"
+      ;;
+  esac
   case "$subcommand" in
     plan)
       shift
