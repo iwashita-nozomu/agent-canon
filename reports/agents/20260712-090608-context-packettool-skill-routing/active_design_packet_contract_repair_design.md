@@ -20,8 +20,8 @@ upstream implementation ../../../tools/agent_tools/waterfall_gate_check.py owns 
 upstream implementation ../../../tools/agent_tools/github_publish.py owns verified GitHub PR metadata and post-merge evidence production.
 upstream implementation ../../../tools/agent_tools/report_artifact_checks.py owns review structure and decision parsing.
 upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py owns immutable report snapshots and their index.
-downstream design ./active_design_packet_implementation_surface_route.txt selects this unit's exclusive implementation surface.
-downstream design ./active_design_packet_implementation_request.txt carries this unit's exact implementation request.
+downstream design ./active_design_packet_implementation_surface_route.txt selects this unit's exclusive implementation surface and projects the normative validation order.
+downstream design ./active_design_packet_implementation_request.txt carries this unit's exact implementation request bound to the selected route identity.
 downstream implementation ../../../tests/agent_tools/test_agent_team_templates.py checks public bundle and projection behavior.
 downstream implementation ../../../tests/agent_tools/test_task_start_and_close.py checks task-start and bootstrap public behavior.
 downstream implementation ../../../tests/agent_tools/test_waterfall_gate_check.py checks manifest-consumer behavior.
@@ -77,30 +77,38 @@ product/source/config/test を変更しません。
 | implementation_authorization | `pending_new_exact_design_identity_reviews` |
 | schedule identity | `ORDER-REPAIR-01` |
 | macro placement | parallel with materializer closure; before current-main semantic integration and before any future source authorization or publication |
-| source HEAD inspected | `4e5318f6483d39b15c29b49eac1af77d56ad23cf` |
+| design-time source HEAD inspected | `4e5318f6483d39b15c29b49eac1af77d56ad23cf` |
+| implementation candidate commit | `db7a7b3ac831c9df19939d6698fab39480c2baea` |
+| implementation candidate state | exists on the current packet branch and is ancestral to this packet revision; it is not ancestral to `refs/remotes/origin/main`; authorized merge and publication records are absent; both predecessor records are absent |
 | historical active-packet commit | `9ba4bba59d7cc4aa386c6066c0c1310710619175` |
 | merged PR #373 commit | `0649a1d9c08ce57972bc3bce9dfaa02c1db8e884` |
-| current-turn edit paths | this design only; every source, config, test, packet, and other report path is preserved |
+| current-turn edit paths | this design, `active_design_packet_implementation_surface_route.txt`, and `active_design_packet_implementation_request.txt` only; every source, config, test, and other report path is preserved |
 | product/source/config/test edits in this turn | `none` |
 | test-design activation | `inactive` |
 
 The chronology is explicit. The detailed-design semantics were reviewed
-independently. Historical source implementation occurred before
+independently. The implementation candidate at
+`db7a7b3ac831c9df19939d6698fab39480c2baea` exists and occurred before
 `ORDER-REPAIR-01`; it remains historical evidence and was not authorized by
-the repaired bytes. `ORDER-REPAIR-01` changes only document order, definition
-placement, the V11 identity commands, and V12 variable projection. The newly
-frozen bytes remain `review_status=pending` until the same reviewers bind that
-exact identity. Only that newly frozen and independently reviewed identity may
-be consumed by future implementation or publication.
+the later repaired bytes. Those bytes create no retroactive authorization,
+authorized merge record, publication record, or predecessor record.
+`ORDER-REPAIR-01` exhaustively changes only Reader Map/semantic-order
+alignment, validation-ID definition placement, the V10 pre-merge/post-merge
+schedule projection in both bound packet files, the V11 seven-file identity
+commands, V12 producer-variable projection, and the three-artifact
+edit/rollback/identity metadata. The newly frozen bytes remain
+`review_status=pending` until the same reviewers bind that exact identity.
+Only that newly frozen and independently reviewed identity may be consumed by
+future source changes, authorized merge, or publication.
 
 The implementation packet uses a one-way hash chain, so no artifact hashes a
 later artifact that hashes it back:
 
 | Artifact | SHA-256 | Lines | Ownership |
 | --- | --- | ---: | --- |
-| `active_design_packet_implementation_surface_route.txt` | `15164e6d67da7603cd7968bf7725397d7944f7487f062b909de1d8092de18d2b` | 218 | exclusive to `active-design-packet-materialization` |
-| `active_design_packet_implementation_request.txt` | `6538c0e508a38f2914c895d8fe8bce6ce8d30bfbee4b60c84f9c6d11d668676c` | 220 | exclusive to `active-design-packet-materialization`; binds the route SHA and line count |
-| this design | computed after final formatting and checks | 3626 | binds both packet SHA/line-count pairs |
+| `active_design_packet_implementation_surface_route.txt` | `09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473` | 219 | exclusive to `active-design-packet-materialization` |
+| `active_design_packet_implementation_request.txt` | `e9f5116f752d49c30e5574e9d73e9785070677439f509521be6e873ef89c3857` | 221 | exclusive to `active-design-packet-materialization`; binds the route SHA and line count |
+| this design | computed after final formatting and checks | 3646 | binds both packet SHA/line-count pairs |
 | detailed-design and document-flow reviews | written after design hashing | generated by each reviewer | each binds the final design SHA |
 
 The packet metadata field is
@@ -3000,9 +3008,9 @@ remains commentless. This paragraph adds no scope or omitted field.
 
 | Class and path | Exact owner | Action and reason | Exact symbols or sections | Request clauses | Reverse edges and consumers | Trace | Validation | Rollback or atomicity effect | Disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md` | `active-design-packet-materialization` design owner | Repair F1–F6 while preserving the approved responsibility, schema, predecessor, and successor decisions. | `File Scope and Individual Validation Mapping`, `Atomic Publication and Failure Contract`, `Durable Post-Merge Predecessor Integration Record`, `One-Writer Implementation Sequence`, `Targeted Validation`, `Review and Handoff` | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: the two unit-owned packet files and four unit-owned review paths; consumers: one implementation writer and reviewers. | T1–T10 | V1–V12 plus current Markdown/dependency/convention checks | No product/runtime mutation; final bytes bind both packet hashes and reviews bind the final design SHA; revision rollback is a three-artifact revert only. | Editable in this turn; implementation remains pending. |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_surface_route.txt` | `active-design-packet-materialization` route owner | Carry every self-contained file-scope record and the exclusive future implementation surface. | `scope_file` records, forbidden paths/behaviors, implementation order, graph replacement gate | ADP-09, ADP-12, ADP-13, RF-01–RF-06 | Reverse edge: this design; consumer: unit-owned implementation request. | T1–T10 | V8–V12 plus dependency-header/format checks | No product/runtime mutation; route is hashed before request and is never overwritten by another unit. | Editable in this turn; generic route file is external and verify-only. |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_request.txt` | `active-design-packet-materialization` request owner | Carry exact request clauses, self-contained file records, review gates, and validation route bound to the route hash. | `request_clause`, `scope_file`, predecessor CLI/failure/graph replacement fields | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: this design and unit route; consumer: one future implementation writer. | T1–T10 | V1–V12 plus dependency-header/format checks | No product/runtime mutation; request binds route bytes, design binds request bytes, and no other unit may replace it. | Editable in this turn; generic request file is external and verify-only. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md` | `active-design-packet-materialization` design owner | Reconcile the three detailed-design re-review contradictions across the bound packet: V10 schedule projection, truthful source-candidate chronology, and actual three-artifact edit/rollback identity; preserve all approved production mechanisms. | `Design Status`, `Current packet and obsolete-checker records`, `Implementation Source Packet`, `One-Writer Implementation Sequence`, `Targeted Validation`, `Review and Handoff` | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: the two unit-owned packet files and four unit-owned review paths; consumers: one implementation writer and reviewers. | T1–T10 | V1–V12 plus current Markdown/dependency/convention checks | No product/runtime mutation; finalize route bytes first, bind them from the request, then bind both from this design. Rollback of this packet revision reverts exactly these three packet artifacts together and touches no source or unrelated dirty path. | Editable and changed in this turn; implementation candidate `db7a7b3ac831c9df19939d6698fab39480c2baea` exists, while authorized merge/publication and predecessor records remain absent and review remains pending. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_surface_route.txt` | `active-design-packet-materialization` route owner | Correct the pre-merge/post-merge V10 schedule and carry every self-contained file-scope record plus the exclusive future authorized implementation surface. | `scope_file` records, candidate chronology, forbidden paths/behaviors, implementation order, graph replacement gate | ADP-09, ADP-12, ADP-13, RF-01–RF-06 | Reverse edge: this design; consumer: unit-owned implementation request. | T1–T10 | V8–V12 plus dependency-header/format checks | No product/runtime mutation; these route bytes are finalized and hashed before the request is rebound. Packet-revision rollback includes this route together with the bound request and design, never a route-only semantic rollback. | This unit-owned route is changed and rehashed in this turn; the separate generic route file remains external and verify-only. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_request.txt` | `active-design-packet-materialization` request owner | Correct the same V10 schedule, carry exact request clauses and review gates, and rebind the final route SHA and line identity. | `request_clause`, `scope_file`, candidate chronology, predecessor CLI/failure/graph replacement fields | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: this design and unit route; consumer: one future authorized implementation writer. | T1–T10 | V1–V12 plus dependency-header/format checks | No product/runtime mutation; this request binds the final route bytes and is then bound by the design. Packet-revision rollback includes all three artifacts and cannot preserve either changed unit-owned packet as the repaired identity. | This unit-owned request is changed, rebound, and rehashed in this turn; the separate generic request file remains external and verify-only. |
 | verify-only `tools/agent_tools/check_design_doc_claims.py` | `knowledge_graph` predecessor owner after integration; no active-packet owner | Do not invoke, repair, or make the obsolete custom parser pass; graph source deletes/replaces its parser/fact semantics. | Obsolete `parse_manifest_edges`, `dependency_closure`, filesystem evidence expansion; future graph-owned `GraphClaimConsumer` only | ADP-05, RF-06 | Reverse edges: `graph_design_brief.md#check_design_doc_claims decision`, verified `predecessor_integration.knowledge_graph.json`; consumer after integration: graph-backed claim route, not this design repair. | T10 | V12 | No current mutation. `not_applicable` is permitted only after predecessor verification plus fresh graph status/context; before that state is pending and no fallback parser runs. | `pending_graph_integration`; excluded from commands and edit scope. |
 
 ### Non-authoritative verify-only dependency index
@@ -3076,21 +3084,25 @@ assumption may be introduced through docs or validation.
 
 ## Implementation Source Packet
 
-The current implementation source packet consists of these exact artifacts:
+The current review-target source packet for any future authorized source
+change, merge, or publication consists of these exact artifacts. It is not
+claimed as provenance or authorization for the earlier implementation
+candidate at `db7a7b3ac831c9df19939d6698fab39480c2baea`:
 
 1. this design;
 2. `active_design_packet_implementation_surface_route.txt`, SHA-256
-   `15164e6d67da7603cd7968bf7725397d7944f7487f062b909de1d8092de18d2b`,
-   218 lines;
+   `09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473`,
+   219 lines;
 3. `active_design_packet_implementation_request.txt`, SHA-256
-   `6538c0e508a38f2914c895d8fe8bce6ce8d30bfbee4b60c84f9c6d11d668676c`,
-   220 lines; its header and metadata bind the route SHA and line count;
-4. pre-implementation
+   `e9f5116f752d49c30e5574e9d73e9785070677439f509521be6e873ef89c3857`,
+   221 lines; its header and metadata bind the route SHA and line count;
+4. authorization-gate
    `active_design_packet_contract_repair_detailed_design_review.md`, owned by
    `role:design_reviewer`, and
    `active_design_packet_contract_repair_document_flow_review.md`, owned by
    `role:document_flow_reviewer`; each must record `approve`, this exact design
-   path, and the same final design SHA before implementation authorization;
+   path, and the same final design SHA before any future authorized merge or
+   publication, and neither can retroactively authorize the earlier candidate;
 5. post-implementation
    `active_design_packet_contract_repair_change_review.md`, owned by
    `role:change_reviewer`, and
@@ -3125,17 +3137,23 @@ The current implementation source packet consists of these exact artifacts:
     stale S1 values remain, and this unit never copies its transient SHA,
     edits it, or treats its S1 as authority.
 
-The two pre-implementation review artifacts are currently unmaterialized
+The two authorization-gate review artifacts are currently unmaterialized
 because `review_status=pending`; their paths and owners are nevertheless closed
-here and in the request packet. Approval is the mechanical same-SHA result, not
-a future scope or routing choice. The post-implementation and conditional test-
-plan names are likewise exclusive to this responsibility unit and cannot be
-reused or overwritten by another design unit.
+here and in the request packet. Any future approval is the mechanical same-SHA
+result, not a future scope or routing choice, and does not rewrite the
+chronology of the existing candidate. The post-source-validation and
+conditional test-plan names are likewise exclusive to this responsibility
+unit and cannot be reused or overwritten by another design unit.
 
-Both predecessor records are currently absent because this responsibility has
-not been implemented or merged. Absence is expected pre-implementation state,
-not a future scope decision or blocker. In addition, intake graph-review
-evidence targeted
+Both predecessor records are currently absent. The implementation candidate
+exists at `db7a7b3ac831c9df19939d6698fab39480c2baea`, is ancestral to this
+packet revision, and is not ancestral to `refs/remotes/origin/main`. Therefore
+the truthful state is post-source-candidate and pre-authorized-integration:
+authorized merge and publication records do not exist, and neither predecessor
+record exists. Record absence is expected in that state, not evidence that no
+implementation candidate exists and not a future scope decision or blocker.
+The repaired packet bytes cannot retroactively authorize the candidate. In
+addition, intake graph-review evidence targeted
 `5febd536a44fe5d3f1e7fe5ffecc028c8e3f0e2658182790393fb20728449f87`;
 the graph owner must provide a review whose target equals the producer-time
 design hash before its generic invocation can succeed. Mutable graph-owner
@@ -3163,8 +3181,9 @@ The read-before-edit order is:
 2. the route packet and request packet, verifying both hashes;
 3. the seven external overlap files, verifying their hashes, status, exact
    reservations, and fixed predecessor order only;
-4. both approving pre-implementation review artifacts, verifying the same
-   design path and SHA;
+4. both approving authorization-gate review artifacts, verifying the same
+   design path and SHA before any future authorized merge or publication and
+   never treating them as retroactive authorization for the existing candidate;
 5. `agent_team.py` exact current symbols and its direct config/template owners;
 6. producer and waterfall call sites;
 7. canonical workflow/docs/skills/templates named in the edit table;
@@ -3618,9 +3637,10 @@ seven-file V11 identity predicates, V12 producer-variable binding, contiguous
 S5/T6/V7 clarity, the one-writer reading of the scope tables,
 predecessor-record placement, and readability of the current packet hashes.
 
-`ORDER-REPAIR-01` is a post-source design-document repair. It neither alters
-allowed paths nor claims that historical source implementation was authorized
-by these later bytes. Any further change produces another exact identity and
-returns that identity to both reviewers. Future implementation or publication
-may consume only the newly frozen identity after both reviewers bind those
-exact bytes; until then review and authorization remain pending.
+`ORDER-REPAIR-01` is a post-source three-artifact source-packet repair. It
+neither alters product/source/config/test paths nor claims that the existing
+implementation candidate was authorized by these later bytes. Any further
+change produces another exact identity and returns that identity to both
+reviewers. Future source changes, authorized merge, or publication may consume
+only the newly frozen identity after both reviewers bind those exact bytes;
+until then review and authorization remain pending.

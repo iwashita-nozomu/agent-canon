@@ -1,8 +1,8 @@
 @dependency-start
 contract design
 responsibility Carries the exact implementation request for the active-design-packet materialization responsibility unit.
-upstream design ./active_design_packet_contract_repair_design.md defines the responsibility unit and normative contracts.
-upstream design ./active_design_packet_implementation_surface_route.txt selects the exclusive surface with SHA-256 15164e6d67da7603cd7968bf7725397d7944f7487f062b909de1d8092de18d2b and 218 lines.
+upstream design ./active_design_packet_contract_repair_design.md defines the responsibility unit, post-source chronology, and normative validation order.
+upstream design ./active_design_packet_implementation_surface_route.txt selects the exclusive surface with SHA-256 09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473 and 219 lines.
 @dependency-end
 
 schema=agent_canon.active_design_packet.implementation_request.v2
@@ -11,14 +11,15 @@ predecessor_record_unit_id=active_design_packet_materialization
 artifact_owner_unit=active-design-packet-materialization
 artifact_reuse_by_other_units=forbidden
 artifact_overwrite_policy=owner-revision-only
-artifact_line_count=220
-bound_route_sha256=15164e6d67da7603cd7968bf7725397d7944f7487f062b909de1d8092de18d2b
-bound_route_line_count=218
+artifact_line_count=221
+bound_route_sha256=09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473
+bound_route_line_count=219
 request_status=ready_pending_review
 review_status=pending
 routing_design_artifact=reports/agents/20260712-090608-context-packettool-skill-routing/routing_llama_design_brief.md|sha256=ba97d93524b70982590c27ada977e38f491a4e93089f063c396e5ff1d903d4d7|lines=854
 routing_review_artifact=reports/agents/20260712-090608-context-packettool-skill-routing/routing_llama_detailed_design_review_v15.md|sha256=f428cf186f2e7dacb1cf99203eee4c0f427eefc7560da7830a2fbd241e5671d2|lines=160|review_status=approved|decision=APPROVE|implementation_authorized=yes|reviewed_design_path=reports/agents/20260712-090608-context-packettool-skill-routing/routing_llama_design_brief.md|reviewed_design_sha256=ba97d93524b70982590c27ada977e38f491a4e93089f063c396e5ff1d903d4d7
-source_head=4e5318f6483d39b15c29b49eac1af77d56ad23cf
+design_inspection_source_head=4e5318f6483d39b15c29b49eac1af77d56ad23cf
+implementation_candidate_commit=db7a7b3ac831c9df19939d6698fab39480c2baea;observed_state=ancestor-of-current-packet-head,not-ancestor-of-refs/remotes/origin/main;authorized_merge_record=absent;publication_record=absent;predecessor_records=absent;retroactive_authorization=forbidden
 historical_active_packet_commit=9ba4bba59d7cc4aa386c6066c0c1310710619175
 historical_added_test_lines=1110;classification=evidence-only;acceptance_metric=forbidden
 merged_pr_373_commit=0649a1d9c08ce57972bc3bce9dfaa02c1db8e884
@@ -205,9 +206,9 @@ graph_replacement_evidence=reviewed design path and SHA,knowledge_graph record p
 obsolete_checker_disposition=pending;do not invoke,repair,wrap,or emulate tools/agent_tools/check_design_doc_claims.py;set not_applicable only after complete graph replacement evidence
 
 test_policy=all listed test files verify-only at authorization;complete source first;open a test for mutation only after concrete post-source validation identifies an assertion conflicting with approved public semantics and this design is revised for that exact edit;add a test only after a revised design records one unresolved public oracle;absence of predecessor coverage is not an oracle gap;no test count or line count measure
-implementation_order=one Luna worker:verify packet hashes,owner records,and graph-before-active order;preserve and execute approved graph-owned dirty semantic intent first;implement active agent_team.py and authoritative source owners;update producers and waterfall consumer;update config,templates,docs,skills,generated views,and reverse edges;run source-targeted validation;apply no test edit unless a revised design authorizes one;run V1 through V11;merge one source PR;produce and verify knowledge_graph and active_design_packet_materialization records at the merged source OID;run V12;return one integrated handoff;an unresolved predecessor pauses the complete graph and creates no narrower slice
+implementation_order=one Luna worker:verify packet hashes,owner records,and graph-before-active order;preserve and execute approved graph-owned dirty semantic intent first;implement active agent_team.py and authoritative source owners;update producers and waterfall consumer;update config,templates,docs,skills,generated views,and reverse edges;run source-targeted validation;apply no test edit unless a revised design authorizes one;run V1 through V9 and V11 before merge;merge one source PR;produce and verify knowledge_graph and active_design_packet_materialization records at the merged source OID;complete V10 post-merge;run V12 only after V10;return one integrated handoff;an unresolved predecessor pauses the complete graph and creates no narrower slice
 validation_handoff=one Luna worker returns one integrated responsibility-graph diff and one V1 through V12 evidence set;do not hand off by file,finding,test,skill,doc,generated view,or checker;split only on an actual concurrent write conflict or unresolved predecessor
-review_gate=unversioned detailed-design APPROVE and document-flow APPROVE bound to one final design path and SHA before source;change-review APPROVE and final-review APPROVE after V1 through V12;review_status remains pending
+review_gate=unversioned detailed-design APPROVE and document-flow APPROVE bound to one final design path and SHA before any future authorized merge or publication;these repaired packet bytes do not retroactively authorize implementation candidate db7a7b3ac831c9df19939d6698fab39480c2baea;change-review APPROVE and final-review APPROVE after V1 through V12;review_status remains pending
 
 validation_route_current=tools/bin/agent-canon docs format active_design_packet_contract_repair_design.md;tools/bin/agent-canon docs check active_design_packet_contract_repair_design.md;check_dependency_headers.py on three unit files;check_dependency_header_format.sh --require-header on three unit files;check_dependency_graph.sh --root . --cycle-report-only --list-related with three focus paths;check_convention_compliance.py;git diff --check on three unit files
 validation_route_source=pyright and ruff on nine edited Python owners;existing targeted public regressions after source;check_agent_runtime_alignment.py;dependency header,format,graph and convention checks;mandatory docs format and docs check;direct predecessor CLI production and verification evidence;four git merge-base ancestry results;V12 graph status and context after predecessor verification;git diff --check
