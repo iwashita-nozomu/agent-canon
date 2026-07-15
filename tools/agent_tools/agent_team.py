@@ -813,7 +813,7 @@ RUN_BUNDLE_DIRECTORY_MODE = 0o755
 PRIVATE_STAGE_MODE = 0o700
 PRIVATE_TEMP_MODE = 0o600
 MATERIALIZATION_LOCK_MODE = 0o600
-MATERIALIZATION_LOCK_SCHEMA = "agent_canon.run_bundle_materialization_lock.v1"
+MATERIALIZATION_LOCK_SCHEMA = "agent_canon.run_bundle_materialization_lock.v2"
 MATERIALIZATION_LOCK_NAME = ".run_bundle_materialization.lock"
 RENAME_NOREPLACE = 1
 RENAME_EXCHANGE = 2
@@ -1035,14 +1035,22 @@ class RollbackResult:
 
 @dataclass(frozen=True)
 class FileIdentity:
-    """Filesystem identity fields used for compare-before-mutate checks."""
+    """Stable filesystem object identity used for compare-before-mutate checks."""
 
     st_dev: int
     st_ino: int
-    st_uid: int
-    st_gid: int
-    st_mode: int
-    st_nlink: int
+
+
+@dataclass(frozen=True)
+class FileState:
+    """Mutable metadata validated independently from stable object identity."""
+
+    identity: FileIdentity
+    file_type: int
+    permission_mode: int
+    owner_uid: int
+    owner_gid: int
+    link_count: int
 
 
 @dataclass(frozen=True)
@@ -1683,8 +1691,9 @@ def _source_reference_parts(
     return prefix, PurePosixPath(path_value), fragment_kind, fragment_value
 
 
-def _resolved_source_path(
-    spec: RunBundleSpec,
+def _resolved_source_binding(
+    workspace_root: Path,
+    report_dir: Path,
     reference: str,
 ) -> tuple[Literal["workspace", "agent_canon", "artifact"], Path, PurePosixPath]:
     prefix, relative_path, _fragment_kind, _fragment_value = _source_reference_parts(
@@ -1696,16 +1705,16 @@ def _resolved_source_path(
         return (
             "artifact",
             resolve_report_bundle_artifact_path(
-                spec.report_dir,
+                report_dir,
                 relative_path.as_posix(),
             ),
             relative_path,
         )
     resolved = resolve_workspace_document_path(
-        spec.workspace_root,
+        workspace_root,
         relative_path.as_posix(),
     ).resolve()
-    workspace = spec.workspace_root.resolve()
+    workspace = workspace_root.resolve()
     canon = ROOT.resolve()
     if resolved.is_relative_to(workspace) and not resolved.is_relative_to(canon):
         return (
@@ -1720,6 +1729,14 @@ def _resolved_source_path(
             PurePosixPath(resolved.relative_to(canon).as_posix()),
         )
     raise ValueError(f"source reference escaped canonical roots: {reference}")
+
+
+def _resolved_source_path(
+    spec: RunBundleSpec,
+    reference: str,
+) -> tuple[Literal["workspace", "agent_canon", "artifact"], Path, PurePosixPath]:
+    """Resolve a source binding from one run specification."""
+    return _resolved_source_binding(spec.workspace_root, spec.report_dir, reference)
 
 
 def _ast_symbol_match_count(path: Path, dotted_qualname: str) -> int:
@@ -1792,17 +1809,67 @@ def _source_reference_result(
 
 
 def _dependency_root_for_paths(
-    spec: RunBundleSpec,
+    workspace_root: Path,
     source: Path,
     target: Path,
 ) -> tuple[Literal["workspace", "agent_canon"], Path]:
     canon = ROOT.resolve()
-    workspace = spec.workspace_root.resolve()
+    workspace = workspace_root.resolve()
     if source.is_relative_to(canon) and target.is_relative_to(canon):
         return "agent_canon", canon
     if source.is_relative_to(workspace) and target.is_relative_to(workspace):
         return "workspace", workspace
     raise ValueError("dependency endpoints resolve to different canonical roots")
+
+
+def _canonical_dependency_binding(
+    workspace_root: Path,
+    reference: str,
+) -> tuple[
+    Literal["workspace", "agent_canon"],
+    Path,
+    str,
+    PurePosixPath,
+    PurePosixPath,
+    str,
+    str,
+]:
+    """Bind one declared dependency reference to its canonical tuple."""
+    prefix, remainder = reference.split(":repo:", 1)
+    direction, kind = prefix.removeprefix("header:").split(":", 1)
+    source_value, target_value = remainder.split("->repo:", 1)
+    source_ref = f"repo:{source_value}"
+    target_ref = f"repo:{target_value}"
+    _source_key, source, _source_relative = _resolved_source_binding(
+        workspace_root,
+        workspace_root,
+        source_ref,
+    )
+    _target_key, target, _target_relative = _resolved_source_binding(
+        workspace_root,
+        workspace_root,
+        target_ref,
+    )
+    root_key, dependency_root = _dependency_root_for_paths(
+        workspace_root,
+        source,
+        target,
+    )
+    source_path = PurePosixPath(source.relative_to(dependency_root).as_posix())
+    target_path = PurePosixPath(target.relative_to(dependency_root).as_posix())
+    normalized_key = (
+        f"header:{direction}:{kind}:repo:{source_path.as_posix()}"
+        f"->repo:{target_path.as_posix()}"
+    )
+    return (
+        root_key,
+        dependency_root,
+        normalized_key,
+        source_path,
+        target_path,
+        direction,
+        kind,
+    )
 
 
 def _canonical_dependency_rows(root: Path) -> tuple[tuple[str, str, str, str], ...]:
@@ -1846,20 +1913,17 @@ def _dependency_reference_result(
     reference: str,
     rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]],
 ) -> DependencyReferenceResult:
-    prefix, remainder = reference.split(":repo:", 1)
-    direction, kind = prefix.removeprefix("header:").split(":", 1)
-    source_value, target_value = remainder.split("->repo:", 1)
-    source_ref = f"repo:{source_value}"
-    target_ref = f"repo:{target_value}"
-    _source_key, source, _source_relative = _resolved_source_path(spec, source_ref)
-    _target_key, target, _target_relative = _resolved_source_path(spec, target_ref)
-    root_key, dependency_root = _dependency_root_for_paths(spec, source, target)
-    source_path = PurePosixPath(source.relative_to(dependency_root).as_posix())
-    target_path = PurePosixPath(target.relative_to(dependency_root).as_posix())
-    normalized_key = (
-        f"header:{direction}:{kind}:repo:{source_path.as_posix()}"
-        f"->repo:{target_path.as_posix()}"
-    )
+    (
+        root_key,
+        dependency_root,
+        normalized_key,
+        source_path,
+        target_path,
+        direction,
+        kind,
+    ) = _canonical_dependency_binding(spec.workspace_root, reference)
+    source = dependency_root / source_path.as_posix()
+    target = dependency_root / target_path.as_posix()
     rows = rows_by_root.get(dependency_root)
     if rows is None:
         rows = _canonical_dependency_rows(dependency_root)
@@ -1893,6 +1957,30 @@ def _distinct_packet_references(
             reference
             for _section, _index, reference in _packet_references(packet, field)
         )
+    )
+
+
+def _active_packet_source_references(
+    packet: ActiveDesignPacketValue,
+) -> tuple[str, ...]:
+    """Return the canonical ordered domain of persisted source projections."""
+    references = list(_distinct_packet_references(packet, "source_refs"))
+    references.extend(
+        clause.source_ref
+        for clause in packet.clause_registry
+        if clause.source_ref not in references
+    )
+    return tuple(references)
+
+
+def _active_packet_dependency_references(
+    packet: ActiveDesignPacketValue,
+) -> tuple[str, ...]:
+    """Return the canonical ordered domain of persisted dependency projections."""
+    return tuple(
+        reference
+        for reference in _distinct_packet_references(packet, "dependency_refs")
+        if reference.startswith("header:")
     )
 
 
@@ -1943,18 +2031,11 @@ def build_active_design_reference_context(
             reviewer_projections.append(
                 ReviewerArtifactProjection(reviewer_ref, matches[0])
             )
-    source_refs = list(_distinct_packet_references(packet, "source_refs"))
-    source_refs.extend(
-        clause.source_ref
-        for clause in packet.clause_registry
-        if clause.source_ref not in source_refs
+    source_results = tuple(
+        _source_reference_result(spec, reference)
+        for reference in _active_packet_source_references(packet)
     )
-    source_results = tuple(_source_reference_result(spec, ref) for ref in source_refs)
-    dependency_refs = tuple(
-        reference
-        for reference in _distinct_packet_references(packet, "dependency_refs")
-        if reference.startswith("header:")
-    )
+    dependency_refs = _active_packet_dependency_references(packet)
     rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]] = {}
     dependency_results = tuple(
         _dependency_reference_result(spec, reference, rows_by_root)
@@ -2282,9 +2363,14 @@ def _design_artifact_violations(
     packet: ActiveDesignPacketValue,
     report_dir: Path,
 ) -> list[ActiveDesignPacketViolation]:
-    path = report_dir / packet.design_artifact
     relative = PurePosixPath(packet.design_artifact)
-    if not path.is_file() or path.is_symlink():
+    try:
+        path = resolve_report_bundle_artifact_path(
+            report_dir,
+            packet.design_artifact,
+            require_existing_regular_file=True,
+        )
+    except ReportBundleArtifactPathError:
         return [DesignArtifactViolation(relative, "missing", None, (2, 0, 0, 0))]
     text = path.read_text(encoding="utf-8")
     violations: list[ActiveDesignPacketViolation] = []
@@ -2318,18 +2404,30 @@ def _review_artifact_violations(
     review_artifact: str,
     order: int,
 ) -> list[ActiveDesignPacketViolation]:
-    review_path = report_dir / review_artifact
     relative = PurePosixPath(review_artifact)
-    if not review_path.is_file() or review_path.is_symlink():
+    try:
+        review_path = resolve_report_bundle_artifact_path(
+            report_dir,
+            review_artifact,
+            require_existing_regular_file=True,
+        )
+    except ReportBundleArtifactPathError:
         return [
             ReviewArtifactViolation(
                 relative, "design_artifact_path_missing", (order, 0, 0, 0)
             )
         ]
-    design_path = report_dir / packet.design_artifact
+    try:
+        design_path = resolve_report_bundle_artifact_path(
+            report_dir,
+            packet.design_artifact,
+            require_existing_regular_file=True,
+        )
+    except ReportBundleArtifactPathError:
+        design_path = None
     expected_sha = (
         hashlib.sha256(design_path.read_bytes()).hexdigest()
-        if design_path.is_file()
+        if design_path is not None
         else ""
     )
     identity = parse_review_identity(review_path.read_text(encoding="utf-8"))
@@ -2426,6 +2524,18 @@ def _projection_mapping(value: object, field: str) -> dict[str, object]:
     return cast(dict[str, object], mapping)
 
 
+def _projection_row(
+    value: object,
+    field: str,
+    expected_fields: frozenset[str],
+) -> dict[str, object]:
+    """Require one projection row to have exactly its canonical field domain."""
+    row = _projection_mapping(value, field)
+    if set(row) != expected_fields:
+        raise ValueError(field)
+    return row
+
+
 def _projection_list(value: object, field: str) -> list[object]:
     if not isinstance(value, list):
         raise ValueError(field)
@@ -2508,21 +2618,49 @@ def _load_source_results(
 ) -> tuple[tuple[SourceReferenceResult, ...], list[ActiveDesignPacketViolation]]:
     results: list[SourceReferenceResult] = []
     violations: list[ActiveDesignPacketViolation] = []
-    for raw in _projection_list(rows, "source_results"):
-        row = _projection_mapping(raw, "source_results[]")
+    raw_rows = _projection_list(rows, "source_results")
+    expected_references = _active_packet_source_references(packet)
+    if len(raw_rows) != len(expected_references):
+        raise ValueError("source_results")
+    expected_fields = frozenset(
+        {
+            "declared_ref",
+            "root_key",
+            "relative_path",
+            "fragment_kind",
+            "fragment_value",
+            "sha256",
+            "parser_match_count",
+        }
+    )
+    for expected_reference, raw in zip(expected_references, raw_rows, strict=True):
+        row = _projection_row(raw, "source_results[]", expected_fields)
         declared_ref = _projection_string(row, "declared_ref")
-        root_key = _projection_string(row, "root_key")
-        relative = PurePosixPath(_projection_string(row, "relative_path"))
-        if root_key == "workspace":
-            base = workspace_root
-        elif root_key == "agent_canon":
-            base = ROOT.resolve()
-        elif root_key == "artifact":
-            base = report_dir
-        else:
-            raise ValueError("source_results[].root_key")
-        resolved = (base / Path(relative.as_posix())).resolve()
-        if not resolved.is_relative_to(base.resolve()) or resolved.is_symlink():
+        root_key, resolved, relative = _resolved_source_binding(
+            workspace_root,
+            report_dir,
+            expected_reference,
+        )
+        _prefix, _path, fragment_kind, fragment_value = _source_reference_parts(
+            expected_reference
+        )
+        observed_binding = (
+            declared_ref,
+            _projection_string(row, "root_key"),
+            _projection_string(row, "relative_path"),
+            _projection_string(row, "fragment_kind"),
+            _projection_optional_string(row, "fragment_value"),
+        )
+        canonical_binding = (
+            expected_reference,
+            root_key,
+            relative.as_posix(),
+            fragment_kind,
+            fragment_value,
+        )
+        if observed_binding != canonical_binding:
+            raise ValueError("source_results[].canonical_binding")
+        if resolved.is_symlink():
             violations.append(
                 _loader_reference_violation(packet, declared_ref, "source_missing")
             )
@@ -2540,9 +2678,22 @@ def _load_source_results(
                     "source_digest_mismatch" if current_sha else "source_missing",
                 )
             )
-        fragment_kind = _projection_string(row, "fragment_kind")
         if fragment_kind not in {"none", "symbol", "section"}:
             raise ValueError("source_results[].fragment_kind")
+        persisted_match_count = _projection_int(row, "parser_match_count")
+        current_match_count = _source_parser_match_count(
+            resolved,
+            fragment_kind,
+            fragment_value,
+        )
+        if current_match_count != persisted_match_count:
+            violations.append(
+                _loader_reference_violation(
+                    packet,
+                    declared_ref,
+                    "source_fragment_mismatch",
+                )
+            )
         results.append(
             SourceReferenceResult(
                 declared_ref=declared_ref,
@@ -2550,9 +2701,9 @@ def _load_source_results(
                 resolved_path=resolved,
                 relative_path=relative,
                 fragment_kind=cast(Literal["none", "symbol", "section"], fragment_kind),
-                fragment_value=_projection_optional_string(row, "fragment_value"),
+                fragment_value=fragment_value,
                 sha256=persisted_sha,
-                parser_match_count=_projection_int(row, "parser_match_count"),
+                parser_match_count=persisted_match_count,
             )
         )
     return tuple(results), violations
@@ -2565,20 +2716,52 @@ def _load_dependency_results(
 ) -> tuple[tuple[DependencyReferenceResult, ...], list[ActiveDesignPacketViolation]]:
     results: list[DependencyReferenceResult] = []
     violations: list[ActiveDesignPacketViolation] = []
-    for raw in _projection_list(rows, "dependency_results"):
-        row = _projection_mapping(raw, "dependency_results[]")
+    raw_rows = _projection_list(rows, "dependency_results")
+    expected_references = _active_packet_dependency_references(packet)
+    if len(raw_rows) != len(expected_references):
+        raise ValueError("dependency_results")
+    expected_fields = frozenset(
+        {
+            "declared_ref",
+            "dependency_root_key",
+            "normalized_key",
+            "source_path",
+            "target_path",
+            "source_sha256",
+            "target_sha256",
+            "graph_match_count",
+        }
+    )
+    for expected_reference, raw in zip(expected_references, raw_rows, strict=True):
+        row = _projection_row(raw, "dependency_results[]", expected_fields)
         declared_ref = _projection_string(row, "declared_ref")
-        root_key = _projection_string(row, "dependency_root_key")
-        if root_key == "workspace":
-            base = workspace_root
-        elif root_key == "agent_canon":
-            base = ROOT.resolve()
-        else:
-            raise ValueError("dependency_results[].dependency_root_key")
-        source_path = PurePosixPath(_projection_string(row, "source_path"))
-        target_path = PurePosixPath(_projection_string(row, "target_path"))
-        source = (base / source_path.as_posix()).resolve()
-        target = (base / target_path.as_posix()).resolve()
+        (
+            root_key,
+            dependency_root,
+            normalized_key,
+            source_path,
+            target_path,
+            _direction,
+            _kind,
+        ) = _canonical_dependency_binding(workspace_root, expected_reference)
+        observed_binding = (
+            declared_ref,
+            _projection_string(row, "dependency_root_key"),
+            _projection_string(row, "normalized_key"),
+            _projection_string(row, "source_path"),
+            _projection_string(row, "target_path"),
+        )
+        canonical_binding = (
+            expected_reference,
+            root_key,
+            normalized_key,
+            source_path.as_posix(),
+            target_path.as_posix(),
+        )
+        if observed_binding != canonical_binding:
+            raise ValueError("dependency_results[].canonical_binding")
+        source = dependency_root / source_path.as_posix()
+        target = dependency_root / target_path.as_posix()
         source_sha = _projection_string(row, "source_sha256")
         target_sha = _projection_string(row, "target_sha256")
         current_source = (
@@ -2597,7 +2780,7 @@ def _load_dependency_results(
             DependencyReferenceResult(
                 declared_ref=declared_ref,
                 dependency_root_key=root_key,
-                normalized_key=_projection_string(row, "normalized_key"),
+                normalized_key=normalized_key,
                 source_path=source_path,
                 target_path=target_path,
                 source_sha256=source_sha,
@@ -4503,38 +4686,30 @@ def _file_identity(value: os.stat_result) -> FileIdentity:
     return FileIdentity(
         st_dev=value.st_dev,
         st_ino=value.st_ino,
-        st_uid=value.st_uid,
-        st_gid=value.st_gid,
-        st_mode=value.st_mode,
-        st_nlink=value.st_nlink,
+    )
+
+
+def _file_state(value: os.stat_result) -> FileState:
+    """Capture permission and ownership state without folding it into identity."""
+    return FileState(
+        identity=_file_identity(value),
+        file_type=stat.S_IFMT(value.st_mode),
+        permission_mode=stat.S_IMODE(value.st_mode),
+        owner_uid=value.st_uid,
+        owner_gid=value.st_gid,
+        link_count=value.st_nlink,
     )
 
 
 def _same_report_root_identity(left: FileIdentity, right: FileIdentity) -> bool:
-    """Compare stable root authority while allowing child-directory link changes."""
-    return (
-        left.st_dev,
-        left.st_ino,
-        left.st_uid,
-        left.st_gid,
-        left.st_mode,
-    ) == (
-        right.st_dev,
-        right.st_ino,
-        right.st_uid,
-        right.st_gid,
-        right.st_mode,
-    )
+    """Compare stable root authority while allowing child-directory state changes."""
+    return left == right
 
 
 def _identity_mapping(value: FileIdentity) -> dict[str, int]:
     return {
         "st_dev": value.st_dev,
         "st_ino": value.st_ino,
-        "st_uid": value.st_uid,
-        "st_gid": value.st_gid,
-        "st_mode": value.st_mode,
-        "st_nlink": value.st_nlink,
     }
 
 
@@ -4542,7 +4717,7 @@ def _identity_from_mapping(value: object) -> FileIdentity:
     if not isinstance(value, dict):
         raise ValueError("identity must be a mapping")
     mapping = cast(dict[object, object], value)
-    expected = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink")
+    expected = ("st_dev", "st_ino")
     if set(mapping) != set(expected):
         raise ValueError("identity fields disagree")
     fields: list[int] = []
@@ -4627,16 +4802,17 @@ def _boot_id() -> str:
 
 
 def _validate_lock_inode(
-    identity: FileIdentity,
+    value: os.stat_result,
     *,
     report_root_identity: FileIdentity,
 ) -> None:
+    state = _file_state(value)
     if (
-        not stat.S_ISREG(identity.st_mode)
-        or identity.st_nlink != 1
-        or identity.st_uid != os.geteuid()
-        or stat.S_IMODE(identity.st_mode) != MATERIALIZATION_LOCK_MODE
-        or identity.st_dev != report_root_identity.st_dev
+        state.file_type != stat.S_IFREG
+        or state.link_count != 1
+        or state.owner_uid != os.geteuid()
+        or state.permission_mode != MATERIALIZATION_LOCK_MODE
+        or state.identity.st_dev != report_root_identity.st_dev
     ):
         raise ValueError("foreign lock inode")
 
@@ -4652,9 +4828,12 @@ def _open_stable_report_root(report_root: Path) -> tuple[int, FileIdentity]:
     try:
         opened = os.fstat(descriptor)
         after = os.lstat(report_root)
-        if _file_identity(before) != _file_identity(opened) or _file_identity(
-            opened
-        ) != _file_identity(after):
+        if (
+            _file_state(before) != _file_state(opened)
+            or _file_state(opened) != _file_state(after)
+            or not stat.S_ISDIR(opened.st_mode)
+            or not stat.S_ISDIR(after.st_mode)
+        ):
             raise ValueError("report root identity changed")
         return descriptor, _file_identity(opened)
     except BaseException:
@@ -4826,14 +5005,18 @@ def _acquire_materialization_lock(
             )
             before_identity = _file_identity(before)
             opened_identity = _file_identity(opened)
-            if before_identity != opened_identity or opened_identity != _file_identity(
-                after
+            if (
+                before_identity != opened_identity
+                or opened_identity != _file_identity(after)
+                or _file_state(before) != _file_state(opened)
+                or _file_state(opened) != _file_state(after)
             ):
                 raise ValueError("lock identity changed during open")
-            _validate_lock_inode(opened_identity, report_root_identity=root_identity)
+            _validate_lock_inode(opened, report_root_identity=root_identity)
             reuse_class = "released_file_reuse"
-        lock_identity = _file_identity(os.fstat(descriptor))
-        _validate_lock_inode(lock_identity, report_root_identity=root_identity)
+        lock_status = os.fstat(descriptor)
+        lock_identity = _file_identity(lock_status)
+        _validate_lock_inode(lock_status, report_root_identity=root_identity)
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
@@ -4845,16 +5028,18 @@ def _acquire_materialization_lock(
             raise _materialization_failure(
                 phase="stage", code=code, target=target
             ) from exc
-        path_identity = _file_identity(
-            os.stat(
-                MATERIALIZATION_LOCK_NAME,
-                dir_fd=root_descriptor,
-                follow_symlinks=False,
-            )
+        path_status = os.stat(
+            MATERIALIZATION_LOCK_NAME,
+            dir_fd=root_descriptor,
+            follow_symlinks=False,
         )
-        descriptor_identity = _file_identity(os.fstat(descriptor))
+        descriptor_status = os.fstat(descriptor)
+        path_identity = _file_identity(path_status)
+        descriptor_identity = _file_identity(descriptor_status)
         if path_identity != lock_identity or descriptor_identity != lock_identity:
             raise ValueError("lock identity changed after flock")
+        _validate_lock_inode(path_status, report_root_identity=root_identity)
+        _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
         payload = _read_descriptor_bytes(descriptor)
         if payload:
             reuse_class = _lock_payload_reuse_class(
@@ -4936,14 +5121,14 @@ def _release_materialization_lock(lock: MaterializationLock) -> None:
     try:
         root_descriptor, root_identity = _open_stable_report_root(lock.path.parent)
         try:
-            path_identity = _file_identity(
-                os.stat(
-                    lock.path.name,
-                    dir_fd=root_descriptor,
-                    follow_symlinks=False,
-                )
+            path_status = os.stat(
+                lock.path.name,
+                dir_fd=root_descriptor,
+                follow_symlinks=False,
             )
-            descriptor_identity = _file_identity(os.fstat(descriptor))
+            descriptor_status = os.fstat(descriptor)
+            path_identity = _file_identity(path_status)
+            descriptor_identity = _file_identity(descriptor_status)
             if (
                 not _same_report_root_identity(
                     root_identity, lock.identity.report_root_identity
@@ -4952,7 +5137,8 @@ def _release_materialization_lock(lock: MaterializationLock) -> None:
                 or descriptor_identity != lock.identity.lock_file_identity
             ):
                 raise ValueError("lock release identity changed")
-            _validate_lock_inode(path_identity, report_root_identity=root_identity)
+            _validate_lock_inode(path_status, report_root_identity=root_identity)
+            _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
             payload = _read_descriptor_bytes(descriptor)
             if (
                 hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
@@ -5270,14 +5456,14 @@ def _assert_materialization_lock_owned(
 ) -> None:
     root_descriptor, root_identity = _open_stable_report_root(report_root)
     try:
-        path_identity = _file_identity(
-            os.stat(
-                MATERIALIZATION_LOCK_NAME,
-                dir_fd=root_descriptor,
-                follow_symlinks=False,
-            )
+        path_status = os.stat(
+            MATERIALIZATION_LOCK_NAME,
+            dir_fd=root_descriptor,
+            follow_symlinks=False,
         )
-        descriptor_identity = _file_identity(os.fstat(lock.descriptor))
+        descriptor_status = os.fstat(lock.descriptor)
+        path_identity = _file_identity(path_status)
+        descriptor_identity = _file_identity(descriptor_status)
         if (
             not _same_report_root_identity(
                 root_identity, lock.identity.report_root_identity
@@ -5286,6 +5472,8 @@ def _assert_materialization_lock_owned(
             or descriptor_identity != lock.identity.lock_file_identity
         ):
             raise ValueError("materialization lock identity drift")
+        _validate_lock_inode(path_status, report_root_identity=root_identity)
+        _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
         payload = _read_descriptor_bytes(lock.descriptor)
         if (
             hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
@@ -5310,11 +5498,12 @@ def _capture_bookkeeping_file(
         except FileNotFoundError:
             return BookkeepingFileState(name, False, None, None, None, None, None)
         before_identity = _file_identity(before)
-        mode = stat.S_IMODE(before.st_mode)
+        before_state = _file_state(before)
+        mode = before_state.permission_mode
         if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_nlink != 1
-            or before.st_uid != os.geteuid()
+            before_state.file_type != stat.S_IFREG
+            or before_state.link_count != 1
+            or before_state.owner_uid != os.geteuid()
             or before.st_dev != root_identity.st_dev
             or mode not in {PRIVATE_TEMP_MODE, RUN_BUNDLE_FILE_MODE}
         ):
@@ -5333,6 +5522,8 @@ def _capture_bookkeeping_file(
         if (
             _file_identity(opened) != before_identity
             or _file_identity(after) != before_identity
+            or _file_state(opened) != before_state
+            or _file_state(after) != before_state
             or len(payload) != opened.st_size
         ):
             raise ValueError(f"active bookkeeping identity changed: {name}")
@@ -5354,10 +5545,11 @@ def _capture_regular_path(
 ) -> tuple[FileIdentity, int, bytes, str]:
     before = os.lstat(path)
     identity = _file_identity(before)
+    before_state = _file_state(before)
     if (
-        not stat.S_ISREG(before.st_mode)
-        or before.st_nlink != 1
-        or before.st_uid != os.geteuid()
+        before_state.file_type != stat.S_IFREG
+        or before_state.link_count != 1
+        or before_state.owner_uid != os.geteuid()
     ):
         raise ValueError(f"nonregular private bookkeeping path: {path}")
     descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
@@ -5370,12 +5562,14 @@ def _capture_regular_path(
     if (
         _file_identity(opened) != identity
         or _file_identity(after) != identity
+        or _file_state(opened) != before_state
+        or _file_state(after) != before_state
         or len(payload) != opened.st_size
     ):
         raise ValueError(f"private bookkeeping identity changed: {path}")
     return (
         identity,
-        stat.S_IMODE(opened.st_mode),
+        before_state.permission_mode,
         payload,
         hashlib.sha256(payload).hexdigest(),
     )

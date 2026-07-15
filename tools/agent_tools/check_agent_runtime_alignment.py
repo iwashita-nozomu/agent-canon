@@ -7,6 +7,8 @@
 # upstream design ../../agents/canonical/skills.md official system skill delegation boundary
 # upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
+# upstream design ../../agents/TASK_WORKFLOWS.md canonical four-entry active design packet reader map
+# upstream design ../../agents/canonical/CLI_ENTRYPOINTS.md canonical packet CLI terminology
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
@@ -41,6 +43,7 @@ from agent_team import (
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     required_output_templates_missing,
+    resolve_active_design_packet,
     resolve_cross_cutting_document_packet,
     resolve_role,
     resolve_role_document_packet,
@@ -698,6 +701,11 @@ def validate_team_config_references() -> None:
 
     packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
+    active_design_packet = resolve_active_design_packet(
+        config,
+        workflow_family=None,
+        explicit=None,
+    )
     for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
         ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
     for role in config.always_on_roles + config.specialist_roles:
@@ -706,6 +714,7 @@ def validate_team_config_references() -> None:
             role=role,
             report_dir=packet_probe_report_dir,
             workspace_root=packet_probe_workspace,
+            active_design_packet=active_design_packet,
         )
         for entry in packet.read_before_work:
             ensure(
@@ -1385,7 +1394,9 @@ def validate_subagent_protocol_docs() -> None:
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
                 "python3 tools/agent_tools/route.py --prompt",
-                "Implementation Flow Graph",
+                "active design packet schema",
+                "Design Artifact Shape",
+                "four-entry active design packet",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:

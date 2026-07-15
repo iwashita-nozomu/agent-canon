@@ -73,13 +73,15 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
   uses only explicit facts projected through canonical graph node IDs; it does
   not read dependency headers.
 - `graph context --path <claim-document> --token <token>` supplies authoritative
-  `resolved_path`, `source_span`, owner, dependency witnesses, producer, and
-  evidence references.
+  `resolved_path`, exact `source_identity` (`snapshot_commit`, `source_path`,
+  `content_sha256`), `source_span`, owner, dependency witnesses, producer, and
+  evidence references. The shared typed graph adapter validates this tuple;
+  the checker does not decode it again.
 - Backticked claim tokens are classified as `path`, `path_or_evidence`,
   `evidence`, or `math_or_prose` before graph dispatch. Classification selects
   which canonical result fields are required; it is not fact authority.
-  Explicit path syntax is supported only when context returns a non-null
-  `resolved_path` and `source_span`. A `path_or_evidence` token may instead
+  Explicit path syntax is supported only when context returns a non-null,
+  tuple-validated `source_identity`. A `path_or_evidence` token may instead
   match a canonical context item or dependency witness. Unknown evidence fails
   closed.
 - Python-compatible key/value tokens use exactly

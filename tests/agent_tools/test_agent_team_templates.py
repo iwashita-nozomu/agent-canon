@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests agent team template rendering behavior.
 # upstream design ../../agents/templates/README.md template partial contract
-# downstream implementation ../../tools/agent_tools/agent_team.py renders templates and partials
+# upstream implementation ../../tools/agent_tools/agent_team.py renders templates and owns atomic bookkeeping promotion
 # @dependency-end
 
 """Tests for run artifact template rendering."""
@@ -101,6 +101,51 @@ class AgentTeamTemplateTest(unittest.TestCase):
             direction="both",
             depth=0,
         )
+
+    def test_bookkeeping_promotion_preserves_identity_across_mode_transition(
+        self,
+    ) -> None:
+        """A 0600-to-0644 promotion changes permission state, not object identity."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir)
+            temp_path = report_root / ".active_run.tmp.fixture"
+            content = b"/canonical/run\n"
+            temp_path.write_bytes(content)
+            temp_path.chmod(agent_team.PRIVATE_TEMP_MODE)
+            identity, mode, payload, digest = agent_team._capture_regular_path(
+                temp_path
+            )
+            temp = agent_team.BookkeepingTempState(
+                path=temp_path,
+                identity=identity,
+                permission_mode=mode,
+                size=len(payload),
+                sha256=digest,
+                content=payload,
+            )
+            lock = cast("agent_team.MaterializationLock", object())
+
+            with mock.patch.object(
+                agent_team,
+                "_assert_materialization_lock_owned",
+            ):
+                promoted = agent_team._promote_bookkeeping_temp(
+                    report_root=report_root,
+                    lock=lock,
+                    temp=temp,
+                )
+
+            promoted_identity, promoted_mode, promoted_payload, promoted_digest = (
+                agent_team._capture_regular_path(temp_path)
+            )
+            self.assertEqual(mode, 0o600)
+            self.assertEqual(promoted_mode, 0o644)
+            self.assertEqual(promoted_identity, identity)
+            self.assertEqual(promoted.identity, identity)
+            self.assertEqual(promoted.permission_mode, promoted_mode)
+            self.assertEqual(promoted_payload, content)
+            self.assertEqual(promoted_digest, digest)
+            self.assertTrue(agent_team._temp_matches(temp_path, promoted))
 
     def test_review_template_expands_partials_and_replacements(self) -> None:
         """Rendered review artifacts should contain expanded tables and run metadata."""

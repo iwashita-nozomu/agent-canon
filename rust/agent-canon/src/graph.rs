@@ -4132,6 +4132,7 @@ fn context_graph(args: &GraphContextArgs) -> Result<Value, GraphError> {
             &status,
             None,
             None,
+            None,
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -4159,6 +4160,7 @@ fn context_graph(args: &GraphContextArgs) -> Result<Value, GraphError> {
     };
     let context_path = resolved_path.as_deref().unwrap_or(&args.path);
     let node = token_node.as_ref().or(claim_node.as_ref());
+    let source_identity = context_source_identity(&connection, node, resolved_path.as_deref())?;
     let nodes = load_nodes(&connection)?;
     let paths_by_id = nodes
         .iter()
@@ -4291,12 +4293,76 @@ fn context_graph(args: &GraphContextArgs) -> Result<Value, GraphError> {
         &root,
         &status,
         resolved_path,
+        source_identity,
         owner,
         witnesses,
         items,
         runtime_measurements,
         context_diagnostics,
     ))
+}
+
+fn context_source_identity(
+    connection: &Connection,
+    node: Option<&Value>,
+    resolved_path: Option<&str>,
+) -> Result<Option<Value>, GraphError> {
+    let (Some(node), Some(resolved_path)) = (node, resolved_path) else {
+        return Ok(None);
+    };
+    let payload = node
+        .get("payload")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: "resolved source node lacks payload".to_string(),
+        })?;
+    let source_path = payload
+        .get("path")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: "resolved source node lacks source path".to_string(),
+        })?;
+    if source_path != resolved_path {
+        return Err(GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: format!(
+                "resolved path {resolved_path} differs from source identity {source_path}"
+            ),
+        });
+    }
+    let content_sha256 = payload
+        .get("content_sha256")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: format!("resolved source {source_path} lacks content SHA-256"),
+        })?;
+    if content_sha256.len() != 64
+        || !content_sha256
+            .bytes()
+            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+    {
+        return Err(GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: format!("resolved source {source_path} has invalid content SHA-256"),
+        });
+    }
+    let snapshot_commit = metadata_value(connection, "snapshot_head")?;
+    if snapshot_commit.is_empty() {
+        return Err(GraphError::Validation {
+            stage: "context-source-identity".to_string(),
+            reason: "snapshot commit is empty".to_string(),
+        });
+    }
+    Ok(Some(json!({
+        "snapshot_commit": snapshot_commit,
+        "source_path": source_path,
+        "content_sha256": content_sha256,
+    })))
 }
 
 fn select_runtime_measurements(measurements: Vec<Value>, context_path: &str) -> Vec<Value> {
@@ -4628,6 +4694,7 @@ fn context_response_from_status(
     _root: &Path,
     status: &Value,
     resolved_path: Option<String>,
+    source_identity: Option<Value>,
     owner: Option<String>,
     witnesses: Vec<Value>,
     items: Vec<Value>,
@@ -4642,7 +4709,7 @@ fn context_response_from_status(
     json!({
         "schema": "agent-canon.graph.context.v1", "command": "context",
         "status": status.get("status").cloned().unwrap_or_else(|| json!("invalid")), "profile": PUBLIC_PROFILE, "root": ".", "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "claim_path": args.path, "token": args.token, "resolved_path": resolved_path, "source_span": source_span, "owner": owner,
+        "claim_path": args.path, "token": args.token, "resolved_path": resolved_path, "source_identity": source_identity, "source_span": source_span, "owner": owner,
         "dependency_witnesses": witnesses, "items": items, "runtime_measurements": runtime_measurements, "context_diagnostics": context_diagnostics, "producer": "source-snapshot",
         "semantic_index": "missing", "semantic_index_path": Value::Null, "semantic_index_content_sha256": Value::Null,
         "graph_fingerprint": status.get("graph_fingerprint").cloned().unwrap_or(Value::Null), "reason": status.get("reason").cloned().unwrap_or(Value::Null), "stderr_summary": Value::Null,
@@ -4666,6 +4733,7 @@ fn context_error_response(args: &GraphContextArgs, error: &GraphError) -> Value 
         args,
         &root,
         &status,
+        None,
         None,
         None,
         Vec::new(),
@@ -5261,6 +5329,97 @@ mod tests {
             "reports/agents/unit-missing/design_brief.md"
         )
         .is_empty());
+    }
+
+    #[test]
+    fn context_source_identity_projects_exact_snapshot_path_and_content_tuple() {
+        let connection = Connection::open_in_memory().expect("in-memory graph");
+        connection
+            .execute_batch("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+            .expect("metadata schema");
+        let snapshot_commit = "0123456789abcdef0123456789abcdef01234567";
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('snapshot_head',?)",
+                [snapshot_commit],
+            )
+            .expect("snapshot metadata");
+        let content_sha256 = "a".repeat(64);
+        let node = json!({
+            "payload": {
+                "path": "documents/design.md",
+                "content_sha256": content_sha256,
+            }
+        });
+
+        let identity =
+            context_source_identity(&connection, Some(&node), Some("documents/design.md"))
+                .expect("source identity")
+                .expect("resolved tuple");
+
+        assert_eq!(
+            identity,
+            json!({
+                "snapshot_commit": snapshot_commit,
+                "source_path": "documents/design.md",
+                "content_sha256": "a".repeat(64),
+            })
+        );
+        let args = GraphContextArgs {
+            root: PathBuf::from("."),
+            profile: PUBLIC_PROFILE.to_string(),
+            format: OutputFormat::Json,
+            path: "documents/design.md".to_string(),
+            token: None,
+        };
+        let status = json!({
+            "status": "fresh",
+            "graph_fingerprint": "graph",
+            "unresolved_count": 0,
+            "ambiguous_count": 0,
+            "uncovered_count": 0,
+            "excluded_count": 0,
+            "unresolved": [],
+            "ambiguous": [],
+            "uncovered": [],
+            "excluded": [],
+        });
+        let response = context_response_from_status(
+            &args,
+            Path::new("."),
+            &status,
+            Some("documents/design.md".to_string()),
+            Some(identity.clone()),
+            None,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        );
+        assert_eq!(response["source_identity"], identity);
+
+        let rebound = json!({
+            "payload": {
+                "path": "documents/other.md",
+                "content_sha256": "a".repeat(64),
+            }
+        });
+        assert!(
+            context_source_identity(&connection, Some(&rebound), Some("documents/design.md"),)
+                .is_err()
+        );
+        let invalid_digest = json!({
+            "payload": {
+                "path": "documents/design.md",
+                "content_sha256": "A".repeat(64),
+            }
+        });
+        assert!(context_source_identity(
+            &connection,
+            Some(&invalid_digest),
+            Some("documents/design.md"),
+        )
+        .is_err());
     }
 
     #[test]

@@ -68,6 +68,15 @@ class GraphDependencyFact:
 
 
 @dataclass(frozen=True)
+class GraphSourceIdentity:
+    """Exact source-snapshot identity returned by graph context."""
+
+    snapshot_commit: str
+    source_path: str
+    content_sha256: str
+
+
+@dataclass(frozen=True)
 class GraphResponse:
     """One parsed command-specific graph response, including valid nonzero states."""
 
@@ -76,6 +85,56 @@ class GraphResponse:
     status: str
     payload: Mapping[str, object]
     exit_code: int
+
+    @property
+    def source_identity(self) -> GraphSourceIdentity | None:
+        """Return the validated context source tuple without consumer-side parsing."""
+        if self.command != "context":
+            return None
+        resolved_path = _optional_string(
+            self.payload.get("resolved_path"),
+            "graph context resolved_path",
+        )
+        raw_identity = self.payload.get("source_identity")
+        if raw_identity is None:
+            if resolved_path is not None:
+                raise GraphClientError(
+                    "graph context resolved_path lacks source_identity"
+                )
+            return None
+        identity = _required_mapping(raw_identity, "graph context source_identity")
+        expected_fields = {"snapshot_commit", "source_path", "content_sha256"}
+        if set(identity) != expected_fields:
+            raise GraphClientError(
+                "graph context source_identity fields must be exactly "
+                "snapshot_commit,source_path,content_sha256"
+            )
+        snapshot_commit = _required_string(
+            identity,
+            "snapshot_commit",
+            "graph context source_identity",
+        )
+        source_path = _required_string(
+            identity,
+            "source_path",
+            "graph context source_identity",
+        )
+        content_sha256 = _required_string(
+            identity,
+            "content_sha256",
+            "graph context source_identity",
+        )
+        if resolved_path != source_path:
+            raise GraphClientError(
+                "graph context source_identity.source_path must equal resolved_path"
+            )
+        if len(content_sha256) != 64 or any(
+            character not in "0123456789abcdef" for character in content_sha256
+        ):
+            raise GraphClientError(
+                "graph context source_identity.content_sha256 must be lowercase SHA-256"
+            )
+        return GraphSourceIdentity(snapshot_commit, source_path, content_sha256)
 
     @property
     def dependency_facts(self) -> tuple[GraphDependencyFact, ...]:
@@ -220,7 +279,10 @@ class GraphClient:
                 f"graph {command} process/response exit mismatch: "
                 f"{result.returncode}/{exit_code}"
             )
-        return GraphResponse(schema, response_command, status, payload, exit_code)
+        response = GraphResponse(schema, response_command, status, payload, exit_code)
+        if command == "context":
+            _ = response.source_identity
+        return response
 
     def build(self) -> GraphResponse:
         """Build the graph and return its typed operation response."""

@@ -241,6 +241,135 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             "graph_status:invalid;reason=integration-input_fingerprint-mismatch",
         )
 
+    def test_context_source_identity_is_exact_and_bound_to_verified_snapshot(
+        self,
+    ) -> None:
+        """A resolved path is evidence only through the exact typed source tuple."""
+        snapshot_commit = "0123456789abcdef0123456789abcdef01234567"
+        content_sha256 = "a" * 64
+        response = checker.GraphResponse(
+            schema="agent-canon.graph.context.v1",
+            command="context",
+            status="fresh",
+            payload={
+                "resolved_path": "tools/feature.py",
+                "source_identity": {
+                    "snapshot_commit": snapshot_commit,
+                    "source_path": "tools/feature.py",
+                    "content_sha256": content_sha256,
+                },
+                "source_span": None,
+                "items": [],
+                "dependency_witnesses": [],
+            },
+            exit_code=0,
+        )
+        client = mock.Mock()
+        client.context.return_value = response
+        status = checker.GraphResponse(
+            schema="agent-canon.graph.status.v1",
+            command="status",
+            status="fresh",
+            payload={
+                "integration_record": {"snapshot_head": snapshot_commit},
+            },
+            exit_code=0,
+        )
+        consumer = checker.GraphClaimConsumer(client, status)
+
+        supported, reason = consumer.token_supported(
+            "documents/design/feature.md",
+            "tools/feature.py",
+        )
+
+        identity = response.source_identity
+        if identity is None:
+            self.fail("resolved context did not expose a source identity")
+        self.assertEqual(
+            (
+                identity.snapshot_commit,
+                identity.source_path,
+                identity.content_sha256,
+            ),
+            (snapshot_commit, "tools/feature.py", content_sha256),
+        )
+        self.assertTrue(supported)
+        self.assertIsNone(reason)
+        client.context.assert_called_once_with(
+            "documents/design/feature.md",
+            "tools/feature.py",
+        )
+
+        mismatched_status = checker.GraphResponse(
+            schema="agent-canon.graph.status.v1",
+            command="status",
+            status="fresh",
+            payload={
+                "integration_record": {"snapshot_head": "f" * 40},
+            },
+            exit_code=0,
+        )
+        with self.assertRaisesRegex(
+            checker.GraphClientError,
+            "differs from the verified integration record",
+        ):
+            checker.GraphClaimConsumer(client, mismatched_status).context(
+                "documents/design/feature.md",
+                "tools/feature.py",
+            )
+
+    def test_context_source_identity_rejects_field_by_field_tampering(self) -> None:
+        """The typed adapter rejects missing, extra, or rebound source tuple fields."""
+        base_identity: dict[str, object] = {
+            "snapshot_commit": "0123456789abcdef0123456789abcdef01234567",
+            "source_path": "tools/feature.py",
+            "content_sha256": "a" * 64,
+        }
+        cases: tuple[tuple[str, dict[str, object]], ...] = (
+            (
+                "missing_snapshot_commit",
+                {
+                    key: value
+                    for key, value in base_identity.items()
+                    if key != "snapshot_commit"
+                },
+            ),
+            (
+                "missing_source_path",
+                {
+                    key: value
+                    for key, value in base_identity.items()
+                    if key != "source_path"
+                },
+            ),
+            (
+                "missing_content_sha256",
+                {
+                    key: value
+                    for key, value in base_identity.items()
+                    if key != "content_sha256"
+                },
+            ),
+            ("extra_field", {**base_identity, "digest": "a" * 64}),
+            ("rebound_path", {**base_identity, "source_path": "tools/other.py"}),
+            ("invalid_digest", {**base_identity, "content_sha256": "A" * 64}),
+        )
+        for case, identity in cases:
+            with self.subTest(case=case):
+                response = checker.GraphResponse(
+                    schema="agent-canon.graph.context.v1",
+                    command="context",
+                    status="fresh",
+                    payload={
+                        "resolved_path": "tools/feature.py",
+                        "source_identity": identity,
+                    },
+                    exit_code=0,
+                )
+
+                with self.assertRaises(checker.GraphClientError):
+                    _ = response.source_identity
+
     def test_context_transport_failure_suppresses_claim_output(self) -> None:
         """A typed adapter error becomes one graph-unavailable result."""
         with tempfile.TemporaryDirectory() as tmp_dir:

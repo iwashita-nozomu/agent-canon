@@ -11,6 +11,7 @@ downstream design workflows/implementation-waterfall-workflow.md stage gate impl
 downstream implementation ../tools/agent_tools/task_start.py emits workflow packets.
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py creates workflow run bundles.
 downstream implementation ../tools/agent_tools/workflow_monitor.py records dynamic wave events.
+downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates the canonical packet owner marker.
 @dependency-end
 -->
 
@@ -37,7 +38,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |
 | skill selection | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt` |
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
-| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md`; run bundle design packet |
+| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
 | validation failure response taxonomy | `documents/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime-profiles-and-check-matrix.md` |
 | validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/REVIEW_PROCESS.md` |
@@ -71,8 +72,8 @@ packet is regenerated for that skill before the handoff proceeds.
 
 ## Design Artifact Shape
 
-Implementation design is owned by the neutral
-`waterfall.design_packet.v1` value persisted at
+Implementation design is owned by the neutral four-entry active design packet
+`waterfall.design_packet.v1`, persisted at
 `team_manifest.yaml#run.active_design_packet`. It carries exactly one clause
 registry and these four typed entries:
 

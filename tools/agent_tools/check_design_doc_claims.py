@@ -214,6 +214,19 @@ class GraphClaimConsumer:
         """Return one fresh graph-owned context response."""
         response = self.client.context(path, token)
         self._require_fresh(response, "context")
+        source_identity = response.source_identity
+        if source_identity is not None:
+            integration_value = self.status.payload.get("integration_record")
+            if not isinstance(integration_value, dict):
+                raise GraphClientError(
+                    "graph context source identity lacks a verified integration record"
+                )
+            integration = cast(dict[str, object], integration_value)
+            if source_identity.snapshot_commit != integration.get("snapshot_head"):
+                raise GraphClientError(
+                    "graph context source_identity.snapshot_commit differs from "
+                    "the verified integration record"
+                )
         return response
 
     def document_metadata(self, path: str) -> tuple[str, tuple[int, int] | None]:
@@ -275,9 +288,7 @@ class GraphClaimConsumer:
         if token_class is ClaimTokenClass.MATH_OR_PROSE:
             return True, None
         response = self.context(claim_path, token)
-        path_supported = isinstance(response.payload.get("resolved_path"), str) and isinstance(
-            response.payload.get("source_span"), dict
-        )
+        path_supported = response.source_identity is not None
         if token_class is ClaimTokenClass.PATH:
             return path_supported, None if path_supported else "graph-code=path-unresolved"
         if path_supported or graph_context_matches_token(response, token):

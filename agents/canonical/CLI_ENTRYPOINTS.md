@@ -4,6 +4,7 @@
 contract agent-runtime
 responsibility Documents CLI Entrypoints for this repository.
 upstream design README.md canonical workflow index
+downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the canonical packet terminology
 @dependency-end
 -->
 
@@ -70,10 +71,10 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 nonstandard design packet を run-local input として固定する場合は、
 `bootstrap_agent_run.py` と `task_start.py` の共通 flag
-`--active-design-packet JSON` を使います。JSON は
-`waterfall.design_packet.v1` の schema、3 つの相対 artifact path、
-`document_flow_required`、clause registry、および4 entryそれぞれの exact
-clause/owner/source/dependency/output/reviewer referencesを一つのobjectとして渡します。
+`--active-design-packet JSON` を使います。JSON は four-entry active design
+packet `waterfall.design_packet.v1` の schema、3 つの相対 artifact path、
+`document_flow_required`、clause registry、および four entries それぞれの exact
+clause/owner/source/dependency/output/reviewer references を一つの object として渡します。
 partial objectやcaller独自shapeはrejectされ、runは作成されません。生成後の唯一の
 authorityは `team_manifest.yaml#run.active_design_packet` です。
 
@@ -88,7 +89,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 `COMPLETE_PACKET_JSON` は `agents/agents_config.json` の
 `artifacts.active_design_packet` と同じclosed shapeを使用し、artifact path変更時は
-4 entryの `output_refs` も同じartifactへ更新します。`task_start.py` と
+four entries の `output_refs` も同じ artifact へ更新します。`task_start.py` と
 `bootstrap_agent_run.py` は packetを解釈・投影・追記せず、complete specを
 `agent_team.py::create_run_bundle` へ一度だけ渡します。このdelegatorが全referenceと
 全projectionをvalidate/renderしてから一つのlock下でstage、no-replace publish、
@@ -153,7 +154,9 @@ tools/bin/agent-canon graph context --root . --profile default --path README.md 
 
 consumer は `status=fresh` と verified integration record を確認してから query / context
 を使います。非 fresh 状態で source header や private transport を再解析する fallback は
-ありません。
+ありません。`context` が source を解決した場合は、同じ response の
+`source_identity` が `snapshot_commit`、`source_path`、`content_sha256` の exact
+tuple を返し、typed consumer は `resolved_path` との一致を検証します。
 
 ## Predecessor Integration
 
