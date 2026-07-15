@@ -116,10 +116,15 @@ def authority_baseline_path(authority_path: Path) -> Path:
     return authority_path.with_name(authority_path.name + AUTHORITY_BASELINE_SUFFIX)
 
 
+def hash_baseline_bytes(payload: bytes) -> bytes:
+    """Return canonical SHA-256 baseline bytes for one authority payload."""
+    return (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
+
+
 def write_hash_baseline(path: Path, baseline_path: Path) -> None:
     """Write a hash baseline sidecar for a runtime authority file."""
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_path.write_text(file_sha256(path) + "\n", encoding="utf-8")
+    baseline_path.write_bytes(hash_baseline_bytes(path.read_bytes()))
 
 
 def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:
@@ -128,17 +133,6 @@ def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:
         return False
     expected = baseline_path.read_text(encoding="utf-8").strip()
     return bool(expected) and file_sha256(path) != expected
-
-
-def write_task_authority_baselines(report_dir: Path, report_root: Path) -> None:
-    """Write baselines for active-run pointer and task authority after bootstrap."""
-    active_pointer = report_root / ACTIVE_RUN_POINTER.name
-    if active_pointer.is_file():
-        active_baseline = active_pointer.with_name(ACTIVE_RUN_BASELINE_POINTER.name)
-        write_hash_baseline(active_pointer, active_baseline)
-    authority_path = report_dir / AUTHORITY_FILE_NAME
-    if authority_path.is_file():
-        write_hash_baseline(authority_path, authority_baseline_path(authority_path))
 
 
 def find_authority_path(root: Path) -> Path | None:

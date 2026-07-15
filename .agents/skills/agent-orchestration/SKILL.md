@@ -38,6 +38,13 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestratio
 Execute the required and task-matching conditional commands that the packet prints.
 <!-- skill-tool-commands:end -->
 
+For run-bundle materialization, carry the approved four-entry active design
+packet as one value and call the repository producer that delegates once to
+`create_run_bundle`; do not add a skill-local parser or writer. For
+implementation handoff, route one approved responsibility graph to one
+write-capable implementer in dependency order. Split only for an actual write
+conflict or unresolved predecessor.
+
 
 1. Read `agents/skills/agent-orchestration.md`.
 1. Read `agents/TASK_WORKFLOWS.md` and `agents/canonical/CLI_ENTRYPOINTS.md` before workflow or entrypoint routing. Read `agents/canonical/CODEX_SUBAGENTS.md` when subagent policy, assignment, implementation handoff, or generated Codex-agent output is in scope.

@@ -70,10 +70,12 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 nonstandard design packet を run-local input として固定する場合は、
 `bootstrap_agent_run.py` と `task_start.py` の共通 flag
-`--active-design-packet JSON` を使います。JSON は schema、3 つの相対 artifact
-path、`document_flow_required` を一度に指定し、全 field がそろった場合だけ run を
-作成します。生成後の authority は `team_manifest.yaml` の
-`run.active_design_packet` です。
+`--active-design-packet JSON` を使います。JSON は
+`waterfall.design_packet.v1` の schema、3 つの相対 artifact path、
+`document_flow_required`、clause registry、および4 entryそれぞれの exact
+clause/owner/source/dependency/output/reviewer referencesを一つのobjectとして渡します。
+partial objectやcaller独自shapeはrejectされ、runは作成されません。生成後の唯一の
+authorityは `team_manifest.yaml#run.active_design_packet` です。
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
@@ -81,8 +83,16 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --task-id T12 \
   --owner codex \
   --workspace-root "$PWD" \
-  --active-design-packet '{"schema":"waterfall.design_packet.v1","design_artifact":"graph_design_brief.md","design_review_artifact":"graph_design_review.md","document_flow_review_artifact":"graph_document_flow_review.md","document_flow_required":true}'
+  --active-design-packet "$COMPLETE_PACKET_JSON"
 ```
+
+`COMPLETE_PACKET_JSON` は `agents/agents_config.json` の
+`artifacts.active_design_packet` と同じclosed shapeを使用し、artifact path変更時は
+4 entryの `output_refs` も同じartifactへ更新します。`task_start.py` と
+`bootstrap_agent_run.py` は packetを解釈・投影・追記せず、complete specを
+`agent_team.py::create_run_bundle` へ一度だけ渡します。このdelegatorが全referenceと
+全projectionをvalidate/renderしてから一つのlock下でstage、no-replace publish、
+pointer-last activationを行い、失敗時はpartial bundleやpointer advanceを返しません。
 
 task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
 `--task` の文面は `route.py --prompt` にも使われ、prompt-derived skill は
@@ -127,3 +137,57 @@ post-implementation change review は `diff_triage_reviewer` が既定です。
 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。
+
+## Canonical Knowledge Graph
+
+Parent repository の構造・責任・依存・公開 surface を参照するときは、固定 DB
+`.agent-canon/knowledge-graph/graph.sqlite` を所有する次の4操作だけを使います。
+`--root` は parent repository root、公開 profile は `default` です。
+
+```bash
+tools/bin/agent-canon graph build --root . --profile default --format json
+tools/bin/agent-canon graph status --root . --profile default --format json
+tools/bin/agent-canon graph query --root . --profile default --path README.md --format json
+tools/bin/agent-canon graph context --root . --profile default --path README.md --format json
+```
+
+consumer は `status=fresh` と verified integration record を確認してから query / context
+を使います。非 fresh 状態で source header や private transport を再解析する fallback は
+ありません。
+
+## Predecessor Integration
+
+Source PR merge後に限り、approved unitごとのimmutable recordをderived filename
+`predecessor_integration.<unit_id>.json` へ生成します。producer、individual verifier、
+exact set verifierのparser/serializer/exit ownerはすべて `github_publish.py` です。
+
+```bash
+python3 tools/agent_tools/github_publish.py --root . predecessor-integration \
+  --user-task "$USER_TASK" \
+  --repo OWNER/REPOSITORY \
+  --pr PR_NUMBER_OR_URL \
+  --report-dir reports/agents/RUN_ID \
+  --unit-id knowledge_graph \
+  --design-path reports/agents/RUN_ID/graph_design_brief.md \
+  --approve-review-path reports/agents/RUN_ID/graph_design_review.md
+
+python3 tools/agent_tools/github_publish.py --root . verify-predecessor-integration \
+  --record ARCHIVE/predecessor_integration.knowledge_graph.json \
+  --archive-manifest ARCHIVE/archive_manifest.json \
+  --expected-unit-id knowledge_graph
+
+python3 tools/agent_tools/github_publish.py --root . verify-predecessor-integration-set \
+  --required-unit-id knowledge_graph \
+  --required-unit-id active_design_packet_materialization \
+  --record knowledge_graph=ARCHIVE/predecessor_integration.knowledge_graph.json \
+  --record active_design_packet_materialization=ARCHIVE/predecessor_integration.active_design_packet_materialization.json \
+  --archive-manifest knowledge_graph=ARCHIVE/archive_manifest.json \
+  --archive-manifest active_design_packet_materialization=ARCHIVE/archive_manifest.json
+```
+
+Success is one canonical JSON line on stdout and zero stderr. Failure is zero
+stdout and one typed canonical error line on stderr with exit `2` through `6`.
+The producer renders complete bytes before identity-owned no-replace publication;
+verifiers are read-only and set verification suppresses every partial prefix.
+Before both source units merge, these record files must remain absent and must
+never be synthesized manually.

@@ -20,11 +20,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design Trace Acceptance
 
-<!-- Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items. Return revise if a changed slice is only justified by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Record blockers or escalation points. -->
+<!-- Confirm that the final integrated responsibility unit remains traceable through all four exact active-packet entries and every active request clause. Return revise for a partial skeleton, duplicate owner/parser/writer, inferred authority, or a changed slice justified only by nearby code or chat. -->
 
 ## Design Side-Effect Trace Acceptance
 
-<!-- Confirm that implemented side effects match the approved Design Side-Effect Map, including documents, workflows, prompt/config, validation output, dependency manifests, and user-facing surfaces. Record any side-effect item that moved to a later stage, was escalated, or received explicit reviewer acceptance. -->
+<!-- Confirm that implemented side effects match the exact Design Side-Effect Map, including atomic run-bundle publication, parent-owned graph DB, consumers, docs/skills/templates, runtime dashboard/token evidence, dependency manifests, and user-facing surfaces. Partial publication or pointer advance is a blocker. -->
 
 ## Planned Work Completion Review
 
@@ -56,7 +56,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Repo-Wide Dependency Review
 
-<!-- Confirm `bash tools/agent_tools/run_repo_dependency_review.sh` was run against the full repository after the latest fix. Return revise if only --changed checks were run or if any dependency manifest issue remains. -->
+<!-- Confirm a fresh canonical graph build/status/query/context and `bash tools/agent_tools/run_repo_dependency_review.sh` were run after the latest fix. Confirm obsolete parser/transport/binder routes are absent and runtime evidence remains metadata/context, not a relation kind. -->
+
+## Predecessor Integration Acceptance
+
+<!-- For post-merge acceptance only, verify the immutable knowledge_graph and active_design_packet_materialization records individually and as the exact two-unit set at one integrated source OID. Before source merge, confirm both derived record files are absent and no manual substitute was created. -->
 
 ## Canonical Tree-Head Acceptance
 

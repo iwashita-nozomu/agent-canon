@@ -235,12 +235,16 @@ implementation handoff、worker input、または follow-up 実装判断の根�
 実装前の design gate は、run manifest の `run.active_design_packet` を唯一の
 artifact ownership source とします。schema は `waterfall.design_packet.v1` で、
 design artifact、technical design review、document-flow review の相対 path と
-`document_flow_required` を必須にします。generator の canonical active-design-packet
+`document_flow_required`、clause registry、および `abstract_design_frame`、
+`implementation_source_packet`、`design_side_effect_map`、
+`design_to_implementation_trace` の4 entryを必須にします。各entryはexact
+clause/owner/source/dependency/output/reviewer referencesを持ちます。generator の canonical active-design-packet
 precedence は、explicit run `--active-design-packet` input、workflow-specific record、
 standard `agents_config` artifact registry の順です。generator は選択 record を
 生成済み run manifest に永続化し、以後その manifest が persisted authority になります。
-gate は persisted manifest の `run.active_design_packet` を唯一の runtime input として
-読みます。
+gate は shared `load_materialized_active_design_packet` と
+`validate_materialized_active_design_packet` だけを通してpersisted manifestの
+`run.active_design_packet` を読み、gate-local type/parser/projector/revalidatorを持ちません。
 選択 record が明示した path を gate は run bundle 内の regular file として解決し、
 manifest-declared path だけを active artifact route として消費します。active packet
 set は historical run、sibling artifact、undeclared basename を除外します。
@@ -249,6 +253,15 @@ missing / unknown schema / invalid field / outside-bundle path は typed blocker
 design artifact、両 review の一致する `Design artifact path:` と
 `review_target_sha256`、最終 `decision=approve`、および required な
 document-flow approval を要求します。
+
+`task_start.py`、`bootstrap_agent_run.py`、`doc_start.py` はcomplete
+`RunBundleSpec` を `create_run_bundle` へ一度だけ渡します。このsole public
+delegatorが全reference validationと全artifact renderingをpublication前に完了し、
+一つのpersistent lockでstage verification、target no-replace rename、bookkeepingの
+compare-before-restore、pointer-last activationを行います。validation/render/stage/
+collision/activation/restoration failureはpartial success、producer-local write、または
+pointer advanceを返しません。chat、history、schedule prose、free-text tableはpacket
+authorityになりません。
 
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
@@ -684,6 +697,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
+- approved packetが一つのreplaceable responsibility unitを固定した場合、workerは内部をdependency orderで処理してもfile/finding/test単位へ責任を分割せず、source mechanism、consumer、config、template、docs/skill、generated view、reverse edge、obsolete-path dispositionを一つのchangeとして完了する
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す

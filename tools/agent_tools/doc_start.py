@@ -80,15 +80,21 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
             "machine-generated workflow/skill/review declarations."
         )
     )
-    parser.add_argument("--task", required=True, help="Short writing task description for the run.")
-    parser.add_argument("--owner", required=True, help="Human or agent responsible for the run.")
+    parser.add_argument(
+        "--task", required=True, help="Short writing task description for the run."
+    )
+    parser.add_argument(
+        "--owner", required=True, help="Human or agent responsible for the run."
+    )
     parser.add_argument(
         "--kind",
         required=True,
         choices=tuple(DOC_KIND_MAP),
         help="Document kind to bootstrap.",
     )
-    parser.add_argument("--run-id", help="Optional explicit run id. Defaults to a timestamped slug.")
+    parser.add_argument(
+        "--run-id", help="Optional explicit run id. Defaults to a timestamped slug."
+    )
     parser.add_argument(
         "--enable",
         action="append",
@@ -120,6 +126,7 @@ def main() -> int:
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     workspace_root = Path(args.workspace_root).resolve()
     report_root = resolve_report_root(args.report_root, workspace_root)
+    report_root.mkdir(parents=True, exist_ok=True)
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
 
@@ -137,7 +144,7 @@ def main() -> int:
         catalog=catalog,
         workflow_family_id=workflow_family_id,
     )
-    created_files = create_run_bundle(
+    materialization = create_run_bundle(
         RunBundleSpec(
             config=config,
             report_dir=report_dir,
@@ -151,6 +158,7 @@ def main() -> int:
             task_catalog=catalog,
         )
     )
+    created_files = materialization.created_files
 
     review_roles = tuple(
         role.id
@@ -169,7 +177,9 @@ def main() -> int:
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"DOC_KIND={args.kind}")
     print(f"WORKFLOW_FAMILY_NAME={kind_spec['workflow_family']}")
-    print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
+    print(
+        "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet"
+    )
     print(f"RECOMMENDED_SPECIALISTS={','.join(kind_spec['enable'])}")
     print(f"SUGGESTED_SKILLS={','.join(kind_spec['skills'])}")
     print(f"START_DECLARATION={start_declaration}")

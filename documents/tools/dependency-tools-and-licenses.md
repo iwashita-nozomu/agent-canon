@@ -103,13 +103,13 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | Tool | Command | Purpose | Writes | License Status |
 | --- | --- | --- | --- | --- |
 | `run-repo-dependency-review` | `bash tools/agent_tools/run_repo_dependency_review.sh` | dependency manifest の scan、format、graph review をまとめて実行します。 | no | local: Apache-2.0 |
-| `scan-dependency-headers` | `bash tools/agent_tools/scan_dependency_headers.sh` | text file に `@dependency-start` manifest があるか棚卸しします。 | no | local: Apache-2.0 |
-| `check-dependency-header-format` | `bash tools/agent_tools/check_dependency_header_format.sh` | manifest marker、field、path、kind、placement を検証します。 | no | local: Apache-2.0 |
+| `scan-dependency-headers` | `bash tools/agent_tools/scan_dependency_headers.sh` | canonical graph の parser-owned manifest coverage を棚卸しします。 | no | local: Apache-2.0 |
+| `check-dependency-header-format` | `bash tools/agent_tools/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-headers` | `python3 tools/agent_tools/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/agent_tools/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
 | `scan-code-dependencies` | `bash tools/agent_tools/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
-| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim、dependency header evidence、implementation text、parent document alignment を検査します。 | no | local: Apache-2.0 |
-| `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | dependency graph TSV から Markdown / DOT review artifact を生成します。 | yes | local: Apache-2.0 |
+| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim を bounded graph context と parent evidence で検査します。 | no | local: Apache-2.0 |
+| `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
 

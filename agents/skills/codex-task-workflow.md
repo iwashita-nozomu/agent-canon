@@ -48,6 +48,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 1. execution plan and plan review for full staged routes
 1. detailed design and detailed design review for full staged routes
 1. document flow review for reader-facing docs, new terms, public APIs, or full staged routes
+1. approved four-entry active design packet materialization
 1. implementation
 1. validation
 1. closeout
@@ -60,6 +61,11 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   run-local packet として扱い、`team_manifest.yaml` の
   `run.repo_tool_routing_policy` を handoff に渡す
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
+- implementation は manifest-selected `run.active_design_packet` の
+  `abstract_design_frame`、`implementation_source_packet`、
+  `design_side_effect_map`、`design_to_implementation_trace` が同じ
+  responsibility unit として shared validator を通った後だけ開始する。producer は
+  complete spec を sole public delegator `create_run_bundle` へ一度だけ渡す
 - owner-bounded route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - repo-changing implementation / patch / doc-edit work では、実装前に
   selected write-capable implementer handoff を bootstrap または schedule
@@ -77,6 +83,10 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   `Implementation Source Packet` に接続し、post-hoc citation cleanup や一時的な
   browser context から実装 claim を閉じません。
 - ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、選択済み write-capable implementer を起動してから実装へ進む
+- 一つの approved responsibility graph は一つの implementation unit として内部の
+  dependency order を保つ。file size、finding count、test location、review area を
+  implementation split の根拠にしない。actual concurrent write conflict または
+  unresolved predecessor の場合だけ全 unit を pause して coordination evidence を残す
 - repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` を併用して selected write-capable implementer handoff を既定 route にする。parent-direct は明示承認または subagent spawn / tool gate blocker を記録した例外 route としてだけ使う
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。

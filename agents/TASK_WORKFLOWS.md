@@ -71,17 +71,23 @@ packet is regenerated for that skill before the handoff proceeds.
 
 ## Design Artifact Shape
 
-Implementation design is owned by the run bundle design packet and the
-implementation-waterfall workflow. The required reader-facing anchors are:
+Implementation design is owned by the neutral
+`waterfall.design_packet.v1` value persisted at
+`team_manifest.yaml#run.active_design_packet`. It carries exactly one clause
+registry and these four typed entries:
 
 - `Abstract Design Frame`
-- `Implementation Flow Graph`
 - `Implementation Source Packet`
 - `Design Side-Effect Map`
 - `Design-To-Implementation Trace`
 
-The graph ties request clauses and compact findings to mechanical scope,
-implementation slices, validation, review, sync, and closeout.
+Each entry declares its exact clause, owner, source, dependency, output, and
+reviewer references. Chat, schedule prose, history, and inferred headings are
+not packet authority. `agent_team.py::create_run_bundle` is the sole public
+delegator: it resolves the packet, validates all references, renders every
+projection, and atomically publishes the complete bundle for task-start,
+bootstrap, and document-start producers. One responsibility unit remains one
+implementation handoff even when its internal work is dependency ordered.
 
 ## Workflow Family Reader Paths
 

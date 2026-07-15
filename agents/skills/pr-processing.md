@@ -10,6 +10,7 @@ upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR
 upstream design result-artifact-writeout.md run-local result artifact writeout contract
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
+upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py archives immutable run-bundle snapshots
 downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
 @dependency-end
@@ -172,6 +173,17 @@ route を短く書きます。
    - PR Essence と validation evidence が PR body、comment、または run bundle にある
    - `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、PR が一つのレビュー単位であること、または複数の差分単位の範囲表と分割判断が PR body、comment、または run bundle にある
    - repo の GitHub automation authority fields が必要なら visible になっている
+1. approved `knowledge_graph` / `active_design_packet_materialization` source units
+   を merge した場合は、merged source OID で post-merge predecessor gate を通します。
+   - `github_publish.py predecessor-integration` を各 unit に一度ずつ実行する
+   - complete run bundle を一つの immutable archive snapshot へ archive / push する
+   - archive の各 record を `verify-predecessor-integration` で検証する
+   - required order `knowledge_graph`, `active_design_packet_materialization` の
+     `verify-predecessor-integration-set` を検証する
+   - verified graph record の後に canonical `graph status` と approved design path の
+     `graph context` を検証する
+   - 二つの record、archive complete-file hashes、common integrated source OID、
+     exact command/exit evidence が揃うまで successor intake と completion を保留する
 1. Issue を処理します。
    - resolved: merge PR / commit / policy reference を書いて close
    - duplicate: canonical issue を示して close
@@ -196,6 +208,9 @@ AgentCanon source PR と template / derived PR が連動している場合は、
 
 1. Source PR を先に green にする。
 1. Source PR を merge する。
+1. 対象 source units が predecessor record owner の場合は、二つの atomic producer、
+   一つの immutable archive、二つの individual verifier、一つの exact set verifier、
+   graph static gate をこの順で完了する。
 1. Parent repo の read-only plan を確認し、mutation が必要なら current-task
    user approval と全 4 inline Git authority/reason field を得て protected
    latest route を実行する。

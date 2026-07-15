@@ -7,10 +7,9 @@ upstream design database-design.md defines SQLite tables and validation boundary
 upstream design code-analysis.md defines code dependency adapter scope
 upstream design ../dependency-manifest-design.md defines dependency manifest DSL and graph semantics
 upstream design ../tools/render_dependency_manifest_graph.md documents dependency graph report rendering
-upstream implementation ../../tools/agent_tools/check_dependency_graph.sh emits dependency manifest graph artifacts
+upstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph storage and query projections
+upstream implementation ../../tools/agent_tools/graph_client.py exposes typed Python graph responses
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
-upstream implementation ../../tools/agent_tools/dependency_manifest_records.py decodes normalized transport and projects source-universe evidence
-upstream implementation ../../tools/agent_tools/bind_r2_scope.py binds review evidence after the source manifest is fixed
 @dependency-end
 -->
 
@@ -26,7 +25,7 @@ dependency header の整合を同じ検証面で扱えるようにすること�
   analysis.
 - Main path: Inputs, Adapter Boundary, Import Mapping, Report Trace,
   Diagnostics, Presentation Recommendations, and Extraction Notes.
-- Read this before joining dependency headers, dependency graph TSVs, code
+- Read this before joining dependency headers, canonical graph facts, code
   evidence, and report claims in structured analysis.
 - Boundary: dependency headers are artifact context contracts, not prose
   sentence nodes or code dependency edges.
@@ -36,7 +35,8 @@ dependency header の整合を同じ検証面で扱えるようにすること�
 | Input | Source | Meaning |
 | --- | --- | --- |
 | Dependency manifest block | file header | human/agent が読むべき upstream/downstream context。 |
-| `dependency_graph.tsv` | `check_dependency_graph.sh --graph-tsv` | normalized manifest edge artifact。 |
+| Canonical graph query | `agent-canon graph query --all --relation dependency --direction both --depth 0` | typed manifest facts with provenance。 |
+| Manifest context | `agent-canon graph context --path <repo-path>` | parser-owned present/contract/responsibility items。 |
 | Dependency graph report | `render_dependency_manifest_graph.py` | review-readable graph summary。 |
 | Code dependency output | `scan_code_dependencies.sh` | import/include/source evidence。manifest graph とは別。 |
 
@@ -53,44 +53,23 @@ artifact、header edge、code edge、check run に依存しているかを参照
 - graph report を citation、logic review、merge authority の代替にする。
 - generated report artifact を `documents/` の正本として扱う。
 
-Generic normalized transport is an input adapter, not a replacement for the
-header graph. `dependency_manifest_records.py` validates the current Rust
-JSONL envelope and exposes every retained record family plus the derived
-`source_universe`. It loads the canonical caller-owned registry artifact and
-uses its entries as the sole kind/capability authority. Before immutable
-projection it rejects cross-family snapshot mismatches, invalid identity/fact/
-pair derivations, endpoints outside the source universe, incomplete
-attestation/observation membership, invalid reconciliation partitions, and
-source-content provenance mismatches, even when summary counts and the body
-fingerprint were refreshed. It does not infer parent paths or materialize
-SQLite. Rust performs a raw duplicate-key preflight before JSON value
-materialization for registry, source, normalized, and evidence input; evidence
-then shares the no-BOM, UTF-8, LF-only, final-LF, and canonical-order byte gate.
-Both implementations reject a locator string shared by different identities
-across repo-path, canonical, or alternate locator fields before resolution.
-Only the exact source ID derived from `parent_repo_id` and declaration span path
-may represent an absent declaration source, yielding `unresolved_source` while
-unknown targets remain transport-invalid.
-`dependency_manifest_records.py relation-registry-artifact` produces the
-canonical registry handoff from the unchanged AgentCanon fixture. The
-two-phase `bind_r2_scope.py` evidence boundary is separate: the manifest fixes
-the pre-review source/fixture/registry set and closeout later re-hashes every
-bound input before verifying exactly one canonical decision and manifest-ID
-line in each of two distinct review artifacts. Exit 21 with no output applies
-to missing, stale, mismatched, malformed, aliased, or content-identical
-bindings. Manifest generation first validates the exact canonical registry
-artifact rather than trusting a supplied fingerprint string.
+The adapter consumes only canonical graph JSON. The Rust `ManifestParser`
+validates full files and the contract registry during source snapshot capture;
+Graph DSL validation owns SQLite shape and relation constraints. Python uses
+`GraphClient` and `GraphResponse.dependency_facts`, while shell tools use fixed
+graph status/query/context argument arrays. No adapter tokenizes headers,
+normalizes dependency targets, decodes a parallel transport, or opens the
+SQLite database directly.
 
 ## Import Mapping
 
 | Manifest artifact | DB table | Required fields |
 | --- | --- | --- |
-| TSV `source` / `target` path | `deps.artifacts` | `artifact_id`, `path`, `kind`, `content_hash` if available |
-| TSV edge row | `deps.dependency_edges` | `direction`, `kind`, `source_artifact_id`, `target_artifact_id`, `reason` |
+| Graph endpoint node | `nodes` | stable ID, path or selector, source payload, producer evidence |
+| `GraphDependencyFact` | `edges` / projection payload | stable fact ID, direction, kind, endpoints, reason, producer, span, evidence, authority |
 | code import/include/source row | `deps.code_edges` | `language`, `kind`, `source_artifact_id`, `target_locator`, `symbol` |
-| graph checker finding | `deps.header_checks` and `report.findings` | `checker`, `status`, `finding_json`, `classification` |
-| normalized Rust JSONL record | `deps.artifacts` plus adapter payload | `record_type`, `record_id`, `snapshot_id`, canonical `payload`, source/provenance hash |
-| normalized aggregate projection | `deps.artifacts` / parent-owned materialization input | all Rust families, `surface_relations`, and derived `source_universe`; no inferred parent state |
+| `GraphDiagnostic` | `diagnostics` and report findings | set, code, severity, path/target, producer, evidence reference |
+| Manifest context item | source-node payload / context projection | present, contract, responsibility, parser span and authority |
 
 Artifact id は path hash だけではなく、repo id、path、content hash、tool provenance から作る。
 rename の検出は future work だが、adapter は `payload_json` に previous locator を残せる。

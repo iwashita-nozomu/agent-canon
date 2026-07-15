@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Builds repo-local semantic search cards for coordinated AgentCanon search.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
+# upstream implementation ./graph_client.py provides verified manifest responsibility metadata
 # upstream implementation ./vector_search.py scans shared text surfaces
 # upstream implementation ./file_responsibility_llm.py resolves llama.cpp local model settings
 # downstream implementation ./search.py consumes search cards as the LLM search provider
@@ -29,10 +30,20 @@ from typing import cast
 import yaml
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import vector_search  # noqa: E402
-from file_responsibility_llm import DEFAULT_MODEL, find_llama_cli, local_llm_cpu_env  # noqa: E402
+from tools.agent_tools import vector_search
+from tools.agent_tools.file_responsibility_llm import (
+    DEFAULT_MODEL,
+    find_llama_cli,
+    local_llm_cpu_env,
+)
+from tools.agent_tools.graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphResponse,
+)
 
 DEFAULT_INDEX_DIR = ".agent-canon/search-index"
 DEFAULT_CARD_FILE = "llm-cards.jsonl"
@@ -243,15 +254,6 @@ def kind_for_path(path: str, tool: ToolEntry) -> str:
     return "text"
 
 
-def responsibility_from_text(text: str) -> str:
-    """Extract dependency-header responsibility text when available."""
-    for raw_line in text.splitlines()[: vector_search.HEADER_SCAN_LINES]:
-        line = vector_search.strip_manifest_line(raw_line)
-        if line.startswith("responsibility "):
-            return line.removeprefix("responsibility ").strip()
-    return ""
-
-
 def heading_or_first_line(text: str) -> str:
     """Extract a compact heading or first meaningful line."""
     for raw_line in text.splitlines():
@@ -337,10 +339,14 @@ def load_tool_entries(root: Path) -> dict[str, ToolEntry]:
     return result
 
 
-def deterministic_card(document: vector_search.Document, tool: ToolEntry) -> SearchCard:
+def deterministic_card(
+    document: vector_search.Document,
+    tool: ToolEntry,
+    responsibilities: Mapping[str, str],
+) -> SearchCard:
     """Build a search card without invoking a model."""
     text = document.text
-    responsibility = responsibility_from_text(text)
+    responsibility = responsibilities.get(document.relative_path, "")
     summary = tool.summary or responsibility or heading_or_first_line(text)
     chunk_hash = stable_hash(text)
     return SearchCard(
@@ -464,7 +470,39 @@ def run_llm_card(invocation: LlmInvocation) -> LlmCardResult:
     return card_from_llm_stdout(invocation.base_card, result.stdout)
 
 
-def build_cards(options: BuildOptions) -> tuple[tuple[SearchCard, ...], int, bool]:
+def graph_responsibilities(response: GraphResponse | None) -> dict[str, str]:
+    """Project manifest responsibilities from an already selected graph response."""
+    if response is None:
+        return {}
+    if response.status != "fresh" or response.exit_code != 0:
+        raise GraphClientError(
+            "canonical graph responsibility response is unavailable: "
+            f"status={response.status} reason={response.payload.get('reason')}"
+        )
+    raw_nodes_value = response.payload.get("nodes")
+    if not isinstance(raw_nodes_value, list):
+        raise GraphClientError("graph query nodes must be an array")
+    raw_nodes = cast(list[object], raw_nodes_value)
+    responsibilities: dict[str, str] = {}
+    for raw_node in raw_nodes:
+        if not isinstance(raw_node, dict):
+            raise GraphClientError("graph query node must be an object")
+        node = cast(dict[str, object], raw_node)
+        path = node.get("path")
+        payload = node.get("payload")
+        if not isinstance(path, str) or not isinstance(payload, dict):
+            continue
+        typed_payload = cast(dict[str, object], payload)
+        responsibility = typed_payload.get("manifest_responsibility")
+        if isinstance(responsibility, str) and responsibility:
+            responsibilities[path] = responsibility
+    return responsibilities
+
+
+def build_cards(
+    options: BuildOptions,
+    graph_response: GraphResponse | None = None,
+) -> tuple[tuple[SearchCard, ...], int, bool]:
     """Build search cards from indexed documents."""
     selected_surfaces = options.surfaces if options.surfaces else vector_search.DEFAULT_SURFACES
     documents = vector_search.read_documents(
@@ -474,6 +512,7 @@ def build_cards(options: BuildOptions) -> tuple[tuple[SearchCard, ...], int, boo
         set(vector_search.EXCLUDED_PARTS),
     )
     tool_entries = load_tool_entries(options.root)
+    responsibilities = graph_responsibilities(graph_response)
     executable = find_llama_cli(options.llama_cli_arg) if options.run_llm else ""
     if options.run_llm and options.require_llm and not executable:
         raise RuntimeError("llama-cli-not-found")
@@ -482,7 +521,7 @@ def build_cards(options: BuildOptions) -> tuple[tuple[SearchCard, ...], int, boo
     llm_used = 0
     for document in documents:
         tool = tool_entries.get(document.relative_path, EMPTY_TOOL_ENTRY)
-        base_card = deterministic_card(document, tool)
+        base_card = deterministic_card(document, tool, responsibilities)
         card = base_card
         if executable and llm_used < max(options.max_llm_files, 0):
             refined = run_llm_card(
@@ -531,6 +570,18 @@ def build_index(args: argparse.Namespace) -> BuildReport:
     index_dir = (root / args.index_dir).resolve()
     card_file = index_dir / DEFAULT_CARD_FILE
     state_file = index_dir / DEFAULT_STATE_FILE
+    graph_response = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+        all=True,
+        relation="all",
+        direction="both",
+        depth=0,
+    )
+    if graph_response.status != "fresh" or graph_response.exit_code != 0:
+        raise GraphClientError(
+            "canonical graph responsibility query is unavailable: "
+            f"status={graph_response.status} "
+            f"reason={graph_response.payload.get('reason')}"
+        )
     cards, llm_used, llm_unavailable = build_cards(
         BuildOptions(
             root=root,
@@ -542,7 +593,8 @@ def build_index(args: argparse.Namespace) -> BuildReport:
             model=str(args.model),
             max_llm_files=int(args.max_llm_files),
             max_bytes=int(args.max_bytes),
-        )
+        ),
+        graph_response,
     )
     report = BuildReport(
         index_dir=index_dir,

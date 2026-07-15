@@ -115,7 +115,9 @@ to choose a route:
 Graph visualization follows the Prose Reasoning Graph DSL projection contract.
 `render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
 runtime dashboard diagrams are adapters or projections; their domain producers
-keep validation authority. Proof and JIT-canonical IR tools provide source facts
+keep validation authority. The dependency renderer reads one canonical graph
+query through `GraphClient`; it does not accept a second fact input. Proof and
+JIT-canonical IR tools provide source facts
 that future graph viewers map through the same DSL contract.
 
 ## Evidence And Assumption Ledger
@@ -154,7 +156,7 @@ second command manual.
 - `tools/bin/agent-canon docs check`
   - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
 - `tools/agent_tools/check_design_doc_claims.py`
-  - design document の claim line を dependency header closure、implementation evidence、parent documents と比較し、Evidence And Assumption Ledger、DSL / standard-form terms、parent-doc alignment を機械的に確認します。
+  - design document の claim line を graph-owned dependency closure、bounded context、parent evidence と比較し、Evidence And Assumption Ledger、DSL / standard-form terms、parent-doc alignment を機械的に確認します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
@@ -278,7 +280,7 @@ second command manual.
 - `tools/agent_tools/vector_search.py`
   - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
   - exact symbol / path / error message は `git grep` または直接 path 確認を使い、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
-  - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
+  - `--context` は search hit を canonical graph の upstream / downstream facts に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
   - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
   - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
   - SQLite-backed semantic candidates が必要な場合は `agent-canon semantic-index` を使います。

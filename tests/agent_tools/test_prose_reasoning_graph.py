@@ -747,13 +747,11 @@ class ProseReasoningGraphTest(unittest.TestCase):
                                 "path": "documents/tools/example.md",
                                 "title": "example",
                                 "responsibility": "Documents example tool usage.",
-                                "has_dependency_manifest": True,
                             },
                             {
                                 "path": "documents/prose-reasoning-graph/dsl-spec.md",
                                 "title": "DSL spec",
                                 "responsibility": "Defines the graph contract.",
-                                "has_dependency_manifest": True,
                             },
                         ],
                         "findings": [
@@ -1313,8 +1311,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("The method cites e.g.", sentences)
             self.assertNotIn("v1.2.3 and Fig.", sentences)
 
-    def test_dependency_manifest_evidence_supports_responsibility_claims(self) -> None:
-        """Dependency manifests should support matching claims without document-type branches."""
+    def test_graph_dependency_evidence_supports_responsibility_claims(self) -> None:
+        """Canonical graph evidence supports claims without parser branches."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "contract.md"
@@ -1349,7 +1347,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
                         "SELECT payload_json FROM edges WHERE layer = 'evidence' AND kind = 'supports'"
                     )
                 }
-            self.assertIn("dependency_manifest_concept_coverage", support_basis)
+            self.assertIn("graph_dependency_concept_coverage", support_basis)
 
     def test_prompt_file_influences_corpus_hints_and_missing_file_errors(self) -> None:
         """Prompt files should feed corpus hints and fail clearly when absent."""

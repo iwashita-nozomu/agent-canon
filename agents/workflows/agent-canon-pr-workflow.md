@@ -239,12 +239,14 @@ standalone AgentCanon repo:
 ```bash
 PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
 trap 'rm -rf "${PR_CHECK_TMP}"' EXIT
+tools/bin/agent-canon graph build --root . --profile default --format json
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --fail-missing \
   --cycle-report-only \
   --report-dir "${PR_CHECK_TMP}/dependency-review/agent-canon-pr"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_graph.tsv" \
+  --root . \
+  --scope full \
   --markdown-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.md" \
   --dot-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"
 python3 tools/agent_tools/classify_path_risk.py --path agents/workflows/agent-canon-pr-workflow.md --format text
@@ -275,6 +277,7 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 
 - shared surface drift check
 - agent runtime checks
+- `tools/bin/agent-canon graph build --root . --profile default --format json`
 - `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - `python3 tools/agent_tools/tool_catalog.py`
 - `python3 tools/agent_tools/tool_drift.py`
@@ -337,7 +340,35 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - file 構成変更がある場合も別 `git worktree` は作らず、current checkout 上の integration branch で merge します。
 - `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 
-8. merge 後に template pin を更新する
+8. approved predecessor units を source merge OID で materialize / verify する
+
+この step は source PR が merge され、merged OID が target `main` の ancestor に
+なった後だけ実行します。merge 前は
+`predecessor_integration.knowledge_graph.json` と
+`predecessor_integration.active_design_packet_materialization.json` を作らず、手書き
+fixture で代替しません。`agents/canonical/CLI_ENTRYPOINTS.md` の frozen grammar で
+次の順序を守ります。
+
+1. `predecessor-integration` を `unit-id=knowledge_graph` に実行する。
+1. `predecessor-integration` を
+   `unit-id=active_design_packet_materialization` に実行する。
+1. 両 record が同じ complete run bundle にある状態で
+   `runtime_log_archive_git.py archive-agent-report --report-dir <report-dir>` と
+   `push` を実行し、一つの immutable snapshot と `archive_manifest.json` に残す。
+1. archive 内の各 record を `verify-predecessor-integration` で個別検証する。
+1. required order を `knowledge_graph`、
+   `active_design_packet_materialization` に固定して
+   `verify-predecessor-integration-set` を実行する。
+1. verified `knowledge_graph` record の後に、同じ source OID を持つ fresh store へ
+   `tools/bin/agent-canon graph status --root . --profile default --format json` と、
+   approved active-packet design path に対する `graph context` を実行する。
+
+producer、archive、individual verifier、set verifier、graph static gate のどれかが
+typed failure を返した場合は completion を公開しません。set result は aggregate
+artifact として保存せず、各 immutable unit record と archive complete-file hash を
+successor packet に渡します。
+
+9. merge 後に template pin を更新する
 
 Keep the current checkout. If it is not the authorized parent integration
 branch, request user direction instead of checking out another branch. After
@@ -353,7 +384,7 @@ external confirmation and must not reimplement this tool route. If it reports
 rerun `make agent-canon-rebuild-tools` inside the DevContainer before relying
 on Rust-backed `agent-canon` CLI behavior.
 
-9. local working clone がある場合は fast-forward する
+10. local working clone がある場合は fast-forward する
 
 ```bash
 git -C /mnt/l/workspace/agent-canon pull --ff-only
@@ -487,6 +518,10 @@ Validation:
   `bash tools/sync_agent_canon.sh link-root` と
   `bash tools/sync_agent_canon.sh check` が pass した後の
   `agentcanon_structure_followup=pass` が記録されている
+- predecessor units を含む source PR では、merge 後の二つの immutable unit record、
+  一つの archive snapshot、二つの individual verification、required-order set
+  verification、共通 integrated source OID、fresh graph status/context がすべて pass
+  している。pre-merge absence または途中成功を PR 完了として扱わない
 - PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
 - PR 本文に structure-intake / responsibility-scope / dependency-review
   evidence、または edit-scope evidence 不要判断が記録されている

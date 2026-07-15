@@ -13,6 +13,7 @@ upstream design ../../../documents/agent-canon-update-route.md defines source PR
 upstream design ../../../agents/skills/result-artifact-writeout.md defines run-local result artifact writeout
 upstream implementation ../../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
+upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py archives immutable run-bundle snapshots
 downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates PR Essence runtime skill markers
 @dependency-end
 -->
@@ -41,6 +42,14 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --fo
 
 Execute the required and task-matching conditional commands that the packet prints.
 <!-- skill-tool-commands:end -->
+
+After the approved source PR is merged, run the exact predecessor sequence from
+`agents/canonical/CLI_ENTRYPOINTS.md`: produce `knowledge_graph`, produce
+`active_design_packet_materialization`, archive and push the complete run
+bundle once, verify each archived record, verify the required two-unit set in
+that order, then run canonical graph `status` and approved-design `context`.
+Accept no partial producer, archive, verifier, set, or graph result. Before
+merge, both predecessor record files remain absent.
 
 
 1. Read `agents/skills/pr-processing.md`.

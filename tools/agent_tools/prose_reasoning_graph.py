@@ -6,6 +6,7 @@
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
 # upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs extracts LocalLLM prose IR
+# upstream implementation ./graph_client.py provides verified manifest dependency facts
 # downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py tests CLI behavior
 # downstream design ../../documents/tools/prose_reasoning_graph.md documents tool contract
 # @dependency-end
@@ -24,7 +25,7 @@ import sqlite3
 import subprocess
 import tempfile
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,12 @@ from typing import TypedDict, cast
 from urllib.parse import quote
 
 import yaml
+from graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphResponse,
+)
 
 SCHEMA_VERSION = 1
 DEFAULT_PROFILE = "writing"
@@ -215,11 +222,8 @@ GRAPH_TOPOLOGY_CONCEPTS = frozenset(
 ALIGNED_ATTRIBUTE_CONCEPTS = frozenset(
     {"metric", "baseline", "expected", "result", "指標", "ベースライン", "期待"}
 )
-DECISION_SEQUENCE_CONCEPTS = frozenset({"option", "choice", "decision", "step", "選択肢", "判断"})
-DEPENDENCY_MANIFEST_START = "@dependency-start"
-DEPENDENCY_MANIFEST_END = "@dependency-end"
-DEPENDENCY_MANIFEST_RECORD_RE = re.compile(
-    r"^(?P<role>responsibility|(?:upstream|downstream)\s+(?:design|implementation))\s+(?P<body>.+)$"
+DECISION_SEQUENCE_CONCEPTS = frozenset(
+    {"option", "choice", "decision", "step", "選択肢", "判断"}
 )
 
 
@@ -305,7 +309,7 @@ class ProjectionView:
 
 
 @dataclass(frozen=True)
-class DependencyManifestRecord:
+class GraphDependencyRecord:
     """One dependency-manifest responsibility or dependency entry."""
 
     role: str
@@ -342,22 +346,53 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    ingest = subparsers.add_parser("ingest", help="Ingest Markdown/plain text into a graph DB.")
+    ingest = subparsers.add_parser(
+        "ingest", help="Ingest Markdown/plain text into a graph DB."
+    )
     ingest.add_argument("input", type=Path)
-    ingest.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    ingest.add_argument(
+        "--db",
+        type=Path,
+        help="Graph DB path. Defaults to the user-home prose graph cache.",
+    )
     ingest.add_argument("--kind", default="document")
-    ingest.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
-    ingest.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
+    ingest.add_argument(
+        "--prompt",
+        default="",
+        help="Optional user prompt text for corpus/domain inference.",
+    )
+    ingest.add_argument(
+        "--prompt-file",
+        type=Path,
+        help="Optional user prompt file for corpus/domain inference.",
+    )
     add_local_llm_ir_args(ingest)
     add_stats_out(ingest)
 
-    ingest_set = subparsers.add_parser("ingest-set", help="Ingest multiple Markdown/plain text files into one graph DB.")
+    ingest_set = subparsers.add_parser(
+        "ingest-set",
+        help="Ingest multiple Markdown/plain text files into one graph DB.",
+    )
     ingest_set.add_argument("inputs", nargs="+", type=Path)
-    ingest_set.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    ingest_set.add_argument(
+        "--db",
+        type=Path,
+        help="Graph DB path. Defaults to the user-home prose graph cache.",
+    )
     ingest_set.add_argument("--kind", default="document")
-    ingest_set.add_argument("--recursive", action="store_true", help="Recurse into input directories.")
-    ingest_set.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
-    ingest_set.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
+    ingest_set.add_argument(
+        "--recursive", action="store_true", help="Recurse into input directories."
+    )
+    ingest_set.add_argument(
+        "--prompt",
+        default="",
+        help="Optional user prompt text for corpus/domain inference.",
+    )
+    ingest_set.add_argument(
+        "--prompt-file",
+        type=Path,
+        help="Optional user prompt file for corpus/domain inference.",
+    )
     add_local_llm_ir_args(ingest_set)
     add_stats_out(ingest_set)
 
@@ -381,23 +416,31 @@ def build_parser() -> argparse.ArgumentParser:
     outline.add_argument("--out", type=Path, required=True)
     add_stats_out(outline)
 
-    explain = subparsers.add_parser("explain", help="Write natural-language graph explanation.")
+    explain = subparsers.add_parser(
+        "explain", help="Write natural-language graph explanation."
+    )
     add_db_profile(explain)
     explain.add_argument("--out", type=Path, required=True)
     add_stats_out(explain)
 
-    integrate = subparsers.add_parser("integrate", help="Write integration operation plan.")
+    integrate = subparsers.add_parser(
+        "integrate", help="Write integration operation plan."
+    )
     add_db_profile(integrate)
     integrate.add_argument("--out", type=Path, required=True)
     add_stats_out(integrate)
 
-    rewrite = subparsers.add_parser("rewrite-packet", help="Write an LLM rewrite packet for one operation.")
+    rewrite = subparsers.add_parser(
+        "rewrite-packet", help="Write an LLM rewrite packet for one operation."
+    )
     rewrite.add_argument("--db", type=Path, required=True)
     rewrite.add_argument("--op", required=True)
     rewrite.add_argument("--out", type=Path, required=True)
     add_stats_out(rewrite)
 
-    handoff = subparsers.add_parser("skill-handoff", help="Write existing-skill handoff packet.")
+    handoff = subparsers.add_parser(
+        "skill-handoff", help="Write existing-skill handoff packet."
+    )
     add_db_profile(handoff)
     handoff.add_argument("--out", type=Path, required=True)
     add_stats_out(handoff)
@@ -407,8 +450,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run prose graph analysis and structured-analysis document-canon checks for one document.",
     )
     check_document.add_argument("input", type=Path)
-    check_document.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
-    check_document.add_argument("--repo-root", type=Path, help="Root for structured-analysis. Defaults from the input path.")
+    check_document.add_argument(
+        "--db",
+        type=Path,
+        help="Graph DB path. Defaults to the user-home prose graph cache.",
+    )
+    check_document.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Root for structured-analysis. Defaults from the input path.",
+    )
     check_document.add_argument("--out-dir", type=Path, required=True)
     check_document.add_argument("--profile", choices=PROFILES, default="all")
     check_document.add_argument("--structured-profile", default="manual")
@@ -418,8 +469,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use an existing structured-analysis document inventory JSON instead of running build.",
     )
     check_document.add_argument("--kind", default="document")
-    check_document.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
-    check_document.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
+    check_document.add_argument(
+        "--prompt",
+        default="",
+        help="Optional user prompt text for corpus/domain inference.",
+    )
+    check_document.add_argument(
+        "--prompt-file",
+        type=Path,
+        help="Optional user prompt file for corpus/domain inference.",
+    )
     add_local_llm_ir_args(check_document)
     add_stats_out(check_document)
 
@@ -434,7 +493,9 @@ def add_db_profile(parser: argparse.ArgumentParser) -> None:
 
 def add_stats_out(parser: argparse.ArgumentParser) -> None:
     """Add the compact stats artifact argument."""
-    parser.add_argument("--stats-out", type=Path, help="Write compact command stats JSON.")
+    parser.add_argument(
+        "--stats-out", type=Path, help="Write compact command stats JSON."
+    )
 
 
 def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
@@ -484,7 +545,9 @@ def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def emit_command_stats(args: argparse.Namespace, status_key: str, fields: dict[str, object]) -> None:
+def emit_command_stats(
+    args: argparse.Namespace, status_key: str, fields: dict[str, object]
+) -> None:
     """Emit compact stdout or write a stats artifact when requested."""
     stats_out = getattr(args, "stats_out", None)
     if isinstance(stats_out, Path):
@@ -495,7 +558,10 @@ def emit_command_stats(args: argparse.Namespace, status_key: str, fields: dict[s
             "fields": fields,
         }
         stats_out.parent.mkdir(parents=True, exist_ok=True)
-        stats_out.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        stats_out.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         print(f"{status_key}=pass")
         print(f"PROSE_REASONING_GRAPH_STATS={stats_out}")
         return
@@ -521,7 +587,9 @@ def graph_db_path(args: argparse.Namespace, inputs: Sequence[Path]) -> Path:
 
 def default_graph_db_path(inputs: Sequence[Path]) -> Path:
     """Return the user-home cache path for an ingested source set."""
-    return default_graph_home().joinpath(repo_cache_key(), source_cache_key(inputs), DEFAULT_DB_NAME)
+    return default_graph_home().joinpath(
+        repo_cache_key(), source_cache_key(inputs), DEFAULT_DB_NAME
+    )
 
 
 def default_graph_home() -> Path:
@@ -572,7 +640,9 @@ def sanitize_cache_segment(value: str) -> str:
 def connect(path: Path) -> sqlite3.Connection:
     """Open a SQLite connection and enable foreign keys."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(sqlite_target(path), timeout=SQLITE_BUSY_TIMEOUT_SECONDS, uri=is_wsl_mount(path))
+    connection = sqlite3.connect(
+        sqlite_target(path), timeout=SQLITE_BUSY_TIMEOUT_SECONDS, uri=is_wsl_mount(path)
+    )
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout = 30000")
     connection.execute("PRAGMA foreign_keys = ON")
@@ -591,7 +661,11 @@ def sqlite_target(path: Path) -> str | Path:
 
 def is_wsl_mount(path: Path) -> bool:
     """Return true for Linux paths under /mnt/*."""
-    return path.is_absolute() and len(path.parts) >= WSL_MOUNT_MIN_PATH_PARTS and path.parts[1] == "mnt"
+    return (
+        path.is_absolute()
+        and len(path.parts) >= WSL_MOUNT_MIN_PATH_PARTS
+        and path.parts[1] == "mnt"
+    )
 
 
 def table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
@@ -823,15 +897,25 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "add": "evidence, warrant, limitation, or verification result",
             "verification_route": "claim_support_verification",
             "verification_question": "Is the claim supported by source evidence, a valid warrant, a formal proof obligation, or a stated limitation?",
-            "verification_targets": ["logic-gap-review", "$literature-survey", "citation-evidence-review"],
+            "verification_targets": [
+                "logic-gap-review",
+                "$literature-survey",
+                "citation-evidence-review",
+            ],
             "conditional_verification_targets": [
                 {
                     "target": "$formal-proof-workflow",
                     "when": "the claim is mathematical, proof-like, or implementation-derived",
                 }
             ],
-            "evidence_required": ["source packet", "citation or measured result", "explicit warrant or proof obligation"],
-            "recursive_verification": recursive_verification_for_route("claim_support_verification"),
+            "evidence_required": [
+                "source packet",
+                "citation or measured result",
+                "explicit warrant or proof obligation",
+            ],
+            "recursive_verification": recursive_verification_for_route(
+                "claim_support_verification"
+            ),
         }
     if rule == "topic_jump_without_bridge":
         return {
@@ -845,8 +929,14 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
                     "when": "the bridge depends on an external factual or scholarly premise",
                 }
             ],
-            "evidence_required": ["relation label", "shared question or warrant", "reader-state before/after"],
-            "recursive_verification": recursive_verification_for_route("connection_verification"),
+            "evidence_required": [
+                "relation label",
+                "shared question or warrant",
+                "reader-state before/after",
+            ],
+            "recursive_verification": recursive_verification_for_route(
+                "connection_verification"
+            ),
         }
     if rule.startswith("experiment_") or rule == "metric_without_baseline":
         return {
@@ -854,16 +944,30 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "verification_route": "experiment_plan_verification",
             "verification_question": "Is the experiment claim testable with a hypothesis, metric, baseline, and expected result?",
             "verification_targets": ["$experiment-lifecycle", "$report-writing"],
-            "evidence_required": ["hypothesis", "metric", "baseline", "expected result", "run or rerun decision"],
-            "recursive_verification": recursive_verification_for_route("experiment_plan_verification"),
+            "evidence_required": [
+                "hypothesis",
+                "metric",
+                "baseline",
+                "expected result",
+                "run or rerun decision",
+            ],
+            "recursive_verification": recursive_verification_for_route(
+                "experiment_plan_verification"
+            ),
         }
     if rule == "local_llm_experiment_plan_ir_missing":
         return {
             "add": "LocalLLM prose IR with analysis_intents.experiment_plan status",
             "verification_route": "local_llm_environment_repair",
             "verification_question": "Why is LocalLLM prose IR missing from a graph that requires experiment-plan applicability?",
-            "verification_targets": ["$prose-reasoning-graph", "agent-canon local-llm extract-prose-ir"],
-            "evidence_required": ["local_llm_prose_ir.analysis_intents", "LocalLLM command path and model evidence"],
+            "verification_targets": [
+                "$prose-reasoning-graph",
+                "agent-canon local-llm extract-prose-ir",
+            ],
+            "evidence_required": [
+                "local_llm_prose_ir.analysis_intents",
+                "LocalLLM command path and model evidence",
+            ],
         }
     if rule == "presentation_format_candidate":
         return {
@@ -871,8 +975,15 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "verification_route": "presentation_format_verification",
             "verification_question": "Does the projection view communicate better as the recommended non-prose form while preserving source anchors?",
             "verification_targets": ["$structure-planning", "$report-writing"],
-            "evidence_required": ["projection view", "member anchors", "format reason", "reader-state before/after"],
-            "recursive_verification": recursive_verification_for_route("presentation_format_verification"),
+            "evidence_required": [
+                "projection view",
+                "member anchors",
+                "format reason",
+                "reader-state before/after",
+            ],
+            "recursive_verification": recursive_verification_for_route(
+                "presentation_format_verification"
+            ),
         }
     if rule == "selected_ordering_cycle":
         return {
@@ -880,8 +991,14 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "verification_route": "ordering_cycle_verification",
             "verification_question": "Which hard ordering constraints should be relaxed, split, or corrected so the reader sequence remains acyclic?",
             "verification_targets": ["$structure-planning", "$prose-reasoning-graph"],
-            "evidence_required": ["selected_ordering.relaxed_edges", "source anchors", "preserved source ids"],
-            "recursive_verification": recursive_verification_for_route("ordering_cycle_verification"),
+            "evidence_required": [
+                "selected_ordering.relaxed_edges",
+                "source anchors",
+                "preserved source ids",
+            ],
+            "recursive_verification": recursive_verification_for_route(
+                "ordering_cycle_verification"
+            ),
         }
     return {}
 
@@ -1028,7 +1145,13 @@ def insert_operation(
             id, kind, target_ids_json, reason, payload_json
         ) VALUES (?, ?, ?, ?, ?)
         """,
-        (operation_id, kind, write_json(list(target_ids)), reason, write_json(payload or {})),
+        (
+            operation_id,
+            kind,
+            write_json(list(target_ids)),
+            reason,
+            write_json(payload or {}),
+        ),
     )
 
 
@@ -1038,6 +1161,11 @@ def command_ingest(args: argparse.Namespace) -> int:
     db_path = graph_db_path(args, [input_path])
     text = input_path.read_text(encoding="utf-8")
     prompt_text = prompt_context(args)
+    graph_root = local_llm_root(args, input_path)
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        graph_root,
+        ((input_path, text),),
+    )
     local_llm_ir = local_llm_prose_ir_payload(args, [input_path], prompt_text, db_path)
     corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
     with connect(db_path) as connection:
@@ -1045,6 +1173,7 @@ def command_ingest(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -1062,13 +1191,19 @@ def command_ingest(args: argparse.Namespace) -> int:
             document_id="doc:1",
             source_node_id="src:1",
             kind=cast(str, args.kind),
+            dependency_records=graph_records.get(
+                graph_source_path(graph_root, input_path),
+                (),
+            ),
         )
     emit_command_stats(
         args,
         "PROSE_REASONING_GRAPH_INGEST",
         {
             "PROSE_REASONING_GRAPH_DB": str(db_path),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(
+                local_llm_ir.get("artifact_path", "")
+            ),
         },
     )
     return 0
@@ -1081,6 +1216,11 @@ def command_ingest_set(args: argparse.Namespace) -> int:
     input_paths = expand_ingest_inputs(input_args, bool(args.recursive))
     prompt_text = prompt_context(args)
     documents = [(path, path.read_text(encoding="utf-8")) for path in input_paths]
+    graph_root = local_llm_root(args, input_paths[0])
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        graph_root,
+        documents,
+    )
     local_llm_ir = local_llm_prose_ir_payload(args, input_paths, prompt_text, db_path)
     corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
     with connect(db_path) as connection:
@@ -1088,6 +1228,7 @@ def command_ingest_set(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -1100,7 +1241,13 @@ def command_ingest_set(args: argparse.Namespace) -> int:
         )
         connection.execute(
             "INSERT INTO documents(id, path, title, kind, created_at) VALUES (?, ?, ?, ?, ?)",
-            ("doc:analysis", "analysis://collection", "Document collection analysis", "analysis", utc_now()),
+            (
+                "doc:analysis",
+                "analysis://collection",
+                "Document collection analysis",
+                "analysis",
+                utc_now(),
+            ),
         )
         for index, (path, text) in enumerate(documents, start=1):
             ingest_document(
@@ -1111,6 +1258,10 @@ def command_ingest_set(args: argparse.Namespace) -> int:
                 source_node_id=f"src:{index}",
                 kind=cast(str, args.kind),
                 node_prefix=f"d{index}:",
+                dependency_records=graph_records.get(
+                    graph_source_path(graph_root, path),
+                    (),
+                ),
             )
     emit_command_stats(
         args,
@@ -1118,7 +1269,9 @@ def command_ingest_set(args: argparse.Namespace) -> int:
         {
             "PROSE_REASONING_GRAPH_DB": str(db_path),
             "PROSE_REASONING_GRAPH_DOCUMENTS": len(documents),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(
+                local_llm_ir.get("artifact_path", "")
+            ),
         },
     )
     return 0
@@ -1133,7 +1286,8 @@ def expand_ingest_inputs(inputs: Sequence[Path], recursive: bool) -> list[Path]:
             output.extend(
                 path
                 for path in sorted(input_path.glob(pattern))
-                if path.is_file() and path.suffix.lower() in {".md", ".markdown", ".txt"}
+                if path.is_file()
+                and path.suffix.lower() in {".md", ".markdown", ".txt"}
             )
             continue
         if input_path.is_file():
@@ -1145,6 +1299,177 @@ def expand_ingest_inputs(inputs: Sequence[Path], recursive: bool) -> list[Path]:
     return output
 
 
+def graph_source_path(root: Path, input_path: Path) -> str:
+    """Return the canonical graph source path for one input document."""
+    resolved_root = root.resolve()
+    resolved_input = input_path.resolve()
+    try:
+        return resolved_input.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return resolved_input.as_posix()
+
+
+def graph_dependency_records_for_inputs(
+    root: Path,
+    documents: Sequence[tuple[Path, str]],
+) -> tuple[dict[str, tuple[GraphDependencyRecord, ...]], str]:
+    """Project parser-owned manifest records from one canonical graph query."""
+    try:
+        result = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+    except GraphClientError as error:
+        raise ValueError(f"canonical graph dependency query failed: {error}") from error
+    if result.status != "fresh" or result.exit_code != 0:
+        raise ValueError(
+            "canonical graph dependency query is unavailable: "
+            f"status={result.status} reason={result.payload.get('reason')}"
+        )
+    graph_fingerprint = result.payload.get("graph_fingerprint")
+    if not isinstance(graph_fingerprint, str) or not graph_fingerprint:
+        raise ValueError("canonical graph query lacks graph_fingerprint")
+    return (
+        {
+            source_path: dependency_records_for_graph_source(
+                result,
+                source_path,
+                text,
+            )
+            for input_path, text in documents
+            if (source_path := graph_source_path(root, input_path))
+        },
+        graph_fingerprint,
+    )
+
+
+def dependency_records_for_graph_source(
+    result: GraphResponse,
+    source_path: str,
+    source_text: str,
+) -> tuple[GraphDependencyRecord, ...]:
+    """Return graph records for one source without interpreting manifest syntax."""
+    records: list[GraphDependencyRecord] = []
+    raw_nodes_value = result.payload.get("nodes")
+    if not isinstance(raw_nodes_value, list):
+        raise ValueError("canonical graph query nodes must be an array")
+    raw_nodes = cast(list[object], raw_nodes_value)
+    source_node: dict[str, object] | None = None
+    for raw_node in raw_nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        node = cast(dict[str, object], raw_node)
+        if node.get("path") == source_path:
+            source_node = node
+            break
+    if source_node is not None:
+        raw_payload = source_node.get("payload")
+        if not isinstance(raw_payload, dict):
+            raise ValueError("canonical graph source payload must be an object")
+        payload = cast(dict[str, object], raw_payload)
+        responsibility = payload.get("manifest_responsibility")
+        if isinstance(responsibility, str) and responsibility:
+            raw_span = source_node.get("source_span")
+            if raw_span is not None and not isinstance(raw_span, dict):
+                raise ValueError("canonical graph source span must be an object or null")
+            source_span = (
+                cast(dict[str, object], raw_span) if isinstance(raw_span, dict) else None
+            )
+            start, end = graph_source_offsets(
+                source_text,
+                source_span,
+                source_path,
+            )
+            records.append(
+                GraphDependencyRecord(
+                    role="responsibility",
+                    body=responsibility,
+                    text=f"responsibility {responsibility}",
+                    source_start=start,
+                    source_end=end,
+                )
+            )
+    for fact in result.dependency_facts:
+        if fact.source != source_path:
+            continue
+        direction = fact.direction
+        kind = fact.kind
+        target = fact.target
+        reason = fact.reason
+        start, end = graph_source_offsets(source_text, fact.source_span, source_path)
+        body = f"{target} {reason}".strip()
+        role = f"{direction} {kind}"
+        records.append(
+            GraphDependencyRecord(
+                role=role,
+                body=body,
+                text=f"{role} {body}",
+                source_start=start,
+                source_end=end,
+            )
+        )
+    return tuple(
+        sorted(
+            records, key=lambda record: (record.source_start, record.role, record.text)
+        )
+    )
+
+
+def graph_source_offsets(
+    source_text: str,
+    span: Mapping[str, object] | None,
+    source_path: str,
+) -> tuple[int, int]:
+    """Convert one parser-owned scalar line span to source scalar offsets."""
+    if span is None:
+        raise ValueError(f"canonical graph source span is missing: {source_path}")
+    span_path = span.get("path")
+    if span_path != source_path:
+        raise ValueError(
+            f"canonical graph source span path mismatch: {span_path!r} != {source_path!r}"
+        )
+    start_line = graph_span_integer(span, "start_line", source_path)
+    start_column = graph_span_integer(span, "start_column", source_path)
+    end_line = graph_span_integer(span, "end_line", source_path)
+    end_column = graph_span_integer(span, "end_column", source_path)
+    start = source_scalar_offset(source_text, start_line, start_column, source_path)
+    end = source_scalar_offset(source_text, end_line, end_column, source_path)
+    if end < start:
+        raise ValueError(f"canonical graph source span is reversed: {source_path}")
+    return start, end
+
+
+def graph_span_integer(
+    span: Mapping[str, object], field: str, source_path: str
+) -> int:
+    """Return one positive parser-owned source-span integer."""
+    value = span.get(field)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ValueError(
+            f"canonical graph source span {field} is invalid: {source_path}"
+        )
+    return value
+
+
+def source_scalar_offset(text: str, line: int, column: int, source_path: str) -> int:
+    """Return a zero-based scalar offset for a one-based line and column."""
+    lines = text.splitlines(keepends=True)
+    if line > len(lines):
+        raise ValueError(
+            f"canonical graph source span line is out of range: {source_path}:{line}"
+        )
+    line_text = lines[line - 1]
+    scalar_line = line_text.rstrip("\r\n")
+    if column > len(scalar_line) + 1:
+        raise ValueError(
+            f"canonical graph source span column is out of range: "
+            f"{source_path}:{line}:{column}"
+        )
+    return sum(len(value) for value in lines[: line - 1]) + column - 1
+
+
 def ingest_document(
     connection: sqlite3.Connection,
     input_path: Path,
@@ -1154,6 +1479,7 @@ def ingest_document(
     source_node_id: str,
     kind: str,
     node_prefix: str = "",
+    dependency_records: Sequence[GraphDependencyRecord] = (),
 ) -> None:
     """Insert one source document and its source/form nodes."""
     title = infer_title(text, input_path)
@@ -1174,9 +1500,14 @@ def ingest_document(
         payload={
             "path": str(input_path),
             "kind": kind,
+            "graph_dependency_records": [
+                asdict(record) for record in dependency_records
+            ],
         },
     )
-    ingest_blocks(connection, document_id, text, str(input_path), node_prefix=node_prefix)
+    ingest_blocks(
+        connection, document_id, text, str(input_path), node_prefix=node_prefix
+    )
 
 
 def prompt_context(args: argparse.Namespace) -> str:
@@ -1219,9 +1550,19 @@ def local_llm_prose_ir_payload(
         "--json-out",
         str(ir_path),
         "--document-batch-size",
-        str(getattr(args, "local_llm_document_batch_size", DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE)),
+        str(
+            getattr(
+                args,
+                "local_llm_document_batch_size",
+                DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE,
+            )
+        ),
         "--term-batch-size",
-        str(getattr(args, "local_llm_term_batch_size", DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE)),
+        str(
+            getattr(
+                args, "local_llm_term_batch_size", DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE
+            )
+        ),
         "--llm-jobs",
         str(getattr(args, "local_llm_jobs", DEFAULT_LOCAL_LLM_JOBS)),
     ]
@@ -1233,11 +1574,17 @@ def local_llm_prose_ir_payload(
         command.extend(["--terms-file", str(terms_file.resolve())])
     command.extend(str(path.resolve()) for path in input_paths)
     command_env = os.environ.copy()
-    command_env.setdefault("CARGO_TARGET_DIR", str(Path(tempfile.gettempdir()) / "agent-canon-local-llm-target"))
+    command_env.setdefault(
+        "CARGO_TARGET_DIR",
+        str(Path(tempfile.gettempdir()) / "agent-canon-local-llm-target"),
+    )
     cargo = shutil.which("cargo", path=command_env.get("PATH"))
     if cargo:
         cargo_path = Path(cargo).resolve()
-        if cargo_path.parent.name == "bin" and cargo_path.parent.parent.name == ".cargo":
+        if (
+            cargo_path.parent.name == "bin"
+            and cargo_path.parent.parent.name == ".cargo"
+        ):
             cargo_home = cargo_path.parent.parent
             rustup_home = cargo_home.parent / ".rustup"
             command_env.setdefault("CARGO_HOME", str(cargo_home))
@@ -1293,7 +1640,9 @@ def agent_canon_cli(repo_root: Path) -> Path | str:
     return "agent-canon"
 
 
-def corpus_hints_from_local_llm_ir(payload: dict[str, object]) -> list[dict[str, object]]:
+def corpus_hints_from_local_llm_ir(
+    payload: dict[str, object],
+) -> list[dict[str, object]]:
     """Return corpus hints extracted by LocalLLM prose IR."""
     hints = object_list(payload.get("corpus_hints"))
     if hints:
@@ -1319,7 +1668,9 @@ def set_metadata(connection: sqlite3.Connection, key: str, value: object) -> Non
 
 def metadata_json(connection: sqlite3.Connection, key: str, default: object) -> object:
     """Return one JSON metadata value."""
-    row = connection.execute("SELECT value FROM metadata WHERE key = ?", (key,)).fetchone()
+    row = connection.execute(
+        "SELECT value FROM metadata WHERE key = ?", (key,)
+    ).fetchone()
     if row is None:
         return default
     return json.loads(str(row["value"]))
@@ -1413,7 +1764,9 @@ def ingest_blocks(
             for sentence in split_sentences(block_text):
                 sentence_index += 1
                 sentence_start = text.find(sentence, start, end)
-                sentence_end = sentence_start + len(sentence) if sentence_start >= 0 else end
+                sentence_end = (
+                    sentence_start + len(sentence) if sentence_start >= 0 else end
+                )
                 sentence_id = f"{node_prefix}s:{sentence_index}"
                 insert_node(
                     connection,
@@ -1475,23 +1828,31 @@ def markdown_blocks(text: str) -> list[MarkdownBlock]:
         if not stripped:
             if current:
                 block_text = "".join(current).strip()
-                blocks.append({"text": block_text, "start": current_start, "end": offset})
+                blocks.append(
+                    {"text": block_text, "start": current_start, "end": offset}
+                )
                 current = []
             offset += len(line)
             continue
         if stripped.startswith("#"):
             if current:
                 block_text = "".join(current).strip()
-                blocks.append({"text": block_text, "start": current_start, "end": offset})
+                blocks.append(
+                    {"text": block_text, "start": current_start, "end": offset}
+                )
                 current = []
-            blocks.append({"text": stripped, "start": offset, "end": offset + len(line)})
+            blocks.append(
+                {"text": stripped, "start": offset, "end": offset + len(line)}
+            )
         else:
             if not current:
                 current_start = offset
             current.append(line)
         offset += len(line)
     if current:
-        blocks.append({"text": "".join(current).strip(), "start": current_start, "end": offset})
+        blocks.append(
+            {"text": "".join(current).strip(), "start": current_start, "end": offset}
+        )
     return blocks
 
 
@@ -1534,7 +1895,12 @@ def is_ascii_sentence_boundary(text: str, index: int) -> bool:
         return False
     if char != ".":
         return True
-    if index > 0 and index + 1 < len(text) and text[index - 1].isdigit() and text[index + 1].isdigit():
+    if (
+        index > 0
+        and index + 1 < len(text)
+        and text[index - 1].isdigit()
+        and text[index + 1].isdigit()
+    ):
         return False
     return not is_ascii_abbreviation_period(text, index)
 
@@ -1579,7 +1945,11 @@ def command_analyze(args: argparse.Namespace) -> int:
         initialize_schema(connection)
         clear_analysis(connection)
         analyze_graph(connection, cast(str, args.profile))
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_ANALYZE", {"PROSE_REASONING_GRAPH_PROFILE": str(args.profile)})
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_ANALYZE",
+        {"PROSE_REASONING_GRAPH_PROFILE": str(args.profile)},
+    )
     return 0
 
 
@@ -1605,7 +1975,9 @@ def analyze_graph(connection: sqlite3.Connection, profile: str) -> None:
 
 def fetch_document_id(connection: sqlite3.Connection) -> str:
     """Return the document id that should own analysis overlays."""
-    analysis_row = connection.execute("SELECT id FROM documents WHERE id = ?", ("doc:analysis",)).fetchone()
+    analysis_row = connection.execute(
+        "SELECT id FROM documents WHERE id = ?", ("doc:analysis",)
+    ).fetchone()
     if analysis_row is not None:
         return str(analysis_row["id"])
     row = connection.execute("SELECT id FROM documents ORDER BY id LIMIT 1").fetchone()
@@ -1649,7 +2021,9 @@ def fetch_nodes(
     )
 
 
-def add_projection_layer(connection: sqlite3.Connection, document_id: str, profile: str) -> None:
+def add_projection_layer(
+    connection: sqlite3.Connection, document_id: str, profile: str
+) -> None:
     """Add projection metadata node."""
     insert_node(
         connection,
@@ -1670,7 +2044,9 @@ def add_projection_layer(connection: sqlite3.Connection, document_id: str, profi
     )
 
 
-def add_concept_layer(connection: sqlite3.Connection, document_id: str, paragraphs: Sequence[Node]) -> None:
+def add_concept_layer(
+    connection: sqlite3.Connection, document_id: str, paragraphs: Sequence[Node]
+) -> None:
     """Extract concept nodes from repeated terms."""
     term_counts: Counter[str] = Counter()
     for paragraph in paragraphs:
@@ -1707,7 +2083,9 @@ def add_concept_layer(connection: sqlite3.Connection, document_id: str, paragrap
         )
     for paragraph in paragraphs:
         paragraph_terms = Counter(tokens(paragraph.text))
-        mentioned_terms = [term for term in candidates if paragraph_terms.get(term, 0) > 0]
+        mentioned_terms = [
+            term for term in candidates if paragraph_terms.get(term, 0) > 0
+        ]
         for term in candidates:
             count = paragraph_terms.get(term, 0)
             if count == 0:
@@ -1754,7 +2132,12 @@ def concept_id_for(candidates: Sequence[str], term: str) -> str:
 
 def tokens(text: str) -> tuple[str, ...]:
     """Tokenize prose into lowercase terms."""
-    return tuple(token.lower() for token in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}|[一-龥ぁ-んァ-ン]{2,}", text))
+    return tuple(
+        token.lower()
+        for token in re.findall(
+            r"[A-Za-z][A-Za-z0-9_-]{2,}|[一-龥ぁ-んァ-ン]{2,}", text
+        )
+    )
 
 
 def add_phase_layer(
@@ -1794,9 +2177,14 @@ def add_phase_layer(
 def infer_phase(text: str, index: int, profile: str) -> str:
     """Infer a phase/move label from keywords and profile."""
     lowered = text.lower()
-    if profile in {"experiment", "all"} and any(cue in lowered for cue in ("hypothesis", "仮説")):
+    if profile in {"experiment", "all"} and any(
+        cue in lowered for cue in ("hypothesis", "仮説")
+    ):
         return "hypothesis"
-    if any(cue in lowered for cue in ("metric", "baseline", "protocol", "指標", "ベースライン")):
+    if any(
+        cue in lowered
+        for cue in ("metric", "baseline", "protocol", "指標", "ベースライン")
+    ):
         return "operationalization"
     if any(cue in lowered for cue in ("risk", "limitation", "ただし", "制限", "限界")):
         return "limitation"
@@ -1807,7 +2195,9 @@ def infer_phase(text: str, index: int, profile: str) -> str:
     return "development"
 
 
-def add_discourse_layer(connection: sqlite3.Connection, paragraphs: Sequence[Node]) -> None:
+def add_discourse_layer(
+    connection: sqlite3.Connection, paragraphs: Sequence[Node]
+) -> None:
     """Add discourse edges between adjacent paragraphs."""
     for index, (left, right) in enumerate(zip(paragraphs, paragraphs[1:]), start=1):
         relation = infer_discourse_relation(right.text)
@@ -1822,10 +2212,15 @@ def add_discourse_layer(connection: sqlite3.Connection, paragraphs: Sequence[Nod
             order_kind="adjacency_preferred",
             confidence=max(
                 DISCOURSE_CONFIDENCE_FLOOR,
-                min(DISCOURSE_CONFIDENCE_CEILING, overlap + DISCOURSE_CONFIDENCE_OVERLAP_OFFSET),
+                min(
+                    DISCOURSE_CONFIDENCE_CEILING,
+                    overlap + DISCOURSE_CONFIDENCE_OVERLAP_OFFSET,
+                ),
             ),
             payload={
-                "shared_terms": sorted(set(tokens(left.text)) & set(tokens(right.text)))[:DISCOURSE_SHARED_TERM_LIMIT],
+                "shared_terms": sorted(
+                    set(tokens(left.text)) & set(tokens(right.text))
+                )[:DISCOURSE_SHARED_TERM_LIMIT],
                 "lexical_overlap": overlap,
                 "surface_signal": first_discourse_signal(right.text),
                 "participates_in_ordering_dag": True,
@@ -1839,7 +2234,19 @@ def infer_discourse_relation(text: str) -> str:
     lowered = text.lower()
     if any(cue in lowered for cue in ("however", "but", "although", "ただし", "一方")):
         return "contrasts"
-    if any(cue in lowered for cue in ("because", "therefore", "thus", "so ", "なので", "したがって", "このため", "根拠")):
+    if any(
+        cue in lowered
+        for cue in (
+            "because",
+            "therefore",
+            "thus",
+            "so ",
+            "なので",
+            "したがって",
+            "このため",
+            "根拠",
+        )
+    ):
         return "causes"
     if any(cue in lowered for cue in ("for example", "e.g.", "例えば", "具体例")):
         return "exemplifies"
@@ -1974,7 +2381,9 @@ def add_evidence_layer(
                     sentence.source_end,
                 )
             )
-    evidence_nodes.extend(add_dependency_manifest_evidence_nodes(connection, document_id))
+    evidence_nodes.extend(
+        add_graph_dependency_evidence_nodes(connection, document_id)
+    )
     for claim in claims:
         evidence = best_supporting_evidence(claim, evidence_nodes)
         if evidence is not None:
@@ -1987,7 +2396,10 @@ def add_evidence_layer(
                 evidence.node_id,
                 claim.node_id,
                 confidence=0.5,
-                payload={"basis": basis, "member_anchor_ids": member_anchor_ids(evidence, claim)},
+                payload={
+                    "basis": basis,
+                    "member_anchor_ids": member_anchor_ids(evidence, claim),
+                },
             )
             evidence_anchor = anchor_id_for_derived_node(evidence)
             claim_anchor = anchor_id_for_derived_node(claim)
@@ -2011,24 +2423,32 @@ def add_evidence_layer(
     return tuple(evidence_nodes)
 
 
-def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, document_id: str) -> tuple[Node, ...]:
-    """Materialize dependency-manifest responsibility entries as evidence."""
+def add_graph_dependency_evidence_nodes(
+    connection: sqlite3.Connection, document_id: str
+) -> tuple[Node, ...]:
+    """Materialize canonical-graph dependency records as prose evidence."""
     row = connection.execute(
-        "SELECT id, text, source_start FROM nodes WHERE layer = 'source' AND kind = 'document' AND document_id = ? LIMIT 1",
+        "SELECT id, payload_json, source_start FROM nodes WHERE layer = 'source' AND kind = 'document' AND document_id = ? LIMIT 1",
         (document_id,),
     ).fetchone()
     if row is None:
         return ()
     source_node_id = str(row["id"])
-    source_text = str(row["text"])
     source_start = int(row["source_start"])
-    records = dependency_manifest_records(source_text)
+    records = dependency_records_from_source_payload(
+        read_json_object(str(row["payload_json"])),
+        source_node_id,
+    )
     evidence_nodes: list[Node] = []
     for index, record in enumerate(records, start=1):
         evidence_id = f"evidence:dependency:{index}"
-        kind = "document_responsibility" if record.role == "responsibility" else "dependency_manifest"
+        kind = (
+            "document_responsibility"
+            if record.role == "responsibility"
+            else "graph_dependency"
+        )
         payload = {
-            "source": "dependency_manifest",
+            "source": "canonical_graph",
             "manifest_role": record.role,
             "responsibility_terms": sorted(set(tokens(record.body)) - STOPWORDS),
             "strength": "responsibility_contract",
@@ -2048,7 +2468,7 @@ def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, docum
                 **payload,
                 "source_anchor_id": source_node_id,
                 "member_anchor_ids": [source_node_id],
-                "derivation_basis": "dependency_manifest",
+                "derivation_basis": "canonical_graph",
             },
         )
         evidence_nodes.append(
@@ -2063,7 +2483,7 @@ def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, docum
                     **payload,
                     "source_anchor_id": source_node_id,
                     "member_anchor_ids": [source_node_id],
-                    "derivation_basis": "dependency_manifest",
+                    "derivation_basis": "canonical_graph",
                 },
                 source_start + record.source_start,
                 source_start + record.source_end,
@@ -2072,44 +2492,50 @@ def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, docum
     return tuple(evidence_nodes)
 
 
-def dependency_manifest_records(source_text: str) -> tuple[DependencyManifestRecord, ...]:
-    """Return dependency-manifest records from a source document."""
-    records: list[DependencyManifestRecord] = []
-    in_manifest = False
-    offset = 0
-    for line in source_text.splitlines(keepends=True):
-        stripped_line = line.strip()
-        if DEPENDENCY_MANIFEST_START in stripped_line:
-            in_manifest = True
-            offset += len(line)
-            continue
-        if DEPENDENCY_MANIFEST_END in stripped_line:
-            break
-        if in_manifest:
-            cleaned = clean_dependency_manifest_line(stripped_line)
-            match = DEPENDENCY_MANIFEST_RECORD_RE.match(cleaned)
-            if match is not None:
-                role = match.group("role")
-                body = match.group("body").strip()
-                records.append(
-                    DependencyManifestRecord(
-                        role=role,
-                        body=body,
-                        text=f"{role} {body}",
-                        source_start=offset,
-                        source_end=offset + len(line),
-                    )
-                )
-        offset += len(line)
+def dependency_records_from_source_payload(
+    payload: dict[str, object],
+    source_node_id: str,
+) -> tuple[GraphDependencyRecord, ...]:
+    """Decode graph-derived dependency records stored at ingest time."""
+    raw_records = payload.get("graph_dependency_records")
+    if not isinstance(raw_records, list):
+        raise ValueError(
+            f"source node lacks canonical graph dependency records: {source_node_id}"
+        )
+    records: list[GraphDependencyRecord] = []
+    for index, value in enumerate(cast(list[object], raw_records)):
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"source node dependency record is not an object: {source_node_id}:{index}"
+            )
+        record = cast(dict[str, object], value)
+        role = record.get("role")
+        body = record.get("body")
+        text = record.get("text")
+        source_start = record.get("source_start")
+        source_end = record.get("source_end")
+        if (
+            not isinstance(role, str)
+            or not isinstance(body, str)
+            or not isinstance(text, str)
+            or not isinstance(source_start, int)
+            or isinstance(source_start, bool)
+            or not isinstance(source_end, int)
+            or isinstance(source_end, bool)
+        ):
+            raise ValueError(
+                f"source node dependency record is invalid: {source_node_id}:{index}"
+            )
+        records.append(
+            GraphDependencyRecord(
+                role=role,
+                body=body,
+                text=text,
+                source_start=source_start,
+                source_end=source_end,
+            )
+        )
     return tuple(records)
-
-
-def clean_dependency_manifest_line(line: str) -> str:
-    """Remove comment syntax around a dependency-manifest line."""
-    cleaned = line.strip()
-    cleaned = cleaned.removeprefix("<!--").removesuffix("-->").strip()
-    cleaned = cleaned.removeprefix("#").strip()
-    return cleaned
 
 
 def derived_anchor_payload(anchor_id: str, basis: str) -> dict[str, object]:
@@ -2138,15 +2564,17 @@ def member_anchor_ids(*nodes: Node) -> list[str]:
     return output
 
 
-def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Node | None:
+def best_supporting_evidence(
+    claim: Node, evidence_nodes: Sequence[Node]
+) -> Node | None:
     """Choose evidence that has local relation to a claim."""
     claim_sentence_id = str(claim.payload.get("sentence_id", ""))
     for evidence in evidence_nodes:
         if str(evidence.payload.get("sentence_id", "")) == claim_sentence_id:
             return evidence
     for evidence in evidence_nodes:
-        if evidence.kind in {"document_responsibility", "dependency_manifest"}:
-            if dependency_manifest_covers_claim(claim, evidence):
+        if evidence.kind in {"document_responsibility", "graph_dependency"}:
+            if graph_dependency_covers_claim(claim, evidence):
                 return evidence
             continue
         if lexical_overlap(claim.text, evidence.text) >= EVIDENCE_SUPPORT_MIN_OVERLAP:
@@ -2154,7 +2582,7 @@ def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Nod
     return None
 
 
-def dependency_manifest_covers_claim(claim: Node, evidence: Node) -> bool:
+def graph_dependency_covers_claim(claim: Node, evidence: Node) -> bool:
     """Return true when manifest responsibility terms cover claim concepts."""
     claim_terms = responsibility_terms(claim.text)
     evidence_terms = responsibility_terms(evidence.text)
@@ -2163,20 +2591,28 @@ def dependency_manifest_covers_claim(claim: Node, evidence: Node) -> bool:
     shared_terms = claim_terms & evidence_terms
     if shared_terms:
         return True
-    claim_anchor_terms = responsibility_terms(str(claim.payload.get("section_path", "")))
+    claim_anchor_terms = responsibility_terms(
+        str(claim.payload.get("section_path", ""))
+    )
     return bool(claim_anchor_terms & evidence_terms)
 
 
 def responsibility_terms(text: str) -> set[str]:
     """Return concept terms used for responsibility coverage."""
-    return {term for term in tokens(text) if term not in STOPWORDS and len(term) > CONCEPT_MIN_TERM_LENGTH}
+    return {
+        term
+        for term in tokens(text)
+        if term not in STOPWORDS and len(term) > CONCEPT_MIN_TERM_LENGTH
+    }
 
 
 def evidence_support_basis(claim: Node, evidence: Node) -> str:
     """Return support edge basis for a claim/evidence relation."""
-    if evidence.kind in {"document_responsibility", "dependency_manifest"}:
-        return "dependency_manifest_concept_coverage"
-    if str(evidence.payload.get("sentence_id", "")) == str(claim.payload.get("sentence_id", "")):
+    if evidence.kind in {"document_responsibility", "graph_dependency"}:
+        return "graph_dependency_concept_coverage"
+    if str(evidence.payload.get("sentence_id", "")) == str(
+        claim.payload.get("sentence_id", "")
+    ):
         return "same_sentence_evidence"
     return "document_neighborhood"
 
@@ -2188,7 +2624,9 @@ def add_experiment_layer(
     profile: str,
 ) -> None:
     """Extract experiment-planning nodes."""
-    if not experiment_plan_applicable_for_graph(connection, [sentence.text for sentence in sentences], profile):
+    if not experiment_plan_applicable_for_graph(
+        connection, [sentence.text for sentence in sentences], profile
+    ):
         return
     counters: Counter[str] = Counter()
     for sentence in sentences:
@@ -2206,7 +2644,9 @@ def add_experiment_layer(
                 sentence.source_start,
                 sentence.source_end,
                 confidence=EXTRACTED_NODE_CONFIDENCE,
-                payload=derived_anchor_payload(sentence.node_id, f"experiment_{kind}_cue"),
+                payload=derived_anchor_payload(
+                    sentence.node_id, f"experiment_{kind}_cue"
+                ),
             )
 
 
@@ -2232,14 +2672,18 @@ def add_presentation_feature_layer(
     for sentence in sentences:
         paragraph_id = sentence.payload.get("paragraph_id")
         if isinstance(paragraph_id, str):
-            sentence_ids_by_paragraph.setdefault(paragraph_id, set()).add(sentence.node_id)
+            sentence_ids_by_paragraph.setdefault(paragraph_id, set()).add(
+                sentence.node_id
+            )
 
     for paragraph in paragraphs:
         if is_structured_presentation_block(paragraph.text):
             continue
         sentence_ids = sentence_ids_by_paragraph.get(paragraph.node_id, set())
         role = phase_by_paragraph.get(paragraph.node_id, "")
-        topology_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, GRAPH_TOPOLOGY_CONCEPTS)
+        topology_edges = concept_relation_edges_for_anchor(
+            connection, paragraph.node_id, GRAPH_TOPOLOGY_CONCEPTS
+        )
         if topology_edges:
             insert_presentation_feature(
                 connection,
@@ -2249,7 +2693,9 @@ def add_presentation_feature_layer(
                 "concept relation subgraph exists inside the projection anchor",
                 topology_edges,
             )
-        attribute_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, ALIGNED_ATTRIBUTE_CONCEPTS)
+        attribute_edges = concept_relation_edges_for_anchor(
+            connection, paragraph.node_id, ALIGNED_ATTRIBUTE_CONCEPTS
+        )
         if has_formula_signal(paragraph.text):
             insert_presentation_feature(
                 connection,
@@ -2269,7 +2715,9 @@ def add_presentation_feature_layer(
                 "phase or experiment nodes create an attribute-set subgraph",
                 attribute_edges,
             )
-        sequence_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, DECISION_SEQUENCE_CONCEPTS)
+        sequence_edges = concept_relation_edges_for_anchor(
+            connection, paragraph.node_id, DECISION_SEQUENCE_CONCEPTS
+        )
         if role == "recommendation" or sequence_edges:
             insert_presentation_feature(
                 connection,
@@ -2309,7 +2757,9 @@ def concept_relation_edges_for_anchor(
     return edge_ids
 
 
-def experiment_kinds_for_anchors(connection: sqlite3.Connection, anchor_ids: set[str]) -> set[str]:
+def experiment_kinds_for_anchors(
+    connection: sqlite3.Connection, anchor_ids: set[str]
+) -> set[str]:
     """Return experiment node kinds derived from the supplied source anchors."""
     if not anchor_ids:
         return set()
@@ -2365,7 +2815,9 @@ def insert_presentation_feature(
     )
 
 
-def add_section_edges(connection: sqlite3.Connection, sections: Sequence[Node], paragraphs: Sequence[Node]) -> None:
+def add_section_edges(
+    connection: sqlite3.Connection, sections: Sequence[Node], paragraphs: Sequence[Node]
+) -> None:
     """Connect sections to paragraphs by recorded section paths."""
     section_ids = {section.node_id for section in sections}
     for paragraph in paragraphs:
@@ -2434,10 +2886,14 @@ def add_diagnostics(
                 f"Claim `{claim.node_id}` has no supporting evidence edge.",
                 action=verification_action_for_rule("unsupported_claim"),
             )
-    if experiment_plan_applicable_for_graph(connection, [paragraph.text for paragraph in paragraphs], profile):
+    if experiment_plan_applicable_for_graph(
+        connection, [paragraph.text for paragraph in paragraphs], profile
+    ):
         experiment_kinds = {
             str(row["kind"])
-            for row in connection.execute("SELECT kind FROM nodes WHERE layer = 'experiment'").fetchall()
+            for row in connection.execute(
+                "SELECT kind FROM nodes WHERE layer = 'experiment'"
+            ).fetchall()
         }
         if "hypothesis" not in experiment_kinds:
             insert_document_diagnostic(
@@ -2485,13 +2941,19 @@ def add_diagnostics(
                 action=verification_action_for_rule("topic_jump_without_bridge"),
             )
     if claims and not evidence_nodes:
-        insert_document_diagnostic(connection, "claim_without_evidence_layer", "Claims exist but the evidence layer has no evidence nodes.")
+        insert_document_diagnostic(
+            connection,
+            "claim_without_evidence_layer",
+            "Claims exist but the evidence layer has no evidence nodes.",
+        )
     add_layer_coverage_diagnostic(connection, profile)
     add_presentation_format_diagnostics(connection, profile)
     add_selected_ordering_cycle_diagnostic(connection, profile)
 
 
-def add_selected_ordering_cycle_diagnostic(connection: sqlite3.Connection, profile: str) -> None:
+def add_selected_ordering_cycle_diagnostic(
+    connection: sqlite3.Connection, profile: str
+) -> None:
     """Record a diagnostic when hard selected ordering constraints cycle."""
     sentence_nodes = fetch_nodes(connection, layer="form", kind="sentence")
     if not sentence_nodes:
@@ -2507,7 +2969,9 @@ def add_selected_ordering_cycle_diagnostic(connection: sqlite3.Connection, profi
     if not cycle_detected:
         return
     first_relaxed_edge = relaxed_edges[0] if relaxed_edges else {}
-    target_node_id = str(first_relaxed_edge.get("from_node_id", sentence_nodes[0].node_id))
+    target_node_id = str(
+        first_relaxed_edge.get("from_node_id", sentence_nodes[0].node_id)
+    )
     target_edge_id = str(first_relaxed_edge.get("edge_id", ""))
     insert_diagnostic(
         connection,
@@ -2565,7 +3029,9 @@ def insert_document_diagnostic(
     action: dict[str, object] | None = None,
 ) -> None:
     """Insert a document-level diagnostic."""
-    row = connection.execute("SELECT id FROM nodes WHERE layer = 'source' LIMIT 1").fetchone()
+    row = connection.execute(
+        "SELECT id FROM nodes WHERE layer = 'source' LIMIT 1"
+    ).fetchone()
     target = str(row["id"]) if row else ""
     insert_diagnostic(
         connection,
@@ -2598,7 +3064,9 @@ def add_layer_coverage_diagnostic(connection: sqlite3.Connection, profile: str) 
         )
 
 
-def add_presentation_format_diagnostics(connection: sqlite3.Connection, profile: str) -> None:
+def add_presentation_format_diagnostics(
+    connection: sqlite3.Connection, profile: str
+) -> None:
     """Record graph-backed non-prose presentation candidates."""
     for view in build_projection_views(connection, profile):
         if view.recommended_format == "prose":
@@ -2638,7 +3106,9 @@ def experiment_layer_applicable(connection: sqlite3.Connection) -> bool:
           AND kind IN ('document', 'section', 'paragraph', 'sentence')
         """
     ).fetchall()
-    return experiment_plan_applicable_for_graph(connection, [str(row["text"]) for row in rows], "all")
+    return experiment_plan_applicable_for_graph(
+        connection, [str(row["text"]) for row in rows], "all"
+    )
 
 
 def experiment_plan_applicable_for_graph(
@@ -2706,18 +3176,28 @@ def experiment_plan_assignment_kinds(texts: Iterable[str]) -> set[str]:
     kinds: set[str] = set()
     for text in texts:
         lowered = text.lower()
-        if re.search(r"\bhypothesis\s+(?:is|=|:)", lowered) or re.search(r"仮説\s*は", text):
+        if re.search(r"\bhypothesis\s+(?:is|=|:)", lowered) or re.search(
+            r"仮説\s*は", text
+        ):
             kinds.add("hypothesis")
-        if re.search(r"\bmetric\s+(?:is|=|:)", lowered) or re.search(r"指標\s*は", text):
+        if re.search(r"\bmetric\s+(?:is|=|:)", lowered) or re.search(
+            r"指標\s*は", text
+        ):
             kinds.add("metric")
-        if re.search(r"\bbaseline\s+(?:is|=|:)", lowered) or re.search(r"ベースライン\s*は", text):
+        if re.search(r"\bbaseline\s+(?:is|=|:)", lowered) or re.search(
+            r"ベースライン\s*は", text
+        ):
             kinds.add("baseline")
-        if re.search(r"\bexpected(?: result)?\s+(?:is|=|:)", lowered) or re.search(r"期待(?:結果)?\s*は", text):
+        if re.search(r"\bexpected(?: result)?\s+(?:is|=|:)", lowered) or re.search(
+            r"期待(?:結果)?\s*は", text
+        ):
             kinds.add("expected_result")
     return kinds
 
 
-def required_layers_for_profile(profile: str, *, experiment_applicable: bool = False) -> tuple[str, ...]:
+def required_layers_for_profile(
+    profile: str, *, experiment_applicable: bool = False
+) -> tuple[str, ...]:
     """Return layers expected for one analysis profile."""
     base_layers = (
         "source",
@@ -2741,9 +3221,15 @@ def required_layers_for_profile(profile: str, *, experiment_applicable: bool = F
     return base_layers
 
 
-def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Node]) -> None:
+def add_edit_operations(
+    connection: sqlite3.Connection, paragraphs: Sequence[Node]
+) -> None:
     """Add split/merge/bridge/reorder operation candidates."""
-    prose_paragraphs = [paragraph for paragraph in paragraphs if not is_structured_presentation_block(paragraph.text)]
+    prose_paragraphs = [
+        paragraph
+        for paragraph in paragraphs
+        if not is_structured_presentation_block(paragraph.text)
+    ]
     for paragraph in prose_paragraphs:
         sentences = split_sentences(paragraph.text)
         if len(sentences) > SPLIT_PARAGRAPH_SENTENCE_LIMIT:
@@ -2778,7 +3264,9 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 ),
             )
             break
-    topic_jump_targets = diagnostic_targets_for_rule(connection, "topic_jump_without_bridge")
+    topic_jump_targets = diagnostic_targets_for_rule(
+        connection, "topic_jump_without_bridge"
+    )
     for left, right in zip(prose_paragraphs, prose_paragraphs[1:]):
         if right.node_id in topic_jump_targets:
             insert_operation(
@@ -2788,7 +3276,9 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 [left.node_id, right.node_id],
                 f"`{left.node_id}` to `{right.node_id}` needs an explicit bridge.",
                 operation_payload(
-                    {"bridge_intent": "state the discourse relation and shared question"}
+                    {
+                        "bridge_intent": "state the discourse relation and shared question"
+                    }
                 ),
             )
             break
@@ -2799,13 +3289,17 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
             "reorder_paragraphs",
             [paragraph.node_id for paragraph in prose_paragraphs],
             "Presentation order can be checked against phase order and hard-before edges.",
-            operation_payload({"strategy": "priority topological sort with phase preference"}),
+            operation_payload(
+                {"strategy": "priority topological sort with phase preference"}
+            ),
         )
 
 
 def diagnostic_targets_for_rule(connection: sqlite3.Connection, rule: str) -> set[str]:
     """Return node targets for one diagnostic rule."""
-    rows = connection.execute("SELECT target_node_id FROM diagnostics WHERE rule = ?", (rule,)).fetchall()
+    rows = connection.execute(
+        "SELECT target_node_id FROM diagnostics WHERE rule = ?", (rule,)
+    ).fetchall()
     return {str(row["target_node_id"]) for row in rows}
 
 
@@ -2819,7 +3313,9 @@ def operation_payload(values: dict[str, object]) -> dict[str, object]:
     return payload
 
 
-def add_explanation_layer(connection: sqlite3.Connection, document_id: str, profile: str) -> None:
+def add_explanation_layer(
+    connection: sqlite3.Connection, document_id: str, profile: str
+) -> None:
     """Add explanation metadata node."""
     insert_node(
         connection,
@@ -2838,15 +3334,25 @@ def add_explanation_layer(connection: sqlite3.Connection, document_id: str, prof
 def layer_counts(connection: sqlite3.Connection) -> dict[str, int]:
     """Return node/edge/diagnostic/operation counts by layer."""
     counts: Counter[str] = Counter()
-    for row in connection.execute("SELECT layer, COUNT(*) AS count FROM nodes GROUP BY layer"):
+    for row in connection.execute(
+        "SELECT layer, COUNT(*) AS count FROM nodes GROUP BY layer"
+    ):
         counts[str(row["layer"])] += int(row["count"])
-    for row in connection.execute("SELECT layer, COUNT(*) AS count FROM edges GROUP BY layer"):
+    for row in connection.execute(
+        "SELECT layer, COUNT(*) AS count FROM edges GROUP BY layer"
+    ):
         counts[str(row["layer"])] += int(row["count"])
-    diagnostics_count = connection.execute("SELECT COUNT(*) AS count FROM diagnostics").fetchone()
+    diagnostics_count = connection.execute(
+        "SELECT COUNT(*) AS count FROM diagnostics"
+    ).fetchone()
     counts["diagnostics"] += int(diagnostics_count["count"]) if diagnostics_count else 0
     if table_exists(connection, "edit_operations"):
-        operations_count = connection.execute("SELECT COUNT(*) AS count FROM edit_operations").fetchone()
-        counts["edit-operation"] += int(operations_count["count"]) if operations_count else 0
+        operations_count = connection.execute(
+            "SELECT COUNT(*) AS count FROM edit_operations"
+        ).fetchone()
+        counts["edit-operation"] += (
+            int(operations_count["count"]) if operations_count else 0
+        )
     return dict(counts)
 
 
@@ -2855,7 +3361,11 @@ def command_lint(args: argparse.Namespace) -> int:
     with connect(cast(Path, args.db)) as connection:
         output = render_diagnostics(connection, cast(str, args.profile))
     write_output(cast(Path, args.out), output)
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_LINT", {"PROSE_REASONING_GRAPH_DIAGNOSTICS": str(args.out)})
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_LINT",
+        {"PROSE_REASONING_GRAPH_DIAGNOSTICS": str(args.out)},
+    )
     return 0
 
 
@@ -2888,7 +3398,11 @@ def diagnostic_verification_summary(diagnostic: Diagnostic) -> str:
     if not route:
         return ""
     targets = diagnostic.action.get("verification_targets", [])
-    target_text = ", ".join(str(target) for target in cast(list[object], targets)) if isinstance(targets, list) else ""
+    target_text = (
+        ", ".join(str(target) for target in cast(list[object], targets))
+        if isinstance(targets, list)
+        else ""
+    )
     if target_text:
         return f" verification_route=`{route}` targets=`{target_text}`"
     return f" verification_route=`{route}`"
@@ -2896,7 +3410,9 @@ def diagnostic_verification_summary(diagnostic: Diagnostic) -> str:
 
 def fetch_diagnostics(connection: sqlite3.Connection) -> tuple[Diagnostic, ...]:
     """Fetch diagnostics."""
-    rows = connection.execute("SELECT * FROM diagnostics ORDER BY severity, id").fetchall()
+    rows = connection.execute(
+        "SELECT * FROM diagnostics ORDER BY severity, id"
+    ).fetchall()
     return tuple(
         Diagnostic(
             diagnostic_id=str(row["id"]),
@@ -2915,17 +3431,25 @@ def fetch_diagnostics(connection: sqlite3.Connection) -> tuple[Diagnostic, ...]:
 def command_project(args: argparse.Namespace) -> int:
     """Run project command."""
     with connect(cast(Path, args.db)) as connection:
-        payload = projection_payload(connection, cast(str, args.profile), cast(Path, args.db))
+        payload = projection_payload(
+            connection, cast(str, args.profile), cast(Path, args.db)
+        )
     if args.format == "json":
         text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     else:
         text = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
     write_output(cast(Path, args.out), text)
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_PROJECT", {"PROSE_REASONING_GRAPH_PROJECTION": str(args.out)})
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_PROJECT",
+        {"PROSE_REASONING_GRAPH_PROJECTION": str(args.out)},
+    )
     return 0
 
 
-def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Path) -> dict[str, object]:
+def projection_payload(
+    connection: sqlite3.Connection, profile: str, db_path: Path
+) -> dict[str, object]:
     """Build a structured projection payload."""
     counts = layer_counts(connection)
     graph_nodes = fetch_nodes(connection)
@@ -2933,7 +3457,9 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
     edges = [asdict(edge) for edge in fetch_edges(connection)]
     diagnostics = [asdict(item) for item in fetch_diagnostics(connection)]
     operations = [asdict(item) for item in fetch_operations(connection)]
-    projection_views = [asdict(item) for item in build_projection_views(connection, profile)]
+    projection_views = [
+        asdict(item) for item in build_projection_views(connection, profile)
+    ]
     return {
         "profile": profile,
         "graph_db": str(db_path),
@@ -2953,7 +3479,9 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
     }
 
 
-def selected_ordering_payload(connection: sqlite3.Connection, profile: str) -> dict[str, object]:
+def selected_ordering_payload(
+    connection: sqlite3.Connection, profile: str
+) -> dict[str, object]:
     """Return whole-document source-anchor order for prose projection."""
     sentence_nodes = fetch_nodes(connection, layer="form", kind="sentence")
     ordering_edges = selected_ordering_edges(connection, sentence_nodes)
@@ -2984,7 +3512,9 @@ def selected_ordering_payload(connection: sqlite3.Connection, profile: str) -> d
         "ordering_edges": ordering_edges,
         "ordered_anchor_ids": ordered_ids,
         "ordered_anchors": [
-            ordered_anchor_record(node_by_id[node_id], position, profile, phase_by_anchor)
+            ordered_anchor_record(
+                node_by_id[node_id], position, profile, phase_by_anchor
+            )
             for position, node_id in enumerate(ordered_ids, start=1)
             if node_id in node_by_id
         ],
@@ -3017,7 +3547,11 @@ def selected_ordering_edges(
     anchor_ids = {node.node_id for node in source_anchors}
     edges: list[dict[str, object]] = []
     for edge in fetch_edges(connection):
-        if edge.from_node_id in anchor_ids and edge.to_node_id in anchor_ids and edge_participates_in_ordering(edge):
+        if (
+            edge.from_node_id in anchor_ids
+            and edge.to_node_id in anchor_ids
+            and edge_participates_in_ordering(edge)
+        ):
             edges.append(ordering_edge_record(edge, "direct"))
     edges.extend(derived_sentence_ordering_edges(connection, source_anchors))
     if not edges:
@@ -3067,7 +3601,9 @@ def derived_sentence_ordering_edges(
                     "layer": edge.layer,
                     "kind": edge.kind,
                     "order_kind": edge.order_kind or "selected_order",
-                    "constraint_strength": ordering_constraint_strength(edge.order_kind),
+                    "constraint_strength": ordering_constraint_strength(
+                        edge.order_kind
+                    ),
                     "confidence": edge.confidence,
                     "basis": f"paragraph_order_edge:{edge.edge_id}",
                 }
@@ -3108,7 +3644,9 @@ def ordering_edge_record(edge: Edge, basis: str) -> dict[str, object]:
     }
 
 
-def source_order_fallback_edges(source_anchors: Sequence[Node]) -> list[dict[str, object]]:
+def source_order_fallback_edges(
+    source_anchors: Sequence[Node],
+) -> list[dict[str, object]]:
     """Return deterministic source-order edges when no explicit ordering edge exists."""
     ordered = sorted(source_anchors, key=source_anchor_sort_key)
     edges: list[dict[str, object]] = []
@@ -3145,7 +3683,11 @@ def priority_topological_order(
     for edge in hard_edges:
         from_id = str(edge.get("from_node_id", ""))
         to_id = str(edge.get("to_node_id", ""))
-        if from_id not in node_by_id or to_id not in node_by_id or (from_id, to_id) in edge_pairs:
+        if (
+            from_id not in node_by_id
+            or to_id not in node_by_id
+            or (from_id, to_id) in edge_pairs
+        ):
             continue
         outgoing[from_id].append(to_id)
         indegree[to_id] += 1
@@ -3156,7 +3698,12 @@ def priority_topological_order(
         if indegree[node.node_id] == 0:
             heapq.heappush(
                 ready,
-                (projection_sort_priority(node, profile, phase_by_anchor, soft_priorities), node.node_id),
+                (
+                    projection_sort_priority(
+                        node, profile, phase_by_anchor, soft_priorities
+                    ),
+                    node.node_id,
+                ),
             )
 
     ordered: list[str] = []
@@ -3165,14 +3712,21 @@ def priority_topological_order(
         ordered.append(node_id)
         for next_id in sorted(
             outgoing[node_id],
-            key=lambda item: projection_sort_priority(node_by_id[item], profile, phase_by_anchor, soft_priorities),
+            key=lambda item: projection_sort_priority(
+                node_by_id[item], profile, phase_by_anchor, soft_priorities
+            ),
         ):
             indegree[next_id] -= 1
             if indegree[next_id] == 0:
                 heapq.heappush(
                     ready,
                     (
-                        projection_sort_priority(node_by_id[next_id], profile, phase_by_anchor, soft_priorities),
+                        projection_sort_priority(
+                            node_by_id[next_id],
+                            profile,
+                            phase_by_anchor,
+                            soft_priorities,
+                        ),
                         next_id,
                     ),
                 )
@@ -3180,7 +3734,9 @@ def priority_topological_order(
     if len(ordered) == len(source_anchors):
         return ordered, False, []
 
-    remaining_nodes = [node for node in source_anchors if node.node_id not in set(ordered)]
+    remaining_nodes = [
+        node for node in source_anchors if node.node_id not in set(ordered)
+    ]
     remaining_ordered, relaxed_edges = relax_cyclic_hard_edges_preserving_component_dag(
         remaining_nodes,
         hard_edges,
@@ -3205,24 +3761,33 @@ def relax_cyclic_hard_edges_preserving_component_dag(
     relevant_edges = [
         edge
         for edge in hard_edges
-        if str(edge.get("from_node_id", "")) in remaining_ids and str(edge.get("to_node_id", "")) in remaining_ids
+        if str(edge.get("from_node_id", "")) in remaining_ids
+        and str(edge.get("to_node_id", "")) in remaining_ids
     ]
     components = strongly_connected_components(remaining_ids, relevant_edges)
     component_by_node = {
-        node_id: component_index for component_index, component in enumerate(components) for node_id in component
+        node_id: component_index
+        for component_index, component in enumerate(components)
+        for node_id in component
     }
     relaxed_edges = [
         edge
         for edge in relevant_edges
-        if component_by_node[str(edge.get("from_node_id", ""))] == component_by_node[str(edge.get("to_node_id", ""))]
+        if component_by_node[str(edge.get("from_node_id", ""))]
+        == component_by_node[str(edge.get("to_node_id", ""))]
     ]
-    component_edges: dict[int, set[int]] = {index: set() for index in range(len(components))}
+    component_edges: dict[int, set[int]] = {
+        index: set() for index in range(len(components))
+    }
     component_indegree: dict[int, int] = {index: 0 for index in range(len(components))}
     component_edge_pairs: set[tuple[int, int]] = set()
     for edge in relevant_edges:
         from_component = component_by_node[str(edge.get("from_node_id", ""))]
         to_component = component_by_node[str(edge.get("to_node_id", ""))]
-        if from_component == to_component or (from_component, to_component) in component_edge_pairs:
+        if (
+            from_component == to_component
+            or (from_component, to_component) in component_edge_pairs
+        ):
             continue
         component_edges[from_component].add(to_component)
         component_indegree[to_component] += 1
@@ -3233,7 +3798,12 @@ def relax_cyclic_hard_edges_preserving_component_dag(
         if component_indegree[component_index] == 0:
             heapq.heappush(
                 ready,
-                (component_sort_priority(component, node_by_id, profile, phase_by_anchor, soft_priorities), component_index),
+                (
+                    component_sort_priority(
+                        component, node_by_id, profile, phase_by_anchor, soft_priorities
+                    ),
+                    component_index,
+                ),
             )
 
     ordered_component_ids: list[int] = []
@@ -3242,20 +3812,30 @@ def relax_cyclic_hard_edges_preserving_component_dag(
         ordered_component_ids.append(component_index)
         for next_component in sorted(
             component_edges[component_index],
-            key=lambda item: component_sort_priority(components[item], node_by_id, profile, phase_by_anchor, soft_priorities),
+            key=lambda item: component_sort_priority(
+                components[item], node_by_id, profile, phase_by_anchor, soft_priorities
+            ),
         ):
             component_indegree[next_component] -= 1
             if component_indegree[next_component] == 0:
                 heapq.heappush(
                     ready,
                     (
-                        component_sort_priority(components[next_component], node_by_id, profile, phase_by_anchor, soft_priorities),
+                        component_sort_priority(
+                            components[next_component],
+                            node_by_id,
+                            profile,
+                            phase_by_anchor,
+                            soft_priorities,
+                        ),
                         next_component,
                     ),
                 )
 
     if len(ordered_component_ids) < len(components):
-        missing_components = sorted(set(range(len(components))) - set(ordered_component_ids))
+        missing_components = sorted(
+            set(range(len(components))) - set(ordered_component_ids)
+        )
         ordered_component_ids.extend(missing_components)
 
     ordered: list[str] = []
@@ -3263,7 +3843,9 @@ def relax_cyclic_hard_edges_preserving_component_dag(
         ordered.extend(
             sorted(
                 components[component_index],
-                key=lambda item: projection_sort_priority(node_by_id[item], profile, phase_by_anchor, soft_priorities),
+                key=lambda item: projection_sort_priority(
+                    node_by_id[item], profile, phase_by_anchor, soft_priorities
+                ),
             )
         )
     return ordered, relaxed_edges
@@ -3325,7 +3907,9 @@ def component_sort_priority(
 ) -> tuple[object, ...]:
     """Return stable queue priority for a hard-order component."""
     return min(
-        projection_sort_priority(node_by_id[node_id], profile, phase_by_anchor, soft_priorities)
+        projection_sort_priority(
+            node_by_id[node_id], profile, phase_by_anchor, soft_priorities
+        )
         for node_id in component
     )
 
@@ -3368,14 +3952,22 @@ def soft_ordering_priorities(
         confidence = ordering_edge_confidence(edge)
         outgoing_counts[from_id] += 1
         incoming_counts[to_id] += 1
-        outgoing_confidence[from_id] = outgoing_confidence.get(from_id, NO_ORDERING_CONFIDENCE) + confidence
-        incoming_confidence[to_id] = incoming_confidence.get(to_id, NO_ORDERING_CONFIDENCE) + confidence
+        outgoing_confidence[from_id] = (
+            outgoing_confidence.get(from_id, NO_ORDERING_CONFIDENCE) + confidence
+        )
+        incoming_confidence[to_id] = (
+            incoming_confidence.get(to_id, NO_ORDERING_CONFIDENCE) + confidence
+        )
     return {
         node.node_id: SoftOrderingPriority(
             incoming_count=incoming_counts[node.node_id],
             outgoing_count=outgoing_counts[node.node_id],
-            incoming_confidence=incoming_confidence.get(node.node_id, NO_ORDERING_CONFIDENCE),
-            outgoing_confidence=outgoing_confidence.get(node.node_id, NO_ORDERING_CONFIDENCE),
+            incoming_confidence=incoming_confidence.get(
+                node.node_id, NO_ORDERING_CONFIDENCE
+            ),
+            outgoing_confidence=outgoing_confidence.get(
+                node.node_id, NO_ORDERING_CONFIDENCE
+            ),
         )
         for node in source_anchors
     }
@@ -3458,7 +4050,9 @@ def ordered_anchor_record(
 
 def fetch_document_records(connection: sqlite3.Connection) -> list[dict[str, object]]:
     """Return document records in projection-friendly form."""
-    rows = connection.execute("SELECT id, path, title, kind, created_at FROM documents ORDER BY id").fetchall()
+    rows = connection.execute(
+        "SELECT id, path, title, kind, created_at FROM documents ORDER BY id"
+    ).fetchall()
     return [
         {
             "document_id": str(row["id"]),
@@ -3476,11 +4070,14 @@ def source_anchor_nodes(nodes: Sequence[Node]) -> tuple[Node, ...]:
     return tuple(
         node
         for node in nodes
-        if node.layer == "form" and node.kind in {"section", "paragraph", "sentence", "edu"}
+        if node.layer == "form"
+        and node.kind in {"section", "paragraph", "sentence", "edu"}
     )
 
 
-def build_projection_views(connection: sqlite3.Connection, profile: str) -> tuple[ProjectionView, ...]:
+def build_projection_views(
+    connection: sqlite3.Connection, profile: str
+) -> tuple[ProjectionView, ...]:
     """Build derived macro prose views over canonical graph anchors."""
     paragraphs = fetch_nodes(connection, layer="form", kind="paragraph")
     sentences = fetch_nodes(connection, layer="form", kind="sentence")
@@ -3502,7 +4099,9 @@ def build_projection_views(connection: sqlite3.Connection, profile: str) -> tupl
         role = str(phase_by_paragraph.get(paragraph.node_id, paragraph).label)
         sentence_ids = sentences_by_paragraph.get(paragraph.node_id, [])
         members = tuple([paragraph.node_id, *sentence_ids])
-        format_evidence = projection_format_evidence(connection, paragraph, members, role)
+        format_evidence = projection_format_evidence(
+            connection, paragraph, members, role
+        )
         recommended_format, format_reason = presentation_recommendation(format_evidence)
         views.append(
             ProjectionView(
@@ -3542,14 +4141,24 @@ def projection_format_evidence(
     member_set = set(members)
     incident_edges = incident_edges_for_members(connection, members)
     derived_nodes = derived_nodes_for_members(connection, members)
-    feature_nodes, feature_edge_ids = presentation_features_for_members(connection, members)
+    feature_nodes, feature_edge_ids = presentation_features_for_members(
+        connection, members
+    )
     return ProjectionFormatEvidence(
         member_anchor_ids=tuple(members),
         role=role,
         presentation_features=tuple(sorted({node.label for node in feature_nodes})),
         presentation_feature_edges=tuple(sorted(feature_edge_ids)),
-        derived_layers=tuple(sorted({node.layer for node in derived_nodes if node.node_id not in member_set})),
-        derived_kinds=tuple(sorted({node.kind for node in derived_nodes if node.node_id not in member_set})),
+        derived_layers=tuple(
+            sorted(
+                {node.layer for node in derived_nodes if node.node_id not in member_set}
+            )
+        ),
+        derived_kinds=tuple(
+            sorted(
+                {node.kind for node in derived_nodes if node.node_id not in member_set}
+            )
+        ),
         edge_layers=tuple(sorted({edge.layer for edge in incident_edges})),
         edge_kinds=tuple(sorted({edge.kind for edge in incident_edges})),
     )
@@ -3568,10 +4177,16 @@ def presentation_features_for_members(
             feature_edge_ids.append(edge.edge_id)
     if not feature_ids:
         return (), []
-    return tuple(node for node in fetch_nodes(connection, layer="presentation", kind="feature") if node.node_id in feature_ids), feature_edge_ids
+    return tuple(
+        node
+        for node in fetch_nodes(connection, layer="presentation", kind="feature")
+        if node.node_id in feature_ids
+    ), feature_edge_ids
 
 
-def incident_edges_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> tuple[Edge, ...]:
+def incident_edges_for_members(
+    connection: sqlite3.Connection, members: Sequence[str]
+) -> tuple[Edge, ...]:
     """Return graph edges touching one projection member set."""
     if not members:
         return ()
@@ -3601,7 +4216,9 @@ def edge_from_row(row: sqlite3.Row) -> Edge:
     )
 
 
-def derived_nodes_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> tuple[Node, ...]:
+def derived_nodes_for_members(
+    connection: sqlite3.Connection, members: Sequence[str]
+) -> tuple[Node, ...]:
     """Return source and analysis nodes derived from one projection member set."""
     member_set = set(members)
     output: list[Node] = []
@@ -3645,7 +4262,9 @@ def has_formula_signal(text: str) -> bool:
     )
 
 
-def basis_edges_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> list[str]:
+def basis_edges_for_members(
+    connection: sqlite3.Connection, members: Sequence[str]
+) -> list[str]:
     """Return relation ids that support one projection view."""
     if not members:
         return []
@@ -3743,7 +4362,11 @@ def skill_handoffs(profile: str, db_path: Path) -> list[dict[str, object]]:
         "logic": ("logic-gap-review", "$academic-writing"),
         "experiment": ("$experiment-lifecycle", "$report-writing"),
         "report": ("$report-writing", "$result-artifact-writeout"),
-        "academic": ("$academic-writing", "logic-gap-review", "citation-evidence-review"),
+        "academic": (
+            "$academic-writing",
+            "logic-gap-review",
+            "citation-evidence-review",
+        ),
         "paper": ("$paper-writing", "citation-evidence-review", "logic-gap-review"),
         "all": SKILL_HANDOFF_TARGETS,
     }
@@ -3786,26 +4409,40 @@ def command_outline(args: argparse.Namespace) -> int:
         lines.append(f"- paragraph `{paragraph.node_id}`: {paragraph.label}")
     lines.append("")
     write_output(cast(Path, args.out), "\n".join(lines))
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_OUTLINE", {"PROSE_REASONING_GRAPH_OUTLINE_PATH": str(args.out)})
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_OUTLINE",
+        {"PROSE_REASONING_GRAPH_OUTLINE_PATH": str(args.out)},
+    )
     return 0
 
 
 def command_explain(args: argparse.Namespace) -> int:
     """Run explain command."""
     with connect(cast(Path, args.db)) as connection:
-        text = render_explanation(connection, cast(str, args.profile), cast(Path, args.db))
+        text = render_explanation(
+            connection, cast(str, args.profile), cast(Path, args.db)
+        )
     write_output(cast(Path, args.out), text)
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_EXPLAIN", {"PROSE_REASONING_GRAPH_EXPLANATION": str(args.out)})
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_EXPLAIN",
+        {"PROSE_REASONING_GRAPH_EXPLANATION": str(args.out)},
+    )
     return 0
 
 
-def render_explanation(connection: sqlite3.Connection, profile: str, db_path: Path) -> str:
+def render_explanation(
+    connection: sqlite3.Connection, profile: str, db_path: Path
+) -> str:
     """Render graph explanation Markdown."""
     counts = layer_counts(connection)
     claims = fetch_nodes(connection, layer="argument", kind="claim")
     diagnostics = fetch_diagnostics(connection)
     operations = fetch_operations(connection)
-    discourse_edges = [edge for edge in fetch_edges(connection) if edge.layer == "discourse"]
+    discourse_edges = [
+        edge for edge in fetch_edges(connection) if edge.layer == "discourse"
+    ]
     lines = [
         "# Prose Reasoning Graph Explanation",
         "",
@@ -3843,7 +4480,9 @@ def render_explanation(connection: sqlite3.Connection, profile: str, db_path: Pa
         lines.append("- No graph diagnostics recorded.")
     lines.extend(["", "## Recommended Next Edits", ""])
     for operation in operations[:EXPLANATION_OPERATION_LIMIT]:
-        lines.append(f"1. `{operation.operation_id}` `{operation.kind}`: {operation.reason}")
+        lines.append(
+            f"1. `{operation.operation_id}` `{operation.kind}`: {operation.reason}"
+        )
     if not operations:
         lines.append("1. No edit operations recorded.")
     lines.extend(
@@ -3903,7 +4542,11 @@ def render_integration_plan(connection: sqlite3.Connection, profile: str) -> str
 
 def render_verification_routes(diagnostics: Sequence[Diagnostic]) -> list[str]:
     """Render verification routes for uncertain logic, evidence, or connections."""
-    routed = [diagnostic for diagnostic in diagnostics if diagnostic.action.get("verification_route")]
+    routed = [
+        diagnostic
+        for diagnostic in diagnostics
+        if diagnostic.action.get("verification_route")
+    ]
     lines = ["", "## Verification Routes", ""]
     if not routed:
         lines.append("No verification routes recorded.")
@@ -3924,7 +4567,9 @@ def render_verification_routes(diagnostics: Sequence[Diagnostic]) -> list[str]:
                 f"- evidence_required: {format_list(evidence_required)}",
             ]
         )
-        lines.extend(format_recursive_verification(action.get("recursive_verification")))
+        lines.extend(
+            format_recursive_verification(action.get("recursive_verification"))
+        )
         lines.append("")
     return lines
 
@@ -3995,8 +4640,12 @@ def command_rewrite_packet(args: argparse.Namespace) -> int:
 def fetch_operation(connection: sqlite3.Connection, operation_id: str) -> EditOperation:
     """Fetch one operation."""
     if not table_exists(connection, "edit_operations"):
-        raise ValueError("graph DB has no edit_operations table; run analyze on an ingest DB before rewrite-packet")
-    row = connection.execute("SELECT * FROM edit_operations WHERE id = ?", (operation_id,)).fetchone()
+        raise ValueError(
+            "graph DB has no edit_operations table; run analyze on an ingest DB before rewrite-packet"
+        )
+    row = connection.execute(
+        "SELECT * FROM edit_operations WHERE id = ?", (operation_id,)
+    ).fetchone()
     if row is None:
         raise ValueError(f"missing edit operation: {operation_id}")
     target_ids = json.loads(str(row["target_ids_json"]))
@@ -4012,7 +4661,9 @@ def fetch_operation(connection: sqlite3.Connection, operation_id: str) -> EditOp
 def render_rewrite_packet(operation: EditOperation) -> str:
     """Render LLM rewrite packet Markdown."""
     targets = ", ".join(f"`{target}`" for target in operation.target_ids)
-    payload_lines = "\n".join(f"- {key}: {value}" for key, value in operation.payload.items())
+    payload_lines = "\n".join(
+        f"- {key}: {value}" for key, value in operation.payload.items()
+    )
     return "\n".join(
         [
             "# Prose Reasoning Graph Rewrite Packet",
@@ -4067,6 +4718,10 @@ def command_check_document(args: argparse.Namespace) -> int:
     inventory_json = structured_inventory_path(args, repo_root)
     prompt_text = prompt_context(args)
     source_text = input_path.read_text(encoding="utf-8")
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        repo_root,
+        ((input_path, source_text),),
+    )
     local_llm_ir = local_llm_prose_ir_payload(args, [input_path], prompt_text, db_path)
     corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
 
@@ -4081,6 +4736,7 @@ def command_check_document(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -4098,6 +4754,10 @@ def command_check_document(args: argparse.Namespace) -> int:
             document_id="doc:1",
             source_node_id="src:1",
             kind=cast(str, args.kind),
+            dependency_records=graph_records.get(
+                graph_source_path(repo_root, input_path),
+                (),
+            ),
         )
         clear_analysis(connection)
         analyze_graph(connection, cast(str, args.profile))
@@ -4109,10 +4769,20 @@ def command_check_document(args: argparse.Namespace) -> int:
         )
         diagnostics = fetch_diagnostics(connection)
         operations = fetch_operations(connection)
-        prose_diagnostics = tuple(item for item in diagnostics if item.layer != "document-canon")
-        write_output(diagnostics_path, render_diagnostics(connection, cast(str, args.profile)))
-        write_output(explanation_path, render_explanation(connection, cast(str, args.profile), db_path))
-        write_output(integration_path, render_integration_plan(connection, cast(str, args.profile)))
+        prose_diagnostics = tuple(
+            item for item in diagnostics if item.layer != "document-canon"
+        )
+        write_output(
+            diagnostics_path, render_diagnostics(connection, cast(str, args.profile))
+        )
+        write_output(
+            explanation_path,
+            render_explanation(connection, cast(str, args.profile), db_path),
+        )
+        write_output(
+            integration_path,
+            render_integration_plan(connection, cast(str, args.profile)),
+        )
 
     write_output(handoff_path, render_skill_handoff(cast(str, args.profile), db_path))
     write_output(
@@ -4143,10 +4813,14 @@ def command_check_document(args: argparse.Namespace) -> int:
             "PROSE_REASONING_GRAPH_INTEGRATION_PLAN": str(integration_path),
             "PROSE_REASONING_GRAPH_SKILL_HANDOFF": str(handoff_path),
             "PROSE_REASONING_GRAPH_STRUCTURED_ANALYSIS_INVENTORY": str(inventory_json),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(
+                local_llm_ir.get("artifact_path", "")
+            ),
             "PROSE_REASONING_GRAPH_PROSE_DIAGNOSTICS": len(prose_diagnostics),
             "PROSE_REASONING_GRAPH_EDIT_OPERATIONS": len(operations),
-            "PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS": len(document_canon_findings),
+            "PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS": len(
+                document_canon_findings
+            ),
         },
     )
     return 0
@@ -4210,7 +4884,9 @@ def structured_inventory_path(args: argparse.Namespace, repo_root: Path) -> Path
     explicit_inventory = getattr(args, "structured_inventory_json", None)
     if isinstance(explicit_inventory, Path):
         if not explicit_inventory.is_file():
-            raise ValueError(f"structured inventory JSON does not exist: {explicit_inventory}")
+            raise ValueError(
+                f"structured inventory JSON does not exist: {explicit_inventory}"
+            )
         return explicit_inventory
     return run_structured_analysis_build(repo_root, cast(str, args.structured_profile))
 
@@ -4219,7 +4895,15 @@ def run_structured_analysis_build(repo_root: Path, profile: str) -> Path:
     """Run Rust structured-analysis build and return the emitted inventory JSON."""
     cli = structured_analysis_cli(repo_root)
     result = subprocess.run(
-        [str(cli), "structured-analysis", "build", "--root", str(repo_root), "--profile", profile],
+        [
+            str(cli),
+            "structured-analysis",
+            "build",
+            "--root",
+            str(repo_root),
+            "--profile",
+            profile,
+        ],
         cwd=repo_root,
         check=False,
         capture_output=True,
@@ -4230,12 +4914,18 @@ def run_structured_analysis_build(repo_root: Path, profile: str) -> Path:
             "structured-analysis build failed: "
             f"exit={result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}"
         )
-    inventory_text = stdout_field(result.stdout, STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY)
+    inventory_text = stdout_field(
+        result.stdout, STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY
+    )
     if not inventory_text:
-        raise ValueError(f"structured-analysis build did not emit {STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY}")
+        raise ValueError(
+            f"structured-analysis build did not emit {STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY}"
+        )
     inventory_path = Path(inventory_text)
     if not inventory_path.is_file():
-        raise ValueError(f"structured-analysis inventory JSON was not created: {inventory_path}")
+        raise ValueError(
+            f"structured-analysis inventory JSON was not created: {inventory_path}"
+        )
     return inventory_path
 
 
@@ -4270,7 +4960,9 @@ def import_target_document_canon_findings(
     documents = object_list(payload.get("documents"))
     findings = object_list(payload.get("findings"))
     candidates = target_path_candidates(input_path, repo_root)
-    target_findings = [finding for finding in findings if finding_matches_target(finding, candidates)]
+    target_findings = [
+        finding for finding in findings if finding_matches_target(finding, candidates)
+    ]
     connection.execute("DELETE FROM diagnostics WHERE layer = 'document-canon'")
     connection.execute("DELETE FROM edges WHERE layer = 'document-canon'")
     connection.execute("DELETE FROM nodes WHERE layer = 'document-canon'")
@@ -4278,7 +4970,9 @@ def import_target_document_canon_findings(
     document_id = fetch_document_id(connection)
     relevant_paths = relevant_document_paths(target_findings, documents, candidates)
     path_to_node: dict[str, str] = {}
-    for index, record in enumerate(relevant_document_records(documents, relevant_paths), start=1):
+    for index, record in enumerate(
+        relevant_document_records(documents, relevant_paths), start=1
+    ):
         path = string_value(record.get("path"))
         title = string_value(record.get("title")) or path
         responsibility = string_value(record.get("responsibility")) or path
@@ -4297,7 +4991,6 @@ def import_target_document_canon_findings(
                 "path": path,
                 "title": title,
                 "responsibility": responsibility,
-                "has_dependency_manifest": bool(record.get("has_dependency_manifest")),
                 "inventory_path": str(inventory_json),
             },
         )
@@ -4388,7 +5081,11 @@ def object_list(value: object) -> list[dict[str, object]]:
     """Return a list containing only dictionary items."""
     if not isinstance(value, list):
         return []
-    return [cast(dict[str, object], item) for item in cast(list[object], value) if isinstance(item, dict)]
+    return [
+        cast(dict[str, object], item)
+        for item in cast(list[object], value)
+        if isinstance(item, dict)
+    ]
 
 
 def target_path_candidates(input_path: Path, repo_root: Path) -> set[str]:
@@ -4444,10 +5141,18 @@ def relevant_document_records(
     paths: set[str],
 ) -> list[dict[str, object]]:
     """Return document records, creating minimal records for paths absent from inventory."""
-    records = [record for record in documents if string_value(record.get("path")) in paths]
+    records = [
+        record for record in documents if string_value(record.get("path")) in paths
+    ]
     seen = {string_value(record.get("path")) for record in records}
     for path in sorted(paths - seen):
-        records.append({"path": path, "title": path, "responsibility": path, "has_dependency_manifest": False})
+        records.append(
+            {
+                "path": path,
+                "title": path,
+                "responsibility": path,
+            }
+        )
     return records
 
 
@@ -4470,7 +5175,9 @@ def document_canon_severity(kind: str) -> str:
     return "info"
 
 
-def document_canon_action(kind: str, action: str, path: str, canonical_path: str, reason: str) -> dict[str, object]:
+def document_canon_action(
+    kind: str, action: str, path: str, canonical_path: str, reason: str
+) -> dict[str, object]:
     """Return suggested-action payload for imported document-canon diagnostics."""
     if kind == "document_responsibility_gap":
         return {
@@ -4512,7 +5219,12 @@ def document_canon_action(kind: str, action: str, path: str, canonical_path: str
                 ],
             },
         }
-    return {"action": action, "path": path, "canonical_path": canonical_path, "reason": reason}
+    return {
+        "action": action,
+        "path": path,
+        "canonical_path": canonical_path,
+        "reason": reason,
+    }
 
 
 def render_document_check_report(

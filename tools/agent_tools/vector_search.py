@@ -4,6 +4,7 @@
 # responsibility Searches AgentCanon text surfaces and expands dependency-aware context.
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md operator guide for shared tools
+# upstream implementation ./graph_client.py provides verified manifest dependency facts
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tests/agent_tools/test_vector_search.py regression tests
 # @dependency-end
@@ -23,7 +24,16 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from tool_path_policy import is_retired_legacy_tool_path
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.agent_tools.graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphDependencyFact,
+)
+from tools.agent_tools.tool_path_policy import is_retired_legacy_tool_path
 
 DEFAULT_SURFACES = (
     "tools",
@@ -65,15 +75,8 @@ DEFAULT_TOP = 8
 PATH_TOKEN_WEIGHT = 2
 SNIPPET_CHARS = 180
 SCORE_DECIMAL_PLACES = 6
-HEADER_SCAN_LINES = 80
 TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
 CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
-DEPENDENCY_LINE_RE = re.compile(
-    r"^(?P<direction>upstream|downstream)\s+"
-    r"(?P<kind>design|implementation|environment)\s+"
-    r"(?P<target>\S+)(?:\s+(?P<reason>.*))?$"
-)
-SHARED_SURFACE_PARTS = frozenset({"tools", "agents", ".agents", ".codex", "mcp"})
 
 
 @dataclass(frozen=True)
@@ -101,17 +104,6 @@ class SearchHit:
             "score": round(self.score, SCORE_DECIMAL_PLACES),
             "snippet": self.snippet,
         }
-
-
-@dataclass(frozen=True)
-class DependencyEdge:
-    """One dependency-manifest edge parsed from a source file."""
-
-    direction: str
-    kind: str
-    source: str
-    target: str
-    reason: str
 
 
 @dataclass(frozen=True)
@@ -231,8 +223,8 @@ class ContextExpansion:
 class DependencyEdgeIndex:
     """Dependency edges indexed for graph expansion."""
 
-    by_source: Mapping[str, Sequence[DependencyEdge]]
-    by_target: Mapping[str, Sequence[DependencyEdge]]
+    by_source: Mapping[str, Sequence[GraphDependencyFact]]
+    by_target: Mapping[str, Sequence[GraphDependencyFact]]
 
 
 @dataclass
@@ -565,69 +557,28 @@ def search(documents: Sequence[Document], query: str, top: int) -> list[SearchHi
     return sorted(scored, key=lambda hit: (-hit.score, hit.relative_path))[:top]
 
 
-def strip_manifest_line(line: str) -> str:
-    """Strip common comment markers from a dependency-manifest line."""
-    stripped = line.rstrip("\r\n").strip()
-    for prefix in ("<!--", "#", "//", "*"):
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix) :].strip()
-    if stripped.endswith("-->"):
-        stripped = stripped[:-3].strip()
-    if stripped.startswith('"') and stripped.endswith('"'):
-        stripped = stripped[1:-1].strip()
-    return stripped.rstrip(",").strip()
-
-
-def resolve_dependency_target(root: Path, source: Document, target: str) -> str:
-    """Resolve a manifest target through root views and vendored canon source."""
-    source_parts = Path(source.relative_path).parts
-    source_context = source.path
-    if source_parts and source_parts[0] in SHARED_SURFACE_PARTS:
-        vendor_source = root / "vendor" / "agent-canon" / source.relative_path
-        if vendor_source.exists():
-            source_context = vendor_source
-    candidate = source_context.parent / target
-    return relative_path(root, candidate.resolve(strict=False))
-
-
-def parse_dependency_edges(root: Path, documents: Sequence[Document]) -> list[DependencyEdge]:
-    """Parse dependency-manifest edges from indexed documents."""
-    edges: list[DependencyEdge] = []
-    for document in documents:
-        in_manifest = False
-        for raw_line in document.text.splitlines()[:HEADER_SCAN_LINES]:
-            line = strip_manifest_line(raw_line)
-            if line == "@dependency-start":
-                in_manifest = True
-                continue
-            if line == "@dependency-end":
-                break
-            if not in_manifest:
-                continue
-            match = DEPENDENCY_LINE_RE.fullmatch(line)
-            if match is None:
-                continue
-            edges.append(
-                DependencyEdge(
-                    direction=match.group("direction"),
-                    kind=match.group("kind"),
-                    source=document.relative_path,
-                    target=resolve_dependency_target(root, document, match.group("target")),
-                    reason=match.group("reason") or "",
-                )
-            )
-    return sorted(
-        set(edges),
-        key=lambda edge: (edge.source, edge.direction, edge.kind, edge.target, edge.reason),
+def graph_dependency_edges(root: Path) -> tuple[GraphDependencyFact, ...]:
+    """Return dependency edges from one canonical graph query."""
+    response = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+        all=True,
+        relation="dependency",
+        direction="both",
+        depth=0,
     )
+    if response.status != "fresh" or response.exit_code != 0:
+        raise GraphClientError(
+            "canonical graph dependency query is unavailable: "
+            f"status={response.status} reason={response.payload.get('reason')}"
+        )
+    return response.dependency_facts
 
 
 def dependency_edge_indexes(
-    edges: Sequence[DependencyEdge],
+    edges: Sequence[GraphDependencyFact],
 ) -> DependencyEdgeIndex:
     """Index dependency edges by source and target path."""
-    by_source: dict[str, list[DependencyEdge]] = defaultdict(list)
-    by_target: dict[str, list[DependencyEdge]] = defaultdict(list)
+    by_source: dict[str, list[GraphDependencyFact]] = defaultdict(list)
+    by_target: dict[str, list[GraphDependencyFact]] = defaultdict(list)
     for edge in edges:
         by_source[edge.source].append(edge)
         by_target[edge.target].append(edge)
@@ -689,7 +640,7 @@ def dependency_frontier_step(
 
 def dependency_context_paths(
     hits: Sequence[SearchHit],
-    edges: Sequence[DependencyEdge],
+    edges: Sequence[GraphDependencyFact],
     depth: int,
     limit: int,
 ) -> tuple[ContextPath, ...]:
@@ -1006,7 +957,7 @@ def build_context_expansion(
     include_callers: bool,
 ) -> ContextExpansion:
     """Build dependency-aware context for the current search."""
-    dependency_edges = parse_dependency_edges(root, documents)
+    dependency_edges = graph_dependency_edges(root)
     path_context = dependency_context_paths(hits, dependency_edges, depth, limit)
     python_symbols = read_python_symbols(documents)
     seed_symbols = select_python_symbols(python_symbols, hits, symbols)
@@ -1084,15 +1035,20 @@ def main(argv: Sequence[str]) -> int:
     hits = search(documents, args.query, max(args.top, 0))
     context = None
     if args.context:
-        context = build_context_expansion(
-            root=root,
-            documents=documents,
-            hits=hits,
-            symbols=tuple(args.symbol),
-            depth=max(args.dependency_depth, 0),
-            limit=max(args.context_top, 0),
-            include_callers=not args.no_callers,
-        )
+        try:
+            context = build_context_expansion(
+                root=root,
+                documents=documents,
+                hits=hits,
+                symbols=tuple(args.symbol),
+                depth=max(args.dependency_depth, 0),
+                limit=max(args.context_top, 0),
+                include_callers=not args.no_callers,
+            )
+        except GraphClientError as error:
+            print("VECTOR_SEARCH=fail", file=sys.stderr)
+            print(f"VECTOR_SEARCH_ERROR=canonical-graph:{error}", file=sys.stderr)
+            return 1
     if args.format == "json":
         print_json(hits, len(documents), context)
     else:

@@ -1,926 +1,290 @@
-"""Tests for design-document claim evidence checker."""
+"""Tests for the graph-gated design claim consumer."""
 
 # @dependency-start
 # contract test
-# responsibility Tests design-document claim evidence checker behavior.
+# responsibility Tests design-document claims against canonical graph status and context evidence.
 # upstream design ../../documents/design/README.md design-document evidence policy
-# upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims
-# upstream implementation ../../tools/agent_tools/check_dependency_graph.sh provides dependency graph semantics
+# upstream implementation ../../tools/agent_tools/check_design_doc_claims.py graph-gated claim consumer
+# upstream implementation ../../tools/agent_tools/graph_client.py canonical graph adapter
 # @dependency-end
 
 from __future__ import annotations
 
+import io
 import json
-import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
 from tools.agent_tools import check_design_doc_claims as checker
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
+
+class FakeClaimConsumer:
+    """Record graph-owned operations without parsing a dependency manifest."""
+
+    def __init__(
+        self,
+        *,
+        status_reason: str | None = None,
+        supported_tokens: frozenset[str] = frozenset(),
+        metadata_error: checker.GraphClientError | None = None,
+    ) -> None:
+        """Initialize one closed graph response scenario."""
+        self._status_reason = status_reason
+        self.supported_tokens = supported_tokens
+        self.metadata_error = metadata_error
+        self.calls: list[tuple[object, ...]] = []
+
+    def status_reason(self) -> str | None:
+        """Return one prerequisite graph-state result."""
+        self.calls.append(("status_reason",))
+        return self._status_reason
+
+    def document_metadata(self, path: str) -> tuple[str, tuple[int, int]]:
+        """Return parser-owned contract/span metadata from canonical context."""
+        self.calls.append(("document_metadata", path))
+        if self.metadata_error is not None:
+            raise self.metadata_error
+        return "design", (2, 7)
+
+    def evidence_paths(
+        self, path: str, recursive_depth: int
+    ) -> tuple[set[str], set[str]]:
+        """Return a canonical dependency projection for the document."""
+        self.calls.append(("evidence_paths", path, recursive_depth))
+        return {"tools/feature.py"}, set()
+
+    def token_supported(self, path: str, token: str) -> tuple[bool, str | None]:
+        """Return exact graph context support for one token."""
+        self.calls.append(("token_supported", path, token))
+        supported = token in self.supported_tokens
+        return supported, None if supported else "graph_context_no_match"
+
+    def context(self, path: str, token: str | None = None) -> None:
+        """Reject unexpected parent-context requests in these fixtures."""
+        self.calls.append(("context", path, token))
+        raise AssertionError("parent context was not configured")
 
 
-def run_checker(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
-    """Run the checker in one fixture repo."""
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), "--root", str(root), *args],
-        cwd=PROJECT_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
+def write_design(root: Path, claim: str) -> Path:
+    """Write one design document whose manifest span is graph-owned metadata."""
+    path = root / "documents/design/feature.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            # Feature Design
+            <!--
+            @dependency-start
+            contract design
+            responsibility Documents one graph-gated fixture.
+            downstream implementation ../../tools/feature.py implementation evidence
+            @dependency-end
+            -->
+
+            ## Evidence And Assumption Ledger
+
+            - Evidence sources: `tools/feature.py`.
+            - Assumptions: canonical graph context is fresh.
+
+            ## Claims
+
+            {claim}
+            """
+        ).lstrip(),
+        encoding="utf-8",
     )
-
-
-def write(path: Path, text: str) -> None:
-    """Write a dedented fixture file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(textwrap.dedent(text).lstrip(), encoding="utf-8")
+    return path
 
 
 class DesignDocClaimCheckerTest(unittest.TestCase):
-    """Exercise deterministic design claim checks."""
+    """Exercise only the public graph-gated checker contract."""
 
-    def test_pass_claim_supported_by_direct_implementation_evidence(self) -> None:
-        """A design claim passes when dependency evidence contains the token."""
+    def invoke(
+        self,
+        root: Path,
+        consumer: FakeClaimConsumer,
+        *arguments: str,
+    ) -> tuple[int, str]:
+        """Run main with one injected canonical consumer."""
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(
+                checker.GraphClaimConsumer,
+                "load",
+                return_value=consumer,
+            ) as load,
+            redirect_stdout(stdout),
+        ):
+            return_code = checker.main(
+                ["--root", str(root), *arguments]
+            )
+        load.assert_called_once_with(root.resolve())
+        return return_code, stdout.getvalue()
+
+    def test_supported_claim_uses_metadata_dependency_and_token_context(self) -> None:
+        """One supported claim passes through the fixed graph call sequence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/feature_runner.py runner implementation
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/feature_runner.py`.
-                - Assumptions: current fixture uses direct implementation evidence.
-
-                ## Claims
-
-                - The design must route work through `run_feature`.
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                # @dependency-start
-                # responsibility Implements feature runner fixture.
-                # upstream design ../documents/design/feature.md feature design
-                # @dependency-end
-
-                def run_feature() -> None:
-                    pass
-                """,
+            write_design(root, "- The design must call `run_feature`.")
+            consumer = FakeClaimConsumer(
+                supported_tokens=frozenset({"run_feature"})
             )
 
-            result = run_checker("documents/design/feature.md", root=root)
+            return_code, output = self.invoke(
+                root, consumer, "documents/design/feature.md"
+            )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", result.stdout)
+        self.assertEqual(return_code, 0, output)
+        self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", output)
+        self.assertIn("DESIGN_DOC_CLAIMS_SUPPORTED=1", output)
+        self.assertIn("DESIGN_DOC_CLAIMS=pass", output)
+        self.assertEqual(
+            consumer.calls,
+            [
+                ("status_reason",),
+                ("document_metadata", "documents/design/feature.md"),
+                ("evidence_paths", "documents/design/feature.md", 3),
+                (
+                    "token_supported",
+                    "documents/design/feature.md",
+                    "run_feature",
+                ),
+            ],
+        )
 
-    def test_dependency_manifest_lines_are_not_claims(self) -> None:
-        """Dependency header route lines are evidence metadata, not body claims."""
+    def test_unsupported_claim_emits_graph_context_finding(self) -> None:
+        """An unmatched token remains a typed claim finding without source fallback."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                upstream implementation ../../tools/feature_runner.py runner implementation
-                downstream design sibling.md sibling design
-                @dependency-end
-                -->
+            write_design(root, "- The design must call `missing_symbol`.")
+            consumer = FakeClaimConsumer()
 
-                ## Context
-
-                Descriptive text.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "sibling.md",
-                """
-                # Sibling
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                def run_feature() -> None:
-                    pass
-                """,
+            return_code, output = self.invoke(
+                root, consumer, "documents/design/feature.md"
             )
 
-            result = run_checker("documents/design/feature.md", root=root)
+        self.assertEqual(return_code, 1)
+        self.assertIn("claim-token-without-evidence", output)
+        self.assertIn("token=missing_symbol;graph_context_no_match", output)
+        self.assertIn("DESIGN_DOC_CLAIMS=fail", output)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
-
-    def test_reference_document_prose_without_tokens_is_not_design_claim(self) -> None:
-        """Reference docs keep cue-only prose out of design-claim enforcement."""
+    def test_manifest_lines_are_excluded_by_graph_owned_span(self) -> None:
+        """Manifest route text does not become a body claim or local parser input."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "documents" / "tools" / "guide.md",
-                """
-                # Tool Guide
-                <!--
-                @dependency-start
-                contract reference
-                responsibility Documents a reference guide fixture.
-                upstream design ../README.md fixture index
-                @dependency-end
-                -->
+            write_design(root, "Descriptive text without a claim cue.")
+            consumer = FakeClaimConsumer()
 
-                This guide must preserve reader flow.
-                """,
-            )
-            write(
-                root / "documents" / "README.md",
-                """
-                # Docs
-                """,
+            return_code, output = self.invoke(
+                root, consumer, "documents/design/feature.md"
             )
 
-            result = run_checker("documents/tools/guide.md", root=root)
+        self.assertEqual(return_code, 0, output)
+        self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", output)
+        self.assertFalse(
+            any(call[0] == "token_supported" for call in consumer.calls)
+        )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
-
-    def test_reference_document_placeholder_token_is_not_design_claim(self) -> None:
-        """Ellipsis placeholders document command families without exact evidence."""
+    def test_nonfresh_status_suppresses_every_context_operation(self) -> None:
+        """A nonfresh graph yields one blocker and no partial claim result."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "documents" / "tools" / "guide.md",
-                """
-                # Tool Guide
-                <!--
-                @dependency-start
-                contract reference
-                responsibility Documents a reference guide fixture.
-                upstream design ../README.md fixture index
-                @dependency-end
-                -->
-
-                Use `agent-canon semantic-index ...` for the command family.
-                """,
+            write_design(root, "- The design must call `run_feature`.")
+            consumer = FakeClaimConsumer(
+                status_reason="graph_status:stale;reason=fingerprint"
             )
-            write(root / "documents" / "README.md", "# Docs\n")
 
-            result = run_checker("documents/tools/guide.md", root=root)
+            return_code, output = self.invoke(
+                root, consumer, "documents/design/feature.md"
+            )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
+        self.assertEqual(return_code, 1)
+        self.assertIn("graph-integration-unverified", output)
+        self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", output)
+        self.assertEqual(consumer.calls, [("status_reason",)])
 
-    def test_relative_parent_path_token_resolves_to_repo_path(self) -> None:
-        """Parent-relative Markdown path tokens resolve from the claim file."""
+    def test_integration_record_must_match_status_fingerprints(self) -> None:
+        """Fresh status alone cannot authorize claim evaluation."""
+        payload: dict[str, object] = {
+            "input_fingerprint": "status-input",
+            "graph_fingerprint": "status-graph",
+            "integration_record": {
+                "schema": "agent-canon.graph.integration.v1",
+                "root": ".",
+                "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
+                "schema_version": "graph_storage_core.v1",
+                "profile": "default",
+                "source_snapshot_profile": "parent",
+                "snapshot_head": "0123456789abcdef",
+                "input_fingerprint": "different-input",
+                "graph_fingerprint": "status-graph",
+                "producer_artifacts": [],
+                "verified": True,
+                "verification_code": "graph.integration.verified",
+            },
+        }
+        response = checker.GraphResponse(
+            schema="agent-canon.graph.status.v1",
+            command="status",
+            status="fresh",
+            payload=payload,
+            exit_code=0,
+        )
+        consumer = checker.GraphClaimConsumer(mock.Mock(), response)
+
+        self.assertEqual(
+            consumer.status_reason(),
+            "graph_status:invalid;reason=integration-input_fingerprint-mismatch",
+        )
+
+    def test_context_transport_failure_suppresses_claim_output(self) -> None:
+        """A typed adapter error becomes one graph-unavailable result."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "tools" / "README.md",
-                """
-                # Tools
-                <!--
-                @dependency-start
-                contract reference
-                responsibility Documents tool guide fixture.
-                upstream design ../documents/contract.md fixture contract
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `../documents/contract.md`.
-                - Assumptions: relative paths are operator-facing links.
-
-                The reader guide points to `../documents/contract.md`.
-                """,
+            write_design(root, "- The design must call `run_feature`.")
+            consumer = FakeClaimConsumer(
+                metadata_error=checker.GraphClientError("malformed context")
             )
-            write(root / "documents" / "contract.md", "# Contract\n")
 
-            result = run_checker("tools/README.md", root=root)
+            return_code, output = self.invoke(
+                root, consumer, "documents/design/feature.md"
+            )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+        self.assertEqual(return_code, 1)
+        self.assertIn("graph-context:malformed context", output)
+        self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", output)
+        self.assertFalse(
+            any(call[0] == "token_supported" for call in consumer.calls)
+        )
 
-    def test_fail_parent_relative_path_token_does_not_collapse_to_repo_root(self) -> None:
-        """Parent-relative path claims do not fall back to unrelated root files."""
+    def test_json_output_is_canonical_result_projection(self) -> None:
+        """JSON output reports graph evidence paths without embedding graph transport."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            write(
-                root / "documents" / "tools" / "guide.md",
-                """
-                # Tool Guide
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents nested tool guide fixture.
-                upstream design ../README.md fixture docs index
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `../README.md`.
-                - Assumptions: parent-relative links are resolved from the guide.
-
-                The guide must read `../README.md`.
-                """,
-            )
-            write(root / "README.md", "# Root Docs\n")
-
-            result = run_checker("documents/tools/guide.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=../README.md", result.stdout)
-
-    def test_dot_relative_path_token_resolves_from_claim_document(self) -> None:
-        """Dot-relative paths resolve from the claim document directory."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `./evidence.md`.
-                - Assumptions: dot-relative paths use the claim document context.
-
-                ## Claims
-
-                - The design reads `./evidence.md`.
-                """,
-            )
-            write(root / "documents" / "design" / "evidence.md", "# Evidence\n")
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-
-    def test_missing_dot_relative_path_is_not_supported_by_root_file(self) -> None:
-        """A missing dot-relative path remains a strict claim finding."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: current implementation.
-                - Assumptions: a missing dot-relative path is unsupported.
-
-                ## Claims
-
-                - The design reads `./missing.md`.
-                """,
-            )
-            write(root / "missing.md", "# Unrelated root file\n")
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=./missing.md", result.stdout)
-
-    def test_math_set_difference_requires_evidence_without_path_resolution(self) -> None:
-        """Math notation is evidence-checked and never treated as a path."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/evidence.py evidence fixture
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/evidence.py`.
-                - Assumptions: set difference is a defined notation.
-
-                ## Claims
-
-                - The design preserves `P(S)\\setminus E_src(S)`.
-                """,
-            )
-            write(
-                root / "tools" / "evidence.py",
-                """
-                # @dependency-start
-                # responsibility Provides math evidence.
-                # @dependency-end
-
-                notation = "P(S)\\setminus E_src(S)"
-                """,
+            write_design(root, "- The design must call `run_feature`.")
+            consumer = FakeClaimConsumer(
+                supported_tokens=frozenset({"run_feature"})
             )
 
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("Traceback", result.stdout + result.stderr)
-
-    def test_math_set_difference_without_evidence_remains_strict(self) -> None:
-        """Unknown math notation does not auto-pass a strict claim."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/evidence.py evidence fixture
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/evidence.py`.
-                - Assumptions: unknown set notation still needs evidence.
-
-                ## Claims
-
-                - The design preserves `P(S)\\setminus Unknown(S)`.
-                """,
-            )
-            write(root / "tools" / "evidence.py", "known = True\n")
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertNotIn("Traceback", result.stdout + result.stderr)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("P(S)\\setminus Unknown(S)", result.stdout)
-
-    def test_relative_wildcard_path_uses_claim_document_context(self) -> None:
-        """Wildcard path support remains bounded to the claim document context."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: current implementation.
-                - Assumptions: wildcard paths stay claim-relative.
-
-                ## Claims
-
-                - The design scans `./evidence-*.md`.
-                """,
-            )
-            write(root / "documents" / "design" / "evidence-one.md", "# Evidence\n")
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-
-    def test_invalid_os_path_emits_typed_finding_without_traceback(self) -> None:
-        """An invalid filesystem token is reported instead of escaping the checker."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            invalid_token = "tools/\x00invalid"
-            write(
-                root / "documents" / "design" / "feature.md",
-                f"""
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: current implementation.
-                - Assumptions: invalid paths remain typed findings.
-
-                ## Claims
-
-                - The design reads `{invalid_token}`.
-                """,
+            return_code, output = self.invoke(
+                root,
+                consumer,
+                "--format",
+                "json",
+                "documents/design/feature.md",
             )
 
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertNotIn("Traceback", result.stdout + result.stderr)
-            self.assertIn("unsupported-reference:path-invalid", result.stdout)
-
-    def test_glob_oserror_emits_typed_claim_finding(self) -> None:
-        """A filesystem OSError becomes the selected typed claim finding."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            claim = checker.Claim(
-                path="documents/design/feature.md",
-                line=17,
-                text="- The design reads `./*.md`.",
-                tokens=("./*.md",),
-            )
-
-            with mock.patch.object(
-                checker.glob,
-                "glob",
-                side_effect=OSError("injected glob failure"),
-            ):
-                supported, findings = checker.check_claim_support(
-                    root,
-                    (claim,),
-                    {},
-                )
-
-            self.assertEqual(supported, 0)
-            self.assertEqual(
-                findings,
-                [
-                    checker.Finding(
-                        kind="claim-token-without-evidence",
-                        path=claim.path,
-                        line=claim.line,
-                        detail=(
-                            "token=./*.md;"
-                            "unsupported-reference:path-invalid:./*.md"
-                        ),
-                    )
-                ],
-            )
-
-    def test_wildcard_and_status_tokens_can_be_supported_by_evidence(self) -> None:
-        """Wildcard and key-value status tokens match implementation evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/feature_runner.py runner implementation
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/feature_runner.py`.
-                - Assumptions: wildcard and status tokens describe emitted output.
-
-                ## Claims
-
-                - The design records `TOKEN_FOOTPRINT_*`.
-                - The loop can record `goal_status: blocked`.
-                - The comparator emits `NEXT_ACTION=repair_skill_workflow_prompt`.
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                TOKEN_FOOTPRINT_COMPARISON = "pass"
-                goal_status = "blocked"
-                print(f"NEXT_ACTION={repair_skill_workflow_prompt}")
-                """,
-            )
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-
-    def test_python_key_value_token_requires_same_record_evidence(self) -> None:
-        """Python-compatible lower-case key/value tokens stay same-record strict."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/feature_runner.py runner implementation
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/feature_runner.py`.
-                - Assumptions: Python-compatible key/value tokens are records.
-
-                ## Claims
-
-                - The loop can emit `status=blocked`.
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                status = "ready"
-                message = "worker blocked on an unrelated condition"
-                """,
-            )
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=status=blocked", result.stdout)
-
-    def test_fail_key_value_token_requires_same_record_evidence(self) -> None:
-        """A key and value in separate evidence records do not support a pair claim."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/feature_runner.py runner implementation
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/feature_runner.py`.
-                - Assumptions: status tokens must describe emitted output records.
-
-                ## Claims
-
-                - The loop can record `goal_status: blocked`.
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                goal_status = "ready"
-                message = "worker blocked on unrelated condition"
-                """,
-            )
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=goal_status: blocked", result.stdout)
-
-    def test_fail_claim_without_evidence_after_recursive_expansion(self) -> None:
-        """A missing token remains visible after recursive header expansion."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "child.md",
-                """
-                # Child Design
-                <!--
-                @dependency-start
-                responsibility Documents Child Design fixture.
-                upstream design parent.md parent design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `parent.md`.
-                - Assumptions: recursive parent design provides the context.
-
-                ## Claims
-
-                - The design must call `missing_symbol`.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "parent.md",
-                """
-                # Parent Design
-                <!--
-                @dependency-start
-                responsibility Documents Parent Design fixture.
-                downstream design child.md child design
-                @dependency-end
-                -->
-
-                Parent text mentions `other_symbol`.
-                """,
-            )
-
-            result = run_checker("documents/design/child.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=missing_symbol", result.stdout)
-
-    def test_fail_natural_language_claim_without_checkable_token(self) -> None:
-        """A modal claim line needs a checkable evidence token."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                upstream design parent.md parent design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: parent design.
-                - Assumptions: current fixture exercises prose-only claims.
-
-                ## Claims
-
-                - The design must preserve the behavior.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "parent.md",
-                """
-                # Parent
-                <!--
-                @dependency-start
-                responsibility Documents Parent fixture.
-                downstream design feature.md feature design
-                @dependency-end
-                -->
-                """,
-            )
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-without-checkable-token", result.stdout)
-
-    def test_fail_missing_explicit_design_path(self) -> None:
-        """An explicit missing design path is reported as a finding."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-
-            result = run_checker("documents/design/missing.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("design-document-unresolved", result.stdout)
-
-    def test_recursive_dependency_evidence_supports_claim(self) -> None:
-        """A transitive implementation dependency can support a child claim."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "child.md",
-                """
-                # Child Design
-                <!--
-                @dependency-start
-                responsibility Documents Child Design fixture.
-                upstream design parent.md parent design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `parent.md` and `tools/engine.py`.
-                - Assumptions: recursive dependency expansion reaches implementation evidence.
-
-                ## Claims
-
-                - The design must call `engine_step`.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "parent.md",
-                """
-                # Parent Design
-                <!--
-                @dependency-start
-                responsibility Documents Parent Design fixture.
-                downstream design child.md child design
-                downstream implementation ../../tools/engine.py engine implementation
-                @dependency-end
-                -->
-                """,
-            )
-            write(
-                root / "tools" / "engine.py",
-                """
-                # @dependency-start
-                # responsibility Implements engine fixture.
-                # upstream design ../documents/design/parent.md parent design
-                # @dependency-end
-
-                def engine_step() -> None:
-                    pass
-                """,
-            )
-
-            result = run_checker("documents/design/child.md", root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
-
-    def test_parent_design_contradiction_is_reported(self) -> None:
-        """Opposite modal polarity over the same code token is a finding."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "child.md",
-                """
-                # Child Design
-                <!--
-                @dependency-start
-                responsibility Documents Child Design fixture.
-                upstream design parent.md parent design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `parent.md`.
-                - Assumptions: child keeps parent-doc alignment evidence.
-
-                ## Claims
-
-                - The design must use `legacy_route`.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "parent.md",
-                """
-                # Parent Design
-                <!--
-                @dependency-start
-                responsibility Documents Parent Design fixture.
-                downstream design child.md child design
-                @dependency-end
-                -->
-
-                - The parent design must not use `legacy_route`.
-                """,
-            )
-
-            result = run_checker("documents/design/child.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("parent-document-contradiction", result.stdout)
-            self.assertIn("token=legacy_route", result.stdout)
-
-    def test_implicit_assumption_term_requires_ledger_entry(self) -> None:
-        """DSL and standard-form terms are tracked through the assumption ledger."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "dsl.md",
-                """
-                # DSL Design
-                <!--
-                @dependency-start
-                responsibility Documents DSL Design fixture.
-                upstream design parent.md parent design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `parent.md`.
-                - Assumptions: standard form is inherited from the parent design.
-
-                ## Claims
-
-                - The design maps the DSL into the problem standard form.
-                """,
-            )
-            write(
-                root / "documents" / "design" / "parent.md",
-                """
-                # Parent Design
-                <!--
-                @dependency-start
-                responsibility Documents Parent Design fixture.
-                downstream design dsl.md child design
-                @dependency-end
-                -->
-                """,
-            )
-
-            result = run_checker("documents/design/dsl.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("implicit-assumption-term-untracked", result.stdout)
-            self.assertIn("term=DSL", result.stdout)
-
-    def test_reports_path_is_not_used_as_manifest_evidence(self) -> None:
-        """Generated report paths stay outside dependency evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../reports/generated.py generated report
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: current implementation.
-                - Assumptions: generated reports are review artifacts.
-
-                ## Claims
-
-                - The design must call `generated_only`.
-                """,
-            )
-            write(
-                root / "reports" / "generated.py",
-                """
-                def generated_only() -> None:
-                    pass
-                """,
-            )
-
-            result = run_checker("documents/design/feature.md", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-
-    def test_json_output_is_stable(self) -> None:
-        """JSON output exposes machine-readable result shape."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                @dependency-end
-                -->
-                """,
-            )
-
-            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
-            payload = json.loads(result.stdout)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(payload["status"], "pass")
-            self.assertEqual(payload["finding_count"], 0)
+        self.assertEqual(return_code, 0, output)
+        payload = json.loads(output)
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["finding_count"], 0)
+        self.assertEqual(
+            payload["documents"][0]["evidence_paths"], ["tools/feature.py"]
+        )
 
 
 if __name__ == "__main__":

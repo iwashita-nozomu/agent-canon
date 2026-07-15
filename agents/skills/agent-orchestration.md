@@ -108,10 +108,15 @@ mode の意味:
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
 - PR を作る task では、同じ routing 宣言と `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
+- `run.active_design_packet` の approved 4-entry value と、その value を一度だけ
+  `create_run_bundle` へ渡す producer route
 - `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` と typed parent-packet selection による implementer routing
 - `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
 - nested subagent が必要な場合は、`run.delegated_spawn_policy` に owner、child role、入力 packet、expected output、dependency-expanded handoff scope、validation route、review gate を載せます
-- parallel write が要るなら file 単位の write-scope 方針
+- approved design が一つの replaceable responsibility unit を宣言するときは、
+  source、consumer、projection、docs、reverse edge、cleanup を dependency order で
+  一人の write-capable implementer に渡す。file / finding / test / review-area split は
+ せず、actual write conflict または unresolved predecessor だけを split blocker にする
 
 ## Workflow Family Mapping
 
@@ -187,6 +192,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - coding / implementation / patch / doc-edit work を求める repo-changing task は、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator / integrator として、handoff packet、起動、追加指示、統合、review / validation gate を所有します。
+- handoff は manifest-selected `run.active_design_packet` の Abstract Design Frame、
+  Implementation Source Packet、Design Side-Effect Map、
+  Design-To-Implementation Trace を一つの typed value として引用します。run bundle
+  publication は `create_run_bundle` にだけ委譲し、orchestrator-local packet parser や
+  partial writer を作りません。
 - Runtime authorization や tool gate で write-capable subagent を起動できない場合は、local/tool context に `WRITE_SUBAGENT_AUTHORIZATION=required` または `write_capable_handoff_blocker=<gate>`、`selected_agent_type`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。parent-direct 実装へ進める route は、`PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` 付き revised workflow route です。
 - Routine docs / Focused code でも implementation / patch / doc-edit work なら write-capable handoff first を既定にします。parent-direct は risk class、check matrix、owner boundary、targeted validation、exception rationale が実装前に記録された場合だけ使います。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope が揃った低リスク slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。

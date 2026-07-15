@@ -5,6 +5,7 @@
 # upstream design ../../agents/templates/workflow_monitoring.md stores run evidence
 # upstream design ../../agents/workflows/token-efficient-codex-workflow.md defines token comparison protocol
 # upstream implementation ./workflow_monitor.py appends monitoring evidence
+# downstream implementation ./generate_agent_runtime_dashboard.py joins canonical token footprints
 # downstream implementation ../../tests/agent_tools/test_compare_codex_token_footprints.py tests it
 # @dependency-end
 """Compare two Codex session token footprints and emit deterministic evidence."""
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from workflow_monitor import append_monitoring
+from workflow_monitor import MonitoringEntries, append_monitoring
 
 TARGET_RATIO = 0.5
 DEFAULT_MOVING_AVERAGE_WINDOW = 5
@@ -368,22 +369,24 @@ def append_report_dir(report_dir: Path, baseline: TokenFootprint, candidate: Tok
     status = comparison_status(candidate, baseline)
     append_monitoring(
         report_dir,
-        behavior_events=[
-            (
+        MonitoringEntries(
+            behavior_events=(
                 "token_efficiency_protocol=active "
                 "token_footprint_comparison="
                 f"{status} baseline_total={baseline.total_tokens} "
                 f"candidate_total={candidate.total_tokens} "
                 f"token_ratio={value:.3f} target_ratio={TARGET_RATIO:.3f}"
+                ,
             ),
-        ],
-        interventions=[
-            (
+            interventions=(
                 "token footprint measured from Codex session logs "
                 f"baseline={baseline.session_file.name} "
                 f"candidate={candidate.session_file.name}"
+                ,
             ),
-        ],
+            responsibility_unit_id=report_dir.name,
+            token_footprint_ref=candidate.session_file.resolve().as_posix(),
+        ),
     )
 
 

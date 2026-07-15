@@ -57,9 +57,9 @@ body/PR body records why an eval would not be meaningful.
 
 ## Empirical Scenario Protocol
 
-The parent owns empirical skill evaluation. Parent Iteration 0 freezes three
-answer-free Scenario Packets: generated `full`, generated `changed`, and a
-supplied-TSV hold-out. Every packet must include the full Prompt Under Test
+The parent owns empirical skill evaluation. Parent Iteration 0 freezes two
+answer-free Scenario Packets: canonical-graph `full` and `changed`. Every
+packet must include the full Prompt Under Test
 text and path, Canonical Target Files, Prompt Dependency Files, the frozen
 scenario, the requirements/checklist, the method, and the fixed report grammar.
 It must not include an expected command, expected artifacts, an answer, prior
@@ -119,10 +119,9 @@ route requirements are:
 
 - `full` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
 - `changed` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
-- supplied TSV uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json`. A supplied scenario may replace only the values after `--graph-tsv` and `--bundle-dir`.
-- `--json` is invalid. `check_dependency_graph.sh` owns dependency pass/fail
-  authority. The renderer invokes that checker in generated mode and owns the
-  six projections; supplied-TSV checker status is `not_run`.
+- `--json` is invalid. The canonical graph owns dependency status and facts.
+  The renderer performs one typed query and owns the six projections; no
+  supplied-input or parser fallback exists.
 - The bundle contains exactly `dependency_graph.tsv`,
   `dependency_graph.ir.json`, `dependency_graph.md`, `dependency_graph.dot`,
   `dependency_graph.html`, and `manifest.json`.

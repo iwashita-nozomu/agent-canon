@@ -161,16 +161,16 @@ environment surfaces before an agent treats the repo as ready.
 directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
-`render_dependency_manifest_graph.py` turns a dependency graph TSV from
-`check_dependency_graph.sh --graph-tsv` into a repo-local Graph IR JSON,
+`render_dependency_manifest_graph.py` turns one canonical dependency query into
+a review-only TSV, repo-local Graph IR JSON,
 Markdown, DOT, and a single-file HTML Graph Workbench with a Voronoi-style code
 territory map, complete static graph map, dependency tables, inferred directory
 containment table, and filtered exploration. It is the dependency-manifest
-adapter for the shared graph visualization DSL; `check_dependency_graph.sh`
-keeps dependency validation authority.
+adapter for the shared graph visualization DSL; the canonical graph keeps fact
+and status authority.
 `check_design_doc_claims.py` compares design-document claim tokens with
-dependency-header closure, implementation text, and upstream parent design
-documents. Use it before accepting implementation-backed design prose or route
+bounded graph context and upstream parent evidence returned by that graph. Use
+it before accepting implementation-backed design prose or route
 it through `run_repo_dependency_review.sh --check-design-doc-claims`.
 `classify_path_risk.py` maps changed paths to runtime profiles and targeted
 validation checks; the manual GitHub smoke workflow uses the same classifier.
@@ -914,13 +914,14 @@ eval entry instead of adding a parallel duplicate-target eval.
 
 ## Dependency Manifest Tools
 
-Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
+Dependency manifest checks live under `tools/agent_tools/` as thin canonical
+graph consumers.
 
 - `scan_code_dependencies.sh` extracts code dependency edges from imports, local includes, and shell `source` statements. This is not a dependency header tool.
-- `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
-- `check_dependency_header_format.sh` validates manifest syntax, relative paths, dependency kinds, registered contract kinds, and target existence.
-- `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
-- `check_dependency_graph.sh --cycle-report-only` reports existing cycle debt without failing; pair it with `--graph-tsv` and a rendered graph report.
+- `scan_dependency_headers.sh` reports parser-owned `manifest.present=false` graph evidence.
+- `check_dependency_header_format.sh` validates typed manifest context for selected paths; Rust owns syntax and registry checks.
+- `check_dependency_graph.sh` queries upstream and downstream facts and fails isolated manifests, self references, and cycles by default.
+- `check_dependency_graph.sh --cycle-report-only` reports existing cycle debt without failing; pair its TSV projection with a rendered graph report when durable evidence is needed.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
 - `check_dependency_graph.sh --list-related --focus <path>` lists every manifest edge declared by, or pointing at, a changed code/doc path so reviewers can see all dependent surfaces before implementation review.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.

@@ -12,23 +12,28 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
+from unittest import mock
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
+import agent_team  # noqa: E402
 from agent_team import (  # noqa: E402
-    ActiveDesignPacketConfig,
+    RunBundleMaterialization,
     RunBundleSpec,
     TaskCatalog,
-    build_manifest,
     create_run_bundle,
     load_task_catalog,
     load_team_config,
     render_template,
+    resolve_active_design_packet,
     resolve_role,
     suggested_public_skills,
 )
@@ -36,6 +41,66 @@ from agent_team import (  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def create_bundle(self, spec: RunBundleSpec) -> RunBundleMaterialization:
+        """Materialize with the already-tested canonical dependency projection."""
+        rows = (
+            (
+                "upstream",
+                "design",
+                "agents/templates/design_brief.md",
+                "documents/dependency-manifest-design.md",
+            ),
+        )
+        with mock.patch("agent_team._canonical_dependency_rows", return_value=rows):
+            return create_run_bundle(spec)
+
+    def test_dependency_references_consume_one_verified_graph_query(self) -> None:
+        """Packet dependency references should consume graph facts without TSV transport."""
+        client = mock.Mock()
+        client.status.return_value = SimpleNamespace(
+            status="fresh",
+            payload={
+                "integration_record": {
+                    "verified": True,
+                    "profile": "default",
+                    "source_snapshot_profile": "parent",
+                }
+            },
+        )
+        client.query.return_value = SimpleNamespace(
+            status="fresh",
+            payload={},
+            dependency_facts=(
+                SimpleNamespace(
+                    direction="upstream",
+                    kind="design",
+                    source="agents/templates/design_brief.md",
+                    target="documents/dependency-manifest-design.md",
+                ),
+            ),
+        )
+        with mock.patch("agent_team.GraphClient", return_value=client):
+            rows = getattr(agent_team, "_canonical_dependency_rows")(PROJECT_ROOT)
+
+        self.assertEqual(
+            rows,
+            (
+                (
+                    "upstream",
+                    "design",
+                    "agents/templates/design_brief.md",
+                    "documents/dependency-manifest-design.md",
+                ),
+            ),
+        )
+        client.status.assert_called_once_with()
+        client.query.assert_called_once_with(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
 
     def test_review_template_expands_partials_and_replacements(self) -> None:
         """Rendered review artifacts should contain expanded tables and run metadata."""
@@ -92,15 +157,36 @@ class AgentTeamTemplateTest(unittest.TestCase):
             for family in base_catalog.workflow_families
             if family.get("id") == "scoped_change"
         )
-        custom_family = {
-            **selected_family,
-            "active_design_packet": {
-                "schema": "waterfall.design_packet.v1",
+        custom_packet_value = deepcopy(config.artifact_registry["active_design_packet"])
+        self.assertIsInstance(custom_packet_value, dict)
+        custom_packet = cast("dict[str, object]", custom_packet_value)
+        custom_packet.update(
+            {
                 "design_artifact": "packet/custom-design.md",
                 "design_review_artifact": "packet/custom-technical-review.md",
                 "document_flow_review_artifact": "packet/custom-flow-review.md",
                 "document_flow_required": True,
-            },
+            }
+        )
+        design_output = "artifact:packet/custom-design.md"
+        for section in (
+            "abstract_design_frame",
+            "implementation_source_packet",
+            "design_side_effect_map",
+        ):
+            entry = custom_packet[section]
+            self.assertIsInstance(entry, dict)
+            cast("dict[str, object]", entry)["output_refs"] = [design_output]
+        trace = custom_packet["design_to_implementation_trace"]
+        self.assertIsInstance(trace, dict)
+        cast("dict[str, object]", trace)["output_refs"] = [
+            design_output,
+            "artifact:packet/custom-technical-review.md",
+            "artifact:packet/custom-flow-review.md",
+        ]
+        custom_family = {
+            **selected_family,
+            "active_design_packet": custom_packet,
         }
         catalog = TaskCatalog(
             raw=base_catalog.raw,
@@ -121,6 +207,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "custom-packet"
+            report_dir.parent.mkdir(parents=True)
             spec = RunBundleSpec(
                 config=config,
                 report_dir=report_dir,
@@ -134,7 +221,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 task_catalog=catalog,
             )
 
-            created = create_run_bundle(spec)
+            created = self.create_bundle(spec)
 
             selected_paths = (
                 "packet/custom-design.md",
@@ -142,7 +229,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 "packet/custom-flow-review.md",
             )
             for path in selected_paths:
-                self.assertIn(path, created)
+                self.assertIn(path, created.created_files)
                 self.assertTrue((report_dir / path).is_file())
             for path in (
                 "design_brief.md",
@@ -226,7 +313,14 @@ class AgentTeamTemplateTest(unittest.TestCase):
     def test_generation_and_manifest_reject_selected_final_symlink(self) -> None:
         """A selected final symlink cannot write or publish outside the bundle."""
         config = load_team_config()
-        roles = (resolve_role(config, "designer"),)
+        roles = tuple(
+            resolve_role(config, role_id)
+            for role_id in (
+                "designer",
+                "design_reviewer",
+                "document_flow_reviewer",
+            )
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             report_dir = root / "reports" / "final-symlink"
@@ -245,10 +339,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 workspace_root=PROJECT_ROOT,
             )
 
-            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
-                create_run_bundle(spec)
-            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
-                build_manifest(spec)
+            with self.assertRaisesRegex(RuntimeError, "render:render_invalid"):
+                self.create_bundle(spec)
 
             self.assertEqual(
                 outside_path.read_text(encoding="utf-8"),
@@ -264,12 +356,38 @@ class AgentTeamTemplateTest(unittest.TestCase):
             resolve_role(config, "design_reviewer"),
             resolve_role(config, "document_flow_reviewer"),
         )
-        packet = ActiveDesignPacketConfig(
-            schema="waterfall.design_packet.v1",
+        base_packet = resolve_active_design_packet(
+            config,
+            workflow_family=None,
+            explicit=None,
+        )
+        design_output = "artifact:packet/graph_design_brief.md"
+        packet = replace(
+            base_packet,
             design_artifact="packet/graph_design_brief.md",
             design_review_artifact="packet/graph_design_review.md",
             document_flow_review_artifact="packet/graph_document_flow_review.md",
             document_flow_required=True,
+            abstract_design_frame=replace(
+                base_packet.abstract_design_frame,
+                output_refs=(design_output,),
+            ),
+            implementation_source_packet=replace(
+                base_packet.implementation_source_packet,
+                output_refs=(design_output,),
+            ),
+            design_side_effect_map=replace(
+                base_packet.design_side_effect_map,
+                output_refs=(design_output,),
+            ),
+            design_to_implementation_trace=replace(
+                base_packet.design_to_implementation_trace,
+                output_refs=(
+                    design_output,
+                    "artifact:packet/graph_design_review.md",
+                    "artifact:packet/graph_document_flow_review.md",
+                ),
+            ),
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -293,10 +411,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 active_design_packet=packet,
             )
 
-            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
-                create_run_bundle(spec)
-            with self.assertRaisesRegex(RuntimeError, "symlink_component"):
-                build_manifest(spec)
+            with self.assertRaisesRegex(RuntimeError, "render:render_invalid"):
+                self.create_bundle(spec)
 
             self.assertEqual(tuple(outside_dir.iterdir()), ())
             self.assertFalse((report_dir / "team_manifest.yaml").exists())
@@ -304,7 +420,14 @@ class AgentTeamTemplateTest(unittest.TestCase):
     def test_generation_rejects_existing_nonregular_packet_target(self) -> None:
         """An existing packet target must be a regular file."""
         config = load_team_config()
-        roles = (resolve_role(config, "designer"),)
+        roles = tuple(
+            resolve_role(config, role_id)
+            for role_id in (
+                "designer",
+                "design_reviewer",
+                "document_flow_reviewer",
+            )
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "nonregular-target"
             (report_dir / "design_brief.md").mkdir(parents=True)
@@ -319,8 +442,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 workspace_root=PROJECT_ROOT,
             )
 
-            with self.assertRaisesRegex(RuntimeError, "nonregular_target"):
-                create_run_bundle(spec)
+            with self.assertRaisesRegex(RuntimeError, "render:render_invalid"):
+                self.create_bundle(spec)
 
             self.assertFalse((report_dir / "team_manifest.yaml").exists())
 

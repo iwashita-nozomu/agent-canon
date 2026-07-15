@@ -160,47 +160,6 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
-  - id: dependency-manifest-records
-    summary: Decodes the exact current Rust normalized-record JSONL against a canonical caller-owned registry authority, returns a deeply immutable aggregate, and produces the canonical AgentCanon registry conformance artifact.
-    path: tools/agent_tools/dependency_manifest_records.py
-    family: agent_tools
-    role: helper
-    status: canonical
-    audience: agent
-    placement: workflow_helper
-    command: python3 tools/agent_tools/dependency_manifest_records.py relation-registry-artifact --source-fixture <fixture> --output <artifact>
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/dependency-manifest-design.md
-      - documents/structured-analysis/dependency-header-analysis.md
-      - documents/structured-analysis/graph-dsl.md
-    tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
-
-  - id: bind-r2-scope
-    summary: Runs manifest mode for the pre-review R2 scope and closeout mode that re-hashes every bound input and parses two unique canonical approve decisions without circular hashes.
-    path: tools/agent_tools/bind_r2_scope.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    audience: workflow
-    placement: workflow_helper
-    command: python3 tools/agent_tools/bind_r2_scope.py <manifest|closeout> <mode-specific-options>
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/dependency-manifest-design.md
-      - documents/structured-analysis/dependency-header-analysis.md
-    tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
-
   - id: responsibility-scope
     summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
     path: tools/agent_tools/responsibility_scope.py

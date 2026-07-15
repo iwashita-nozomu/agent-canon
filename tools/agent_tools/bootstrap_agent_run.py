@@ -3,6 +3,9 @@
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
 # upstream design ../README.md shared automation index
+# upstream implementation ./agent_team.py owns run-bundle and active-packet materialization
+# upstream implementation ./workflow_monitor.py builds initial monitoring entries
+# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py validates bootstrap behavior
 # @dependency-end
 
 """Bootstrap a persistent agent-team run directory."""
@@ -13,12 +16,15 @@ import argparse
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 from agent_team import (
-    ActiveDesignPacketConfig,
+    ActiveDesignPacketInputError,
+    ActiveDesignPacketValue,
     AgentTypeSelection,
     Role,
+    RunActivationSpec,
     RunBundleSpec,
     TaskCatalog,
     TeamConfig,
@@ -36,6 +42,7 @@ from agent_team import (
     enable_choices,
     expand_enabled_specialists,
     format_agent_type_selections,
+    format_start_declaration,
     format_subagent_role_instance_wave_chunks,
     format_subagent_wave,
     format_subagent_wave_chunks,
@@ -55,7 +62,6 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
-    run_active_design_packet,
     same_role_subagent_policy_output_lines,
     select_roles,
     standard_agent_wave_sequence_output_lines,
@@ -66,8 +72,7 @@ from agent_team import (
     validate_agent_type_selections,
     workflow_spawn_budget,
 )
-from task_authority import write_task_authority_baselines
-from workflow_monitor import append_monitoring
+from workflow_monitor import build_run_start_monitoring_entries
 
 
 @dataclass(frozen=True)
@@ -97,7 +102,7 @@ class BootstrapRuntime:
     created_files: tuple[str, ...]
     active_pointer: Path
     agent_type_selections: tuple[AgentTypeSelection, ...]
-    active_design_packet: ActiveDesignPacketConfig
+    active_design_packet: ActiveDesignPacketValue
 
 
 def suggested_skills(
@@ -122,7 +127,7 @@ def document_packet_output(
     role_id: str,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: ActiveDesignPacketConfig | None = None,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> str:
     """Render one role's explicit document packet as a CSV-like path list."""
     role = next(
@@ -351,16 +356,13 @@ def emit_bootstrap_output(
     workspace_root: Path,
     preflight: AgentCanonPreflightResult,
     runtime: BootstrapRuntime,
+    selected_skills: tuple[str, ...],
+    active_skills: tuple[str, ...],
+    review_roles: tuple[str, ...],
+    start_declaration: str,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
-    selected_skills = suggested_skills(
-        args.task_id,
-        context.workflow_family_id,
-        args.task,
-    )
-    active_skills = current_stage_skills(selected_skills, args.task)
     deferred_skills = deferred_stage_skills(selected_skills, args.task)
-    review_roles = selected_review_roles(runtime.roles)
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
@@ -376,12 +378,7 @@ def emit_bootstrap_output(
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(f"ACTIVE_SKILLS={','.join(active_skills)}")
     print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
-    print(
-        "START_DECLARATION="
-        f"workflow={context.workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(active_skills) or '-'}, "
-        f"review={','.join(review_roles) or '-'}"
-    )
+    print(f"START_DECLARATION={start_declaration}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print("TASK_ID_ROUTE_STATUS=explicit")
@@ -526,34 +523,6 @@ def emit_bootstrap_output(
     print(f"AGENT_CANON_ACTIVE_RUN_POINTER={runtime.active_pointer}")
 
 
-def record_bootstrap_monitoring(
-    context: BootstrapRunContext,
-    roles: tuple[Role, ...],
-    selected_skills: tuple[str, ...],
-    review_roles: tuple[str, ...],
-    task_text: str,
-    preflight_status: str,
-) -> None:
-    """Record bootstrap monitoring evidence."""
-    append_monitoring(
-        context.report_dir,
-        signals=[
-            (
-                f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(current_stage_skills(selected_skills, task_text)) or '-'}, "
-                f"review={','.join(review_roles) or '-'}"
-            ),
-            f"stage owner routing active_roles={','.join(role.id for role in roles)}",
-            f"agent_canon_preflight={preflight_status}",
-            "web_research_not_required: bootstrap does not decide external research",
-        ],
-        interventions=[
-            f"created run bundle and workflow_monitoring.md at {context.report_dir}"
-        ],
-        behavior_events=["token_efficiency_not_required reason=bootstrap_default"],
-    )
-
-
 def main() -> int:
     """Run the bootstrap command."""
     config = load_team_config()
@@ -563,7 +532,7 @@ def main() -> int:
         explicit_active_design_packet = parse_active_design_packet_input(
             args.active_design_packet
         )
-    except RuntimeError as exc:
+    except ActiveDesignPacketInputError as exc:
         print(str(exc), flush=True)
         return 2
     workspace_root = Path(args.workspace_root).resolve()
@@ -576,6 +545,7 @@ def main() -> int:
         print(str(exc), flush=True)
         return 1
     context = resolve_bootstrap_context(args, config, catalog, workspace_root)
+    context.report_root.mkdir(parents=True, exist_ok=True)
     roles = select_roles(
         config,
         list(context.enabled_specialists),
@@ -597,6 +567,27 @@ def main() -> int:
         context.workflow_family_id,
         args.task,
     )
+    active_skills = current_stage_skills(selected_skills, args.task)
+    review_roles = selected_review_roles(roles)
+    start_declaration = format_start_declaration(
+        context.workflow_family_name or "Unspecified",
+        active_skills,
+        review_roles,
+    )
+    monitoring_entries = build_run_start_monitoring_entries(
+        command="bootstrap_agent_run",
+        report_dir=context.report_dir,
+        created_at_iso=context.created_at_iso,
+        start_declaration=start_declaration,
+        role_ids=tuple(role.id for role in roles),
+        preflight_status=preflight.status,
+        writer_ids=tuple(
+            role.id
+            for role in roles
+            if role.write_policy.mode not in {"read_only", "artifacts_only"}
+        ),
+        reviewer_ids=review_roles,
+    )
     run_spec = RunBundleSpec(
         config=config,
         report_dir=context.report_dir,
@@ -607,6 +598,10 @@ def main() -> int:
         roles=roles,
         workspace_root=workspace_root,
         active_design_packet=explicit_active_design_packet,
+        activation=RunActivationSpec(
+            report_root=context.report_root,
+            monitoring_entries=monitoring_entries,
+        ),
         workflow_family_id=context.workflow_family_id or "",
         manual_specialists=context.manual_specialists,
         task_default_specialists=context.task_default_specialists,
@@ -619,21 +614,14 @@ def main() -> int:
         task_catalog=catalog,
         agent_type_selections=agent_type_selections,
     )
-    active_design_packet = run_active_design_packet(run_spec)
-    created_files = create_run_bundle(run_spec)
-    active_pointer = context.report_root / ".active_run"
-    active_pointer.write_text(
-        str(context.report_dir.resolve()) + "\n", encoding="utf-8"
-    )
-    write_task_authority_baselines(context.report_dir, context.report_root)
+    materialization = create_run_bundle(run_spec)
     runtime = BootstrapRuntime(
         roles=roles,
-        created_files=created_files,
-        active_pointer=active_pointer,
+        created_files=materialization.created_files,
+        active_pointer=cast(Path, materialization.active_pointer),
         agent_type_selections=agent_type_selections,
-        active_design_packet=active_design_packet,
+        active_design_packet=materialization.active_design_packet,
     )
-    review_roles = selected_review_roles(roles)
     emit_bootstrap_output(
         args=args,
         config=config,
@@ -642,14 +630,10 @@ def main() -> int:
         workspace_root=workspace_root,
         preflight=preflight,
         runtime=runtime,
-    )
-    record_bootstrap_monitoring(
-        context,
-        roles,
-        selected_skills,
-        review_roles,
-        args.task,
-        preflight.status,
+        selected_skills=selected_skills,
+        active_skills=active_skills,
+        review_roles=review_roles,
+        start_declaration=start_declaration,
     )
     return 0
 

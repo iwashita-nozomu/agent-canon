@@ -4,6 +4,7 @@
 # contract test
 # responsibility Tests workflow monitor accumulation behavior.
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
+# upstream implementation ../../tools/agent_tools/agent_team.py stages initial monitoring with run bundles
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
 # upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
 # @dependency-end
@@ -128,6 +129,63 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- memory_learning_decision: not_applicable", text)
+
+    def test_monitor_emits_nullable_runtime_measurement_input(self) -> None:
+        """The monitor should preserve producer nulls and explicit numeric zero."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "runtime-unit"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--responsibility-unit-id",
+                    "runtime-unit",
+                    "--packet-hash",
+                    "a" * 64,
+                    "--context-bytes",
+                    "z-source=0",
+                    "--context-bytes",
+                    "a-source=41",
+                    "--finding-iteration",
+                    "0",
+                    "--writer-id",
+                    "writer-2",
+                    "--writer-id",
+                    "writer-1",
+                    "--launch-epoch",
+                    "0",
+                    "--retries",
+                    "0",
+                    "--waits",
+                    "0",
+                    "--progress-bytes",
+                    "0",
+                    "--artifact-hash",
+                    "b" * 64,
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        measurement_line = next(
+            line for line in text.splitlines() if "runtime_measurement_input=" in line
+        )
+        payload = json.loads(measurement_line.split("runtime_measurement_input=", 1)[1])
+        self.assertIsNone(payload["generation_parent"])
+        self.assertIsNone(payload["review_iteration"])
+        self.assertEqual(payload["context_bytes_by_source"], {"a-source": 41, "z-source": 0})
+        self.assertEqual(payload["writer_ids"], ["writer-1", "writer-2"])
+        self.assertEqual(payload["launch_epoch"], 0)
+        self.assertEqual(payload["retries"], 0)
+        self.assertEqual(payload["waits"], 0)
+        self.assertEqual(payload["progress_bytes"], 0)
 
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""

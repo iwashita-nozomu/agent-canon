@@ -97,7 +97,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             )
 
     def test_code_visualization_packet_contains_only_renderer_variants(self) -> None:
-        """The code-visualization packet exposes exactly its three renderers."""
+        """The code-visualization packet exposes exactly its two graph renderers."""
         result = self.run_tool(
             PROJECT_ROOT,
             "show",
@@ -115,7 +115,6 @@ class SkillToolCommandsTest(unittest.TestCase):
             [
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for command in payload["discovered_commands"]:

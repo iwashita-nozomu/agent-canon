@@ -3,7 +3,8 @@
 # contract tool
 # responsibility Coordinates purpose-based search across text, local LLM cards, tool catalog, dependency headers, and Python code facts.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
-# upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts
+# upstream implementation ./graph_client.py provides verified manifest dependency facts
+# upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, and Python code facts
 # upstream implementation ./search_index.py builds repo-local local-LLM semantic search cards
 # downstream implementation ../../tests/agent_tools/test_search.py validates coordinated search providers
 # @dependency-end
@@ -20,10 +21,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import search_index  # noqa: E402
-import vector_search  # noqa: E402
+from tools.agent_tools import search_index, vector_search
+from tools.agent_tools.graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphDependencyFact,
+    GraphResponse,
+)
 
 DEFAULT_PROVIDERS = ("text", "llm", "vector", "tool", "header-deps", "code-deps")
 DEFAULT_INDEX_DIR = search_index.DEFAULT_INDEX_DIR
@@ -79,7 +86,7 @@ class SearchCorpus:
     documents: tuple[vector_search.Document, ...]
     tool_entries: Mapping[str, search_index.ToolEntry]
     cards: tuple[search_index.SearchCard, ...]
-    dependency_edges: tuple[vector_search.DependencyEdge, ...]
+    dependency_edges: tuple[GraphDependencyFact, ...]
     python_symbols: tuple[vector_search.PythonSymbol, ...]
     python_edges: tuple[vector_search.PythonCallEdge, ...]
 
@@ -163,7 +170,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-llm", action="store_true")
     parser.add_argument("--llama-cli", default="")
     parser.add_argument("--model", default=search_index.DEFAULT_MODEL)
-    parser.add_argument("--max-llm-files", type=int, default=search_index.DEFAULT_LLM_FILES)
+    parser.add_argument(
+        "--max-llm-files", type=int, default=search_index.DEFAULT_LLM_FILES
+    )
     parser.add_argument("--max-bytes", type=int, default=search_index.DEFAULT_MAX_BYTES)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
@@ -177,7 +186,9 @@ def query_profile(query: str) -> QueryProfile:
 
 def selected_providers(raw: str) -> tuple[str, ...]:
     """Parse provider names."""
-    names = tuple(dict.fromkeys(part.strip() for part in raw.split(",") if part.strip()))
+    names = tuple(
+        dict.fromkeys(part.strip() for part in raw.split(",") if part.strip())
+    )
     return names or DEFAULT_PROVIDERS
 
 
@@ -189,7 +200,10 @@ def snippet(text: str, limit: int = SNIPPET_LIMIT) -> str:
     return f"{normalized[: limit - SNIPPET_ELLIPSIS_CHARS]}..."
 
 
-def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, ...]:
+def load_index_cards(
+    request: SearchRequest,
+    graph_response: GraphResponse | None,
+) -> tuple[search_index.SearchCard, ...]:
     """Load or build local LLM search cards."""
     card_file = request.index_dir / search_index.DEFAULT_CARD_FILE
     if request.refresh_index:
@@ -204,7 +218,8 @@ def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, .
                 model=request.model,
                 max_llm_files=request.max_llm_files,
                 max_bytes=request.max_bytes,
-            )
+            ),
+            graph_response,
         )
         report = search_index.BuildReport(
             index_dir=request.index_dir,
@@ -232,7 +247,8 @@ def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, .
             model=request.model,
             max_llm_files=0,
             max_bytes=request.max_bytes,
-        )
+        ),
+        graph_response,
     )
     return cards
 
@@ -247,12 +263,30 @@ def load_corpus(request: SearchRequest) -> SearchCorpus:
             set(vector_search.EXCLUDED_PARTS),
         )
     )
+    graph_response = None
+    dependency_facts: tuple[GraphDependencyFact, ...] = ()
+    if "header-deps" in request.providers:
+        graph_response = GraphClient(
+            request.root, CANONICAL_GRAPH_EXECUTABLE
+        ).query(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+        if graph_response.status != "fresh" or graph_response.exit_code != 0:
+            raise GraphClientError(
+                "canonical graph dependency query is unavailable: "
+                f"status={graph_response.status} "
+                f"reason={graph_response.payload.get('reason')}"
+            )
+        dependency_facts = graph_response.dependency_facts
     symbols = vector_search.read_python_symbols(documents)
     return SearchCorpus(
         documents=documents,
         tool_entries=search_index.load_tool_entries(request.root),
-        cards=load_index_cards(request),
-        dependency_edges=tuple(vector_search.parse_dependency_edges(request.root, documents)),
+        cards=load_index_cards(request, graph_response),
+        dependency_edges=dependency_facts,
         python_symbols=symbols,
         python_edges=vector_search.build_python_call_edges(symbols),
     )
@@ -280,7 +314,9 @@ def text_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit
     return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
 
 
-def vector_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
+def vector_hits(
+    request: SearchRequest, corpus: SearchCorpus
+) -> tuple[ProviderHit, ...]:
     """Return TF-IDF vector search hits."""
     hits = vector_search.search(corpus.documents, request.query.raw, request.top)
     return tuple(
@@ -334,31 +370,49 @@ def tool_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit
     return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
 
 
-def header_dependency_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
+def header_dependency_hits(
+    request: SearchRequest, corpus: SearchCorpus
+) -> tuple[ProviderHit, ...]:
     """Return dependency-header hits."""
     hits: list[ProviderHit] = []
     for edge in corpus.dependency_edges:
-        searchable = f"{edge.source} {edge.target} {edge.direction} {edge.kind} {edge.reason}"
+        searchable = (
+            f"{edge.source} {edge.target} {edge.direction} {edge.kind} {edge.reason}"
+        )
         score = request.query.score_text(searchable)
         if score <= 0.0:
             continue
-        evidence = f"{edge.source} {edge.direction} {edge.kind} {edge.target} {edge.reason}"
+        evidence = " ".join(
+            (
+                edge.source,
+                edge.direction,
+                edge.kind,
+                edge.target,
+                edge.reason,
+                f"producer={edge.producer}",
+                f"source_path={edge.source_path}",
+                "source_span="
+                + json.dumps(edge.source_span, sort_keys=True, separators=(",", ":")),
+                f"evidence_ref={edge.evidence_ref}",
+                f"authority={edge.authority}",
+            )
+        )
         hits.append(
             ProviderHit(
                 provider="header-deps",
                 path=edge.source,
                 score=score,
                 reason="declared-dependency-source",
-                evidence=snippet(evidence),
+                evidence=evidence,
             )
         )
         hits.append(
             ProviderHit(
                 provider="header-deps",
                 path=edge.target,
-                    score=score * HEADER_TARGET_SCORE_MULTIPLIER,
+                score=score * HEADER_TARGET_SCORE_MULTIPLIER,
                 reason="declared-dependency-target",
-                evidence=snippet(evidence),
+                evidence=evidence,
             )
         )
     return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
@@ -414,7 +468,9 @@ def code_edge_hits(
     return tuple(hits)
 
 
-def code_dependency_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
+def code_dependency_hits(
+    request: SearchRequest, corpus: SearchCorpus
+) -> tuple[ProviderHit, ...]:
     """Return code dependency hits."""
     hits = (
         *code_symbol_hits(request, corpus.python_symbols),
@@ -435,7 +491,9 @@ def provider_registry() -> Mapping[str, ProviderFunction]:
     }
 
 
-def provider_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
+def provider_hits(
+    request: SearchRequest, corpus: SearchCorpus
+) -> tuple[ProviderHit, ...]:
     """Run selected providers."""
     registry = provider_registry()
     hits: list[ProviderHit] = []
@@ -456,14 +514,18 @@ def build_candidates(hits: Sequence[ProviderHit], top: int) -> tuple[Candidate, 
     for path, path_hits in grouped.items():
         providers = tuple(dict.fromkeys(hit.provider for hit in path_hits))
         reasons = tuple(dict.fromkeys(hit.reason for hit in path_hits))
-        score = sum(hit.score for hit in path_hits) + (len(providers) - 1) * PROVIDER_BONUS
+        score = (
+            sum(hit.score for hit in path_hits) + (len(providers) - 1) * PROVIDER_BONUS
+        )
         candidates.append(
             Candidate(
                 path=path,
                 score=score,
                 providers=providers,
                 reasons=reasons,
-                evidence=tuple(sorted(path_hits, key=lambda hit: (-hit.score, hit.provider))),
+                evidence=tuple(
+                    sorted(path_hits, key=lambda hit: (-hit.score, hit.provider))
+                ),
             )
         )
     return tuple(sorted(candidates, key=lambda item: (-item.score, item.path))[:top])
@@ -555,7 +617,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("AGENT_SEARCH=fail", file=sys.stderr)
         print(f"AGENT_SEARCH_ERROR={exc}", file=sys.stderr)
         return 2
-    report = run_search(request)
+    try:
+        report = run_search(request)
+    except GraphClientError as error:
+        print("AGENT_SEARCH=fail", file=sys.stderr)
+        print(f"AGENT_SEARCH_ERROR=canonical-graph:{error}", file=sys.stderr)
+        return 1
     if args.format == "json":
         print_json(report)
     else:

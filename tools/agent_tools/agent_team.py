@@ -5,31 +5,59 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
+# upstream implementation ./graph_client.py provides canonical dependency facts for packet references
+# upstream implementation ./workflow_monitor.py renders initial monitoring artifacts for atomic publication
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
+# downstream implementation ./task_start.py creates task-start run bundles
+# downstream implementation ./bootstrap_agent_run.py creates bootstrap run bundles
+# downstream implementation ./waterfall_gate_check.py consumes materialized active packets
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
 from __future__ import annotations
 
+import ast
+import ctypes
+import errno
+import fcntl
 import hashlib
 import json
+import os
 import re
+import secrets
+import shutil
+import stat
 import subprocess
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
-from typing import cast
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING, Any, Literal, cast
+from urllib.parse import quote
 
 import yaml
+from graph_client import CANONICAL_GRAPH_EXECUTABLE, GraphClient, GraphClientError
+from report_artifact_checks import (
+    is_placeholder_only_section,
+    parse_review_identity,
+    section_has_content,
+)
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import (
     PROMPT_PLACEHOLDER,
     SkillCommandPacket,
     packet_for_skill,
 )
-from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
+from task_authority import (
+    AUTHORITY_FILE_NAME,
+    authority_baseline_path,
+    build_default_task_authority,
+    hash_baseline_bytes,
+)
+
+if TYPE_CHECKING:
+    from workflow_monitor import MonitoringEntries
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
@@ -229,6 +257,8 @@ DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
 )
+
+
 def validation_failure_response_policy() -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
     global _validation_failure_response_policy_cache
@@ -246,11 +276,16 @@ def validation_failure_response_policy() -> dict[str, object]:
         if not isinstance(required_fields, list) or not all(
             isinstance(field, str) for field in cast("list[object]", required_fields)
         ):
-            raise ValueError("validation_failure_response.required_fields must be strings")
+            raise ValueError(
+                "validation_failure_response.required_fields must be strings"
+            )
         if not isinstance(intent_preservation, list) or not all(
-            isinstance(value, str) for value in cast("list[object]", intent_preservation)
+            isinstance(value, str)
+            for value in cast("list[object]", intent_preservation)
         ):
-            raise ValueError("validation_failure_response.intent_preservation must be strings")
+            raise ValueError(
+                "validation_failure_response.intent_preservation must be strings"
+            )
         _validation_failure_response_policy_cache = {
             "taxonomy_source": VALIDATION_FAILURE_TAXONOMY_SOURCE,
             "required_fields": tuple(cast("list[str]", required_fields)),
@@ -659,15 +694,70 @@ class RoleDocumentPacket:
     notes: str
 
 
+ActiveDesignSection = Literal[
+    "abstract_design_frame",
+    "implementation_source_packet",
+    "design_side_effect_map",
+    "design_to_implementation_trace",
+]
+ACTIVE_DESIGN_SECTIONS: tuple[ActiveDesignSection, ...] = (
+    "abstract_design_frame",
+    "implementation_source_packet",
+    "design_side_effect_map",
+    "design_to_implementation_trace",
+)
+ACTIVE_DESIGN_REFERENCE_FIELDS = (
+    "clause_refs",
+    "owner_refs",
+    "source_refs",
+    "dependency_refs",
+    "output_refs",
+    "reviewer_refs",
+)
+
+
 @dataclass(frozen=True)
-class ActiveDesignPacketConfig:
-    """Artifact-registry declaration for a run's active design packet."""
+class ActiveDesignClause:
+    """One packet clause and its canonical source reference."""
+
+    clause_id: str
+    source_ref: str
+
+
+@dataclass(frozen=True)
+class ActiveDesignPacketEntry:
+    """Neutral reference record shared by all four design sections."""
+
+    entry_id: str
+    responsibility_id: str
+    clause_refs: tuple[str, ...]
+    owner_refs: tuple[str, ...]
+    source_refs: tuple[str, ...]
+    dependency_refs: tuple[str, ...]
+    output_refs: tuple[str, ...]
+    reviewer_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ActiveDesignPacketValue:
+    """Complete four-section active design packet value."""
 
     schema: str
     design_artifact: str
     design_review_artifact: str
     document_flow_review_artifact: str
     document_flow_required: bool
+    clause_registry: tuple[ActiveDesignClause, ...]
+    abstract_design_frame: ActiveDesignPacketEntry
+    implementation_source_packet: ActiveDesignPacketEntry
+    design_side_effect_map: ActiveDesignPacketEntry
+    design_to_implementation_trace: ActiveDesignPacketEntry
+
+    def section_entries(
+        self,
+    ) -> tuple[tuple[ActiveDesignSection, ActiveDesignPacketEntry], ...]:
+        """Return section/value pairs in canonical order."""
+        return tuple((name, getattr(self, name)) for name in ACTIVE_DESIGN_SECTIONS)
 
 
 def resolve_cross_cutting_document_packet(
@@ -718,6 +808,363 @@ class TaskCatalog:
     review_packs: tuple[dict[str, object], ...]
 
 
+RUN_BUNDLE_FILE_MODE = 0o644
+RUN_BUNDLE_DIRECTORY_MODE = 0o755
+PRIVATE_STAGE_MODE = 0o700
+PRIVATE_TEMP_MODE = 0o600
+MATERIALIZATION_LOCK_MODE = 0o600
+MATERIALIZATION_LOCK_SCHEMA = "agent_canon.run_bundle_materialization_lock.v1"
+MATERIALIZATION_LOCK_NAME = ".run_bundle_materialization.lock"
+RENAME_NOREPLACE = 1
+RENAME_EXCHANGE = 2
+AT_FDCWD = -100
+GENERATED_NAME_ATTEMPTS = 8
+CleanupStatus = Literal["not_required", "pass", "fail"]
+MaterializationPhase = Literal[
+    "decode",
+    "reference_validation",
+    "render",
+    "stage",
+    "publish",
+    "activate",
+    "rollback",
+]
+MaterializationErrorCode = Literal[
+    "packet_invalid",
+    "reference_invalid",
+    "render_invalid",
+    "artifact_set_invalid",
+    "report_root_invalid",
+    "materialization_lock_failed",
+    "materialization_lock_busy",
+    "materialization_lock_foreign",
+    "materialization_lock_release_failed",
+    "atomic_noreplace_unavailable",
+    "atomic_exchange_unavailable",
+    "staging_name_exhausted",
+    "staging_write_failed",
+    "staging_verify_failed",
+    "run_bundle_target_exists",
+    "run_bundle_cross_device",
+    "run_bundle_publish_failed",
+    "active_bookkeeping_nonregular",
+    "bookkeeping_name_exhausted",
+    "active_baseline_publish_failed",
+    "active_pointer_publish_failed",
+    "bookkeeping_restore_conflict",
+    "run_bundle_rollback_failed",
+]
+LockReuseClass = Literal[
+    "first_acquisition",
+    "released_file_reuse",
+    "crash_stale_reuse",
+]
+
+
+@dataclass(frozen=True)
+class RenderedArtifact:
+    """One fully rendered run-bundle artifact awaiting publication."""
+
+    relative_path: PurePosixPath
+    content: bytes
+    mode: int
+
+
+@dataclass(frozen=True)
+class ArtifactDigest:
+    """Stable digest for one rendered artifact."""
+
+    relative_path: PurePosixPath
+    sha256: str
+
+
+@dataclass(frozen=True)
+class SubagentPromptPacket:
+    """Projected prompt inputs for one selected role."""
+
+    role_id: str
+    active_design_packet: ActiveDesignPacketValue
+    document_packet: RoleDocumentPacket
+    required_outputs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SourceReferenceResult:
+    """Resolved source-reference evidence for the active design packet."""
+
+    declared_ref: str
+    root_key: Literal["workspace", "agent_canon", "artifact"]
+    resolved_path: Path
+    relative_path: PurePosixPath
+    fragment_kind: Literal["none", "symbol", "section"]
+    fragment_value: str | None
+    sha256: str
+    parser_match_count: int
+
+
+@dataclass(frozen=True)
+class DependencyReferenceResult:
+    """Canonical dependency-edge evidence for one declared reference."""
+
+    declared_ref: str
+    dependency_root_key: Literal["workspace", "agent_canon"]
+    normalized_key: str
+    source_path: PurePosixPath
+    target_path: PurePosixPath
+    source_sha256: str
+    target_sha256: str
+    graph_match_count: int
+
+
+@dataclass(frozen=True)
+class RoleOutputProjection:
+    """Exact selected output paths owned by one active role."""
+
+    role_ref: str
+    output_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReviewerArtifactProjection:
+    """Exact one-to-one join from a reviewer role to its review artifact."""
+
+    reviewer_ref: str
+    review_artifact_ref: str
+
+
+@dataclass(frozen=True)
+class ClauseReferenceResult:
+    """Resolved clause identifier and its authoritative source reference."""
+
+    clause_id: str
+    source_ref: str
+
+
+@dataclass(frozen=True)
+class OutputReferenceResult:
+    """Planned artifact-path evidence for one output reference."""
+
+    output_ref: str
+    relative_path: PurePosixPath
+    planned_count: int
+
+
+@dataclass(frozen=True)
+class ActiveDesignReferenceContext:
+    """Complete authoritative projection used by packet validation."""
+
+    workspace_root: Path
+    report_dir: Path
+    source_results: tuple[SourceReferenceResult, ...]
+    dependency_results: tuple[DependencyReferenceResult, ...]
+    role_output_projections: tuple[RoleOutputProjection, ...]
+    reviewer_artifact_projections: tuple[ReviewerArtifactProjection, ...]
+    clause_results: tuple[ClauseReferenceResult, ...]
+    output_results: tuple[OutputReferenceResult, ...]
+    planned_output_paths: frozenset[PurePosixPath]
+
+
+@dataclass(frozen=True)
+class ManifestPacketViolation:
+    """One typed manifest-shape violation."""
+
+    kind: str
+    field: str | None
+    observed_schema: str | None
+    order_key: tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class ReferencePacketViolation:
+    """One typed active-packet reference violation."""
+
+    section: ActiveDesignSection
+    field: str
+    input_index: int
+    reason: str
+    order_key: tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class DesignArtifactViolation:
+    """One typed design-artifact validation violation."""
+
+    artifact_path: PurePosixPath
+    reason: str
+    section_slug: str | None
+    order_key: tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class ReviewArtifactViolation:
+    """One typed design-review validation violation."""
+
+    artifact_path: PurePosixPath
+    reason: str
+    order_key: tuple[int, int, int, int]
+
+
+ActiveDesignPacketViolation = (
+    ManifestPacketViolation
+    | ReferencePacketViolation
+    | DesignArtifactViolation
+    | ReviewArtifactViolation
+)
+
+
+@dataclass(frozen=True)
+class MaterializedActiveDesignPacketResult:
+    """Loaded packet, persisted projection, and complete violation set."""
+
+    value: ActiveDesignPacketValue | None
+    context: ActiveDesignReferenceContext | None
+    violations: tuple[ActiveDesignPacketViolation, ...]
+
+
+@dataclass(frozen=True)
+class RollbackResult:
+    """Independent cleanup outcomes for a failed materialization."""
+
+    staging_cleanup: CleanupStatus = "not_required"
+    target_cleanup: CleanupStatus = "not_required"
+    pointer_restore: CleanupStatus = "not_required"
+    baseline_restore: CleanupStatus = "not_required"
+    temp_cleanup: CleanupStatus = "not_required"
+    failed_paths: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FileIdentity:
+    """Filesystem identity fields used for compare-before-mutate checks."""
+
+    st_dev: int
+    st_ino: int
+    st_uid: int
+    st_gid: int
+    st_mode: int
+    st_nlink: int
+
+
+@dataclass(frozen=True)
+class BookkeepingFileState:
+    """Exact prior or published state of one activation bookkeeping file."""
+
+    name: Literal[".active_run", ".active_run.sha256"]
+    existed: bool
+    identity: FileIdentity | None
+    permission_mode: int | None
+    size: int | None
+    sha256: str | None
+    content: bytes | None
+
+
+@dataclass(frozen=True)
+class BookkeepingTempState:
+    """Verified temporary bookkeeping artifact and its bytes."""
+
+    path: Path
+    identity: FileIdentity
+    permission_mode: int
+    size: int
+    sha256: str
+    content: bytes
+
+
+@dataclass(frozen=True)
+class MaterializationLockIdentity:
+    """Canonical persistent lock payload and process identity."""
+
+    schema_version: str
+    state: Literal["held"]
+    report_root_identity: FileIdentity
+    lock_file_identity: FileIdentity
+    effective_uid: int
+    pid: int
+    process_start_ticks: int
+    boot_id: str
+    nonce: str
+    acquired_at: str
+    run_id: str
+    reuse_class: LockReuseClass
+    payload_sha256: str
+
+
+@dataclass(frozen=True)
+class MaterializationLock:
+    """Held persistent materialization lock and open descriptor."""
+
+    path: Path
+    descriptor: int
+    identity: MaterializationLockIdentity
+
+
+@dataclass(frozen=True)
+class PriorBookkeepingState:
+    """Snapshot and transaction state for pointer-last activation."""
+
+    report_root_identity: FileIdentity
+    lock_file_identity: FileIdentity
+    lock_nonce: str
+    pointer_prior: BookkeepingFileState
+    baseline_prior: BookkeepingFileState
+    pointer_temp: BookkeepingTempState | None = None
+    baseline_temp: BookkeepingTempState | None = None
+    pointer_quarantine: BookkeepingTempState | None = None
+    baseline_quarantine: BookkeepingTempState | None = None
+    pointer_published: BookkeepingFileState | None = None
+    baseline_published: BookkeepingFileState | None = None
+
+
+@dataclass(frozen=True)
+class StagedArtifactSet:
+    """Verified private staging directory awaiting publication."""
+
+    path: Path
+    identity: FileIdentity
+
+
+@dataclass(frozen=True)
+class PublishedTarget:
+    """Published run-bundle identity and content-tree digest."""
+
+    path: Path
+    identity: FileIdentity
+    tree_sha256: str
+
+
+class RunBundleMaterializationError(RuntimeError):
+    """Closed typed failure for bundle render, publication, and rollback."""
+
+    def __init__(
+        self,
+        *,
+        phase: MaterializationPhase,
+        code: MaterializationErrorCode,
+        cause_code: MaterializationErrorCode,
+        target_path: Path,
+        staging_path: Path | None = None,
+        violations: tuple[ActiveDesignPacketViolation, ...] = (),
+        rollback: RollbackResult | None = None,
+    ) -> None:
+        """Initialize one closed materialization failure."""
+        self.phase = phase
+        self.code = code
+        self.cause_code = cause_code
+        self.target_path = target_path
+        self.staging_path = staging_path
+        self.violations = violations
+        self.rollback = rollback if rollback is not None else RollbackResult()
+        super().__init__(f"run_bundle_materialization:{phase}:{code}")
+
+
+@dataclass(frozen=True)
+class RunActivationSpec:
+    """Parent-owned activation inputs rendered in the atomic transaction."""
+
+    report_root: Path
+    monitoring_entries: MonitoringEntries
+
+
 @dataclass(frozen=True)
 class RunBundleSpec:
     """Inputs required to create a run bundle and team manifest."""
@@ -730,7 +1177,8 @@ class RunBundleSpec:
     created_at_iso: str
     roles: tuple[Role, ...]
     workspace_root: Path
-    active_design_packet: ActiveDesignPacketConfig | None = None
+    active_design_packet: ActiveDesignPacketValue | None = None
+    activation: RunActivationSpec | None = None
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
@@ -742,9 +1190,28 @@ class RunBundleSpec:
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
 
 
+@dataclass(frozen=True)
+class RunBundleMaterialization:
+    """Published run-bundle result returned to every producer."""
+
+    report_dir: Path
+    created_files: tuple[str, ...]
+    active_design_packet: ActiveDesignPacketValue
+    role_document_packets: tuple[RoleDocumentPacket, ...]
+    subagent_prompt_packets: tuple[SubagentPromptPacket, ...]
+    artifact_digests: tuple[ArtifactDigest, ...]
+    active_pointer: Path | None
+
+
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
-    parsed: object = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        parsed: object = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
+    except _DuplicateJsonKey as exc:
+        raise RuntimeError(f"team_config:duplicate_key:{exc.key}") from exc
     raw = _as_object_mapping(parsed, "team config")
     team = _as_object_mapping(raw.get("team"), "team")
     always_on_roles = tuple(
@@ -783,80 +1250,394 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     )
 
 
-ACTIVE_DESIGN_PACKET_FIELDS = (
+ActiveDesignPacketInputErrorCode = Literal[
+    "json_invalid",
+    "missing_field",
+    "unknown_field",
+    "wrong_type",
+    "unknown_schema",
+    "duplicate_id",
+    "empty_reference_set",
+    "malformed_reference",
+]
+ACTIVE_PACKET_VALUE_KEYS = (
     "schema",
     "design_artifact",
     "design_review_artifact",
     "document_flow_review_artifact",
     "document_flow_required",
+    "clause_registry",
+    *ACTIVE_DESIGN_SECTIONS,
 )
+ACTIVE_PACKET_ENTRY_KEYS = (
+    "entry_id",
+    "responsibility_id",
+    *ACTIVE_DESIGN_REFERENCE_FIELDS,
+)
+ACTIVE_PACKET_ENTRY_IDS = {
+    "abstract_design_frame": "abstract-design-frame",
+    "implementation_source_packet": "implementation-source-packet",
+    "design_side_effect_map": "design-side-effect-map",
+    "design_to_implementation_trace": "design-to-implementation-trace",
+}
+SOURCE_REFERENCE_PATTERN = re.compile(
+    r"^(?:repo|artifact):[^#]+(?:#(?:symbol|section):[^#]+)?$"
+)
+HEADER_REFERENCE_PATTERN = re.compile(
+    r"^header:(?:upstream|downstream):(?:design|implementation|environment):"
+    r"repo:[^#\x00]+->repo:[^#\x00]+$"
+)
+ROLE_REFERENCE_PATTERN = re.compile(r"^role:[A-Za-z0-9][A-Za-z0-9_-]*$")
+CLAUSE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
 
-def normalize_active_design_packet_config(
-    raw_packet: object,
-    field_prefix: str,
-) -> ActiveDesignPacketConfig:
-    """Normalize one complete active-packet record into its typed boundary."""
-    packet = _as_object_mapping(raw_packet, field_prefix)
-    missing = [field for field in ACTIVE_DESIGN_PACKET_FIELDS if field not in packet]
+class ActiveDesignPacketInputError(ValueError):
+    """One stable active-design-packet decoder failure."""
+
+    def __init__(
+        self,
+        *,
+        code: ActiveDesignPacketInputErrorCode,
+        field: str,
+    ) -> None:
+        """Initialize one stable decoder failure."""
+        self.code = code
+        self.field = field
+        super().__init__(f"active_design_packet:{code}:{field}")
+
+
+class _DuplicateJsonKey(ValueError):
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(key)
+
+
+def _reject_duplicate_json_keys(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateJsonKey(key)
+        result[key] = value
+    return result
+
+
+def _input_mapping(value: object, field: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
+    mapping = cast(dict[object, object], value)
+    if not all(isinstance(key, str) for key in mapping):
+        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
+    return cast(dict[str, object], mapping)
+
+
+def _input_required_fields(
+    mapping: Mapping[str, object],
+    expected: tuple[str, ...],
+    field: str,
+) -> None:
+    missing = [key for key in expected if key not in mapping]
     if missing:
-        raise RuntimeError(f"{field_prefix}:field_missing:" + ",".join(missing))
-    schema = _as_required_string(
-        packet["schema"],
-        f"{field_prefix}.schema",
-    )
-    if schema != "waterfall.design_packet.v1":
-        raise RuntimeError(f"{field_prefix}:schema_unknown:{schema}")
-    values: dict[str, str] = {}
-    for field in (
-        "design_artifact",
-        "design_review_artifact",
-        "document_flow_review_artifact",
-    ):
-        value = _as_required_string(
-            packet[field],
-            f"{field_prefix}.{field}",
+        raise ActiveDesignPacketInputError(
+            code="missing_field",
+            field=f"{field}.{missing[0]}",
         )
-        path = Path(value)
-        if not value or path.is_absolute() or ".." in path.parts:
-            raise RuntimeError(f"{field_prefix}:field_invalid:{field}")
-        values[field] = value
+    unknown = [key for key in mapping if key not in expected]
+    if unknown:
+        raise ActiveDesignPacketInputError(
+            code="unknown_field",
+            field=f"{field}.{unknown[0]}",
+        )
+
+
+def _input_string(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
+    return value
+
+
+def _validate_relative_posix_path(value: str, field: str) -> str:
+    path = PurePosixPath(value)
+    if (
+        "\\" in value
+        or "\x00" in value
+        or path.is_absolute()
+        or not path.parts
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
+    return value
+
+
+def _input_reference_tuple(
+    value: object,
+    field: str,
+) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
+    if not value:
+        raise ActiveDesignPacketInputError(code="empty_reference_set", field=field)
+    refs = tuple(
+        _input_string(item, f"{field}[{index}]")
+        for index, item in enumerate(cast(list[object], value))
+    )
+    if len(set(refs)) != len(refs):
+        raise ActiveDesignPacketInputError(code="duplicate_id", field=field)
+    return refs
+
+
+def _validate_source_reference(reference: str, field: str) -> None:
+    if SOURCE_REFERENCE_PATTERN.fullmatch(reference) is None:
+        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
+    root, _, fragment = reference.partition("#")
+    _prefix, path = root.split(":", 1)
+    _validate_relative_posix_path(path, field)
+    if fragment and fragment.split(":", 1)[1] == "":
+        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
+
+
+def _validate_entry_reference(reference: str, field: str) -> None:
+    if not reference.startswith("entry:") or not reference.removeprefix("entry:"):
+        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
+
+
+def _validate_reference_field(
+    field_name: str, refs: tuple[str, ...], field: str
+) -> None:
+    for index, reference in enumerate(refs):
+        item_field = f"{field}[{index}]"
+        if field_name == "clause_refs":
+            valid = CLAUSE_ID_PATTERN.fullmatch(reference) is not None
+        elif field_name in {"owner_refs", "reviewer_refs"}:
+            valid = ROLE_REFERENCE_PATTERN.fullmatch(reference) is not None
+        elif field_name == "source_refs":
+            _validate_source_reference(reference, item_field)
+            valid = True
+        elif field_name == "dependency_refs":
+            if reference.startswith("entry:"):
+                _validate_entry_reference(reference, item_field)
+                valid = True
+            else:
+                valid = HEADER_REFERENCE_PATTERN.fullmatch(reference) is not None
+                remainder = reference.split(":", 3)[3] if valid else ""
+                valid = valid and remainder.count("->repo:") == 1
+                if valid:
+                    source, target = remainder.split("->", 1)
+                    _validate_source_reference(source, item_field)
+                    _validate_source_reference(target, item_field)
+        else:
+            valid = reference.startswith("artifact:") and "#" not in reference
+            if valid:
+                _validate_relative_posix_path(
+                    reference.removeprefix("artifact:"),
+                    item_field,
+                )
+        if not valid:
+            raise ActiveDesignPacketInputError(
+                code="malformed_reference",
+                field=item_field,
+            )
+
+
+def _decode_packet_entry(
+    raw: object,
+    *,
+    section: ActiveDesignSection,
+    field_prefix: str,
+) -> ActiveDesignPacketEntry:
+    field = f"{field_prefix}.{section}"
+    mapping = _input_mapping(raw, field)
+    _input_required_fields(mapping, ACTIVE_PACKET_ENTRY_KEYS, field)
+    entry_id = _input_string(mapping["entry_id"], f"{field}.entry_id")
+    if entry_id != ACTIVE_PACKET_ENTRY_IDS[section]:
+        raise ActiveDesignPacketInputError(
+            code="malformed_reference",
+            field=f"{field}.entry_id",
+        )
+    responsibility_id = _input_string(
+        mapping["responsibility_id"],
+        f"{field}.responsibility_id",
+    )
+    references = {
+        name: _input_reference_tuple(mapping[name], f"{field}.{name}")
+        for name in ACTIVE_DESIGN_REFERENCE_FIELDS
+    }
+    for name, refs in references.items():
+        _validate_reference_field(name, refs, f"{field}.{name}")
+    return ActiveDesignPacketEntry(
+        entry_id=entry_id,
+        responsibility_id=responsibility_id,
+        clause_refs=references["clause_refs"],
+        owner_refs=references["owner_refs"],
+        source_refs=references["source_refs"],
+        dependency_refs=references["dependency_refs"],
+        output_refs=references["output_refs"],
+        reviewer_refs=references["reviewer_refs"],
+    )
+
+
+def _decode_active_design_packet(
+    raw: object,
+    *,
+    field_prefix: str,
+) -> ActiveDesignPacketValue:
+    """Decode the one complete active-design-packet input shape."""
+    packet = _input_mapping(raw, field_prefix)
+    _input_required_fields(packet, ACTIVE_PACKET_VALUE_KEYS, field_prefix)
+    schema = _input_string(packet["schema"], f"{field_prefix}.schema")
+    if schema != "waterfall.design_packet.v1":
+        raise ActiveDesignPacketInputError(
+            code="unknown_schema",
+            field=f"{field_prefix}.schema",
+        )
+    artifact_values = {
+        name: _validate_relative_posix_path(
+            _input_string(packet[name], f"{field_prefix}.{name}"),
+            f"{field_prefix}.{name}",
+        )
+        for name in (
+            "design_artifact",
+            "design_review_artifact",
+            "document_flow_review_artifact",
+        )
+    }
     document_flow_required = packet["document_flow_required"]
     if not isinstance(document_flow_required, bool):
-        raise RuntimeError(
-            f"{field_prefix}:field_invalid:document_flow_required"
+        raise ActiveDesignPacketInputError(
+            code="wrong_type",
+            field=f"{field_prefix}.document_flow_required",
         )
-    return ActiveDesignPacketConfig(
+    raw_clauses = packet["clause_registry"]
+    if not isinstance(raw_clauses, list):
+        raise ActiveDesignPacketInputError(
+            code="wrong_type",
+            field=f"{field_prefix}.clause_registry",
+        )
+    if not raw_clauses:
+        raise ActiveDesignPacketInputError(
+            code="empty_reference_set",
+            field=f"{field_prefix}.clause_registry",
+        )
+    clauses: list[ActiveDesignClause] = []
+    for index, raw_clause in enumerate(cast(list[object], raw_clauses)):
+        clause_field = f"{field_prefix}.clause_registry[{index}]"
+        clause = _input_mapping(raw_clause, clause_field)
+        _input_required_fields(clause, ("clause_id", "source_ref"), clause_field)
+        clause_id = _input_string(clause["clause_id"], f"{clause_field}.clause_id")
+        source_ref = _input_string(clause["source_ref"], f"{clause_field}.source_ref")
+        if CLAUSE_ID_PATTERN.fullmatch(clause_id) is None:
+            raise ActiveDesignPacketInputError(
+                code="malformed_reference",
+                field=f"{clause_field}.clause_id",
+            )
+        _validate_source_reference(source_ref, f"{clause_field}.source_ref")
+        clauses.append(ActiveDesignClause(clause_id=clause_id, source_ref=source_ref))
+    clause_ids = tuple(clause.clause_id for clause in clauses)
+    if len(set(clause_ids)) != len(clause_ids):
+        raise ActiveDesignPacketInputError(
+            code="duplicate_id",
+            field=f"{field_prefix}.clause_registry",
+        )
+    entries: dict[ActiveDesignSection, ActiveDesignPacketEntry] = {
+        section: _decode_packet_entry(
+            packet[section],
+            section=section,
+            field_prefix=field_prefix,
+        )
+        for section in ACTIVE_DESIGN_SECTIONS
+    }
+    responsibility_ids = {entry.responsibility_id for entry in entries.values()}
+    if len(responsibility_ids) != 1:
+        raise ActiveDesignPacketInputError(
+            code="duplicate_id",
+            field=f"{field_prefix}.responsibility_id",
+        )
+    known_entry_ids = {entry.entry_id for entry in entries.values()}
+    expected_dependencies: dict[ActiveDesignSection, set[str]] = {
+        "abstract_design_frame": set(),
+        "implementation_source_packet": {"abstract-design-frame"},
+        "design_side_effect_map": {"abstract-design-frame"},
+        "design_to_implementation_trace": {
+            "abstract-design-frame",
+            "implementation-source-packet",
+            "design-side-effect-map",
+        },
+    }
+    referenced_clauses: set[str] = set()
+    for section, entry in entries.items():
+        referenced_clauses.update(entry.clause_refs)
+        if not set(entry.clause_refs).issubset(set(clause_ids)):
+            raise ActiveDesignPacketInputError(
+                code="malformed_reference",
+                field=f"{field_prefix}.{section}.clause_refs",
+            )
+        joined = {
+            value.removeprefix("entry:")
+            for value in entry.dependency_refs
+            if value.startswith("entry:")
+        }
+        if entry.entry_id in joined or not joined.issubset(known_entry_ids):
+            raise ActiveDesignPacketInputError(
+                code="malformed_reference",
+                field=f"{field_prefix}.{section}.dependency_refs",
+            )
+        if joined != expected_dependencies[section]:
+            raise ActiveDesignPacketInputError(
+                code="malformed_reference",
+                field=f"{field_prefix}.{section}.dependency_refs",
+            )
+    if referenced_clauses != set(clause_ids):
+        raise ActiveDesignPacketInputError(
+            code="malformed_reference",
+            field=f"{field_prefix}.clause_registry",
+        )
+    return ActiveDesignPacketValue(
         schema=schema,
-        design_artifact=values["design_artifact"],
-        design_review_artifact=values["design_review_artifact"],
-        document_flow_review_artifact=values["document_flow_review_artifact"],
+        design_artifact=artifact_values["design_artifact"],
+        design_review_artifact=artifact_values["design_review_artifact"],
+        document_flow_review_artifact=artifact_values["document_flow_review_artifact"],
         document_flow_required=document_flow_required,
+        clause_registry=tuple(clauses),
+        abstract_design_frame=entries["abstract_design_frame"],
+        implementation_source_packet=entries["implementation_source_packet"],
+        design_side_effect_map=entries["design_side_effect_map"],
+        design_to_implementation_trace=entries["design_to_implementation_trace"],
     )
 
 
 def parse_active_design_packet_input(
     value: str | None,
-) -> ActiveDesignPacketConfig | None:
+) -> ActiveDesignPacketValue | None:
     """Parse one atomic JSON packet supplied by a run entrypoint."""
     if value is None:
         return None
     try:
-        parsed: object = json.loads(value)
+        parsed: object = json.loads(
+            value, object_pairs_hook=_reject_duplicate_json_keys
+        )
+    except _DuplicateJsonKey as exc:
+        raise ActiveDesignPacketInputError(
+            code="duplicate_id",
+            field=f"active_design_packet.{exc.key}",
+        ) from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError("active_design_packet:json_invalid") from exc
-    packet = _as_object_mapping(parsed, "active_design_packet")
-    unknown = sorted(set(packet).difference(ACTIVE_DESIGN_PACKET_FIELDS))
-    if unknown:
-        raise RuntimeError("active_design_packet:field_unknown:" + ",".join(unknown))
-    return normalize_active_design_packet_config(packet, "active_design_packet")
+        raise ActiveDesignPacketInputError(
+            code="json_invalid",
+            field="active_design_packet",
+        ) from exc
+    return _decode_active_design_packet(parsed, field_prefix="active_design_packet")
 
 
-def resolve_active_design_packet_config(
+def resolve_active_design_packet(
     config: TeamConfig,
-    workflow_family: Mapping[str, object] | None = None,
-) -> ActiveDesignPacketConfig:
-    """Resolve the workflow-selected packet or the standard config record."""
+    *,
+    workflow_family: Mapping[str, object] | None,
+    explicit: ActiveDesignPacketValue | None,
+) -> ActiveDesignPacketValue:
+    """Resolve exactly explicit, workflow, then standard packet precedence."""
+    if explicit is not None:
+        return explicit
     if workflow_family is not None and "active_design_packet" in workflow_family:
         raw_packet = workflow_family["active_design_packet"]
         field_prefix = "workflow_family.active_design_packet"
@@ -864,22 +1645,1156 @@ def resolve_active_design_packet_config(
         raw_packet = config.artifact_registry.get("active_design_packet")
         field_prefix = "artifacts.active_design_packet"
     if raw_packet is None:
-        raise RuntimeError("artifacts.active_design_packet:missing")
-    return normalize_active_design_packet_config(raw_packet, field_prefix)
+        raise ActiveDesignPacketInputError(
+            code="missing_field",
+            field="artifacts.active_design_packet",
+        )
+    return _decode_active_design_packet(raw_packet, field_prefix=field_prefix)
 
 
-def manifest_active_design_packet_lines(
-    packet: ActiveDesignPacketConfig,
-) -> list[str]:
-    """Render the run.active_design_packet declaration."""
-    return [
-        "  active_design_packet:",
-        f"    schema: {packet.schema}",
-        f"    design_artifact: {packet.design_artifact}",
-        f"    design_review_artifact: {packet.design_review_artifact}",
-        f"    document_flow_review_artifact: {packet.document_flow_review_artifact}",
-        f"    document_flow_required: {str(packet.document_flow_required).lower()}",
-    ]
+FORBIDDEN_ACTIVE_PACKET_AUTHORITY_NAMES = {
+    "schedule.md",
+    "workflow_monitoring.md",
+    "work_log.md",
+    "decision_log.md",
+}
+
+
+def _packet_references(
+    packet: ActiveDesignPacketValue,
+    field: str,
+) -> tuple[tuple[ActiveDesignSection, int, str], ...]:
+    return tuple(
+        (section, index, reference)
+        for section, entry in packet.section_entries()
+        for index, reference in enumerate(cast(tuple[str, ...], getattr(entry, field)))
+    )
+
+
+def _source_reference_parts(
+    reference: str,
+) -> tuple[str, PurePosixPath, str, str | None]:
+    root, separator, fragment = reference.partition("#")
+    prefix, path_value = root.split(":", 1)
+    fragment_kind = "none"
+    fragment_value: str | None = None
+    if separator:
+        fragment_kind, fragment_value = fragment.split(":", 1)
+    return prefix, PurePosixPath(path_value), fragment_kind, fragment_value
+
+
+def _resolved_source_path(
+    spec: RunBundleSpec,
+    reference: str,
+) -> tuple[Literal["workspace", "agent_canon", "artifact"], Path, PurePosixPath]:
+    prefix, relative_path, _fragment_kind, _fragment_value = _source_reference_parts(
+        reference
+    )
+    if relative_path.name in FORBIDDEN_ACTIVE_PACKET_AUTHORITY_NAMES:
+        raise ValueError(f"forbidden packet authority source: {reference}")
+    if prefix == "artifact":
+        return (
+            "artifact",
+            resolve_report_bundle_artifact_path(
+                spec.report_dir,
+                relative_path.as_posix(),
+            ),
+            relative_path,
+        )
+    resolved = resolve_workspace_document_path(
+        spec.workspace_root,
+        relative_path.as_posix(),
+    ).resolve()
+    workspace = spec.workspace_root.resolve()
+    canon = ROOT.resolve()
+    if resolved.is_relative_to(workspace) and not resolved.is_relative_to(canon):
+        return (
+            "workspace",
+            resolved,
+            PurePosixPath(resolved.relative_to(workspace).as_posix()),
+        )
+    if resolved.is_relative_to(canon):
+        return (
+            "agent_canon",
+            resolved,
+            PurePosixPath(resolved.relative_to(canon).as_posix()),
+        )
+    raise ValueError(f"source reference escaped canonical roots: {reference}")
+
+
+def _ast_symbol_match_count(path: Path, dotted_qualname: str) -> int:
+    tree = ast.parse(path.read_bytes(), filename=path.as_posix())
+    components = dotted_qualname.split(".")
+    nodes: list[ast.AST] = [tree]
+    for component in components:
+        matched: list[ast.AST] = []
+        for node in nodes:
+            body = getattr(node, "body", ())
+            matched.extend(
+                child
+                for child in body
+                if isinstance(
+                    child, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+                )
+                and child.name == component
+            )
+        nodes = matched
+    return len(nodes)
+
+
+def _source_parser_match_count(
+    path: Path,
+    fragment_kind: str,
+    fragment_value: str | None,
+) -> int:
+    if not path.is_file() or path.is_symlink():
+        return 0
+    if fragment_kind == "none":
+        return 1
+    if fragment_value is None:
+        return 0
+    if fragment_kind == "symbol":
+        return _ast_symbol_match_count(path, fragment_value)
+    if fragment_kind == "section":
+        return sum(
+            markdown_heading_anchor(heading) == fragment_value
+            for heading in markdown_document_headings(path)
+        )
+    return 0
+
+
+def _source_reference_result(
+    spec: RunBundleSpec,
+    reference: str,
+) -> SourceReferenceResult:
+    root_key, resolved_path, relative_path = _resolved_source_path(spec, reference)
+    _prefix, _path, fragment_kind, fragment_value = _source_reference_parts(reference)
+    match_count = _source_parser_match_count(
+        resolved_path,
+        fragment_kind,
+        fragment_value,
+    )
+    digest = (
+        hashlib.sha256(resolved_path.read_bytes()).hexdigest()
+        if resolved_path.is_file()
+        else ""
+    )
+    return SourceReferenceResult(
+        declared_ref=reference,
+        root_key=root_key,
+        resolved_path=resolved_path,
+        relative_path=relative_path,
+        fragment_kind=cast(Literal["none", "symbol", "section"], fragment_kind),
+        fragment_value=fragment_value,
+        sha256=digest,
+        parser_match_count=match_count,
+    )
+
+
+def _dependency_root_for_paths(
+    spec: RunBundleSpec,
+    source: Path,
+    target: Path,
+) -> tuple[Literal["workspace", "agent_canon"], Path]:
+    canon = ROOT.resolve()
+    workspace = spec.workspace_root.resolve()
+    if source.is_relative_to(canon) and target.is_relative_to(canon):
+        return "agent_canon", canon
+    if source.is_relative_to(workspace) and target.is_relative_to(workspace):
+        return "workspace", workspace
+    raise ValueError("dependency endpoints resolve to different canonical roots")
+
+
+def _canonical_dependency_rows(root: Path) -> tuple[tuple[str, str, str, str], ...]:
+    client = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE)
+    try:
+        status = client.status()
+        integration = status.payload.get("integration_record")
+        if status.status != "fresh" or not isinstance(integration, Mapping):
+            raise RuntimeError(
+                "canonical dependency graph is not verified and fresh: "
+                f"status={status.status} reason={status.payload.get('reason')}"
+            )
+        integration_fields = cast(Mapping[str, object], integration)
+        if (
+            integration_fields.get("verified") is not True
+            or integration_fields.get("profile") != "default"
+            or integration_fields.get("source_snapshot_profile") != "parent"
+        ):
+            raise RuntimeError("canonical dependency graph integration is invalid")
+        response = client.query(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+        if response.status != "fresh":
+            raise RuntimeError(
+                "canonical dependency query is not fresh: "
+                f"status={response.status} reason={response.payload.get('reason')}"
+            )
+        return tuple(
+            (fact.direction, fact.kind, fact.source, fact.target)
+            for fact in response.dependency_facts
+        )
+    except GraphClientError as error:
+        raise RuntimeError(f"canonical dependency graph failed: {error}") from error
+
+
+def _dependency_reference_result(
+    spec: RunBundleSpec,
+    reference: str,
+    rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]],
+) -> DependencyReferenceResult:
+    prefix, remainder = reference.split(":repo:", 1)
+    direction, kind = prefix.removeprefix("header:").split(":", 1)
+    source_value, target_value = remainder.split("->repo:", 1)
+    source_ref = f"repo:{source_value}"
+    target_ref = f"repo:{target_value}"
+    _source_key, source, _source_relative = _resolved_source_path(spec, source_ref)
+    _target_key, target, _target_relative = _resolved_source_path(spec, target_ref)
+    root_key, dependency_root = _dependency_root_for_paths(spec, source, target)
+    source_path = PurePosixPath(source.relative_to(dependency_root).as_posix())
+    target_path = PurePosixPath(target.relative_to(dependency_root).as_posix())
+    normalized_key = (
+        f"header:{direction}:{kind}:repo:{source_path.as_posix()}"
+        f"->repo:{target_path.as_posix()}"
+    )
+    rows = rows_by_root.get(dependency_root)
+    if rows is None:
+        rows = _canonical_dependency_rows(dependency_root)
+        rows_by_root[dependency_root] = rows
+    match_count = sum(
+        row == (direction, kind, source_path.as_posix(), target_path.as_posix())
+        for row in rows
+    )
+    return DependencyReferenceResult(
+        declared_ref=reference,
+        dependency_root_key=root_key,
+        normalized_key=normalized_key,
+        source_path=source_path,
+        target_path=target_path,
+        source_sha256=hashlib.sha256(source.read_bytes()).hexdigest()
+        if source.is_file()
+        else "",
+        target_sha256=hashlib.sha256(target.read_bytes()).hexdigest()
+        if target.is_file()
+        else "",
+        graph_match_count=match_count,
+    )
+
+
+def _distinct_packet_references(
+    packet: ActiveDesignPacketValue,
+    field: str,
+) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            reference
+            for _section, _index, reference in _packet_references(packet, field)
+        )
+    )
+
+
+def build_active_design_reference_context(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketValue,
+    workflow_family: Mapping[str, object] | None,
+    *,
+    artifact_names: tuple[str, ...],
+) -> ActiveDesignReferenceContext:
+    """Construct the sole authoritative active-design reference projection."""
+    del workflow_family
+    role_output_projections = tuple(
+        RoleOutputProjection(
+            role_ref=f"role:{role.id}",
+            output_refs=tuple(
+                f"artifact:{output}"
+                for output in selected_role_outputs(spec.config, role, packet)
+            ),
+        )
+        for role in spec.roles
+    )
+    role_outputs = {
+        projection.role_ref: projection.output_refs
+        for projection in role_output_projections
+    }
+    reviewer_refs = tuple(
+        dict.fromkeys(
+            reference
+            for _section, _index, reference in _packet_references(
+                packet,
+                "reviewer_refs",
+            )
+        )
+    )
+    review_outputs = {
+        f"artifact:{packet.design_review_artifact}",
+        f"artifact:{packet.document_flow_review_artifact}",
+    }
+    reviewer_projections: list[ReviewerArtifactProjection] = []
+    for reviewer_ref in reviewer_refs:
+        matches = tuple(
+            output
+            for output in role_outputs.get(reviewer_ref, ())
+            if output in review_outputs
+        )
+        if len(matches) == 1:
+            reviewer_projections.append(
+                ReviewerArtifactProjection(reviewer_ref, matches[0])
+            )
+    source_refs = list(_distinct_packet_references(packet, "source_refs"))
+    source_refs.extend(
+        clause.source_ref
+        for clause in packet.clause_registry
+        if clause.source_ref not in source_refs
+    )
+    source_results = tuple(_source_reference_result(spec, ref) for ref in source_refs)
+    dependency_refs = tuple(
+        reference
+        for reference in _distinct_packet_references(packet, "dependency_refs")
+        if reference.startswith("header:")
+    )
+    rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]] = {}
+    dependency_results = tuple(
+        _dependency_reference_result(spec, reference, rows_by_root)
+        for reference in dependency_refs
+    )
+    planned_paths = tuple(
+        PurePosixPath(path)
+        for path in (
+            *artifact_names,
+            AUTHORITY_FILE_NAME,
+            authority_baseline_path(Path(AUTHORITY_FILE_NAME)).name,
+        )
+    )
+    output_results = tuple(
+        OutputReferenceResult(
+            output_ref=reference,
+            relative_path=PurePosixPath(reference.removeprefix("artifact:")),
+            planned_count=planned_paths.count(
+                PurePosixPath(reference.removeprefix("artifact:"))
+            ),
+        )
+        for reference in _distinct_packet_references(packet, "output_refs")
+    )
+    return ActiveDesignReferenceContext(
+        workspace_root=spec.workspace_root.resolve(),
+        report_dir=spec.report_dir.resolve(),
+        source_results=source_results,
+        dependency_results=dependency_results,
+        role_output_projections=role_output_projections,
+        reviewer_artifact_projections=tuple(reviewer_projections),
+        clause_results=tuple(
+            ClauseReferenceResult(clause.clause_id, clause.source_ref)
+            for clause in packet.clause_registry
+        ),
+        output_results=output_results,
+        planned_output_paths=frozenset(planned_paths),
+    )
+
+
+def _packet_entry_mapping(entry: ActiveDesignPacketEntry) -> dict[str, object]:
+    return {
+        "entry_id": entry.entry_id,
+        "responsibility_id": entry.responsibility_id,
+        "clause_refs": list(entry.clause_refs),
+        "owner_refs": list(entry.owner_refs),
+        "source_refs": list(entry.source_refs),
+        "dependency_refs": list(entry.dependency_refs),
+        "output_refs": list(entry.output_refs),
+        "reviewer_refs": list(entry.reviewer_refs),
+    }
+
+
+def active_design_packet_mapping(packet: ActiveDesignPacketValue) -> dict[str, object]:
+    """Return the exact manifest/config packet mapping."""
+    return {
+        "schema": packet.schema,
+        "design_artifact": packet.design_artifact,
+        "design_review_artifact": packet.design_review_artifact,
+        "document_flow_review_artifact": packet.document_flow_review_artifact,
+        "document_flow_required": packet.document_flow_required,
+        "clause_registry": [
+            {"clause_id": clause.clause_id, "source_ref": clause.source_ref}
+            for clause in packet.clause_registry
+        ],
+        **{
+            section: _packet_entry_mapping(entry)
+            for section, entry in packet.section_entries()
+        },
+    }
+
+
+def active_design_reference_projection_mapping(
+    context: ActiveDesignReferenceContext,
+) -> dict[str, object]:
+    """Return the exact persisted reference projection without absolute paths."""
+    return {
+        "source_results": [
+            {
+                "declared_ref": result.declared_ref,
+                "root_key": result.root_key,
+                "relative_path": result.relative_path.as_posix(),
+                "fragment_kind": result.fragment_kind,
+                "fragment_value": result.fragment_value,
+                "sha256": result.sha256,
+                "parser_match_count": result.parser_match_count,
+            }
+            for result in context.source_results
+        ],
+        "dependency_results": [
+            {
+                "declared_ref": result.declared_ref,
+                "dependency_root_key": result.dependency_root_key,
+                "normalized_key": result.normalized_key,
+                "source_path": result.source_path.as_posix(),
+                "target_path": result.target_path.as_posix(),
+                "source_sha256": result.source_sha256,
+                "target_sha256": result.target_sha256,
+                "graph_match_count": result.graph_match_count,
+            }
+            for result in context.dependency_results
+        ],
+        "role_output_projections": [
+            {
+                "role_ref": result.role_ref,
+                "output_refs": list(result.output_refs),
+            }
+            for result in context.role_output_projections
+        ],
+        "reviewer_artifact_projections": [
+            {
+                "reviewer_ref": result.reviewer_ref,
+                "review_artifact_ref": result.review_artifact_ref,
+            }
+            for result in context.reviewer_artifact_projections
+        ],
+        "clause_results": [
+            {"clause_id": result.clause_id, "source_ref": result.source_ref}
+            for result in context.clause_results
+        ],
+        "output_results": [
+            {
+                "output_ref": result.output_ref,
+                "relative_path": result.relative_path.as_posix(),
+                "planned_count": result.planned_count,
+            }
+            for result in context.output_results
+        ],
+        "planned_output_paths": sorted(
+            path.as_posix() for path in context.planned_output_paths
+        ),
+    }
+
+
+def _encoded_violation_component(value: str) -> str:
+    return quote(
+        value, safe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-"
+    )
+
+
+def render_active_design_packet_violation(
+    violation: ActiveDesignPacketViolation,
+) -> str:
+    """Render the sole closed public active-packet blocker grammar."""
+    if isinstance(violation, ManifestPacketViolation):
+        if violation.kind == "manifest_missing":
+            return "team_manifest.yaml:missing"
+        if violation.kind == "manifest_invalid":
+            return "team_manifest.yaml:active_design_packet_field_invalid:manifest"
+        if violation.kind == "packet_missing":
+            return "team_manifest.yaml:active_design_packet_missing"
+        if violation.field is None:
+            raise ValueError("manifest packet violation requires a field")
+        field = _encoded_violation_component(violation.field)
+        if violation.kind == "field_missing":
+            return f"team_manifest.yaml:active_design_packet_field_missing:{field}"
+        if violation.kind == "field_invalid":
+            return f"team_manifest.yaml:active_design_packet_field_invalid:{field}"
+        if violation.kind == "schema_unknown":
+            if violation.observed_schema is None:
+                raise ValueError("schema violation requires observed_schema")
+            return (
+                "team_manifest.yaml:active_design_packet_schema_unknown:"
+                + _encoded_violation_component(violation.observed_schema)
+            )
+        if violation.kind == "path_outside_bundle":
+            return (
+                f"team_manifest.yaml:active_design_packet_path_outside_bundle:{field}"
+            )
+        raise ValueError(f"unknown manifest packet violation: {violation.kind}")
+    if isinstance(violation, ReferencePacketViolation):
+        return (
+            "team_manifest.yaml:active_design_packet_reference_invalid:"
+            f"{violation.section}:{violation.field}:{violation.input_index}:"
+            f"{violation.reason}"
+        )
+    if isinstance(violation, DesignArtifactViolation):
+        path = _encoded_violation_component(violation.artifact_path.as_posix())
+        if violation.reason == "section_empty_or_missing":
+            if violation.section_slug is None:
+                raise ValueError("section violation requires section_slug")
+            return f"{path}:section_empty_or_missing:{_encoded_violation_component(violation.section_slug)}"
+        if violation.section_slug is not None:
+            raise ValueError("non-section violation cannot carry section_slug")
+        return f"{path}:{violation.reason}"
+    return (
+        f"{_encoded_violation_component(violation.artifact_path.as_posix())}:"
+        f"{violation.reason}"
+    )
+
+
+def _reference_semantic_violations(
+    packet: ActiveDesignPacketValue,
+    context: ActiveDesignReferenceContext,
+) -> list[ActiveDesignPacketViolation]:
+    violations: list[ActiveDesignPacketViolation] = []
+    clause_ids = {result.clause_id for result in context.clause_results}
+    role_refs = {result.role_ref for result in context.role_output_projections}
+    reviewer_map = {
+        result.reviewer_ref: result.review_artifact_ref
+        for result in context.reviewer_artifact_projections
+    }
+    distinct_reviewer_refs = _distinct_packet_references(packet, "reviewer_refs")
+    role_output_map = {
+        result.role_ref: result.output_refs
+        for result in context.role_output_projections
+    }
+    review_artifacts = {
+        f"artifact:{packet.design_review_artifact}",
+        f"artifact:{packet.document_flow_review_artifact}",
+    }
+    invalid_reviewer_refs = {
+        reviewer
+        for reviewer in distinct_reviewer_refs
+        if len(
+            tuple(
+                output
+                for output in role_output_map.get(reviewer, ())
+                if output in review_artifacts
+            )
+        )
+        != 1
+    }
+    required_review_artifacts = [f"artifact:{packet.design_review_artifact}"]
+    if packet.document_flow_required:
+        required_review_artifacts.append(
+            f"artifact:{packet.document_flow_review_artifact}"
+        )
+    for artifact in required_review_artifacts:
+        matching_reviewers = tuple(
+            reviewer
+            for reviewer, projected_artifact in reviewer_map.items()
+            if projected_artifact == artifact
+        )
+        if len(matching_reviewers) != 1:
+            invalid_reviewer_refs.update(matching_reviewers or distinct_reviewer_refs)
+    source_map = {result.declared_ref: result for result in context.source_results}
+    dependency_map = {
+        result.declared_ref: result for result in context.dependency_results
+    }
+    output_map = {result.output_ref: result for result in context.output_results}
+    for section, entry in packet.section_entries():
+        for index, clause in enumerate(entry.clause_refs):
+            if clause not in clause_ids:
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "clause_refs",
+                        index,
+                        "clause_unknown",
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 0, index),
+                    )
+                )
+        for index, owner in enumerate(entry.owner_refs):
+            if owner not in role_refs:
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "owner_refs",
+                        index,
+                        "owner_unknown",
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 1, index),
+                    )
+                )
+        for index, source in enumerate(entry.source_refs):
+            result = source_map.get(source)
+            reason = None
+            if result is None or not result.sha256:
+                reason = "source_missing"
+            elif result.parser_match_count != 1:
+                reason = "source_fragment_mismatch"
+            if reason is not None:
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "source_refs",
+                        index,
+                        reason,
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 2, index),
+                    )
+                )
+        for index, dependency in enumerate(entry.dependency_refs):
+            if dependency.startswith("entry:"):
+                continue
+            result = dependency_map.get(dependency)
+            if result is None or result.graph_match_count != 1:
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "dependency_refs",
+                        index,
+                        "dependency_edge_missing",
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 3, index),
+                    )
+                )
+        for index, output in enumerate(entry.output_refs):
+            result = output_map.get(output)
+            if result is None or result.planned_count != 1:
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "output_refs",
+                        index,
+                        "output_missing",
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 4, index),
+                    )
+                )
+        for index, reviewer in enumerate(entry.reviewer_refs):
+            if (
+                reviewer in invalid_reviewer_refs
+                or reviewer_map.get(reviewer) not in review_artifacts
+            ):
+                violations.append(
+                    ReferencePacketViolation(
+                        section,
+                        "reviewer_refs",
+                        index,
+                        "reviewer_output_mismatch",
+                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 5, index),
+                    )
+                )
+    return violations
+
+
+def _design_artifact_violations(
+    packet: ActiveDesignPacketValue,
+    report_dir: Path,
+) -> list[ActiveDesignPacketViolation]:
+    path = report_dir / packet.design_artifact
+    relative = PurePosixPath(packet.design_artifact)
+    if not path.is_file() or path.is_symlink():
+        return [DesignArtifactViolation(relative, "missing", None, (2, 0, 0, 0))]
+    text = path.read_text(encoding="utf-8")
+    violations: list[ActiveDesignPacketViolation] = []
+    if is_placeholder_only_section(text):
+        violations.append(
+            DesignArtifactViolation(
+                relative, "template_or_placeholder_remaining", None, (2, 0, 0, 0)
+            )
+        )
+    for index, (heading, slug) in enumerate(
+        (
+            ("## Abstract Design Frame", "abstract_design_frame"),
+            ("## Implementation Source Packet", "implementation_source_packet"),
+            ("## Design Side-Effect Map", "design_side_effect_map"),
+            ("## Design-To-Implementation Trace", "design-to-implementation_trace"),
+        ),
+        start=1,
+    ):
+        if not section_has_content(text, heading):
+            violations.append(
+                DesignArtifactViolation(
+                    relative, "section_empty_or_missing", slug, (2, 0, index, 0)
+                )
+            )
+    return violations
+
+
+def _review_artifact_violations(
+    report_dir: Path,
+    packet: ActiveDesignPacketValue,
+    review_artifact: str,
+    order: int,
+) -> list[ActiveDesignPacketViolation]:
+    review_path = report_dir / review_artifact
+    relative = PurePosixPath(review_artifact)
+    if not review_path.is_file() or review_path.is_symlink():
+        return [
+            ReviewArtifactViolation(
+                relative, "design_artifact_path_missing", (order, 0, 0, 0)
+            )
+        ]
+    design_path = report_dir / packet.design_artifact
+    expected_sha = (
+        hashlib.sha256(design_path.read_bytes()).hexdigest()
+        if design_path.is_file()
+        else ""
+    )
+    identity = parse_review_identity(review_path.read_text(encoding="utf-8"))
+    violations: list[ActiveDesignPacketViolation] = []
+    if identity.design_artifact_path is None:
+        violations.append(
+            ReviewArtifactViolation(
+                relative, "design_artifact_path_missing", (order, 0, 0, 0)
+            )
+        )
+    elif identity.design_artifact_path != packet.design_artifact:
+        violations.append(
+            ReviewArtifactViolation(
+                relative, "design_artifact_path_mismatch", (order, 0, 1, 0)
+            )
+        )
+    if identity.review_target_sha256 is None:
+        violations.append(
+            ReviewArtifactViolation(
+                relative, "review_target_sha256_missing", (order, 1, 0, 0)
+            )
+        )
+    elif identity.review_target_sha256 != expected_sha:
+        violations.append(
+            ReviewArtifactViolation(
+                relative, "review_target_sha256_mismatch", (order, 1, 1, 0)
+            )
+        )
+    if not identity.decision_approved:
+        violations.append(
+            ReviewArtifactViolation(relative, "decision_not_approve", (order, 2, 0, 0))
+        )
+    return violations
+
+
+def validate_materialized_active_design_packet(
+    value: ActiveDesignPacketValue,
+    context: ActiveDesignReferenceContext,
+    *,
+    gate: Literal["materialization", "design", "document_flow", "implementation"],
+) -> tuple[ActiveDesignPacketViolation, ...]:
+    """Validate shared packet semantics without decoding or reparsing its projection."""
+    violations = _reference_semantic_violations(value, context)
+    if gate in {"design", "implementation"}:
+        violations.extend(_design_artifact_violations(value, context.report_dir))
+        if not any(
+            isinstance(item, DesignArtifactViolation) and item.reason == "missing"
+            for item in violations
+        ):
+            violations.extend(
+                _review_artifact_violations(
+                    context.report_dir,
+                    value,
+                    value.design_review_artifact,
+                    3,
+                )
+            )
+            if value.document_flow_required:
+                violations.extend(
+                    _review_artifact_violations(
+                        context.report_dir,
+                        value,
+                        value.document_flow_review_artifact,
+                        4,
+                    )
+                )
+    elif gate == "document_flow" and value.document_flow_required:
+        violations.extend(
+            _review_artifact_violations(
+                context.report_dir,
+                value,
+                value.document_flow_review_artifact,
+                4,
+            )
+        )
+    return tuple(sorted(violations, key=lambda item: item.order_key))
+
+
+def _manifest_violation(
+    kind: str,
+    field: str | None = None,
+    observed_schema: str | None = None,
+    order: int = 0,
+) -> ManifestPacketViolation:
+    return ManifestPacketViolation(kind, field, observed_schema, (0, order, 0, 0))
+
+
+def _projection_mapping(value: object, field: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError(field)
+    mapping = cast(dict[object, object], value)
+    if not all(isinstance(key, str) for key in mapping):
+        raise ValueError(field)
+    return cast(dict[str, object], mapping)
+
+
+def _projection_list(value: object, field: str) -> list[object]:
+    if not isinstance(value, list):
+        raise ValueError(field)
+    return cast(list[object], value)
+
+
+def _projection_string(mapping: Mapping[str, object], field: str) -> str:
+    value = mapping.get(field)
+    if not isinstance(value, str):
+        raise ValueError(field)
+    return value
+
+
+def _projection_int(mapping: Mapping[str, object], field: str) -> int:
+    value = mapping.get(field)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(field)
+    return value
+
+
+def _projection_optional_string(
+    mapping: Mapping[str, object],
+    field: str,
+) -> str | None:
+    value = mapping.get(field)
+    if value is not None and not isinstance(value, str):
+        raise ValueError(field)
+    return value
+
+
+def _loader_reference_violation(
+    packet: ActiveDesignPacketValue,
+    declared_ref: str,
+    reason: str,
+) -> ReferencePacketViolation:
+    for field in ("source_refs", "dependency_refs", "output_refs"):
+        for section, index, reference in _packet_references(packet, field):
+            if reference == declared_ref:
+                return ReferencePacketViolation(
+                    section,
+                    field,
+                    index,
+                    reason,
+                    (
+                        1,
+                        ACTIVE_DESIGN_SECTIONS.index(section),
+                        ACTIVE_DESIGN_REFERENCE_FIELDS.index(field),
+                        index,
+                    ),
+                )
+    clause = next(
+        (item for item in packet.clause_registry if item.source_ref == declared_ref),
+        None,
+    )
+    if clause is not None:
+        for section, entry in packet.section_entries():
+            if clause.clause_id in entry.clause_refs:
+                index = entry.clause_refs.index(clause.clause_id)
+                return ReferencePacketViolation(
+                    section,
+                    "clause_refs",
+                    index,
+                    reason,
+                    (1, ACTIVE_DESIGN_SECTIONS.index(section), 0, index),
+                )
+    return ReferencePacketViolation(
+        "abstract_design_frame",
+        "source_refs",
+        0,
+        "projection_mismatch",
+        (1, 0, 2, 0),
+    )
+
+
+def _load_source_results(
+    packet: ActiveDesignPacketValue,
+    rows: object,
+    workspace_root: Path,
+    report_dir: Path,
+) -> tuple[tuple[SourceReferenceResult, ...], list[ActiveDesignPacketViolation]]:
+    results: list[SourceReferenceResult] = []
+    violations: list[ActiveDesignPacketViolation] = []
+    for raw in _projection_list(rows, "source_results"):
+        row = _projection_mapping(raw, "source_results[]")
+        declared_ref = _projection_string(row, "declared_ref")
+        root_key = _projection_string(row, "root_key")
+        relative = PurePosixPath(_projection_string(row, "relative_path"))
+        if root_key == "workspace":
+            base = workspace_root
+        elif root_key == "agent_canon":
+            base = ROOT.resolve()
+        elif root_key == "artifact":
+            base = report_dir
+        else:
+            raise ValueError("source_results[].root_key")
+        resolved = (base / Path(relative.as_posix())).resolve()
+        if not resolved.is_relative_to(base.resolve()) or resolved.is_symlink():
+            violations.append(
+                _loader_reference_violation(packet, declared_ref, "source_missing")
+            )
+        persisted_sha = _projection_string(row, "sha256")
+        current_sha = (
+            hashlib.sha256(resolved.read_bytes()).hexdigest()
+            if resolved.is_file()
+            else ""
+        )
+        if current_sha != persisted_sha:
+            violations.append(
+                _loader_reference_violation(
+                    packet,
+                    declared_ref,
+                    "source_digest_mismatch" if current_sha else "source_missing",
+                )
+            )
+        fragment_kind = _projection_string(row, "fragment_kind")
+        if fragment_kind not in {"none", "symbol", "section"}:
+            raise ValueError("source_results[].fragment_kind")
+        results.append(
+            SourceReferenceResult(
+                declared_ref=declared_ref,
+                root_key=root_key,
+                resolved_path=resolved,
+                relative_path=relative,
+                fragment_kind=cast(Literal["none", "symbol", "section"], fragment_kind),
+                fragment_value=_projection_optional_string(row, "fragment_value"),
+                sha256=persisted_sha,
+                parser_match_count=_projection_int(row, "parser_match_count"),
+            )
+        )
+    return tuple(results), violations
+
+
+def _load_dependency_results(
+    packet: ActiveDesignPacketValue,
+    rows: object,
+    workspace_root: Path,
+) -> tuple[tuple[DependencyReferenceResult, ...], list[ActiveDesignPacketViolation]]:
+    results: list[DependencyReferenceResult] = []
+    violations: list[ActiveDesignPacketViolation] = []
+    for raw in _projection_list(rows, "dependency_results"):
+        row = _projection_mapping(raw, "dependency_results[]")
+        declared_ref = _projection_string(row, "declared_ref")
+        root_key = _projection_string(row, "dependency_root_key")
+        if root_key == "workspace":
+            base = workspace_root
+        elif root_key == "agent_canon":
+            base = ROOT.resolve()
+        else:
+            raise ValueError("dependency_results[].dependency_root_key")
+        source_path = PurePosixPath(_projection_string(row, "source_path"))
+        target_path = PurePosixPath(_projection_string(row, "target_path"))
+        source = (base / source_path.as_posix()).resolve()
+        target = (base / target_path.as_posix()).resolve()
+        source_sha = _projection_string(row, "source_sha256")
+        target_sha = _projection_string(row, "target_sha256")
+        current_source = (
+            hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else ""
+        )
+        current_target = (
+            hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else ""
+        )
+        if current_source != source_sha or current_target != target_sha:
+            violations.append(
+                _loader_reference_violation(
+                    packet, declared_ref, "source_digest_mismatch"
+                )
+            )
+        results.append(
+            DependencyReferenceResult(
+                declared_ref=declared_ref,
+                dependency_root_key=root_key,
+                normalized_key=_projection_string(row, "normalized_key"),
+                source_path=source_path,
+                target_path=target_path,
+                source_sha256=source_sha,
+                target_sha256=target_sha,
+                graph_match_count=_projection_int(row, "graph_match_count"),
+            )
+        )
+    return tuple(results), violations
+
+
+def _load_role_projections(rows: object) -> tuple[RoleOutputProjection, ...]:
+    results: list[RoleOutputProjection] = []
+    for raw in _projection_list(rows, "role_output_projections"):
+        row = _projection_mapping(raw, "role_output_projections[]")
+        outputs = tuple(
+            _projection_string({"value": value}, "value")
+            for value in _projection_list(row.get("output_refs"), "output_refs")
+        )
+        results.append(
+            RoleOutputProjection(_projection_string(row, "role_ref"), outputs)
+        )
+    return tuple(results)
+
+
+def _load_reviewer_projections(rows: object) -> tuple[ReviewerArtifactProjection, ...]:
+    return tuple(
+        ReviewerArtifactProjection(
+            _projection_string(row, "reviewer_ref"),
+            _projection_string(row, "review_artifact_ref"),
+        )
+        for raw in _projection_list(rows, "reviewer_artifact_projections")
+        if (row := _projection_mapping(raw, "reviewer_artifact_projections[]"))
+    )
+
+
+def _load_clause_results(rows: object) -> tuple[ClauseReferenceResult, ...]:
+    return tuple(
+        ClauseReferenceResult(
+            _projection_string(row, "clause_id"),
+            _projection_string(row, "source_ref"),
+        )
+        for raw in _projection_list(rows, "clause_results")
+        if (row := _projection_mapping(raw, "clause_results[]"))
+    )
+
+
+def _load_output_results(rows: object) -> tuple[OutputReferenceResult, ...]:
+    return tuple(
+        OutputReferenceResult(
+            _projection_string(row, "output_ref"),
+            PurePosixPath(_projection_string(row, "relative_path")),
+            _projection_int(row, "planned_count"),
+        )
+        for raw in _projection_list(rows, "output_results")
+        if (row := _projection_mapping(raw, "output_results[]"))
+    )
+
+
+def load_materialized_active_design_packet(
+    report_dir: Path,
+) -> MaterializedActiveDesignPacketResult:
+    """Load one persisted packet and projection without consulting live config."""
+    manifest_path = report_dir / "team_manifest.yaml"
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("manifest_missing"),),
+        )
+    try:
+        parsed: object = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("manifest_invalid"),),
+        )
+    if not isinstance(parsed, dict):
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("manifest_invalid"),),
+        )
+    parsed_mapping = cast(dict[object, object], parsed)
+    raw_run = parsed_mapping.get("run")
+    if not isinstance(raw_run, dict):
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("manifest_invalid"),),
+        )
+    run_mapping = cast(dict[object, object], raw_run)
+    if not all(isinstance(key, str) for key in run_mapping):
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("manifest_invalid"),),
+        )
+    run = cast(dict[str, object], run_mapping)
+    if "active_design_packet" not in run:
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation("packet_missing"),),
+        )
+    try:
+        packet = _decode_active_design_packet(
+            run["active_design_packet"],
+            field_prefix="run.active_design_packet",
+        )
+    except ActiveDesignPacketInputError as error:
+        field = error.field.removeprefix("run.active_design_packet.")
+        kind = {
+            "missing_field": "field_missing",
+            "unknown_schema": "schema_unknown",
+        }.get(error.code, "field_invalid")
+        observed_schema = None
+        if error.code == "unknown_schema" and isinstance(
+            run["active_design_packet"], dict
+        ):
+            schema = cast(dict[str, object], run["active_design_packet"]).get("schema")
+            observed_schema = schema if isinstance(schema, str) else ""
+        return MaterializedActiveDesignPacketResult(
+            None,
+            None,
+            (_manifest_violation(kind, field, observed_schema),),
+        )
+    try:
+        workspace_root = Path(_projection_string(run, "workspace_root")).resolve()
+        persisted_report_dir = Path(_projection_string(run, "report_dir")).resolve()
+        if persisted_report_dir != report_dir.resolve():
+            raise ValueError("run.report_dir")
+        projection = _projection_mapping(
+            run.get("active_design_packet_reference_projection"),
+            "active_design_packet_reference_projection",
+        )
+        expected_keys = {
+            "source_results",
+            "dependency_results",
+            "role_output_projections",
+            "reviewer_artifact_projections",
+            "clause_results",
+            "output_results",
+            "planned_output_paths",
+        }
+        if set(projection) != expected_keys:
+            raise ValueError("active_design_packet_reference_projection")
+        source_results, source_violations = _load_source_results(
+            packet,
+            projection["source_results"],
+            workspace_root,
+            persisted_report_dir,
+        )
+        dependency_results, dependency_violations = _load_dependency_results(
+            packet,
+            projection["dependency_results"],
+            workspace_root,
+        )
+        context = ActiveDesignReferenceContext(
+            workspace_root=workspace_root,
+            report_dir=persisted_report_dir,
+            source_results=source_results,
+            dependency_results=dependency_results,
+            role_output_projections=_load_role_projections(
+                projection["role_output_projections"]
+            ),
+            reviewer_artifact_projections=_load_reviewer_projections(
+                projection["reviewer_artifact_projections"]
+            ),
+            clause_results=_load_clause_results(projection["clause_results"]),
+            output_results=_load_output_results(projection["output_results"]),
+            planned_output_paths=frozenset(
+                PurePosixPath(_projection_string({"path": value}, "path"))
+                for value in _projection_list(
+                    projection["planned_output_paths"],
+                    "planned_output_paths",
+                )
+            ),
+        )
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return MaterializedActiveDesignPacketResult(
+            packet,
+            None,
+            (
+                _manifest_violation(
+                    "field_invalid",
+                    "active_design_packet_reference_projection",
+                ),
+            ),
+        )
+    violations = tuple(
+        sorted(
+            [*source_violations, *dependency_violations],
+            key=lambda item: item.order_key,
+        )
+    )
+    return MaterializedActiveDesignPacketResult(packet, context, violations)
 
 
 def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
@@ -1378,14 +3293,12 @@ def workflow_topology_policy_violations(
         always_on_raw = roles.get("always_on")
         specialists_raw = roles.get("specialists")
         if not isinstance(always_on_raw, list) or not all(
-            isinstance(role_id, str)
-            for role_id in cast(list[object], always_on_raw)
+            isinstance(role_id, str) for role_id in cast(list[object], always_on_raw)
         ):
             violations.append((family_id, "malformed-always-on"))
             continue
         if not isinstance(specialists_raw, list) or not all(
-            isinstance(role_id, str)
-            for role_id in cast(list[object], specialists_raw)
+            isinstance(role_id, str) for role_id in cast(list[object], specialists_raw)
         ):
             violations.append((family_id, "malformed-specialists"))
             continue
@@ -1467,7 +3380,9 @@ def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str
     return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
 
 
-def parse_agent_type_selections(raw_values: tuple[str, ...]) -> tuple[AgentTypeSelection, ...]:
+def parse_agent_type_selections(
+    raw_values: tuple[str, ...],
+) -> tuple[AgentTypeSelection, ...]:
     """Parse explicit role-to-agent selections from parent-packet CLI values."""
     selections: list[AgentTypeSelection] = []
     for raw_value in raw_values:
@@ -1562,7 +3477,9 @@ def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults",
     )
-    waves = _as_mapping_tuple(topology.get("stage_waves"), "role_topology_defaults.stage_waves")
+    waves = _as_mapping_tuple(
+        topology.get("stage_waves"), "role_topology_defaults.stage_waves"
+    )
     return tuple(
         StageWave(
             id=_as_required_string(wave.get("id"), "stage_waves[].id"),
@@ -1666,11 +3583,9 @@ def _initial_stage_wave_slots(
         set(),
         selections,
     )
-    return tuple(
-        slot
-        for slot in slots
-        if slot.role_id not in {"verifier", "auditor"}
-    )[:active_subagents]
+    return tuple(slot for slot in slots if slot.role_id not in {"verifier", "auditor"})[
+        :active_subagents
+    ]
 
 
 def _chunk_wave_slots(
@@ -1827,10 +3742,7 @@ def format_subagent_role_instance_wave_chunks(
 ) -> str:
     """Render follow-up role-instance waves in a machine-readable summary form."""
     return ";".join(
-        f"WAVE-{index + 2}="
-        + ",".join(
-            slot.executable_identity for slot in wave
-        )
+        f"WAVE-{index + 2}=" + ",".join(slot.executable_identity for slot in wave)
         for index, wave in enumerate(waves)
     )
 
@@ -1973,9 +3885,9 @@ def codex_agent_model_matrix_for_roles(
     return tuple(dict.fromkeys(rows))
 
 
-def active_design_packet_artifact_map(
+def selected_packet_artifact_paths(
     config: TeamConfig,
-    packet: ActiveDesignPacketConfig,
+    packet: ActiveDesignPacketValue,
 ) -> dict[str, str]:
     """Map standard design artifact names to the selected packet outputs."""
     return {
@@ -1988,21 +3900,21 @@ def active_design_packet_artifact_map(
 def selected_role_outputs(
     config: TeamConfig,
     role: Role,
-    packet: ActiveDesignPacketConfig,
+    packet: ActiveDesignPacketValue,
 ) -> tuple[str, ...]:
     """Return role outputs aligned with the selected design packet."""
-    artifact_map = active_design_packet_artifact_map(config, packet)
+    artifact_map = selected_packet_artifact_paths(config, packet)
     return tuple(artifact_map.get(output, output) for output in role.required_outputs)
 
 
 def selected_artifact_name(
     config: TeamConfig,
     artifact_key: str,
-    packet: ActiveDesignPacketConfig,
+    packet: ActiveDesignPacketValue,
 ) -> str:
     """Resolve one logical artifact key through the selected design packet."""
     artifact_name = config.artifacts[artifact_key]
-    return active_design_packet_artifact_map(config, packet).get(
+    return selected_packet_artifact_paths(config, packet).get(
         artifact_name,
         artifact_name,
     )
@@ -2011,10 +3923,9 @@ def selected_artifact_name(
 def iter_artifacts(
     config: TeamConfig,
     roles: tuple[Role, ...],
-    active_design_packet: ActiveDesignPacketConfig | None = None,
+    packet: ActiveDesignPacketValue,
 ) -> tuple[str, ...]:
     """Return unique artifact filenames in deterministic order."""
-    packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         dict.fromkeys(
             (
@@ -2037,7 +3948,7 @@ def resolve_role_document_packet(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: ActiveDesignPacketConfig | None = None,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> RoleDocumentPacket:
     """Resolve explicit read-before-work packet for one role."""
     spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
@@ -2051,7 +3962,7 @@ def resolve_role_document_packet(
     )
     entries: list[DocumentPacketEntry] = []
     seen_paths: set[Path] = set()
-    active_packet = active_design_packet or resolve_active_design_packet_config(config)
+    active_packet = active_design_packet
     active_packet_paths = {
         "design_brief": active_packet.design_artifact,
         "design_review": active_packet.design_review_artifact,
@@ -2080,8 +3991,7 @@ def resolve_role_document_packet(
                         active_packet_paths[artifact_key],
                     ),
                     rationale=(
-                        f"run artifact:{artifact_key}; "
-                        "source=run.active_design_packet"
+                        f"run artifact:{artifact_key}; source=run.active_design_packet"
                     ),
                 )
             )
@@ -2253,60 +4163,97 @@ def run_workflow_family(spec: RunBundleSpec) -> dict[str, object] | None:
     return resolve_workflow_family(spec.task_catalog, spec.workflow_family_id)
 
 
-def run_active_design_packet(
+def rendered_text_artifact(relative_path: str, text: str) -> RenderedArtifact:
+    """Create one canonical UTF-8 run-bundle text artifact."""
+    return RenderedArtifact(
+        relative_path=PurePosixPath(relative_path),
+        content=text.encode("utf-8"),
+        mode=RUN_BUNDLE_FILE_MODE,
+    )
+
+
+def project_role_document_packets(
     spec: RunBundleSpec,
-    workflow_family: Mapping[str, object] | None = None,
-) -> ActiveDesignPacketConfig:
-    """Resolve the explicit run, workflow, or standard packet for one run."""
-    if spec.active_design_packet is not None:
-        return spec.active_design_packet
-    selected_workflow = (
-        workflow_family if workflow_family is not None else run_workflow_family(spec)
-    )
-    return resolve_active_design_packet_config(
-        spec.config,
-        workflow_family=selected_workflow,
+    packet: ActiveDesignPacketValue,
+) -> tuple[RoleDocumentPacket, ...]:
+    """Project every selected role's immutable document packet."""
+    return tuple(
+        resolve_role_document_packet(
+            spec.config,
+            role,
+            spec.report_dir,
+            spec.workspace_root,
+            packet,
+        )
+        for role in spec.roles
     )
 
 
-def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
-    """Create the standard files for a run."""
+def project_subagent_prompt_packets(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketValue,
+    role_packets: tuple[RoleDocumentPacket, ...],
+) -> tuple[SubagentPromptPacket, ...]:
+    """Project one packet-bearing prompt value for every selected role."""
+    documents_by_role = {value.role_id: value for value in role_packets}
+    if tuple(documents_by_role) != tuple(role.id for role in spec.roles):
+        raise RuntimeError(
+            "role document packet projection disagrees with selected roles"
+        )
+    return tuple(
+        SubagentPromptPacket(
+            role_id=role.id,
+            active_design_packet=packet,
+            document_packet=documents_by_role[role.id],
+            required_outputs=selected_role_outputs(spec.config, role, packet),
+        )
+        for role in spec.roles
+    )
+
+
+def project_template_artifacts(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketValue,
+    *,
+    artifact_names: tuple[str, ...],
+    role_packets: tuple[RoleDocumentPacket, ...],
+    prompt_packets: tuple[SubagentPromptPacket, ...],
+) -> tuple[RenderedArtifact, ...]:
+    """Render every template-owned run artifact entirely in memory."""
+    role_ids = tuple(role.id for role in spec.roles)
+    if tuple(value.role_id for value in role_packets) != role_ids:
+        raise RuntimeError("role document packet order disagrees with selected roles")
+    if tuple(value.role_id for value in prompt_packets) != role_ids:
+        raise RuntimeError("subagent prompt packet order disagrees with selected roles")
     replacements = {
         "RUN_ID": spec.run_id,
         "TASK": spec.task,
         "OWNER": spec.owner,
         "CREATED_AT": spec.created_at_iso,
     }
-    spec.report_dir.mkdir(parents=True, exist_ok=True)
-    workflow_family = run_workflow_family(spec)
-    active_design_packet = run_active_design_packet(spec, workflow_family)
-    created_files = list(
-        iter_artifacts(spec.config, spec.roles, active_design_packet)
-    )
-    artifact_paths = {
-        artifact: resolve_report_bundle_artifact_path(spec.report_dir, artifact)
-        for artifact in (*created_files, AUTHORITY_FILE_NAME)
-    }
     selected_templates = {
-        active_design_packet.design_artifact: spec.config.artifacts["design_brief"],
-        active_design_packet.design_review_artifact: spec.config.artifacts["design_review"],
-        active_design_packet.document_flow_review_artifact: spec.config.artifacts[
+        packet.design_artifact: spec.config.artifacts["design_brief"],
+        packet.design_review_artifact: spec.config.artifacts["design_review"],
+        packet.document_flow_review_artifact: spec.config.artifacts[
             "document_flow_review"
         ],
     }
-    for artifact in created_files:
-        template_name = selected_templates.get(artifact, artifact)
-        if has_template(template_name):
-            output_path = artifact_paths[artifact]
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(
-                render_template(template_name, replacements),
-                encoding="utf-8",
-            )
-    write_team_manifest(spec)
-    artifact_paths[spec.config.artifacts["verification"]].write_text(
+    return tuple(
+        rendered_text_artifact(
+            artifact,
+            render_template(selected_templates.get(artifact, artifact), replacements),
+        )
+        for artifact in artifact_names
+        if has_template(selected_templates.get(artifact, artifact))
+    )
+
+
+def project_verification_artifact(spec: RunBundleSpec) -> RenderedArtifact:
+    """Project the canonical pending verification record."""
+    return rendered_text_artifact(
+        spec.config.artifacts["verification"],
         "\n".join(
-            [
+            (
                 f"run_id={spec.run_id}",
                 f"task={spec.task}",
                 f"owner={spec.owner}",
@@ -2315,47 +4262,44 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
                 "user_completion_report=locked",
                 "closeout_gate_status=pending",
                 "",
-            ]
+            )
         ),
-        encoding="utf-8",
     )
+
+
+def project_authority_artifacts(
+    spec: RunBundleSpec,
+) -> tuple[RenderedArtifact, RenderedArtifact]:
+    """Project task authority and its hash baseline from the same bytes."""
     authority_roles = {
         role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
-    artifact_paths[AUTHORITY_FILE_NAME].write_text(
-        build_default_task_authority(
-            run_id=spec.run_id,
-            task=spec.task,
-            roles=authority_roles,
-        ),
-        encoding="utf-8",
+    authority_bytes = build_default_task_authority(
+        run_id=spec.run_id,
+        task=spec.task,
+        roles=authority_roles,
+    ).encode("utf-8")
+    authority = RenderedArtifact(
+        PurePosixPath(AUTHORITY_FILE_NAME),
+        authority_bytes,
+        RUN_BUNDLE_FILE_MODE,
     )
-    created_files.append(AUTHORITY_FILE_NAME)
-    write_initial_wave_execution_gate(spec)
-    unique_created_files: list[str] = []
-    for artifact in created_files:
-        if artifact not in unique_created_files:
-            unique_created_files.append(artifact)
-    return tuple(unique_created_files)
-
-
-def write_team_manifest(spec: RunBundleSpec) -> Path:
-    """Serialize and write only the authoritative run team manifest."""
-    manifest_path = resolve_report_bundle_artifact_path(
-        spec.report_dir,
-        spec.config.artifacts["team_manifest"],
+    baseline_name = authority_baseline_path(Path(AUTHORITY_FILE_NAME)).name
+    baseline = RenderedArtifact(
+        PurePosixPath(baseline_name),
+        hash_baseline_bytes(authority_bytes),
+        RUN_BUNDLE_FILE_MODE,
     )
-    manifest_text = build_manifest(spec)
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(manifest_text, encoding="utf-8")
-    return manifest_path
+    return authority, baseline
 
 
-def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
-    """Record the parent runtime gate for the first recommended subagent wave."""
+def project_initial_wave_row(
+    spec: RunBundleSpec,
+) -> Mapping[str, str] | None:
+    """Project the sole initial wave row without mutating run artifacts."""
     if not spec.workflow_family_id:
-        return
+        return None
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for initial wave materialization")
     active_subagents, _max_write_subagents = workflow_spawn_budget(
@@ -2369,21 +4313,104 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
         spec.agent_type_selections,
     )
     if not initial_wave:
-        return
-    row = initial_wave_gate_fields(
+        return None
+    return initial_wave_gate_fields(
         initial_wave=initial_wave,
         active_subagents=active_subagents,
     )
-    append_markdown_section_line(
-        spec.report_dir / "schedule.md",
-        "## Agent Wave Ledger",
-        schedule_wave_row(row),
+
+
+def project_wave_ledger_artifacts(
+    spec: RunBundleSpec,
+    template_artifacts: tuple[RenderedArtifact, ...],
+    *,
+    monitoring_entries: MonitoringEntries,
+    initial_wave_row: Mapping[str, str] | None,
+) -> tuple[RenderedArtifact, ...]:
+    """Project schedule and monitoring replacements through the shared renderer."""
+    from workflow_monitor import render_monitoring_artifacts
+
+    schedule_name = spec.config.artifacts["schedule"]
+    monitoring_name = spec.config.artifacts["workflow_monitoring"]
+    by_path = {value.relative_path.as_posix(): value for value in template_artifacts}
+    try:
+        schedule_text = by_path[schedule_name].content.decode("utf-8")
+        monitoring_text = by_path[monitoring_name].content.decode("utf-8")
+    except KeyError as exc:
+        raise RuntimeError(
+            f"missing monitoring template artifact: {exc.args[0]}"
+        ) from exc
+    schedule_text, monitoring_text = render_monitoring_artifacts(
+        schedule_text=schedule_text,
+        workflow_monitoring_text=monitoring_text,
+        entries=monitoring_entries,
+        initial_wave_row=initial_wave_row,
     )
-    append_markdown_section_line(
-        spec.report_dir / "workflow_monitoring.md",
-        "## Actual Wave Events",
-        workflow_wave_event_line(row),
+    return (
+        rendered_text_artifact(schedule_name, schedule_text),
+        rendered_text_artifact(monitoring_name, monitoring_text),
     )
+
+
+def enrich_runtime_measurement_input(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketValue,
+    context: ActiveDesignReferenceContext,
+    entries: MonitoringEntries,
+) -> MonitoringEntries:
+    """Attach immutable packet/source identity to the monitor-owned record."""
+    packet_bytes = json.dumps(
+        active_design_packet_mapping(packet),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    source_bytes = {
+        result.declared_ref: len(result.resolved_path.read_bytes())
+        for result in context.source_results
+    }
+    reviewer_ids = tuple(
+        sorted(
+            role.id
+            for role in spec.roles
+            if role.id.endswith("_reviewer")
+            or role.id
+            in {"reviewer", "verifier", "auditor", "docs_workflow_steward"}
+        )
+    )
+    writer_ids = tuple(
+        sorted(
+            role.id
+            for role in spec.roles
+            if role.write_policy.mode not in {"read_only", "artifacts_only"}
+        )
+    )
+    return replace(
+        entries,
+        responsibility_unit_id=entries.responsibility_unit_id or spec.run_id,
+        packet_hash=hashlib.sha256(packet_bytes).hexdigest(),
+        context_bytes_by_source=tuple(sorted(source_bytes.items())),
+        writer_ids=entries.writer_ids or writer_ids,
+        reviewer_ids=entries.reviewer_ids or reviewer_ids,
+    )
+
+
+def format_start_declaration(
+    workflow_family_name: str,
+    active_skills: tuple[str, ...],
+    review_roles: tuple[str, ...],
+) -> str:
+    """Format the one start declaration shared by publication and CLI output."""
+    return (
+        f"workflow={workflow_family_name or 'Unspecified'}, "
+        f"skills={','.join(active_skills) or '-'}, "
+        f"review={','.join(review_roles) or '-'}"
+    )
+
+
+def create_run_bundle(spec: RunBundleSpec) -> RunBundleMaterialization:
+    """Materialize one complete run bundle through the sole public delegator."""
+    return _materialize_run_bundle(spec)
 
 
 def initial_wave_gate_fields(
@@ -2472,51 +4499,1767 @@ def workflow_wave_event_line(row: dict[str, str]) -> str:
     return "- " + " ".join(f"{key}={value}" for key, value in fields)
 
 
-def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
-    """Append one line to a level-2 Markdown section if it is not already present."""
-    if not path.is_file():
-        return
-    text = path.read_text(encoding="utf-8")
-    if line in text:
-        return
-    lines = text.splitlines()
-    in_section = False
-    insert_at = len(lines)
-    for index, existing_line in enumerate(lines):
-        stripped = existing_line.strip()
-        if not stripped.startswith("## "):
-            continue
-        if in_section:
-            insert_at = index
+def _file_identity(value: os.stat_result) -> FileIdentity:
+    return FileIdentity(
+        st_dev=value.st_dev,
+        st_ino=value.st_ino,
+        st_uid=value.st_uid,
+        st_gid=value.st_gid,
+        st_mode=value.st_mode,
+        st_nlink=value.st_nlink,
+    )
+
+
+def _same_report_root_identity(left: FileIdentity, right: FileIdentity) -> bool:
+    """Compare stable root authority while allowing child-directory link changes."""
+    return (
+        left.st_dev,
+        left.st_ino,
+        left.st_uid,
+        left.st_gid,
+        left.st_mode,
+    ) == (
+        right.st_dev,
+        right.st_ino,
+        right.st_uid,
+        right.st_gid,
+        right.st_mode,
+    )
+
+
+def _identity_mapping(value: FileIdentity) -> dict[str, int]:
+    return {
+        "st_dev": value.st_dev,
+        "st_ino": value.st_ino,
+        "st_uid": value.st_uid,
+        "st_gid": value.st_gid,
+        "st_mode": value.st_mode,
+        "st_nlink": value.st_nlink,
+    }
+
+
+def _identity_from_mapping(value: object) -> FileIdentity:
+    if not isinstance(value, dict):
+        raise ValueError("identity must be a mapping")
+    mapping = cast(dict[object, object], value)
+    expected = ("st_dev", "st_ino", "st_uid", "st_gid", "st_mode", "st_nlink")
+    if set(mapping) != set(expected):
+        raise ValueError("identity fields disagree")
+    fields: list[int] = []
+    for key in expected:
+        field = mapping[key]
+        if not isinstance(field, int) or isinstance(field, bool):
+            raise ValueError(f"identity field is not an integer: {key}")
+        fields.append(field)
+    return FileIdentity(*fields)
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    offset = 0
+    while offset < len(payload):
+        written = os.write(descriptor, payload[offset:])
+        if written <= 0:
+            raise OSError(errno.EIO, "short write")
+        offset += written
+
+
+def _read_descriptor_bytes(descriptor: int, expected_size: int | None = None) -> bytes:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = expected_size
+    while True:
+        request_size = SHA256_READ_CHUNK_BYTES
+        if remaining is not None:
+            request_size = min(request_size, remaining + 1)
+            if request_size == 0:
+                break
+        chunk = os.read(descriptor, request_size)
+        if not chunk:
             break
-        in_section = stripped == heading
-    if not in_section:
-        lines.extend(("", heading, "", line))
+        chunks.append(chunk)
+        if remaining is not None:
+            remaining -= len(chunk)
+            if remaining < 0:
+                break
+    return b"".join(chunks)
+
+
+def _canonical_lock_payload(identity: MaterializationLockIdentity) -> bytes:
+    value = {
+        "schema_version": identity.schema_version,
+        "state": identity.state,
+        "report_root_identity": _identity_mapping(identity.report_root_identity),
+        "lock_file_identity": _identity_mapping(identity.lock_file_identity),
+        "effective_uid": identity.effective_uid,
+        "pid": identity.pid,
+        "process_start_ticks": identity.process_start_ticks,
+        "boot_id": identity.boot_id,
+        "nonce": identity.nonce,
+        "acquired_at": identity.acquired_at,
+        "run_id": identity.run_id,
+        "reuse_class": identity.reuse_class,
+    }
+    return (
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode("utf-8")
+
+
+def _process_start_ticks(pid: int) -> int | None:
+    try:
+        line = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    close = line.rfind(")")
+    if close < 0:
+        raise RuntimeError("process stat is malformed")
+    fields = line[close + 2 :].split()
+    if len(fields) <= 19:
+        raise RuntimeError("process stat lacks start ticks")
+    return int(fields[19])
+
+
+def _boot_id() -> str:
+    value = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+    if not value:
+        raise RuntimeError("kernel boot id is empty")
+    return value
+
+
+def _validate_lock_inode(
+    identity: FileIdentity,
+    *,
+    report_root_identity: FileIdentity,
+) -> None:
+    if (
+        not stat.S_ISREG(identity.st_mode)
+        or identity.st_nlink != 1
+        or identity.st_uid != os.geteuid()
+        or stat.S_IMODE(identity.st_mode) != MATERIALIZATION_LOCK_MODE
+        or identity.st_dev != report_root_identity.st_dev
+    ):
+        raise ValueError("foreign lock inode")
+
+
+def _open_stable_report_root(report_root: Path) -> tuple[int, FileIdentity]:
+    before = os.lstat(report_root)
+    if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+        raise ValueError("report root is not a direct directory")
+    descriptor = os.open(
+        report_root,
+        os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        after = os.lstat(report_root)
+        if _file_identity(before) != _file_identity(opened) or _file_identity(
+            opened
+        ) != _file_identity(after):
+            raise ValueError("report root identity changed")
+        return descriptor, _file_identity(opened)
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _materialization_failure(
+    *,
+    phase: MaterializationPhase,
+    code: MaterializationErrorCode,
+    target: Path,
+    staging: Path | None = None,
+    cause_code: MaterializationErrorCode | None = None,
+    violations: tuple[ActiveDesignPacketViolation, ...] = (),
+    rollback: RollbackResult | None = None,
+) -> RunBundleMaterializationError:
+    return RunBundleMaterializationError(
+        phase=phase,
+        code=code,
+        cause_code=cause_code or code,
+        target_path=target,
+        staging_path=staging,
+        violations=violations,
+        rollback=rollback,
+    )
+
+
+def _lock_payload_reuse_class(
+    payload: bytes,
+    *,
+    report_root_identity: FileIdentity,
+    lock_identity: FileIdentity,
+) -> LockReuseClass:
+    try:
+        decoded: object = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
+        if not isinstance(decoded, dict):
+            raise ValueError("lock payload is not a mapping")
+        mapping = cast(dict[str, object], decoded)
+        expected = {
+            "schema_version",
+            "state",
+            "report_root_identity",
+            "lock_file_identity",
+            "effective_uid",
+            "pid",
+            "process_start_ticks",
+            "boot_id",
+            "nonce",
+            "acquired_at",
+            "run_id",
+            "reuse_class",
+        }
+        if set(mapping) != expected:
+            raise ValueError("lock payload fields disagree")
+        root_value = _identity_from_mapping(mapping["report_root_identity"])
+        lock_value = _identity_from_mapping(mapping["lock_file_identity"])
+        if (
+            not _same_report_root_identity(root_value, report_root_identity)
+            or lock_value != lock_identity
+        ):
+            raise ValueError("lock payload identities disagree")
+        if mapping["schema_version"] != MATERIALIZATION_LOCK_SCHEMA:
+            raise ValueError("lock payload schema disagrees")
+        if mapping["state"] != "held" or mapping["effective_uid"] != os.geteuid():
+            raise ValueError("lock payload owner state disagrees")
+        pid = mapping["pid"]
+        start_ticks = mapping["process_start_ticks"]
+        if (
+            not isinstance(pid, int)
+            or isinstance(pid, bool)
+            or pid <= 0
+            or not isinstance(start_ticks, int)
+            or isinstance(start_ticks, bool)
+            or start_ticks <= 0
+        ):
+            raise ValueError("lock process identity is invalid")
+        nonce = mapping["nonce"]
+        if not isinstance(nonce, str) or re.fullmatch(r"[0-9a-f]{32}", nonce) is None:
+            raise ValueError("lock nonce is invalid")
+        reuse_class = mapping["reuse_class"]
+        if not isinstance(reuse_class, str) or reuse_class not in {
+            "first_acquisition",
+            "released_file_reuse",
+            "crash_stale_reuse",
+        }:
+            raise ValueError("lock reuse class is invalid")
+        run_id = mapping["run_id"]
+        if not isinstance(run_id, str) or not run_id:
+            raise ValueError("lock run id is invalid")
+        acquired_at = mapping["acquired_at"]
+        if not isinstance(acquired_at, str):
+            raise ValueError("lock acquisition time is invalid")
+        datetime.fromisoformat(acquired_at.replace("Z", "+00:00"))
+        stored_boot_id = mapping["boot_id"]
+        if not isinstance(stored_boot_id, str) or not stored_boot_id:
+            raise ValueError("lock boot id is invalid")
+        reconstructed = MaterializationLockIdentity(
+            schema_version=MATERIALIZATION_LOCK_SCHEMA,
+            state="held",
+            report_root_identity=root_value,
+            lock_file_identity=lock_value,
+            effective_uid=os.geteuid(),
+            pid=pid,
+            process_start_ticks=start_ticks,
+            boot_id=stored_boot_id,
+            nonce=nonce,
+            acquired_at=acquired_at,
+            run_id=run_id,
+            reuse_class=cast(LockReuseClass, reuse_class),
+            payload_sha256=hashlib.sha256(payload).hexdigest(),
+        )
+        if _canonical_lock_payload(reconstructed) != payload:
+            raise ValueError("lock payload is not canonical")
+        current_boot_id = _boot_id()
+        live_ticks = (
+            _process_start_ticks(pid) if stored_boot_id == current_boot_id else None
+        )
+        if (
+            stored_boot_id != current_boot_id
+            or live_ticks is None
+            or live_ticks != start_ticks
+        ):
+            return "crash_stale_reuse"
+        raise ValueError("held lock payload still names a live process")
+    except (OSError, UnicodeError, ValueError, _DuplicateJsonKey, RuntimeError) as exc:
+        raise ValueError("foreign lock payload") from exc
+
+
+def _acquire_materialization_lock(
+    *,
+    report_root: Path,
+    run_id: str,
+) -> MaterializationLock:
+    """Acquire and identify the persistent canonical materialization lock."""
+    target = report_root / run_id
+    root_descriptor: int | None = None
+    descriptor: int | None = None
+    try:
+        root_descriptor, root_identity = _open_stable_report_root(report_root)
+        reuse_class: LockReuseClass
+        try:
+            descriptor = os.open(
+                MATERIALIZATION_LOCK_NAME,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+                MATERIALIZATION_LOCK_MODE,
+                dir_fd=root_descriptor,
+            )
+            reuse_class = "first_acquisition"
+        except FileExistsError:
+            before = os.stat(
+                MATERIALIZATION_LOCK_NAME,
+                dir_fd=root_descriptor,
+                follow_symlinks=False,
+            )
+            descriptor = os.open(
+                MATERIALIZATION_LOCK_NAME,
+                os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=root_descriptor,
+            )
+            opened = os.fstat(descriptor)
+            after = os.stat(
+                MATERIALIZATION_LOCK_NAME,
+                dir_fd=root_descriptor,
+                follow_symlinks=False,
+            )
+            before_identity = _file_identity(before)
+            opened_identity = _file_identity(opened)
+            if before_identity != opened_identity or opened_identity != _file_identity(
+                after
+            ):
+                raise ValueError("lock identity changed during open")
+            _validate_lock_inode(opened_identity, report_root_identity=root_identity)
+            reuse_class = "released_file_reuse"
+        lock_identity = _file_identity(os.fstat(descriptor))
+        _validate_lock_inode(lock_identity, report_root_identity=root_identity)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            code: MaterializationErrorCode = (
+                "materialization_lock_busy"
+                if exc.errno in {errno.EACCES, errno.EAGAIN}
+                else "materialization_lock_failed"
+            )
+            raise _materialization_failure(
+                phase="stage", code=code, target=target
+            ) from exc
+        path_identity = _file_identity(
+            os.stat(
+                MATERIALIZATION_LOCK_NAME,
+                dir_fd=root_descriptor,
+                follow_symlinks=False,
+            )
+        )
+        descriptor_identity = _file_identity(os.fstat(descriptor))
+        if path_identity != lock_identity or descriptor_identity != lock_identity:
+            raise ValueError("lock identity changed after flock")
+        payload = _read_descriptor_bytes(descriptor)
+        if payload:
+            reuse_class = _lock_payload_reuse_class(
+                payload,
+                report_root_identity=root_identity,
+                lock_identity=lock_identity,
+            )
+        start_ticks = _process_start_ticks(os.getpid())
+        if start_ticks is None:
+            raise RuntimeError("current process start ticks are unavailable")
+        acquired_at = (
+            datetime.now(UTC)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace(
+                "+00:00",
+                "Z",
+            )
+        )
+        provisional = MaterializationLockIdentity(
+            schema_version=MATERIALIZATION_LOCK_SCHEMA,
+            state="held",
+            report_root_identity=root_identity,
+            lock_file_identity=lock_identity,
+            effective_uid=os.geteuid(),
+            pid=os.getpid(),
+            process_start_ticks=start_ticks,
+            boot_id=_boot_id(),
+            nonce=secrets.token_hex(16),
+            acquired_at=acquired_at,
+            run_id=run_id,
+            reuse_class=reuse_class,
+            payload_sha256="",
+        )
+        held_payload = _canonical_lock_payload(provisional)
+        identity = replace(
+            provisional,
+            payload_sha256=hashlib.sha256(held_payload).hexdigest(),
+        )
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        _write_all(descriptor, held_payload)
+        os.fsync(descriptor)
+        if _read_descriptor_bytes(descriptor, len(held_payload)) != held_payload:
+            raise RuntimeError("held lock payload verification failed")
+        return MaterializationLock(
+            path=report_root / MATERIALIZATION_LOCK_NAME,
+            descriptor=descriptor,
+            identity=identity,
+        )
+    except RunBundleMaterializationError:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+    except ValueError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise _materialization_failure(
+            phase="stage",
+            code="materialization_lock_foreign",
+            target=target,
+        ) from exc
+    except (OSError, RuntimeError) as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise _materialization_failure(
+            phase="stage",
+            code="materialization_lock_failed",
+            target=target,
+        ) from exc
+    finally:
+        if root_descriptor is not None:
+            os.close(root_descriptor)
+
+
+def _release_materialization_lock(lock: MaterializationLock) -> None:
+    """Release an exact held lock while retaining its empty persistent inode."""
+    descriptor = lock.descriptor
+    try:
+        root_descriptor, root_identity = _open_stable_report_root(lock.path.parent)
+        try:
+            path_identity = _file_identity(
+                os.stat(
+                    lock.path.name,
+                    dir_fd=root_descriptor,
+                    follow_symlinks=False,
+                )
+            )
+            descriptor_identity = _file_identity(os.fstat(descriptor))
+            if (
+                not _same_report_root_identity(
+                    root_identity, lock.identity.report_root_identity
+                )
+                or path_identity != lock.identity.lock_file_identity
+                or descriptor_identity != lock.identity.lock_file_identity
+            ):
+                raise ValueError("lock release identity changed")
+            _validate_lock_inode(path_identity, report_root_identity=root_identity)
+            payload = _read_descriptor_bytes(descriptor)
+            if (
+                hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
+                or payload != _canonical_lock_payload(lock.identity)
+            ):
+                raise ValueError("lock release payload changed")
+            os.ftruncate(descriptor, 0)
+            os.fsync(descriptor)
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(root_descriptor)
+    except BaseException as exc:
+        os.close(descriptor)
+        raise RuntimeError("materialization lock release failed") from exc
+    os.close(descriptor)
+
+
+def _normalized_artifact_path(value: str | PurePosixPath) -> PurePosixPath:
+    path = PurePosixPath(value)
+    if (
+        path.is_absolute()
+        or not path.parts
+        or "\\" in path.as_posix()
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError(f"invalid run artifact path: {value}")
+    return path
+
+
+def _build_in_memory_artifact_set(
+    *,
+    planned_paths: tuple[str, ...],
+    projected_artifacts: tuple[RenderedArtifact, ...],
+) -> tuple[RenderedArtifact, ...]:
+    """Validate and sort the complete in-memory artifact set."""
+    normalized_planned = tuple(
+        _normalized_artifact_path(path) for path in planned_paths
+    )
+    if len(set(normalized_planned)) != len(normalized_planned):
+        raise ValueError("planned run artifact paths are not unique")
+    by_path: dict[PurePosixPath, RenderedArtifact] = {}
+    for artifact in projected_artifacts:
+        path = _normalized_artifact_path(artifact.relative_path)
+        if path in by_path:
+            raise ValueError(f"duplicate projected artifact: {path.as_posix()}")
+        if artifact.mode != RUN_BUNDLE_FILE_MODE:
+            raise ValueError(f"invalid projected artifact mode: {path.as_posix()}")
+        try:
+            artifact.content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                f"projected artifact is not UTF-8 text: {path.as_posix()}"
+            ) from exc
+        by_path[path] = replace(artifact, relative_path=path)
+    planned_set = set(normalized_planned)
+    if set(by_path) != planned_set:
+        missing = sorted(path.as_posix() for path in planned_set - set(by_path))
+        unexpected = sorted(path.as_posix() for path in set(by_path) - planned_set)
+        raise ValueError(
+            f"projected artifact set disagrees: missing={missing} unexpected={unexpected}"
+        )
+    return tuple(by_path[path] for path in sorted(by_path, key=PurePosixPath.as_posix))
+
+
+def _artifact_digests(
+    artifacts: tuple[RenderedArtifact, ...],
+) -> tuple[ArtifactDigest, ...]:
+    return tuple(
+        ArtifactDigest(
+            relative_path=artifact.relative_path,
+            sha256=hashlib.sha256(artifact.content).hexdigest(),
+        )
+        for artifact in artifacts
+    )
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(
+        path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    )
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _tree_records(path: Path) -> tuple[tuple[str, int, int, str], ...]:
+    records: list[tuple[str, int, int, str]] = []
+    for candidate in sorted(
+        path.rglob("*"), key=lambda item: item.relative_to(path).as_posix()
+    ):
+        relative = candidate.relative_to(path).as_posix()
+        status = os.lstat(candidate)
+        if stat.S_ISDIR(status.st_mode):
+            continue
+        if not stat.S_ISREG(status.st_mode) or status.st_nlink != 1:
+            raise ValueError(f"nonregular staged artifact: {relative}")
+        payload = candidate.read_bytes()
+        records.append(
+            (
+                relative,
+                stat.S_IMODE(status.st_mode),
+                len(payload),
+                hashlib.sha256(payload).hexdigest(),
+            )
+        )
+    return tuple(records)
+
+
+def _tree_sha256(path: Path) -> str:
+    lines = "".join(
+        f"{relative}\t{mode:o}\t{size}\t{digest}\n"
+        for relative, mode, size, digest in _tree_records(path)
+    )
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
+def _verify_staged_artifacts(
+    stage: Path,
+    artifacts: tuple[RenderedArtifact, ...],
+) -> str:
+    expected = tuple(
+        (
+            artifact.relative_path.as_posix(),
+            artifact.mode,
+            len(artifact.content),
+            hashlib.sha256(artifact.content).hexdigest(),
+        )
+        for artifact in artifacts
+    )
+    observed = _tree_records(stage)
+    if observed != expected:
+        raise ValueError("staged artifact path/mode/size/digest verification failed")
+    return _tree_sha256(stage)
+
+
+class _StageArtifactSetError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        code: Literal["staging_write_failed", "staging_verify_failed"],
+        path: Path,
+        cleanup: CleanupStatus,
+    ) -> None:
+        self.code: Literal["staging_write_failed", "staging_verify_failed"] = code
+        self.path = path
+        self.cleanup: CleanupStatus = cleanup
+        super().__init__(code)
+
+
+def _stage_artifact_set(
+    *,
+    report_root: Path,
+    target: Path,
+    run_id: str,
+    artifacts: tuple[RenderedArtifact, ...],
+) -> StagedArtifactSet:
+    """Write and verify one complete private sibling staging tree."""
+    del target
+    stage: Path | None = None
+    for _attempt in range(GENERATED_NAME_ATTEMPTS):
+        candidate = report_root / (
+            f".{run_id}.stage.{os.getpid()}.{secrets.token_hex(16)}"
+        )
+        try:
+            candidate.mkdir(mode=PRIVATE_STAGE_MODE)
+        except FileExistsError:
+            continue
+        stage = candidate
+        break
+    if stage is None:
+        raise FileExistsError(errno.EEXIST, "staging name exhausted")
+    phase: Literal["write", "verify"] = "write"
+    initial_identity = _file_identity(os.lstat(stage))
+    try:
+        created_directories = {stage}
+        for artifact in artifacts:
+            output = stage.joinpath(*artifact.relative_path.parts)
+            parent = output.parent
+            missing: list[Path] = []
+            while parent != stage and not parent.exists():
+                missing.append(parent)
+                parent = parent.parent
+            for directory in reversed(missing):
+                directory.mkdir(mode=PRIVATE_STAGE_MODE)
+                created_directories.add(directory)
+            with output.open("xb") as handle:
+                handle.write(artifact.content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(output, artifact.mode, follow_symlinks=False)
+        for directory in sorted(
+            created_directories,
+            key=lambda item: len(item.relative_to(stage).parts),
+            reverse=True,
+        ):
+            os.chmod(directory, RUN_BUNDLE_DIRECTORY_MODE, follow_symlinks=False)
+            _fsync_directory(directory)
+        phase = "verify"
+        _verify_staged_artifacts(stage, artifacts)
+        return StagedArtifactSet(path=stage, identity=_file_identity(os.lstat(stage)))
+    except BaseException as exc:
+        cleanup: CleanupStatus = "pass"
+        try:
+            current = _file_identity(os.lstat(stage))
+            if (
+                current.st_dev != initial_identity.st_dev
+                or current.st_ino != initial_identity.st_ino
+            ):
+                cleanup = "fail"
+            else:
+                shutil.rmtree(stage)
+        except FileNotFoundError:
+            cleanup = "pass"
+        except OSError:
+            cleanup = "fail"
+        raise _StageArtifactSetError(
+            code="staging_verify_failed"
+            if phase == "verify"
+            else "staging_write_failed",
+            path=stage,
+            cleanup=cleanup,
+        ) from exc
+
+
+def _renameat2_function() -> Any:
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        function = libc.renameat2
+    except AttributeError as exc:
+        raise OSError(errno.ENOSYS, os.strerror(errno.ENOSYS)) from exc
+    function.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    function.restype = ctypes.c_int
+    return function
+
+
+def _renameat2(source: Path, target: Path, flag: int) -> None:
+    function = _renameat2_function()
+    result = function(
+        AT_FDCWD,
+        os.fsencode(source),
+        AT_FDCWD,
+        os.fsencode(target),
+        flag,
+    )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(source), str(target))
+
+
+def _require_renameat2_capability(report_root: Path, flag: int) -> None:
+    nonce = secrets.token_hex(16)
+    source = report_root / f".renameat2.probe.source.{nonce}"
+    target = report_root / f".renameat2.probe.target.{nonce}"
+    try:
+        _renameat2(source, target, flag)
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            return
+        raise
+    raise RuntimeError("renameat2 capability probe unexpectedly mutated a path")
+
+
+def _rename_directory_noreplace(
+    staging: StagedArtifactSet,
+    target: Path,
+) -> PublishedTarget:
+    """Publish one staged directory through the sole kernel no-replace path."""
+    staged_tree_sha = _tree_sha256(staging.path)
+    _renameat2(staging.path, target, RENAME_NOREPLACE)
+    identity = _file_identity(os.lstat(target))
+    if identity != staging.identity:
+        raise OSError(errno.EIO, "published target identity disagrees")
+    target_tree_sha = _tree_sha256(target)
+    if target_tree_sha != staged_tree_sha:
+        raise OSError(errno.EIO, "published target tree digest disagrees")
+    return PublishedTarget(path=target, identity=identity, tree_sha256=target_tree_sha)
+
+
+def _remove_staging_tree(staging: StagedArtifactSet) -> bool:
+    try:
+        current = _file_identity(os.lstat(staging.path))
+    except FileNotFoundError:
+        return True
+    if current != staging.identity:
+        return False
+    shutil.rmtree(staging.path)
+    return not staging.path.exists()
+
+
+def _remove_published_target(published: PublishedTarget) -> bool:
+    try:
+        current = _file_identity(os.lstat(published.path))
+    except FileNotFoundError:
+        return True
+    if (
+        current != published.identity
+        or _tree_sha256(published.path) != published.tree_sha256
+    ):
+        return False
+    shutil.rmtree(published.path)
+    _fsync_directory(published.path.parent)
+    return not published.path.exists()
+
+
+def _assert_materialization_lock_owned(
+    report_root: Path,
+    lock: MaterializationLock,
+) -> None:
+    root_descriptor, root_identity = _open_stable_report_root(report_root)
+    try:
+        path_identity = _file_identity(
+            os.stat(
+                MATERIALIZATION_LOCK_NAME,
+                dir_fd=root_descriptor,
+                follow_symlinks=False,
+            )
+        )
+        descriptor_identity = _file_identity(os.fstat(lock.descriptor))
+        if (
+            not _same_report_root_identity(
+                root_identity, lock.identity.report_root_identity
+            )
+            or path_identity != lock.identity.lock_file_identity
+            or descriptor_identity != lock.identity.lock_file_identity
+        ):
+            raise ValueError("materialization lock identity drift")
+        payload = _read_descriptor_bytes(lock.descriptor)
+        if (
+            hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
+            or payload != _canonical_lock_payload(lock.identity)
+        ):
+            raise ValueError("materialization lock payload drift")
+    finally:
+        os.close(root_descriptor)
+
+
+def _capture_bookkeeping_file(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    name: Literal[".active_run", ".active_run.sha256"],
+) -> BookkeepingFileState:
+    _assert_materialization_lock_owned(report_root, lock)
+    root_descriptor, root_identity = _open_stable_report_root(report_root)
+    try:
+        try:
+            before = os.stat(name, dir_fd=root_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return BookkeepingFileState(name, False, None, None, None, None, None)
+        before_identity = _file_identity(before)
+        mode = stat.S_IMODE(before.st_mode)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_uid != os.geteuid()
+            or before.st_dev != root_identity.st_dev
+            or mode not in {PRIVATE_TEMP_MODE, RUN_BUNDLE_FILE_MODE}
+        ):
+            raise ValueError(f"nonregular active bookkeeping: {name}")
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=root_descriptor,
+        )
+        try:
+            opened = os.fstat(descriptor)
+            payload = _read_descriptor_bytes(descriptor, opened.st_size)
+        finally:
+            os.close(descriptor)
+        after = os.stat(name, dir_fd=root_descriptor, follow_symlinks=False)
+        if (
+            _file_identity(opened) != before_identity
+            or _file_identity(after) != before_identity
+            or len(payload) != opened.st_size
+        ):
+            raise ValueError(f"active bookkeeping identity changed: {name}")
+        return BookkeepingFileState(
+            name=name,
+            existed=True,
+            identity=before_identity,
+            permission_mode=mode,
+            size=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+            content=payload,
+        )
+    finally:
+        os.close(root_descriptor)
+
+
+def _capture_regular_path(
+    path: Path,
+) -> tuple[FileIdentity, int, bytes, str]:
+    before = os.lstat(path)
+    identity = _file_identity(before)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.geteuid()
+    ):
+        raise ValueError(f"nonregular private bookkeeping path: {path}")
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(descriptor)
+        payload = _read_descriptor_bytes(descriptor, opened.st_size)
+    finally:
+        os.close(descriptor)
+    after = os.lstat(path)
+    if (
+        _file_identity(opened) != identity
+        or _file_identity(after) != identity
+        or len(payload) != opened.st_size
+    ):
+        raise ValueError(f"private bookkeeping identity changed: {path}")
+    return (
+        identity,
+        stat.S_IMODE(opened.st_mode),
+        payload,
+        hashlib.sha256(payload).hexdigest(),
+    )
+
+
+def _create_bookkeeping_temp(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    name: Literal[".active_run", ".active_run.sha256"],
+    content: bytes,
+    final_mode: int = PRIVATE_TEMP_MODE,
+) -> BookkeepingTempState:
+    _assert_materialization_lock_owned(report_root, lock)
+    root_descriptor, _root_identity = _open_stable_report_root(report_root)
+    try:
+        for _attempt in range(GENERATED_NAME_ATTEMPTS):
+            path = report_root / f"{name}.tmp.{os.getpid()}.{secrets.token_hex(16)}"
+            try:
+                descriptor = os.open(
+                    path.name,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+                    PRIVATE_TEMP_MODE,
+                    dir_fd=root_descriptor,
+                )
+            except FileExistsError:
+                continue
+            try:
+                _write_all(descriptor, content)
+                os.fsync(descriptor)
+                if final_mode != PRIVATE_TEMP_MODE:
+                    os.fchmod(descriptor, final_mode)
+                    os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            identity, mode, observed, digest = _capture_regular_path(path)
+            if observed != content or mode != final_mode:
+                raise ValueError(f"bookkeeping temp verification failed: {path}")
+            return BookkeepingTempState(
+                path=path,
+                identity=identity,
+                permission_mode=mode,
+                size=len(content),
+                sha256=digest,
+                content=content,
+            )
+    finally:
+        os.close(root_descriptor)
+    raise FileExistsError(errno.EEXIST, "bookkeeping name exhausted")
+
+
+def _bookkeeping_matches(
+    observed: BookkeepingFileState,
+    expected: BookkeepingFileState,
+    *,
+    require_identity: bool = True,
+) -> bool:
+    if observed.existed != expected.existed:
+        return False
+    if not observed.existed:
+        return True
+    return (
+        (not require_identity or observed.identity == expected.identity)
+        and observed.permission_mode == expected.permission_mode
+        and observed.size == expected.size
+        and observed.sha256 == expected.sha256
+        and observed.content == expected.content
+    )
+
+
+def _temp_matches(path: Path, expected: BookkeepingTempState) -> bool:
+    try:
+        identity, mode, payload, digest = _capture_regular_path(path)
+    except (FileNotFoundError, OSError, ValueError):
+        return False
+    return (
+        identity == expected.identity
+        and mode == expected.permission_mode
+        and len(payload) == expected.size
+        and digest == expected.sha256
+        and payload == expected.content
+    )
+
+
+def _publish_temp_over_bookkeeping(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    temp: BookkeepingTempState,
+    prior: BookkeepingFileState,
+) -> BookkeepingFileState:
+    current = _capture_bookkeeping_file(
+        report_root=report_root,
+        lock=lock,
+        name=prior.name,
+    )
+    if not _bookkeeping_matches(current, prior):
+        raise ValueError(f"bookkeeping compare-before-publish failed: {prior.name}")
+    if temp.permission_mode != RUN_BUNDLE_FILE_MODE or not _temp_matches(
+        temp.path, temp
+    ):
+        raise ValueError(f"bookkeeping temp is not publication-ready: {temp.path}")
+    root_descriptor, _root_identity = _open_stable_report_root(report_root)
+    try:
+        os.replace(
+            temp.path.name,
+            prior.name,
+            src_dir_fd=root_descriptor,
+            dst_dir_fd=root_descriptor,
+        )
+    finally:
+        os.close(root_descriptor)
+    published = _capture_bookkeeping_file(
+        report_root=report_root,
+        lock=lock,
+        name=prior.name,
+    )
+    if (
+        not published.existed
+        or published.permission_mode != RUN_BUNDLE_FILE_MODE
+        or published.content != temp.content
+        or published.sha256 != temp.sha256
+    ):
+        raise ValueError(f"bookkeeping publish verification failed: {prior.name}")
+    return published
+
+
+def _promote_bookkeeping_temp(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    temp: BookkeepingTempState,
+) -> BookkeepingTempState:
+    _assert_materialization_lock_owned(report_root, lock)
+    if not _temp_matches(temp.path, temp):
+        raise ValueError(f"bookkeeping temp changed before promotion: {temp.path}")
+    root_descriptor, _root_identity = _open_stable_report_root(report_root)
+    try:
+        os.chmod(
+            temp.path.name,
+            RUN_BUNDLE_FILE_MODE,
+            dir_fd=root_descriptor,
+            follow_symlinks=False,
+        )
+        _fsync_directory(report_root)
+    finally:
+        os.close(root_descriptor)
+    identity, mode, payload, digest = _capture_regular_path(temp.path)
+    if (
+        identity != temp.identity
+        or payload != temp.content
+        or mode != RUN_BUNDLE_FILE_MODE
+    ):
+        raise ValueError(f"bookkeeping temp promotion failed: {temp.path}")
+    return replace(
+        temp,
+        permission_mode=mode,
+        size=len(payload),
+        sha256=digest,
+    )
+
+
+def _publish_active_bookkeeping(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    published_target: PublishedTarget,
+) -> tuple[Path, PriorBookkeepingState]:
+    """Publish active baseline then pointer and rollback any activation failure."""
+    pointer_bytes = (str(published_target.path.resolve()) + "\n").encode("utf-8")
+    baseline_bytes = hash_baseline_bytes(pointer_bytes)
+    prior: PriorBookkeepingState | None = None
+    failure_code: MaterializationErrorCode = "active_bookkeeping_nonregular"
+    try:
+        pointer_prior = _capture_bookkeeping_file(
+            report_root=report_root,
+            lock=lock,
+            name=".active_run",
+        )
+        baseline_prior = _capture_bookkeeping_file(
+            report_root=report_root,
+            lock=lock,
+            name=".active_run.sha256",
+        )
+        prior = PriorBookkeepingState(
+            report_root_identity=lock.identity.report_root_identity,
+            lock_file_identity=lock.identity.lock_file_identity,
+            lock_nonce=lock.identity.nonce,
+            pointer_prior=pointer_prior,
+            baseline_prior=baseline_prior,
+        )
+        failure_code = "bookkeeping_name_exhausted"
+        baseline_temp = _create_bookkeeping_temp(
+            report_root=report_root,
+            lock=lock,
+            name=".active_run.sha256",
+            content=baseline_bytes,
+        )
+        prior = replace(prior, baseline_temp=baseline_temp)
+        pointer_temp = _create_bookkeeping_temp(
+            report_root=report_root,
+            lock=lock,
+            name=".active_run",
+            content=pointer_bytes,
+        )
+        prior = replace(prior, pointer_temp=pointer_temp)
+        failure_code = "active_baseline_publish_failed"
+        baseline_temp = _promote_bookkeeping_temp(
+            report_root=report_root,
+            lock=lock,
+            temp=baseline_temp,
+        )
+        prior = replace(prior, baseline_temp=baseline_temp)
+        baseline_published = _publish_temp_over_bookkeeping(
+            report_root=report_root,
+            lock=lock,
+            temp=baseline_temp,
+            prior=baseline_prior,
+        )
+        prior = replace(
+            prior,
+            baseline_temp=None,
+            baseline_published=baseline_published,
+        )
+        failure_code = "active_pointer_publish_failed"
+        pointer_temp = _promote_bookkeeping_temp(
+            report_root=report_root,
+            lock=lock,
+            temp=pointer_temp,
+        )
+        prior = replace(prior, pointer_temp=pointer_temp)
+        pointer_published = _publish_temp_over_bookkeeping(
+            report_root=report_root,
+            lock=lock,
+            temp=pointer_temp,
+            prior=pointer_prior,
+        )
+        prior = replace(prior, pointer_temp=None, pointer_published=pointer_published)
+        _fsync_directory(report_root)
+        return report_root / ".active_run", prior
+    except BaseException as exc:
+        rollback = _rollback_publication(
+            report_root=report_root,
+            lock=lock,
+            published_target=published_target,
+            staging=None,
+            prior=prior,
+        )
+        failed = bool(rollback.failed_paths)
+        raise _materialization_failure(
+            phase="rollback" if failed else "activate",
+            code="run_bundle_rollback_failed" if failed else failure_code,
+            cause_code=failure_code,
+            target=published_target.path,
+            rollback=rollback,
+        ) from exc
+
+
+def _bookkeeping_state_from_regular_path(
+    *,
+    path: Path,
+    name: Literal[".active_run", ".active_run.sha256"],
+) -> BookkeepingFileState:
+    identity, mode, payload, digest = _capture_regular_path(path)
+    return BookkeepingFileState(
+        name=name,
+        existed=True,
+        identity=identity,
+        permission_mode=mode,
+        size=len(payload),
+        sha256=digest,
+        content=payload,
+    )
+
+
+def _unlink_exact_bookkeeping_temp(
+    path: Path,
+    expected: BookkeepingFileState | BookkeepingTempState,
+) -> bool:
+    try:
+        identity, mode, payload, digest = _capture_regular_path(path)
+    except FileNotFoundError:
+        return True
+    except (OSError, ValueError):
+        return False
+    expected_identity = expected.identity
+    return_value = (
+        expected_identity is not None
+        and identity == expected_identity
+        and mode == expected.permission_mode
+        and len(payload) == expected.size
+        and digest == expected.sha256
+        and payload == expected.content
+    )
+    if not return_value:
+        return False
+    path.unlink()
+    return not path.exists()
+
+
+def _unique_bookkeeping_quarantine(
+    report_root: Path,
+    name: Literal[".active_run", ".active_run.sha256"],
+) -> Path:
+    for _attempt in range(GENERATED_NAME_ATTEMPTS):
+        candidate = report_root / (
+            f"{name}.quarantine.{os.getpid()}.{secrets.token_hex(16)}"
+        )
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+    raise FileExistsError(errno.EEXIST, "bookkeeping quarantine name exhausted")
+
+
+def _restore_one_bookkeeping_file(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    prior: BookkeepingFileState,
+    published: BookkeepingFileState,
+) -> None:
+    current = _capture_bookkeeping_file(
+        report_root=report_root,
+        lock=lock,
+        name=prior.name,
+    )
+    if not _bookkeeping_matches(current, published):
+        raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+    destination = report_root / prior.name
+    if prior.existed:
+        if prior.content is None or prior.permission_mode is None:
+            raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+        restore_temp = _create_bookkeeping_temp(
+            report_root=report_root,
+            lock=lock,
+            name=prior.name,
+            content=prior.content,
+            final_mode=prior.permission_mode,
+        )
+        _renameat2(destination, restore_temp.path, RENAME_EXCHANGE)
+        try:
+            restored = _capture_bookkeeping_file(
+                report_root=report_root,
+                lock=lock,
+                name=prior.name,
+            )
+            exchanged = _bookkeeping_state_from_regular_path(
+                path=restore_temp.path,
+                name=prior.name,
+            )
+            if not _bookkeeping_matches(restored, prior, require_identity=False):
+                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+            if not _bookkeeping_matches(exchanged, published):
+                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+            if not _unlink_exact_bookkeeping_temp(restore_temp.path, exchanged):
+                raise ValueError(
+                    f"bookkeeping_restore_conflict:{restore_temp.path.name}"
+                )
+        except BaseException:
+            try:
+                destination_identity = _file_identity(os.lstat(destination))
+                temp_identity = _file_identity(os.lstat(restore_temp.path))
+                if (
+                    destination_identity == restore_temp.identity
+                    and temp_identity == published.identity
+                ):
+                    _renameat2(destination, restore_temp.path, RENAME_EXCHANGE)
+            except (FileNotFoundError, OSError, ValueError):
+                pass
+            raise
     else:
-        while insert_at > 0 and not lines[insert_at - 1].strip():
-            insert_at -= 1
-        lines.insert(insert_at, line)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        quarantine = _unique_bookkeeping_quarantine(report_root, prior.name)
+        _renameat2(destination, quarantine, RENAME_NOREPLACE)
+        try:
+            quarantined = _bookkeeping_state_from_regular_path(
+                path=quarantine,
+                name=prior.name,
+            )
+            if not _bookkeeping_matches(quarantined, published):
+                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+            if not _unlink_exact_bookkeeping_temp(quarantine, quarantined):
+                raise ValueError(f"bookkeeping_restore_conflict:{quarantine.name}")
+        except BaseException:
+            try:
+                if not destination.exists() and quarantine.exists():
+                    _renameat2(quarantine, destination, RENAME_NOREPLACE)
+            except OSError:
+                pass
+            raise
+        absent = _capture_bookkeeping_file(
+            report_root=report_root,
+            lock=lock,
+            name=prior.name,
+        )
+        if absent.existed:
+            raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
+    _fsync_directory(report_root)
 
 
-def build_manifest(spec: RunBundleSpec) -> str:
+def _cleanup_prior_temps(
+    prior: PriorBookkeepingState | None,
+) -> tuple[CleanupStatus, list[str]]:
+    if prior is None:
+        return "not_required", []
+    states = tuple(
+        state
+        for state in (
+            prior.pointer_temp,
+            prior.baseline_temp,
+            prior.pointer_quarantine,
+            prior.baseline_quarantine,
+        )
+        if state is not None
+    )
+    if not states:
+        return "not_required", []
+    failed: list[str] = []
+    for state in states:
+        if not _unlink_exact_bookkeeping_temp(state.path, state):
+            failed.append(str(state.path))
+    return ("fail" if failed else "pass"), failed
+
+
+def _rollback_publication(
+    *,
+    report_root: Path,
+    lock: MaterializationLock,
+    published_target: PublishedTarget | None,
+    staging: StagedArtifactSet | None,
+    prior: PriorBookkeepingState | None,
+) -> RollbackResult:
+    """Rollback only identity- and digest-bound state owned by this call."""
+    pointer_restore: CleanupStatus = "not_required"
+    baseline_restore: CleanupStatus = "not_required"
+    target_cleanup: CleanupStatus = "not_required"
+    staging_cleanup: CleanupStatus = "not_required"
+    failed_paths: list[str] = []
+    try:
+        _assert_materialization_lock_owned(report_root, lock)
+    except (OSError, RuntimeError, ValueError):
+        return RollbackResult(
+            pointer_restore="fail"
+            if prior and prior.pointer_published
+            else "not_required",
+            baseline_restore="not_required",
+            target_cleanup="not_required",
+            staging_cleanup="not_required",
+            temp_cleanup="not_required",
+            failed_paths=("materialization_lock_identity",),
+        )
+    if prior is not None and prior.pointer_published is not None:
+        try:
+            _restore_one_bookkeeping_file(
+                report_root=report_root,
+                lock=lock,
+                prior=prior.pointer_prior,
+                published=prior.pointer_published,
+            )
+            pointer_restore = "pass"
+        except (OSError, RuntimeError, ValueError):
+            pointer_restore = "fail"
+            failed_paths.append(
+                f"bookkeeping_restore_conflict:{prior.pointer_prior.name}"
+            )
+    if (
+        pointer_restore != "fail"
+        and prior is not None
+        and prior.baseline_published is not None
+    ):
+        try:
+            _restore_one_bookkeeping_file(
+                report_root=report_root,
+                lock=lock,
+                prior=prior.baseline_prior,
+                published=prior.baseline_published,
+            )
+            baseline_restore = "pass"
+        except (OSError, RuntimeError, ValueError):
+            baseline_restore = "fail"
+            failed_paths.append(
+                f"bookkeeping_restore_conflict:{prior.baseline_prior.name}"
+            )
+    if pointer_restore != "fail" and baseline_restore != "fail":
+        if published_target is not None:
+            try:
+                target_cleanup = (
+                    "pass" if _remove_published_target(published_target) else "fail"
+                )
+            except (OSError, ValueError):
+                target_cleanup = "fail"
+            if target_cleanup == "fail":
+                failed_paths.append(str(published_target.path))
+        elif staging is not None:
+            try:
+                staging_cleanup = "pass" if _remove_staging_tree(staging) else "fail"
+            except OSError:
+                staging_cleanup = "fail"
+            if staging_cleanup == "fail":
+                failed_paths.append(str(staging.path))
+    temp_cleanup, temp_failures = _cleanup_prior_temps(prior)
+    failed_paths.extend(temp_failures)
+    return RollbackResult(
+        staging_cleanup=staging_cleanup,
+        target_cleanup=target_cleanup,
+        pointer_restore=pointer_restore,
+        baseline_restore=baseline_restore,
+        temp_cleanup=temp_cleanup,
+        failed_paths=tuple(sorted(set(failed_paths))),
+    )
+
+
+def _validated_publication_paths(spec: RunBundleSpec) -> tuple[Path, Path]:
+    root_input = (
+        spec.activation.report_root
+        if spec.activation is not None
+        else spec.report_dir.parent
+    )
+    report_root = root_input.absolute()
+    target = spec.report_dir.absolute()
+    try:
+        root_descriptor, _identity = _open_stable_report_root(report_root)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        raise ValueError("report root is invalid") from exc
+    else:
+        os.close(root_descriptor)
+    if target.parent != report_root or target.name != spec.run_id:
+        raise ValueError("report target parent or run id disagrees")
+    return report_root, target
+
+
+def _publish_error_code(error: OSError) -> MaterializationErrorCode:
+    if error.errno in {errno.EEXIST, errno.ENOTEMPTY}:
+        return "run_bundle_target_exists"
+    if error.errno in {errno.ENOSYS, errno.EINVAL, errno.EOPNOTSUPP}:
+        return "atomic_noreplace_unavailable"
+    if error.errno == errno.EXDEV:
+        return "run_bundle_cross_device"
+    return "run_bundle_publish_failed"
+
+
+def _error_after_rollback(
+    *,
+    phase: MaterializationPhase,
+    cause_code: MaterializationErrorCode,
+    target: Path,
+    rollback: RollbackResult,
+    staging: Path | None = None,
+) -> RunBundleMaterializationError:
+    failed = bool(rollback.failed_paths)
+    return _materialization_failure(
+        phase="rollback" if failed else phase,
+        code="run_bundle_rollback_failed" if failed else cause_code,
+        cause_code=cause_code,
+        target=target,
+        staging=staging,
+        rollback=rollback,
+    )
+
+
+def _materialize_run_bundle(spec: RunBundleSpec) -> RunBundleMaterialization:
+    """Validate, render, stage, publish, and optionally activate one run bundle."""
+    target_for_error = spec.report_dir.absolute()
+    try:
+        workflow_family = run_workflow_family(spec)
+        packet = resolve_active_design_packet(
+            spec.config,
+            workflow_family=workflow_family,
+            explicit=spec.active_design_packet,
+        )
+    except ActiveDesignPacketInputError as exc:
+        raise _materialization_failure(
+            phase="decode",
+            code="packet_invalid",
+            target=target_for_error,
+        ) from exc
+    artifact_names = iter_artifacts(spec.config, spec.roles, packet)
+    try:
+        context = build_active_design_reference_context(
+            spec,
+            packet,
+            workflow_family,
+            artifact_names=artifact_names,
+        )
+        violations = validate_materialized_active_design_packet(
+            packet,
+            context,
+            gate="materialization",
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise _materialization_failure(
+            phase="reference_validation",
+            code="reference_invalid",
+            target=target_for_error,
+        ) from exc
+    if violations:
+        raise _materialization_failure(
+            phase="reference_validation",
+            code="reference_invalid",
+            target=target_for_error,
+            violations=violations,
+        )
+    try:
+        role_packets = project_role_document_packets(spec, packet)
+        prompt_packets = project_subagent_prompt_packets(spec, packet, role_packets)
+        template_artifacts = project_template_artifacts(
+            spec,
+            packet,
+            artifact_names=artifact_names,
+            role_packets=role_packets,
+            prompt_packets=prompt_packets,
+        )
+        verification = project_verification_artifact(spec)
+        authority_artifacts = project_authority_artifacts(spec)
+        initial_wave_row = project_initial_wave_row(spec)
+        if spec.activation is None:
+            from workflow_monitor import EMPTY_MONITORING_ENTRIES
+
+            monitoring_entries = EMPTY_MONITORING_ENTRIES
+        else:
+            monitoring_entries = enrich_runtime_measurement_input(
+                spec,
+                packet,
+                context,
+                spec.activation.monitoring_entries,
+            )
+        wave_artifacts = project_wave_ledger_artifacts(
+            spec,
+            template_artifacts,
+            monitoring_entries=monitoring_entries,
+            initial_wave_row=initial_wave_row,
+        )
+        manifest = rendered_text_artifact(
+            spec.config.artifacts["team_manifest"],
+            build_manifest(
+                spec,
+                packet,
+                context,
+                artifact_names=artifact_names,
+                role_packets=role_packets,
+                prompt_packets=prompt_packets,
+            ),
+        )
+    except (OSError, RuntimeError, UnicodeError, ValueError) as exc:
+        raise _materialization_failure(
+            phase="render",
+            code="render_invalid",
+            target=target_for_error,
+        ) from exc
+    wave_paths = {artifact.relative_path for artifact in wave_artifacts}
+    projected = (
+        *(
+            artifact
+            for artifact in template_artifacts
+            if artifact.relative_path not in wave_paths
+        ),
+        *wave_artifacts,
+        verification,
+        *authority_artifacts,
+        manifest,
+    )
+    authority_paths = tuple(
+        artifact.relative_path.as_posix() for artifact in authority_artifacts
+    )
+    planned_paths = (*artifact_names, *authority_paths)
+    try:
+        artifacts = _build_in_memory_artifact_set(
+            planned_paths=planned_paths,
+            projected_artifacts=projected,
+        )
+    except ValueError as exc:
+        raise _materialization_failure(
+            phase="render",
+            code="artifact_set_invalid",
+            target=target_for_error,
+        ) from exc
+    digests = _artifact_digests(artifacts)
+    try:
+        report_root, target = _validated_publication_paths(spec)
+    except ValueError as exc:
+        raise _materialization_failure(
+            phase="reference_validation",
+            code="report_root_invalid",
+            target=target_for_error,
+        ) from exc
+
+    lock = _acquire_materialization_lock(report_root=report_root, run_id=spec.run_id)
+    lock_released = False
+    staged: StagedArtifactSet | None = None
+    published: PublishedTarget | None = None
+    active_pointer: Path | None = None
+    try:
+        try:
+            _require_renameat2_capability(report_root, RENAME_NOREPLACE)
+        except OSError as exc:
+            code: MaterializationErrorCode = "atomic_noreplace_unavailable"
+            raise _materialization_failure(
+                phase="publish", code=code, target=target
+            ) from exc
+        if spec.activation is not None:
+            try:
+                _require_renameat2_capability(report_root, RENAME_EXCHANGE)
+            except OSError as exc:
+                raise _materialization_failure(
+                    phase="activate",
+                    code="atomic_exchange_unavailable",
+                    target=target,
+                ) from exc
+        if os.path.lexists(target):
+            raise _materialization_failure(
+                phase="publish",
+                code="run_bundle_target_exists",
+                target=target,
+            )
+        try:
+            staged = _stage_artifact_set(
+                report_root=report_root,
+                target=target,
+                run_id=spec.run_id,
+                artifacts=artifacts,
+            )
+        except FileExistsError as exc:
+            raise _materialization_failure(
+                phase="stage",
+                code="staging_name_exhausted",
+                target=target,
+            ) from exc
+        except _StageArtifactSetError as exc:
+            rollback = RollbackResult(
+                staging_cleanup=exc.cleanup,
+                failed_paths=(str(exc.path),) if exc.cleanup == "fail" else (),
+            )
+            raise _error_after_rollback(
+                phase="stage",
+                cause_code=exc.code,
+                target=target,
+                staging=exc.path,
+                rollback=rollback,
+            ) from exc
+        if os.path.lexists(target):
+            rollback = _rollback_publication(
+                report_root=report_root,
+                lock=lock,
+                published_target=None,
+                staging=staged,
+                prior=None,
+            )
+            raise _error_after_rollback(
+                phase="publish",
+                cause_code="run_bundle_target_exists",
+                target=target,
+                staging=staged.path,
+                rollback=rollback,
+            )
+        try:
+            published = _rename_directory_noreplace(staged, target)
+            staged = None
+            _fsync_directory(report_root)
+        except OSError as exc:
+            cause_code = _publish_error_code(exc)
+            if published is None and staged is not None and os.path.lexists(target):
+                try:
+                    target_identity = _file_identity(os.lstat(target))
+                    if target_identity == staged.identity:
+                        published = PublishedTarget(
+                            path=target,
+                            identity=target_identity,
+                            tree_sha256=_tree_sha256(target),
+                        )
+                        staged = None
+                except (OSError, ValueError):
+                    published = None
+            rollback = _rollback_publication(
+                report_root=report_root,
+                lock=lock,
+                published_target=cast(PublishedTarget, published),
+                staging=staged,
+                prior=None,
+            )
+            raise _error_after_rollback(
+                phase="publish",
+                cause_code=cause_code,
+                target=target,
+                staging=staged.path if staged is not None else None,
+                rollback=rollback,
+            ) from exc
+        if spec.activation is not None:
+            active_pointer, _prior = _publish_active_bookkeeping(
+                report_root=report_root,
+                lock=lock,
+                published_target=published,
+            )
+        try:
+            _release_materialization_lock(lock)
+            lock_released = True
+        except RuntimeError as release_error:
+            lock_released = True
+            raise _materialization_failure(
+                phase="rollback",
+                code="materialization_lock_release_failed",
+                target=target,
+            ) from release_error
+    except RunBundleMaterializationError as exc:
+        if not lock_released:
+            try:
+                _release_materialization_lock(lock)
+                lock_released = True
+            except RuntimeError as release_error:
+                raise _materialization_failure(
+                    phase="rollback",
+                    code="materialization_lock_release_failed",
+                    target=target,
+                    cause_code="materialization_lock_release_failed",
+                    rollback=exc.rollback,
+                ) from release_error
+        raise
+    except RuntimeError as exc:
+        if not lock_released:
+            try:
+                _release_materialization_lock(lock)
+                lock_released = True
+            except RuntimeError as release_error:
+                raise _materialization_failure(
+                    phase="rollback",
+                    code="materialization_lock_release_failed",
+                    target=target,
+                ) from release_error
+        raise _materialization_failure(
+            phase="rollback",
+            code="materialization_lock_release_failed",
+            target=target,
+        ) from exc
+    return RunBundleMaterialization(
+        report_dir=target,
+        created_files=tuple(
+            artifact.relative_path.as_posix() for artifact in artifacts
+        ),
+        active_design_packet=packet,
+        role_document_packets=role_packets,
+        subagent_prompt_packets=prompt_packets,
+        artifact_digests=digests,
+        active_pointer=active_pointer,
+    )
+
+
+def _indented_yaml_mapping_lines(key: str, value: object) -> list[str]:
+    rendered = yaml.safe_dump(
+        {key: value},
+        allow_unicode=True,
+        sort_keys=False,
+    ).rstrip()
+    return [f"  {line}" for line in rendered.splitlines()]
+
+
+def build_manifest(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketValue,
+    context: ActiveDesignReferenceContext,
+    *,
+    artifact_names: tuple[str, ...],
+    role_packets: tuple[RoleDocumentPacket, ...],
+    prompt_packets: tuple[SubagentPromptPacket, ...],
+) -> str:
     """Build the team manifest yaml."""
     workflow_family = run_workflow_family(spec)
-    active_design_packet = run_active_design_packet(spec, workflow_family)
-    lines = manifest_run_lines(spec, workflow_family, active_design_packet)
-    lines.extend(manifest_role_lines(spec, workflow_family, active_design_packet))
-    lines.extend(manifest_context_policy_lines(spec.config, active_design_packet))
-    lines.extend(manifest_quality_gate_lines(spec.config))
+    lines = manifest_run_lines(spec, workflow_family, packet, context)
     lines.extend(
-        manifest_artifact_lines(spec.config, spec.roles, active_design_packet)
+        manifest_role_lines(
+            spec,
+            workflow_family,
+            packet,
+            role_packets,
+            prompt_packets,
+        )
     )
+    lines.extend(manifest_context_policy_lines(spec.config, packet))
+    lines.extend(manifest_quality_gate_lines(spec.config))
+    lines.extend(manifest_artifact_lines(artifact_names))
     return "\n".join(lines) + "\n"
 
 
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
+    context: ActiveDesignReferenceContext,
 ) -> list[str]:
     """Render run-level manifest fields."""
     lines = [
@@ -2530,7 +6273,14 @@ def manifest_run_lines(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
-        *manifest_active_design_packet_lines(active_design_packet),
+        *_indented_yaml_mapping_lines(
+            "active_design_packet",
+            active_design_packet_mapping(active_design_packet),
+        ),
+        *_indented_yaml_mapping_lines(
+            "active_design_packet_reference_projection",
+            active_design_reference_projection_mapping(context),
+        ),
         "  subagent_lifecycle_policy:",
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
@@ -2819,8 +6569,7 @@ def manifest_contract_complete_implementation_policy_lines(
     ]
     if implementation_handoff_required(task_text):
         lines[
-            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:
-            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
+            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
         ] = [
             f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
             f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
@@ -2885,7 +6634,7 @@ def manifest_pre_handoff_scope_policy_lines() -> list[str]:
 
 
 def manifest_pre_handoff_gate_status_lines(
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
     applies_when = (
@@ -3036,9 +6785,13 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
 def manifest_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
+    role_packets: tuple[RoleDocumentPacket, ...],
+    prompt_packets: tuple[SubagentPromptPacket, ...],
 ) -> list[str]:
     """Render role entries for the team manifest."""
+    documents_by_role = {packet.role_id: packet for packet in role_packets}
+    prompts_by_role = {packet.role_id: packet for packet in prompt_packets}
     lines = ["roles:"]
     for role in spec.roles:
         lines.extend(
@@ -3047,6 +6800,8 @@ def manifest_role_lines(
                 workflow_family,
                 active_design_packet,
                 role,
+                documents_by_role[role.id],
+                prompts_by_role[role.id],
             )
         )
     return lines
@@ -3055,8 +6810,10 @@ def manifest_role_lines(
 def manifest_one_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
     role: Role,
+    document_packet: RoleDocumentPacket,
+    prompt_packet: SubagentPromptPacket,
 ) -> list[str]:
     """Render one role entry for the team manifest."""
     lines = [
@@ -3073,10 +6830,10 @@ def manifest_one_role_lines(
     for responsibility in role.owns:
         lines.append(f"      - {responsibility}")
     lines.append("    required_outputs:")
-    for output in selected_role_outputs(spec.config, role, active_design_packet):
+    for output in prompt_packet.required_outputs:
         lines.append(f"      - {output}")
     lines.extend(manifest_write_policy_lines(spec, role, active_design_packet))
-    lines.extend(manifest_document_packet_lines(spec, role, active_design_packet))
+    lines.extend(manifest_document_packet_lines(document_packet))
     return lines
 
 
@@ -3114,7 +6871,7 @@ def manifest_prompt_contract_lines(
 def manifest_write_policy_lines(
     spec: RunBundleSpec,
     role: Role,
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> list[str]:
     """Render resolved write policy lines for one role."""
     scope = resolve_role_write_scope(
@@ -3145,18 +6902,9 @@ def manifest_write_policy_lines(
 
 
 def manifest_document_packet_lines(
-    spec: RunBundleSpec,
-    role: Role,
-    active_design_packet: ActiveDesignPacketConfig,
+    document_packet: RoleDocumentPacket,
 ) -> list[str]:
     """Render explicit document packet lines for one role."""
-    document_packet = resolve_role_document_packet(
-        spec.config,
-        role,
-        spec.report_dir,
-        spec.workspace_root,
-        active_design_packet,
-    )
     lines = ["    document_packet:"]
     lines.append(
         f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
@@ -3176,9 +6924,7 @@ def manifest_document_packet_lines(
             for section in entry.sections:
                 lines.append(f"            - heading: {section.heading!r}")
                 lines.append(f"              anchor: {section.anchor!r}")
-                lines.append(
-                    f"              required: {str(section.required).lower()}"
-                )
+                lines.append(f"              required: {str(section.required).lower()}")
     return lines
 
 
@@ -3195,17 +6941,19 @@ def role_specific_document_entries(
 
 def manifest_context_policy_lines(
     config: TeamConfig,
-    active_design_packet: ActiveDesignPacketConfig,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> list[str]:
     """Render context-sharing policy lines."""
-    packet_artifacts = active_design_packet_artifact_map(
+    packet_artifacts = selected_packet_artifact_paths(
         config,
         active_design_packet,
     )
     lines = ["context_policies:"]
     for policy in config.context_policies:
         lines.append("  - roles:")
-        for role_name in _as_string_tuple(policy.get("roles"), "context_policies.roles"):
+        for role_name in _as_string_tuple(
+            policy.get("roles"), "context_policies.roles"
+        ):
             lines.append(f"      - {role_name}")
         mode = _as_required_string(policy.get("mode"), "context_policies.mode")
         lines.append(f"    mode: {mode}")
@@ -3230,14 +6978,10 @@ def manifest_quality_gate_lines(config: TeamConfig) -> list[str]:
     return lines
 
 
-def manifest_artifact_lines(
-    config: TeamConfig,
-    roles: tuple[Role, ...],
-    active_design_packet: ActiveDesignPacketConfig,
-) -> list[str]:
+def manifest_artifact_lines(artifact_names: tuple[str, ...]) -> list[str]:
     """Render artifact lines."""
     lines = ["artifacts:"]
-    for artifact in iter_artifacts(config, roles, active_design_packet):
+    for artifact in artifact_names:
         lines.append(f"  - {artifact}")
     return lines
 
@@ -3296,13 +7040,17 @@ def render_role_topology(
             cast(object, stage_waves),
             "role_topology.stage_waves",
         ):
-            lines.append(f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}")
+            lines.append(
+                f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}"
+            )
             lines.append(
                 f"{indent}      stage_class: "
                 f"{_as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
             )
             lines.append(f"{indent}      role_ids:")
-            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"):
+            for role_id in _as_string_tuple(
+                wave.get("role_ids"), "stage_waves[].role_ids"
+            ):
                 lines.append(f"{indent}        - {role_id}")
     return lines
 
@@ -3472,7 +7220,7 @@ def resolve_role_write_scope(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: ActiveDesignPacketConfig | None = None,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
     allowed_files = role_allowed_artifact_files(
@@ -3499,16 +7247,15 @@ def role_allowed_artifact_files(
     config: TeamConfig,
     role: Role,
     report_dir: Path,
-    active_design_packet: ActiveDesignPacketConfig | None = None,
+    active_design_packet: ActiveDesignPacketValue,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
-    packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         sorted(
             {
                 resolve_report_bundle_artifact_path(
                     report_dir,
-                    selected_artifact_name(config, artifact_key, packet),
+                    selected_artifact_name(config, artifact_key, active_design_packet),
                 )
                 for artifact_key in role.write_policy.allowed_artifacts
             },
@@ -3596,8 +7343,19 @@ def validate_role_write_scope(
     role = resolve_role(config, role_name)
     resolved_report_dir = report_dir.resolve()
     resolved_workspace_root = workspace_root.resolve()
+    loaded_packet = load_materialized_active_design_packet(resolved_report_dir)
+    if loaded_packet.value is None or loaded_packet.violations:
+        blockers = ",".join(
+            render_active_design_packet_violation(violation)
+            for violation in loaded_packet.violations
+        )
+        raise RuntimeError(f"active design packet is invalid: {blockers or 'missing'}")
     scope = resolve_role_write_scope(
-        config, role, resolved_report_dir, resolved_workspace_root
+        config,
+        role,
+        resolved_report_dir,
+        resolved_workspace_root,
+        loaded_packet.value,
     )
     resolved_ignored_paths = tuple(path.resolve() for path in ignored_paths)
     if workspace_snapshot is None:

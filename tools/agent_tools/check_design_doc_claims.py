@@ -4,6 +4,7 @@
 # responsibility Checks design-document claims against implementation-backed evidence.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../documents/design/README.md design-document evidence policy
+# upstream implementation ./graph_client.py provides verified graph status, query, and context evidence
 # downstream design ../../documents/tools/check_design_doc_claims.md tool contract
 # downstream implementation ../../tests/agent_tools/test_check_design_doc_claims.py validates checker behavior
 # @dependency-end
@@ -12,23 +13,28 @@
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import os
 import re
 import subprocess
-from collections import deque
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from enum import Enum
-from itertools import groupby
 from pathlib import Path
+from typing import cast
 
-HEADER_SCAN_LINES = 80
-MANIFEST_FIELD_COUNT = 4
-MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.agent_tools.graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphResponse,
+)
+
 DEFAULT_RECURSIVE_DEPTH = 3
-CHECKABLE_TOKEN_MAX_CHARS = 120
 TEXT_SUFFIXES = {
     ".bash",
     ".c",
@@ -81,6 +87,10 @@ ASSUMPTION_TERM_RE = re.compile(
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
 TOKEN_RE = re.compile(r"`([^`]+)`")
 KEY_VALUE_TOKEN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*=\S+$")
+DOTTED_SELECTOR_RE = re.compile(
+    r"^[A-Za-z_][A-Za-z0-9_]*(?:\[\*\])?"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*(?:\[\*\])?)+$"
+)
 MATH_OPERATOR_RE = re.compile(
     r"(?:\\(?:cap|cup|in|mapsto|notin|setminus|subset|subseteq|supset|"
     r"supseteq|times|to|varnothing)\b|[∖∪∩⊂⊆⊃⊇∈∉∅×→↦])"
@@ -95,19 +105,9 @@ class ClaimTokenClass(str, Enum):  # noqa: UP042 - supports the repository's Pyt
     """Classification used before any claim token reaches filesystem APIs."""
 
     PATH = "path"
+    PATH_OR_EVIDENCE = "path_or_evidence"
     EVIDENCE = "evidence"
     MATH_OR_PROSE = "math_or_prose"
-
-
-@dataclass(frozen=True)
-class ManifestEdge:
-    """One dependency manifest edge."""
-
-    direction: str
-    kind: str
-    source: str
-    target: str
-    reason: str
 
 
 @dataclass(frozen=True)
@@ -149,13 +149,187 @@ class CheckResult:
     findings: tuple[Finding, ...]
 
 
-@dataclass
-class ClosureAccumulator:
-    """Mutable traversal state for dependency closure."""
+class GraphClaimConsumer:
+    """Graph-gated claim evidence and manifest metadata consumer."""
 
-    evidence: set[str]
-    parents: set[str]
-    queue: deque[tuple[str, int]]
+    def __init__(self, client: GraphClient, status: GraphResponse) -> None:
+        """Bind one adapter and its prerequisite status response."""
+        self.client = client
+        self.status = status
+
+    @classmethod
+    def load(cls, root: Path) -> GraphClaimConsumer:
+        """Load the prerequisite status without rebuilding or parsing source."""
+        client = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE)
+        return cls(client, client.status())
+
+    def status_reason(self) -> str | None:
+        """Return the typed prerequisite failure for every nonfresh graph state."""
+        if self.status.status != "fresh" or self.status.exit_code != 0:
+            return (
+                f"graph_status:{self.status.status};"
+                f"reason={self.status.payload.get('reason')};"
+                f"unresolved_count={self.status.payload.get('unresolved_count')};"
+                f"ambiguous_count={self.status.payload.get('ambiguous_count')}"
+            )
+        raw_integration = self.status.payload.get("integration_record")
+        if not isinstance(raw_integration, dict):
+            return "graph_status:invalid;reason=missing-integration-record"
+        integration = cast(dict[str, object], raw_integration)
+        expected: dict[str, object] = {
+            "schema": "agent-canon.graph.integration.v1",
+            "root": ".",
+            "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
+            "schema_version": "graph_storage_core.v1",
+            "profile": "default",
+            "source_snapshot_profile": "parent",
+            "verified": True,
+            "verification_code": "graph.integration.verified",
+        }
+        observed = {field: integration.get(field) for field in expected}
+        if observed != expected:
+            return f"graph_status:invalid;reason=integration-mismatch:{observed}"
+        for field in ("input_fingerprint", "graph_fingerprint"):
+            value = integration.get(field)
+            if not isinstance(value, str) or not value:
+                return f"graph_status:invalid;reason=integration-{field}-missing"
+            if self.status.payload.get(field) != value:
+                return f"graph_status:invalid;reason=integration-{field}-mismatch"
+        snapshot_head = integration.get("snapshot_head")
+        if not isinstance(snapshot_head, str) or not snapshot_head:
+            return "graph_status:invalid;reason=integration-snapshot-head-missing"
+        if not isinstance(integration.get("producer_artifacts"), list):
+            return "graph_status:invalid;reason=integration-producer-artifacts-missing"
+        return None
+
+    @staticmethod
+    def _require_fresh(response: GraphResponse, operation: str) -> None:
+        if response.status != "fresh" or response.exit_code != 0:
+            raise GraphClientError(
+                f"graph_status:{response.status};operation={operation};"
+                f"reason={response.payload.get('reason')}"
+            )
+
+    def context(self, path: str, token: str | None = None) -> GraphResponse:
+        """Return one fresh graph-owned context response."""
+        response = self.client.context(path, token)
+        self._require_fresh(response, "context")
+        return response
+
+    def document_metadata(self, path: str) -> tuple[str, tuple[int, int] | None]:
+        """Return manifest contract and span from canonical context items."""
+        response = self.context(path)
+        contract = ""
+        manifest_span: tuple[int, int] | None = None
+        for item in graph_context_items(response):
+            if item.get("kind") == "manifest.contract" and isinstance(
+                item.get("value"), str
+            ):
+                contract = str(item["value"])
+            if item.get("kind") == "manifest.present":
+                span = item.get("source_span")
+                if isinstance(span, dict):
+                    typed_span = cast(dict[str, object], span)
+                    start = typed_span.get("start_line")
+                    end = typed_span.get("end_line")
+                    if isinstance(start, int) and isinstance(end, int):
+                        manifest_span = (start, end)
+        return contract, manifest_span
+
+    def evidence_paths(
+        self,
+        target: str,
+        recursive_depth: int,
+    ) -> tuple[set[str], set[str]]:
+        """Return graph-derived bounded evidence and direct parent paths."""
+        response = self.client.query(
+            path=target,
+            all=False,
+            relation="dependency",
+            direction="both",
+            depth=recursive_depth,
+        )
+        self._require_fresh(response, "query")
+        evidence: set[str] = set()
+        parents: set[str] = set()
+        for fact in response.dependency_facts:
+            if fact.kind not in {"design", "implementation"}:
+                continue
+            if fact.source != target:
+                evidence.add(fact.source)
+            if fact.target != target:
+                evidence.add(fact.target)
+            if (
+                fact.source == target
+                and fact.direction == "upstream"
+                and fact.kind == "design"
+            ):
+                parents.add(fact.target)
+        return evidence, parents
+
+    def token_supported(
+        self, claim_path: str, token: str
+    ) -> tuple[bool, str | None]:
+        """Check one classified token against only canonical graph context."""
+        token_class = classify_claim_token(token)
+        if token_class is ClaimTokenClass.MATH_OR_PROSE:
+            return True, None
+        response = self.context(claim_path, token)
+        path_supported = isinstance(response.payload.get("resolved_path"), str) and isinstance(
+            response.payload.get("source_span"), dict
+        )
+        if token_class is ClaimTokenClass.PATH:
+            return path_supported, None if path_supported else "graph-code=path-unresolved"
+        if path_supported or graph_context_matches_token(response, token):
+            return True, None
+        return False, "graph-code=evidence-unresolved"
+
+    def parent_context_text(self, parent_path: str) -> str:
+        """Return parent evidence text projected only from graph context fields."""
+        response = self.context(parent_path)
+        values: list[str] = []
+        for item in graph_context_items(response):
+            for field in ("value", "excerpt"):
+                value = item.get(field)
+                if isinstance(value, str) and value:
+                    values.append(value)
+        return "\n".join(values)
+
+
+def graph_context_items(response: GraphResponse) -> tuple[Mapping[str, object], ...]:
+    """Return validated graph context item mappings."""
+    raw_items_value = response.payload.get("items")
+    if not isinstance(raw_items_value, list):
+        raise GraphClientError("graph context items must be an array")
+    raw_items = cast(list[object], raw_items_value)
+    items: list[Mapping[str, object]] = []
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            raise GraphClientError("graph context item must be an object")
+        items.append(cast(dict[str, object], raw_item))
+    return tuple(items)
+
+
+def graph_context_matches_token(response: GraphResponse, token: str) -> bool:
+    """Match one evidence token against context items and dependency witnesses."""
+    evidence: dict[str, str] = {}
+    for index, item in enumerate(graph_context_items(response)):
+        for field in ("value", "excerpt", "evidence_ref", "source_path"):
+            value = item.get(field)
+            if isinstance(value, str) and value:
+                evidence[f"item-{index}-{field}"] = value
+    witnesses_value = response.payload.get("dependency_witnesses")
+    if not isinstance(witnesses_value, list):
+        raise GraphClientError("graph context dependency_witnesses must be an array")
+    witnesses = cast(list[object], witnesses_value)
+    for index, witness in enumerate(witnesses):
+        if not isinstance(witness, dict):
+            raise GraphClientError("graph context dependency witness must be an object")
+        typed_witness = cast(dict[str, object], witness)
+        for field, value in typed_witness.items():
+            if isinstance(value, str) and value:
+                evidence[f"witness-{index}-{field}"] = value
+    return token_in_evidence(token, evidence)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -178,23 +352,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def strip_manifest_line(line: str) -> str:
-    """Strip common comment syntax from one manifest line."""
-    stripped = line.rstrip("\r").strip()
-    for prefix in ("#", "//", "*"):
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix) :].strip()
-    stripped = stripped.rstrip(",").strip()
-    if stripped.startswith('"') and stripped.endswith('"'):
-        stripped = stripped[1:-1]
-    return stripped.strip()
-
-
 def repo_relative(root: Path, path: Path) -> str:
     """Return a normalized path relative to root when possible."""
     absolute_root = Path(os.path.normpath(root.absolute().as_posix()))
-    absolute_path = Path(os.path.normpath((root / path).absolute().as_posix())) if not path.is_absolute() else Path(
-        os.path.normpath(path.absolute().as_posix())
+    absolute_path = (
+        Path(os.path.normpath((root / path).absolute().as_posix()))
+        if not path.is_absolute()
+        else Path(os.path.normpath(path.absolute().as_posix()))
     )
     try:
         return absolute_path.relative_to(absolute_root).as_posix()
@@ -203,100 +367,11 @@ def repo_relative(root: Path, path: Path) -> str:
 
 
 def resolve_repo_path(root: Path, path: str | Path) -> Path:
-    """Resolve root-relative, vendored, or absolute paths."""
+    """Resolve one graph-declared root-relative or explicit absolute path."""
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
-    direct = root / candidate
-    if direct.exists():
-        return direct
-    vendor = root / "vendor" / "agent-canon" / candidate
-    if vendor.exists():
-        return vendor
-    return direct
-
-
-def resolve_claim_token_path(
-    root: Path,
-    claim_path: str,
-    token_path: str,
-) -> tuple[Path | None, str | None]:
-    """Resolve a path-like token using the claim document as its context."""
-    try:
-        resolved_root = root.resolve(strict=False)
-        claim_file = Path(claim_path)
-        if not claim_file.is_absolute():
-            claim_file = resolved_root / claim_file
-        claim_file = claim_file.resolve(strict=False)
-        if not path_is_under_root(resolved_root, claim_file):
-            return None, f"unsupported-reference:path-invalid:{token_path}"
-
-        candidate = Path(token_path)
-        if candidate.is_absolute():
-            resolved = candidate
-        elif token_path.startswith(("./", "../")):
-            resolved = claim_file.parent / candidate
-        else:
-            resolved = resolved_root / candidate
-        return Path(os.path.normpath(resolved.as_posix())), None
-    except (OSError, ValueError, RuntimeError):
-        return None, f"unsupported-reference:path-invalid:{token_path}"
-
-
-def path_is_under_root(root: Path, path: Path) -> bool:
-    """Return whether one path stays inside the repository root."""
-    try:
-        path.resolve(strict=False).relative_to(root.resolve(strict=False))
-        return True
-    except (OSError, ValueError, RuntimeError):
-        return False
-
-
-def normalize_target(root: Path, source: Path, relative_target: str) -> str:
-    """Normalize one manifest target relative to its source file."""
-    target = source.parent / relative_target
-    return repo_relative(root, target)
-
-
-def parse_manifest_edges(root: Path, relative_path: str) -> tuple[ManifestEdge, ...]:
-    """Extract dependency manifest edges from one file."""
-    path = resolve_repo_path(root, relative_path)
-    if not path.is_file() or path.is_symlink():
-        return ()
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
-    except UnicodeDecodeError:
-        return ()
-    in_manifest = False
-    source = repo_relative(root, path)
-    edges: list[ManifestEdge] = []
-    for line in lines:
-        stripped = strip_manifest_line(line)
-        if stripped == "@dependency-start":
-            in_manifest = True
-            continue
-        if stripped == "@dependency-end":
-            break
-        if not in_manifest or not stripped:
-            continue
-        if stripped in {"<!--", "-->", "/*", "*/", '"""', "'''"}:
-            continue
-        fields = stripped.split(maxsplit=MANIFEST_REASON_MAX_SPLIT)
-        if len(fields) < MANIFEST_FIELD_COUNT:
-            continue
-        direction, kind, target_path, reason = fields
-        if direction not in {"upstream", "downstream"}:
-            continue
-        edges.append(
-            ManifestEdge(
-                direction=direction,
-                kind=kind,
-                source=source,
-                target=normalize_target(root, path, target_path),
-                reason=reason,
-            )
-        )
-    return tuple(edges)
+    return root / candidate
 
 
 def git_files(root: Path) -> list[str]:
@@ -323,19 +398,8 @@ def run_git_files(root: Path, prefix: str) -> list[str]:
     if result.returncode != 0:
         return []
     return [
-        f"{prefix}{line.strip()}"
-        for line in result.stdout.splitlines()
-        if line.strip()
+        f"{prefix}{line.strip()}" for line in result.stdout.splitlines() if line.strip()
     ]
-
-
-def walk_files(root: Path) -> list[str]:
-    """Return a fallback file list for non-git fixtures."""
-    return sorted(
-        repo_relative(root, path)
-        for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink()
-    )
 
 
 def is_checkable_path(path: str) -> bool:
@@ -346,16 +410,6 @@ def is_checkable_path(path: str) -> bool:
     return Path(normalized).suffix in TEXT_SUFFIXES
 
 
-def all_manifest_edges(root: Path) -> tuple[ManifestEdge, ...]:
-    """Extract manifest edges from all checkable files under root."""
-    files = git_files(root) or walk_files(root)
-    edges: list[ManifestEdge] = []
-    for path in files:
-        if is_checkable_path(path):
-            edges.extend(parse_manifest_edges(root, path))
-    return tuple(sorted(set(edges), key=lambda item: (item.source, item.direction, item.kind, item.target)))
-
-
 def changed_design_paths(root: Path) -> tuple[str, ...]:
     """Return changed design-document paths."""
     return design_paths_from_candidates(run_git_changed_path_names(root))
@@ -364,7 +418,16 @@ def changed_design_paths(root: Path) -> tuple[str, ...]:
 def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
     """Return git changed path names from the current checkout."""
     result = subprocess.run(
-        ["git", "-C", str(root), "diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"],
+        [
+            "git",
+            "-C",
+            str(root),
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMRT",
+            "HEAD",
+            "--",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -376,11 +439,7 @@ def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
 
 def design_paths_from_candidates(paths: Iterable[str]) -> tuple[str, ...]:
     """Return design-document paths from candidate path names."""
-    return tuple(
-        path
-        for path in paths
-        if is_design_doc_path(path)
-    )
+    return tuple(path for path in paths if is_design_doc_path(path))
 
 
 def is_design_doc_path(path: str) -> bool:
@@ -394,117 +453,6 @@ def is_design_doc_path(path: str) -> bool:
         or normalized == "agents/templates/design_brief.md"
         or normalized == "vendor/agent-canon/agents/templates/design_brief.md"
     )
-
-
-def dependency_indexes(edges: Sequence[ManifestEdge]) -> tuple[dict[str, list[ManifestEdge]], dict[str, list[ManifestEdge]]]:
-    """Return outgoing and incoming manifest-edge indexes."""
-    return edge_index_by_source(edges), edge_index_by_target(edges)
-
-
-def edge_index_by_source(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
-    """Return manifest edges grouped by source path."""
-    return {
-        source: list(group)
-        for source, group in groupby(
-            sorted(edges, key=lambda edge: edge.source),
-            key=lambda edge: edge.source,
-        )
-    }
-
-
-def edge_index_by_target(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
-    """Return manifest edges grouped by target path."""
-    return {
-        target: list(group)
-        for target, group in groupby(
-            sorted(edges, key=lambda edge: edge.target),
-            key=lambda edge: edge.target,
-        )
-    }
-
-
-def dependency_closure(
-    target: str,
-    edges: Sequence[ManifestEdge],
-    recursive_depth: int,
-) -> tuple[set[str], set[str], list[Finding]]:
-    """Return evidence paths, parent paths, and dependency traversal findings."""
-    outgoing, incoming = dependency_indexes(edges)
-    findings: list[Finding] = []
-    accumulator = ClosureAccumulator(set(), set(), deque([(target, 0)]))
-    visited: set[str] = set()
-    while accumulator.queue:
-        current, depth = accumulator.queue.popleft()
-        if closure_node_visited_or_too_deep(current, depth, recursive_depth, visited):
-            continue
-        visited.add(current)
-        for edge in related_dependency_edges(outgoing, incoming, current):
-            record_dependency_closure_edge(target, current, depth, recursive_depth, edge, accumulator)
-    return accumulator.evidence, accumulator.parents, findings
-
-
-def closure_node_visited_or_too_deep(
-    current: str,
-    depth: int,
-    recursive_depth: int,
-    visited: set[str],
-) -> bool:
-    """Return whether one closure node should be skipped."""
-    return current in visited or depth > recursive_depth
-
-
-def related_dependency_edges(
-    outgoing: dict[str, list[ManifestEdge]],
-    incoming: dict[str, list[ManifestEdge]],
-    current: str,
-) -> tuple[ManifestEdge, ...]:
-    """Return deterministic manifest edges touching one path."""
-    return tuple(
-        sorted(
-            [*outgoing.get(current, ()), *incoming.get(current, ())],
-            key=lambda edge: (edge.source, edge.direction, edge.kind, edge.target),
-        )
-    )
-
-
-def record_dependency_closure_edge(
-    target: str,
-    current: str,
-    depth: int,
-    recursive_depth: int,
-    edge: ManifestEdge,
-    accumulator: ClosureAccumulator,
-) -> None:
-    """Record one traversable dependency edge in closure state."""
-    next_path = dependency_next_path(edge, current)
-    if not dependency_edge_is_traversable(edge, next_path, target):
-        return
-    accumulator.evidence.add(next_path)
-    if dependency_edge_is_parent(target, edge):
-        accumulator.parents.add(next_path)
-    if depth < recursive_depth:
-        accumulator.queue.append((next_path, depth + 1))
-
-
-def dependency_next_path(edge: ManifestEdge, current: str) -> str:
-    """Return the opposite endpoint from the current path."""
-    if edge.source == current:
-        return edge.target
-    return edge.source
-
-
-def dependency_edge_is_traversable(edge: ManifestEdge, next_path: str, target: str) -> bool:
-    """Return whether one dependency edge participates in claim evidence closure."""
-    return (
-        edge.kind in {"design", "implementation"}
-        and is_checkable_path(next_path)
-        and next_path != target
-    )
-
-
-def dependency_edge_is_parent(target: str, edge: ManifestEdge) -> bool:
-    """Return whether one edge identifies an upstream parent design document."""
-    return edge.source == target and edge.direction == "upstream" and edge.kind == "design"
 
 
 def read_text(root: Path, relative_path: str) -> str:
@@ -530,37 +478,27 @@ def resolve_existing_text_path(root: Path, relative_path: str) -> Path | None:
     return path
 
 
-def evidence_texts(root: Path, paths: Iterable[str]) -> dict[str, str]:
-    """Return readable evidence texts."""
-    return {
-        path: text
-        for path in sorted(paths)
-        if (text := read_text(root, path))
-    }
-
-
-def iter_body_lines(text: str) -> Iterable[tuple[int, str]]:
+def iter_body_lines(
+    text: str,
+    manifest_span: tuple[int, int] | None = None,
+) -> Iterable[tuple[int, str]]:
     """Yield non-fenced Markdown body lines."""
     in_fence = False
-    in_manifest = False
     for index, raw_line in enumerate(text.splitlines(), start=1):
+        if manifest_span is not None and manifest_span[0] <= index <= manifest_span[1]:
+            continue
         stripped = raw_line.strip()
         if stripped.startswith("```") or stripped.startswith("~~~"):
             in_fence = not in_fence
             continue
         if in_fence:
             continue
-        manifest_line = strip_manifest_line(stripped)
-        if manifest_line == "@dependency-start":
-            in_manifest = True
-            continue
-        if in_manifest:
-            if manifest_line == "@dependency-end":
-                in_manifest = False
-            continue
         if not stripped or stripped.startswith("<!--") or stripped.startswith("-->"):
             continue
-        if stripped.startswith("|") and set(stripped.replace("|", "").strip()) <= {"-", ":"}:
+        if stripped.startswith("|") and set(stripped.replace("|", "").strip()) <= {
+            "-",
+            ":",
+        }:
             continue
         yield index, raw_line.rstrip()
 
@@ -602,7 +540,7 @@ def checkable_tokens(line: str) -> tuple[str, ...]:
 def normalized_checkable_token(raw_token: str) -> str | None:
     """Return a normalized token when one Markdown code span is checkable."""
     token = raw_token.strip()
-    if not token or len(token) > CHECKABLE_TOKEN_MAX_CHARS:
+    if not token:
         return None
     if "..." in token:
         return None
@@ -630,6 +568,8 @@ def classify_claim_token(token: str) -> ClaimTokenClass:
         return ClaimTokenClass.MATH_OR_PROSE
     if KEY_VALUE_TOKEN_RE.fullmatch(stripped):
         return ClaimTokenClass.EVIDENCE
+    if DOTTED_SELECTOR_RE.fullmatch(stripped):
+        return ClaimTokenClass.PATH_OR_EVIDENCE
     try:
         candidate = Path(stripped)
         if candidate.is_absolute() or stripped.startswith(("./", "../")):
@@ -639,7 +579,7 @@ def classify_claim_token(token: str) -> ClaimTokenClass:
         if any(marker in stripped for marker in ("*", "?", "[")) and candidate.suffix:
             return ClaimTokenClass.PATH
         if candidate.suffix and not any(char.isspace() for char in stripped):
-            return ClaimTokenClass.PATH
+            return ClaimTokenClass.PATH_OR_EVIDENCE
     except (OSError, ValueError, RuntimeError):
         return ClaimTokenClass.PATH
     return ClaimTokenClass.EVIDENCE
@@ -655,27 +595,30 @@ def is_checkable_token(token: str) -> bool:
         return True
     if token.startswith("--"):
         return True
-    if " " in token and any(part.endswith((".py", ".sh", ".rs", ".md")) for part in token.split()):
+    if " " in token and any(
+        part.endswith((".py", ".sh", ".rs", ".md")) for part in token.split()
+    ):
         return True
     return token.isupper() and len(token) > 2
 
 
-def strict_claim_prose_required(path: str, text: str) -> bool:
+def strict_claim_prose_required(path: str, manifest_contract: str) -> bool:
     """Return whether cue-only prose lines are design claims for this document."""
     if "/design/" in path or path.endswith("-design.md"):
         return True
-    for raw_line in text.splitlines()[:HEADER_SCAN_LINES]:
-        line = strip_manifest_line(raw_line)
-        if line == "contract design":
-            return True
-    return False
+    return manifest_contract == "design"
 
 
-def extract_claims(path: str, text: str) -> tuple[Claim, ...]:
+def extract_claims(
+    path: str,
+    text: str,
+    manifest_contract: str,
+    manifest_span: tuple[int, int] | None,
+) -> tuple[Claim, ...]:
     """Extract checkable design claim lines."""
     claims: list[Claim] = []
-    strict_prose = strict_claim_prose_required(path, text)
-    for line_number, line in iter_body_lines(text):
+    strict_prose = strict_claim_prose_required(path, manifest_contract)
+    for line_number, line in iter_body_lines(text, manifest_span):
         stripped = line.strip()
         if stripped.startswith("#"):
             continue
@@ -704,51 +647,6 @@ def is_non_claim_control_line(line: str) -> bool:
     )
 
 
-def token_path_candidates(token: str) -> tuple[str, ...]:
-    """Return path-like candidates from a token or command token."""
-    parts = [token]
-    parts.extend(part for part in token.split() if "/" in part or Path(part).suffix)
-    normalized: list[str] = []
-    for part in parts:
-        candidate = part.strip("'\";,")
-        normalized.append(candidate)
-    return tuple(dict.fromkeys(normalized))
-
-
-def token_is_path_in_repo(
-    root: Path,
-    claim_path: str,
-    token: str,
-) -> tuple[bool, str | None]:
-    """Return whether one path-class token points to an existing repo path."""
-    for candidate in token_path_candidates(token):
-        path, error = resolve_claim_token_path(root, claim_path, candidate)
-        if error is not None or path is None:
-            return False, error
-        if "\x00" in str(path):
-            return False, f"unsupported-reference:path-invalid:{token}"
-        try:
-            resolved_root = root.resolve(strict=False)
-            resolved_path = path.resolve(strict=False)
-            resolved_path.relative_to(resolved_root)
-        except ValueError:
-            return False, f"unsupported-reference:path-outside-root:{token}"
-        except (OSError, RuntimeError):
-            return False, f"unsupported-reference:path-invalid:{token}"
-
-        try:
-            if glob.has_magic(str(path)):
-                matches = glob.glob(str(path), recursive=True)
-                if any(path_is_under_root(resolved_root, Path(match)) for match in matches):
-                    return True, None
-                continue
-            if path.exists():
-                return True, None
-        except (OSError, ValueError, RuntimeError):
-            return False, f"unsupported-reference:path-invalid:{token}"
-    return False, None
-
-
 def key_value_token_in_evidence(token: str, texts: Mapping[str, str]) -> bool:
     """Return whether a key/value token has same-record evidence."""
     for separator in (":", "="):
@@ -770,7 +668,11 @@ def token_in_evidence(token: str, texts: Mapping[str, str]) -> bool:
     """Return whether one token appears in any evidence text."""
     token_lower = token.lower()
     candidates = [token_lower]
-    if any(candidate and candidate in text.lower() for text in texts.values() for candidate in candidates):
+    if any(
+        candidate and candidate in text.lower()
+        for text in texts.values()
+        for candidate in candidates
+    ):
         return True
     if "*" in token:
         pattern = re.compile(re.escape(token_lower).replace(r"\*", r"[^\s`'\"|,]+"))
@@ -780,27 +682,20 @@ def token_in_evidence(token: str, texts: Mapping[str, str]) -> bool:
     return False
 
 
-def dispatch_claim_token(
-    root: Path,
-    claim_path: str,
-    token: str,
-    evidence_texts: Mapping[str, str],
-) -> tuple[bool, str | None]:
-    """Dispatch one token to its strict evidence or path validation route."""
-    token_class = classify_claim_token(token)
-    if token_class is ClaimTokenClass.PATH:
-        return token_is_path_in_repo(root, claim_path, token)
-    return token_in_evidence(token, evidence_texts), None
-
-
 def has_evidence_ledger(text: str) -> bool:
     """Return whether the design carries an evidence / assumption section."""
-    return bool(section_text(text, ("evidence and assumption", "assumption ledger", "evidence ledger")))
+    return bool(
+        section_text(
+            text, ("evidence and assumption", "assumption ledger", "evidence ledger")
+        )
+    )
 
 
 def assumption_terms(text: str) -> tuple[str, ...]:
     """Return implicit-assumption vocabulary terms present in text."""
-    return tuple(dict.fromkeys(match.group(0) for match in ASSUMPTION_TERM_RE.finditer(text)))
+    return tuple(
+        dict.fromkeys(match.group(0) for match in ASSUMPTION_TERM_RE.finditer(text))
+    )
 
 
 def check_assumption_ledger(path: str, text: str) -> list[Finding]:
@@ -808,7 +703,9 @@ def check_assumption_ledger(path: str, text: str) -> list[Finding]:
     terms = assumption_terms(text)
     if not terms:
         return []
-    ledger = section_text(text, ("evidence and assumption", "assumption ledger", "assumptions"))
+    ledger = section_text(
+        text, ("evidence and assumption", "assumption ledger", "assumptions")
+    )
     if not ledger:
         return [
             Finding(
@@ -837,11 +734,14 @@ def polarity_for_line(line: str) -> str:
     return "neutral"
 
 
-def token_polarities(text: str) -> dict[str, set[str]]:
+def token_polarities(
+    text: str,
+    manifest_span: tuple[int, int] | None,
+) -> dict[str, set[str]]:
     """Return token to modal polarity mapping for one text."""
     entries = tuple(
         entry
-        for _line_number, line in iter_body_lines(text)
+        for _line_number, line in iter_body_lines(text, manifest_span)
         for entry in token_polarity_entries(line)
     )
     return {
@@ -861,35 +761,48 @@ def token_polarity_entries(line: str) -> tuple[tuple[str, str], ...]:
 
 
 def check_parent_contradictions(
-    root: Path,
+    consumer: GraphClaimConsumer,
     path: str,
     text: str,
+    manifest_span: tuple[int, int] | None,
     parent_paths: Sequence[str],
 ) -> list[Finding]:
-    """Find deterministic parent/child modal contradictions over code tokens."""
-    child_polarities = token_polarities(text)
+    """Find modal contradictions using only parent graph context strings."""
+    child_polarities = token_polarities(text, manifest_span)
     findings: list[Finding] = []
     for parent_path in parent_paths:
-        parent_polarities = token_polarities(read_text(root, parent_path))
+        parent_polarities = token_polarities(
+            consumer.parent_context_text(parent_path),
+            None,
+        )
         for token, child_values in sorted(child_polarities.items()):
             parent_values = parent_polarities.get(token, set())
             if "positive" in child_values and "negative" in parent_values:
                 findings.append(
-                    Finding("parent-document-contradiction", path, 0, f"token={token} parent={parent_path}")
+                    Finding(
+                        "parent-document-contradiction",
+                        path,
+                        0,
+                        f"token={token} parent={parent_path}",
+                    )
                 )
             if "negative" in child_values and "positive" in parent_values:
                 findings.append(
-                    Finding("parent-document-contradiction", path, 0, f"token={token} parent={parent_path}")
+                    Finding(
+                        "parent-document-contradiction",
+                        path,
+                        0,
+                        f"token={token} parent={parent_path}",
+                    )
                 )
     return findings
 
 
 def check_claim_support(
-    root: Path,
+    consumer: GraphClaimConsumer,
     claims: Sequence[Claim],
-    evidence: dict[str, str],
 ) -> tuple[int, list[Finding]]:
-    """Check claim tokens against repo paths and evidence text."""
+    """Check claim tokens against graph-owned path and evidence context."""
     supported = 0
     findings: list[Finding] = []
     for claim in claims:
@@ -905,12 +818,7 @@ def check_claim_support(
             continue
         token_findings: list[Finding] = []
         for token in claim.tokens:
-            supported_token, reason = dispatch_claim_token(
-                root,
-                claim.path,
-                token,
-                evidence,
-            )
+            supported_token, reason = consumer.token_supported(claim.path, token)
             if supported_token:
                 continue
             detail = f"token={token}"
@@ -931,24 +839,24 @@ def check_claim_support(
     return supported, findings
 
 
-def missing_dependency_target_findings(root: Path, path: str, evidence_paths: Sequence[str]) -> list[Finding]:
-    """Return findings for dependency targets that do not resolve."""
-    findings: list[Finding] = []
-    for evidence_path in evidence_paths:
-        if not resolve_repo_path(root, evidence_path).exists():
-            findings.append(
-                Finding("dependency-target-unresolved", path, 0, f"path={evidence_path}")
-            )
-    return findings
-
-
 def check_one(
     root: Path,
     path: str,
-    edges: Sequence[ManifestEdge],
+    consumer: GraphClaimConsumer,
     recursive_depth: int,
 ) -> CheckResult:
     """Check one design document."""
+    if status_reason := consumer.status_reason():
+        return CheckResult(
+            path=path,
+            claims=0,
+            supported_claims=0,
+            evidence_paths=(),
+            parent_paths=(),
+            findings=(
+                Finding("graph-integration-unverified", path, 0, status_reason),
+            ),
+        )
     if resolve_existing_text_path(root, path) is None:
         return CheckResult(
             path=path,
@@ -959,17 +867,41 @@ def check_one(
             findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
         )
     text = read_text(root, path)
-    claims = extract_claims(path, text)
-    evidence_paths, parent_paths, traversal_findings = dependency_closure(path, edges, recursive_depth)
-    readable_evidence = evidence_texts(root, evidence_paths)
-    supported, claim_findings = check_claim_support(root, claims, readable_evidence)
+    try:
+        contract, manifest_span = consumer.document_metadata(path)
+        claims = extract_claims(path, text, contract, manifest_span)
+        evidence_paths, parent_paths = consumer.evidence_paths(path, recursive_depth)
+        supported, claim_findings = check_claim_support(consumer, claims)
+        parent_findings = check_parent_contradictions(
+            consumer,
+            path,
+            text,
+            manifest_span,
+            sorted(parent_paths),
+        )
+    except GraphClientError as error:
+        return CheckResult(
+            path=path,
+            claims=0,
+            supported_claims=0,
+            evidence_paths=(),
+            parent_paths=(),
+            findings=(
+                Finding("graph-unavailable", path, 0, f"graph-context:{error}"),
+            ),
+        )
     findings: list[Finding] = []
     if claims and not has_evidence_ledger(text):
-        findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
-    findings.extend(traversal_findings)
-    findings.extend(missing_dependency_target_findings(root, path, sorted(evidence_paths)))
+        findings.append(
+            Finding(
+                "missing-evidence-assumption-ledger",
+                path,
+                0,
+                "section=Evidence And Assumption Ledger",
+            )
+        )
     findings.extend(check_assumption_ledger(path, text))
-    findings.extend(check_parent_contradictions(root, path, text, sorted(parent_paths)))
+    findings.extend(parent_findings)
     findings.extend(claim_findings)
     return CheckResult(
         path=path,
@@ -977,7 +909,12 @@ def check_one(
         supported_claims=supported,
         evidence_paths=tuple(sorted(evidence_paths)),
         parent_paths=tuple(sorted(parent_paths)),
-        findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
+        findings=tuple(
+            sorted(
+                findings,
+                key=lambda item: (item.kind, item.path, item.line, item.detail),
+            )
+        ),
     )
 
 
@@ -1025,8 +962,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
     paths = selected_paths(root, args)
-    edges = all_manifest_edges(root)
-    results = tuple(check_one(root, path, edges, args.recursive_depth) for path in paths)
+    try:
+        consumer = GraphClaimConsumer.load(root)
+    except GraphClientError as error:
+        print(f"DESIGN_DOC_CLAIMS_GRAPH_ERROR={error}")
+        print("DESIGN_DOC_CLAIMS=fail")
+        return 1
+    results = tuple(
+        check_one(root, path, consumer, args.recursive_depth) for path in paths
+    )
     if args.format == "json":
         print(render_json(results))
     else:

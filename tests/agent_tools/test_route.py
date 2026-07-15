@@ -469,7 +469,6 @@ class RouteToolTest(unittest.TestCase):
         for command in (
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
         ):
             self.assertIn(command, direct_text)
         self.assertNotIn("<path>", direct_text)
@@ -478,21 +477,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("`--json` is invalid", direct_text)
         direct_flat = " ".join(direct_text.split())
         for invariant in (
-            "Treat these three commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Treat these two commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in both routes.",
             "Do not remove, add, or rename any flag.",
-            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
         ):
             self.assertIn(invariant, direct_flat)
         for boundary in (
-            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
-            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+            "The canonical graph owns dependency status and facts.",
+            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, direct_flat)
         self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", direct_flat)
         self.assertIn(
-            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             direct_flat,
         )
         packet_result = subprocess.run(
@@ -520,7 +517,6 @@ class RouteToolTest(unittest.TestCase):
             [
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
@@ -542,35 +538,32 @@ class RouteToolTest(unittest.TestCase):
         )
 
     def test_code_visualization_canonical_skill_mirrors_renderer_invariant(self) -> None:
-        """The canonical owner keeps generated and supplied-TSV routes synchronized."""
+        """The canonical owner keeps full and changed graph routes synchronized."""
         canonical_text = (PROJECT_ROOT / "agents" / "skills" / "code-visualization.md").read_text(
             encoding="utf-8"
         )
         source_start = canonical_text.index("## Source Evidence Routes")
         source_text = canonical_text[source_start:]
         self.assertIn("changed-scope command only when changed scope is explicit", source_text)
-        self.assertIn("--graph-tsv reports/dependency_graph.tsv", source_text)
         self.assertIn("--bundle-dir reports/dependency-graph", source_text)
         self.assertNotIn("<path>", source_text)
         self.assertNotIn("<provided-path>", source_text)
         self.assertIn("`--json` is invalid", source_text)
         source_flat = " ".join(source_text.split())
         for invariant in (
-            "Treat these three commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Treat these two commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in both routes.",
             "Do not remove, add, or rename any flag.",
-            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
         ):
             self.assertIn(invariant, source_flat)
         for boundary in (
-            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
-            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+            "The canonical graph owns dependency status and facts.",
+            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, source_flat)
         self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", source_flat)
         self.assertIn(
-            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             source_flat,
         )
         self.assertNotIn(

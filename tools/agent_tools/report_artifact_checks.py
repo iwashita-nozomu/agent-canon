@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 import subprocess
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from mid_task_user_input_policy import (
@@ -33,6 +34,14 @@ PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 APPROVE_DECISION_PATTERN = re.compile(
     r"^(?:[-*]\s*)?(?:decision\s*:\s*)?approve\s*$",
     re.IGNORECASE,
+)
+REVIEW_TARGET_SHA_PATTERN = re.compile(
+    r"\breview_target_sha256\s*=\s*`?([0-9a-f]{64})`?",
+    re.IGNORECASE,
+)
+DESIGN_ARTIFACT_PATH_PATTERN = re.compile(
+    r"^\s*-\s*Design artifact path:\s*`?([^`\r\n]+?)`?\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
 REQUIRED_ACTUAL_WAVE_FIELDS = (
     "wave_event",
@@ -121,7 +130,9 @@ def section_has_content(text: str, heading: str) -> bool:
     if not in_section:
         return False
     body_text = PLACEHOLDER_PATTERN.sub("", "\n".join(body))
-    body_text = "\n".join(line for line in body_text.splitlines() if line.strip()).strip()
+    body_text = "\n".join(
+        line for line in body_text.splitlines() if line.strip()
+    ).strip()
     return bool(body_text)
 
 
@@ -140,7 +151,8 @@ def table_body_rows(text: str, heading: str) -> list[str]:
         if not cells or all(not cell or set(cell) <= {"-"} for cell in cells):
             continue
         if any(
-            cell in {"Clause ID", "Source Bucket", "Stage", "Unit ID", "Wave ID", "Time"}
+            cell
+            in {"Clause ID", "Source Bucket", "Stage", "Unit ID", "Wave ID", "Time"}
             for cell in cells
         ):
             continue
@@ -306,10 +318,12 @@ def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> lis
     """
     if not report_dir.resolve().is_relative_to(workspace.resolve()):
         return []
-    report_paths = {}
+    report_paths: dict[str, str] = {}
     for path in _git_report_paths(workspace, ()):
         normalized = _normalized_git_path(path)
-        if normalized.startswith("reports/agents/") or is_mechanically_regenerated_report_path(path):
+        if normalized.startswith(
+            "reports/agents/"
+        ) or is_mechanically_regenerated_report_path(path):
             report_paths[path] = "tracked"
     for path in _git_report_paths(
         workspace,
@@ -538,8 +552,9 @@ def _mid_task_user_input_blockers(
             f"{wave_id}:expected={expected_scope}"
         )
     target_agents = actual.get("target_agents", "").strip()
-    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
-        target_agents
+    if (
+        classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS
+        and is_empty_policy_value(target_agents)
     ):
         blockers.append(
             f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:target_agents"
@@ -601,17 +616,20 @@ def _actual_wave_mismatch_blockers(
         planned_value = planned.get(schedule_field, "").strip()
         if planned_value and planned_value != actual.get(event_field, "").strip():
             blockers.append(
-                "workflow_monitoring.md:actual_wave_mismatch:"
-                f"{wave_id}:{event_field}"
+                f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:{event_field}"
             )
     if _split_csv_field(planned.get("Spawned Roles", "")) != _split_csv_field(
         actual.get("spawned_roles", "")
     ):
-        blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles")
+        blockers.append(
+            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles"
+        )
     if _split_csv_field(planned.get("Role Instances", "")) != _split_csv_field(
         actual.get("role_instances", "")
     ):
-        blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances")
+        blockers.append(
+            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances"
+        )
     return blockers
 
 
@@ -634,7 +652,9 @@ def wave_reconciliation_blockers(
     if lifecycle_status.get("agent_wave_ledger_status") == "not_applicable":
         actual_rows = actual_wave_event_fields(workflow_monitoring_text)
         if planned_by_id or actual_rows:
-            blockers.append("subagent_lifecycle:not_applicable_but_wave_evidence_present")
+            blockers.append(
+                "subagent_lifecycle:not_applicable_but_wave_evidence_present"
+            )
         return blockers
 
     actual_by_id, actual_id_blockers = _actual_waves_by_id(
@@ -702,7 +722,32 @@ def final_review_decision_lines(text: str) -> list[str]:
 
 def has_approve_decision(text: str) -> bool:
     """Return whether a final-review Decision section contains an exact approve decision."""
-    return any(APPROVE_DECISION_PATTERN.fullmatch(line) for line in final_review_decision_lines(text))
+    return any(
+        APPROVE_DECISION_PATTERN.fullmatch(line)
+        for line in final_review_decision_lines(text)
+    )
+
+
+@dataclass(frozen=True)
+class ReviewIdentityResult:
+    """Authoritative design-path, target-digest, and decision projection."""
+
+    design_artifact_path: str | None
+    review_target_sha256: str | None
+    decision_approved: bool
+
+
+def parse_review_identity(text: str) -> ReviewIdentityResult:
+    """Parse one review identity through the shared structural decision owner."""
+    path_matches = DESIGN_ARTIFACT_PATH_PATTERN.findall(text)
+    sha_matches = REVIEW_TARGET_SHA_PATTERN.findall(text)
+    return ReviewIdentityResult(
+        design_artifact_path=(
+            path_matches[-1].strip().strip("'\"") if path_matches else None
+        ),
+        review_target_sha256=(sha_matches[-1].lower() if sha_matches else None),
+        decision_approved=has_approve_decision(text),
+    )
 
 
 def check_final_review_artifact(text: str) -> list[str]:

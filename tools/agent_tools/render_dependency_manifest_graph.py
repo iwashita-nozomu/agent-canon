@@ -21,16 +21,24 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
-GRAPH_TSV_FIELD_COUNT = 4
+from graph_client import (  # noqa: E402
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+)
+
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
 BUNDLE_SCHEMA = "agent_canon.dependency_graph_bundle.v1"
 PROJECTION_SCHEMA = "agent_canon.dependency_graph_projection.v1"
-CHECKER_AUTHORITY = "tools/agent_tools/check_dependency_graph.sh"
-CHECKER_GRAPH_TSV_LOCATOR = f"{CHECKER_AUTHORITY}#graph-tsv"
+CHECKER_AUTHORITY = (
+    "tools/bin/agent-canon graph query --all --relation dependency "
+    "--direction both --depth 0"
+)
 BUNDLE_GRAPH_TSV_LOCATOR = "dependency_graph.tsv"
 BUNDLE_ARTIFACTS = (
     "dependency_graph.tsv",
@@ -79,6 +87,13 @@ class Edge:
     kind: str
     source: str
     target: str
+    fact_id: str = ""
+    reason: str = ""
+    producer: str = ""
+    source_path: str | None = None
+    source_span: Mapping[str, object] | None = None
+    evidence_ref: str = ""
+    authority: str = ""
 
 
 @dataclass(frozen=True)
@@ -115,7 +130,9 @@ class GraphInput:
     """Dependency graph TSV input and source checker status."""
 
     path: Path
-    source_returncode: int | None
+    edges: tuple[Edge, ...]
+    source_returncode: int
+    graph_status: str
     origin_kind: str
     origin_locator: str
 
@@ -317,7 +334,6 @@ def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Repository root.")
-    parser.add_argument("--graph-tsv", help="Existing dependency graph TSV to render.")
     parser.add_argument("--scope", choices=("full", "changed"), default="full")
     parser.add_argument("--bundle-dir", help="Write the fixed six-file dependency graph bundle.")
     parser.add_argument("--ir-out", help="Write repo-local graph IR JSON to this path.")
@@ -379,52 +395,80 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+def changed_source_paths(root: Path) -> frozenset[str]:
+    """Return the current changed-source selection without deriving graph facts."""
+    selected: set[str] = set()
+    for command in (
+        ("git", "diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    ):
+        result = subprocess.run(
+            command,
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise GraphClientError(
+                f"changed graph scope selection failed: {result.stderr.strip()}"
+            )
+        selected.update(line for line in result.stdout.splitlines() if line)
+    return frozenset(selected)
+
+
 def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInput:
-    """Generate a temporary graph TSV by calling the canonical graph checker."""
-    command = [
-        "bash",
-        CHECKER_AUTHORITY,
-        "--root",
-        str(root),
-        "--graph-tsv",
-        str(target_path),
-    ]
-    if scope == "changed":
-        command.append("--changed")
-    result = subprocess.run(
-        command,
-        cwd=root,
-        check=False,
-        capture_output=True,
-        text=True,
+    """Project one canonical dependency query into the bundle TSV view."""
+    try:
+        response = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+        if response.status != "fresh" or response.exit_code != 0:
+            sys.stderr.write(json.dumps(response.payload, sort_keys=True) + "\n")
+            raise SystemExit(response.exit_code or 1)
+        selected = changed_source_paths(root) if scope == "changed" else None
+        edges = tuple(
+            Edge(
+                direction=fact.direction,
+                kind=fact.kind,
+                source=fact.source,
+                target=fact.target,
+                fact_id=fact.id,
+                reason=fact.reason,
+                producer=fact.producer,
+                source_path=fact.source_path,
+                source_span=fact.source_span,
+                evidence_ref=fact.evidence_ref,
+                authority=fact.authority,
+            )
+            for fact in response.dependency_facts
+            if selected is None or fact.source in selected
+        )
+    except GraphClientError as error:
+        print(f"canonical graph query failed: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
+    body = "direction\tkind\tsource\ttarget\n" + "".join(
+        f"{edge.direction}\t{edge.kind}\t{edge.source}\t{edge.target}\n"
+        for edge in edges
     )
-    if result.returncode != 0 and (not target_path.exists() or target_path.stat().st_size == 0):
-        sys.stderr.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        raise SystemExit(result.returncode)
-    if result.returncode != 0:
-        sys.stderr.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        raise SystemExit(result.returncode)
+    atomic_write_text(target_path, body)
+    fingerprint = response.payload.get("graph_fingerprint")
+    locator = (
+        f"canonical-graph:{fingerprint}"
+        if isinstance(fingerprint, str) and fingerprint
+        else "canonical-graph"
+    )
     return GraphInput(
         path=target_path,
-        source_returncode=result.returncode,
-        origin_kind="generated",
-        origin_locator=CHECKER_GRAPH_TSV_LOCATOR,
+        edges=edges,
+        source_returncode=response.exit_code,
+        graph_status=response.status,
+        origin_kind="canonical_graph_query",
+        origin_locator=locator,
     )
-
-
-def load_edges(path: Path) -> tuple[Edge, ...]:
-    """Load graph TSV edges."""
-    edges: list[Edge] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.startswith("direction\t"):
-            continue
-        fields = line.split("\t")
-        if len(fields) != GRAPH_TSV_FIELD_COUNT:
-            continue
-        edges.append(Edge(*fields))
-    return tuple(edges)
 
 
 def repo_path_exists(root: Path, path: str) -> bool:
@@ -774,32 +818,45 @@ def directory_node_record(
 
 
 def dependency_edge_records(edges: tuple[Edge, ...]) -> list[GraphEdgeRecord]:
-    """Return IR edge records for dependency graph TSV rows."""
-    return [
-        {
-            "id": f"edge:{index:06d}",
+    """Return IR edge records with canonical graph provenance."""
+    records: list[GraphEdgeRecord] = []
+    for index, edge in enumerate(edges):
+        span = edge.source_span or {}
+        start_line = span.get("start_line")
+        end_line = span.get("end_line")
+        source_start = start_line if isinstance(start_line, int) else 0
+        source_end = end_line if isinstance(end_line, int) else source_start
+        records.append(
+            {
+            "id": edge.fact_id or f"edge:{index:06d}",
             "document_id": "dependency-manifest-graph",
-            "layer": "artifact",
+            "layer": "adapter:graph-fact",
             "kind": edge.kind,
             "relation": edge.direction,
             "from_node_id": edge.source,
             "to_node_id": edge.target,
             "order_kind": "none",
             "label": edge.kind if edge.direction == "upstream" else f"{edge.direction}:{edge.kind}",
-            "source_locator": f"dependency_graph.tsv:{index + 2}",
-            "source_start": index + 2,
-            "source_end": index + 2,
+            "source_locator": edge.evidence_ref or f"dependency_graph.tsv:{index + 2}",
+            "source_start": source_start,
+            "source_end": source_end,
             "confidence": 1.0,
             "payload_json": {
                 "direction": edge.direction,
                 "kind": edge.kind,
                 "source": edge.source,
                 "target": edge.target,
+                "reason": edge.reason,
+                "producer": edge.producer,
+                "source_path": edge.source_path,
+                "source_span": edge.source_span,
+                "evidence_ref": edge.evidence_ref,
+                "authority": edge.authority,
                 "row": index,
             },
-        }
-        for index, edge in enumerate(edges)
-    ]
+            }
+        )
+    return records
 
 
 def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[GraphEdgeRecord]:
@@ -907,14 +964,14 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
         "id": f"dependency-manifest:{graph_fingerprint(report.edges)[:16]}",
         "producer": "tools/agent_tools/render_dependency_manifest_graph.py",
         "source": {
-            "kind": "dependency_manifest_graph_tsv",
+            "kind": "canonical_graph_query",
             "path": source,
-            "authority": f"{CHECKER_AUTHORITY} --graph-tsv",
+            "authority": CHECKER_AUTHORITY,
         },
         "documents": [
             {
                 "id": "dependency-manifest-graph",
-                "kind": "dependency_manifest_graph_tsv",
+                "kind": "canonical_graph_projection",
                 "title": "Dependency Manifest Graph",
                 "source_locator": source,
                 "created_at": "unknown",
@@ -2556,14 +2613,10 @@ def source_envelope(root: Path, graph_input: GraphInput) -> SourceEnvelope:
 
 
 def checker_envelope(graph_input: GraphInput) -> CheckerEnvelope:
-    """Return the checker authority envelope."""
-    if graph_input.origin_kind == "supplied":
-        status = "not_run"
-    else:
-        status = "pass" if graph_input.source_returncode == 0 else "fail"
+    """Return the canonical graph authority envelope."""
     return {
         "authority": CHECKER_AUTHORITY,
-        "status": status,
+        "status": graph_input.graph_status,
     }
 
 
@@ -2604,7 +2657,6 @@ def write_bundle(
     *,
     root: Path,
     scope: str,
-    graph_tsv: Path | None,
     bundle_dir: Path,
     title: str,
 ) -> tuple[OutputEnvelope, GraphReport]:
@@ -2622,18 +2674,8 @@ def write_bundle(
     staging_dir = Path(tempfile.mkdtemp(prefix=f".{target_dir.name}.staging-", dir=parent_dir))
     try:
         staged_tsv = staging_dir / "dependency_graph.tsv"
-        if graph_tsv is None:
-            graph_input = generate_graph_tsv(root, staged_tsv, scope=scope)
-        else:
-            supplied = graph_tsv.resolve()
-            shutil.copyfile(supplied, staged_tsv)
-            graph_input = GraphInput(
-                path=staged_tsv,
-                source_returncode=None,
-                origin_kind="supplied",
-                origin_locator=normalized_cli_token(supplied),
-            )
-        report = build_report(root, load_edges(staged_tsv))
+        graph_input = generate_graph_tsv(root, staged_tsv, scope=scope)
+        report = build_report(root, graph_input.edges)
         for artifact_name, body in render_outputs(
             report,
             title=title,
@@ -2711,35 +2753,6 @@ def reject_duplicate_projection_paths(
         seen[target_path] = option_name
 
 
-def reject_output_input_collisions(
-    parser: argparse.ArgumentParser,
-    *,
-    graph_tsv: Path | None,
-    projection_paths: dict[str, Path],
-    bundle_dir: Path | None,
-) -> None:
-    """Reject output paths that resolve to a supplied graph TSV input."""
-    if graph_tsv is None:
-        return
-
-    output_paths = [
-        (projection_option_flag(option_name), target_path)
-        for option_name, target_path in projection_paths.items()
-    ]
-    if bundle_dir is not None:
-        output_paths.append(("--bundle-dir", bundle_dir))
-        output_paths.extend(
-            (f"--bundle-dir/{artifact_name}", bundle_dir / artifact_name)
-            for artifact_name in BUNDLE_ARTIFACTS
-        )
-    for output_name, output_path in output_paths:
-        if output_path == graph_tsv:
-            parser.error(
-                "conflicting output path: "
-                f"{output_name} and --graph-tsv resolve to {graph_tsv}"
-            )
-
-
 def build_projection_envelope(
     *,
     root: Path,
@@ -2767,34 +2780,24 @@ def write_projection(
     *,
     root: Path,
     scope: str,
-    graph_tsv: Path | None,
     paths: dict[str, Path],
     title: str,
 ) -> tuple[OutputEnvelope, GraphReport]:
     """Write selected named projections through sibling atomic replaces."""
     temp_tsv: Path | None = None
     try:
-        if graph_tsv is None:
-            handle = tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                newline="\n",
-                prefix=".dependency_graph.tsv.tmp-",
-                dir=root,
-                delete=False,
-            )
-            temp_tsv = Path(handle.name)
-            handle.close()
-            graph_input = generate_graph_tsv(root, temp_tsv, scope=scope)
-        else:
-            supplied = graph_tsv.resolve()
-            graph_input = GraphInput(
-                path=supplied,
-                source_returncode=None,
-                origin_kind="supplied",
-                origin_locator=normalized_cli_token(supplied),
-            )
-        report = build_report(root, load_edges(graph_input.path))
+        handle = tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=".dependency_graph.tsv.tmp-",
+            dir=root,
+            delete=False,
+        )
+        temp_tsv = Path(handle.name)
+        handle.close()
+        graph_input = generate_graph_tsv(root, temp_tsv, scope=scope)
+        report = build_report(root, graph_input.edges)
         outputs = render_outputs(report, title=title, source_locator=graph_input.origin_locator)
         for option_name, target_path in sorted(paths.items()):
             artifact_name = projection_artifact_name(option_name)
@@ -2847,18 +2850,10 @@ def main() -> int:
         parser.error("projection mode requires at least one named output")
     reject_duplicate_projection_paths(parser, selected_projection_paths)
     root = Path(args.root).resolve()
-    graph_tsv = Path(args.graph_tsv) if args.graph_tsv else None
-    reject_output_input_collisions(
-        parser,
-        graph_tsv=graph_tsv.resolve() if graph_tsv is not None else None,
-        projection_paths=selected_projection_paths,
-        bundle_dir=Path(args.bundle_dir).resolve() if args.bundle_dir else None,
-    )
     if args.bundle_dir:
         manifest, report = write_bundle(
             root=root,
             scope=args.scope,
-            graph_tsv=graph_tsv,
             bundle_dir=Path(args.bundle_dir),
             title=args.title,
         )
@@ -2871,7 +2866,6 @@ def main() -> int:
     envelope, report = write_projection(
         root=root,
         scope=args.scope,
-        graph_tsv=graph_tsv,
         paths=selected_projection_paths,
         title=args.title,
     )

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import yaml
 from agent_team import (
+    ActiveDesignPacketValue,
     RunBundleSpec,
     create_run_bundle,
     load_team_config,
@@ -133,11 +134,16 @@ def validate_task_catalog() -> None:
     data = yaml.safe_load(TASK_CATALOG.read_text(encoding="utf-8"))
     ensure(isinstance(data, dict), "task catalog did not parse as a mapping")
 
-    research_family = find_by_id(data.get("workflow_families"), "research_driven_change")
+    research_family = find_by_id(
+        data.get("workflow_families"), "research_driven_change"
+    )
     family_roles = research_family.get("roles", {})
     ensure(isinstance(family_roles, dict), "research family roles must be a mapping")
     family_specialists = family_roles.get("specialists", [])
-    ensure(isinstance(family_specialists, list), "research family specialists must be a list")
+    ensure(
+        isinstance(family_specialists, list),
+        "research family specialists must be a list",
+    )
     ensure("T9" in research_family.get("tasks", []), "research family is missing T9")
 
     task_t9 = find_by_id(data.get("tasks"), "T9")
@@ -148,28 +154,48 @@ def validate_task_catalog() -> None:
     pack_specialists = review_pack.get("specialists", [])
     ensure(isinstance(pack_specialists, list), "review pack specialists must be a list")
     optional_for_tasks = review_pack.get("optional_for_tasks", [])
-    ensure(isinstance(optional_for_tasks, list), "review pack optional_for_tasks must be a list")
+    ensure(
+        isinstance(optional_for_tasks, list),
+        "review pack optional_for_tasks must be a list",
+    )
     ensure("T4" in optional_for_tasks, "full review pack must be optional for T4")
     ensure("T5" in optional_for_tasks, "full review pack must be optional for T5")
     ensure("T9" in optional_for_tasks, "full review pack must be optional for T9")
 
     triage_pack = find_by_id(data.get("review_packs"), "research_perspective_triage")
     triage_specialists = triage_pack.get("specialists", [])
-    ensure(isinstance(triage_specialists, list), "triage pack specialists must be a list")
+    ensure(
+        isinstance(triage_specialists, list), "triage pack specialists must be a list"
+    )
     triage_default_for_tasks = triage_pack.get("default_for_tasks", [])
-    ensure(isinstance(triage_default_for_tasks, list), "triage default_for_tasks must be a list")
+    ensure(
+        isinstance(triage_default_for_tasks, list),
+        "triage default_for_tasks must be a list",
+    )
     for task_id in ("T4", "T5", "T9", "T13"):
-        ensure(task_id in triage_default_for_tasks, f"triage pack must default to {task_id}")
+        ensure(
+            task_id in triage_default_for_tasks,
+            f"triage pack must default to {task_id}",
+        )
 
     for role_id in PERSPECTIVE_ROLE_IDS:
-        ensure(role_id in family_specialists, f"research family missing specialist {role_id}")
+        ensure(
+            role_id in family_specialists,
+            f"research family missing specialist {role_id}",
+        )
         ensure(role_id in pack_specialists, f"review pack missing specialist {role_id}")
     for role_id in TRIAGE_ROLE_IDS:
         ensure(role_id in t9_specialists, f"T9 missing triage specialist {role_id}")
-        ensure(role_id in triage_specialists, f"triage pack missing specialist {role_id}")
+        ensure(
+            role_id in triage_specialists, f"triage pack missing specialist {role_id}"
+        )
 
 
-def validate_runtime_surfaces(report_dir: Path, workspace_root: Path) -> None:
+def validate_runtime_surfaces(
+    report_dir: Path,
+    workspace_root: Path,
+    active_design_packet: ActiveDesignPacketValue,
+) -> None:
     """Check that config, agent inventory, templates, and bundle outputs align."""
     config = load_team_config()
     manifest_path = report_dir / config.artifacts["team_manifest"]
@@ -200,13 +226,20 @@ def validate_runtime_surfaces(report_dir: Path, workspace_root: Path) -> None:
             role=role,
             report_dir=report_dir,
             workspace_root=workspace_root,
+            active_design_packet=active_design_packet,
         )
         if scope.mode != "artifacts_only":
-            raise RuntimeError(f"role {role_id} should be artifacts_only, got {scope.mode}")
+            raise RuntimeError(
+                f"role {role_id} should be artifacts_only, got {scope.mode}"
+            )
         if artifact_path.resolve() not in scope.allowed_files:
-            raise RuntimeError(f"role {role_id} missing allowed file for {artifact_path}")
+            raise RuntimeError(
+                f"role {role_id} missing allowed file for {artifact_path}"
+            )
 
-        ensure(f"  - id: {role_id}" in manifest_text, f"manifest missing role {role_id}")
+        ensure(
+            f"  - id: {role_id}" in manifest_text, f"manifest missing role {role_id}"
+        )
         ensure(
             f"      - {artifact_name}" in manifest_text,
             f"manifest missing artifact {artifact_name}",
@@ -246,7 +279,7 @@ def main() -> int:
         created_at_iso = created_at.isoformat().replace("+00:00", "Z")
         report_dir = (report_root / args.run_id).resolve()
 
-        create_run_bundle(
+        materialization = create_run_bundle(
             RunBundleSpec(
                 config=config,
                 report_dir=report_dir,
@@ -259,7 +292,11 @@ def main() -> int:
             )
         )
 
-        validate_runtime_surfaces(report_dir, workspace_root.resolve())
+        validate_runtime_surfaces(
+            report_dir,
+            workspace_root.resolve(),
+            materialization.active_design_packet,
+        )
 
         print(f"RUN_ID={args.run_id}")
         print(f"REPORT_DIR={report_dir}")

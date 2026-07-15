@@ -10,6 +10,8 @@ downstream design runtime-log-archive-migration.md documents in-tree hook JSONL 
 downstream implementation ../.codex/hooks/log_archive_mount_warning.py warns when the archive mount is absent
 downstream implementation ../.codex/hooks/runtime_log_auto_sync.py runs best-effort Stop-time archive sync
 downstream implementation ../.codex/hooks/hook_event_log.py writes hook JSONL into the archive
+downstream implementation ../tools/agent_tools/workflow_monitor.py emits canonical responsibility-unit measurements
+downstream implementation ../tools/agent_tools/compare_codex_token_footprints.py provides canonical token measurements
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
 downstream implementation ../tools/agent_tools/generate_agent_runtime_dashboard.py displays mounted archive evidence
@@ -55,6 +57,7 @@ Use this table first when deciding where a report is kept:
 | Current task run bundle | `<source-repo>/reports/agents/<run-id>/` | none until archived | `bootstrap_agent_run.py` / task tools create it |
 | Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<environment-key>-<chat-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
 | Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<environment-key>-<chat-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
+| Approved predecessor records | two `predecessor_integration.<unit_id>.json` files in one complete run bundle | the same immutable run-bundle snapshot plus its `archive_manifest.json` | produce both after source merge, archive once, then verify each record and the exact set |
 | Hook chronology | hook runtime | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on branch `logs/<environment-key>-<chat-key>` | hooks write it; `push` or `sync` commits it |
 | Accumulated eval reports | eval producer output | `.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md` | `run_accumulated_agent_evals.py --run-id <run-id>` |
 | Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
@@ -144,6 +147,51 @@ hook workflow-monitor evidence resolves the parent repo
 `reports/agents/.active_run` before any submodule-local pointer. That prevents
 submodule hook calls from writing active-task evidence into stale AgentCanon
 source report bundles.
+
+## Runtime Measurement and Attribution
+
+`workflow_monitor.py` is the write owner for the canonical
+`runtime_measurement_input` signal. The runtime dashboard consumes that signal;
+it does not infer measurements from prose or introduce another logger/schema.
+Each row has exactly these fields:
+
+- required `responsibility_unit_id`;
+- nullable `generation_parent`, `reuse_mode`, `packet_hash`,
+  `finding_iteration`, `review_iteration`, `launch_epoch`, `finish_epoch`,
+  `input_tokens`, `cached_input_tokens`, `output_tokens`, `reasoning_tokens`,
+  `retries`, `waits`, and `progress_bytes`;
+- sorted `context_bytes_by_source`, `writer_ids`, `reviewer_ids`, and
+  `repeated_artifact_hashes`.
+
+Numeric `null` means the producer did not record a measurement; `0` means it
+recorded zero. `packet_hash` and repeated artifact hashes are canonical SHA-256
+values. Token values come from
+`compare_codex_token_footprints.py::TokenFootprint` through the recorded
+`token_footprint_ref`; the dashboard does not parse a second token format.
+
+Workflow attribution has one writer route.
+`.codex/hooks/skill_usage_logger.py::append_skill_usage_entry` supplies the
+workflow fields, and `.codex/hooks/hook_event_log.py::HookLogContext.append`
+preserves them with `workflow_attribution_kind=owner|context|missing` and the
+hook namespace. The dashboard reports owner attribution, namespace-local
+context carry-forward, and missing entries separately. It never guesses a
+workflow. Missing attribution is
+`runtime.workflow_attribution_missing` in `Uncovered`; missing token comparison
+is `runtime.token_comparison_missing` in `Uncovered`; a missing measurement
+join is `runtime.measurement_join_missing` in `Unresolved`; finish-before-launch
+is `runtime.lifecycle_order` in `Ambiguous`.
+
+Event-derived candidate paths pass through
+`generate_agent_runtime_dashboard.py::normalize_runtime_candidate_path` before
+any Git lookup. Accepted paths are nonempty UTF-8 root-relative slash paths,
+normalize `.` components, contain no NUL, drive/absolute prefix, `..`, empty
+component, backslash, duplicate/trailing separator, or root escape, and resolve
+to a regular non-symlink source. Rejected paths are not probed and use one of
+`runtime.path.type`, `runtime.path.empty`, `runtime.path.absolute`,
+`runtime.path.drive_prefix`, `runtime.path.parent_escape`, `runtime.path.nul`,
+`runtime.path.separator`, `runtime.path.root_escape`, or
+`runtime.path.non_regular`, with `set=Unresolved` and the dashboard producer
+evidence reference.
 
 The initial import from the former in-tree log surface is preserved under:
 
@@ -320,3 +368,13 @@ content is idempotent; re-running it after the run bundle changes creates a new
 snapshot. Agents should not generate a separate archive report by prose. Eval,
 hook, runtime summary, and run-bundle archive entries must be created by tools
 that write the archive paths directly.
+
+For approved predecessor units, archive only after both atomic producers have
+completed in the same run bundle. The immutable snapshot retains
+`predecessor_integration.knowledge_graph.json`,
+`predecessor_integration.active_design_packet_materialization.json`, and the
+manifest-owned complete-file SHA-256 for each. Individual and exact-set
+verification read those archived bytes; no record is regenerated, rewritten,
+or accepted from a different snapshot. A producer, archive, push, individual
+verification, set verification, or graph-gate failure leaves predecessor
+integration incomplete.

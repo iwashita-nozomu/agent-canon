@@ -297,9 +297,11 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
+tools/bin/agent-canon graph build --root . --profile default --format json
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv "${PR_DEPENDENCY_REVIEW_DIR}/dependency_graph.tsv" \
+  --root . \
+  --scope full \
   --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
   --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
 echo ""

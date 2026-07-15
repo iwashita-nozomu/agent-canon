@@ -82,6 +82,14 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 ## Standard Commands
 
+Repository dependency, owner, public-surface, and bounded claim context use the
+canonical graph. Build is explicit; consumers never rebuild or fall back:
+
+```bash
+tools/bin/agent-canon graph build --root . --profile default --format json
+tools/bin/agent-canon graph status --root . --profile default --format json
+```
+
 明示的な skill 指定例:
 
 ```text

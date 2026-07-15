@@ -219,6 +219,25 @@ class HookLogContext:
         path = self.result_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         source_root = self.source_root()
+        workflow_values: list[str] = []
+        for field in ("selected_workflows", "selected_workflow", "workflow_family", "workflow"):
+            value = entry.get(field)
+            if isinstance(value, str) and value:
+                workflow_values.append(value)
+            elif isinstance(value, list):
+                workflow_values.extend(
+                    item for item in value if isinstance(item, str) and item
+                )
+        workflow_values = list(dict.fromkeys(workflow_values))
+        attribution = str(entry.get("workflow_attribution_kind") or "")
+        if not attribution:
+            attribution = "owner" if workflow_values else "missing"
+            entry["workflow_attribution_kind"] = attribution
+        if attribution == "owner" and workflow_values:
+            entry.setdefault("workflow_owner", workflow_values[0])
+            entry.setdefault("workflow_owner_workflows", workflow_values)
+        elif attribution == "context" and workflow_values:
+            entry.setdefault("workflow_context_workflows", workflow_values)
         entry.setdefault("source_repo_key", repo_log_key(source_root))
         trace_key = codex_trace_key()
         if trace_key:

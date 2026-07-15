@@ -29,7 +29,7 @@ from tool_path_policy import is_retired_legacy_tool_path
 
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
-HEADER_SCAN_LINES = 80
+PUBLIC_SURFACE_PRODUCER_VERSION = "public-surface.v1"
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TOOL_REFERENCE_RE = re.compile(r"\btools/[A-Za-z0-9_./-]+\.(?:py|sh)\b")
 DEFAULT_COMMAND_SOURCES = (
@@ -91,6 +91,50 @@ class CatalogReport:
     entries: tuple[CatalogRow, ...]
 
 
+@dataclass(frozen=True)
+class PublicSourceSpan:
+    """One exact public-surface source span."""
+
+    path: str
+    start_line: int
+    start_column: int
+    end_line: int
+    end_column: int
+
+
+@dataclass(frozen=True)
+class PublicSurfaceRow:
+    """One canonical public CLI, tool, or skill surface."""
+
+    surface_id: str
+    kind: str
+    path: str
+    selector: str
+    source_span: PublicSourceSpan
+    secondary_spans: tuple[PublicSourceSpan, ...]
+    authority: str = "public-surface"
+
+
+@dataclass(frozen=True)
+class PublicSurfaceReport:
+    """Token-parsed public surface plus producer diagnostics."""
+
+    producer_version: str
+    rows: tuple[PublicSurfaceRow, ...]
+    findings: tuple[Finding, ...]
+
+
+@dataclass(frozen=True)
+class RustToken:
+    """One bounded Rust token with a one-based source span."""
+
+    value: str
+    start_line: int
+    start_column: int
+    end_line: int
+    end_column: int
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -149,16 +193,6 @@ def has_non_string_key(mapping: Mapping[str, object], key: str) -> bool:
     return key in mapping and not isinstance(mapping[key], str)
 
 
-def has_dependency_manifest(path: Path) -> bool:
-    """Return whether one file has a dependency manifest near the top."""
-    if not path.is_file():
-        return False
-    lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
-    return any("@dependency-start" in line for line in lines) and any(
-        "@dependency-end" in line for line in lines
-    )
-
-
 def resolve_repo_path(root: Path, relative_path: str) -> Path:
     """Resolve a path through the root view or vendored AgentCanon source."""
     root_path = root / relative_path
@@ -174,8 +208,6 @@ def load_catalog(path: Path) -> tuple[Mapping[str, object] | None, list[Finding]
     """Load the catalog YAML."""
     if not path.is_file():
         return None, [Finding("catalog", CATALOG_PATH, "missing-file")]
-    if not has_dependency_manifest(path):
-        return None, [Finding("catalog", CATALOG_PATH, "missing-dependency-header")]
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     data = as_mapping(raw)
     if data is None:
@@ -284,8 +316,6 @@ def check_entry(
         doc_path = resolve_repo_path(root, doc)
         if not doc_path.is_file():
             findings.append(Finding("entry", path, f"missing-doc:{doc}"))
-        elif not has_dependency_manifest(doc_path):
-            findings.append(Finding("entry", path, f"doc-missing-dependency-header:{doc}"))
 
     tests = string_list(entry.get("tests"))
     exempt_reason = entry.get("test_exempt_reason")
@@ -296,8 +326,6 @@ def check_entry(
         test_path = resolve_repo_path(root, test)
         if not test_path.is_file():
             findings.append(Finding("entry", path, f"missing-test:{test}"))
-        elif not has_dependency_manifest(test_path):
-            findings.append(Finding("entry", path, f"test-missing-dependency-header:{test}"))
 
     return findings
 
@@ -360,8 +388,6 @@ def load_tool_docs(root: Path) -> tuple[list[Mapping[str, object]], list[Finding
     path = resolve_repo_path(root, TOOL_DOCS_PATH)
     if not path.is_file():
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "missing-file")]
-    if not has_dependency_manifest(path):
-        return [], [Finding("tool_docs", TOOL_DOCS_PATH, "missing-dependency-header")]
     raw = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     if raw.get("catalog_kind") != "agent_canon_tool_docs":
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "invalid-catalog-kind")]
@@ -416,8 +442,6 @@ def check_tool_docs_manifest(
             findings.append(Finding("tool_docs", tool, "missing-tool"))
         if not doc_path.is_file():
             findings.append(Finding("tool_docs", doc, "missing-doc"))
-        elif not has_dependency_manifest(doc_path):
-            findings.append(Finding("tool_docs", doc, "doc-missing-dependency-header"))
         if Path(tool).stem != Path(doc).stem:
             findings.append(Finding("tool_docs", doc, "tool-doc-name-mismatch"))
         docs = string_list(catalog_entry.get("docs"))
@@ -516,13 +540,287 @@ def check_catalog(root: Path) -> list[Finding]:
     return list(validate_catalog(root).findings)
 
 
-def render_json(report: CatalogReport) -> str:
+def rust_tokens(text: str) -> tuple[RustToken, ...]:
+    """Lex the bounded Rust token subset used by manual CLI dispatch."""
+    tokens: list[RustToken] = []
+    index = 0
+    line = 1
+    column = 1
+
+    def advance(value: str) -> None:
+        nonlocal line, column
+        for character in value:
+            if character == "\n":
+                line += 1
+                column = 1
+            else:
+                column += 1
+
+    while index < len(text):
+        character = text[index]
+        if character.isspace():
+            advance(character)
+            index += 1
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            end = len(text) if end < 0 else end
+            advance(text[index:end])
+            index = end
+            continue
+        if text.startswith("/*", index):
+            depth = 1
+            end = index + 2
+            while end < len(text) and depth:
+                if text.startswith("/*", end):
+                    depth += 1
+                    end += 2
+                elif text.startswith("*/", end):
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+            if depth:
+                raise ValueError("unterminated block comment")
+            advance(text[index:end])
+            index = end
+            continue
+        start_line, start_column = line, column
+        if character == '"':
+            end = index + 1
+            escaped = False
+            while end < len(text):
+                current = text[end]
+                if current == '"' and not escaped:
+                    end += 1
+                    break
+                escaped = current == "\\" and not escaped
+                if current != "\\":
+                    escaped = False
+                end += 1
+            else:
+                raise ValueError("unterminated string literal")
+            value = text[index:end]
+        elif character.isalpha() or character == "_":
+            end = index + 1
+            while end < len(text) and (text[end].isalnum() or text[end] == "_"):
+                end += 1
+            value = text[index:end]
+        elif character.isdigit():
+            end = index + 1
+            while end < len(text) and text[end].isdigit():
+                end += 1
+            value = text[index:end]
+        else:
+            compound = next(
+                (
+                    item
+                    for item in ("::", "..", ">=", "&&", "||", "==", "=>")
+                    if text.startswith(item, index)
+                ),
+                None,
+            )
+            value = compound or character
+            end = index + len(value)
+        advance(text[index:end])
+        tokens.append(
+            RustToken(
+                value=value,
+                start_line=start_line,
+                start_column=start_column,
+                end_line=line,
+                end_column=column,
+            )
+        )
+        index = end
+    return tuple(tokens)
+
+
+def token_sequence_matches(tokens: tuple[RustToken, ...], values: tuple[str, ...]) -> tuple[int, ...]:
+    """Return every exact token-sequence start."""
+    return tuple(
+        index
+        for index in range(0, len(tokens) - len(values) + 1)
+        if tuple(token.value for token in tokens[index : index + len(values)]) == values
+    )
+
+
+def token_span(path: str, tokens: tuple[RustToken, ...], start: int, length: int) -> PublicSourceSpan:
+    """Return the span covering one exact token sequence."""
+    first = tokens[start]
+    last = tokens[start + length - 1]
+    return PublicSourceSpan(
+        path=path,
+        start_line=first.start_line,
+        start_column=first.start_column,
+        end_line=last.end_line,
+        end_column=last.end_column,
+    )
+
+
+def text_phrase_span(path: str, text: str, phrase: str) -> PublicSourceSpan | None:
+    """Return the unique line span for one corroborating phrase."""
+    matches: list[PublicSourceSpan] = []
+    for line_number, source_line in enumerate(text.splitlines(), start=1):
+        start = source_line.find(phrase)
+        if start >= 0:
+            matches.append(
+                PublicSourceSpan(
+                    path=path,
+                    start_line=line_number,
+                    start_column=start + 1,
+                    end_line=line_number,
+                    end_column=start + len(phrase) + 1,
+                )
+            )
+    return matches[0] if len(matches) == 1 else None
+
+
+def yaml_id_spans(path: str, text: str) -> dict[str, PublicSourceSpan]:
+    """Index exact YAML id declarations without interpreting YAML semantics."""
+    spans: dict[str, PublicSourceSpan] = {}
+    for line_number, source_line in enumerate(text.splitlines(), start=1):
+        stripped = source_line.strip()
+        prefix = "- id:"
+        if not stripped.startswith(prefix):
+            continue
+        identifier = stripped[len(prefix) :].strip().strip('"\'')
+        start = source_line.find(identifier)
+        if identifier and identifier not in spans:
+            spans[identifier] = PublicSourceSpan(
+                path=path,
+                start_line=line_number,
+                start_column=start + 1,
+                end_line=line_number,
+                end_column=start + len(identifier) + 1,
+            )
+    return spans
+
+
+def extract_public_surface(root: Path) -> PublicSurfaceReport:
+    """Extract the fixed public CLI/tool/skill surfaces from canonical inputs."""
+    root = root.resolve()
+    main_path = "rust/agent-canon/src/main.rs"
+    graph_path = "rust/agent-canon/src/graph.rs"
+    cli_path = "agents/canonical/CLI_ENTRYPOINTS.md"
+    tool_path = CATALOG_PATH
+    skill_path = "agents/skills/catalog.yaml"
+    findings: list[Finding] = []
+    required_paths = (main_path, graph_path, cli_path, tool_path, skill_path)
+    texts: dict[str, str] = {}
+    for relative_path in required_paths:
+        resolved = resolve_repo_path(root, relative_path)
+        if not resolved.is_file():
+            findings.append(Finding("public_surface", relative_path, "missing-input"))
+            continue
+        texts[relative_path] = resolved.read_text(encoding="utf-8")
+    if main_path not in texts or graph_path not in texts or cli_path not in texts:
+        return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
+    try:
+        main_tokens = rust_tokens(texts[main_path])
+        graph_tokens = rust_tokens(texts[graph_path])
+    except ValueError as error:
+        findings.append(Finding("public_surface", "rust-dispatch", f"rust_dispatch_invalid:{error}"))
+        return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
+
+    mod_sequence = ("mod", "graph", ";")
+    main_sequence = (
+        "if", "args", ".", "len", "(", ")", ">=", "2", "&&", "args", "[", "1", "]",
+        "==", '"graph"', "{", "std", "::", "process", "::", "exit", "(", "graph", "::", "run",
+        "(", "&", "args", "[", "2", "..", "]", ")", ")", ";", "}",
+    )
+    mod_matches = token_sequence_matches(main_tokens, mod_sequence)
+    main_matches = token_sequence_matches(main_tokens, main_sequence)
+    if len(mod_matches) != 1 or len(main_matches) != 1:
+        detail = "rust_dispatch_ambiguous" if len(mod_matches) > 1 or len(main_matches) > 1 else "rust_dispatch_invalid"
+        findings.append(Finding("public_surface", main_path, detail))
+        return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
+    main_span = token_span(main_path, main_tokens, main_matches[0], len(main_sequence))
+    rows: list[PublicSurfaceRow] = []
+    for operation in ("build", "status", "query", "context"):
+        sequence = (
+            f'"{operation}"', "=>", f"run_{operation}", "(", "&", "args", "[", "1", "..", "]", ")",
+        )
+        matches = token_sequence_matches(graph_tokens, sequence)
+        doc_span = text_phrase_span(cli_path, texts[cli_path], f"graph {operation}")
+        if len(matches) != 1 or doc_span is None:
+            detail = "rust_dispatch_ambiguous" if len(matches) > 1 else "rust_dispatch_invalid"
+            findings.append(Finding("public_surface", graph_path, f"{detail}:{operation}"))
+            continue
+        rows.append(
+            PublicSurfaceRow(
+                surface_id=f"cli:graph {operation}",
+                kind="cli",
+                path=graph_path,
+                selector=f"graph {operation}",
+                source_span=token_span(graph_path, graph_tokens, matches[0], len(sequence)),
+                secondary_spans=tuple(sorted((main_span, doc_span), key=lambda item: (item.path, item.start_line, item.start_column))),
+            )
+        )
+
+    if tool_path in texts:
+        raw_tools = yaml.safe_load(texts[tool_path])
+        tool_mapping = as_mapping(raw_tools) or {}
+        tool_entries = as_sequence(tool_mapping.get("entries")) or ()
+        tool_spans = yaml_id_spans(tool_path, texts[tool_path])
+        for raw_entry in tool_entries:
+            entry = as_mapping(raw_entry)
+            if entry is None or not isinstance(entry.get("id"), str):
+                continue
+            identifier = cast(str, entry["id"])
+            span = tool_spans.get(identifier)
+            if span is None:
+                findings.append(Finding("public_surface", tool_path, f"span-missing:{identifier}"))
+                continue
+            command = entry.get("command")
+            selector = command if isinstance(command, str) else identifier
+            rows.append(PublicSurfaceRow(f"tool:{identifier}", "tool", span.path, selector, span, ()))
+    if skill_path in texts:
+        raw_skills = yaml.safe_load(texts[skill_path])
+        skill_mapping = as_mapping(raw_skills) or {}
+        skill_entries = as_sequence(skill_mapping.get("skill_families")) or ()
+        skill_spans = yaml_id_spans(skill_path, texts[skill_path])
+        for raw_entry in skill_entries:
+            entry = as_mapping(raw_entry)
+            if entry is None or not isinstance(entry.get("id"), str):
+                continue
+            identifier = cast(str, entry["id"])
+            span = skill_spans.get(identifier)
+            if span is None:
+                findings.append(Finding("public_surface", skill_path, f"span-missing:{identifier}"))
+                continue
+            rows.append(PublicSurfaceRow(f"skill:{identifier}", "skill", span.path, identifier, span, ()))
+    rows.sort(key=lambda row: (row.kind, row.surface_id, row.source_span.path, row.source_span.start_line))
+    seen: set[str] = set()
+    for row in rows:
+        if row.surface_id in seen:
+            findings.append(Finding("public_surface", row.source_span.path, f"surface-id-duplicate:{row.surface_id}"))
+        seen.add(row.surface_id)
+    return PublicSurfaceReport(
+        PUBLIC_SURFACE_PRODUCER_VERSION,
+        tuple(rows) if not findings else (),
+        tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
+    )
+
+
+def render_json(report: CatalogReport, public: PublicSurfaceReport | None = None) -> str:
     """Render JSON output."""
-    payload = {
+    catalog = {
         "status": "pass" if not report.findings else "fail",
         "findings": [asdict(finding) for finding in report.findings],
         "entries": [asdict(entry) for entry in report.entries],
     }
+    payload: dict[str, object] = {
+        "schema": "agent_canon.catalog_bundle.v1",
+        "catalog": catalog,
+    }
+    if public is not None:
+        payload["public"] = {
+            "producer_version": public.producer_version,
+            "status": "pass" if not public.findings else "fail",
+            "findings": [asdict(finding) for finding in public.findings],
+            "rows": [asdict(row) for row in public.rows],
+        }
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -590,9 +888,11 @@ def render_markdown(report: CatalogReport) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the catalog validator."""
     args = build_parser().parse_args(argv)
-    report = validate_catalog(Path(args.root))
+    root = Path(args.root)
+    report = validate_catalog(root)
+    public = extract_public_surface(root)
     if args.format == "json":
-        print(render_json(report))
+        print(render_json(report, public))
     elif args.format == "markdown":
         print(render_markdown(report))
     else:
@@ -600,7 +900,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(finding.render())
         print(f"TOOL_CATALOG_FINDINGS={len(report.findings)}")
         print(f"TOOL_CATALOG={'pass' if not report.findings else 'fail'}")
-    return 1 if report.findings else 0
+    return 1 if report.findings or public.findings else 0
 
 
 if __name__ == "__main__":

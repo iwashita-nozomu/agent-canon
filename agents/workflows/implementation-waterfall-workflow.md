@@ -113,13 +113,23 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 Design gate は `run.active_design_packet` に宣言された packet だけを読みます。
 packet は `waterfall.design_packet.v1` で、`design_artifact`、
 `design_review_artifact`、`document_flow_review_artifact`、
-`document_flow_required` を必須とします。generator の ownership precedence は
-entrypoint の explicit `--active-design-packet`、workflow-specific record、config
-registry の standard record の順です。explicit input は complete JSON record として
-一度に検証し、選択された record を新しい run manifest へコピーします。宣言された
-packet file は role execution より先に生成します。role の `required_outputs`、write
-scope、reader packet は同じ選択 record を参照し、生成後は manifest record が run
-authority になります。
+`document_flow_required`、`clause_registry` と、
+`abstract_design_frame`、`implementation_source_packet`、
+`design_side_effect_map`、`design_to_implementation_trace` の 4 entry を必須とします。
+各 entry は同じ `responsibility_id` と exact な `entry_id` を持ち、
+`clause_refs`、`owner_refs`、`source_refs`、`dependency_refs`、`output_refs`、
+`reviewer_refs` を空でない閉じた参照集合として宣言します。chat、history、schedule
+prose、自由記述 table、basename 推測は packet authority になりません。
+
+generator の ownership precedence は entrypoint の explicit
+`--active-design-packet`、workflow-specific record、config registry の standard
+record の順です。explicit input は complete JSON value として一度だけ parse / validate
+されます。全 producer は `create_run_bundle` だけへ complete `RunBundleSpec` を渡し、
+この sole public delegator が全 projection と reference を memory 上で検証してから、
+単一 lock、verified stage、no-replace target rename、pointer-last activation で bundle
+全体を publish します。producer-local parser、partial writer、作成後の manifest / pointer /
+monitoring mutation は持ちません。生成後は manifest の `run.active_design_packet` が
+current-state authority です。
 
 gate は manifest-declared path だけを active artifact route として消費します。
 active packet set は historical artifact、sibling run、undeclared basename を
@@ -133,6 +143,10 @@ technical review と required な document-flow review は、それぞれ
 standalone の `--gate document_flow` も manifest-selected review path を使います。
 `document_flow_required=false` の packet では Gate 7 を inactive として扱い、
 approval blocker なしで次の gate へ進めます。
+`waterfall_gate_check.py` は shared
+`load_materialized_active_design_packet` と
+`validate_materialized_active_design_packet` の結果だけを消費します。gate-local schema、
+parser、reference projector、review identity parser、fallback validation は作りません。
 
 ### Cycle A. 実行計画 -> 計画レビュー
 
@@ -175,6 +189,8 @@ approval blocker なしで次の gate へ進めます。
 - 完了条件:
 - 実装者が文書だけ読んで着手できる
 - `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` が揃っている
+- 4 entry が一つの responsibility unit を表し、Source Packet、Side-Effect Map、Trace
+  の dependency refs が canonical packet graph と一致している
 - `Evidence And Assumption Ledger` が current code、dependency header evidence、parent documents、初出 DSL / standard-form terms を設計 claim に接続している
 - 新規または変更された design document は、詳細設計レビュー前に次の gate を通している
   `python3 tools/agent_tools/check_design_doc_claims.py --root . <design-doc>`
@@ -423,6 +439,9 @@ exit 条件:
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
+- Gate 5 の owner は 4 section を同じ責務 ID、clause registry、owner / source /
+  dependency / output / reviewer references に閉じ、complete packet として
+  `create_run_bundle` に渡します。file 数や finding 数で packet を分割しません
 - Design Integrity Gate はこの gate の中心条件です。設計は
   owning responsibility model から始め、近い file、current finding、会話印象から
   file-level work を決めません。API shape、責務境界、path layout、命名、
@@ -496,6 +515,9 @@ exit 条件:
   - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
   - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path を列挙し、test plan を実装前提にしていないか確認する
   - `Design Side-Effect Map` が主要設計判断から downstream surface、owner stage、review gate、canonical validation evidence へ trace できるか確認する
+  - manifest-selected packet の 4 entry が同じ responsibility unit、complete clause
+    coverage、canonical dependency order、owner / source / output / reviewer reference
+    closure を持つか、shared validator の blocker set で確認する
   - `Dependency Manifest Plan` が各 touched file の `@dependency-start` block、upstream / downstream edge、reverse edge、読む順序、検証 command に落ちているか確認する
   - 旧 `Dependency Files:` block を新規・変更 file に残す設計を blocker として扱う
   - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
@@ -553,6 +575,8 @@ exit 条件:
 ルール:
 - `document_flow_reviewer` は `design_reviewer` と兼務させません
 - 文書主体の成果物では、top-down readthrough で major rewrite が必要なまま実装へ進みません
+- review 対象 path と hash は manifest-selected packet から取得し、sibling run、
+  undeclared basename、free-text table から補いません
 
 exit 条件:
 - `document_flow_review.md` が `resolved` になっている
@@ -596,6 +620,11 @@ exit 条件:
   Record `WRITE_SUBAGENT_AUTHORIZATION=required` or
   `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
+- approved packet が一つの replaceable responsibility unit を宣言する場合、同じ
+  write-capable implementer が source mechanism、consumer、config、projection、docs、
+  reverse edge、obsolete-path disposition を dependency order で統合します。file、finding、
+  test location、review area を理由に別 writer へ分けず、分割は実 write conflict または
+  unresolved predecessor のみです
 - 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、active な場合の `document_flow_review.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します。`test_plan.md` は test-design route が明示的に activate された場合だけ参照し、実装の前提にしません
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
 - 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
