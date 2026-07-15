@@ -580,14 +580,16 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`python3 tools/agent_tools/route.py --prompt` |\n"
         "| implementation stage gate | "
         "`agents/workflows/implementation-waterfall-workflow.md` |\n"
-        "| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md` |\n"
+        "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
+        "`agents/agents_config.json#artifacts.active_design_packet` |\n"
         "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
         "## Workflow Family Reader Paths\n\n"
         "| Family | Owner Row |\n"
         "| ------ | --------- |\n"
         "| Scoped Change | `agents/task_catalog.yaml` "
         "`workflow_families[].id=scoped_change` |\n\n"
-        "Implementation Flow Graph\n"
+        "## Design Artifact Shape\n\n"
+        "Implementation design uses the four-entry active design packet.\n"
     ),
     "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (

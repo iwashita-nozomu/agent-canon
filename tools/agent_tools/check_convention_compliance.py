@@ -1003,8 +1003,9 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "agents/workflows/implementation-waterfall-workflow.md",
                 ),
                 (
-                    "implementation packet schema",
+                    "active design packet schema",
                     "agents/COMMUNICATION_PROTOCOL.md",
+                    "agents/agents_config.json#artifacts.active_design_packet",
                 ),
                 (
                     "closeout authority",
