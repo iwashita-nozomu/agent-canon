@@ -97,7 +97,7 @@ No finding. The reviewer verified:
   inference;
 - identical route/request identifier registries and validation schedules;
 - explicit post-source chronology and exact three-artifact rollback;
-- the one-way route → request → design SHA/line binding; and
+- the request binds the route SHA/line identity, and the design binds both route and request SHA/line identities; no reverse hash cycle exists.
 - the seven exact V11 evidence identities encoded by the reviewed design.
 
 Candidate commit `db7a7b3ac831c9df19939d6698fab39480c2baea` is not on
