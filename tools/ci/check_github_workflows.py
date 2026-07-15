@@ -43,7 +43,11 @@ AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
 )
-WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(r"\$\{\{\s*inputs\.[^}]+\}\}")
+WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
+    r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
+    r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
+    r"\s*\}\}"
+)
 WORKFLOW_DISPATCH_INPUT_CHECK_WORKFLOW = "agent-coordination.yml"
 TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "Validation Evidence",

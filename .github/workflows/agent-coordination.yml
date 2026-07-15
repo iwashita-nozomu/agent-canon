@@ -74,6 +74,12 @@ jobs:
       - name: Bootstrap agent run
         id: bootstrap
         run: |
+          case "${AGENT_COORDINATION_SPECIALISTS}" in
+            *$'\n'*|*$'\r'*)
+              echo "specialist values must be comma-separated on one line" >&2
+              exit 1
+              ;;
+          esac
           normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
           flags=()
           if [ "${AGENT_COORDINATION_FULL_TEAM}" = "true" ]; then
