@@ -34,6 +34,38 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
+    def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
+        """Shell run blocks must not interpolate workflow-dispatch inputs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            workflow = root / ".github" / "workflows" / "agent-coordination.yml"
+            shutil.copy2(
+                REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml",
+                workflow,
+            )
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    '--task "${AGENT_COORDINATION_TASK}"',
+                    '--task "${{ inputs.task }}"',
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "direct_workflow_dispatch_input_interpolation",
+                result.stdout,
+            )
+
     def test_legacy_auto_submodule_checkout_fails(self) -> None:
         """Checkout steps must use the explicit AgentCanon helper."""
         with tempfile.TemporaryDirectory() as tmp_dir:
