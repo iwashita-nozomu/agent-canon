@@ -7,12 +7,14 @@
 # upstream implementation ../../tools/agent_tools/agent_team.py stages initial monitoring with run bundles
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
 # upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
+# upstream implementation ../../tools/bin/agent-canon builds the verified graph fixture
 # @dependency-end
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -24,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 )
@@ -60,6 +63,155 @@ def load_monitor_module() -> WorkflowMonitorModule:
 
 class WorkflowMonitorTest(unittest.TestCase):
     """Verify workflow monitoring is updated mechanically."""
+
+    _graph_fixture: tuple[
+        tempfile.TemporaryDirectory[str], Path, dict[str, str]
+    ] | None = None
+
+    @classmethod
+    def verified_graph_fixture(cls) -> tuple[Path, dict[str, str]]:
+        """Build one stable parent-profile graph for subprocess fixture consumers."""
+        if cls._graph_fixture is not None:
+            return cls._graph_fixture[1], cls._graph_fixture[2]
+
+        fixture_directory = tempfile.TemporaryDirectory(
+            prefix="agent-canon-workflow-monitor-graph-"
+        )
+        fixture_root = Path(fixture_directory.name)
+        workspace_root = fixture_root / "workspace"
+        environment = dict(os.environ)
+        environment["CARGO_TARGET_DIR"] = str(fixture_root / "cargo-target")
+        clone = subprocess.run(
+            [
+                "git",
+                "clone",
+                "--quiet",
+                "--no-local",
+                str(PROJECT_ROOT),
+                str(workspace_root),
+            ],
+            cwd=fixture_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if clone.returncode != 0:
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "failed to create graph fixture checkout: "
+                f"{clone.stdout}{clone.stderr}"
+            )
+        graph_state_root = workspace_root / ".agent-canon" / "knowledge-graph"
+        graph_state_root.mkdir(parents=True)
+        (graph_state_root / ".fixture-parent-state").write_text(
+            "parent-owned graph fixture state\n",
+            encoding="utf-8",
+        )
+        source_state_before = subprocess.run(
+            ["git", "status", "--porcelain=v2", "-z"],
+            cwd=workspace_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if source_state_before.returncode != 0:
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "failed to capture graph fixture source state: "
+                f"{source_state_before.stdout}{source_state_before.stderr}"
+            )
+        build = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "graph",
+                "build",
+                "--root",
+                str(workspace_root),
+                "--profile",
+                "default",
+                "--format",
+                "json",
+            ],
+            cwd=workspace_root,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if build.returncode != 0:
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "failed to build verified graph fixture: "
+                f"{build.stdout}{build.stderr}"
+            )
+        source_state_after = subprocess.run(
+            ["git", "status", "--porcelain=v2", "-z"],
+            cwd=workspace_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if (
+            source_state_after.returncode != 0
+            or source_state_after.stdout != source_state_before.stdout
+        ):
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "graph fixture source fingerprint changed during build: "
+                f"before={source_state_before.stdout!r} "
+                f"after={source_state_after.stdout!r} "
+                f"stderr={source_state_after.stderr}"
+            )
+        status = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "graph",
+                "status",
+                "--root",
+                str(workspace_root),
+                "--profile",
+                "default",
+                "--format",
+                "json",
+            ],
+            cwd=workspace_root,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        try:
+            status_payload = json.loads(status.stdout)
+        except json.JSONDecodeError as error:
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "verified graph fixture status was not canonical JSON: "
+                f"{status.stdout}{status.stderr}"
+            ) from error
+        integration = status_payload.get("integration_record", {})
+        if (
+            status.returncode != 0
+            or status_payload.get("status") != "fresh"
+            or not isinstance(integration, dict)
+            or integration.get("verified") is not True
+            or integration.get("profile") != "default"
+            or integration.get("source_snapshot_profile") != "parent"
+        ):
+            fixture_directory.cleanup()
+            raise AssertionError(
+                "graph fixture lacks a verified integration record: "
+                f"{status.stdout}{status.stderr}"
+            )
+        cls._graph_fixture = (fixture_directory, workspace_root, environment)
+        return workspace_root, environment
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        """Remove the isolated graph checkout after its consumers finish."""
+        if cls._graph_fixture is not None:
+            cls._graph_fixture[0].cleanup()
+            cls._graph_fixture = None
+        super().tearDownClass()
 
     def test_monitor_validation_failure_taxonomy_comes_from_runtime_inventory(
         self,
@@ -317,10 +469,9 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
         """A real parent wave should replace the bootstrap authority blocker."""
+        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -337,9 +488,11 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
+                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
+                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1031,10 +1184,9 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
+        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1051,9 +1203,11 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
+                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
+                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1069,10 +1223,9 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_task_start_seeds_monitoring_with_routing_evidence(self) -> None:
         """task_start should seed workflow monitoring without manual edits."""
+        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1089,9 +1242,11 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
+                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
+                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
