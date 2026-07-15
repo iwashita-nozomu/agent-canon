@@ -20,8 +20,8 @@ upstream implementation ../../../tools/agent_tools/waterfall_gate_check.py owns 
 upstream implementation ../../../tools/agent_tools/github_publish.py owns verified GitHub PR metadata and post-merge evidence production.
 upstream implementation ../../../tools/agent_tools/report_artifact_checks.py owns review structure and decision parsing.
 upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py owns immutable report snapshots and their index.
-downstream design ./active_design_packet_implementation_surface_route.txt selects this unit's exclusive implementation surface and projects the normative validation order.
-downstream design ./active_design_packet_implementation_request.txt carries this unit's exact implementation request bound to the selected route identity.
+downstream design ./active_design_packet_implementation_surface_route.txt selects this unit's exclusive implementation surface and projects the identifier registry, fully bound executable argv, and normative validation order.
+downstream design ./active_design_packet_implementation_request.txt carries this unit's exact implementation request bound to the selected route identity and executable projection.
 downstream implementation ../../../tests/agent_tools/test_agent_team_templates.py checks public bundle and projection behavior.
 downstream implementation ../../../tests/agent_tools/test_task_start_and_close.py checks task-start and bootstrap public behavior.
 downstream implementation ../../../tests/agent_tools/test_waterfall_gate_check.py checks manifest-consumer behavior.
@@ -62,6 +62,19 @@ projection、run-bundle publication、waterfall consumption を一つの置換�
 1. `Evidence And Assumption Ledger`
 1. `Review and Handoff`
 
+Identifier binding is established here before every use and does not duplicate
+the later predicates or trace semantics. Local side-effect IDs `S1`, `S2`,
+`S3`, `S4`, `S5`, `S6`, `S7`, `S8`, `S9`, and `S10` bind exclusively to the
+same-numbered rows in `Design Side-Effect Summary`. Local implementation-trace
+IDs `T1`, `T2`, `T3`, `T4`, `T5`, `T6`, `T7`, `T8`, `T9`, and `T10` bind
+exclusively to the same-numbered rows in `Design-To-Implementation Trace`;
+`T6` names the shared waterfall loader/validator implementation trace. Local
+validation IDs `V1`, `V2`, `V3`, `V4`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`,
+`V11`, and `V12` bind exclusively to the same-numbered rows in `Validation ID
+Definitions`. External IDs `container:S1` and `container:V0` bind only to
+`container_codex_home_design.md`. The named tables remain the sole substantive
+definitions.
+
 この revision は prior six-generation plan を廃止します。別 schema、caller
 別 packet、gate-local parser、file 別の implementation slice は作りません。
 実装はこの文書に列挙した一単位だけであり、現在の design-writing turn は
@@ -71,10 +84,11 @@ product/source/config/test を変更しません。
 
 | Field | Value |
 | --- | --- |
-| revision | `materialization-rewrite-5-order-repair-01` |
+| revision | `materialization-rewrite-6-order-repair-01-chain-closure` |
 | review_status | `pending` |
 | approval_claimed | `no` |
 | implementation_authorization | `pending_new_exact_design_identity_reviews` |
+| prior exact-byte detailed-design review | `APPROVE` for commit `b036f86a4e0c0314158553e9aa1f82c0cc714d7c` and design SHA-256 `8da6da3c7efc0f82149a1669fd0cd08087f4782a2a372bd6f24f8cf22bb4ee88`; preserved as semantic evidence but not approval of this revision's bytes |
 | schedule identity | `ORDER-REPAIR-01` |
 | macro placement | parallel with materializer closure; before current-main semantic integration and before any future source authorization or publication |
 | design-time source HEAD inspected | `4e5318f6483d39b15c29b49eac1af77d56ad23cf` |
@@ -101,14 +115,23 @@ edit/rollback/identity metadata. The newly frozen bytes remain
 Only that newly frozen and independently reviewed identity may be consumed by
 future source changes, authorized merge, or publication.
 
+The detailed-design reviewer approved commit `b036f86a4e0c0314158553e9aa1f82c0cc714d7c`
+exactly; the document-flow reviewer then identified identifier-definition order
+and executable-projection defects. This chain-closure revision changes only the
+non-duplicating S/T/V registry, external successor-ID qualification, fully bound
+argv projection, and resulting three-artifact identities. It preserves the
+approved mechanism semantics, V1-V9/V11 pre-merge → V10 post-merge → V12 order,
+post-source chronology, and exact three-artifact scope. Both reviewers must bind
+the newly frozen bytes before any future authorization.
+
 The implementation packet uses a one-way hash chain, so no artifact hashes a
 later artifact that hashes it back:
 
 | Artifact | SHA-256 | Lines | Ownership |
 | --- | --- | ---: | --- |
-| `active_design_packet_implementation_surface_route.txt` | `09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473` | 219 | exclusive to `active-design-packet-materialization` |
-| `active_design_packet_implementation_request.txt` | `e9f5116f752d49c30e5574e9d73e9785070677439f509521be6e873ef89c3857` | 221 | exclusive to `active-design-packet-materialization`; binds the route SHA and line count |
-| this design | computed after final formatting and checks | 3646 | binds both packet SHA/line-count pairs |
+| `active_design_packet_implementation_surface_route.txt` | `a416839e24c148a6d9924570a804f9214331b37c281579565e7da312adea8586` | 224 | exclusive to `active-design-packet-materialization` |
+| `active_design_packet_implementation_request.txt` | `841037f2ddc34c131b759617110f2c0315b366281a28e2e34483ce1fb92a5068` | 226 | exclusive to `active-design-packet-materialization`; binds the route SHA and line count |
+| this design | computed after final formatting and checks | 3817 | binds both packet SHA/line-count pairs |
 | detailed-design and document-flow reviews | written after design hashing | generated by each reviewer | each binds the final design SHA |
 
 The packet metadata field is
@@ -150,7 +173,7 @@ derive a clause, schedule, path, or schema:
 | `routing_llama_detailed_design_review_v15.md` | `f428cf186f2e7dacb1cf99203eee4c0f427eefc7560da7830a2fbd241e5671d2` | 160 lines; `review_status=approved`; `decision=APPROVE`; `implementation_authorized=yes`; binds the exact routing brief path, SHA, and 854 lines above |
 | `graph_design_brief.md` | producer-computed after same-SHA APPROVE; no transient live SHA is copied | external `knowledge_graph` design; verify-only input to its own predecessor record |
 | `graph_design_review.md` | producer-computed with the final review bytes; no replaceable review-file SHA is copied | external live review input; intake target evidence was `5febd536a44fe5d3f1e7fe5ffecc028c8e3f0e2658182790393fb20728449f87`, and final production still requires same-SHA APPROVE |
-| `container_codex_home_design.md` | successor-owner current revision; no transient live SHA is copied | external successor design; verify-only here; any stale S1 schema, IDs, filenames, or manual pair comparison must rebase to this owner's final contract |
+| `container_codex_home_design.md` | successor-owner current revision; no transient live SHA is copied | external successor design; verify-only here; any stale `container:S1` schema, IDs, filenames, or manual pair comparison must rebase to this owner's final contract |
 
 Only the unversioned detailed-design and document-flow review paths named in
 the Implementation Source Packet may authorize implementation, and both must
@@ -323,7 +346,7 @@ redefine them.
 | V7 | waterfall shared-consumer path | design/document-flow/implementation gates call `load_materialized_active_design_packet` then `validate_materialized_active_design_packet`; local packet symbols are absent; sibling/history prose is ignored; shared violations map unchanged to CLI blocker ownership |
 | V8 | docs/templates/skills/reverse edges | every individually mapped section states the single owner/reference model; canonical/runtime skills agree; dependency headers and related surfaces are paired |
 | V9 | source-first test policy | no test path is an unconditional edit and no test or line count is an acceptance measure; source completes before test inspection; an existing test changes only after a concrete conflicting public assertion is recorded and this design is revised for that exact edit; a new test enters only after evidence of an unresolved public oracle and a design revision naming it |
-| V10 | predecessor integration | after the shared merge, generic production yields exactly `predecessor_integration.knowledge_graph.json` and `predecessor_integration.active_design_packet_materialization.json`, each with the same thirteen-field schema, valid twelve-field payload `artifact_sha256`, valid archive complete-file SHA, exact unit-derived filename, matching design/review bytes, and same-path/same-SHA detailed-design APPROVE; both PR identities are merged/main-bound and `integrated_source_oid` strings are byte-equal; each record passes integrated→observed and observed→fixed `refs/remotes/origin/main` `git merge-base --is-ancestor`; collision never overwrites; duplicate, missing, unexpected, or unequal-OID sets fail atomically; successor verification exposes no remote/ref option, performs no write/fetch, creates no aggregate, and uses no manifest/chat/schedule/document-flow input; the live container path and owner boundary are verify-only here, and its next owner revision replaces any stale S1/V0 values with the set API, drops observed-OID equality/manual pair comparison, and requires only common-integrated-OID→HEAD after successful set verification |
+| V10 | predecessor integration | after the shared merge, generic production yields exactly `predecessor_integration.knowledge_graph.json` and `predecessor_integration.active_design_packet_materialization.json`, each with the same thirteen-field schema, valid twelve-field payload `artifact_sha256`, valid archive complete-file SHA, exact unit-derived filename, matching design/review bytes, and same-path/same-SHA detailed-design APPROVE; both PR identities are merged/main-bound and `integrated_source_oid` strings are byte-equal; each record passes integrated→observed and observed→fixed `refs/remotes/origin/main` `git merge-base --is-ancestor`; collision never overwrites; duplicate, missing, unexpected, or unequal-OID sets fail atomically; successor verification exposes no remote/ref option, performs no write/fetch, creates no aggregate, and uses no manifest/chat/schedule/document-flow input; the live container path and owner boundary are verify-only here, and its next owner revision replaces any stale `container:S1`/`container:V0` values with the set API, drops observed-OID equality/manual pair comparison, and requires only common-integrated-OID→HEAD after successful set verification |
 | V11 | external overlap closure | all seven external hashes and line identities match; productive-wait remains non-authoritative until separately approved; routing/Llama brief SHA `ba97d93524b70982590c27ada977e38f491a4e93089f063c396e5ff1d903d4d7` has 854 lines and its durable v15 review SHA `f428cf186f2e7dacb1cf99203eee4c0f427eefc7560da7830a2fbd241e5671d2` has 160 lines with `review_status=approved`, `decision=APPROVE`, and `implementation_authorized=yes`; the brief observes this unit as predecessor; static symbol/section comparison shows active packet owns packet blocks/pure renderer/producer activation while WAIT/routing own only the later reservations listed in the precedence section; integration order is verified `knowledge_graph` plus `active_design_packet_materialization` records at one OID → approved WAIT-1 if any → routing/Llama, with no concurrent edit, aggregate, or schema bridge |
 | V12 | graph-owned static replacement | while the `knowledge_graph` predecessor record is absent or unverified, state is `pending_graph_integration` and the obsolete custom checker is neither invoked nor repaired; after individual predecessor verification succeeds, graph `status` and graph `context` both return fresh evidence for this exact reviewed design path/SHA and the evidence binding below is complete, at which point the obsolete checker alone becomes `not_applicable` |
 
@@ -747,24 +770,56 @@ def produce_predecessor_integration_record(
 ) -> Path: ...
 ```
 
-```bash
-python3 tools/agent_tools/github_publish.py predecessor-integration \
-  --user-task "<current merge task>" \
-  --repo <verified-owner/repository> \
-  --pr <shared-merged-source-pr-number-or-url> \
-  --report-dir reports/agents/20260712-090608-context-packettool-skill-routing \
-  --unit-id knowledge_graph \
-  --design-path reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md \
-  --approve-review-path reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_review.md
+The PR-processing owner first materializes a closed
+`predecessor_production_binding` with nonempty `user_task`, the exact
+`repository` returned by `verify_remote`, and the one merged source-PR number
+or canonical URL returned by the same PR query. Its source identity is
+`(verified_remote.remote_name, verified_remote.repository, source_pr_number,
+source_pr_url, merge_commit_oid)`. No field is selected from a latest-PR query,
+chat, schedule, or current directory. The executable projection is these two
+fully bound argv tuples:
 
-python3 tools/agent_tools/github_publish.py predecessor-integration \
-  --user-task "<current merge task>" \
-  --repo <verified-owner/repository> \
-  --pr <shared-merged-source-pr-number-or-url> \
-  --report-dir reports/agents/20260712-090608-context-packettool-skill-routing \
-  --unit-id active_design_packet_materialization \
-  --design-path reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md \
-  --approve-review-path reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_detailed_design_review.md
+```python
+knowledge_graph_produce_argv = (
+    "python3",
+    "tools/agent_tools/github_publish.py",
+    "predecessor-integration",
+    "--user-task",
+    predecessor_production_binding.user_task,
+    "--repo",
+    predecessor_production_binding.repository,
+    "--pr",
+    predecessor_production_binding.source_pr,
+    "--report-dir",
+    "reports/agents/20260712-090608-context-packettool-skill-routing",
+    "--unit-id",
+    "knowledge_graph",
+    "--design-path",
+    "reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md",
+    "--approve-review-path",
+    "reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_review.md",
+)
+active_packet_produce_argv = (
+    "python3",
+    "tools/agent_tools/github_publish.py",
+    "predecessor-integration",
+    "--user-task",
+    predecessor_production_binding.user_task,
+    "--repo",
+    predecessor_production_binding.repository,
+    "--pr",
+    predecessor_production_binding.source_pr,
+    "--report-dir",
+    "reports/agents/20260712-090608-context-packettool-skill-routing",
+    "--unit-id",
+    "active_design_packet_materialization",
+    "--design-path",
+    "reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md",
+    "--approve-review-path",
+    "reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_detailed_design_review.md",
+)
+runner.run(knowledge_graph_produce_argv)
+runner.run(active_packet_produce_argv)
 ```
 
 Each action runs only after the same named source PR reports merged. The
@@ -775,8 +830,10 @@ producer mode. Each invocation executes this order exactly:
    remote name to equal `PREDECESSOR_TARGET_REMOTE`. A different remote name
    fails before any record write because the exact record has no remote field
    and therefore cannot safely bind another ref.
-2. Call `gh pr view <pr> --repo <verified-repo> --json
-   number,url,state,mergedAt,mergeCommit,baseRefName`; require
+2. Run the exact argv tuple `("gh", "pr", "view",
+   predecessor_production_binding.source_pr, "--repo",
+   predecessor_production_binding.repository, "--json",
+   "number,url,state,mergedAt,mergeCommit,baseRefName")`; require
    `state == "MERGED"`, non-null `mergedAt`, `baseRefName == "main"`, a positive
    number, an HTTPS URL for the verified repository, and one full
    `mergeCommit.oid`. These parser results populate the PR fields and
@@ -784,11 +841,10 @@ producer mode. Each invocation executes this order exactly:
 3. Run `git fetch origin main`, then
    `git rev-parse refs/remotes/origin/main^{commit}`. That exact result
    populates `observed_target_main_oid`.
-4. Run
-   `git merge-base --is-ancestor <integrated_source_oid>
-   <observed_target_main_oid>` and require exit 0. Exit 1 is a semantic failure;
-   any other status is a Git-process failure. The literal argv and exit status
-   are emitted as producer evidence.
+4. Run the fully bound tuple `("git", "merge-base", "--is-ancestor",
+   integrated_source_oid, observed_target_main_oid)` and require exit 0. Exit 1
+   is a semantic failure; any other status is a Git-process failure. The
+   literal argv and exit status are emitted as producer evidence.
 5. Resolve the two declared files under `root` without symlink escape, hash
    exact bytes, decode the review through `parse_review_identity`, and enforce
    the same-SHA APPROVE checks above.
@@ -851,31 +907,125 @@ team manifest, chat, or schedule, and it never writes an aggregate record.
 ### Typed command bindings and source identities
 
 The command bindings below are closed review-evidence projections, not a new
-persisted schema or public API. The successor Implementation Source Packet
-supplies one `ParentRepositoryBinding` with `root: Path`, `head_oid: GitOid`,
+persisted schema or public API. Canonical repository-root resolution
+materializes `parent_repository_binding` with `root: Path`, `head_oid: GitOid`,
 and `reviewed_design_source_identity: GraphSourceIdentity`. The
 `GraphSourceIdentity` is the exact tuple `(snapshot_commit: GitOid,
 source_path: PurePosixPath, content_sha256: Sha256)` for this reviewed design.
-Repository-root resolution produces `root` and `head_oid`; V12 accepts the
-binding only when graph context returns the byte-equal source-identity tuple.
-The shell projection is therefore the typed assignment
-`PARENT_ROOT: Path = parent_repository_binding.root`.
+V12 accepts the binding only when graph context returns the byte-equal
+source-identity tuple.
 
 The existing `runtime_log_archive_git.py archive-agent-report` producer and
-its matching append-only index row supply one
-`PredecessorArchiveSnapshotBinding` with `repo_key: str`, `run_id: str`,
+its matching append-only index row materialize
+`predecessor_archive_snapshot_binding` with `repo_key: str`, `run_id: str`,
 `snapshot_id: str`, `source_report_dir: PurePosixPath`,
 `archive_manifest_path: Path`, the manifest's existing
 `complete_file_sha256_by_unit`, and exactly two `PredecessorIntegrationInput`
 values. Both inputs carry the byte-equal `archive_manifest_path`, and their
 record paths are the two unit-derived files in that snapshot. Its source
 identity is the exact tuple `(repo_key, run_id, snapshot_id,
-source_report_dir)` from the archive producer result and index row. The shell
-projection is the typed assignment
-`SAME_SNAPSHOT_MANIFEST: Path =
-predecessor_archive_snapshot_binding.archive_manifest_path`. An absent field,
-an index/manifest disagreement, unequal input manifest paths, or a source-
-identity mismatch fails before either verifier runs.
+source_report_dir)` from the archive producer result and index row. An absent
+field, an index/manifest disagreement, unequal input manifest paths, or a
+source-identity mismatch fails before argv projection.
+
+The projection below resolves each path relative to the typed parent root and
+constructs literal argv tuples; it creates no shell variable, caller-selected
+path, latest-snapshot lookup, or unresolved metavariable:
+
+```python
+knowledge_graph_input = exactly_one(
+    item
+    for item in predecessor_archive_snapshot_binding.inputs
+    if item.expected_unit_id == "knowledge_graph"
+)
+active_packet_input = exactly_one(
+    item
+    for item in predecessor_archive_snapshot_binding.inputs
+    if item.expected_unit_id == "active_design_packet_materialization"
+)
+parent_root_arg = str(parent_repository_binding.root)
+archive_manifest_arg = (
+    predecessor_archive_snapshot_binding.archive_manifest_path.relative_to(
+        parent_repository_binding.root
+    ).as_posix()
+)
+knowledge_graph_record_arg = knowledge_graph_input.record_path.relative_to(
+    parent_repository_binding.root
+).as_posix()
+active_packet_record_arg = active_packet_input.record_path.relative_to(
+    parent_repository_binding.root
+).as_posix()
+
+graph_replacement_predecessor_verify_argv = (
+    "python3",
+    "tools/agent_tools/github_publish.py",
+    "--root",
+    parent_root_arg,
+    "verify-predecessor-integration",
+    "--record",
+    knowledge_graph_record_arg,
+    "--archive-manifest",
+    archive_manifest_arg,
+    "--expected-unit-id",
+    "knowledge_graph",
+)
+active_packet_predecessor_verify_argv = (
+    "python3",
+    "tools/agent_tools/github_publish.py",
+    "--root",
+    parent_root_arg,
+    "verify-predecessor-integration",
+    "--record",
+    active_packet_record_arg,
+    "--archive-manifest",
+    archive_manifest_arg,
+    "--expected-unit-id",
+    "active_design_packet_materialization",
+)
+predecessor_set_verify_argv = (
+    "python3",
+    "tools/agent_tools/github_publish.py",
+    "--root",
+    parent_root_arg,
+    "verify-predecessor-integration-set",
+    "--required-unit-id",
+    "knowledge_graph",
+    "--required-unit-id",
+    "active_design_packet_materialization",
+    "--record",
+    f"knowledge_graph={knowledge_graph_record_arg}",
+    "--record",
+    f"active_design_packet_materialization={active_packet_record_arg}",
+    "--archive-manifest",
+    f"knowledge_graph={archive_manifest_arg}",
+    "--archive-manifest",
+    f"active_design_packet_materialization={archive_manifest_arg}",
+)
+graph_replacement_status_argv = (
+    "tools/bin/agent-canon",
+    "graph",
+    "status",
+    "--root",
+    parent_root_arg,
+    "--profile",
+    "default",
+    "--format",
+    "json",
+)
+graph_replacement_context_argv = (
+    "tools/bin/agent-canon",
+    "graph",
+    "context",
+    "--root",
+    parent_root_arg,
+    "--path",
+    "reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md",
+    "--profile",
+    "default",
+    "--format",
+    "json",
+)
+```
 
 ### Read-only verifier and ancestry evidence
 
@@ -933,19 +1083,12 @@ def verify_predecessor_integration_set(
 ) -> PredecessorIntegrationSetVerification: ...
 ```
 
-```bash
-python3 tools/agent_tools/github_publish.py verify-predecessor-integration \
-  --record <explicit-archived-active-packet-record-path> \
-  --archive-manifest "$SAME_SNAPSHOT_MANIFEST" \
-  --expected-unit-id active_design_packet_materialization
+The PR-processing `Runner` executes the already materialized argv fields; this
+is executable projection, not a shell template:
 
-python3 tools/agent_tools/github_publish.py verify-predecessor-integration-set \
-  --required-unit-id knowledge_graph \
-  --required-unit-id active_design_packet_materialization \
-  --record knowledge_graph=<explicit-archived-knowledge-graph-record-path> \
-  --archive-manifest knowledge_graph="$SAME_SNAPSHOT_MANIFEST" \
-  --record active_design_packet_materialization=<explicit-archived-active-packet-record-path> \
-  --archive-manifest active_design_packet_materialization="$SAME_SNAPSHOT_MANIFEST"
+```python
+runner.run(active_packet_predecessor_verify_argv)
+runner.run(predecessor_set_verify_argv)
 ```
 
 ### Frozen predecessor CLI grammar, mapping, and emission
@@ -1085,16 +1228,30 @@ digest, and requires equality with `artifact_sha256`. That field is the
 canonical record hash; it is not the complete-file hash. The verifier then
 checks the archive manifest's complete-file entry, maps the two repository-
 relative report paths into the same immutable snapshot, hashes them, and calls
-`parse_review_identity` for the same-SHA APPROVE check. It calls the same read-
-only `gh pr view <source_pr_url>` query and requires URL, number, merged state,
-main base, and merge OID equality with the record. It requires all three
-commits to exist locally, then runs these exact read-only commands:
+`parse_review_identity` for the same-SHA APPROVE check. It runs the fully bound
+tuple `("gh", "pr", "view", record.source_pr_url, "--repo",
+verified_remote.repository, "--json",
+"number,url,state,mergedAt,mergeCommit,baseRefName")` and requires URL, number,
+merged state, main base, and merge OID equality with the record. It requires all
+three commits to exist locally, then executes these exact read-only argv tuples:
 
-```bash
-git merge-base --is-ancestor \
-  <integrated_source_oid> <observed_target_main_oid>
-git merge-base --is-ancestor \
-  <observed_target_main_oid> refs/remotes/origin/main
+```python
+integrated_to_observed_argv = (
+    "git",
+    "merge-base",
+    "--is-ancestor",
+    record.integrated_source_oid,
+    record.observed_target_main_oid,
+)
+observed_to_current_main_argv = (
+    "git",
+    "merge-base",
+    "--is-ancestor",
+    record.observed_target_main_oid,
+    "refs/remotes/origin/main",
+)
+runner.run(integrated_to_observed_argv)
+runner.run(observed_to_current_main_argv)
 ```
 
 The verifier has no ref or remote option and rejects a repository whose
@@ -1146,13 +1303,13 @@ integration APIs a successor uses.
 The live successor design
 `reports/agents/20260712-090608-context-packettool-skill-routing/container_codex_home_design.md`
 is verify-only in this unit. Its transient SHA is successor-owner state, not an
-active-packet Source Packet hash. If its S1 names the superseded schema, dashed
+active-packet Source Packet hash. If its `container:S1` names the superseded schema, dashed
 unit IDs, old filenames, two caller-level verifier calls, equal observed-main
 OIDs, or a caller-level integrated-OID comparison, it is not valid successor
 intake for this revision and the exact replacement below is mandatory.
 
 There is no remaining parent choice. Before container implementation, the
-container design owner replaces that S1 surface exactly as follows:
+container design owner replaces that `container:S1` surface exactly as follows:
 
 1. Replace schema
    `agent_canon.active_design_packet.predecessor_integration.v1` with
@@ -1173,13 +1330,14 @@ container design owner replaces that S1 surface exactly as follows:
    each individual verifier already proves integrated→observed and
    observed→fixed `origin/main` ancestry.
 6. After the set result succeeds, retain exactly one container-readiness check:
-   `git merge-base --is-ancestor <common_integrated_source_oid> HEAD` must exit
-   0 before container source work. This consumes the in-memory result and adds
-   no record, aggregate, or document-flow field.
+   execute `("git", "merge-base", "--is-ancestor",
+   set_result.common_integrated_source_oid, "HEAD")` and require exit 0 before
+   container source work. This consumes the in-memory result and adds no record,
+   aggregate, or document-flow field.
 
 The active-packet writer does not edit the container design. The container
 owner performs this deterministic rebase after the generic owner integrates;
-until then, its current S1 and V0 are stale verify-only evidence rather than a
+until then, its current `container:S1` and `container:V0` are stale verify-only evidence rather than a
 second contract.
 
 ## Normative Typed Value
@@ -1471,13 +1629,26 @@ vendored AgentCanon source, or standalone source selected by
 `resolve_workspace_document_path`; a project-local path resolves beneath the
 workspace root. Endpoints that resolve to different dependency roots are
 rejected. Invoke the canonical dependency graph builder for the one selected
-root with a private temporary TSV:
+root with a private temporary TSV. `agent_canon_source` is the canonical
+AgentCanon source root returned by `resolve_workspace_document_path`,
+`selected_dependency_root` is the common Git root proved above, and
+`private_temp` is the materializer-owned private temporary directory. The exact
+executable projection is:
 
-```bash
-bash <agent-canon-source>/tools/agent_tools/check_dependency_graph.sh \
-  --root <selected-dependency-root> \
-  --cycle-report-only \
-  --graph-tsv <private-temp>/dependency_graph.tsv
+```python
+dependency_graph_argv = (
+    "bash",
+    str(
+        agent_canon_source
+        / "tools/agent_tools/check_dependency_graph.sh"
+    ),
+    "--root",
+    str(selected_dependency_root),
+    "--cycle-report-only",
+    "--graph-tsv",
+    str(private_temp / "dependency_graph.tsv"),
+)
+runner.run(dependency_graph_argv)
 ```
 
 The materializer consumes the documented four-column normalized result
@@ -3008,9 +3179,9 @@ remains commentless. This paragraph adds no scope or omitted field.
 
 | Class and path | Exact owner | Action and reason | Exact symbols or sections | Request clauses | Reverse edges and consumers | Trace | Validation | Rollback or atomicity effect | Disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md` | `active-design-packet-materialization` design owner | Reconcile the three detailed-design re-review contradictions across the bound packet: V10 schedule projection, truthful source-candidate chronology, and actual three-artifact edit/rollback identity; preserve all approved production mechanisms. | `Design Status`, `Current packet and obsolete-checker records`, `Implementation Source Packet`, `One-Writer Implementation Sequence`, `Targeted Validation`, `Review and Handoff` | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: the two unit-owned packet files and four unit-owned review paths; consumers: one implementation writer and reviewers. | T1–T10 | V1–V12 plus current Markdown/dependency/convention checks | No product/runtime mutation; finalize route bytes first, bind them from the request, then bind both from this design. Rollback of this packet revision reverts exactly these three packet artifacts together and touches no source or unrelated dirty path. | Editable and changed in this turn; implementation candidate `db7a7b3ac831c9df19939d6698fab39480c2baea` exists, while authorized merge/publication and predecessor records remain absent and review remains pending. |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_surface_route.txt` | `active-design-packet-materialization` route owner | Correct the pre-merge/post-merge V10 schedule and carry every self-contained file-scope record plus the exclusive future authorized implementation surface. | `scope_file` records, candidate chronology, forbidden paths/behaviors, implementation order, graph replacement gate | ADP-09, ADP-12, ADP-13, RF-01–RF-06 | Reverse edge: this design; consumer: unit-owned implementation request. | T1–T10 | V8–V12 plus dependency-header/format checks | No product/runtime mutation; these route bytes are finalized and hashed before the request is rebound. Packet-revision rollback includes this route together with the bound request and design, never a route-only semantic rollback. | This unit-owned route is changed and rehashed in this turn; the separate generic route file remains external and verify-only. |
-| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_request.txt` | `active-design-packet-materialization` request owner | Correct the same V10 schedule, carry exact request clauses and review gates, and rebind the final route SHA and line identity. | `request_clause`, `scope_file`, candidate chronology, predecessor CLI/failure/graph replacement fields | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: this design and unit route; consumer: one future authorized implementation writer. | T1–T10 | V1–V12 plus dependency-header/format checks | No product/runtime mutation; this request binds the final route bytes and is then bound by the design. Packet-revision rollback includes all three artifacts and cannot preserve either changed unit-owned packet as the repaired identity. | This unit-owned request is changed, rebound, and rehashed in this turn; the separate generic request file remains external and verify-only. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md` | `active-design-packet-materialization` design owner | Close the two remaining document-flow defects after exact-byte detailed-design approval: bind every local S/T/V identifier before first use, qualify external successor IDs, and replace command metavariables with fully bound argv projections while preserving all approved production mechanisms. | `Reader Map`, `Design Status`, `Durable Post-Merge Predecessor Integration Record`, `Reference Grammar and Resolution Algorithms`, `Current packet and obsolete-checker records`, `Implementation Source Packet`, `Targeted Validation`, `Review and Handoff` | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: the two unit-owned packet files and four unit-owned review paths; consumers: one implementation writer and reviewers. | T1–T10 | V1–V12 plus current Markdown/dependency/convention checks | No product/runtime mutation; finalize route bytes first, bind them from the request, then bind both from this design. Rollback of this packet revision reverts exactly these three packet artifacts together and touches no source or unrelated dirty path. | Editable and changed in this turn; approved semantics and V schedule are preserved, while the new exact bytes return to both reviewers with review pending. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_surface_route.txt` | `active-design-packet-materialization` route owner | Preserve the approved V schedule while adding the closed identifier registry and fully bound predecessor/graph argv projection to the exclusive future authorized implementation surface. | `scope_file` records, identifier registry, candidate chronology, forbidden paths/behaviors, implementation order, graph replacement binding/argv fields | ADP-09, ADP-12, ADP-13, RF-01–RF-06 | Reverse edge: this design; consumer: unit-owned implementation request. | T1–T10 | V8–V12 plus dependency-header/format checks | No product/runtime mutation; these route bytes are finalized and hashed before the request is rebound. Packet-revision rollback includes this route together with the bound request and design, never a route-only semantic rollback. | This unit-owned route is changed and rehashed in this turn; the separate generic route file remains external and verify-only. |
+| current-turn edit `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_implementation_request.txt` | `active-design-packet-materialization` request owner | Preserve exact request clauses and V schedule, carry the same identifier/argv projection, and rebind the final route SHA and line identity. | `request_clause`, `scope_file`, identifier registry, candidate chronology, predecessor CLI/failure/graph replacement fields | ADP-01–ADP-13, RF-01–RF-06 | Reverse edges: this design and unit route; consumer: one future authorized implementation writer. | T1–T10 | V1–V12 plus dependency-header/format checks | No product/runtime mutation; this request binds the final route bytes and is then bound by the design. Packet-revision rollback includes all three artifacts and cannot preserve either changed unit-owned packet as the repaired identity. | This unit-owned request is changed, rebound, and rehashed in this turn; the separate generic request file remains external and verify-only. |
 | verify-only `tools/agent_tools/check_design_doc_claims.py` | `knowledge_graph` predecessor owner after integration; no active-packet owner | Do not invoke, repair, or make the obsolete custom parser pass; graph source deletes/replaces its parser/fact semantics. | Obsolete `parse_manifest_edges`, `dependency_closure`, filesystem evidence expansion; future graph-owned `GraphClaimConsumer` only | ADP-05, RF-06 | Reverse edges: `graph_design_brief.md#check_design_doc_claims decision`, verified `predecessor_integration.knowledge_graph.json`; consumer after integration: graph-backed claim route, not this design repair. | T10 | V12 | No current mutation. `not_applicable` is permitted only after predecessor verification plus fresh graph status/context; before that state is pending and no fallback parser runs. | `pending_graph_integration`; excluded from commands and edit scope. |
 
 ### Non-authoritative verify-only dependency index
@@ -3034,7 +3205,7 @@ covered by their complete authoritative records above.
 | --- | --- | --- | --- |
 | `reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md` | `knowledge_graph` design owner; producer-time design input only | T9, T10; V10–V12 | Read-only; no copied transient SHA and no active-packet edit. |
 | `reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_review.md` | `knowledge_graph` review owner; same-SHA APPROVE input only | T9, T10; V10–V12 | Read-only; stale review fails before record publication. |
-| `reports/agents/20260712-090608-context-packettool-skill-routing/container_codex_home_design.md` | successor-container design owner; consumes the verified two-record set | T9; V10 | Read-only here; successor owner rebases stale S1/V0 values. |
+| `reports/agents/20260712-090608-context-packettool-skill-routing/container_codex_home_design.md` | successor-container design owner; consumes the verified two-record set | T9; V10 | Read-only here; successor owner rebases stale `container:S1`/`container:V0` values. |
 | `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design_review_v1.md` | historical review owner; non-authoritative evidence | T10; V11 | Read-only hash evidence; cannot authorize source or publication. |
 | `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design_review_v2.md` | historical review owner; non-authoritative evidence | T10; V11 | Read-only hash evidence; cannot authorize source or publication. |
 | `reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design_review_v3.md` | historical review owner; non-authoritative evidence | T10; V11 | Read-only hash evidence; cannot authorize source or publication. |
@@ -3091,11 +3262,11 @@ candidate at `db7a7b3ac831c9df19939d6698fab39480c2baea`:
 
 1. this design;
 2. `active_design_packet_implementation_surface_route.txt`, SHA-256
-   `09db291056c2f61fd17afa205bc35de5367f5fb5420a99a24eeb6406c1b3c473`,
-   219 lines;
+   `a416839e24c148a6d9924570a804f9214331b37c281579565e7da312adea8586`,
+   224 lines;
 3. `active_design_packet_implementation_request.txt`, SHA-256
-   `e9f5116f752d49c30e5574e9d73e9785070677439f509521be6e873ef89c3857`,
-   221 lines; its header and metadata bind the route SHA and line count;
+   `841037f2ddc34c131b759617110f2c0315b366281a28e2e34483ce1fb92a5068`,
+   226 lines; its header and metadata bind the route SHA and line count;
 4. authorization-gate
    `active_design_packet_contract_repair_detailed_design_review.md`, owned by
    `role:design_reviewer`, and
@@ -3134,8 +3305,8 @@ candidate at `db7a7b3ac831c9df19939d6698fab39480c2baea`:
 11. downstream live verify-only consumer `container_codex_home_design.md`;
     its owner applies the exact schema/ID/filename/set-API/observed-OID/HEAD-
     ancestry replacements in `Successor container reconciliation` whenever
-    stale S1 values remain, and this unit never copies its transient SHA,
-    edits it, or treats its S1 as authority.
+    stale `container:S1` values remain, and this unit never copies its transient
+    SHA, edits it, or treats its `container:S1` as authority.
 
 The two authorization-gate review artifacts are currently unmaterialized
 because `review_status=pending`; their paths and owners are nevertheless closed
@@ -3228,7 +3399,7 @@ authorize a smaller substitute.
 | S6 | ADP-03, ADP-06, ADP-07 | explicit packet intent and typed failures stay public | current argparse option, run-manifest output, CLI machine-readable output helpers | `--active-design-packet`, `run.active_design_packet`, CLI outputs and exit codes | Gate 0 bootstrap producers and Gate 8 consumer | change review and final review | V5, V7 |
 | S7 | ADP-03, ADP-08, ADP-09, ADP-12 | structural instructions and reverse edges state the one owner and reference model | current dependency headers, template renderer, Markdown heading index, canonical workflow sections | five templates, template README, canonical docs/workflow, six skill surfaces, paired headers | Gate 5-7 doc/skill owners updated in the same Gate 8 unit | document-flow and detailed-design approval, then final review | V8 |
 | S8 | ADP-08, ADP-09, ADP-10, ADP-12, RF-05 | test files are verify-only at authorization; source is completed first, a conflicting stale public assertion requires a design revision before its exact test edit, and a new test requires a revised design naming a concrete unresolved public oracle | historical `git show 9ba4bba5` inventory and existing public CLI/bundle/gate evidence | verify-only historical and public test paths; no currently authorized test edit | Gate 8 source first; stop and revise this design only if post-source evidence meets the exact stale-assertion or unresolved-oracle rule | change review verifies source-first evidence and the absence of count-based or unconditional test work | V9 |
-| S9 | ADP-05, ADP-09, ADP-13 | one generic schema and filename function produce independent `knowledge_graph` and `active_design_packet_materialization` records; individual verification proves record/review/PR/ancestry, while the in-memory set verifier rejects duplicate/missing/unexpected units and requires one byte-equal merged source OID without an aggregate artifact; the container owner deterministically replaces its stale schema/IDs/filenames/manual comparison and retains only common-integrated-OID→HEAD readiness | `verify_remote`, `parse_review_identity`, `gh pr view` result, Git process results, `archive-agent-report` snapshot/manifest/index | GitHub publish tool/docs/test, PR workflow and canonical/runtime skill, placement/archive docs, both unit inputs, current Source Packet, successor Source Packets, verify-only `container_codex_home_design.md` | source first in Gate 8; graph owner supplies its same-SHA review; canonical PR-processing producer runs twice after the shared merge; container owner rebases its S1/V0 after integration; successor intake is read-only | each unit's same-SHA detailed-design gate plus change/final review before merge; V10 after merge; container review consumes the final contract | V10 |
+| S9 | ADP-05, ADP-09, ADP-13 | one generic schema and filename function produce independent `knowledge_graph` and `active_design_packet_materialization` records; individual verification proves record/review/PR/ancestry, while the in-memory set verifier rejects duplicate/missing/unexpected units and requires one byte-equal merged source OID without an aggregate artifact; the container owner deterministically replaces its stale schema/IDs/filenames/manual comparison and retains only common-integrated-OID→HEAD readiness | `verify_remote`, `parse_review_identity`, `gh pr view` result, Git process results, `archive-agent-report` snapshot/manifest/index | GitHub publish tool/docs/test, PR workflow and canonical/runtime skill, placement/archive docs, both unit inputs, current Source Packet, successor Source Packets, verify-only `container_codex_home_design.md` | source first in Gate 8; graph owner supplies its same-SHA review; canonical PR-processing producer runs twice after the shared merge; container owner rebases its `container:S1`/`container:V0` after integration; successor intake is read-only | each unit's same-SHA detailed-design gate plus change/final review before merge; V10 after merge; container review consumes the final contract | V10 |
 | S10 | ADP-04, ADP-09, ADP-13 | seven hash-bound external overlap inputs are verify-only; one Luna worker executes the graph-owned dirty semantic intent, active packet, affected source/config, skills/docs, generated views, and checker cleanup as one owner-preserving responsibility graph in dependency order; both required predecessor records for the merged source OID integrate first, optional approved WAIT-1 second, routing/Llama last; split occurs only for an actual concurrent write conflict or unresolved predecessor | current graph-owned dirty paths, productive-wait reconciliation/design/reviews, and routing/Llama predecessor table | graph predecessor paths under graph authority, `agent_team.py`, workflow monitor, task-start/bootstrap, manifest/docs/skill/generated-view sections, and post-merge record/graph evidence | one Luna writer preserves each node's path authority, lands the integrated source PR, and hands off one V1–V12 evidence set; later units consume both archived records and narrower reservations | equal-SHA reviews plus change/final review check owner boundaries, hashes, reservations, and one-worker handoff; successor verifies both records and common OID | V11, V12 |
 
 No item delegates schema interpretation, path selection, or test count to a
@@ -3247,7 +3418,7 @@ unit.
 | T6 | ADP-02, ADP-03, ADP-04, ADP-05 | exact shared loader/validator call path; delete gate-local semantics | `yaml.safe_load` and current report-artifact structural/review-decision results | waterfall source and review templates | S5, S6 | V7 |
 | T7 | ADP-03, ADP-08, ADP-09, ADP-12 | exact reader-facing sections and paired owner edges | existing dependency headers, canonical sections, template/runtime skill views | each doc/template/skill row in File Scope | S7 | V8 |
 | T8 | ADP-08, ADP-09, ADP-10, ADP-12, RF-05 | keep every test path verify-only until source-complete validation identifies a concrete stale public assertion; authorize a new oracle only through a revised design with evidence | historical `git show` inventory and current public property observations | verify-only test paths and a design-revision gate; no current test edit | S8 | V9 |
-| T9 | ADP-05, ADP-09, ADP-13 | generic exact record fields and payload hash, unit-ID grammar and filename derivation, per-unit merged-PR producer, immutable two-record archive path, individual verifier, duplicate/exact-set/common-OID verifier, two ancestry checks per record, and exact stale-container S1/V0 replacement with common-OID→HEAD readiness | verified GitHub metadata, authoritative review identity result, Git object/process results, existing run archive, container design's explicit owner-deference | `github_publish.py`, report parser, PR workflow/skills/docs, archive/placement docs, graph and active design/review inputs, public regression, verify-only container successor design; no manifest consumer or aggregate schema | S9 | V10 |
+| T9 | ADP-05, ADP-09, ADP-13 | generic exact record fields and payload hash, unit-ID grammar and filename derivation, per-unit merged-PR producer, immutable two-record archive path, individual verifier, duplicate/exact-set/common-OID verifier, two ancestry checks per record, and exact stale-container `container:S1`/`container:V0` replacement with common-OID→HEAD readiness | verified GitHub metadata, authoritative review identity result, Git object/process results, existing run archive, container design's explicit owner-deference | `github_publish.py`, report parser, PR workflow/skills/docs, archive/placement docs, graph and active design/review inputs, public regression, verify-only container successor design; no manifest consumer or aggregate schema | S9 | V10 |
 | T10 | ADP-04, ADP-09, ADP-13 | exact external hashes, statuses, shared-symbol reservations, two-record predecessor requirement, and one-Luna owner-preserving dependency order; no file/finding/test/review slice is valid | current graph-owned dirty state, seven external overlap artifacts, routing brief's active-packet predecessor declaration, and durable v15 identity `review_status=approved`, `decision=APPROVE`, `implementation_authorized=yes` | one responsibility-graph handoff, graph paths under graph authority, frozen active-packet blocks, explicit predecessor set, and post-merge graph validation | S10 | V11, V12 |
 
 Every edit row cites at least one trace and validation ID. The trace is by
@@ -3354,8 +3525,9 @@ python3 tools/agent_tools/check_convention_compliance.py
 
 python3 tools/agent_tools/prose_reasoning_graph.py check-document \
   reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md \
-  --out-dir <task-local-artifact-dir> --profile writing \
-  --stats-out <task-local-stats.json>
+  --out-dir reports/agents/20260712-090608-context-packettool-skill-routing/prose-reasoning-graph/order-repair-01 \
+  --profile writing \
+  --stats-out reports/agents/20260712-090608-context-packettool-skill-routing/prose-reasoning-graph/order-repair-01/stats.json
 
 git diff --check -- \
   reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md \
@@ -3378,22 +3550,10 @@ predecessor deletes/replaces that custom parser with its graph-owned
 V12 changes the obsolete checker's disposition to `not_applicable` only after
 all three read-only commands below succeed in this order:
 
-```bash
-python3 tools/agent_tools/github_publish.py verify-predecessor-integration \
-  --record reports/agents/20260712-090608-context-packettool-skill-routing/predecessor_integration.knowledge_graph.json \
-  --archive-manifest "$SAME_SNAPSHOT_MANIFEST" \
-  --expected-unit-id knowledge_graph
-
-tools/bin/agent-canon graph status \
-  --root "$PARENT_ROOT" \
-  --profile default \
-  --format json
-
-tools/bin/agent-canon graph context \
-  --root "$PARENT_ROOT" \
-  --path reports/agents/20260712-090608-context-packettool-skill-routing/active_design_packet_contract_repair_design.md \
-  --profile default \
-  --format json
+```python
+runner.run(graph_replacement_predecessor_verify_argv)
+runner.run(graph_replacement_status_argv)
+runner.run(graph_replacement_context_argv)
 ```
 
 The individual predecessor result must be `verified=true` for
@@ -3419,9 +3579,10 @@ command_exit_status
 ```
 
 `knowledge_graph_archive_manifest_path` must equal
-`SAME_SNAPSHOT_MANIFEST`, and each recorded graph argv must carry the exact
-`PARENT_ROOT` value. `graph_integration_record` binds the parent repository
-snapshot, while graph context's `source_identity` must equal
+`predecessor_archive_snapshot_binding.archive_manifest_path`, and each recorded
+graph argv must carry the exact `parent_repository_binding.root` value.
+`graph_integration_record` binds the parent repository snapshot, while graph
+context's `source_identity` must equal
 `parent_repository_binding.reviewed_design_source_identity`. These are
 projections of the two typed producer records above; no command may substitute
 a caller-selected path or infer either value from the latest archive, current
@@ -3503,11 +3664,18 @@ statuses, the archive destination/snapshot ID, both payload
 is not serialized. This post-merge operation is not replaced by a pre-merge
 fixture result.
 
-The later container V0 consumes that common OID and requires exit 0 from this
-one additional literal argv:
+The later `container:V0` consumes that common OID and requires exit 0 from this
+one additional fully bound argv:
 
-```bash
-git merge-base --is-ancestor <common_integrated_source_oid> HEAD
+```python
+container_readiness_argv = (
+    "git",
+    "merge-base",
+    "--is-ancestor",
+    set_result.common_integrated_source_oid,
+    "HEAD",
+)
+runner.run(container_readiness_argv)
 ```
 
 It does not compare the two observed-main OIDs or rerun record parsing.
@@ -3624,18 +3792,21 @@ instead of copying the old result shape locally.
 
 `review_status=pending`. After the formatter and static checks pass, compute
 the final SHA and hand the exact bytes independently to the same
-`detailed_design_reviewer` and `document_flow_reviewer`. The independently
-reviewed semantics are preserved evidence, but their earlier review identities
-do not bind the `ORDER-REPAIR-01` bytes. The detailed-design review covers
+`detailed_design_reviewer` and `document_flow_reviewer`. The detailed-design
+APPROVE for commit `b036f86a4e0c0314158553e9aa1f82c0cc714d7c` preserves the
+reviewed semantics as evidence, and the document-flow REVISE supplies this
+revision's two findings; neither decision binds the newly frozen bytes. The
+detailed-design review covers
 implementability of the exact types, JSON record,
 reference algorithms, projector signatures, call order, waterfall API, atomic
 failure behavior, deletion list, scope classification, predecessor producer /
 verifier/archive contract, external-overlap order, graph replacement state,
 and V1-V12 mapping. The document-flow review covers
-Reader Map/order equality, definition before use, V10 state order, the exact
-seven-file V11 identity predicates, V12 producer-variable binding, contiguous
-S5/T6/V7 clarity, the one-writer reading of the scope tables,
-predecessor-record placement, and readability of the current packet hashes.
+Reader Map/order equality, identifier definition before use, V10 state order,
+the exact seven-file V11 identity predicates, V12 typed-binding-to-literal-argv
+projection with no command placeholder, contiguous S5/T6/V7 clarity, the
+one-writer reading of the scope tables, predecessor-record placement, and
+readability of the current packet hashes.
 
 `ORDER-REPAIR-01` is a post-source three-artifact source-packet repair. It
 neither alters product/source/config/test paths nor claims that the existing
