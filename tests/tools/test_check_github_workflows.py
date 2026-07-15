@@ -34,6 +34,59 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
+    def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
+        """Shell run blocks must not interpolate workflow-dispatch inputs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            workflow = root / ".github" / "workflows" / "agent-coordination.yml"
+            shutil.copy2(
+                REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml",
+                workflow,
+            )
+            source = workflow.read_text(encoding="utf-8")
+            for interpolation in (
+                "${{ inputs.task }}",
+                "${{ inputs['task'] }}",
+                "${{ github.event.inputs.task }}",
+            ):
+                with self.subTest(interpolation=interpolation):
+                    workflow.write_text(
+                        source.replace(
+                            '--task "${AGENT_COORDINATION_TASK}"',
+                            '--task "' + interpolation + '"',
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    result = subprocess.run(
+                        [sys.executable, str(SCRIPT), "--root", str(root)],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(
+                        "direct_workflow_dispatch_input_interpolation",
+                        result.stdout,
+                    )
+
+    def test_specialist_allowlist_rejects_multiline_values(self) -> None:
+        """The canonical workflow guards malformed specialist input before parsing."""
+        workflow = REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml"
+        text = workflow.read_text(encoding="utf-8")
+
+        self.assertIn('case "${AGENT_COORDINATION_SPECIALISTS}" in', text)
+        self.assertIn("*$'\\n'*|*$'\\r'*)", text)
+        self.assertIn(
+            "researcher|research_reviewer|scheduler|schedule_reviewer|"
+            "infra_steward|infra_reviewer",
+            text,
+        )
+        self.assertIn("unsupported specialist role", text)
+
     def test_legacy_auto_submodule_checkout_fails(self) -> None:
         """Checkout steps must use the explicit AgentCanon helper."""
         with tempfile.TemporaryDirectory() as tmp_dir:

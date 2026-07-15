@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -42,6 +43,12 @@ AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
 )
+WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
+    r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
+    r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
+    r"\s*\}\}"
+)
+WORKFLOW_DISPATCH_INPUT_CHECK_WORKFLOW = "agent-coordination.yml"
 TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "Validation Evidence",
     "Plan Mode Evidence",
@@ -323,6 +330,25 @@ def step_contexts(workflow: dict[str, object]) -> list[StepContext]:
     return contexts
 
 
+def workflow_dispatch_input_interpolation_findings(
+    path: Path,
+    workflow: dict[str, object],
+) -> list[Finding]:
+    """Return findings for direct workflow-dispatch input use in shell blocks."""
+    findings: list[Finding] = []
+    for context in step_contexts(workflow):
+        run = context.step.get("run")
+        if isinstance(run, str) and WORKFLOW_DISPATCH_INPUT_PATTERN.search(run):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"run_step_{context.index}_direct_workflow_dispatch_input_interpolation",
+                )
+            )
+    return findings
+
+
 def checkout_steps(workflow: dict[str, object]) -> list[StepContext]:
     """Return every actions/checkout step in one workflow."""
     steps: list[StepContext] = []
@@ -445,6 +471,11 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
     workflow_text = read_text(path)
     return [
         *workflow_declared_findings(path, workflow),
+        *(
+            workflow_dispatch_input_interpolation_findings(path, workflow)
+            if path.name == WORKFLOW_DISPATCH_INPUT_CHECK_WORKFLOW
+            else []
+        ),
         *agent_canon_checkout_policy_findings(root, path, workflow, workflow_text),
         *checkout_step_findings(path, workflow),
     ]

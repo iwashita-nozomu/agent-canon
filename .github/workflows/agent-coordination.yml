@@ -37,6 +37,10 @@ permissions:
 
 env:
   AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+  AGENT_COORDINATION_TASK: ${{ inputs.task }}
+  AGENT_COORDINATION_OWNER: ${{ inputs.owner }}
+  AGENT_COORDINATION_SPECIALISTS: ${{ inputs.specialists }}
+  AGENT_COORDINATION_FULL_TEAM: ${{ inputs.full_team }}
 
 concurrency:
   group: agent-coordination-${{ github.ref }}-${{ inputs.task }}
@@ -70,20 +74,36 @@ jobs:
       - name: Bootstrap agent run
         id: bootstrap
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          case "${AGENT_COORDINATION_SPECIALISTS}" in
+            *$'\n'*|*$'\r'*)
+              echo "specialist values must be comma-separated on one line" >&2
+              exit 1
+              ;;
+          esac
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
           flags=()
-          if [ "${{ inputs.full_team }}" = "true" ]; then
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" = "true" ]; then
             flags+=(--full-team)
           fi
           if [ -n "${normalized}" ]; then
             IFS=',' read -ra roles <<< "${normalized}"
             for role in "${roles[@]}"; do
-              [ -n "${role}" ] && flags+=(--enable "${role}")
+              case "${role}" in
+                researcher|research_reviewer|scheduler|schedule_reviewer|infra_steward|infra_reviewer)
+                  flags+=(--enable "${role}")
+                  ;;
+                "")
+                  ;;
+                *)
+                  echo "unsupported specialist role: ${role}" >&2
+                  exit 1
+                  ;;
+              esac
             done
           fi
           python3 tools/agent_tools/bootstrap_agent_run.py \
-            --task "${{ inputs.task }}" \
-            --owner "${{ inputs.owner }}" \
+            --task "${AGENT_COORDINATION_TASK}" \
+            --owner "${AGENT_COORDINATION_OWNER}" \
             --workspace-root "${GITHUB_WORKSPACE}" \
             "${flags[@]}" > bootstrap.txt
           cat bootstrap.txt
@@ -281,8 +301,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run researcher stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",researcher,"* ]] \
             && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
             echo "researcher inactive; pass-through"
@@ -340,8 +360,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run research reviewer stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",researcher,"* ]] \
             && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
             echo "research reviewer inactive; pass-through"
@@ -399,8 +419,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run research response stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",researcher,"* ]] \
             && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
             echo "research response inactive; pass-through"
@@ -458,8 +478,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run scheduler stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",scheduler,"* ]] \
             && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
             echo "scheduler inactive; pass-through"
@@ -517,8 +537,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run schedule reviewer stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",scheduler,"* ]] \
             && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
             echo "schedule reviewer inactive; pass-through"
@@ -576,8 +596,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run schedule response stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",scheduler,"* ]] \
             && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
             echo "schedule response inactive; pass-through"
@@ -635,8 +655,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run infra steward stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",infra_steward,"* ]] \
             && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
             echo "infra steward inactive; pass-through"
@@ -694,8 +714,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run infra reviewer stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",infra_steward,"* ]] \
             && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
             echo "infra reviewer inactive; pass-through"
@@ -753,8 +773,8 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run infra response stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
-          if [ "${{ inputs.full_team }}" != "true" ] \
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" != "true" ] \
             && [[ ",${normalized}," != *,",infra_steward,"* ]] \
             && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
             echo "infra response inactive; pass-through"
@@ -812,9 +832,9 @@ jobs:
           path: ${{ needs.bootstrap.outputs.report_dir }}
       - name: Run manager specialist response stage
         run: |
-          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          normalized="$(printf '%s' "${AGENT_COORDINATION_SPECIALISTS}" | tr -d ' ')"
           activated="none"
-          if [ "${{ inputs.full_team }}" = "true" ]; then
+          if [ "${AGENT_COORDINATION_FULL_TEAM}" = "true" ]; then
             activated="full-team"
           elif [ -n "${normalized}" ]; then
             activated="${normalized}"
