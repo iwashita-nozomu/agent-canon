@@ -763,72 +763,503 @@ fn check_markdown_math(files: &[PathBuf]) -> Vec<Finding> {
         let Ok(text) = fs::read_to_string(path) else {
             continue;
         };
-        let mut in_fence = false;
+        let mut fence: Option<(char, usize, Option<String>)> = None;
         let mut in_display_block = false;
         for (line_index, line) in text.lines().enumerate() {
-            if line.trim_start().starts_with("```") {
-                in_fence = !in_fence;
+            let trimmed = line.trim_start();
+            if let Some((fence_char, fence_len, math_fence_lang)) = fence.as_ref() {
+                if is_closing_fence(trimmed, *fence_char, *fence_len) {
+                    fence = None;
+                    continue;
+                }
+                if let Some(lang) = math_fence_lang.as_deref() {
+                    if is_text_fence_language(lang) && has_math_like_fence_violation(line) {
+                        findings.push(math_finding(
+                            path,
+                            line_index + 1,
+                            &format!(
+                                "mathematical notation must use standalone `$$` display math, not a `{}` fenced block",
+                                lang
+                            ),
+                        ));
+                    }
+                }
                 continue;
             }
-            if in_fence {
+            let Some((fence_char, fence_len, info)) = opening_fence_info(trimmed) else {
+                let line_no = line_index + 1;
+                if line.contains("\\(") || line.contains("\\)") {
+                    findings.push(math_finding(
+                        path,
+                        line_no,
+                        "inline math must use `$...$`, not `\\(...\\)`",
+                    ));
+                }
+                if line.contains("\\[") || line.contains("\\]") {
+                    findings.push(math_finding(
+                        path,
+                        line_no,
+                        "display math must use `$$...$$`, not `\\[...\\]`",
+                    ));
+                }
+                let compact = line.trim();
+                if compact == "$$" {
+                    in_display_block = !in_display_block;
+                    continue;
+                }
+                if compact == "$" {
+                    findings.push(math_finding(
+                        path,
+                        line_no,
+                        "display math must use `$$...$$`, not `$` block delimiters",
+                    ));
+                    continue;
+                }
+                if in_display_block {
+                    continue;
+                }
+                if compact.starts_with('$')
+                    && compact.ends_with('$')
+                    && !compact.starts_with("$$")
+                    && compact.len() > 2
+                {
+                    findings.push(math_finding(
+                        path,
+                        line_no,
+                        "display math must use `$$...$$`, not `$...$` on its own line",
+                    ));
+                    continue;
+                }
+                if compact.starts_with("$$") && compact.ends_with("$$") {
+                    continue;
+                }
+                if line.contains("$$") {
+                    findings.push(math_finding(
+                        path,
+                        line_no,
+                        "inline math must use `$...$`, not `$$...$$`",
+                    ));
+                }
                 continue;
-            }
-            let line_no = line_index + 1;
-            if line.contains("\\(") || line.contains("\\)") {
+            };
+            let fence_info = math_fence_language(info);
+            if fence_info.as_deref().is_some_and(is_declared_math_fence) {
                 findings.push(math_finding(
                     path,
-                    line_no,
-                    "inline math must use `$...$`, not `\\(...\\)`",
+                    line_index + 1,
+                    &format!(
+                        "mathematical notation must use standalone `$$` display math, not a `{}` fenced block",
+                        fence_info.as_deref().unwrap_or_default()
+                    ),
                 ));
             }
-            if line.contains("\\[") || line.contains("\\]") {
-                findings.push(math_finding(
-                    path,
-                    line_no,
-                    "display math must use `$$...$$`, not `\\[...\\]`",
-                ));
-            }
-            let compact = line.trim();
-            if compact == "$$" {
-                in_display_block = !in_display_block;
-                continue;
-            }
-            if compact == "$" {
-                findings.push(math_finding(
-                    path,
-                    line_no,
-                    "display math must use `$$...$$`, not `$` block delimiters",
-                ));
-                continue;
-            }
-            if in_display_block {
-                continue;
-            }
-            if compact.starts_with('$')
-                && compact.ends_with('$')
-                && !compact.starts_with("$$")
-                && compact.len() > 2
-            {
-                findings.push(math_finding(
-                    path,
-                    line_no,
-                    "display math must use `$$...$$`, not `$...$` on its own line",
-                ));
-                continue;
-            }
-            if compact.starts_with("$$") && compact.ends_with("$$") {
-                continue;
-            }
-            if line.contains("$$") {
-                findings.push(math_finding(
-                    path,
-                    line_no,
-                    "inline math must use `$...$`, not `$$...$$`",
-                ));
-            }
+            fence = Some((fence_char, fence_len, fence_info));
         }
     }
     findings
+}
+
+fn has_math_like_fence_violation(line: &str) -> bool {
+    let compact = line.trim();
+    if compact.is_empty() {
+        return false;
+    }
+    has_text_fence_math_syntax(compact)
+}
+
+fn is_declared_math_fence(language: &str) -> bool {
+    matches!(language, "math" | "latex" | "tex")
+}
+
+fn is_text_fence_language(language: &str) -> bool {
+    matches!(language, "text" | "plaintext" | "txt" | "plain")
+}
+
+fn has_text_fence_math_syntax(line: &str) -> bool {
+    let candidate = math_candidate_text(line);
+    let candidate = candidate.trim();
+    has_math_optimization_keyword(candidate)
+        || has_explicit_math_delimiters(candidate)
+        || has_math_relation_operator(candidate)
+        || contains_tex_command(candidate)
+}
+
+fn math_candidate_text(line: &str) -> String {
+    let mut candidate = String::with_capacity(line.len());
+    let mut index = 0;
+    while index < line.len() {
+        let rest = &line[index..];
+        if let Some(length) = backtick_literal_span_length(rest) {
+            candidate.push(' ');
+            index += length;
+            continue;
+        }
+        if let Some(length) = url_literal_span_length(rest) {
+            candidate.push(' ');
+            index += length;
+            continue;
+        }
+        if let Some(length) = angle_literal_span_length(rest) {
+            candidate.push(' ');
+            index += length;
+            continue;
+        }
+        if rest.starts_with("->") {
+            candidate.push(' ');
+            index += 2;
+            continue;
+        }
+        let character = rest.chars().next().unwrap_or_default();
+        candidate.push(character);
+        index += character.len_utf8();
+    }
+    candidate
+}
+
+fn backtick_literal_span_length(rest: &str) -> Option<usize> {
+    if !rest.starts_with('`') {
+        return None;
+    }
+    rest[1..].find('`').map(|closing| closing + 2)
+}
+
+fn url_literal_span_length(rest: &str) -> Option<usize> {
+    if !rest.starts_with("https://") && !rest.starts_with("http://") {
+        return None;
+    }
+    Some(
+        rest.char_indices()
+            .find_map(|(index, character)| character.is_whitespace().then_some(index))
+            .unwrap_or(rest.len()),
+    )
+}
+
+fn angle_literal_span_length(rest: &str) -> Option<usize> {
+    if !rest.starts_with('<') {
+        return None;
+    }
+    let closing = rest.find('>')?;
+    let body = &rest[1..closing];
+    if body.is_empty() || body.trim() != body {
+        return None;
+    }
+    body.chars()
+        .all(|character| {
+            character.is_alphanumeric()
+                || character.is_whitespace()
+                || matches!(
+                    character,
+                    '|' | ',' | '_' | '-' | '/' | '.' | '=' | ':' | '"' | '\'' | '!' | '?'
+                )
+        })
+        .then_some(closing + 1)
+}
+
+fn has_explicit_math_delimiters(line: &str) -> bool {
+    line == "$"
+        || has_unescaped_dollar_math_pair(line)
+        || has_paired_delimiters(line, "\\(", "\\)")
+        || has_paired_delimiters(line, "\\[", "\\]")
+}
+
+fn has_paired_delimiters(line: &str, opening: &str, closing: &str) -> bool {
+    let Some(opening_index) = line.find(opening) else {
+        return false;
+    };
+    let content_start = opening_index + opening.len();
+    let Some(closing_offset) = line[content_start..].find(closing) else {
+        return false;
+    };
+    closing_offset > 0
+}
+
+fn has_unescaped_dollar_math_pair(line: &str) -> bool {
+    let positions: Vec<usize> = line
+        .char_indices()
+        .filter_map(|(index, character)| {
+            (character == '$' && !is_escaped_delimiter(line, index)).then_some(index)
+        })
+        .collect();
+
+    positions.windows(2).any(|pair| {
+        if pair[1] == pair[0] + 1 {
+            return true;
+        }
+        if dollar_starts_shell_or_currency_token(line, pair[1]) {
+            return false;
+        }
+        has_math_dollar_payload(&line[pair[0] + 1..pair[1]])
+    })
+}
+
+fn dollar_starts_shell_or_currency_token(line: &str, dollar_index: usize) -> bool {
+    line[dollar_index + 1..]
+        .chars()
+        .next()
+        .is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
+}
+
+fn is_escaped_delimiter(line: &str, index: usize) -> bool {
+    let mut backslash_count = 0;
+    let mut cursor = index;
+    while cursor > 0 && line.as_bytes()[cursor - 1] == b'\\' {
+        backslash_count += 1;
+        cursor -= 1;
+    }
+    backslash_count % 2 == 1
+}
+
+fn has_math_dollar_payload(payload: &str) -> bool {
+    has_math_expression_marker(payload) || payload.split_whitespace().any(is_math_atom_token)
+}
+
+fn has_math_optimization_keyword(line: &str) -> bool {
+    has_prefix_token(line, "minimize")
+        || has_prefix_token(line, "maximize")
+        || has_prefix_token(line, "subject to")
+}
+
+fn has_prefix_token(line: &str, token: &str) -> bool {
+    if !line.starts_with(token) {
+        return false;
+    }
+    if line.len() == token.len() {
+        return true;
+    }
+    !line
+        .as_bytes()
+        .get(token.len())
+        .is_some_and(|char_byte| char_byte.is_ascii_alphabetic())
+}
+
+fn has_math_relation_operator(line: &str) -> bool {
+    has_binary_math_relation(line) || has_spaced_math_equality(line)
+}
+
+fn has_binary_math_relation(line: &str) -> bool {
+    let mut index = 0;
+    while index < line.len() {
+        let rest = &line[index..];
+        if let Some(operator_length) = relation_operator_length(rest) {
+            let left = line[..index].split_whitespace().next_back();
+            let right = line[index + operator_length..].split_whitespace().next();
+            if left.is_some_and(is_math_atom_token) && right.is_some_and(is_math_atom_token) {
+                return true;
+            }
+            index += operator_length;
+            continue;
+        }
+        index += rest.chars().next().unwrap_or_default().len_utf8();
+    }
+    false
+}
+
+fn relation_operator_length(rest: &str) -> Option<usize> {
+    ["<=", ">=", "!=", "≤", "≥", "≠", "≈", "<", ">"]
+        .iter()
+        .find_map(|operator| rest.starts_with(operator).then_some(operator.len()))
+}
+
+fn has_spaced_math_equality(line: &str) -> bool {
+    let tokens: Vec<&str> = line.split_whitespace().collect();
+    let has_expression_marker = has_math_expression_marker(line);
+
+    tokens.iter().enumerate().any(|(index, token)| {
+        if *token != "=" {
+            return false;
+        }
+        let left = &tokens[..index];
+        let right = &tokens[index + 1..];
+        !left.is_empty()
+            && !right.is_empty()
+            && ((contains_math_atom(left) && contains_math_atom(right))
+                || (has_expression_marker
+                    && (contains_math_atom(left) || contains_math_atom(right))))
+    })
+}
+
+fn contains_math_atom(side: &[&str]) -> bool {
+    side.iter().any(|token| is_math_atom_token(token))
+}
+
+fn is_math_atom_token(token: &str) -> bool {
+    let expression_token = token.trim_matches(|character: char| {
+        matches!(character, '[' | ']' | '{' | '}' | ',' | ';' | ':')
+    });
+    if is_function_expression_atom(expression_token) {
+        return true;
+    }
+    let token = expression_token.trim_matches(|character: char| {
+        matches!(
+            character,
+            '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';' | ':'
+        )
+    });
+    if token.is_empty() {
+        return false;
+    }
+
+    is_numeric_math_atom(token) || is_symbolic_math_atom(token)
+}
+
+fn is_numeric_math_atom(token: &str) -> bool {
+    token.chars().any(|character| character.is_ascii_digit()) && token.parse::<f64>().is_ok()
+}
+
+fn is_function_expression_atom(token: &str) -> bool {
+    let Some(opening) = token.find('(') else {
+        return false;
+    };
+    if opening == 0 || !token.ends_with(')') {
+        return false;
+    }
+    let function = &token[..opening];
+    let arguments = &token[opening + 1..token.len() - 1];
+    is_symbolic_math_atom(function)
+        && !arguments.is_empty()
+        && arguments.split(',').all(|argument| {
+            let argument = argument.trim();
+            is_numeric_math_atom(argument) || is_symbolic_math_atom(argument)
+        })
+}
+
+fn is_symbolic_math_atom(token: &str) -> bool {
+    let mut chars = token.chars();
+    if matches!((chars.next(), chars.next()), (Some(character), None) if character.is_alphabetic())
+    {
+        return true;
+    }
+
+    if let Some((base, suffix)) = token.split_once('_') {
+        let mut base_chars = base.chars();
+        return matches!(
+            (base_chars.next(), base_chars.next()),
+            (Some(character), None) if character.is_alphabetic()
+        ) && !suffix.is_empty()
+            && suffix.chars().all(|character| character.is_alphanumeric());
+    }
+
+    matches!(
+        token,
+        "alpha"
+            | "beta"
+            | "gamma"
+            | "delta"
+            | "epsilon"
+            | "theta"
+            | "lambda"
+            | "mu"
+            | "pi"
+            | "sigma"
+            | "phi"
+            | "omega"
+    )
+}
+
+fn has_math_expression_marker(line: &str) -> bool {
+    line.chars()
+        .any(|character| matches!(character, '^' | '+' | '*' | '/'))
+        || contains_tex_command(line)
+        || contains_unicode_math_symbol(line)
+}
+
+fn contains_unicode_math_symbol(line: &str) -> bool {
+    line.chars().any(|character| {
+        matches!(
+            character,
+            '≤' | '≥'
+                | '≠'
+                | '≈'
+                | '∈'
+                | '∉'
+                | '∑'
+                | '∏'
+                | '∫'
+                | '∂'
+                | '∇'
+                | '∞'
+                | '∪'
+                | '∩'
+                | '⊂'
+                | '⊆'
+                | '⊃'
+                | '⊇'
+                | '∀'
+                | '∃'
+                | '×'
+                | '·'
+                | '±'
+                | '→'
+                | '⇒'
+                | '⇔'
+                | '√'
+                | 'α'
+                | 'β'
+                | 'γ'
+                | 'δ'
+                | 'ε'
+                | 'θ'
+                | 'λ'
+                | 'μ'
+                | 'π'
+                | 'σ'
+                | 'φ'
+                | 'ω'
+                | 'Δ'
+                | 'Σ'
+                | 'Π'
+                | 'Ω'
+        )
+    })
+}
+
+fn contains_tex_command(line: &str) -> bool {
+    const MATH_TEX_COMMANDS: &[&str] = &[
+        "frac",
+        "sum",
+        "prod",
+        "int",
+        "le",
+        "ge",
+        "neq",
+        "in",
+        "notin",
+        "times",
+        "cdot",
+        "left",
+        "right",
+        "begin",
+        "end",
+        "sqrt",
+        "operatorname",
+        "mathcal",
+        "mathbb",
+        "mathrm",
+        "mathbf",
+        "partial",
+        "nabla",
+        "alpha",
+        "beta",
+        "gamma",
+    ];
+
+    line.match_indices('\\').any(|(offset, _)| {
+        let rest = &line[offset + 1..];
+        let command_len = rest
+            .bytes()
+            .take_while(|byte| byte.is_ascii_alphabetic())
+            .count();
+        command_len > 0 && MATH_TEX_COMMANDS.contains(&&rest[..command_len])
+    })
+}
+
+fn math_fence_language(info: &str) -> Option<String> {
+    let first_token = info.split_whitespace().next()?;
+    let normalized = first_token.to_ascii_lowercase();
+    match normalized.as_str() {
+        "text" | "plaintext" | "txt" | "plain" | "math" | "latex" | "tex" => Some(normalized),
+        _ => None,
+    }
 }
 
 fn math_finding(path: &Path, line_no: usize, message: &str) -> Finding {

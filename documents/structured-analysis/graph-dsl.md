@@ -56,9 +56,9 @@ sections define validation, SQLite materialization, and extension rules.
 
 Let an AgentCanon graph artifact be a tuple:
 
-```text
+$$
 G = (D, N, E, A, P, X, M)
-```
+$$
 
 where adapter profiles can demand non-empty families, and:
 
@@ -112,9 +112,9 @@ faithful adapter mapping such as the mappings in
 `../prose-reasoning-graph/dsl-spec.md` and
 `../dependency-manifest-design.md`:
 
-```text
-phi_surface : SurfaceObject -> D + N + E + A + P + X + M
-```
+$$
+\phi_{\mathrm{surface}} : \mathrm{SurfaceObject} \to D + N + E + A + P + X + M
+$$
 
 such that:
 

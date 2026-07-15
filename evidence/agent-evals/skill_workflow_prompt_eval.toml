@@ -2,6 +2,8 @@
 # contract data
 # responsibility Defines deterministic evals for skill and workflow prompt drift.
 # upstream design README.md prompt eval directory contract
+# upstream design ../../agents/skills/md-style-check.md Markdown style skill human document contract
+# upstream design ../../.agents/skills/md-style-check/SKILL.md md-style-check skill shim contract
 # upstream design ../../agents/skills/adaptive-improvement-loop.md adaptive improvement skill contract
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
 # upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
@@ -279,6 +281,24 @@ description = "Requires adjacent checks after formatter or fixer execution."
 required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
 
 [[evals.checklist]]
+id = "MD-STYLE-MATH-FENCE-1"
+critical = true
+description = "Runtime md-style-check skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
+required_regex = [
+  "\\btext\\b",
+  "\\bplaintext\\b",
+  "\\btxt\\b",
+  "\\bplain\\b",
+  "\\bmath\\b",
+  "\\blatex\\b",
+  "\\btex\\b",
+  "fenced block",
+  "must not be placed",
+  "standalone double-dollar",
+  "case-insensitively",
+]
+
+[[evals.checklist]]
 id = "MD-STYLE-STRUCTURE-GATE-1"
 critical = true
 description = "Routes substantive Markdown document edits through prose graph and structure planning, with format-only skip evidence."
@@ -319,6 +339,24 @@ id = "MD-STYLE-DOC-RUST-2"
 critical = true
 description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
 required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-MATH-FENCE-1"
+critical = true
+description = "Canonical md-style-check doc skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
+required_regex = [
+  "\\btext\\b",
+  "\\bplaintext\\b",
+  "\\btxt\\b",
+  "\\bplain\\b",
+  "\\bmath\\b",
+  "\\blatex\\b",
+  "\\btex\\b",
+  "fenced block",
+  "数式を\\s+入れず",
+  "standalone double-dollar",
+  "大文字小文字を区別せず",
+]
 
 [[evals.checklist]]
 id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
