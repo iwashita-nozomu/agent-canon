@@ -551,7 +551,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
                 loaded = load_materialized_active_design_packet(report_dir)
 
-                self.assertIsNotNone(loaded.packet)
+                self.assertIsNotNone(loaded.value)
                 self.assertIsNone(loaded.context)
                 self.assertEqual(
                     tuple(
@@ -606,7 +606,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
                 loaded = load_materialized_active_design_packet(report_dir)
 
-                self.assertIsNotNone(loaded.packet)
+                self.assertIsNotNone(loaded.value)
                 self.assertIsNone(loaded.context)
                 self.assertEqual(
                     tuple(
