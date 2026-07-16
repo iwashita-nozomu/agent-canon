@@ -2051,7 +2051,7 @@ class ExperimentRunnerExecutionPort(Protocol):
         self,
         *,
         plan: ExecutionResourcePlan,
-    ) -> Mapping[str, object]: ...
+    ) -> Mapping[str, Callable[[Mapping[str, object]], Mapping[str, object]]]: ...
 
 
 class RunnerTransport(Protocol):
@@ -3176,7 +3176,7 @@ def handle_pre_execution_failure(
     )
 
 
-def _failure_after_durable_cleanup(
+def failure_after_durable_cleanup(
     failure: Exception,
     cleanup: PreExecutionFailureCleanupEvidence,
 ) -> TypedPreflightFailure:
@@ -3245,7 +3245,7 @@ def discover_resources(request: ResourceRequest) -> DiscoveredResources:
             source_state=PlanState.RESOURCE_DISCOVERED,
             request=request,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
 
 
 def _discover_resources_impl(request: ResourceRequest) -> DiscoveredResources:
@@ -3426,7 +3426,7 @@ def plan_gpu_allocation(
             discovered=discovered,
             acquired_leases=attempt.leases,
         )
-        raise _failure_after_durable_cleanup(attempt.cause, cleanup) from attempt.cause
+        raise failure_after_durable_cleanup(attempt.cause, cleanup) from attempt.cause
     except Exception as exc:
         cleanup = handle_pre_execution_failure(
             exc,
@@ -3435,7 +3435,7 @@ def plan_gpu_allocation(
             request=request,
             discovered=discovered,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
 
 
 def _plan_gpu_allocation_impl(
@@ -3623,14 +3623,19 @@ def _plan_gpu_allocation_impl(
             reread_allocated = observation_s_lock.caller_allocated_ids
             reread_processes = observation_s_lock.process_identities
             reread_memory = observation_s_lock.free_memory_bytes
-            raced = (
-                uuid not in reread_allocated
-                or uuid in _occupied_gpu_units(
-                    reread_processes,
-                    observation_s_lock.gpu_devices,
-                    (uuid,),
-                )
-                or reread_memory.get(uuid, 0) < request.gpu_requested_memory_bytes
+            selected_under_lock = (*selected, uuid)
+            occupied_under_lock = _occupied_gpu_units(
+                reread_processes,
+                observation_s_lock.gpu_devices,
+                selected_under_lock,
+            )
+            raced_selected = tuple(
+                selected_uuid
+                for selected_uuid in selected_under_lock
+                if selected_uuid not in reread_allocated
+                or selected_uuid in occupied_under_lock
+                or reread_memory.get(selected_uuid, 0)
+                < request.gpu_requested_memory_bytes
             )
             readback_attempts.append(
                 {
@@ -3646,64 +3651,38 @@ def _plan_gpu_allocation_impl(
                     "observation_fingerprint": observation_s_lock.fingerprint,
                     "observation_event": "S_lock",
                     "observation_event_id": observation_s_lock.observation_event_id,
-                    "raced": raced,
+                    "selected_ids_under_lock": selected_under_lock,
+                    "occupied_ids_under_lock": occupied_under_lock,
+                    "raced_selected_ids": raced_selected,
+                    "raced": bool(raced_selected),
                 }
-            )
-            if raced:
-                release_witness = _release_lease_with_observation(
-                    lease,
-                    lambda: fresh_observation(f"release_race:{uuid}"),
-                )
-                if release_witness.get("result") != "released":
-                    raise _gpu_preflight(
-                        "gpu_race_release_retained",
-                        "raced GPU lease retained because a live holder appeared",
-                        release_witness=release_witness,
-                    )
-                leases.remove(lease)
-                continue
-            selected.append(uuid)
-            free_memory[uuid] = reread_memory.get(uuid, free_memory.get(uuid, 0))
-            observation_s_selected = fresh_observation("selected_set")
-            global_allocated = observation_s_selected.caller_allocated_ids
-            global_processes = observation_s_selected.process_identities
-            global_memory = observation_s_selected.free_memory_bytes
-            raced_selected = tuple(
-                selected_uuid
-                for selected_uuid in selected
-                if selected_uuid not in global_allocated
-                or selected_uuid in _occupied_gpu_units(
-                    global_processes,
-                    observation_s_selected.gpu_devices,
-                    selected,
-                )
-                or global_memory.get(selected_uuid, 0)
-                < request.gpu_requested_memory_bytes
             )
             if raced_selected:
                 retained_leases: list[ReservationLease] = []
                 for selected_lease in leases:
-                    if selected_lease.uuid in raced_selected:
-                        release_witness = _release_lease_with_observation(
-                            selected_lease,
-                            lambda: fresh_observation(
-                                f"release_selected:{selected_lease.uuid}"
-                            ),
-                        )
-                        if release_witness.get("result") != "released":
-                            raise _gpu_preflight(
-                                "gpu_race_release_retained",
-                                "selected GPU lease retained because a live holder appeared",
-                                release_witness=release_witness,
-                            )
-                        selected.remove(selected_lease.uuid)
-                    else:
+                    if selected_lease.uuid not in raced_selected:
                         retained_leases.append(selected_lease)
+                        continue
+                    release_witness = _release_lease_with_observation(
+                        selected_lease,
+                        lambda selected_uuid=selected_lease.uuid: fresh_observation(
+                            f"release_race:{selected_uuid}"
+                        ),
+                    )
+                    if release_witness.get("result") != "released":
+                        raise _gpu_preflight(
+                            "gpu_race_release_retained",
+                            "raced GPU lease retained because a live holder appeared",
+                            release_witness=release_witness,
+                        )
+                    if selected_lease.uuid in selected:
+                        selected.remove(selected_lease.uuid)
                 leases = retained_leases
                 continue
-            reread_processes = global_processes
+            selected.append(uuid)
+            free_memory[uuid] = reread_memory.get(uuid, free_memory.get(uuid, 0))
             for selected_uuid in selected:
-                free_memory[selected_uuid] = global_memory[selected_uuid]
+                free_memory[selected_uuid] = reread_memory[selected_uuid]
         if len(selected) != requested:
             raise _gpu_preflight(
                 "gpu_memory_or_lease_unavailable",
@@ -3879,7 +3858,7 @@ def freeze_resource_plan(
             discovered=discovered,
             acquired_leases=gpu_allocation.leases,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
 
 
 def _freeze_resource_plan_impl(
@@ -4171,7 +4150,7 @@ def materialize_environment(plan: ExecutionResourcePlan) -> MaterializedEnvironm
             source_state=PlanState.PLAN_FROZEN,
             plan=plan,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
 
 
 def _materialize_environment_impl(plan: ExecutionResourcePlan) -> MaterializedEnvironment:
@@ -4255,7 +4234,7 @@ def verify_effective_environment(
             source_state=PlanState.ENV_MATERIALIZED,
             plan=plan,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
 
 
 def _verify_effective_environment_impl(
@@ -4698,7 +4677,7 @@ class ExperimentRunnerPreLaunchAdapter:
                 source_state=PlanState.ENV_MATERIALIZED,
                 plan=plan,
             )
-            raise _failure_after_durable_cleanup(exc, cleanup) from exc
+            raise failure_after_durable_cleanup(exc, cleanup) from exc
 
     def _pre_launch_impl(
         self,
@@ -4726,6 +4705,22 @@ class ExperimentRunnerPreLaunchAdapter:
             gpu_allocation,
         )
         probe_observation = plan.resource_probe.observe()
+        final_observation = gpu_allocation.lock_readback.get("final_observation", {})
+        if gpu_allocation.selected_ids and (
+            not isinstance(final_observation, Mapping)
+            or not probe_observation.observation_event_id
+            or not probe_observation.fingerprint
+            or probe_observation.observation_event_id
+            == final_observation.get("event_id")
+            or probe_observation.fingerprint == final_observation.get("fingerprint")
+        ):
+            raise TypedPreflightFailure(
+                "gpu_observation_fingerprint_reused",
+                "prelaunch requires a fresh observation after S_final",
+                s_final=final_observation,
+                prelaunch_event_id=probe_observation.observation_event_id,
+                prelaunch_fingerprint=probe_observation.fingerprint,
+            )
         cpu_resources = cast(Mapping[str, object], plan.resources["cpu"])
         payload = {
             "scheduler_policy": "transport_only_no_reselection_no_rewrite",
@@ -5835,6 +5830,7 @@ __all__ = [
     "discover_resources",
     "dispose_resources",
     "execute_with_experiment_runner",
+    "failure_after_durable_cleanup",
     "freeze_resource_plan",
     "handle_pre_execution_failure",
     "materialize_environment",

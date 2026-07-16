@@ -59,7 +59,7 @@ from tools.experiments.execution_resource_plan import (
     release_runner_owned_gpu_leases,
     PlanState,
     record_terminal,
-    _failure_after_durable_cleanup,
+    failure_after_durable_cleanup,
 )
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
@@ -93,14 +93,14 @@ REGISTERED_COMMAND_KINDS = ("default", "formal")
 REVIEWED_W1_LINEAGE_ARTIFACT = (
     "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
 )
-REVIEWED_W1_LINEAGE_COMMIT = "2d94fdc08d0f666d9c4a7476b397cef430464df3"
-REVIEWED_W1_LINEAGE_TREE = "21e47cc188cd285ce9043dd440985857ee6f1f2d"
+REVIEWED_W1_LINEAGE_COMMIT = "ece3cd12a2a298660e7b1ad92346ab1f88ff2e6c"
+REVIEWED_W1_LINEAGE_TREE = "f06a683f3856b8e1ebfab128346e82b2a0888798"
 REVIEWED_W1_SOURCE_BLOBS = {
     "tools/experiments/execution_resource_plan.py": (
-        "96c61fb69d6da11a91c45d1ca3fd5e222b661ca8"
+        "fe24023335d824ebb1b5fbc4ca92dab87c3aa736"
     ),
     "tools/experiments/run_managed_experiment.py": (
-        "a933108d6cdb64e09c8670e23cdfe2614fdb0c8a"
+        "afc10c9bee64eb7cba699e0e3b7092f5ac151465"
     ),
 }
 LEGACY_REGISTERED_COMMAND_ALIASES = {"smoke": "default"}
@@ -2054,7 +2054,7 @@ def execute_managed_run(
             source_state=PlanState.ENV_MATERIALIZED,
             plan=materialized.plan,
         )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+        raise failure_after_durable_cleanup(exc, cleanup) from exc
     quiescence_evidence = _runner_quiescence_evidence(
         runner_port,
         terminal.plan,
