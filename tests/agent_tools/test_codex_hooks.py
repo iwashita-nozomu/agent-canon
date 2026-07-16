@@ -73,7 +73,6 @@ DIRECT_RG_CONTEXT_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "direct_rg_context
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
 NOTEBOOK_MINOR_VERSION = 5
-OOP_READABILITY_MIN_SCORE = 95
 EXPECTED_PROMPT_FEEDBACK_MIN = 3
 EXPECTED_HOOK_EVENT_COUNT = 4
 
@@ -3632,11 +3631,10 @@ class CodexHooksTest(unittest.TestCase):
             ),
             analyzer_text=(
                 "#!/usr/bin/env python3\n"
-                "import sys\n"
-                f"if sys.argv[sys.argv.index('--min-score') + 1] != '{OOP_READABILITY_MIN_SCORE}':\n"
-                "    raise SystemExit(0)\n"
-                "print('OOP_READABILITY=fail')\n"
-                "raise SystemExit(1)\n"
+                "print('OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=1')\n"
+                "print('OOP_READABILITY_STATUS_REASON=review-signal')\n"
+                "print('OOP_READABILITY_TYPED_BOUNDARY_COUNTS={\\\"api_boundary\\\": 1}')\n"
+                "print('OOP_READABILITY=review')\n"
             ),
         )
         self.assertEqual(payload["decision"], "approve")
@@ -3645,14 +3643,14 @@ class CodexHooksTest(unittest.TestCase):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
         self.assertIn("warning", reason)
-        self.assertIn("--min-score 95", reason)
         self.assertIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["mode"], "diff")
         self.assertEqual(log_entry["baseline_ref"], "HEAD")
-        self.assertEqual(log_entry["min_score"], OOP_READABILITY_MIN_SCORE)
-        self.assertEqual(log_entry["failed_count"], 1)
+        self.assertEqual(log_entry["failed_count"], 0)
+        self.assertEqual(log_entry["review_signal_count"], 1)
+        self.assertEqual(log_entry["status"], "warn")
 
     def test_oop_readability_guard_defaults_to_agentcanon_hook_result(self) -> None:
         """OOP guard should append to the AgentCanon hook result surface by default."""
@@ -3878,7 +3876,7 @@ class CodexHooksTest(unittest.TestCase):
         commands = (
             (
                 "python3 /workspace/tools/oop/python/readability.py "
-                "--root /workspace --min-score 95 python/pkg/module.py"
+                "--root /workspace python/pkg/module.py"
             ),
             "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
             "python3 -m ruff check .codex/hooks/oop_readability_guard.py",

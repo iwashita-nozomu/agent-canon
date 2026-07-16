@@ -35,7 +35,7 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
-from work_log import append_ledger_event
+from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -521,6 +521,8 @@ def normalize_semantic_event(entry: str) -> str:
             "semantic_kind must be one of: "
             + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
         )
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        _structured_semantic_field(fields, field)
     return f"ledger_event=projected {entry.strip()}"
 
 
@@ -558,7 +560,27 @@ def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
             event[optional] = fields[optional]
     if fields.get("member_clause_ids"):
         event["member_clause_ids"] = refs("member_clause_ids")
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        value = _structured_semantic_field(fields, field)
+        if value is not None:
+            event[field] = value
     return event
+
+
+def _structured_semantic_field(
+    fields: Mapping[str, str], field: str
+) -> Mapping[str, object] | list[object] | None:
+    """Decode schema-owned structured evidence without dropping it at the monitor boundary."""
+    raw = fields.get(field, "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"semantic event {field} must be compact JSON") from exc
+    if not isinstance(value, (dict, list)):
+        raise ValueError(f"semantic event {field} must be an object or list")
+    return cast(Mapping[str, object] | list[object], value)
 
 
 def parse_token_fields(entry: str) -> dict[str, str]:

@@ -6,6 +6,7 @@
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md run bundle artifact placement contract
 # downstream implementation ./workflow_monitor.py projects semantic events into monitoring output
 # downstream implementation ./workflow_monitor.py projects semantic monitoring events here
+# downstream implementation ./report_artifact_checks.py materializes the checked completion read model from this ledger
 # downstream implementation ../../tests/agent_tools/test_work_log.py verifies work log behavior
 # @dependency-end
 """Append one timestamped run-local work-log entry."""
@@ -13,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections.abc import Mapping
 from datetime import datetime
@@ -34,6 +36,16 @@ LEDGER_SEMANTIC_KINDS = (
 )
 NON_GROUPABLE_SEMANTIC_KINDS = frozenset(
     {"responsibility_unit", "decision", "failure", "deferral", "publication_state"}
+)
+MONITOR_PASSTHROUGH_FIELDS = frozenset(
+    {
+        "gate_evidence",
+        "failure_response",
+        "resource_certificate",
+        "source_binding",
+        "monitor_evidence",
+        "monitoring_evidence",
+    }
 )
 
 
@@ -86,13 +98,46 @@ def _validate_ledger_event(event: Mapping[str, object], report_dir: Path) -> str
     if clause_id is not None and (not isinstance(clause_id, str) or not clause_id.strip()):
         raise ValueError("ledger event clause_id must be null or non-empty text")
     mapping_mode = event.get("mapping_mode", "direct")
+    if not isinstance(mapping_mode, str) or not mapping_mode.strip():
+        raise ValueError("ledger event mapping_mode must be non-empty text")
+    mapping_mode = mapping_mode.strip()
     if mapping_mode not in {"direct", "group"}:
         raise ValueError("ledger event mapping_mode must be direct or group")
     if mapping_mode == "group" and semantic_kind in NON_GROUPABLE_SEMANTIC_KINDS:
         raise ValueError(f"{semantic_kind} ledger events cannot be grouped")
+    if mapping_mode == "group":
+        group_identity = event.get("group_identity", event.get("group_id"))
+        if not isinstance(group_identity, str) or not group_identity.strip():
+            raise ValueError("group ledger events require group_identity")
+        members = event.get("member_clause_ids")
+        if not isinstance(members, (list, tuple)) or len(members) < 2:
+            raise ValueError("group ledger events require member_clause_ids")
+        if any(not isinstance(member, str) or not member.strip() for member in members):
+            raise ValueError("group member_clause_ids must be non-empty text")
+        if len(set(member.strip() for member in members)) != len(members):
+            raise ValueError("group member_clause_ids must be unique")
     source_binding = event.get("source_binding")
-    if source_binding is not None and not isinstance(source_binding, Mapping):
-        raise ValueError("ledger event source_binding must be an object")
+    if source_binding is not None:
+        if not isinstance(source_binding, Mapping):
+            raise ValueError("ledger event source_binding must be an object")
+        binding_run_id = source_binding.get("run_id")
+        binding_context_id = source_binding.get("context_id")
+        if not isinstance(binding_run_id, str) or not binding_run_id.strip():
+            raise ValueError("ledger event source_binding requires run_id")
+        if not isinstance(binding_context_id, str) or not binding_context_id.strip():
+            raise ValueError("ledger event source_binding requires context_id")
+        if binding_run_id.strip() != run_id:
+            raise ValueError("ledger event source_binding.run_id does not match run_id")
+        if binding_context_id.strip() != _required_ledger_text(event, "context_id"):
+            raise ValueError(
+                "ledger event source_binding.context_id does not match context_id"
+            )
+    for field in MONITOR_PASSTHROUGH_FIELDS - {"source_binding"}:
+        value = event.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, (Mapping, list, tuple)):
+            raise ValueError(f"ledger event {field} must remain structured evidence")
     return str(identity).strip()
 
 
@@ -218,11 +263,22 @@ def read_ledger_snapshot(report_dir: Path, snapshot_identity: str) -> dict[str, 
             str(event.get("event_id", event.get("sequence", ""))),
         )
     )
-    return {
+    snapshot = {
         "snapshot_identity": snapshot_identity.strip(),
         "events": events,
         "event_identities": sorted(identities),
     }
+    snapshot["snapshot_digest"] = ledger_snapshot_digest(snapshot)
+    return snapshot
+
+
+def ledger_snapshot_digest(snapshot: Mapping[str, object]) -> str:
+    """Return the stable digest for the canonical ledger event projection."""
+    events = snapshot.get("events")
+    if not isinstance(events, list):
+        raise ValueError("ledger snapshot events must be a list")
+    payload = json.dumps(events, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path | None:

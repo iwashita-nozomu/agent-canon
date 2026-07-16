@@ -17419,38 +17419,6 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_FORWARDER",
-      "line": 15,
-      "path": "tools/ci/run_docs_checks.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_FORWARDER_CALLER_CHAIN",
-      "line": 17,
-      "path": "tools/ci/run_docs_checks.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_FORWARDER_CANONICAL",
-      "line": 18,
-      "path": "tools/ci/run_docs_checks.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_FORWARDER_SEVERITY",
-      "line": 16,
-      "path": "tools/ci/run_docs_checks.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
       "line": 74,
       "path": "tools/ci/run_python_quality_checks.sh",
@@ -18251,14 +18219,6 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "OOP_READABILITY_GRADE",
-      "line": 4335,
-      "path": "tools/oop/shared/readability_core.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_REVIEW_SIGNAL_FINDINGS",
       "line": 4340,
       "path": "tools/oop/shared/readability_core.py",
@@ -18267,32 +18227,8 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "OOP_READABILITY_SCORE",
-      "line": 4333,
-      "path": "tools/oop/shared/readability_core.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_READABILITY_SCORE_STATUS",
-      "line": 4334,
-      "path": "tools/oop/shared/readability_core.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_STATUS_REASON",
       "line": 4336,
-      "path": "tools/oop/shared/readability_core.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 4337,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -20701,7 +20637,6 @@
     "tools/ci/run_all_checks.sh",
     "tools/ci/run_codex_in_repo_container.py",
     "tools/ci/run_container_pack.py",
-    "tools/ci/run_docs_checks.sh",
     "tools/ci/run_in_repo_container.py",
     "tools/ci/run_python_in_dockerfile.py",
     "tools/ci/run_python_quality_checks.sh",

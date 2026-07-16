@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -153,6 +154,36 @@ W1_CERTIFICATE_REQUIRED_FIELDS = (
     "artifact_refs",
     "terminal_outcome",
 )
+SOURCE_BINDING_REQUIRED_FIELDS = (
+    "run_id",
+    "context_id",
+    "organizer_context_id",
+    "parent",
+    "component_manager",
+    "assigned_unit",
+    "source_binding",
+    "source_refs",
+)
+TOPOLOGY_BOOLEAN_FIELDS = (
+    "writer_release_order_complete",
+    "final_review_approved",
+    "closeout_unlocked",
+)
+TOPOLOGY_REQUIRED_FIELDS = (
+    "branch_creation_reason",
+    "source_freeze_before_review",
+    "formatter_static_events",
+    "writer_cardinality",
+    "writer_collision_state",
+    "descendant_disposition",
+    "topology_schema",
+    "topology_order",
+)
+OOP_REVIEW_SIGNAL_GATE_IDS = frozenset(
+    {"oop_readability_guard", "solid_evidence_gate"}
+)
+BRANCH_CREATION_REASON = "convergence_w2_writer_owned_after_git_index_blocker"
+TOPOLOGY_SCHEMA = "agent-canon.control-topology.v1"
 
 
 @dataclass(frozen=True)
@@ -197,6 +228,156 @@ def _text_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if not result:
         raise ValueError(f"{field_name} must not be empty")
     return result
+
+
+def _source_binding_errors(binding: object) -> list[str]:
+    """Return fail-closed errors for one artifact source binding."""
+    errors: list[str] = []
+    if not isinstance(binding, Mapping):
+        return ["object"]
+    for field in SOURCE_BINDING_REQUIRED_FIELDS:
+        if field == "source_refs":
+            value = binding.get(field)
+            if not isinstance(value, list) or not value or any(
+                not isinstance(ref, str) or not ref.strip() for ref in value
+            ):
+                errors.append(field)
+            continue
+        if field == "source_binding":
+            nested = binding.get(field)
+            if not isinstance(nested, Mapping) or not nested:
+                errors.append(field)
+            continue
+        value = binding.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(field)
+    nested = binding.get("source_binding")
+    if isinstance(nested, Mapping):
+        for field in ("run_id", "context_id"):
+            value = nested.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"nested:{field}")
+        if nested.get("run_id") != binding.get("run_id"):
+            errors.append("nested:run_id_binding")
+        if nested.get("context_id") != binding.get("context_id"):
+            errors.append("nested:context_id_binding")
+    return sorted(set(errors))
+
+
+def _mapping_text_list(value: object) -> bool:
+    """Return whether a value is a non-empty list of non-empty text."""
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(item, str) and item.strip() for item in value
+    )
+
+
+def _typed_count_mapping(value: object) -> bool:
+    """Return whether a typed OOP count projection has string keys and int values."""
+    return isinstance(value, Mapping) and all(
+        isinstance(key, str)
+        and key.strip()
+        and isinstance(count, int)
+        and not isinstance(count, bool)
+        and count >= 0
+        for key, count in value.items()
+    )
+
+
+def _oop_solid_gate_errors(evidence: Mapping[str, object]) -> list[str]:
+    """Validate changed-path OOP and SOLID evidence at the gate boundary."""
+    gate_id = evidence.get("gate_id")
+    errors: list[str] = []
+    if gate_id == "oop_readability_guard":
+        if not _mapping_text_list(evidence.get("scanned_paths")):
+            errors.append("scanned_paths")
+        for field in ("signal_counts", "typed_boundary_counts", "solid_counts"):
+            if not _typed_count_mapping(evidence.get(field)):
+                errors.append(field)
+        if evidence.get("typed_evidence_owner") != "oop-readability-checker":
+            errors.append("typed_evidence_owner")
+    elif gate_id == "solid_evidence_gate":
+        if not _mapping_text_list(evidence.get("scanned_paths")):
+            errors.append("scanned_paths")
+        if not _mapping_text_list(evidence.get("covered_paths")):
+            errors.append("covered_paths")
+        if not _typed_count_mapping(evidence.get("solid_counts")):
+            errors.append("solid_counts")
+    return errors
+
+
+def _topology_errors(snapshot: object) -> list[str]:
+    """Return typed topology errors used by the delivery boundary."""
+    if not isinstance(snapshot, Mapping):
+        return ["object"]
+    errors: list[str] = []
+    for field in (
+        "run_id",
+        "context_id",
+        "observation_ref",
+        "global_publication_state",
+        "routing_gate",
+    ):
+        value = snapshot.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(field)
+    for field in TOPOLOGY_BOOLEAN_FIELDS:
+        if not isinstance(snapshot.get(field), bool):
+            errors.append(field)
+    for field in TOPOLOGY_REQUIRED_FIELDS:
+        value = snapshot.get(field)
+        if field in {"source_freeze_before_review"}:
+            if not isinstance(value, bool):
+                errors.append(field)
+        elif field in {"writer_cardinality"}:
+            if value != 1:
+                errors.append(field)
+        elif field in {"formatter_static_events", "topology_order"}:
+            if not _mapping_text_list(value):
+                errors.append(field)
+        elif field == "descendant_disposition":
+            if not isinstance(value, Mapping) or not value or not any(
+                isinstance(value.get(key), str) and value.get(key).strip()
+                for key in ("status", "release", "retained")
+            ):
+                errors.append(field)
+        elif field == "writer_collision_state":
+            if value != "collision_preserved":
+                errors.append(field)
+        elif field == "topology_schema":
+            if value != TOPOLOGY_SCHEMA:
+                errors.append(field)
+        elif field == "branch_creation_reason":
+            if value != BRANCH_CREATION_REASON:
+                errors.append(field)
+        elif not isinstance(value, str) or not value.strip():
+            errors.append(field)
+    order = snapshot.get("topology_order")
+    if isinstance(order, list) and _mapping_text_list(order):
+        if len(order) != len(set(order)):
+            errors.append("topology_order:duplicate")
+        try:
+            if order.index("source_frozen") > order.index("change_review_approved"):
+                errors.append("topology_order:freeze_after_review")
+        except ValueError:
+            errors.append("topology_order:freeze_or_review_missing")
+    return sorted(set(errors))
+
+
+def _open_state_errors(value: object, field: str) -> list[str]:
+    """Return schema errors for one non-routing open-state list."""
+    if not isinstance(value, list):
+        return [f"{field}:list"]
+    errors: list[str] = []
+    for index, item in enumerate(value):
+        if isinstance(item, str) and item.strip():
+            continue
+        if isinstance(item, Mapping) and any(
+            isinstance(item.get(key), str) and item.get(key).strip()
+            for key in ("id", "ref", "identity")
+        ):
+            continue
+        errors.append(f"{field}:item:{index}")
+    return errors
 
 
 def _taxonomy_values(field: str) -> frozenset[str]:
@@ -296,18 +477,26 @@ def _mapping_from_event(event: Mapping[str, object]) -> dict[str, object] | None
         raise ValueError("direct mappings must contain exactly their clause_id")
     if mapping_mode == "group" and len(set(members)) < 2:
         raise ValueError("group mappings require at least two distinct member clauses")
+    source_event_ref = _nonempty_text(
+        event.get("event_id", event.get("sequence", ""))
+    )
+    group_identity = _nonempty_text(
+        event.get("group_identity", event.get("group_id", source_event_ref))
+    )
     return {
         "clause_id": _nonempty_text(clause_id),
         "mapping_mode": mapping_mode,
+        "group_identity": group_identity,
         "owner": _nonempty_text(event.get("owner")),
+        "state_owner": _nonempty_text(event.get("state_owner")),
+        "api_owner": _nonempty_text(event.get("api_owner")),
+        "dependency_owner": _nonempty_text(event.get("dependency_owner")),
         "responsibility_unit": _nonempty_text(event.get("responsibility_unit")),
         "outcome": _nonempty_text(event.get("outcome")),
         "member_clause_ids": list(members),
         "semantic_kind": semantic_kind,
         "evidence_refs": list(_text_tuple(event.get("evidence_refs"), "evidence_refs")),
-        "source_event_ref": _nonempty_text(
-            event.get("event_id", event.get("sequence", ""))
-        ),
+        "source_event_ref": source_event_ref,
     }
 
 
@@ -318,16 +507,35 @@ def _resource_certificate_errors(
     """Validate W1 certificate shape without recomputing resource semantics."""
     errors: list[str] = []
     for field in W1_CERTIFICATE_REQUIRED_FIELDS:
-        if not certificate.get(field):
+        value = certificate.get(field)
+        if not value:
             errors.append(f"missing:{field}")
+        if field == "sequence" and not (
+            (isinstance(value, str) and bool(value.strip()))
+            or _mapping_text_list(value)
+        ):
+            errors.append("typed:sequence")
+    for field in (
+        "run_id",
+        "context_id",
+        "producer_owner",
+        "certificate_id",
+        "terminal_outcome",
+    ):
+        value = certificate.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"typed:{field}")
     if certificate.get("producer_owner") != "W1":
         errors.append("producer_owner")
+    for field in ("source_refs", "artifact_refs"):
+        if not _mapping_text_list(certificate.get(field)):
+            errors.append(f"typed:{field}")
     for field in ("run_id", "context_id"):
         if certificate.get(field) != source_binding.get(
             "run_id" if field == "run_id" else "context_id"
         ):
             errors.append(f"binding:{field}")
-    for field in (
+    sections = (
         "applicability",
         "plan",
         "actual",
@@ -336,9 +544,17 @@ def _resource_certificate_errors(
         "terminal",
         "cleanup",
         "failure",
-    ):
-        if not isinstance(certificate.get(field), Mapping):
+    )
+    for field in sections:
+        section = certificate.get(field)
+        if not isinstance(section, Mapping):
             errors.append(f"missing:{field}")
+            continue
+        evidence_refs = section.get("evidence_refs")
+        if not _mapping_text_list(evidence_refs):
+            errors.append(f"typed_evidence:{field}:evidence_refs")
+        if field == "applicability" and section.get("applicable") is not True:
+            errors.append("applicability:not_applicable")
     gpu_items = certificate.get("gpu_semantics")
     if gpu_items is not None:
         if not isinstance(gpu_items, list):
@@ -357,6 +573,86 @@ def _resource_certificate_errors(
                     for field in ("item", "semantic_identity", "consumer_rule", "evidence_refs")
                 ):
                     errors.append("gpu_semantics:item_evidence")
+                elif not isinstance(item.get("evidence_refs"), list) or any(
+                    not isinstance(ref, str) or not ref.strip()
+                    for ref in item.get("evidence_refs", [])
+                ) or not item.get("evidence_refs"):
+                    errors.append("gpu_semantics:item_evidence_refs")
+    return sorted(set(errors))
+
+
+def materialize_completion_coverage_from_work_log(
+    report_dir: Path,
+    snapshot_identity: str,
+    source_binding: Mapping[str, object],
+    active_clause_ids: Sequence[str],
+    owner_contract: Mapping[str, object],
+    schedule_state_non_routing: Mapping[str, object],
+    open_work_state_non_routing: Mapping[str, object],
+    repair_state_non_routing: Mapping[str, object],
+    crossing_edge_state_non_routing: Mapping[str, object],
+    control_topology_ledger_snapshot: Mapping[str, object],
+    taxonomy_refs: Sequence[str] = COMPLETION_COVERAGE_TAXONOMY_REFS,
+    monitor_evidence: Sequence[Mapping[str, object]] = (),
+) -> Path:
+    """Read the canonical work ledger and materialize one checked read model."""
+    from work_log import read_ledger_snapshot
+
+    ledger_snapshot = read_ledger_snapshot(report_dir, snapshot_identity)
+    return write_completion_coverage_artifact(
+        report_dir,
+        ledger_snapshot,
+        source_binding,
+        active_clause_ids,
+        owner_contract,
+        schedule_state_non_routing,
+        open_work_state_non_routing,
+        repair_state_non_routing,
+        crossing_edge_state_non_routing,
+        control_topology_ledger_snapshot,
+        taxonomy_refs,
+        monitor_evidence,
+    )
+
+
+def generated_completion_coverage_errors(
+    report_dir: Path, artifact: Mapping[str, object]
+) -> list[str]:
+    """Reject a hand-written artifact by comparing it with the canonical ledger projection."""
+    metadata = artifact.get("projection_metadata")
+    source_binding = artifact.get("source_binding")
+    if not isinstance(metadata, Mapping) or not isinstance(source_binding, Mapping):
+        return ["generated_projection_metadata_missing"]
+    snapshot_identity = metadata.get("ledger_snapshot_identity")
+    if not isinstance(snapshot_identity, str) or not snapshot_identity.strip():
+        return ["ledger_snapshot_identity_missing"]
+    try:
+        from work_log import ledger_snapshot_digest, read_ledger_snapshot
+
+        snapshot = read_ledger_snapshot(report_dir, snapshot_identity)
+        expected = project_completion_coverage(snapshot, source_binding)
+        expected_digest = ledger_snapshot_digest(snapshot)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return [f"ledger_projection_error:{exc}"]
+    errors: list[str] = []
+    if metadata.get("ledger_snapshot_digest") != expected_digest:
+        errors.append("ledger_snapshot_digest_mismatch")
+    for field in (
+        "schema",
+        "source_binding",
+        "projection_metadata",
+        "semantic_events",
+        "coverage_map",
+        "owner_boundary_evidence",
+        "gate_evidence",
+        "monitor_evidence",
+        "failure_event_refs",
+        "failure_responses",
+        "resource_certificates",
+        "resource_certificate_errors",
+    ):
+        if artifact.get(field) != expected.get(field):
+            errors.append(f"generated_projection_mismatch:{field}")
     return sorted(set(errors))
 
 
@@ -364,6 +660,7 @@ def project_completion_coverage(
     ledger_snapshot: object,
     source_binding: Mapping[str, object],
     schema_version: str = COMPLETION_COVERAGE_SCHEMA,
+    monitor_evidence: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     """Generate the deterministic v1 reader model from one ledger snapshot."""
     if schema_version != COMPLETION_COVERAGE_SCHEMA:
@@ -386,6 +683,17 @@ def project_completion_coverage(
                 raise ValueError("source_binding must be a non-empty object")
         else:
             binding[field] = _nonempty_text(binding.get(field))
+    binding["source_binding"] = dict(binding["source_binding"])
+    nested_binding = binding["source_binding"]
+    if nested_binding.get("run_id") != binding["run_id"]:
+        raise ValueError("source_binding.run_id does not match run_id")
+    if nested_binding.get("context_id") != binding["context_id"]:
+        raise ValueError("source_binding.context_id does not match context_id")
+    binding_errors = _source_binding_errors(binding)
+    if binding_errors:
+        raise ValueError(
+            "source_binding contract errors: " + ",".join(binding_errors)
+        )
     events = _event_records(ledger_snapshot)
     for event in events:
         if event.get("run_id") != binding["run_id"]:
@@ -407,18 +715,118 @@ def project_completion_coverage(
         )
         certificate_record["source_clause_id"] = event.get("clause_id")
         resource_certificates.append(certificate_record)
-    semantic_events = [
-        {
-            "event_id": _nonempty_text(event.get("event_id", event.get("sequence", ""))),
+    semantic_events: list[dict[str, object]] = []
+    gate_evidence: list[dict[str, object]] = []
+    projected_monitor_evidence: list[dict[str, object]] = []
+    for event in events:
+        event_id = _nonempty_text(event.get("event_id", event.get("sequence", "")))
+        semantic_event: dict[str, object] = {
+            "run_id": _nonempty_text(event.get("run_id")),
+            "context_id": _nonempty_text(event.get("context_id")),
+            "event_id": event_id,
             "sequence": str(event.get("sequence", "")),
             "semantic_kind": _nonempty_text(event.get("semantic_kind")),
             "owner_evidence": _owner_evidence(event),
+            "responsibility_unit": _nonempty_text(event.get("responsibility_unit")),
             "intent_id": _nonempty_text(event.get("intent_id")),
             "outcome": _nonempty_text(event.get("outcome")),
+            "evidence_refs": list(_text_tuple(event.get("evidence_refs"), "evidence_refs")),
             "artifact_refs": list(_text_tuple(event.get("artifact_refs"), "artifact_refs")),
+            "source_binding": dict(binding["source_binding"]),
         }
-        for event in events
-    ]
+        if event.get("clause_id") is not None:
+            semantic_event["clause_id"] = _nonempty_text(event.get("clause_id"))
+            semantic_event["mapping_mode"] = _nonempty_text(
+                event.get("mapping_mode", "direct")
+            )
+            semantic_event["member_clause_ids"] = list(
+                _text_tuple(
+                    event.get("member_clause_ids", [event.get("clause_id")]),
+                    "member_clause_ids",
+                )
+            )
+            semantic_event["group_identity"] = _nonempty_text(
+                event.get("group_identity", event.get("group_id", event_id))
+            )
+        for optional_field in (
+            "gate_evidence",
+            "failure_response",
+            "resource_certificate",
+            "monitor_evidence",
+            "monitoring_evidence",
+        ):
+            optional_value = event.get(optional_field)
+            if optional_value is not None:
+                semantic_event[optional_field] = optional_value
+        semantic_events.append(semantic_event)
+
+        raw_gate_evidence = event.get("gate_evidence")
+        gate_records = (
+            [raw_gate_evidence]
+            if isinstance(raw_gate_evidence, Mapping)
+            else raw_gate_evidence
+            if isinstance(raw_gate_evidence, list)
+            else []
+        )
+        if raw_gate_evidence is not None and not gate_records:
+            raise ValueError("ledger gate_evidence must be an object or list")
+        for raw_gate in gate_records:
+            if not isinstance(raw_gate, Mapping):
+                raise ValueError("ledger gate_evidence entries must be objects")
+            gate = dict(raw_gate)
+            gate["source_event_refs"] = list(
+                _text_tuple(gate.get("source_event_refs", [event_id]), "source_event_refs")
+            )
+            gate_evidence.append(gate)
+
+        for monitor_field in ("monitor_evidence", "monitoring_evidence"):
+            raw_monitor = event.get(monitor_field)
+            monitor_records = (
+                [raw_monitor]
+                if isinstance(raw_monitor, Mapping)
+                else raw_monitor
+                if isinstance(raw_monitor, list)
+                else []
+            )
+            if raw_monitor is not None and not monitor_records:
+                raise ValueError(
+                    f"ledger {monitor_field} must be an object or list"
+                )
+            for raw_record in monitor_records:
+                if not isinstance(raw_record, Mapping):
+                    raise ValueError(f"ledger {monitor_field} entries must be objects")
+                record = dict(raw_record)
+                record["run_id"] = _nonempty_text(record.get("run_id", binding["run_id"]))
+                record["context_id"] = _nonempty_text(
+                    record.get("context_id", binding["context_id"])
+                )
+                if record["run_id"] != binding["run_id"] or record["context_id"] != binding[
+                    "context_id"
+                ]:
+                    raise ValueError("ledger monitor evidence binding mismatch")
+                record["source_event_ref"] = event_id
+                projected_monitor_evidence.append(record)
+    for index, raw_monitor in enumerate(monitor_evidence):
+        if not isinstance(raw_monitor, Mapping):
+            raise ValueError(f"monitor_evidence[{index}] must be an object")
+        record = dict(raw_monitor)
+        record["run_id"] = _nonempty_text(record.get("run_id", binding["run_id"]))
+        record["context_id"] = _nonempty_text(
+            record.get("context_id", binding["context_id"])
+        )
+        if record["run_id"] != binding["run_id"] or record["context_id"] != binding[
+            "context_id"
+        ]:
+            raise ValueError("monitor evidence binding mismatch")
+        projected_monitor_evidence.append(record)
+    snapshot_digest = (
+        str(ledger_snapshot.get("snapshot_digest", ""))
+        if isinstance(ledger_snapshot, Mapping)
+        else ""
+    )
+    if not snapshot_digest:
+        events_payload = json.dumps(events, sort_keys=True, separators=(",", ":"))
+        snapshot_digest = hashlib.sha256(events_payload.encode("utf-8")).hexdigest()
     return {
         "schema": COMPLETION_COVERAGE_SCHEMA,
         "source_binding": binding,
@@ -429,6 +837,7 @@ def project_completion_coverage(
                 if isinstance(ledger_snapshot, Mapping)
                 else "in_memory_snapshot"
             ),
+            "ledger_snapshot_digest": snapshot_digest,
             "generated_artifact_identity": f"{binding['run_id']}:{binding['context_id']}",
             "semantic_kinds": list(COMPLETION_SEMANTIC_KINDS),
             "source_refs": list(binding["source_refs"]),
@@ -438,11 +847,8 @@ def project_completion_coverage(
         "owner_boundary_evidence": [
             event["owner_evidence"] for event in semantic_events
         ],
-        "gate_evidence": [
-            dict(event.get("gate_evidence", {}))
-            for event in events
-            if isinstance(event.get("gate_evidence"), Mapping)
-        ],
+        "gate_evidence": gate_evidence,
+        "monitor_evidence": projected_monitor_evidence,
         "failure_event_refs": [
             _nonempty_text(event.get("event_id", event.get("sequence", "")))
             for event in events
@@ -489,12 +895,27 @@ def check_completion_coverage(
 ) -> dict[str, object]:
     """Check exact mappings and typed gate evidence without scalar heuristics."""
     errors = _empty_error_sets()
+    owner_contract_for_check: Mapping[str, object] = (
+        owner_contract if isinstance(owner_contract, Mapping) else {}
+    )
+    if not isinstance(owner_contract, Mapping):
+        errors["empty"].append("owner_contract")
     if completion_coverage.get("schema") != COMPLETION_COVERAGE_SCHEMA:
         errors["empty"].append("schema")
-    if not isinstance(completion_coverage.get("source_binding"), Mapping):
+    source_binding = completion_coverage.get("source_binding")
+    if not isinstance(source_binding, Mapping):
         errors["empty"].append("source_binding")
+    else:
+        errors["empty"].extend(
+            f"source_binding:{item}" for item in _source_binding_errors(source_binding)
+        )
+    binding_for_comparison: Mapping[str, object] = (
+        source_binding if isinstance(source_binding, Mapping) else {}
+    )
     expected = tuple(_nonempty_text(clause_id) for clause_id in active_clause_ids)
     expected_set = set(expected)
+    if len(expected) != len(expected_set):
+        errors["redundant"].append("duplicate_expected_clause_id")
     raw_mappings = completion_coverage.get("coverage_map", [])
     if not isinstance(raw_mappings, list):
         errors["empty"].append("coverage_map")
@@ -507,6 +928,7 @@ def check_completion_coverage(
         clause_id = str(raw_mapping.get("clause_id", ""))
         members = raw_mapping.get("member_clause_ids")
         mode = raw_mapping.get("mapping_mode")
+        group_identity = raw_mapping.get("group_identity")
         if not isinstance(members, list) or not members or any(
             not isinstance(member, str) or not member.strip() for member in members
         ):
@@ -525,17 +947,26 @@ def check_completion_coverage(
                 errors["empty"].append(f"group:{clause_id or 'mapping'}")
             if clause_id not in member_ids:
                 errors["redundant"].append(clause_id or "mapping")
+            if not isinstance(group_identity, str) or not group_identity.strip():
+                errors["empty"].append(f"group_identity:{clause_id or 'mapping'}")
         else:
             errors["empty"].append(clause_id or "mapping")
         required = (
             "owner",
+            "state_owner",
+            "api_owner",
+            "dependency_owner",
             "responsibility_unit",
             "outcome",
             "semantic_kind",
             "source_event_ref",
-            "evidence_refs",
+            "group_identity",
         )
-        if any(not raw_mapping.get(field) for field in required):
+        if any(
+            not isinstance(raw_mapping.get(field), str)
+            or not str(raw_mapping.get(field)).strip()
+            for field in required
+        ) or not _mapping_text_list(raw_mapping.get("evidence_refs")):
             errors["empty"].append(clause_id or "mapping")
         for member_id in member_ids:
             by_clause.setdefault(member_id, []).append(raw_mapping)
@@ -550,33 +981,54 @@ def check_completion_coverage(
         elif len(matches) != 1:
             errors["multiply_mapped"].append(clause_id)
     owner_fields = ("owner", "state_owner", "api_owner", "dependency_owner")
-    if not all(_nonempty_text(owner_contract.get(field, "")) for field in owner_fields):
+    if not all(
+        isinstance(owner_contract_for_check.get(field), str)
+        and owner_contract_for_check.get(field).strip()
+        for field in owner_fields
+    ):
         errors["empty"].append("owner_contract")
     owner_evidence = completion_coverage.get("owner_boundary_evidence", [])
     if not isinstance(owner_evidence, list) or not owner_evidence:
         errors["empty"].append("owner_boundary_evidence")
     for evidence in owner_evidence if isinstance(owner_evidence, list) else []:
         if not isinstance(evidence, Mapping) or any(
-            not evidence.get(field)
-            for field in ("owner", "state_owner", "api_owner", "dependency_owner", "evidence_refs")
-        ):
+            not isinstance(evidence.get(field), str) or not evidence.get(field).strip()
+            for field in ("owner", "state_owner", "api_owner", "dependency_owner")
+        ) or not _mapping_text_list(evidence.get("evidence_refs")):
             errors["empty"].append("owner_boundary_evidence")
+    if isinstance(owner_evidence, list) and all(
+        isinstance(owner_contract_for_check.get(field), str)
+        and owner_contract_for_check.get(field).strip()
+        for field in ("owner", "state_owner", "api_owner", "dependency_owner")
+    ) and not any(
+        isinstance(evidence, Mapping)
+        and all(
+            evidence.get(field) == owner_contract_for_check.get(field)
+            for field in owner_fields
+        )
+        for evidence in owner_evidence
+    ):
+        errors["empty"].append("owner_contract:correspondence")
     gate_evidence = completion_coverage.get("gate_evidence", [])
     if not isinstance(gate_evidence, list) or not gate_evidence:
         errors["empty"].append("gate_evidence")
+    gate_ids: set[str] = set()
     for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
         if not isinstance(evidence, Mapping) or any(
-            not evidence.get(field)
-            for field in (
-                "gate_id",
-                "stage",
-                "owner",
-                "outcome",
-                "artifact_refs",
-                "source_event_refs",
-            )
+            not isinstance(evidence.get(field), str) or not evidence.get(field).strip()
+            for field in ("gate_id", "stage", "owner", "outcome")
+        ) or not _mapping_text_list(evidence.get("artifact_refs")) or not _mapping_text_list(
+            evidence.get("source_event_refs")
         ):
             errors["empty"].append("gate_evidence")
+            continue
+        gate_id = str(evidence["gate_id"])
+        if gate_id in gate_ids:
+            errors["redundant"].append(f"gate_evidence:{gate_id}")
+        gate_ids.add(gate_id)
+        errors["empty"].extend(
+            f"{gate_id}:{field}" for field in _oop_solid_gate_errors(evidence)
+        )
     if tuple(taxonomy_refs) != COMPLETION_COVERAGE_TAXONOMY_REFS:
         errors["empty"].append("taxonomy_refs")
     certificate_results = completion_coverage.get("resource_certificate_errors", [])
@@ -602,11 +1054,152 @@ def check_completion_coverage(
         for mapping in raw_mappings
         if isinstance(mapping, Mapping)
     }
+    semantic_events = completion_coverage.get("semantic_events", [])
+    if not isinstance(semantic_events, list) or not semantic_events:
+        errors["empty"].append("semantic_events")
+    events_by_id = {
+        str(event.get("event_id")): event
+        for event in semantic_events
+        if isinstance(event, Mapping) and event.get("event_id")
+    }
+    if isinstance(semantic_events, list):
+        if len(events_by_id) != len(semantic_events):
+            errors["redundant"].append("semantic_event_identity")
+        for event in semantic_events:
+            if not isinstance(event, Mapping):
+                errors["empty"].append("semantic_event")
+                continue
+            if event.get("run_id") != binding_for_comparison.get("run_id"):
+                errors["empty"].append("semantic_event:run_id_binding")
+            if event.get("context_id") != binding_for_comparison.get("context_id"):
+                errors["empty"].append("semantic_event:context_id_binding")
+            if event.get("source_binding") != binding_for_comparison.get("source_binding"):
+                errors["empty"].append("semantic_event:source_binding")
+    for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
+        if not isinstance(evidence, Mapping):
+            continue
+        refs = evidence.get("source_event_refs")
+        if not _mapping_text_list(refs):
+            continue
+        if len(set(refs)) != len(refs):
+            errors["redundant"].append(f"gate_evidence:{evidence.get('gate_id', '')}")
+        for event_ref in refs:
+            if event_ref not in events_by_id:
+                errors["empty"].append(f"gate_evidence:source_event:{event_ref}")
+    projected_monitor_evidence = completion_coverage.get("monitor_evidence", [])
+    if not isinstance(projected_monitor_evidence, list):
+        errors["empty"].append("monitor_evidence")
+        projected_monitor_evidence = []
+    for evidence in projected_monitor_evidence:
+        if not isinstance(evidence, Mapping):
+            errors["empty"].append("monitor_evidence:item")
+            continue
+        source_event_ref = evidence.get("source_event_ref")
+        if source_event_ref is not None and source_event_ref not in events_by_id:
+            errors["empty"].append(
+                f"monitor_evidence:source_event:{source_event_ref}"
+            )
+    oop_signals = [
+        evidence
+        for evidence in gate_evidence
+        if isinstance(evidence, Mapping)
+        and evidence.get("gate_id") in OOP_REVIEW_SIGNAL_GATE_IDS
+    ] if isinstance(gate_evidence, list) else []
+    if not oop_signals:
+        errors["empty"].append("oop_review_signal")
+    source_event_owners: dict[str, str] = {}
+    group_facts: dict[str, tuple[object, ...]] = {}
+    group_members: dict[str, set[str]] = {}
+    for raw_mapping in raw_mappings:
+        if not isinstance(raw_mapping, Mapping):
+            continue
+        source_event_ref = str(raw_mapping.get("source_event_ref", ""))
+        clause_id = str(raw_mapping.get("clause_id", ""))
+        if source_event_ref in source_event_owners:
+            errors["redundant"].append(f"source_event:{source_event_ref}")
+        source_event_owners[source_event_ref] = clause_id
+        if raw_mapping.get("mapping_mode") == "group":
+            group_identity = str(raw_mapping.get("group_identity", ""))
+            facts = tuple(raw_mapping.get(field) for field in (
+                "owner",
+                "state_owner",
+                "api_owner",
+                "dependency_owner",
+                "responsibility_unit",
+                "outcome",
+            ))
+            prior_facts = group_facts.get(group_identity)
+            if prior_facts is not None and prior_facts != facts:
+                errors["empty"].append(f"group_identity:{group_identity}:member_facts")
+            group_facts.setdefault(group_identity, facts)
+            member_set = group_members.setdefault(group_identity, set())
+            raw_members = raw_mapping.get("member_clause_ids")
+            if isinstance(raw_members, list):
+                if member_set.intersection(raw_members):
+                    errors["redundant"].append(f"group_identity:{group_identity}:members")
+                member_set.update(str(member) for member in raw_members)
+        source_event = events_by_id.get(source_event_ref)
+        if source_event is None:
+            errors["empty"].append(f"source_event:{source_event_ref or 'missing'}")
+            continue
+        owner_evidence = source_event.get("owner_evidence")
+        if not isinstance(owner_evidence, Mapping):
+            errors["empty"].append(f"source_event:{source_event_ref}:owner_evidence")
+            continue
+        correspondence = (
+            ("owner", owner_evidence.get("owner")),
+            ("state_owner", owner_evidence.get("state_owner")),
+            ("api_owner", owner_evidence.get("api_owner")),
+            ("dependency_owner", owner_evidence.get("dependency_owner")),
+            ("responsibility_unit", source_event.get("responsibility_unit")),
+            ("outcome", source_event.get("outcome")),
+            ("semantic_kind", source_event.get("semantic_kind")),
+            ("group_identity", source_event.get("group_identity", source_event_ref)),
+            ("mapping_mode", source_event.get("mapping_mode", "direct")),
+            ("evidence_refs", source_event.get("evidence_refs")),
+            ("member_clause_ids", source_event.get("member_clause_ids")),
+        )
+        for field, expected_value in correspondence:
+            actual_value = raw_mapping.get(field)
+            if field in {"evidence_refs", "member_clause_ids"}:
+                if actual_value != expected_value:
+                    errors["empty"].append(
+                        f"source_event:{source_event_ref}:{field}:correspondence"
+                    )
+            elif actual_value != expected_value:
+                errors["empty"].append(
+                    f"source_event:{source_event_ref}:{field}:correspondence"
+                )
     certificates_by_event = {
         str(result.get("source_event_ref")): result
         for result in certificate_results
         if isinstance(result, Mapping)
     }
+    certificate_source_refs = [
+        str(result.get("source_event_ref"))
+        for result in certificate_results
+        if isinstance(result, Mapping) and result.get("source_event_ref")
+    ]
+    if len(certificate_source_refs) != len(set(certificate_source_refs)):
+        errors["redundant"].append("resource_certificate:source_event_ref")
+    for certificate in completion_coverage.get("resource_certificates", []):
+        if not isinstance(certificate, Mapping):
+            continue
+        source_event_ref = str(certificate.get("source_event_ref", ""))
+        source_event = events_by_id.get(source_event_ref)
+        if source_event is None:
+            errors["empty"].append(
+                f"resource_certificate:source_event:{source_event_ref or 'missing'}"
+            )
+            continue
+        if certificate.get("run_id") != binding_for_comparison.get("run_id"):
+            errors["empty"].append(f"resource_certificate:{source_event_ref}:run_id")
+        if certificate.get("context_id") != binding_for_comparison.get("context_id"):
+            errors["empty"].append(f"resource_certificate:{source_event_ref}:context_id")
+        if certificate.get("source_clause_id") != source_event.get("clause_id"):
+            errors["empty"].append(
+                f"resource_certificate:{source_event_ref}:source_clause"
+            )
     resource_mapping_event_refs: dict[str, str] = {}
     for clause_id in ("W2-12", "W2-19"):
         if clause_id not in expected_set:
@@ -635,6 +1228,12 @@ def check_completion_coverage(
                 certificate.get("gpu_semantics"), list
             ):
                 errors["empty"].append("resource_mapping:W2-19:gpu_semantics")
+            elif [
+                item.get("item")
+                for item in certificate.get("gpu_semantics", [])
+                if isinstance(item, Mapping)
+            ] != list(GPU_CERTIFICATE_SEQUENCE):
+                errors["empty"].append("resource_mapping:W2-19:ordered_gpu_semantics")
     if len(resource_mapping_event_refs) == 2 and len(
         set(resource_mapping_event_refs.values())
     ) != 2:
@@ -668,36 +1267,75 @@ def check_completion_coverage(
                 "repair_or_escalation_owner",
                 "repair_or_escalation_result",
                 "result_artifact_refs",
+                "source_event_ref",
             )
         ):
             errors["empty"].append("failure_response")
+        if not _mapping_text_list(response.get("evidence")) or not _mapping_text_list(
+            response.get("result_artifact_refs")
+        ):
+            errors["empty"].append("failure_response:typed_refs")
     response_refs = {
         str(response.get("source_event_ref"))
         for response in responses
         if isinstance(response, Mapping) and response.get("source_event_ref")
     }
+    response_ref_list = [
+        str(response.get("source_event_ref"))
+        for response in responses
+        if isinstance(response, Mapping) and response.get("source_event_ref")
+    ]
+    if len(response_ref_list) != len(set(response_ref_list)):
+        errors["redundant"].append("failure_response:source_event_ref")
     failure_event_refs = completion_coverage.get("failure_event_refs", [])
     if not isinstance(failure_event_refs, list):
         errors["empty"].append("failure_event_refs")
         failure_event_refs = []
+    if any(not isinstance(event_ref, str) or not event_ref.strip() for event_ref in failure_event_refs):
+        errors["empty"].append("failure_event_refs:item")
+    if len(failure_event_refs) != len(set(failure_event_refs)):
+        errors["redundant"].append("failure_event_refs")
+    expected_failure_refs = {
+        str(event.get("event_id"))
+        for event in semantic_events
+        if isinstance(event, Mapping) and event.get("semantic_kind") == "failure"
+    } if isinstance(semantic_events, list) else set()
+    if set(failure_event_refs) != expected_failure_refs:
+        errors["empty"].append("failure_event_refs:source_ownership")
     for event_ref in failure_event_refs:
         if not isinstance(event_ref, str) or event_ref not in response_refs:
             errors["empty"].append(f"failure_response:{event_ref}")
+    for response_ref in response_refs:
+        event = events_by_id.get(response_ref)
+        if event is None or event.get("semantic_kind") != "failure":
+            errors["empty"].append(f"failure_response:source_event:{response_ref}")
     errors = {key: sorted(set(value)) for key, value in errors.items()}
     failure_response_errors = tuple(
         item
         for item in errors["empty"]
-        if item == "failure_response" or item.startswith("failure_response:")
+        if item == "failure_response"
+        or item.startswith("failure_response:")
+        or item.startswith("failure_event_refs")
     )
     owner_boundary_error = any(
         item in {"owner_contract", "owner_boundary_evidence"}
+        or item.startswith("owner_contract:")
+        or item.startswith("owner_boundary_evidence:")
+        or item.startswith("source_binding:")
         for item in errors["empty"]
     )
     gate_results = {
         "G1_CLAUSE_COVERAGE": not any(errors.values()),
         "G2_OWNER_BOUNDARY": not owner_boundary_error,
         "G3_STAGE_EVIDENCE": bool(gate_evidence)
-        and "gate_evidence" not in errors["empty"],
+        and not any(
+            item == "gate_evidence"
+            or item.startswith("gate_evidence:")
+            or item == "oop_review_signal"
+            or item.startswith("oop_readability_guard:")
+            or item.startswith("solid_evidence_gate:")
+            for item in errors["empty"]
+        ),
         "G4_VALIDATION_RESPONSE": not failure_response_errors and all(
             all(
                 response.get(field)
@@ -712,6 +1350,7 @@ def check_completion_coverage(
                     "repair_or_escalation_owner",
                     "repair_or_escalation_result",
                     "result_artifact_refs",
+                    "source_event_ref",
                 )
             )
             for response in responses
@@ -719,14 +1358,56 @@ def check_completion_coverage(
         ),
         "G5_DELIVERY_BOUNDARY": False,
     }
+    gate_ids = {
+        str(evidence.get("gate_id"))
+        for evidence in gate_evidence
+        if isinstance(evidence, Mapping)
+    }
+    if not OOP_REVIEW_SIGNAL_GATE_IDS.issubset(gate_ids):
+        errors["empty"].append("oop_solid_evidence_contract")
+        gate_results["G3_STAGE_EVIDENCE"] = False
+    if not any(
+        "format" in gate_id or "static" in gate_id for gate_id in gate_ids
+    ):
+        errors["empty"].append("formatter_static_events")
+        gate_results["G3_STAGE_EVIDENCE"] = False
+    errors = {key: sorted(set(value)) for key, value in errors.items()}
+    gate_results["G1_CLAUSE_COVERAGE"] = not any(errors.values())
+    gate_results["G2_OWNER_BOUNDARY"] = not any(
+        item in {"owner_contract", "owner_boundary_evidence"}
+        or item.startswith("owner_contract:")
+        or item.startswith("owner_boundary_evidence:")
+        or item.startswith("source_binding:")
+        for item in errors["empty"]
+    )
+    gate_results["G4_VALIDATION_RESPONSE"] = not failure_response_errors and all(
+        all(
+            response.get(field)
+            for field in (
+                "failing_contract",
+                "observation_level",
+                "cause_classification",
+                "intent_preservation",
+                "evidence",
+                "taxonomy_refs",
+                "same_intent_repair_or_escalation",
+                "repair_or_escalation_owner",
+                "repair_or_escalation_result",
+                "result_artifact_refs",
+                "source_event_ref",
+            )
+        )
+        for response in responses
+        if isinstance(response, Mapping)
+    )
     return {
         "schema": "agent-canon.completion-coverage-check.v1",
         "source_binding": dict(completion_coverage.get("source_binding", {})),
-        "ok": not any(errors.values()) and all(gate_results[key] for key in gate_results if key != "G5_DELIVERY_BOUNDARY"),
+        "ok": not any(errors.values()) and all(gate_results.values()),
         "error_sets": errors,
         "gate_results": gate_results,
         "taxonomy_refs": list(COMPLETION_COVERAGE_TAXONOMY_REFS),
-        "owner_contract": dict(owner_contract),
+        "owner_contract": dict(owner_contract_for_check),
     }
 
 
@@ -742,9 +1423,14 @@ def write_completion_coverage_artifact(
     crossing_edge_state_non_routing: Mapping[str, object],
     control_topology_ledger_snapshot: Mapping[str, object],
     taxonomy_refs: Sequence[str] = COMPLETION_COVERAGE_TAXONOMY_REFS,
+    monitor_evidence: Sequence[Mapping[str, object]] = (),
 ) -> Path:
     """Materialize one deterministic checked projection from one ledger snapshot."""
-    coverage = project_completion_coverage(ledger_snapshot, source_binding)
+    coverage = project_completion_coverage(
+        ledger_snapshot,
+        source_binding,
+        monitor_evidence=monitor_evidence,
+    )
     coverage_check = check_completion_coverage(
         coverage,
         active_clause_ids,
@@ -759,6 +1445,14 @@ def write_completion_coverage_artifact(
         crossing_edge_state_non_routing,
         control_topology_ledger_snapshot,
     )
+    gate_results = coverage_check.get("gate_results")
+    if isinstance(gate_results, dict):
+        gate_results["G5_DELIVERY_BOUNDARY"] = bool(
+            completion_boundary.get("overall_delivery_complete")
+        )
+        coverage_check["ok"] = not any(coverage_check.get("error_sets", {}).values()) and all(
+            bool(value) for value in gate_results.values()
+        )
     artifact = {
         **coverage,
         "coverage_check": coverage_check,
@@ -827,25 +1521,94 @@ def evaluate_completion_boundary(
     control_topology_ledger_snapshot: Mapping[str, object],
 ) -> dict[str, object]:
     """Derive planned-work and delivery predicates from one topology snapshot."""
-    open_repairs = list(repair_state_non_routing.get("open_repairs", []))
-    open_edges = list(crossing_edge_state_non_routing.get("open_crossing_edges", []))
-    _nonempty_text(control_topology_ledger_snapshot.get("observation_ref"))
+    raw_repairs = (
+        repair_state_non_routing.get("open_repairs")
+        if isinstance(repair_state_non_routing, Mapping)
+        else None
+    )
+    raw_edges = (
+        crossing_edge_state_non_routing.get("open_crossing_edges")
+        if isinstance(crossing_edge_state_non_routing, Mapping)
+        else None
+    )
+    open_state_errors = _open_state_errors(raw_repairs, "open_repairs") + _open_state_errors(
+        raw_edges, "open_crossing_edges"
+    )
+    open_repairs = list(raw_repairs) if isinstance(raw_repairs, list) else []
+    open_edges = list(raw_edges) if isinstance(raw_edges, list) else []
+    topology_errors = _topology_errors(control_topology_ledger_snapshot)
+    topology = (
+        control_topology_ledger_snapshot
+        if isinstance(control_topology_ledger_snapshot, Mapping)
+        else {}
+    )
+    coverage_binding = (
+        coverage_check.get("source_binding")
+        if isinstance(coverage_check, Mapping)
+        else None
+    )
+    if not isinstance(coverage_binding, Mapping):
+        topology_errors.append("coverage_source_binding")
+    elif isinstance(control_topology_ledger_snapshot, Mapping):
+        for field in ("run_id", "context_id"):
+            if control_topology_ledger_snapshot.get(field) != coverage_binding.get(field):
+                topology_errors.append(f"binding:{field}")
+    topology_valid = not topology_errors
+    typed_schedule = all(
+        isinstance(schedule_state_non_routing.get(field), bool)
+        if isinstance(schedule_state_non_routing, Mapping)
+        else False
+        for field in (
+            "w2_implementation_complete",
+            "w2_review_complete",
+            "source_freeze_review_complete",
+            "formatter_and_static_checks_pass",
+        )
+    )
+    typed_open_work = isinstance(
+        open_work_state_non_routing.get("planned_work_complete"), bool
+    ) if isinstance(open_work_state_non_routing, Mapping) else False
+    typed_coverage = isinstance(coverage_check, Mapping)
+    coverage_gate_results = (
+        coverage_check.get("gate_results")
+        if isinstance(coverage_check, Mapping)
+        else None
+    )
+    coverage_ready_before_delivery = typed_coverage and isinstance(
+        coverage_gate_results, Mapping
+    ) and all(
+        coverage_gate_results.get(gate) is True
+        for gate in (
+            "G1_CLAUSE_COVERAGE",
+            "G2_OWNER_BOUNDARY",
+            "G3_STAGE_EVIDENCE",
+            "G4_VALIDATION_RESPONSE",
+        )
+    )
     planned = bool(
-        schedule_state_non_routing.get("w2_implementation_complete")
+        topology_valid
+        and not open_state_errors
+        and typed_schedule
+        and typed_open_work
+        and schedule_state_non_routing.get("w2_implementation_complete")
         and schedule_state_non_routing.get("w2_review_complete")
         and schedule_state_non_routing.get("source_freeze_review_complete")
         and open_work_state_non_routing.get("planned_work_complete")
         and not open_repairs
         and not open_edges
-        and control_topology_ledger_snapshot.get("writer_release_order_complete")
+        and topology.get("writer_release_order_complete")
     )
     delivery = bool(
-        coverage_check.get("ok")
-        and control_topology_ledger_snapshot.get("global_publication_state")
+        topology_valid
+        and not open_state_errors
+        and typed_schedule
+        and typed_open_work
+        and coverage_ready_before_delivery
+        and topology.get("global_publication_state")
         == "publication_ready"
-        and control_topology_ledger_snapshot.get("final_review_approved")
-        and control_topology_ledger_snapshot.get("closeout_unlocked")
-        and control_topology_ledger_snapshot.get("routing_gate") == "verified"
+        and topology.get("final_review_approved")
+        and topology.get("closeout_unlocked")
+        and topology.get("routing_gate") == "verified"
         and schedule_state_non_routing.get("formatter_and_static_checks_pass")
         and not open_repairs
         and not open_edges
@@ -856,9 +1619,13 @@ def evaluate_completion_boundary(
         "overall_delivery_complete": delivery,
         "open_repairs": open_repairs,
         "open_crossing_edges": open_edges,
+        "topology_errors": sorted(set(topology_errors + open_state_errors)),
+        "gate_results": {
+            "G5_DELIVERY_BOUNDARY": delivery,
+        },
         "control_topology_observation_ref": _nonempty_text(
-            control_topology_ledger_snapshot.get("observation_ref")
-        ),
+            topology.get("observation_ref")
+        ) if "observation_ref" not in topology_errors else "",
     }
 
 
@@ -870,8 +1637,30 @@ def consume_checked_completion_coverage(
     """Consume the checked projection without rebuilding coverage or state."""
     if completion_coverage_v1.get("schema") != COMPLETION_COVERAGE_SCHEMA:
         raise ValueError("closeout requires agent-canon.completion-coverage.v1")
+    if not isinstance(coverage_check, Mapping) or not isinstance(
+        completion_boundary, Mapping
+    ):
+        return {"ready": False, "reason": "checked_projection_types_invalid"}
     if not coverage_check.get("ok"):
         return {"ready": False, "reason": "coverage_check_failed"}
+    gate_results = coverage_check.get("gate_results")
+    required_gate_results = {
+        "G1_CLAUSE_COVERAGE",
+        "G2_OWNER_BOUNDARY",
+        "G3_STAGE_EVIDENCE",
+        "G4_VALIDATION_RESPONSE",
+        "G5_DELIVERY_BOUNDARY",
+    }
+    if not isinstance(gate_results, Mapping) or set(gate_results) != required_gate_results:
+        return {"ready": False, "reason": "coverage_gate_results_incomplete"}
+    if any(gate_results.get(gate) is not True for gate in required_gate_results):
+        return {"ready": False, "reason": "coverage_gate_results_not_ready"}
+    if completion_boundary.get("topology_errors") != []:
+        return {"ready": False, "reason": "completion_boundary_topology_invalid"}
+    if gate_results.get("G5_DELIVERY_BOUNDARY") is not completion_boundary.get(
+        "overall_delivery_complete"
+    ):
+        return {"ready": False, "reason": "coverage_delivery_gate_mismatch"}
     return {
         "ready": bool(completion_boundary.get("overall_delivery_complete")),
         "all_planned_chunks_complete": bool(

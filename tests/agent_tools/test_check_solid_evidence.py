@@ -133,8 +133,6 @@ class CheckSolidEvidenceTest(unittest.TestCase):
                     str(root),
                     "--format",
                     "json",
-                    "--min-score",
-                    "0",
                     str(source),
                 ],
                 cwd=PROJECT_ROOT,

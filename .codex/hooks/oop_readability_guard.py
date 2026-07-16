@@ -49,6 +49,9 @@ GIT_CHANGED_PATHS_TIMEOUT_SECONDS = 10
 ANALYZER_TIMEOUT_SECONDS = 30
 MAX_BLOCKED_ANALYZER_SNIPPETS = 3
 MAX_ANALYZER_OUTPUT_LINES = 12
+REVIEW_SIGNAL_PATTERN = re.compile(
+    r"^OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=(\d+)$", re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
@@ -424,9 +427,13 @@ def should_check(payload: dict[str, object]) -> bool:
 
 def emit_warning(results: list[AnalyzerResult]) -> None:
     """Emit a non-blocking hook result with OOP remediation details."""
-    failed = [result for result in results if result.returncode != 0]
+    notable = [
+        result
+        for result in results
+        if result.returncode != 0 or review_signal_count(result) > 0
+    ]
     snippets = []
-    for result in failed[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
+    for result in notable[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
         first_lines = "\n".join(result.output.splitlines()[:MAX_ANALYZER_OUTPUT_LINES])
         snippets.append(f"$ {' '.join(result.command)}\n{first_lines}")
     json.dump(
@@ -502,7 +509,17 @@ def hook_log_status(
     """Return the status value for one OOP hook log entry."""
     if not logged_checked(checked, results):
         return "skipped"
-    return "warn" if failed else "pass"
+    return (
+        "warn"
+        if failed or any(review_signal_count(result) > 0 for result in results)
+        else "pass"
+    )
+
+
+def review_signal_count(result: AnalyzerResult) -> int:
+    """Return the non-blocking STATUS_REVIEW signal count from analyzer output."""
+    match = REVIEW_SIGNAL_PATTERN.search(result.output)
+    return int(match.group(1)) if match else 0
 
 
 def analyzer_log_payload(
@@ -545,6 +562,7 @@ def analyzer_log_payload(
         "baseline_ref": check_mode.baseline_ref or "",
         "result_count": len(results),
         "failed_count": len(failed),
+        "review_signal_count": sum(review_signal_count(result) for result in results),
         "failure_fingerprint": failure_fingerprint if failed else "",
         "status": hook_log_status(checked, results, failed),
         "root": str(root),
@@ -602,7 +620,9 @@ def main() -> int:
             check_mode=check_mode,
         ),
     )
-    if any(result.returncode != 0 for result in results):
+    if any(
+        result.returncode != 0 or review_signal_count(result) > 0 for result in results
+    ):
         emit_warning(results)
     return 0
 
