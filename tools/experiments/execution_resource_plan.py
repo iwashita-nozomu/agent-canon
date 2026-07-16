@@ -314,7 +314,7 @@ class ReservationLease:
     def release(
         self,
         *,
-        gpu_processes: Callable[[], Sequence[ProcessIdentity]] | None = None,
+        gpu_processes: Callable[[], Sequence[ProcessIdentity]],
     ) -> Mapping[str, object]:
         if self._released.is_set():
             return MappingProxyType(
@@ -326,7 +326,7 @@ class ReservationLease:
             )
         holders = tuple(
             process
-            for process in (gpu_processes() if gpu_processes is not None else ())
+            for process in gpu_processes()
             if process.gpu_uuid == self.uuid
         )
         readback_at = utc_now()

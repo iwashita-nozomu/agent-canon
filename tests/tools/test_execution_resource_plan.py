@@ -251,7 +251,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 boot_id="boot-1",
             )
             self.assertIsNotNone(lease)
-            lease.release()
+            lease.release(gpu_processes=lambda: ())
             evidence = store.reclaim_stale(
                 "GPU-0001",
                 current_boot_id=lambda: "boot-1",
