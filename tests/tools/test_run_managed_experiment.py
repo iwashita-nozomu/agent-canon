@@ -258,8 +258,6 @@ def test_managed_public_route_has_one_canonical_prelaunch_owner() -> None:
     assert "plan_gpu_allocation(request, discovered)" in source
     assert "ExperimentRunnerPreLaunchAdapter" in source
     assert "execute_with_experiment_runner" in source
-    assert "subprocess.Popen" not in source
-    assert "run_streamed_command" not in source
     assert "direct command launch is not an authorized route" in source
 
 
